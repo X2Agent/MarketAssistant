@@ -34,7 +34,7 @@ jobs:
       run: dotnet workload install maui-windows
       
     - name: Restore dependencies
-      run: dotnet restore MarketAssistant.sln
+      run: dotnet restore MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj
       
     - name: Build Windows app
       run: |
@@ -99,7 +99,7 @@ jobs:
       run: dotnet workload install maui-maccatalyst
       
     - name: Restore dependencies
-      run: dotnet restore MarketAssistant.sln
+      run: dotnet restore MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj
       
     - name: Build macOS app
       run: |
