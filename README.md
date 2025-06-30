@@ -61,14 +61,11 @@
 
 [![Star History Chart](https://api.star-history.com/svg?repos=X2Agent/MarketAssistant&type=Date)](https://www.star-history.com/#X2Agent/MarketAssistant&Date)
 
--- ## 📈 项目状态
--- (https://repobeats.axiom.co/)
-
 ## 🙏 鸣谢
 
-本项目大部分代码由 AI 智能编程助手生成。在此特别感谢 Trae AI、 Lingma IDE 强大的代码生成能力，为本项目的开发提供了极大帮助。
+本项目大部分代码由 AI 智能编程助手生成。在此特别感谢 Trae AI 强大的代码生成能力，为本项目的开发提供了极大帮助。
 
 
 ## 📄 许可证
 
-MIT License
+Apache License 2.0
