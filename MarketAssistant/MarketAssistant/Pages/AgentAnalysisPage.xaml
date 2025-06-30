@@ -1,0 +1,86 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:converters="clr-namespace:MarketAssistant.Converts"
+             xmlns:views="clr-namespace:MarketAssistant.Views"
+             xmlns:controls="clr-namespace:MarketAssistant.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="MarketAssistant.Pages.AgentAnalysisPage"
+             x:DataType="viewmodels:AgentAnalysisViewModel"
+             x:Name="ParentPage">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            <converters:DoubleConverter x:Key="DoubleConverter" />
+            
+            <!-- FAB按钮样式 -->
+            <Style x:Key="FabButtonStyle" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="#2196F3" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="FontSize" Value="22" />
+                <Setter Property="CornerRadius" Value="28" />
+                <Setter Property="WidthRequest" Value="56" />
+                <Setter Property="HeightRequest" Value="56" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="20" />
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid>
+        <!-- 进度显示区域 - 仅在分析时显示 -->
+        <views:ProgressDisplayView 
+            IsVisible="{Binding IsBusy}"
+            IsProgressVisible="{Binding IsBusy}"
+            AnalysisProgress="{Binding AnalysisProgress}"
+            AnalysisStage="{Binding AnalysisStage}"
+            CurrentAnalyst="{Binding CurrentAnalyst}"/>
+
+        <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
+        <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
+            <!-- 智能分析报告区域 -->
+            <views:AnalysisReportView 
+                BindingContext="{Binding AnalysisReportViewModel}"
+                IsVisible="{Binding IsRawDataViewVisible, Converter={StaticResource InvertedBoolConverter}}" 
+                />
+
+            <!-- 原始数据展示区域 -->
+            <views:RawDataView
+                AnalysisMessages="{Binding AnalysisMessages}" 
+                IsVisible="{Binding IsRawDataViewVisible}" />
+            
+            <!-- 水印控件 -->
+            <controls:WatermarkView 
+                Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！" 
+                OpacityValue="0.4" 
+                Angle="-30" 
+                TextColor="{StaticResource Gray900}" 
+                FontSize="28" 
+                HorizontalRepeatCount="2" 
+                VerticalRepeatCount="4" 
+                InputTransparent="True" 
+                ZIndex="999" />
+            
+            <!-- 浮动操作按钮(FAB) -->
+            <StackLayout HorizontalOptions="End" VerticalOptions="End" 
+                         ZIndex="1000" Margin="0,0,20,20">
+                <!-- 查看K线图按钮 -->
+                <Button 
+                    Style="{StaticResource FabButtonStyle}"
+                    Text="📈" 
+                    FontSize="24"
+                    Command="{Binding ViewKLineChartCommand}"
+                    ToolTipProperties.Text="查看K线图" />
+                    
+                <!-- 切换视图按钮 -->
+                <Button 
+                    Style="{StaticResource FabButtonStyle}"
+                    Text="⇄" 
+                    FontSize="24"
+                    Command="{Binding ToggleViewCommand}"
+                    ToolTipProperties.Text="切换视图" />                
+            </StackLayout>
+        </Grid>
+    </Grid>
+</ContentPage>

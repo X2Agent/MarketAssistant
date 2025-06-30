@@ -1,0 +1,51 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarketAssistant", "MarketAssistant\MarketAssistant\MarketAssistant.csproj", "{D84488BA-4FB9-40BF-891F-11D4C20FA679}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarketAssistant.Mac", "MarketAssistant\MarketAssistant.Mac\MarketAssistant.Mac.csproj", "{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MarketAssistant.WinUI", "MarketAssistant\MarketAssistant.WinUI\MarketAssistant.WinUI.csproj", "{CE75E6A8-57D3-49F8-B702-FDFD7B702FD4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestMarketAssistant", "TestMarketAssistant\TestMarketAssistant.csproj", "{DA9FF3BF-E93B-4A54-B057-7AA902CA837D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D84488BA-4FB9-40BF-891F-11D4C20FA679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D84488BA-4FB9-40BF-891F-11D4C20FA679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D84488BA-4FB9-40BF-891F-11D4C20FA679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D84488BA-4FB9-40BF-891F-11D4C20FA679}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFDE0D59-AC7B-49E1-BE45-A3E0394F81F4}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{CE75E6A8-57D3-49F8-B702-FDFD7B702FD4}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{CE75E6A8-57D3-49F8-B702-FDFD7B702FD4}.Debug|Any CPU.Build.0 = Debug|x64
+		{CE75E6A8-57D3-49F8-B702-FDFD7B702FD4}.Release|Any CPU.ActiveCfg = Release|x64
+		{CE75E6A8-57D3-49F8-B702-FDFD7B702FD4}.Release|Any CPU.Build.0 = Release|x64
+		{DA9FF3BF-E93B-4A54-B057-7AA902CA837D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA9FF3BF-E93B-4A54-B057-7AA902CA837D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA9FF3BF-E93B-4A54-B057-7AA902CA837D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA9FF3BF-E93B-4A54-B057-7AA902CA837D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {85C32241-0422-4ECD-99F9-91DBC2919123}
+	EndGlobalSection
+EndGlobal

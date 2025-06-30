@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:controls="clr-namespace:MarketAssistant.Controls"
+             x:Class="MarketAssistant.Pages.AboutPage"
+             x:DataType="vm:AboutViewModel">
+
+    <VerticalStackLayout Spacing="24" Padding="16">
+
+        <!-- 顶部应用信息区域 -->
+        <controls:CardView Header="关于我们">
+            <!-- Logo和应用信息 -->
+            <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto" Margin="0,10,0,10">
+                <!-- Logo -->
+                <Image Grid.Column="0"
+                       Source="logo.jpg"
+                       HeightRequest="90"
+                       WidthRequest="90"
+                       Aspect="AspectFit"
+                       VerticalOptions="Center"/>
+
+                <!-- 应用信息 -->
+                <VerticalStackLayout Grid.Column="1" 
+                                     VerticalOptions="Center" 
+                                     Spacing="6"
+                                     Margin="20,0,0,0">
+                    <Label Text="{Binding AppName}"
+                           FontSize="28"
+                           FontAttributes="Bold"
+                           TextColor="#333333"/>
+                    <Label Text="{Binding Description}"
+                           FontSize="16"
+                           TextColor="#666666"
+                           Margin="0,2,0,4"/>
+                    <HorizontalStackLayout Spacing="2">
+                        <Label Text="v"
+                               FontSize="15"
+                               TextColor="#888888"
+                               VerticalOptions="Center"/>
+                        <Label Text="{Binding Version}"
+                               FontSize="15"
+                               TextColor="#888888"
+                               FontAttributes="Bold"
+                               VerticalOptions="Center"/>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Grid>
+        </controls:CardView>
+        
+        <!-- 功能选项列表 -->
+        <controls:CardView>
+            <ListView ItemsSource="{Binding FeatureItems}"
+                      SelectionMode="None"
+                      HasUnevenRows="True"
+                      SeparatorVisibility="Default"
+                      SeparatorColor="#EEEEEE">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FeatureItem">
+                        <ViewCell>
+                            <Grid ColumnDefinitions="Auto, *, Auto"
+                                  Padding="12">
+                                <Image Source="{Binding IconSource}"
+                                       HeightRequest="24"
+                                       WidthRequest="24"
+                                       VerticalOptions="Center"/>
+                                <Label Grid.Column="1"
+                                       Text="{Binding Title}"
+                                       VerticalOptions="Center"
+                                       Margin="16,0,0,0"
+                                       FontSize="16"
+                                       TextColor="#333333"/>
+                                <Button Grid.Column="2"
+                                        Text="{Binding ButtonText}"
+                                        CornerRadius="4"
+                                        BackgroundColor="White"
+                                        TextColor="#4CAF50"
+                                        BorderColor="#4CAF50"
+                                        BorderWidth="1"
+                                        FontSize="14"
+                                        Padding="12,4"
+                                        HeightRequest="32"
+                                        Command="{Binding Command}"/>
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Command}"/>
+                                </Grid.GestureRecognizers>
+                            </Grid>
+                        </ViewCell>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </controls:CardView>
+        
+        <!-- GitHub链接 -->
+        <Grid HorizontalOptions="Center">
+            <Image Source="github.svg"
+                   HeightRequest="40"
+                   WidthRequest="40">
+                <Image.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding OpenGitHubCommand}"/>
+                </Image.GestureRecognizers>
+            </Image>
+        </Grid>
+
+        </VerticalStackLayout>
+</ContentPage>

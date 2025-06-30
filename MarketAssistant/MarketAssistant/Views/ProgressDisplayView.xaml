@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MarketAssistant.Views.ProgressDisplayView">
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- 可以在这里添加特定于此视图的资源 -->
+        </ResourceDictionary>
+    </ContentView.Resources>
+    
+    <Border x:Name="ProgressBorder" BackgroundColor="#f8f9fa" Stroke="Transparent"
+           StrokeShape="RoundRectangle 8" Margin="16" Padding="16" VerticalOptions="Center" HorizontalOptions="Center">
+        <Border.Shadow>
+            <Shadow Brush="#22000000" Offset="0,3" Radius="6" />
+        </Border.Shadow>
+        <VerticalStackLayout Spacing="16" WidthRequest="400">
+            <Label Text="AI分析中..." FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" />
+
+            <ProgressBar x:Name="AnalysisProgressBar" 
+                         ProgressColor="#007bff" HeightRequest="10" />
+            
+            <Label x:Name="StageLabel" FontSize="14" HorizontalOptions="Center" />
+            
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                <Label Grid.Column="0" Grid.Row="0" Text="当前分析师:" FontSize="14" FontAttributes="Bold" />
+                <Label Grid.Column="1" Grid.Row="0" x:Name="AnalystLabel" FontSize="14" />
+                
+                <Label Grid.Column="0" Grid.Row="1" Text="进度:" FontSize="14" FontAttributes="Bold" />
+                <Label Grid.Column="1" Grid.Row="1" x:Name="ProgressLabel" FontSize="14" />
+            </Grid>
+
+            <Button x:Name="ShowDetailsButton" Text="查看分析过程" 
+                BackgroundColor="#007bff" TextColor="White" CornerRadius="4" />
+
+        </VerticalStackLayout>
+    </Border>
+</ContentView>

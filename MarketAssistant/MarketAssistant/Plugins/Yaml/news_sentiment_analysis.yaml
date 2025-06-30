@@ -1,0 +1,32 @@
+name: AnalyzeNewsSentiment
+template: |
+  你是一个专业的新闻情感分析专家。请分析以下新闻内容的情感倾向，并提供详细分析。
+
+  新闻内容：
+  {{$news_content}}
+
+  请提供以下分析结果：
+  1. 整体情感倾向（积极、消极或中性）
+  2. 情感强度评分（1-10分，1分最消极，10分最积极，5分为中性）
+  3. 关键情感词汇或短语（至少3个）
+  4. 主要观点摘要
+  5. 可能对市场的影响分析
+
+  请以JSON格式返回结果，包含以下字段：
+  - sentiment: 情感倾向（"positive", "negative", "neutral"）
+  - score: 情感强度评分（1-10的数字）
+  - keywords: 关键情感词汇或短语（数组）
+  - summary: 主要观点摘要
+  - market_impact: 可能对市场的影响分析
+template_format: semantic-kernel
+description: 分析新闻内容的情感倾向，提供情感评分、关键词和市场影响分析。
+input_variables:
+  - name: news_content
+    description: 需要分析的新闻内容文本。
+    is_required: true
+output_variable:
+  description: 包含情感分析结果的JSON对象，包括情感倾向、评分、关键词、摘要和市场影响。
+execution_settings:
+  default:
+    temperature: 0.3
+    max_token: 2048

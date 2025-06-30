@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:settings="clr-namespace:MarketAssistant.Applications.Settings"
+             xmlns:controls="clr-namespace:MarketAssistant.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:converts="clr-namespace:MarketAssistant.Converts"
+             x:Class="MarketAssistant.Pages.MCPServerConfigPage"
+             x:DataType="viewmodels:MCPServerConfigViewModel">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <!-- 桌面端布局参数 -->
+            <Thickness x:Key="CardPadding">20</Thickness>
+            <x:Double x:Key="StackSpacing">20</x:Double>
+            <x:Double x:Key="ButtonWidth">120</x:Double>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid ColumnDefinitions="300,*" Padding="0">
+        <!-- 左侧服务器列表 -->
+        <Grid Grid.Column="0" RowDefinitions="Auto,*" Padding="{StaticResource CardPadding}" BackgroundColor="{AppThemeBinding Light=#f8f9fa, Dark=#212529}">
+            <!-- 添加服务器按钮 -->
+            <Button Grid.Row="0" Text="添加服务器" Command="{Binding AddServerCommand}" 
+                    BackgroundColor="#28a745" TextColor="White" Margin="0,0,0,16" />
+
+            <!-- 服务器列表 -->
+            <CollectionView Grid.Row="1" ItemsSource="{Binding ServerConfigs}" SelectedItem="{Binding SelectedConfig}" SelectionMode="Single">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="settings:MCPServerConfig">
+                        <Grid Padding="12" Margin="0,4">
+                            <Grid.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MCPServerConfigViewModel}}, Path=EditServerCommand}" />
+                            </Grid.GestureRecognizers>
+                            <VerticalStackLayout>
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label Text="{Binding Description}" FontSize="12" TextColor="#6c757d" LineBreakMode="TailTruncation" />
+                                <HorizontalStackLayout Spacing="8">
+                                    <Label Text="{Binding TransportType}" FontSize="10" TextColor="#007bff" />
+                                    <Label Text="{Binding IsEnabled, StringFormat='{0}启用'}" FontSize="10" TextColor="#28a745" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
+                        <Label Text="暂无服务器配置" TextColor="#6c757d" HorizontalOptions="Center" />
+                        <Label Text="点击上方按钮添加" TextColor="#6c757d" HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </Grid>
+
+        <!-- 右侧配置详情 -->
+        <ScrollView Grid.Column="1" Padding="{StaticResource CardPadding}">
+            <Grid>
+                <Grid IsVisible="{Binding IsEditing}">
+                    <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                        <!-- 服务器基本信息 -->
+                        <controls:CardView Header="基本信息">
+                            <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                                <!-- 服务器名称 -->
+                                <VerticalStackLayout Spacing="8">
+                                    <Label FontSize="14" TextColor="#6c757d">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="*" TextColor="#dc3545" />
+                                                <Span Text="名称" TextColor="#6c757d" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Entry Text="{Binding Name}" Placeholder="请输入服务器名称" />
+                                </VerticalStackLayout>
+
+                                <!-- 服务器描述 -->
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="描述" FontSize="14" TextColor="#6c757d" />
+                                    <Editor Text="{Binding Description}" Placeholder="请输入服务器描述" HeightRequest="100" />
+                                </VerticalStackLayout>
+
+                                <!-- 服务器类型 -->
+                                <VerticalStackLayout Spacing="8">
+                                    <Label FontSize="14" TextColor="#6c757d">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="*" TextColor="#dc3545" />
+                                                <Span Text="类型" TextColor="#6c757d" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <HorizontalStackLayout Spacing="16">
+                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio', Mode=TwoWay}" 
+                                     Value="stdio" GroupName="transportType" />
+                                        <Label Text="标准输入/输出(stdio)" VerticalOptions="Center" />
+
+                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse', Mode=TwoWay}" 
+                                     Value="sse" GroupName="transportType" />
+                                        <Label Text="服务器发送事件(sse)" VerticalOptions="Center" />
+
+                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp', Mode=TwoWay}" 
+                                    Value="streamableHttp" GroupName="transportType" />
+                                        <Label Text="可流式传输的HTTP(streamableHttp)" VerticalOptions="Center" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+
+                                <!-- 命令或URL -->
+                                <VerticalStackLayout Spacing="8">
+                                    <!-- 使用多个Label，根据条件显示不同的Label -->
+                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="*" TextColor="#dc3545" />
+                                                <Span Text="命令" TextColor="#6c757d" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="*" TextColor="#dc3545" />
+                                                <Span Text="URL" TextColor="#6c757d" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="*" TextColor="#dc3545" />
+                                                <Span Text="URL" TextColor="#6c757d" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Entry Text="{Binding Command}">
+                                        <Entry.Triggers>
+                                            <DataTrigger TargetType="Entry" Binding="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}" Value="True">
+                                                <Setter Property="Placeholder" Value="请输入命令，如npx" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Entry" Binding="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}" Value="True">
+                                                <Setter Property="Placeholder" Value="请输入URL，如http://localhost:3000/sse" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Entry" Binding="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}" Value="True">
+                                                <Setter Property="Placeholder" Value="请输入URL，如http://localhost:3000/mcp" />
+                                            </DataTrigger>
+                                        </Entry.Triggers>
+                                    </Entry>
+                                    <Label Text="提示：URL示例 http://localhost:3000/sse" FontSize="12" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}" />
+                                    <Label Text="提示：URL示例 http://localhost:3000/mcp" FontSize="12" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}" />
+                                </VerticalStackLayout>
+
+                                <!-- 参数 -->
+                                <VerticalStackLayout Spacing="8" IsVisible="{Binding TransportType, Converter={toolkit:IsEqualConverter}, ConverterParameter='stdio'}">
+                                    <Label Text="参数" FontSize="14" TextColor="#6c757d" />
+                                    <Editor Text="{Binding Arguments}" Placeholder="请输入命令参数，如-y @modelcontextprotocol/server-github" HeightRequest="100" />
+                                    <Label Text="提示：多个参数请用空格分隔" FontSize="12" TextColor="#6c757d" />
+                                </VerticalStackLayout>
+
+                                <!-- 环境变量设置 -->
+                                <VerticalStackLayout Spacing="{StaticResource StackSpacing}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}">
+                                    <Label Text="环境变量" ToolTipProperties.Text="每行一个环境变量，格式为KEY=value" FontSize="14" TextColor="#6c757d" />
+                                    <Editor x:Name="environmentVariablesEditor"
+Placeholder="KEY1=value1&#x0a;KEY2=value2" 
+HeightRequest="150"
+Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
+                                </VerticalStackLayout>
+
+                                <!-- 是否启用 -->
+                                <HorizontalStackLayout>
+                                    <CheckBox IsChecked="{Binding IsEnabled}" Color="#007bff" />
+                                    <Label Text="启用" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </controls:CardView>
+
+                        <!-- 操作按钮区域 -->
+                        <HorizontalStackLayout HorizontalOptions="End" Spacing="{StaticResource StackSpacing}" Margin="0,16,0,0">
+                            <Button Text="取消" Command="{Binding CancelEditCommand}" 
+                    BackgroundColor="#6c757d" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                            <Button Text="保存" Command="{Binding SaveServerCommand}" 
+                    BackgroundColor="#007bff" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+
+                    <!-- 删除确认对话框 -->
+                    <Border IsVisible="{Binding ShowDeleteConfirmation}" 
+            BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource Gray900}}" 
+            StrokeThickness="1" 
+            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}" 
+            StrokeShape="RoundRectangle 8" 
+            WidthRequest="400" 
+            HeightRequest="200" 
+            HorizontalOptions="Center" 
+            VerticalOptions="Center">
+                        <VerticalStackLayout Padding="20" Spacing="20" VerticalOptions="Center">
+                            <Label Text="确认删除" FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" />
+                            <Label Text="确定要删除此服务器配置吗？此操作无法撤销。" HorizontalOptions="Center" />
+                            <HorizontalStackLayout HorizontalOptions="Center" Spacing="20">
+                                <Button Text="取消" Command="{Binding CancelDeleteCommand}" 
+                        BackgroundColor="#6c757d" TextColor="White" WidthRequest="120" />
+                                <Button Text="删除" Command="{Binding ConfirmDeleteCommand}" 
+                        BackgroundColor="#dc3545" TextColor="White" WidthRequest="120" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- 未选择服务器时的提示 -->
+                <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={toolkit:InvertedBoolConverter}}" 
+                     HorizontalOptions="Center" 
+                     VerticalOptions="Center">
+                    <Label Text="请选择或添加MCP服务器" 
+           TextColor="#6c757d" 
+           FontSize="18" 
+           HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Grid>
+        </ScrollView>
+    </Grid>
+</ContentPage>

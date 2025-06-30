@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:MarketAssistant.Views.Models"
+             xmlns:views="clr-namespace:MarketAssistant.Views"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="MarketAssistant.Views.AnalysisReportView"
+             x:DataType="viewmodels:AnalysisReportViewModel">
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <toolkit:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <toolkit:IsStringNullOrEmptyConverter x:Key="IsStringNullOrEmptyConverter" />
+
+            <Style x:Key="SectionTitleStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="#212529" />
+            </Style>
+            <Style x:Key="CardStyle" TargetType="Border">
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="BackgroundColor" Value="#f8f9fa" />
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+    <Grid>
+        
+        <!-- 主要内容区域 -->
+        <ScrollView x:Name="ReportScrollView" IsVisible="{Binding IsReportVisible}">
+            <VerticalStackLayout Padding="16" Spacing="16">
+                 <!--股票信息卡片--> 
+            <Border Style="{StaticResource CardStyle}">
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+                    <VerticalStackLayout Grid.Column="0">
+                        <Label Text="股票代码" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding StockSymbol}" FontSize="16" FontAttributes="Bold" TextColor="#212529" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1">
+                        <Label Text="目标价格" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding TargetPrice}" FontSize="16" FontAttributes="Bold" TextColor="#212529" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2">
+                        <Label Text="价格变化预期" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding PriceChange}" FontSize="16" FontAttributes="Bold" TextColor="#28a745" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+             <!--顶部卡片区域--> 
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="20">
+                 <!--投资建议卡片--> 
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout>
+                        <Label Text="投资建议" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding Recommendation}" FontSize="20" FontAttributes="Bold" TextColor="#212529" />
+                        <Label Text="{Binding ConfidenceLevel}" FontSize="12" TextColor="#6c757d" />
+                    </VerticalStackLayout>
+                </Border>
+
+                 <!--风险等级卡片--> 
+                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout>
+                        <Label Text="风险等级" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding RiskLevel}" FontSize="20" FontAttributes="Bold" TextColor="#dc3545" />
+                    </VerticalStackLayout>
+                </Border>
+
+                 <!--综合评分卡片--> 
+                <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout>
+                        <Label Text="综合评分" FontSize="12" TextColor="#6c757d" />
+                        <Label Text="{Binding OverallScore}" FontSize="20" FontAttributes="Bold" TextColor="#007bff" />
+                        <Label Text="{Binding ScorePercentage}" FontSize="12" TextColor="#6c757d" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+             <!--投资亮点与风险因素--> 
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                 <!--投资亮点--> 
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="投资亮点" Style="{StaticResource SectionTitleStyle}" />
+
+                        <CollectionView ItemsSource="{Binding InvestmentHighlights}" SelectionMode="None" EmptyView="暂无投资亮点">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Grid ColumnDefinitions="Auto,*" Padding="0,8">
+                                        <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10" Fill="#28a745" VerticalOptions="Center" Margin="0,0,12,0" />
+                                        <Label Grid.Column="1" Text="{Binding .}" TextColor="#212529" LineBreakMode="WordWrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                 <!--风险因素--> 
+                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="风险因素" Style="{StaticResource SectionTitleStyle}" />
+
+                        <CollectionView ItemsSource="{Binding RiskFactors}" SelectionMode="None" EmptyView="暂无风险因素">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Grid ColumnDefinitions="Auto,*" Padding="0,8">
+                                        <Ellipse Grid.Column="0" WidthRequest="10" HeightRequest="10" Fill="#dc3545" VerticalOptions="Center" Margin="0,0,12,0" />
+                                        <Label Grid.Column="1" Text="{Binding .}" TextColor="#212529" LineBreakMode="WordWrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+             <!--操作建议--> 
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="操作建议" Style="{StaticResource SectionTitleStyle}" />
+                    <CollectionView ItemsSource="{Binding OperationSuggestions}" SelectionMode="None" EmptyView="暂无操作建议">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Label Text="{Binding .}" TextColor="#212529" LineBreakMode="WordWrap" Padding="0,4" />
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+             <!--维度评分--> 
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="维度评分" Style="{StaticResource SectionTitleStyle}" />
+                    <CollectionView ItemsSource="{Binding DimensionScores}" SelectionMode="None" EmptyView="暂无评分数据">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:ScoreItem">
+                                <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,8" ColumnSpacing="12">
+                                    <Label Grid.Column="0" Text="{Binding Name}" TextColor="#212529" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding FormattedScore}" TextColor="#212529" FontAttributes="Bold" VerticalOptions="Center" />
+                                    <ProgressBar Grid.Column="2" Progress="{Binding ScorePercentage}" ProgressColor="#007bff" WidthRequest="100" HeightRequest="8" VerticalOptions="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+             <!--分析师共识与分歧--> 
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16" IsVisible="{Binding HasConsensusOrDisagreement}">
+                 <!--核心共识--> 
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}" IsVisible="{Binding HasConsensusInfo}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="核心共识" Style="{StaticResource SectionTitleStyle}" />
+                        <Label Text="{Binding ConsensusInfo}" TextColor="#212529" LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
+
+                 <!--主要分歧--> 
+                <Border Grid.Column="1" Style="{StaticResource CardStyle}" IsVisible="{Binding HasDisagreementInfo}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="主要分歧" Style="{StaticResource SectionTitleStyle}" />
+                        <Label Text="{Binding DisagreementInfo}" TextColor="#212529" LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+             <!--技术指标与基本面指标--> 
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                 <!--基本面指标--> 
+                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="基本面指标" Style="{StaticResource SectionTitleStyle}" />
+
+                        <CollectionView ItemsSource="{Binding FundamentalIndicators}" SelectionMode="None" EmptyView="暂无基本面指标">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:AnalysisDataItem">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,8" ColumnSpacing="12">
+                                        <Label Grid.Column="0" Text="{Binding Name}" TextColor="#212529" />
+                                        <Label Grid.Column="1" Text="{Binding Value}" TextColor="#212529" FontAttributes="Bold" />
+                                        <Label Grid.Column="2" Text="{Binding Signal}" TextColor="#6c757d" FontSize="12" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+                
+                 <!--技术指标--> 
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="技术指标" Style="{StaticResource SectionTitleStyle}" />
+
+                        <CollectionView ItemsSource="{Binding TechnicalIndicators}" SelectionMode="None" EmptyView="暂无技术指标">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:AnalysisDataItem">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,8" ColumnSpacing="12">
+                                        <Label Grid.Column="0" Text="{Binding Name}" TextColor="#212529" />
+                                        <Label Grid.Column="1" Text="{Binding Value}" TextColor="#212529" />
+                                        <Label Grid.Column="2" Text="{Binding Signal}" TextColor="#007bff" FontAttributes="Bold" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+             <!--财务数据与市场情绪--> 
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                 <!--财务数据--> 
+                <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="财务数据" Style="{StaticResource SectionTitleStyle}" />
+                        <CollectionView ItemsSource="{Binding FinancialData}" SelectionMode="None" EmptyView="暂无财务数据">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:AnalysisDataItem">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,8" ColumnSpacing="12">
+                                        <Label Grid.Column="0" Text="{Binding Name}" TextColor="#212529" />
+                                        <Label Grid.Column="1" Text="{Binding Value}" TextColor="#212529" FontAttributes="Bold" />
+                                        <Label Grid.Column="2" Text="{Binding Unit}" TextColor="#6c757d" FontSize="12" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                 <!--市场情绪数据--> 
+                <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="市场情绪" Style="{StaticResource SectionTitleStyle}" />
+                        <CollectionView ItemsSource="{Binding MarketSentimentData}" SelectionMode="None" EmptyView="暂无市场情绪数据">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:AnalysisDataItem">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Padding="0,8" ColumnSpacing="12">
+                                        <Label Grid.Column="0" Text="{Binding Name}" TextColor="#212529" />
+                                        <Label Grid.Column="1" Text="{Binding Value}" TextColor="#212529" FontAttributes="Bold" />
+                                        <Label Grid.Column="2" Text="{Binding Signal}" TextColor="#6c757d" FontSize="12" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+            </Grid>
+
+             <!--新闻事件数据--> 
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="新闻事件" Style="{StaticResource SectionTitleStyle}" />
+                    <CollectionView ItemsSource="{Binding NewsEventData}" SelectionMode="None" EmptyView="暂无新闻事件">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:AnalysisDataItem">
+                                <Border BackgroundColor="#ffffff" Stroke="#e9ecef" StrokeShape="RoundRectangle 4" Padding="12" Margin="0,4">
+                                    <VerticalStackLayout Spacing="8">
+                                        <Label Text="{Binding Name}" FontAttributes="Bold" TextColor="#212529" />
+                                        <Label Text="{Binding Value}" TextColor="#6c757d" LineBreakMode="WordWrap" />
+                                        <Label Text="{Binding Impact}" TextColor="#007bff" FontSize="12" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+                 <!--其他分析数据--> 
+                <Border Style="{StaticResource CardStyle}" IsVisible="{Binding AnalysisData.Count, Converter={StaticResource IntToBoolConverter}}">
+                    <VerticalStackLayout>
+                        <Label Text="其他分析数据" FontSize="16" FontAttributes="Bold" Margin="0,0,0,12" />
+                        <CollectionView ItemsSource="{Binding AnalysisData}" SelectionMode="None" EmptyView="暂无其他分析数据">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate x:DataType="models:AnalysisDataItem">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" Padding="0,8">
+                                        <VerticalStackLayout Grid.Column="0">
+                                            <Label Text="{Binding Name}" FontSize="14" FontAttributes="Bold" />
+                                            <Label Text="{Binding DataType}" FontSize="12" TextColor="#6c757d" />
+                                            <Label Text="{Binding Strategy}" FontSize="12" TextColor="#495057" IsVisible="{Binding Strategy, Converter={StaticResource IsStringNullOrEmptyConverter}, ConverterParameter=Invert}" />
+                                        </VerticalStackLayout>
+                                        <Label Grid.Column="1" Text="{Binding Value}" FontSize="14" FontAttributes="Bold" VerticalOptions="Center" />
+                                        <Label Grid.Column="2" Text="{Binding Unit}" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" IsVisible="{Binding Unit, Converter={StaticResource IsStringNullOrEmptyConverter}, ConverterParameter=Invert}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <!-- 数据解析加载指示器覆盖层 -->
+        <Grid IsVisible="{Binding IsBusy}" 
+              BackgroundColor="#80FFFFFF" 
+              ZIndex="1000">
+            <VerticalStackLayout HorizontalOptions="Center" 
+                               VerticalOptions="Center" 
+                               Spacing="16">
+                <ActivityIndicator IsRunning="{Binding IsBusy}" 
+                                 Color="{AppThemeBinding Light=#512BD4, Dark=#AC99EA}" 
+                                 WidthRequest="40" 
+                                 HeightRequest="40" />
+                <Label Text="正在解析分析数据..." 
+                       FontSize="16" 
+                       TextColor="{AppThemeBinding Light=#212529, Dark=#FFFFFF}" 
+                       HorizontalOptions="Center" />
+            </VerticalStackLayout>
+        </Grid>
+    </Grid>
+
+</ContentView>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>股票K线图</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu,
+          Cantarell, 'Open Sans',  sans-serif;
+        background-color: #f5f5f5;
+        color: #333;
+      }
+      #chart-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        background-color: #ffffff;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+        display: none;
+      }
+      .error-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.95);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 11;
+        flex-direction: column;
+        display: none;
+      }
+      .error-message {
+        color: #e74c3c;
+        font-size: 14px;
+        margin-top: 10px;
+        max-width: 80%;
+        text-align: center;
+        padding: 10px;
+        border-radius: 4px;
+        background-color: rgba(231, 76, 60, 0.1);
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-left-color: #3498db;
+        animation: spin 1s linear infinite;
+      }
+      .chart-legend {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        display: flex;
+        gap: 15px;
+        z-index: 5;
+        font-size: 12px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      @media (max-width: 768px) {
+        #chart-container {
+          height: 100%;
+        }
+        .chart-legend {
+          font-size: 10px;
+          gap: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="chart-container">
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+      </div>
+      <div class="error-overlay" id="error-overlay">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#e74c3c"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+        <div class="error-message" id="error-message">加载数据失败</div>
+      </div>
+    </div>
+
+    <!-- 引入KLineChart库 -->
+    <script src="https://cdn.jsdelivr.net/npm/klinecharts@latest/dist/klinecharts.min.js"></script>
+
+    <script>
+      // 初始化图表
+      const chart = klinecharts.init(document.getElementById('chart-container'), {
+        // 设置默认主题
+        theme: 'light',
+        // 设置时区
+        timezone: 'Asia/Shanghai',
+        // 设置语言
+        locale: 'zh-CN',
+      });
+
+      // 设置图表样式
+      chart.setStyles({
+        grid: {
+          show: true,
+          horizontal: {
+            show: true,
+            size: 1,
+            color: '#EEEEEE',
+            style: 'dashed',
+          },
+          vertical: {
+            show: true,
+            size: 1,
+            color: '#EEEEEE',
+            style: 'dashed',
+          },
+        },
+        candle: {
+          type: 'candle_solid',
+          bar: {
+            upColor: '#26A69A',
+            downColor: '#EF5350',
+            noChangeColor: '#888888',
+            upBorderColor: '#26A69A',
+            downBorderColor: '#EF5350',
+            noChangeBorderColor: '#888888',
+            upWickColor: '#26A69A',
+            downWickColor: '#EF5350',
+            noChangeWickColor: '#888888',
+          },
+          tooltip: {
+            showRule: 'always',
+            showType: 'standard',
+            labels: ['时间', '开盘', '收盘', '最高', '最低', '成交量'],
+            values: null,
+            defaultValue: '-',
+          },
+          priceMark: {
+            show: true,
+            high: {
+              show: true,
+              color: '#76808F',
+              textSize: 12,
+              textFamily: 'Consolas',
+              textWeight: 'normal',
+            },
+            low: {
+              show: true,
+              color: '#76808F',
+              textSize: 12,
+              textFamily: 'Consolas',
+              textWeight: 'normal',
+            },
+            last: {
+              show: true,
+              upColor: '#26A69A',
+              downColor: '#EF5350',
+              noChangeColor: '#888888',
+              line: {
+                show: true,
+                style: 'dashed',
+                size: 1,
+              },
+            },
+          },
+        },
+        indicator: {
+          tooltip: {
+            showRule: 'always',
+            showType: 'standard',
+            showName: true,
+            showParams: true,
+            defaultValue: '-',
+          },
+        },
+        xAxis: {
+          show: true,
+          axisLine: {
+            show: true,
+            color: '#DDDDDD',
+            size: 1,
+          },
+          tickText: {
+            show: true,
+            color: '#76808F',
+            family: 'Consolas',
+            weight: 'normal',
+            size: 12,
+          },
+          tickLine: {
+            show: true,
+            size: 1,
+            length: 3,
+            color: '#DDDDDD',
+          },
+        },
+        yAxis: {
+          show: true,
+          position: 'right',
+          type: 'normal',
+          inside: false,
+          axisLine: {
+            show: true,
+            color: '#DDDDDD',
+            size: 1,
+          },
+          tickText: {
+            show: true,
+            color: '#76808F',
+            family: 'Consolas',
+            weight: 'normal',
+            size: 12,
+          },
+          tickLine: {
+            show: true,
+            size: 1,
+            length: 3,
+            color: '#DDDDDD',
+          },
+        },
+        separator: {
+          size: 1,
+          color: '#DDDDDD',
+          fill: true,
+          activeBackgroundColor: 'rgba(230, 230, 230, .15)',
+        },
+        crosshair: {
+          show: true,
+          horizontal: {
+            show: true,
+            line: {
+              show: true,
+              style: 'dashed',
+              color: '#76808F',
+              size: 1,
+            },
+            text: {
+              show: true,
+              color: '#FFFFFF',
+              size: 12,
+              family: 'Consolas',
+              weight: 'normal',
+              backgroundColor: '#76808F',
+            },
+          },
+          vertical: {
+            show: true,
+            line: {
+              show: true,
+              style: 'dashed',
+              color: '#76808F',
+              size: 1,
+            },
+            text: {
+              show: true,
+              color: '#FFFFFF',
+              size: 12,
+              family: 'Consolas',
+              weight: 'normal',
+              backgroundColor: '#76808F',
+            },
+          },
+        },
+      });
+
+      // 创建主图指标
+      chart.createIndicator('MA', false, {
+        size: 2,
+        precision: 2,
+        params: [5, 10, 20, 60],
+      });
+
+      // 创建副图指标
+      chart.createIndicator('VOL', true, {
+        size: 2,
+        precision: 0,
+      });
+      chart.createIndicator('MACD', true, {
+        size: 2,
+        precision: 2,
+      });
+
+      // 格式化日期
+      function formatDate(timestamp) {
+        const date = new Date(timestamp);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      // 格式化时间
+      function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+
+      // 格式化数字
+      function formatNumber(num, precision = 2) {
+        if (num === null || num === undefined) return '-';
+        return parseFloat(num).toFixed(precision);
+      }
+
+      // 格式化成交量
+      function formatVolume(volume) {
+        if (volume === null || volume === undefined) return '-';
+        if (volume >= 100000000) {
+          return (volume / 100000000).toFixed(2) + '亿';
+        } else if (volume >= 10000) {
+          return (volume / 10000).toFixed(2) + '万';
+        } else {
+          return volume.toString();
+        }
+      }
+
+      // 定义与C#交互的接口
+      window.stockChartInterface = {
+        // 加载K线数据
+        loadData: function (data) {
+          try {
+
+            const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+
+            // 转换数据格式为KLineChart所需格式
+            const klineData = parsedData.map((item) => ({
+              timestamp: new Date(item.timestamp).getTime(),
+              open: item.open,
+              high: item.high,
+              low: item.low,
+              close: item.close,
+              volume: item.volume,
+              preClose: item.pre_close,
+            }));
+
+            // 设置数据
+            chart.applyNewData(klineData);
+
+            // 隐藏错误信息
+            this.setError(false);
+          } catch (error) {
+            console.error('处理数据失败:', error);
+            this.setError(true, '处理数据失败: ' + error.message);
+          }
+        },
+
+        // 设置加载状态
+        setLoading: function (isLoading) {
+          document.getElementById('loading-overlay').style.display = isLoading ? 'flex' : 'none';
+        },
+
+        // 设置错误状态
+        setError: function (hasError, message) {
+          const errorOverlay = document.getElementById('error-overlay');
+          errorOverlay.style.display = hasError ? 'flex' : 'none';
+
+          if (hasError && message) {
+            document.getElementById('error-message').textContent = message;
+          }
+        },
+      };
+
+      // 响应窗口大小变化
+      window.addEventListener('resize', function () {
+        chart.resize();
+      });
+    </script>
+  </body>
+</html>
