@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
-using static MarketAssistant.Agents.MarketAnalysisEvents;
 
 namespace MarketAssistant.Agents;
 
@@ -32,7 +31,7 @@ public class MarketAnalysisAgent
     private readonly string _copilot = "Copilot";
 
     // 当前进度信息
-    private MarketAnalysisEvents.AnalysisProgressEventArgs _currentProgress = new();
+    private AnalysisProgressEventArgs _currentProgress = new();
 
     private List<ChatCompletionAgent> _analysts = new();
 
@@ -188,7 +187,7 @@ public class MarketAnalysisAgent
     /// <summary>
     /// 触发进度变化事件
     /// </summary>
-    protected virtual void OnProgressChanged(MarketAnalysisEvents.AnalysisProgressEventArgs e)
+    protected virtual void OnProgressChanged(AnalysisProgressEventArgs e)
     {
         ProgressChanged?.Invoke(this, e);
     }

@@ -107,8 +107,6 @@ namespace MarketAssistant
             builder.Services.AddSingleton<GlobalExceptionHandler>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
 
-            //Preferences.Default.Clear();
-
             return builder;
         }
 

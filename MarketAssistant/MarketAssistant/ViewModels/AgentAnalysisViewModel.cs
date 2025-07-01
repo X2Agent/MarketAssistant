@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using static MarketAssistant.Agents.MarketAnalysisEvents;
 
 namespace MarketAssistant.ViewModels;
 
