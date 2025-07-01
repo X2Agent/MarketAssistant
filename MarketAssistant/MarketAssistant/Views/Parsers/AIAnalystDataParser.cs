@@ -66,7 +66,7 @@ public class AIAnalystDataParser : IAnalystDataParser
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
-
+            //todo The JSON value could not be converted to System.String. Path: $.analysisData[0].value | LineNumber: 34 | BytePositionInLine: 22.
             return JsonSerializer.Deserialize<AnalystResult>(jsonResult, options) ?? new AnalystResult();
         }
         catch (Exception ex)

@@ -42,18 +42,13 @@ public class HybridAnalystDataParser : IAnalystDataParser
         {
             //先使用AI解析，AI解析报错在使用正则解析作为兜底
             //完整性验证和结果合并逻辑暂时不用
-            try
+            var aiResult = await _aiParser.ParseDataAsync(content);
+            if (aiResult.OverallScore > 0)
             {
-                var aiResult = await _aiParser.ParseDataAsync(content);
-
                 return aiResult;
             }
-            catch (Exception ex)
-            {
-                // AI解析失败，记录错误并使用正则解析作为兜底
-                _logger?.LogWarning(ex, "AI解析失败，回退到正则解析");
-                return await _regexParser.ParseDataAsync(content);
-            }
+            _logger?.LogWarning("AI解析结果不完整，使用正则解析作为兜底");
+            return await _regexParser.ParseDataAsync(content);
         }
         catch (Exception ex)
         {
