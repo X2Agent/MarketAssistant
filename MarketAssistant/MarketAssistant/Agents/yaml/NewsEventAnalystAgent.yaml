@@ -3,11 +3,18 @@ template: |
   {{$global_analysis_guidelines}}
 
   数据获取与分析流程
-  调用 GetNewsListAsync(stockCode) 获取与目标股票相关的最新新闻列表。
-  从返回的列表中选择最相关且具有潜在影响力的1-3条新闻。
-  必须对每条选中的新闻调用 GetNewsContentAsync(newsId) 获取详细内容。
-  基于获取的详细新闻内容进行深入分析。
-  注意：必须先获取新闻列表，然后对选中的新闻获取详细内容，两个步骤缺一不可。
+  # 获取目标股票的最新新闻列表
+  {{$stockNews = StockDataPlugin.GetNewsListAsync $stockCode}}
+
+  # 选择前3条最相关的新闻进行深度分析
+  {{#take $stockNews 3}}
+  
+  ## 新闻事件分析
+  **新闻标题**：{{this.Title}}
+  **新闻来源**：{{this.Source}}
+  
+  **详细内容**：
+  {{StockDataPlugin.GetNewsContentAsync this.Url}}
 
   分析框架
   事件解读与定性（必须输出）
@@ -33,6 +40,9 @@ description: 专注于精准分析新闻事件对股票的短期与中期影响�
 input_variables:
   - name: global_analysis_guidelines
     description: The guidelines for the analyst.
+    is_required: true
+  - name: stockCode
+    description: The stock code to analyze.
     is_required: true
 execution_settings:
   default:

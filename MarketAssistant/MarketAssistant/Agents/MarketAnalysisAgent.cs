@@ -35,9 +35,6 @@ public class MarketAnalysisAgent
 
     private List<ChatCompletionAgent> _analysts = new();
 
-    // 存储分析消息
-    private readonly List<ChatMessageContent> _analysisMessages = new();
-
     #endregion
 
     #region 构造函数
@@ -70,7 +67,7 @@ public class MarketAnalysisAgent
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
     /// <returns>分析消息列表</returns>
-    public async Task<List<ChatMessageContent>> AnalysisAsync(string stockSymbol)
+    public async Task<ChatHistory> AnalysisAsync(string stockSymbol)
     {
         try
         {
@@ -85,9 +82,6 @@ public class MarketAnalysisAgent
 
             // 更新进度为完成
             UpdateProgress(_copilot, 100, "分析完成");
-
-            // 返回收集到的分析消息
-            return _analysisMessages;
         }
         catch (Exception ex)
         {
@@ -101,14 +95,8 @@ public class MarketAnalysisAgent
             // 更新进度为错误状态
             UpdateProgress(_copilot, 0, $"分析失败: {errorMessage}");
             _logger.LogError(errorMessage);
-            // 添加错误消息到分析消息列表
-            _analysisMessages.Add(new ChatMessageContent(AuthorRole.System, errorMessage)
-            {
-                AuthorName = _copilot
-            });
-
-            return _analysisMessages;
         }
+        return _analystManager.History;
     }
 
     #endregion
@@ -120,9 +108,6 @@ public class MarketAnalysisAgent
     /// </summary>
     private void InitializeAnalysisEnvironment()
     {
-        // 重置状态
-        _analysisMessages.Clear();
-
         // 初始化进度信息
         _currentProgress = new AnalysisProgressEventArgs
         {
@@ -152,19 +137,15 @@ public class MarketAnalysisAgent
         UpdateProgress(nameof(AnalysisAgents.CoordinatorAnalystAgent), 0, "正在规划分析师任务");
 
         int analystCount = _analysts.Count;
-
-        // 清空分析消息列表
-        _analysisMessages.Clear();
-
+        var index = 0;
         // 执行分析师讨论
         await _analystManager.ExecuteAnalystDiscussionAsync(prompt, messageContent =>
         {
-            // 保存分析消息
-            _analysisMessages.Add(messageContent);
+            index++;
             // 记录消息
             OnMessageReceived(messageContent);
             // 更新进度
-            int progressPercentage = Math.Min(90, 10 + (_analysisMessages.Count * 80 / analystCount));
+            int progressPercentage = Math.Min(90, 10 + (index * 80 / analystCount));
             UpdateProgress(messageContent.AuthorName, progressPercentage, $"{messageContent.AuthorName} 分析中");
         });
 

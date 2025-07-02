@@ -48,7 +48,7 @@ public class BaseKernelTest
 
 
         // 硬编码ModelId和Endpoint
-        var modelId = "deepseek-ai/DeepSeek-V3";//"Qwen/Qwen3-32B";
+        var modelId = "Qwen/Qwen3-32B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务

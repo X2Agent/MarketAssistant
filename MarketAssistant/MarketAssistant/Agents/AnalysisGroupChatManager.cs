@@ -19,12 +19,24 @@ public class AnalysisGroupChatManager : RoundRobinGroupChatManager
     {
         // 判断是否新一轮
         var lastMessage = history.Count > 0 ? history.Last() : null;
+
         if (IsNewConversationRound(lastMessage))
         {
             // 新一轮由FundamentalAnalyst先发言
             return ValueTask.FromResult(new GroupChatManagerResult<string>(FundamentalAnalystName)
             {
                 Reason = "新一轮由基本面分析师先发言"
+            });
+        }
+
+        //如果最新的消息是Assistant的消息且内容为空，则当前Assistant再次发言
+        if (lastMessage?.Role == AuthorRole.Assistant
+            && string.IsNullOrEmpty(lastMessage.Content)
+            && !string.IsNullOrEmpty(lastMessage.AuthorName))
+        {
+            return ValueTask.FromResult(new GroupChatManagerResult<string>(lastMessage.AuthorName)
+            {
+                Reason = "上轮分析结果为空，分析师再次发言"
             });
         }
 
@@ -59,11 +71,6 @@ public class AnalysisGroupChatManager : RoundRobinGroupChatManager
         {
             Reason = "轮到协调分析师总结"
         });
-        // fallback
-        //return ValueTask.FromResult(new GroupChatManagerResult<string>(team.First().Key)
-        //{
-        //    Reason = "未找到合适的分析师，默认第一个"
-        //});
     }
 
     /// <summary>

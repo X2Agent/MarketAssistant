@@ -1,6 +1,8 @@
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
-using Microsoft.Extensions.Logging;
+using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace TestMarketAssistant;
 
@@ -8,12 +10,25 @@ namespace TestMarketAssistant;
 public class StockKLineServiceTest
 {
     private StockKLineService _stockKLineService = null!;
+    private Mock<IUserSettingService> _mockUserSettingService = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        // 使用NullLogger作为测试环境的日志记录器
-        _stockKLineService = new StockKLineService(NullLogger<StockKLineService>.Instance);
+        var tushareApiToken = Environment.GetEnvironmentVariable("TUSHARE_API_TOKEN") ?? throw new InvalidOperationException("TUSHARE_API_TOKEN environment variable is not set");
+
+        // 创建模拟的用户设置服务
+        _mockUserSettingService = new Mock<IUserSettingService>();
+        var testUserSetting = new UserSetting
+        {
+            TushareApiToken = tushareApiToken
+        };
+        _mockUserSettingService.Setup(x => x.CurrentSetting).Returns(testUserSetting);
+
+        // 使用NullLogger和模拟的用户设置服务创建StockKLineService实例
+        _stockKLineService = new StockKLineService(
+            NullLogger<StockKLineService>.Instance,
+            _mockUserSettingService.Object);
     }
 
     [TestMethod]

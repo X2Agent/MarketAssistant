@@ -24,7 +24,7 @@ public class MarketAnalysisAgentTest : BaseKernelTest
     [TestMethod]
     public async Task TestAnalysisAsync()
     {
-        var result = await _marketAnalysisAgent.AnalysisAsync("sz002594");
+        var result = await _marketAnalysisAgent.AnalysisAsync("sh601606");
         Assert.IsNotNull(result);
     }
 }

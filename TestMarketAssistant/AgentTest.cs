@@ -2,6 +2,7 @@ using MarketAssistant.Agents;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace TestMarketAssistant;
 
@@ -217,7 +218,7 @@ public class AgentTest : BaseKernelTest
         var agent = CreateAgentFromYaml("FinancialAnalystAgent");
 
         var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sz002594 进行财务分析，提供投资建议。")).ToListAsync();
+            "请对股票 sh601606 进行财务分析，提供投资建议。")).ToListAsync();
 
         Assert.IsTrue(content.Count > 0);
         Console.WriteLine(content.First().Message);
@@ -229,7 +230,7 @@ public class AgentTest : BaseKernelTest
         var agent = CreateAgentFromYaml("FundamentalAnalystAgent");
 
         var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sz002594 进行分析，提供投资建议。")).ToListAsync();
+            "请对股票 sh601606 进行分析，提供投资建议。")).ToListAsync();
 
         Assert.IsTrue(content.Count > 0);
         Console.WriteLine(content.First().Message);
@@ -295,11 +296,21 @@ public class AgentTest : BaseKernelTest
         - 直接输出专业分析，无需询问
         ";
 
+        var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
+            {
+                AllowParallelCalls = true,
+                AllowStrictSchemaAdherence = true,
+                RetainArgumentTypes = true
+            })
+        };
+
         ChatCompletionAgent chatCompletionAgent =
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
                 Kernel = _kernel,
-                Arguments = new KernelArguments
+                Arguments = new KernelArguments(promptExecutionSettings)
                 {
                     { "global_analysis_guidelines", globalGuidelines },
                 }
