@@ -241,7 +241,7 @@ public sealed class StockDataPlugin
         }
     }
 
-    [KernelFunction("get_news_list")]
+    [KernelFunction("get_news_list"), Description("获取指定股票新闻列表")]
     [return: Description("返回一个元组集合，每个元组包含新闻标题(string)和对应的URL链接(string)，用于分析股票相关的最新新闻动态")]
     public async Task<IEnumerable<NewsItem>> GetNewsListAsync(string stockSymbol)
     {
@@ -257,7 +257,7 @@ public sealed class StockDataPlugin
                 await page.GotoAsync(url);
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-                var newsElements = await page.QuerySelectorAllAsync(".telegraph-list");
+                var newsElements = await page.QuerySelectorAllAsync("div.p-t-20.p-b-20.b-b-w-1.b-b-s-s.b-c-e6e7ea");
 
                 var newsList = new List<NewsItem>();
 
