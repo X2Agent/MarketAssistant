@@ -3,9 +3,9 @@ template: |
   {{$global_analysis_guidelines}}
 
   数据获取与分析流程
-  调用 GetNewsListAsync 获取与目标股票相关的最新新闻列表。
-  从返回的列表中选择最相关且具有潜在影响力的1-3条新闻。
-  对每条选中的新闻调用 GetNewsContentAsync 获取详细内容。
+  调用 get_news_list 获取与目标股票相关的最新新闻列表。
+  从返回的列表中选择最相关且具有潜在影响力的2-3条新闻。
+  对每条选中的新闻调用 get_news_content 获取详细内容。
   基于获取的详细新闻内容进行深入分析。
 
   分析框架
@@ -44,7 +44,7 @@ execution_settings:
     function_choice_behavior:
       allow_parallel_calls: false
       allow_concurrent_invocation: false
-      type: required #auto
+      type: required
       functions:
-        - StockDataPlugin.GetNewsListAsync
-        - StockDataPlugin.GetNewsContentAsync
+        - StockNewsPlugin.GetNewsListAsync
+        - StockNewsPlugin.GetNewsContentAsync

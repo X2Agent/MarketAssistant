@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Applications.Stocks.Models;
+namespace MarketAssistant.Plugins.Models;
 
 /// <summary>
 /// 季度利润数据实体类

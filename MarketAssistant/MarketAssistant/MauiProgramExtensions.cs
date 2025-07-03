@@ -48,6 +48,9 @@ namespace MarketAssistant
             builder.Logging.ClearProviders();
             builder.Logging.AddSerilog(Log.Logger);
 
+            // 注册HttpClient服务
+            builder.Services.AddHttpClient();
+
             // 注册用户设置服务为单例
             builder.Services.AddSingleton<IUserSettingService, UserSettingService>();
             // Add filters with logging.
@@ -89,6 +92,7 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IWindowsService, WindowsService>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
             builder.Services.AddSingleton<PlaywrightService>();
+            builder.Services.AddSingleton<GitHubReleaseService>();
 
             // 注册AI解析器
             builder.Services.AddAnalystDataParsers();

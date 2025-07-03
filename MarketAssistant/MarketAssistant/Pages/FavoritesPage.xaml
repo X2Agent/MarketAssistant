@@ -5,7 +5,7 @@
              xmlns:converts="clr-namespace:MarketAssistant.Converts"
              xmlns:controls="clr-namespace:MarketAssistant.Controls"
              xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
-             xmlns:stocks="clr-namespace:MarketAssistant.Applications.Stocks"
+             xmlns:stocks="clr-namespace:MarketAssistant.Applications.Stocks.Models"
              x:Class="MarketAssistant.Pages.FavoritesPage"
              x:DataType="viewmodels:FavoritesViewModel">
 

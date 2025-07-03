@@ -45,16 +45,16 @@
 		<PackageReference Include="Microsoft.Maui.Graphics.Text.Markdig" Version="9.0.80" />
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0-preview.1.25127.4" />
 		<PackageReference Include="Microsoft.Playwright" Version="1.53.0" />
-		<PackageReference Include="Microsoft.SemanticKernel" Version="1.58.0" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.58.0" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration" Version="1.58.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess" Version="1.58.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.58.0-alpha" />
-		<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.58.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.58.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.58.0-alpha" />
-		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.58.0-alpha" />
-		<PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.58.0" />
+		<PackageReference Include="Microsoft.SemanticKernel" Version="1.59.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.59.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration" Version="1.59.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess" Version="1.59.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.59.0-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.59.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.59.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.59.0-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.59.0-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.59.0" />
 		<PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.1" />
 		<PackageReference Include="PdfPig" Version="0.1.10" />
 		<PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />

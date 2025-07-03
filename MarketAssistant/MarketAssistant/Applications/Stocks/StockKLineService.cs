@@ -1,7 +1,7 @@
 using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.Stocks;
@@ -9,16 +9,14 @@ namespace MarketAssistant.Applications.Stocks;
 public class StockKLineService
 {
     private readonly HttpClient _httpClient;
-    private readonly string _tushareApiToken;
+    private readonly string _zhiTuApiToken;
     private readonly ILogger<StockKLineService> _logger;
-    private const string TUSHARE_API_URL = "http://api.tushare.pro";
-    private const string DAILY_FIELDS = "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount";
-    private const string MINUTE_FIELDS = "ts_code,trade_time,open,close,high,low,vol,amount";
+    private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
 
     public StockKLineService(ILogger<StockKLineService> logger, IUserSettingService userSettingService)
     {
         _httpClient = new HttpClient();
-        _tushareApiToken = userSettingService.CurrentSetting.TushareApiToken;
+        _zhiTuApiToken = userSettingService.CurrentSetting.ZhiTuApiToken;
         _logger = logger;
     }
 
@@ -37,143 +35,145 @@ public class StockKLineService
     }
 
     /// <summary>
-    /// 构建K线请求参数
+    /// 构建zhituapi请求URL
     /// </summary>
-    /// <param name="tsCode">股票代码</param>
-    /// <param name="startDate">开始日期</param>
-    /// <param name="endDate">结束日期</param>
-    /// <returns>参数字典</returns>
-    private Dictionary<string, string> BuildKLineParameters(string tsCode, DateTime? startDate, DateTime? endDate)
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
+    /// <param name="interval">分时级别（如d、w、m、y、1、5、15、30、60）</param>
+    /// <param name="adjustType">除权方式（n、f、b、fr、br）</param>
+    /// <param name="startDate">开始时间</param>
+    /// <param name="endDate">结束时间</param>
+    /// <returns>完整的API URL</returns>
+    private string BuildZhiTuApiUrl(string symbol, string interval, string adjustType = "n", DateTime? startDate = null, DateTime? endDate = null)
     {
-        var parameters = new Dictionary<string, string>();
-
-        if (!string.IsNullOrEmpty(tsCode))
-            parameters.Add("ts_code", tsCode);
+        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={_zhiTuApiToken}";
+        
+        // 如果没有指定时间范围，根据不同的interval设置合理的默认时间范围
+        DateTime defaultStartDate;
+        DateTime defaultEndDate = DateTime.Now;
+        
+        if (!startDate.HasValue && !endDate.HasValue)
+        {
+            switch (interval.ToLower())
+            {
+                case "d": // 日K线，默认查询最近1年
+                    defaultStartDate = DateTime.Now.AddMonths(-6);
+                    break;
+                case "w": // 周K线，默认查询最近2年
+                    defaultStartDate = DateTime.Now.AddYears(-1);
+                    break;
+                case "m": // 月K线，默认查询最近5年
+                    defaultStartDate = DateTime.Now.AddYears(-3);
+                    break;
+                case "y": // 年K线，默认查询最近10年
+                    defaultStartDate = DateTime.Now.AddYears(-10);
+                    break;
+                case "1":
+                case "5":
+                case "15":
+                case "30":
+                case "60": // 分钟级别数据，默认查询最近30天
+                    defaultStartDate = DateTime.Now.AddDays(-30);
+                    break;
+                default: // 其他情况，默认查询最近1年
+                    defaultStartDate = DateTime.Now.AddYears(-1);
+                    break;
+            }
+            
+            startDate = defaultStartDate;
+            endDate = defaultEndDate;
+        }
+        
         if (startDate.HasValue)
-            parameters.Add("start_date", startDate.Value.ToString("yyyyMMdd"));
+        {
+            url += $"&st={startDate.Value:yyyyMMdd}";
+        }
+        
         if (endDate.HasValue)
-            parameters.Add("end_date", endDate.Value.ToString("yyyyMMdd"));
-
-        return parameters;
+        {
+            url += $"&et={endDate.Value:yyyyMMdd}";
+        }
+        
+        return url;
     }
 
     /// <summary>
-    /// 从Tushare获取数据
+    /// 从zhituapi获取数据
     /// </summary>
-    /// <param name="apiName">API名称</param>
-    /// <param name="parameters">请求参数</param>
-    /// <param name="fields">返回字段</param>
+    /// <param name="url">API URL</param>
     /// <param name="dataType">数据类型描述</param>
-    /// <param name="tsCode">股票代码</param>
+    /// <param name="symbol">股票代码</param>
     /// <returns>API响应数据</returns>
-    private async Task<TushareResponse> FetchTushareDataAsync(string apiName, object parameters, string fields, string dataType, string tsCode)
+    private async Task<List<ZhiTuKLineData>> FetchZhiTuDataAsync(string url, string dataType, string symbol)
     {
-        // 构建日志信息
-        string logInfo = !string.IsNullOrEmpty(tsCode) ? $"股票代码: {tsCode}" : "";
+        _logger.LogInformation("正在获取股票{DataType}数据: 股票代码: {Symbol}", dataType, symbol);
 
-        _logger.LogInformation("正在获取股票{DataType}数据: {LogInfo}", dataType, logInfo);
-
-        // 构建请求数据
-        var requestData = new
+        try
         {
-            api_name = apiName,
-            token = _tushareApiToken,
-            Params = parameters,
-            fields
-        };
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
 
-        // 发送请求
-        var response = await _httpClient.PostAsJsonAsync(TUSHARE_API_URL, requestData);
-        response.EnsureSuccessStatusCode();
+            var jsonContent = await response.Content.ReadAsStringAsync();
+            var zhiTuData = JsonSerializer.Deserialize<List<ZhiTuKLineData>>(jsonContent);
 
-        // 解析响应
-        var responseData = await response.Content.ReadFromJsonAsync<TushareResponse>();
+            if (zhiTuData == null || !zhiTuData.Any())
+            {
+                throw new Exception($"获取{dataType}数据失败: 返回数据为空");
+            }
 
-        if (responseData == null ||
-            responseData.Code != 0 ||
-            responseData.Data == null ||
-            responseData.Data.Items == null ||
-            !responseData.Data.Items.Any())
-        {
-            throw new Exception($"获取{dataType}数据失败: {responseData?.Message ?? "未知错误"}");
+            return zhiTuData;
         }
-
-        return responseData;
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"获取{dataType}数据失败: 网络请求错误 - {ex.Message}", ex);
+        }
+        catch (JsonException ex)
+        {
+            throw new Exception($"获取{dataType}数据失败: 数据解析错误 - {ex.Message}", ex);
+        }
     }
 
     /// <summary>
-    /// 解析日K线数据
+    /// 解析zhituapi K线数据
     /// </summary>
-    /// <param name="responseData">API响应数据</param>
+    /// <param name="zhiTuData">zhituapi响应数据</param>
     /// <param name="klineDataSet">K线数据集</param>
-    private void ParseDailyKLineData(TushareResponse responseData, StockKLineDataSet klineDataSet)
+    private void ParseZhiTuKLineData(List<ZhiTuKLineData> zhiTuData, StockKLineDataSet klineDataSet)
     {
-        if (responseData.Data == null)
+        foreach (var item in zhiTuData)
         {
-            return;
-        }
-        foreach (var item in responseData.Data.Items)
-        {
-            if (item.Length >= 11)
+            // 解析时间戳
+            if (DateTime.TryParse(item.T, out DateTime timestamp))
             {
-                // 解析日期，Tushare返回的日期格式为YYYYMMDD
-                if (DateTime.TryParseExact(item[1].ToString(), "yyyyMMdd", null, System.Globalization.DateTimeStyles.None, out DateTime timestamp))
+                var klineData = new StockKLineData
                 {
-                    klineDataSet.Data.Add(new StockKLineData
-                    {
-                        Timestamp = timestamp,
-                        Open = ParseDecimal(item[2]),
-                        High = ParseDecimal(item[3]),
-                        Low = ParseDecimal(item[4]),
-                        Close = ParseDecimal(item[5]),
-                        PreClose = ParseDecimal(item[6]),
-                        Change = ParseDecimal(item[7]),
-                        PctChg = ParseDecimal(item[8]),
-                        Volume = ParseDecimal(item[9]),
-                        Amount = ParseDecimal(item[10])
-                    });
+                    Timestamp = timestamp,
+                    Open = item.O,
+                    High = item.H,
+                    Low = item.L,
+                    Close = item.C,
+                    Volume = item.V,
+                    Amount = item.A,
+                    PreClose = item.Pc
+                };
+
+                // 计算涨跌额和涨跌幅
+                if (item.Pc > 0)
+                {
+                    klineData.Change = item.C - item.Pc;
+                    klineData.PctChg = (klineData.Change / item.Pc) * 100;
                 }
+                else
+                {
+                    klineData.Change = 0;
+                    klineData.PctChg = 0;
+                }
+
+                klineDataSet.Data.Add(klineData);
             }
         }
 
-        // 按日期排序（从新到旧）
-        klineDataSet.Data = klineDataSet.Data.OrderByDescending(x => x.Timestamp).ToList();
-    }
-
-    /// <summary>
-    /// 解析分钟K线数据
-    /// </summary>
-    /// <param name="responseData">API响应数据</param>
-    /// <param name="klineDataSet">K线数据集</param>
-    private void ParseMinuteKLineData(TushareResponse responseData, StockKLineDataSet klineDataSet)
-    {
-        foreach (var item in responseData.Data.Items)
-        {
-            if (item.Length >= 8)
-            {
-                // 解析日期时间，Tushare返回的格式为yyyy-MM-dd HH:mm:ss
-                if (DateTime.TryParse(item[1].ToString(), out DateTime timestamp))
-                {
-                    klineDataSet.Data.Add(new StockKLineData
-                    {
-                        Timestamp = timestamp,
-                        Open = ParseDecimal(item[2]),
-                        Close = ParseDecimal(item[3]),
-                        High = ParseDecimal(item[4]),
-                        Low = ParseDecimal(item[5]),
-                        Volume = ParseDecimal(item[6]),
-                        Amount = ParseDecimal(item[7]),
-                        // 分钟数据可能没有以下字段，设置为0
-                        PreClose = 0,
-                        Change = 0,
-                        PctChg = 0
-                    });
-                }
-            }
-        }
-
-        // 按日期时间排序（从新到旧）
-        klineDataSet.Data = klineDataSet.Data.OrderByDescending(x => x.Timestamp).ToList();
+        // 按日期时间排序（从旧到新）
+        klineDataSet.Data = klineDataSet.Data.OrderBy(x => x.Timestamp).ToList();
     }
 
     /// <summary>
@@ -194,14 +194,14 @@ public class StockKLineService
     #endregion
 
     /// <summary>
-    /// 从Tushare获取日K线数据
+    /// 从zhituapi获取日K线数据
     /// </summary>
-    /// <param name="symbol">股票代码（支持多个股票同时提取，逗号分隔）</param>
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
     /// <param name="startDate">开始日期，默认为null</param>
     /// <param name="endDate">结束日期，默认为null</param>
-    /// <param name="tradeDate">交易日期，默认为null</param>
+    /// <param name="adjustType">除权方式（n=不复权，f=前复权，b=后复权，fr=等比前复权，br=等比后复权），默认为n</param>
     /// <returns>K线数据集合</returns>
-    public async Task<StockKLineDataSet> GetDailyKLineDataAsync(string symbol = "", DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<StockKLineDataSet> GetDailyKLineDataAsync(string symbol, DateTime? startDate = null, DateTime? endDate = null, string adjustType = "n")
     {
         try
         {
@@ -209,44 +209,44 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string tsCode = string.IsNullOrEmpty(symbol) ? "" : FormatSymbolForTushare(symbol);
+            string formattedSymbol = FormatSymbolForZhiTu(symbol);
 
-            // 构建请求参数
-            var parameters = BuildKLineParameters(tsCode, startDate, endDate);
+            // 构建API URL
+            string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "d", adjustType, startDate, endDate);
 
             // 发送请求并获取数据
-            var responseData = await FetchTushareDataAsync("daily", parameters, DAILY_FIELDS, "日K线", tsCode);
+            var zhiTuData = await FetchZhiTuDataAsync(apiUrl, "日K线", symbol);
 
             // 转换为应用程序数据模型
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = !string.IsNullOrEmpty(tsCode) ? tsCode : "日线数据",
+                Name = formattedSymbol,
                 Interval = "daily",
                 Data = new List<StockKLineData>()
             };
 
             // 解析数据
-            ParseDailyKLineData(responseData, klineDataSet);
+            ParseZhiTuKLineData(zhiTuData, klineDataSet);
 
             return klineDataSet;
         }
         catch (Exception ex)
         {
             LogAndThrowException("日K线", symbol, ex);
-            return null; // 不会执行到这里，只是为了满足编译器要求
+            throw; // LogAndThrowException 已经抛出异常，这里不会执行到
         }
     }
 
     /// <summary>
-    /// 从Tushare获取周K线数据
+    /// 从zhituapi获取周K线数据
     /// </summary>
-    /// <param name="symbol">股票代码</param>
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
     /// <param name="startDate">开始日期，默认为null</param>
     /// <param name="endDate">结束日期，默认为null</param>
-    /// <param name="tradeDate">交易日期（每周最后一个交易日期），默认为null</param>
+    /// <param name="adjustType">除权方式（n=不复权，f=前复权，b=后复权，fr=等比前复权，br=等比后复权），默认为n</param>
     /// <returns>K线数据集合</returns>
-    public async Task<StockKLineDataSet> GetWeeklyKLineDataAsync(string symbol = "", DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<StockKLineDataSet> GetWeeklyKLineDataAsync(string symbol, DateTime? startDate = null, DateTime? endDate = null, string adjustType = "n")
     {
         try
         {
@@ -254,44 +254,44 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string tsCode = string.IsNullOrEmpty(symbol) ? "" : FormatSymbolForTushare(symbol);
+            string formattedSymbol = FormatSymbolForZhiTu(symbol);
 
-            // 构建请求参数
-            var parameters = BuildKLineParameters(tsCode, startDate, endDate);
+            // 构建API URL
+            string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "w", adjustType, startDate, endDate);
 
             // 发送请求并获取数据
-            var responseData = await FetchTushareDataAsync("weekly", parameters, DAILY_FIELDS, "周K线", tsCode);
+            var zhiTuData = await FetchZhiTuDataAsync(apiUrl, "周K线", symbol);
 
             // 转换为应用程序数据模型
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = !string.IsNullOrEmpty(tsCode) ? tsCode : "周线数据",
+                Name = formattedSymbol,
                 Interval = "weekly",
                 Data = new List<StockKLineData>()
             };
 
             // 解析数据
-            ParseDailyKLineData(responseData, klineDataSet);
+            ParseZhiTuKLineData(zhiTuData, klineDataSet);
 
             return klineDataSet;
         }
         catch (Exception ex)
         {
             LogAndThrowException("周K线", symbol, ex);
-            return null; // 不会执行到这里，只是为了满足编译器要求
+            throw; // LogAndThrowException 已经抛出异常，这里不会执行到
         }
     }
 
     /// <summary>
-    /// 从Tushare获取月K线数据
+    /// 从zhituapi获取月K线数据
     /// </summary>
-    /// <param name="symbol">股票代码</param>
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
     /// <param name="startDate">开始日期，默认为null</param>
     /// <param name="endDate">结束日期，默认为null</param>
-    /// <param name="tradeDate">交易日期（每月最后一个交易日日期），默认为null</param>
+    /// <param name="adjustType">除权方式（n=不复权，f=前复权，b=后复权，fr=等比前复权，br=等比后复权），默认为n</param>
     /// <returns>K线数据集合</returns>
-    public async Task<StockKLineDataSet> GetMonthlyKLineDataAsync(string symbol = "", DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<StockKLineDataSet> GetMonthlyKLineDataAsync(string symbol, DateTime? startDate = null, DateTime? endDate = null, string adjustType = "n")
     {
         try
         {
@@ -299,46 +299,46 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string tsCode = string.IsNullOrEmpty(symbol) ? "" : FormatSymbolForTushare(symbol);
+            string formattedSymbol = FormatSymbolForZhiTu(symbol);
 
-            // 构建请求参数
-            var parameters = BuildKLineParameters(tsCode, startDate, endDate);
+            // 构建API URL
+            string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "m", adjustType, startDate, endDate);
 
             // 发送请求并获取数据
-            var responseData = await FetchTushareDataAsync("monthly", parameters, DAILY_FIELDS, "月K线", tsCode);
+            var zhiTuData = await FetchZhiTuDataAsync(apiUrl, "月K线", symbol);
 
             // 转换为应用程序数据模型
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = !string.IsNullOrEmpty(tsCode) ? tsCode : "月线数据",
+                Name = formattedSymbol,
                 Interval = "monthly",
                 Data = new List<StockKLineData>()
             };
 
             // 解析数据
-            ParseDailyKLineData(responseData, klineDataSet);
+            ParseZhiTuKLineData(zhiTuData, klineDataSet);
 
             return klineDataSet;
         }
         catch (Exception ex)
         {
             LogAndThrowException("月K线", symbol, ex);
-            return null;
+            throw; // LogAndThrowException 已经抛出异常，这里不会执行到
         }
     }
 
     /// <summary>
-    /// 将股票代码格式化为Tushare API所需格式
+    /// 将股票代码格式化为zhituapi所需格式
     /// </summary>
     /// <param name="symbol">原始股票代码</param>
-    /// <returns>格式化后的股票代码</returns>
-    private string FormatSymbolForTushare(string symbol)
+    /// <returns>格式化后的股票代码（如000001.SZ）</returns>
+    private string FormatSymbolForZhiTu(string symbol)
     {
-        // 如果已经是Tushare格式，直接返回
+        // 如果已经是zhituapi格式，直接返回
         if (symbol.Contains("."))
         {
-            return symbol;
+            return symbol.ToUpper();
         }
 
         // 处理常见的A股代码格式
@@ -370,128 +370,175 @@ public class StockKLineService
         }
 
         // 默认返回原始代码
-        return symbol;
+        return symbol.ToUpper();
     }
 
     /// <summary>
-    /// 安全解析decimal值
+    /// 从zhituapi获取分钟级K线数据
     /// </summary>
-    /// <param name="value">要解析的值</param>
-    /// <returns>解析后的decimal值，解析失败返回0</returns>
-    private decimal ParseDecimal(object value)
-    {
-        if (value == null)
-        {
-            return 0;
-        }
-
-        if (decimal.TryParse(value.ToString(), out decimal result))
-        {
-            return result;
-        }
-
-        return 0;
-    }
-
-    /// <summary>
-    /// 从Tushare获取分钟级K线数据
-    /// </summary>
-    /// <param name="symbol">股票代码</param>
-    /// <param name="freq">分钟频度（1min/5min/15min/30min/60min）</param>
-    /// <param name="startDateTime">开始日期时间，格式：2023-08-25 09:00:00</param>
-    /// <param name="endDateTime">结束日期时间，格式：2023-08-25 19:00:00</param>
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
+    /// <param name="interval">分钟频度（1、5、15、30、60）</param>
+    /// <param name="startDate">开始日期</param>
+    /// <param name="endDate">结束日期</param>
+    /// <param name="adjustType">除权方式（n=不复权，f=前复权，b=后复权，fr=等比前复权，br=等比后复权），默认为n</param>
     /// <returns>K线数据集合</returns>
-    public async Task<StockKLineDataSet> GetMinuteKLineDataAsync(string symbol, string freq, string startDateTime = null, string endDateTime = null)
+    public async Task<StockKLineDataSet> GetMinuteKLineDataAsync(string symbol, string interval, DateTime? startDate = null, DateTime? endDate = null, string adjustType = "n")
     {
         try
         {
             // 验证频率参数
-            if (!IsValidFreq(freq))
+            if (!IsValidInterval(interval))
             {
-                throw new ArgumentException("无效的分钟频度参数，有效值为：1min, 5min, 15min, 30min, 60min", nameof(freq));
+                throw new ArgumentException("无效的分钟频度参数，有效值为：1, 5, 15, 30, 60", nameof(interval));
             }
 
-            if (string.IsNullOrEmpty(symbol))
-            {
-                throw new ArgumentException("股票代码参数必须提供", nameof(symbol));
-            }
+            // 验证参数
+            ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string tsCode = FormatSymbolForTushare(symbol);
+            string formattedSymbol = FormatSymbolForZhiTu(symbol);
 
-            // 构建请求参数
-            var parameters = new Dictionary<string, object>
-            {
-                { "ts_code", tsCode },
-                { "freq", freq }
-            };
-
-            if (!string.IsNullOrEmpty(startDateTime))
-                parameters.Add("start_date", startDateTime);
-            if (!string.IsNullOrEmpty(endDateTime))
-                parameters.Add("end_date", endDateTime);
+            // 构建API URL
+            string apiUrl = BuildZhiTuApiUrl(formattedSymbol, interval, adjustType, startDate, endDate);
 
             // 发送请求并获取数据
-            var responseData = await FetchTushareDataAsync("stk_mins", parameters, MINUTE_FIELDS, $"{freq}分钟K线", tsCode);
+            var zhiTuData = await FetchZhiTuDataAsync(apiUrl, $"{interval}分钟K线", symbol);
 
             // 转换为应用程序数据模型
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = tsCode,
-                Interval = freq,
+                Name = formattedSymbol,
+                Interval = $"{interval}min",
                 Data = new List<StockKLineData>()
             };
 
             // 解析数据
-            ParseMinuteKLineData(responseData, klineDataSet);
+            ParseZhiTuKLineData(zhiTuData, klineDataSet);
 
             return klineDataSet;
         }
         catch (Exception ex)
         {
-            LogAndThrowException($"{freq}分钟K线", symbol, ex);
-            return null; // 不会执行到这里，只是为了满足编译器要求
+            LogAndThrowException($"{interval}分钟K线", symbol, ex);
+            throw; // LogAndThrowException 已经抛出异常，这里不会执行到
         }
     }
 
     /// <summary>
     /// 验证分钟频度参数是否有效
     /// </summary>
-    /// <param name="freq">分钟频度参数</param>
+    /// <param name="interval">分钟频度参数</param>
     /// <returns>是否有效</returns>
-    private bool IsValidFreq(string freq)
+    private bool IsValidInterval(string interval)
     {
-        string[] validFreqs = { "1min", "5min", "15min", "30min", "60min" };
-        return validFreqs.Contains(freq);
+        string[] validIntervals = { "1", "5", "15", "30", "60" };
+        return validIntervals.Contains(interval);
+    }
+
+    /// <summary>
+    /// 从zhituapi获取年K线数据
+    /// </summary>
+    /// <param name="symbol">股票代码（如000001.SZ）</param>
+    /// <param name="startDate">开始日期，默认为null</param>
+    /// <param name="endDate">结束日期，默认为null</param>
+    /// <param name="adjustType">除权方式（n=不复权，f=前复权，b=后复权，fr=等比前复权，br=等比后复权），默认为n</param>
+    /// <returns>K线数据集合</returns>
+    public async Task<StockKLineDataSet> GetYearlyKLineDataAsync(string symbol, DateTime? startDate = null, DateTime? endDate = null, string adjustType = "n")
+    {
+        try
+        {
+            // 验证参数
+            ValidateKLineParameters(symbol);
+
+            // 处理股票代码格式
+            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+
+            // 构建API URL
+            string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "y", adjustType, startDate, endDate);
+
+            // 发送请求并获取数据
+            var zhiTuData = await FetchZhiTuDataAsync(apiUrl, "年K线", symbol);
+
+            // 转换为应用程序数据模型
+            var klineDataSet = new StockKLineDataSet
+            {
+                Symbol = symbol,
+                Name = formattedSymbol,
+                Interval = "yearly",
+                Data = new List<StockKLineData>()
+            };
+
+            // 解析数据
+            ParseZhiTuKLineData(zhiTuData, klineDataSet);
+
+            return klineDataSet;
+        }
+        catch (Exception ex)
+        {
+            LogAndThrowException("年K线", symbol, ex);
+            throw; // LogAndThrowException 已经抛出异常，这里不会执行到
+        }
     }
 }
 
 /// <summary>
-/// Tushare API响应模型
+/// ZhiTu API K线数据模型
 /// </summary>
 [Serializable]
-public class TushareResponse
+public class ZhiTuKLineData
 {
-    [JsonPropertyName("code")]
-    public int Code { get; set; }
+    /// <summary>
+    /// 交易时间
+    /// </summary>
+    [JsonPropertyName("t")]
+    public string T { get; set; } = string.Empty;
 
-    [JsonPropertyName("msg")]
-    public string Message { get; set; } = string.Empty;
+    /// <summary>
+    /// 开盘价
+    /// </summary>
+    [JsonPropertyName("o")]
+    public decimal O { get; set; }
 
-    [JsonPropertyName("data")]
-    public TushareData? Data { get; set; }
-}
+    /// <summary>
+    /// 最高价
+    /// </summary>
+    [JsonPropertyName("h")]
+    public decimal H { get; set; }
 
-/// <summary>
-/// Tushare数据模型
-/// </summary>
-[Serializable]
-public class TushareData
-{
-    [JsonPropertyName("fields")]
-    public List<string> Fields { get; set; } = new List<string>();
+    /// <summary>
+    /// 最低价
+    /// </summary>
+    [JsonPropertyName("l")]
+    public decimal L { get; set; }
 
-    [JsonPropertyName("items")]
-    public List<object[]> Items { get; set; } = new List<object[]>();
+    /// <summary>
+    /// 收盘价
+    /// </summary>
+    [JsonPropertyName("c")]
+    public decimal C { get; set; }
+
+    /// <summary>
+    /// 成交量
+    /// </summary>
+    [JsonPropertyName("v")]
+    public decimal V { get; set; }
+
+    /// <summary>
+    /// 成交额
+    /// </summary>
+    [JsonPropertyName("a")]
+    public decimal A { get; set; }
+
+    /// <summary>
+    /// 前收盘价
+    /// </summary>
+    [JsonPropertyName("pc")]
+    public decimal Pc { get; set; }
+
+    /// <summary>
+    /// 停牌标志（1停牌，0不停牌）
+    /// </summary>
+    [JsonPropertyName("sf")]
+    public int Sf { get; set; }
 }

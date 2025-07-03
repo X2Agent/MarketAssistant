@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Applications.Stocks.Models;
+namespace MarketAssistant.Plugins.Models;
 
 /// <summary>
 /// 资金流向趋势数据（最近10天）

@@ -1,5 +1,5 @@
-using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins.Models;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
 using System.Text.Json;
@@ -7,19 +7,15 @@ using System.Text.Json;
 namespace MarketAssistant.Plugins;
 
 [Description("根据股票代码获取技术指标")]
-public sealed class StockKLinePlugin
+public sealed class StockTechnicalPlugin
 {
-    //https://www.zhituapi.com/free  FBC77D33-FA6A-4126-B91E-FF9F0236AB55  ZHITU_TOKEN_LIMIT_TEST
-    //https://www.mairui.club/hsdata 1BB21B75-1A4A-40F7-8CF2-1B47531FD454
-    //https://www.alphavantage.co api key  34CQMM9E4T6I070B
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _zhiTuToken;
 
-    private readonly HttpClient httpClient;
-    private string zhiTuToken = "";
-
-    public StockKLinePlugin(IUserSettingService userSettingService)
+    public StockTechnicalPlugin(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
     {
-        httpClient = new HttpClient();
-        zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
     }
 
     [KernelFunction("get_stock_kdj"), Description("获取最新日线KDJ")]
@@ -30,8 +26,9 @@ public sealed class StockKLinePlugin
             // 只保留 stockSymbol 中的数字部分
             stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            var url = $"https://api.zhituapi.com/hs/latest/kdj/{stockSymbol}/d?token={zhiTuToken}";
+            var url = $"https://api.zhituapi.com/hs/latest/kdj/{stockSymbol}/d?token={_zhiTuToken}";
 
+            using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
             var info = JsonSerializer.Deserialize<StockKDJ>(response);
 
@@ -57,8 +54,9 @@ public sealed class StockKLinePlugin
             // 只保留 stockSymbol 中的数字部分
             stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            var url = $"https://api.zhituapi.com/hs/latest/macd/{stockSymbol}/d?token={zhiTuToken}";
+            var url = $"https://api.zhituapi.com/hs/latest/macd/{stockSymbol}/d?token={_zhiTuToken}";
 
+            using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
             var info = JsonSerializer.Deserialize<StockMACD>(response);
 
@@ -85,8 +83,9 @@ public sealed class StockKLinePlugin
             // 只保留 stockSymbol 中的数字部分
             stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            var url = $"https://api.zhituapi.com/hs/latest/boll/{stockSymbol}/d?token={zhiTuToken}";
+            var url = $"https://api.zhituapi.com/hs/latest/boll/{stockSymbol}/d?token={_zhiTuToken}";
 
+            using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
             var info = JsonSerializer.Deserialize<StockBoll>(response);
 
@@ -112,8 +111,9 @@ public sealed class StockKLinePlugin
             // 只保留 stockSymbol 中的数字部分
             stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            var url = $"https://api.zhituapi.com/hs/latest/ma/{stockSymbol}/d?token={zhiTuToken}";
+            var url = $"https://api.zhituapi.com/hs/latest/ma/{stockSymbol}/d?token={_zhiTuToken}";
 
+            using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
             var info = JsonSerializer.Deserialize<StockMA>(response);
 

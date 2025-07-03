@@ -200,16 +200,7 @@
                         </Grid>
                     </VerticalStackLayout>
                     
-                    <!-- Tushare API令牌 -->
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Tushare API令牌" FontSize="14" TextColor="#6c757d" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.TushareApiToken}" Placeholder="请输入Tushare API令牌" />
-                            <Button Grid.Column="1" Text="获取令牌" Command="{Binding OpenTushareApiWebsiteCommand}" 
-                                    BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" 
-                                    WidthRequest="100" HeightRequest="40" />
-                        </Grid>
-                    </VerticalStackLayout>
+
                 </VerticalStackLayout>
             </controls:CardView>
             

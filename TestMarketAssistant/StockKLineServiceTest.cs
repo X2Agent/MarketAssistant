@@ -15,13 +15,13 @@ public class StockKLineServiceTest
     [TestInitialize]
     public void Initialize()
     {
-        var tushareApiToken = Environment.GetEnvironmentVariable("TUSHARE_API_TOKEN") ?? throw new InvalidOperationException("TUSHARE_API_TOKEN environment variable is not set");
+        var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
         // 创建模拟的用户设置服务
         _mockUserSettingService = new Mock<IUserSettingService>();
         var testUserSetting = new UserSetting
         {
-            TushareApiToken = tushareApiToken
+            ZhiTuApiToken = zhiTuApiToken
         };
         _mockUserSettingService.Setup(x => x.CurrentSetting).Returns(testUserSetting);
 
@@ -36,7 +36,7 @@ public class StockKLineServiceTest
     {
         // Arrange
         string symbol = "600000";
-        string expectedTsCode = "600000.SH";
+        string expectedFormattedSymbol = "600000.SH";
 
         // Act
         var result = await _stockKLineService.GetDailyKLineDataAsync(symbol);
@@ -44,7 +44,7 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedTsCode, result.Name);
+        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("daily", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -53,8 +53,8 @@ public class StockKLineServiceTest
     public async Task GetWeeklyKLineDataAsync_ValidSymbol_ReturnsCorrectData()
     {
         // Arrange
-        string symbol = "000001";
-        string expectedTsCode = "000001.SZ";
+        string symbol = "000001.SZ";
+        string expectedFormattedSymbol = "000001.SZ";
 
         // Act
         var result = await _stockKLineService.GetWeeklyKLineDataAsync(symbol);
@@ -62,7 +62,7 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedTsCode, result.Name);
+        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("weekly", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -71,8 +71,8 @@ public class StockKLineServiceTest
     public async Task GetMonthlyKLineDataAsync_ValidSymbol_ReturnsCorrectData()
     {
         // Arrange
-        string symbol = "sh601398";
-        string expectedTsCode = "601398.SH";
+        string symbol = "601398.SH";
+        string expectedFormattedSymbol = "601398.SH";
 
         // Act
         var result = await _stockKLineService.GetMonthlyKLineDataAsync(symbol);
@@ -80,7 +80,7 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedTsCode, result.Name);
+        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("monthly", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -89,18 +89,18 @@ public class StockKLineServiceTest
     public async Task GetMinuteKLineDataAsync_ValidSymbol_ReturnsCorrectData()
     {
         // Arrange
-        string symbol = "600000";
-        string expectedTsCode = "600000.SH";
-        string freq = "5min";
+        string symbol = "600000.SH";
+        string expectedFormattedSymbol = "600000.SH";
+        string interval = "5";
 
         // Act
-        var result = await _stockKLineService.GetMinuteKLineDataAsync(symbol, freq);
+        var result = await _stockKLineService.GetMinuteKLineDataAsync(symbol, interval);
 
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedTsCode, result.Name);
-        Assert.AreEqual(freq, result.Interval);
+        Assert.AreEqual(expectedFormattedSymbol, result.Name);
+        Assert.AreEqual("5min", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
 }
