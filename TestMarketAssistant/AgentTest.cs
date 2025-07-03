@@ -310,7 +310,7 @@ public class AgentTest : BaseKernelTest
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
                 Kernel = _kernel,
-                Arguments = new KernelArguments
+                Arguments = new KernelArguments(promptExecutionSettings)
                 {
                     { "global_analysis_guidelines", globalGuidelines },
                 }

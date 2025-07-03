@@ -6,9 +6,8 @@
 
 ## TODO
 
-- AI分析结果页面展示,分析进度展示优化
+- 股票分析替换GroupChatOrchestration(更适合股票推荐)
 - 选定目录文档(Pdf,Docx)向量化搜索
-- 优化异常处理
 - SK Web Search 支持
 - MCP Client 支持
 - https://github.com/microsoft/semantic-kernel/blob/main/docs/decisions/0070-declarative-agent-schema.md

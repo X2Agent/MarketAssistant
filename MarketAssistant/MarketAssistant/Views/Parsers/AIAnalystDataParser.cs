@@ -1,6 +1,7 @@
 using MarketAssistant.Views.Models;
 using Microsoft.SemanticKernel;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Views.Parsers;
 
@@ -64,9 +65,10 @@ public class AIAnalystDataParser : IAnalystDataParser
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                Converters = { new FlexibleStringConverter() }
             };
-            //todo The JSON value could not be converted to System.String. Path: $.analysisData[0].value | LineNumber: 34 | BytePositionInLine: 22.
             return JsonSerializer.Deserialize<AnalystResult>(jsonResult, options) ?? new AnalystResult();
         }
         catch (Exception ex)
@@ -75,5 +77,29 @@ public class AIAnalystDataParser : IAnalystDataParser
             Console.WriteLine($"AI解析失败: {ex.Message}");
             return new AnalystResult();
         }
+    }
+}
+
+/// <summary>
+/// 灵活的字符串转换器，用于处理JSON中各种类型到字符串的转换
+/// </summary>
+public class FlexibleStringConverter : JsonConverter<string>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.String => reader.GetString(),
+            JsonTokenType.Number => reader.GetDouble().ToString(),
+            JsonTokenType.True => "true",
+            JsonTokenType.False => "false",
+            JsonTokenType.Null => null,
+            _ => reader.GetString()
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value);
     }
 }

@@ -71,7 +71,7 @@ public sealed class StockBasicPlugin
         }
     }
 
-    [KernelFunction("get_stock_company_info"), Description("根据股票代码获取上市公司简介")]
+    [KernelFunction("get_stock_company_info"), Description("根据股票代码获取上市公司基本面")]
     public async Task<StockCompanyInfo> GetStockCompanyInfoAsync(string stockSymbol)
     {
         try

@@ -40,8 +40,6 @@
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 		<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.6" />
 		<PackageReference Include="Microsoft.Maui.Graphics.Text.Markdig" Version="9.0.80" />
 		<PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0-preview.1.25127.4" />
 		<PackageReference Include="Microsoft.Playwright" Version="1.53.0" />
@@ -49,7 +47,6 @@
 		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.59.0" />
 		<PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration" Version="1.59.0-preview" />
 		<PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess" Version="1.59.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Connectors.Ollama" Version="1.59.0-alpha" />
 		<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.59.0-preview" />
 		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.59.0-preview" />
 		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Memory" Version="1.59.0-alpha" />

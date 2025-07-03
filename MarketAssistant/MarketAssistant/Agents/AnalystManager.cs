@@ -102,10 +102,11 @@ public class AnalystManager
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
             {
-                AllowParallelCalls = true,
-                AllowStrictSchemaAdherence = true,
+                AllowParallelCalls = false,
+                AllowStrictSchemaAdherence = false,
                 RetainArgumentTypes = true
-            })
+            }),
+            //TopP = 1
         };
 
         ChatCompletionAgent chatCompletionAgent =

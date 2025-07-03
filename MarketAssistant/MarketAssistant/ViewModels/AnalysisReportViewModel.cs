@@ -88,7 +88,7 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public bool HasConsensusInfo => !string.IsNullOrEmpty(ConsensusInfo);
     public bool HasDisagreementInfo => !string.IsNullOrEmpty(DisagreementInfo);
     public bool HasConsensusOrDisagreement => HasConsensusInfo || HasDisagreementInfo;
-    public string ScorePercentage => $"{OverallScore * 10:F0}/100";
+    public string ScorePercentage => $"{OverallScore}/10";
 
     public AnalysisReportViewModel(IAnalystDataParser aiParser, ILogger<AnalysisReportViewModel> logger)
         : base(logger)
