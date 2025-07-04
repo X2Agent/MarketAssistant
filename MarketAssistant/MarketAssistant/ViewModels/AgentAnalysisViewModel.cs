@@ -31,11 +31,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         set => SetProperty(ref _currentAnalyst, value);
     }
 
-    private int _analysisProgress;
-    public int AnalysisProgress
+    private bool _isAnalysisInProgress;
+    public bool IsAnalysisInProgress
     {
-        get => _analysisProgress;
-        set => SetProperty(ref _analysisProgress, value);
+        get => _isAnalysisInProgress;
+        set => SetProperty(ref _isAnalysisInProgress, value);
     }
 
     private string _analysisStage = "等待开始分析";
@@ -91,7 +91,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     private void SubscribeToEvents()
     {
         _marketAnalysisAgent.ProgressChanged += OnAnalysisProgressChanged;
-        _marketAnalysisAgent.MessageReceived += OnAnalysisMessageReceived;
+        _marketAnalysisAgent.AnalysisCompleted += OnAnalysisCompleted;
     }
 
     private void ToggleView()
@@ -140,18 +140,18 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         MainThread.BeginInvokeOnMainThread(() =>
         {
             CurrentAnalyst = e.CurrentAnalyst;
-            AnalysisProgress = e.ProgressPercentage;
+            IsAnalysisInProgress = e.IsInProgress;
             AnalysisStage = e.StageDescription;
         });
     }
 
-    private void OnAnalysisMessageReceived(object sender, ChatMessageContent e)
+    private void OnAnalysisCompleted(object sender, ChatMessageContent e)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
             var message = new AnalysisMessage
             {
-                Sender = e.AuthorName ?? "Unknown",
+                Sender = e.AuthorName ?? string.Empty,
                 Content = e.Content ?? string.Empty,
                 Timestamp = DateTime.Now,
                 InputTokenCount = 0,
@@ -160,15 +160,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             };
 
             AnalysisMessages.Add(message);
-
-            // 如果是CoordinatorAnalystAgent的消息，更新FinalAnalysisMessage
-            if (e.AuthorName == nameof(AnalysisAgents.CoordinatorAnalystAgent))
-            {
-                FinalAnalysisMessage = message;
-                AnalysisReportViewModel.IsReportVisible = true;
-                // 调用AnalysisReportViewModel的ProcessAnalysisMessage方法
-                AnalysisReportViewModel.ProcessAnalysisMessage(message);
-            }
+            FinalAnalysisMessage = message;
+            AnalysisReportViewModel.IsReportVisible = true;
         });
     }
 

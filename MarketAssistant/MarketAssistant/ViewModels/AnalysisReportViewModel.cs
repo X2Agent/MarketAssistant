@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Agents;
 using MarketAssistant.Views.Models;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.Logging;
@@ -9,7 +8,7 @@ namespace MarketAssistant.ViewModels;
 
 public partial class AnalysisReportViewModel : ViewModelBase
 {
-    private readonly IAnalystDataParser _aiParser;
+    private readonly IAnalystDataParser _analystDataParser;
 
     [ObservableProperty]
     private bool _isReportVisible;
@@ -90,10 +89,10 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public bool HasConsensusOrDisagreement => HasConsensusInfo || HasDisagreementInfo;
     public string ScorePercentage => $"{OverallScore}/10";
 
-    public AnalysisReportViewModel(IAnalystDataParser aiParser, ILogger<AnalysisReportViewModel> logger)
+    public AnalysisReportViewModel(IAnalystDataParser analystDataParser, ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
-        _aiParser = aiParser;
+        _analystDataParser = analystDataParser;
     }
 
     partial void OnConsensusInfoChanged(string value)
@@ -113,14 +112,6 @@ public partial class AnalysisReportViewModel : ViewModelBase
         OnPropertyChanged(nameof(ScorePercentage));
     }
 
-    public void ProcessAnalysisMessage(AnalysisMessage message)
-    {
-        if (message?.Sender == nameof(AnalysisAgents.CoordinatorAnalystAgent))
-        {
-            _ = ParseAnalystOpinionAsync(message.Content);
-        }
-    }
-
     private async Task ParseAnalystOpinionAsync(string opinion)
     {
         if (string.IsNullOrEmpty(opinion))
@@ -133,7 +124,7 @@ public partial class AnalysisReportViewModel : ViewModelBase
         {
             Logger?.LogInformation("开始解析分析师意见");
 
-            var result = await _aiParser.ParseDataAsync(opinion);
+            var result = await _analystDataParser.ParseDataAsync(opinion);
 
             if (result != null)
             {

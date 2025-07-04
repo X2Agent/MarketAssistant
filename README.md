@@ -6,7 +6,7 @@
 
 ## TODO
 
-- 股票分析替换GroupChatOrchestration(更适合股票推荐)
+- 增加股票推荐功能
 - 选定目录文档(Pdf,Docx)向量化搜索
 - SK Web Search 支持
 - MCP Client 支持

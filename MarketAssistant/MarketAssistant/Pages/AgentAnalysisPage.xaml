@@ -33,7 +33,7 @@
         <views:ProgressDisplayView 
             IsVisible="{Binding IsBusy}"
             IsProgressVisible="{Binding IsBusy}"
-            AnalysisProgress="{Binding AnalysisProgress}"
+            IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
             AnalysisStage="{Binding AnalysisStage}"
             CurrentAnalyst="{Binding CurrentAnalyst}"/>
 

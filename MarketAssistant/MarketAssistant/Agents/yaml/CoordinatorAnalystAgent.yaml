@@ -1,11 +1,9 @@
 ﻿name: CoordinatorAnalystAgent
 template: |
-  {{$history}}  
-  ---
   {{$global_analysis_guidelines}}
 
   核心职责
-  系统整合各维度分析师的结论，识别核心投资见解。
+  整合各维度分析师的结论 {{$history}}。
   评估分析师共识度与潜在分歧，形成综合判断。
   提炼核心投资逻辑，确保建议具备高度的逻辑性和可操作性。
   提供最终的、明确的投资评级、目标及风险提示。
@@ -48,13 +46,13 @@ input_variables:
     description: The guidelines for the analyst.
     is_required: true
   - name: history
-    description: The conversation history from chat.
+    description: The conclusions of various analysts.
     is_required: true
-execution_settings:
-  default:
-    temperature: 0.0
-    top_p: 0.0
-    top_k: 1
-    function_choice_behavior:
-      type: auto
-      allow_strict_schema_adherence: true
+# execution_settings:
+#   default:
+#     temperature: 0.0
+#     top_p: 0.0
+#     top_k: 1
+#     function_choice_behavior:
+#       type: auto
+#       allow_strict_schema_adherence: true

@@ -64,8 +64,8 @@ public class BaseKernelTest
                 AnalystRoleSettings = new MarketAnalystRoleSettings
                 {
                     EnableFinancialAnalyst = true,
-                    EnableMarketSentimentAnalyst = true,
-                    EnableTechnicalAnalyst = true,
+                    EnableMarketSentimentAnalyst = false,
+                    EnableTechnicalAnalyst = false,
                     EnableNewsEventAnalyst = true
                 }
             };
