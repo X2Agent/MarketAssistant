@@ -24,13 +24,8 @@
                 <ActivityIndicator x:Name="LoadingIndicator" IsRunning="True" Color="#007bff" 
                                    WidthRequest="40" HeightRequest="40" />
             </Grid>
-            
+
             <Label x:Name="StageLabel" FontSize="14" HorizontalOptions="Center" />
-            
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto" ColumnSpacing="8" RowSpacing="4">
-                <Label Grid.Column="0" Grid.Row="0" Text="当前分析师:" FontSize="14" FontAttributes="Bold" />
-                <Label Grid.Column="1" Grid.Row="0" x:Name="AnalystLabel" FontSize="14" />
-            </Grid>
 
             <Button x:Name="ShowDetailsButton" Text="查看分析过程" 
                 BackgroundColor="#007bff" TextColor="White" CornerRadius="4" />

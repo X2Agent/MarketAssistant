@@ -127,7 +127,7 @@
     </div>
 
     <!-- 引入KLineChart库 -->
-    <script src="https://cdn.jsdelivr.net/npm/klinecharts@latest/dist/klinecharts.min.js"></script>
+    <script src="klinecharts.min.js"></script>
 
     <script>
       // 初始化图表
@@ -361,10 +361,12 @@
       window.stockChartInterface = {
         // 加载K线数据
         loadData: function (data) {
-          try {
-
-            const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-
+              try {
+              console.log('接收到的原始数据:', data);
+              const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+              console.log('解析后的数据:', parsedData);
+              console.log('数据数量:', parsedData.length);
+              
             // 转换数据格式为KLineChart所需格式
             const klineData = parsedData.map((item) => ({
               timestamp: new Date(item.timestamp).getTime(),
@@ -375,9 +377,15 @@
               volume: item.volume,
               preClose: item.pre_close,
             }));
+            
+            console.log('转换后的K线数据:', klineData);
+            if (klineData.length > 0) {
+              console.log('第一条K线数据:', klineData[0]);
+            }
 
             // 设置数据
             chart.applyNewData(klineData);
+            console.log('图表数据已应用');
 
             // 隐藏错误信息
             this.setError(false);

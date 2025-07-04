@@ -16,10 +16,6 @@ public partial class ProgressDisplayView : ContentView
     public static readonly BindableProperty AnalysisStageProperty =
         BindableProperty.Create(nameof(AnalysisStage), typeof(string), typeof(ProgressDisplayView), string.Empty, propertyChanged: OnAnalysisStageChanged);
 
-    // 当前分析师
-    public static readonly BindableProperty CurrentAnalystProperty =
-        BindableProperty.Create(nameof(CurrentAnalyst), typeof(string), typeof(ProgressDisplayView), string.Empty, propertyChanged: OnCurrentAnalystChanged);
-
     public bool IsProgressVisible
     {
         get => (bool)GetValue(IsProgressVisibleProperty);
@@ -36,12 +32,6 @@ public partial class ProgressDisplayView : ContentView
     {
         get => (string)GetValue(AnalysisStageProperty);
         set => SetValue(AnalysisStageProperty, value);
-    }
-
-    public string CurrentAnalyst
-    {
-        get => (string)GetValue(CurrentAnalystProperty);
-        set => SetValue(CurrentAnalystProperty, value);
     }
 
     public ProgressDisplayView()
@@ -81,12 +71,6 @@ public partial class ProgressDisplayView : ContentView
     {
         var control = (ProgressDisplayView)bindable;
         control.StageLabel.Text = (string)newValue;
-    }
-
-    private static void OnCurrentAnalystChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var control = (ProgressDisplayView)bindable;
-        control.AnalystLabel.Text = (string)newValue;
     }
 
     private static void OnShowDetailsCommandChanged(BindableObject bindable, object oldValue, object newValue)

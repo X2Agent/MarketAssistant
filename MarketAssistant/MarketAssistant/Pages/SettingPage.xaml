@@ -48,6 +48,22 @@
                 </Grid>
             </controls:CardView>
 
+            <!-- API令牌设置区域 -->
+            <controls:CardView Header="API令牌设置">
+                <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                    <!-- 智图API令牌 -->
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="ZhiTu API令牌" FontSize="14" TextColor="#6c757d" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Entry Grid.Column="0" Text="{Binding UserSetting.ZhiTuApiToken}" Placeholder="请输入ZhiTu API令牌" />
+                            <Button Grid.Column="1" Text="获取令牌" Command="{Binding OpenZhiTuApiWebsiteCommand}" 
+                                BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" 
+                                WidthRequest="100" HeightRequest="40" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </controls:CardView>
+            
             <!-- 知识库设置区域 -->
             <controls:CardView ShadowOpacity="0.4" Header="知识库设置">
                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
@@ -56,7 +72,7 @@
                         <CheckBox IsChecked="{Binding UserSetting.LoadKnowledge}" Color="{StaticResource PrimaryButtonColor}" />
                         <Label Text="加载知识库" FontSize="{StaticResource LabelFontSize}" TextColor="#212529" VerticalOptions="Center" />
                     </HorizontalStackLayout>
-                    
+
                     <!-- 知识文件目录 -->
                     <StackLayout Grid.Row="1" Spacing="8" IsEnabled="{Binding UserSetting.LoadKnowledge}">
                         <Label Text="知识文件目录" FontSize="{StaticResource LabelFontSize}" TextColor="{StaticResource LabelTextColor}" />
@@ -66,7 +82,7 @@
                                     BackgroundColor="{StaticResource PrimaryButtonColor}" TextColor="White" Margin="8,0,0,0" />
                         </Grid>
                     </StackLayout>
-                    
+
                     <!-- 向量化按钮 -->
                     <StackLayout Grid.Row="2" Spacing="8" IsEnabled="{Binding UserSetting.LoadKnowledge}">
                         <Label Text="知识库向量化" FontSize="{StaticResource LabelFontSize}" TextColor="{StaticResource LabelTextColor}" />
@@ -81,18 +97,7 @@
                     </StackLayout>
                 </Grid>
             </controls:CardView>
-            
-            <!-- 通知设置区域 -->
-            <controls:CardView Header="通知设置">
-                <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <!-- 是否开启通知 -->
-                    <HorizontalStackLayout>
-                        <CheckBox IsChecked="{Binding UserSetting.Notification}" Color="#007bff" />
-                        <Label Text="开启通知" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                    </HorizontalStackLayout>
-                </VerticalStackLayout>
-            </controls:CardView>
-            
+
             <!-- 市场分析师角色设置区域 -->
             <controls:CardView Header="市场分析师角色设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
@@ -154,7 +159,18 @@
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>
-            
+
+            <!-- 通知设置区域 -->
+            <controls:CardView Header="通知设置">
+                <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                    <!-- 是否开启通知 -->
+                    <HorizontalStackLayout>
+                        <CheckBox IsChecked="{Binding UserSetting.Notification}" Color="#007bff" />
+                        <Label Text="开启通知" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </controls:CardView>
+
             <!-- 浏览器设置区域 -->
             <controls:CardView Header="浏览器设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
@@ -185,25 +201,7 @@
                     </VerticalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>
-            
-            <!-- API令牌设置区域 -->
-            <controls:CardView Header="API令牌设置">
-                <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <!-- 智图API令牌 -->
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="ZhiTu API令牌" FontSize="14" TextColor="#6c757d" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.ZhiTuApiToken}" Placeholder="请输入ZhiTu API令牌" />
-                            <Button Grid.Column="1" Text="获取令牌" Command="{Binding OpenZhiTuApiWebsiteCommand}" 
-                                    BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" 
-                                    WidthRequest="100" HeightRequest="40" />
-                        </Grid>
-                    </VerticalStackLayout>
-                    
 
-                </VerticalStackLayout>
-            </controls:CardView>
-            
             <!-- Web Search设置区域 -->
             <controls:CardView Header="Web Search设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">

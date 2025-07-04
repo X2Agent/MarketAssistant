@@ -34,8 +34,7 @@
             IsVisible="{Binding IsBusy}"
             IsProgressVisible="{Binding IsBusy}"
             IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
-            AnalysisStage="{Binding AnalysisStage}"
-            CurrentAnalyst="{Binding CurrentAnalyst}"/>
+            AnalysisStage="{Binding AnalysisStage}"/>
 
         <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
         <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">

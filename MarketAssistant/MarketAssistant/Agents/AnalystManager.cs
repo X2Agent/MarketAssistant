@@ -1,11 +1,16 @@
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Vectors;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Agents;
 
@@ -19,6 +24,8 @@ public class AnalystManager
     private readonly IUserSettingService _userSettingService;
     private readonly List<ChatCompletionAgent> _analysts = new();
     private ConcurrentOrchestration _orchestration;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly VectorStore _vectorStore;
 
     private Action<ChatMessageContent>? _messageCallback;
 
@@ -31,11 +38,18 @@ public class AnalystManager
     /// </summary>
     public ChatHistory History { get; } = [];
 
-    public AnalystManager(Kernel kernel, ILogger<AnalystManager> logger, IUserSettingService userSettingService)
+    public AnalystManager(Kernel kernel,
+        ILogger<AnalystManager> logger,
+        IUserSettingService userSettingService,
+        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        VectorStore vectorStore)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
+        _embeddingGenerator = embeddingGenerator;
+        _vectorStore = vectorStore;
+
         // 创建分析师及编排
         CreateAnalysts();
     }
@@ -163,6 +177,16 @@ public class AnalystManager
     public ChatCompletionAgent CreateCoordinatorAgent()
     {
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
+
+        if (_userSettingService.CurrentSetting.LoadKnowledge)
+        {
+            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+
+            var searchPlugin = textSearch.CreateWithGetTextSearchResults("VectorSearchPlugin");
+            coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
+        }
+
         return coordinatorAgent;
     }
 

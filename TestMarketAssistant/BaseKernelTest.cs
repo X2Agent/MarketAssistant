@@ -78,6 +78,10 @@ public class BaseKernelTest
                 modelId,
                 new Uri(endpoint),
                 apiKey)
+            .AddOpenAITextEmbeddingGeneration(
+                "BAAI/bge-m3",
+                endpoint,
+                apiKey)
             .Plugins
             .AddFromType<StockBasicPlugin>()
             .AddFromType<StockTechnicalPlugin>()

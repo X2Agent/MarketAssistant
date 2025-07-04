@@ -13,6 +13,7 @@ namespace MarketAssistant.ViewModels
 
         public enum KLineType
         {
+            Minute5,
             Minute15,
             Daily,
             Weekly,
@@ -31,7 +32,7 @@ namespace MarketAssistant.ViewModels
         public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
         public bool IsMonthlySelected => CurrentKLineType == KLineType.Monthly;
 
-        private string _stockCode = "sh601398";
+        private string _stockCode = "";
         public string StockCode
         {
             get => _stockCode;
@@ -208,7 +209,7 @@ namespace MarketAssistant.ViewModels
 
                 var kLineDataSet = CurrentKLineType switch
                 {
-                    KLineType.Minute15 => await _stockKLineService.GetMinuteKLineDataAsync(stockCode, "15min"),
+                    KLineType.Minute15 => await _stockKLineService.GetMinuteKLineDataAsync(stockCode, "15"),
                     KLineType.Weekly => await _stockKLineService.GetWeeklyKLineDataAsync(stockCode),
                     KLineType.Monthly => await _stockKLineService.GetMonthlyKLineDataAsync(stockCode),
                     _ => await _stockKLineService.GetDailyKLineDataAsync(stockCode)
@@ -220,8 +221,8 @@ namespace MarketAssistant.ViewModels
 
                 if (kLineDataSet.Data.Count > 0)
                 {
-                    var latestData = kLineDataSet.Data[0];
-                    var previousData = kLineDataSet.Data.Count > 1 ? kLineDataSet.Data[1] : null;
+                    var latestData = kLineDataSet.Data.Last();
+                    var previousData = kLineDataSet.Data.Count > 1 ? kLineDataSet.Data[kLineDataSet.Data.Count - 2] : null;
 
                     CurrentPrice = latestData.Close;
                     HighPrice = latestData.High;

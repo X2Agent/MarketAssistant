@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Agents;
 using MarketAssistant.Views.Models;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.Logging;
@@ -110,6 +111,14 @@ public partial class AnalysisReportViewModel : ViewModelBase
     partial void OnOverallScoreChanged(float value)
     {
         OnPropertyChanged(nameof(ScorePercentage));
+    }
+
+    public void ProcessAnalysisMessage(AnalysisMessage message)
+    {
+        if (message?.Sender == nameof(AnalysisAgents.CoordinatorAnalystAgent))
+        {
+            _ = ParseAnalystOpinionAsync(message.Content);
+        }
     }
 
     private async Task ParseAnalystOpinionAsync(string opinion)

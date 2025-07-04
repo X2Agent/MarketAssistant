@@ -3,6 +3,7 @@ using MarketAssistant.Agents;
 using MarketAssistant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -46,13 +47,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     }
 
     public ObservableCollection<AnalysisMessage> AnalysisMessages { get; } = new ObservableCollection<AnalysisMessage>();
-
-    private AnalysisMessage? _finalAnalysisMessage;
-    public AnalysisMessage? FinalAnalysisMessage
-    {
-        get => _finalAnalysisMessage;
-        set => SetProperty(ref _finalAnalysisMessage, value);
-    }
 
     private bool _isRawDataViewVisible;
     public bool IsRawDataViewVisible
@@ -160,7 +154,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             };
 
             AnalysisMessages.Add(message);
-            FinalAnalysisMessage = message;
+            AnalysisReportViewModel.ProcessAnalysisMessage(message);
             AnalysisReportViewModel.IsReportVisible = true;
         });
     }
@@ -173,8 +167,28 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         await SafeExecuteAsync(async () =>
         {
             AnalysisMessages.Clear();
-            FinalAnalysisMessage = null;
-            await _marketAnalysisAgent.AnalyzeStockAsync(StockCode);
+            AnalysisReportViewModel.ProcessAnalysisMessage(new AnalysisMessage());
+            var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
+            foreach (var message in history)
+            {
+                if (message.Role != AuthorRole.Assistant)
+                {
+                    continue; // 只处理助手的消息
+                }
+                if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
+                {
+                    continue;
+                }
+                AnalysisMessages.Add(new AnalysisMessage()
+                {
+                    Sender = message.AuthorName ?? string.Empty,
+                    Content = message.Content ?? string.Empty,
+                    Timestamp = DateTime.Now,
+                    InputTokenCount = 0,
+                    OutputTokenCount = 0,
+                    TotalTokenCount = 0
+                });
+            }
         }, "股票分析");
     }
 }

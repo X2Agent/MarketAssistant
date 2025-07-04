@@ -1,8 +1,4 @@
-using MarketAssistant.Applications.Settings;
 using MarketAssistant.Plugins;
-using MarketAssistant.Vectors;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Data;
 using Microsoft.SemanticKernel.Plugins.Core;
@@ -19,9 +15,7 @@ public interface IUserSemanticKernelService
 
 internal class UserSemanticKernelService(
         IUserSettingService userSettingService,
-        PlaywrightService playwrightService,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore) : IUserSemanticKernelService
+        PlaywrightService playwrightService) : IUserSemanticKernelService
 {
 
     public Kernel GetKernel()
@@ -66,16 +60,6 @@ internal class UserSemanticKernelService(
             }
 
             var searchPlugin = textSearch.CreateWithSearch("SearchPlugin");
-            builder.Plugins.Add(searchPlugin);
-        }
-
-        if (userSetting.LoadKnowledge)
-        {
-            var collection = vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, embeddingGenerator);
-
-            // Build a text search plugin with vector store search and add to the kernel
-            var searchPlugin = textSearch.CreateWithGetTextSearchResults("VectorSearchPlugin");
             builder.Plugins.Add(searchPlugin);
         }
 
