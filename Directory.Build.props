@@ -1,0 +1,17 @@
+<Project>
+  <PropertyGroup>
+    <!-- 在非 Windows 平台上禁用 Windows 目标构建 -->
+    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">false</EnableWindowsTargeting>
+    
+    <!-- 在 macOS 上明确禁用 Windows 目标 -->
+    <EnableWindowsTargeting Condition="'$(RuntimeIdentifier)' == 'maccatalyst-x64' OR '$(RuntimeIdentifier)' == 'maccatalyst-arm64'">false</EnableWindowsTargeting>
+    
+    <!-- 排除 Windows 项目的构建 -->
+    <DefaultItemExcludes Condition="'$(OS)' != 'Windows_NT'">$(DefaultItemExcludes);**/*WinUI*/**</DefaultItemExcludes>
+  </PropertyGroup>
+  
+  <!-- 条件性排除 Windows 项目引用 -->
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <ProjectReference Remove="**/*WinUI*/*.csproj" />
+  </ItemGroup>
+</Project>
