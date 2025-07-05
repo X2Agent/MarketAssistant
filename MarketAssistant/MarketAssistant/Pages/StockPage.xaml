@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:MarketAssistant.Controls"
              xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:converts="clr-namespace:MarketAssistant.Converts"
              x:Class="MarketAssistant.Pages.StockPage"
              x:DataType="viewmodels:StockViewModel"
              Title="{Binding StockName}"
@@ -29,6 +30,7 @@
             <AppThemeBinding x:Key="CardBackgroundColor" Light="{StaticResource CardBackgroundLight}" Dark="{StaticResource CardBackgroundDark}"/>
             <AppThemeBinding x:Key="TextColor" Light="{StaticResource TextColorLight}" Dark="{StaticResource TextColorDark}"/>
             <AppThemeBinding x:Key="BorderColor" Light="{StaticResource BorderColorLight}" Dark="{StaticResource BorderColorDark}"/>
+            <AppThemeBinding x:Key="TradingDataBackgroundColor" Light="#f8f9fa" Dark="#2d2d2d"/>
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -65,7 +67,7 @@
                 </StackLayout>
                 
                 <!-- 右侧：交易数据 -->
-                <StackLayout Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" BackgroundColor="{AppThemeBinding Light=#f8f9fa, Dark=#2d2d2d}" Padding="12,8" VerticalOptions="Center">
+                <StackLayout Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" BackgroundColor="{DynamicResource TradingDataBackgroundColor}" Padding="12,8" VerticalOptions="Center">
                     <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*" ColumnSpacing="12" RowSpacing="8">
                         <!-- 第一行 -->
                         <StackLayout Grid.Row="0" Grid.Column="0" Spacing="2">

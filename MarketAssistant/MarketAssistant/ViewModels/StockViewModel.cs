@@ -192,6 +192,10 @@ namespace MarketAssistant.ViewModels
             if (previousType != CurrentKLineType)
             {
                 OnPropertyChanged(nameof(CurrentKLineType));
+                OnPropertyChanged(nameof(IsMinuteSelected));
+                OnPropertyChanged(nameof(IsDailySelected));
+                OnPropertyChanged(nameof(IsWeeklySelected));
+                OnPropertyChanged(nameof(IsMonthlySelected));
                 await LoadStockDataAsync(StockCode);
             }
         }

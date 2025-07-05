@@ -54,11 +54,27 @@
 
 ## 📸 功能截图
 
-*即将添加*
+### 主界面
+![主界面](images/1.png)
 
-## 📊 Star History
+### 股票收藏
+![股票收藏](images/2.png)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=X2Agent/MarketAssistant&type=Date)](https://www.star-history.com/#X2Agent/MarketAssistant&Date)
+### 基本设置
+![基本设置](images/3.png)
+
+### 分析报告
+![分析报告](images/4-1.png)
+
+![分析报告](images/4-2.png)
+
+### 结构化报告 
+![结构化报告](images/5-1.png)
+
+![结构化报告](images/5-2.png)
+
+### K线
+![K线](images/6.png)
 
 ## 🙏 鸣谢
 

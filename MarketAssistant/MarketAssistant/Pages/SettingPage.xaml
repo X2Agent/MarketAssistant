@@ -24,7 +24,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="{StaticResource CardPadding}" Spacing="{StaticResource StackSpacing}">
             <!-- 模型设置区域 -->
-            <controls:CardView ShadowOpacity="0.4" Header="模型设置">
+            <controls:CardView ShadowOpacity="0.4" Header="模型设置(硅基流动)">
                 <Grid RowDefinitions="Auto,Auto" RowSpacing="16">
                     <!-- 模型选择 -->
                     <StackLayout Grid.Row="0" Spacing="8">
