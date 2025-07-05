@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Applications.Stocks.Models;
+namespace MarketAssistant.Plugins.Models;
 
 /// <summary>
 /// 股票公司信息实体类

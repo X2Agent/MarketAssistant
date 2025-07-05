@@ -33,8 +33,6 @@ public class UserSetting : INotifyPropertyChanged
 
     public string ZhiTuApiToken { get; set; } = "";
 
-    public string TushareApiToken { get; set; } = "";
-
     /// <summary>
     /// 浏览器路径，如果为空则自动检测
     /// </summary>

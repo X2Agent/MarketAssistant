@@ -58,7 +58,6 @@ public partial class SettingViewModel : ViewModelBase
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
-    public string TushareApiUrl { get; } = "https://tushare.pro/register?reg=782634";
 
     // 打开API密钥网站命令
     [RelayCommand]
@@ -66,9 +65,6 @@ public partial class SettingViewModel : ViewModelBase
 
     [RelayCommand]
     private async Task OpenZhiTuApiWebsite() => await OpenUrlAsync(ZhiTuApiUrl);
-
-    [RelayCommand]
-    private async Task OpenTushareApiWebsite() => await OpenUrlAsync(TushareApiUrl);
 
     // 协调分析师启用状态 - 计算属性
     public bool EnableAnalysisSynthesizer => UserSetting.AnalystRoleSettings.EnableAnalysisSynthesizer;

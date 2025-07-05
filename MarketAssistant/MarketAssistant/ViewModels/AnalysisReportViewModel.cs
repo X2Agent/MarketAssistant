@@ -9,7 +9,7 @@ namespace MarketAssistant.ViewModels;
 
 public partial class AnalysisReportViewModel : ViewModelBase
 {
-    private readonly IAnalystDataParser _aiParser;
+    private readonly IAnalystDataParser _analystDataParser;
 
     [ObservableProperty]
     private bool _isReportVisible;
@@ -88,12 +88,12 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public bool HasConsensusInfo => !string.IsNullOrEmpty(ConsensusInfo);
     public bool HasDisagreementInfo => !string.IsNullOrEmpty(DisagreementInfo);
     public bool HasConsensusOrDisagreement => HasConsensusInfo || HasDisagreementInfo;
-    public string ScorePercentage => $"{OverallScore * 10:F0}/100";
+    public string ScorePercentage => $"{OverallScore}/10";
 
-    public AnalysisReportViewModel(IAnalystDataParser aiParser, ILogger<AnalysisReportViewModel> logger)
+    public AnalysisReportViewModel(IAnalystDataParser analystDataParser, ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
-        _aiParser = aiParser;
+        _analystDataParser = analystDataParser;
     }
 
     partial void OnConsensusInfoChanged(string value)
@@ -133,7 +133,7 @@ public partial class AnalysisReportViewModel : ViewModelBase
         {
             Logger?.LogInformation("开始解析分析师意见");
 
-            var result = await _aiParser.ParseDataAsync(opinion);
+            var result = await _analystDataParser.ParseDataAsync(opinion);
 
             if (result != null)
             {

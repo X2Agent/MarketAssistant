@@ -6,13 +6,12 @@ namespace MarketAssistant.Infrastructure;
 
 public class GitHubReleaseService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private const string GITHUB_API_URL = "https://api.github.com/repos/owner/MarketAssistant/releases/latest";
     
-    public GitHubReleaseService()
+    public GitHubReleaseService(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     }
 
     /// <summary>
@@ -23,7 +22,9 @@ public class GitHubReleaseService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<ReleaseInfo>(GITHUB_API_URL);
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(GITHUB_API_URL);
             return response;
         }
         catch (Exception ex)
@@ -65,7 +66,9 @@ public class GitHubReleaseService
     {
         try
         {
-            var response = await _httpClient.GetAsync(downloadUrl);
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            var response = await httpClient.GetAsync(downloadUrl);
             response.EnsureSuccessStatusCode();
 
             using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);

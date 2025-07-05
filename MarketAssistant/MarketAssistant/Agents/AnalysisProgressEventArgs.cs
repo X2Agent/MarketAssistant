@@ -11,12 +11,12 @@ public class AnalysisProgressEventArgs : EventArgs
     public string CurrentAnalyst { get; set; } = string.Empty;
 
     /// <summary>
-    /// 进度百分比（0-100）
-    /// </summary>
-    public int ProgressPercentage { get; set; }
-
-    /// <summary>
     /// 当前阶段描述
     /// </summary>
     public string StageDescription { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 是否正在进行中
+    /// </summary>
+    public bool IsInProgress { get; set; } = true;
 }

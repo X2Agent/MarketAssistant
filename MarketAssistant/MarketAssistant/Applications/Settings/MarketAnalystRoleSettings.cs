@@ -31,7 +31,7 @@ public class MarketAnalystRoleSettings
     /// <summary>
     /// 技术分析师（专注于图表模式和技术指标分析）
     /// </summary>
-    public bool EnableTechnicalAnalyst { get; set; } = true;
+    public bool EnableTechnicalAnalyst { get; set; } = false;
 
     /// <summary>
     /// 新闻事件分析师（专注于新闻事件对股票的影响分析）

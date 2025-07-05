@@ -10,7 +10,6 @@ namespace MarketAssistant.ViewModels;
 public class AboutViewModel : ViewModelBase
 {
     private readonly GitHubReleaseService _githubService;
-    private readonly IUserSettingService _userSettingService;
 
     private bool _isCheckingUpdate;
     public bool IsCheckingUpdate
@@ -55,10 +54,9 @@ public class AboutViewModel : ViewModelBase
 
     public AboutViewModel(
         ILogger<AboutViewModel> logger,
-        IUserSettingService userSettingService) : base(logger)
+        GitHubReleaseService gitHubReleaseService) : base(logger)
     {
-        _githubService = new GitHubReleaseService();
-        _userSettingService = userSettingService;
+        _githubService = gitHubReleaseService;
 
         CheckUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
         DownloadUpdateCommand = new AsyncRelayCommand(DownloadUpdateAsync);

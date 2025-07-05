@@ -16,17 +16,6 @@ public partial class StockPage : ContentPage
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
     }
 
-    protected override void OnAppearing()
-    {
-        base.OnAppearing();
-
-        // 确保首次进入页面时加载数据
-        if (_viewModel.KLineData == null || !_viewModel.KLineData.Any())
-        {
-            _viewModel.RefreshDataCommand.Execute(null);
-        }
-    }
-
     protected override void OnDisappearing()
     {
         base.OnDisappearing();
@@ -49,15 +38,19 @@ public partial class StockPage : ContentPage
         if (_viewModel.KLineData == null || !_viewModel.KLineData.Any())
             return;
 
-        try
+        // 确保UI操作在主线程执行
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
-            // 更新WebView图表
-            WebChartView.SetTitleAsync(_viewModel.StockName).ConfigureAwait(false);
-            WebChartView.UpdateChartAsync(_viewModel.KLineData).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"更新图表时发生错误: {ex.Message}");
-        }
+            try
+            {
+                // 更新WebView图表
+                await WebChartView.SetTitleAsync(_viewModel.StockName);
+                await WebChartView.UpdateChartAsync(_viewModel.KLineData);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"更新图表时发生错误: {ex.Message}");
+            }
+        });
     }
 }

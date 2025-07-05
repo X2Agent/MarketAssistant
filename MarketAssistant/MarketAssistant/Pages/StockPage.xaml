@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:MarketAssistant.Controls"
              xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:converts="clr-namespace:MarketAssistant.Converts"
              x:Class="MarketAssistant.Pages.StockPage"
              x:DataType="viewmodels:StockViewModel"
              Title="{Binding StockName}"
@@ -29,67 +30,79 @@
             <AppThemeBinding x:Key="CardBackgroundColor" Light="{StaticResource CardBackgroundLight}" Dark="{StaticResource CardBackgroundDark}"/>
             <AppThemeBinding x:Key="TextColor" Light="{StaticResource TextColorLight}" Dark="{StaticResource TextColorDark}"/>
             <AppThemeBinding x:Key="BorderColor" Light="{StaticResource BorderColorLight}" Dark="{StaticResource BorderColorDark}"/>
+            <AppThemeBinding x:Key="TradingDataBackgroundColor" Light="#f8f9fa" Dark="#2d2d2d"/>
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <Grid Padding="10,5" VerticalOptions="Fill">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <!-- 股票标题和信息区域 -->
-            <RowDefinition Height="Auto" /> <!-- 交易数据 -->
+            <RowDefinition Height="Auto" /> <!-- 股票标题信息和交易数据合并区域 -->
             <RowDefinition Height="*" /> <!-- K线图 -->
         </Grid.RowDefinitions>
 
-        <!-- 股票标题和信息区域 -->
+        <!-- 股票标题信息和交易数据合并区域 -->
         <Border Grid.Row="0" Stroke="{DynamicResource BorderColor}" StrokeThickness="1" StrokeShape="RoundRectangle 8" 
                 BackgroundColor="{DynamicResource CardBackgroundColor}" Margin="0,5" Padding="15,12">
-            <StackLayout Spacing="8">
-                <StackLayout Orientation="Horizontal" Spacing="8">
-                    <Label Text="{Binding StockName}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource TextColor}" VerticalOptions="Center" />
-                    <Label Text="{Binding StockCode}" FontSize="14" TextColor="{StaticResource NeutralColor}" VerticalOptions="Center" />
-                </StackLayout>
-                
-                <StackLayout Orientation="Horizontal" Spacing="12">
-                    <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" FontSize="28" FontAttributes="Bold" 
-                           TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" VerticalOptions="Center" />
-                    <StackLayout Spacing="0" VerticalOptions="Center">
-                        <StackLayout Orientation="Horizontal" Spacing="4">
-                            <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" FontSize="14" 
-                                   TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                            <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" FontSize="14" 
-                                   TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                <!-- 左侧：股票标题和价格信息 -->
+                <StackLayout Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Spacing="8" VerticalOptions="Center">
+                    <StackLayout Orientation="Horizontal" Spacing="8">
+                        <Label Text="{Binding StockName}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource TextColor}" VerticalOptions="Center" />
+                        <Label Text="{Binding StockCode}" FontSize="14" TextColor="{StaticResource NeutralColor}" VerticalOptions="Center" />
+                    </StackLayout>
+                    
+                    <StackLayout Orientation="Horizontal" Spacing="12">
+                        <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" FontSize="28" FontAttributes="Bold" 
+                               TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" VerticalOptions="Center" />
+                        <StackLayout Spacing="0" VerticalOptions="Center">
+                            <StackLayout Orientation="Horizontal" Spacing="4">
+                                <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" FontSize="14" 
+                                       TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+                                <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" FontSize="14" 
+                                       TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+                            </StackLayout>
+                            <Label Text="较昨收" FontSize="12" TextColor="{StaticResource NeutralColor}" />
                         </StackLayout>
-                        <Label Text="较昨收" FontSize="12" TextColor="{StaticResource NeutralColor}" />
                     </StackLayout>
                 </StackLayout>
-            </StackLayout>
-        </Border>
-
-        <!-- 交易数据 -->
-        <Border Grid.Row="1" Stroke="{DynamicResource BorderColor}" StrokeThickness="1" StrokeShape="RoundRectangle 8" 
-                BackgroundColor="{DynamicResource CardBackgroundColor}" Margin="0,5" Padding="12">
-            <StackLayout BackgroundColor="{AppThemeBinding Light=#f8f9fa, Dark=#2d2d2d}" Padding="8,10" Spacing="4">
-                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="8">
-                    <!-- 标题行 -->
-                    <Label Grid.Row="0" Grid.Column="0" Text="今开" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="0" Grid.Column="1" Text="昨收" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="0" Grid.Column="2" Text="最高" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="0" Grid.Column="3" Text="最低" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="0" Grid.Column="4" Text="成交量" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="0" Grid.Column="5" Text="成交额" FontSize="12" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                    
-                    <!-- 数据行 -->
-                    <Label Grid.Row="1" Grid.Column="0" Text="{Binding OpenPrice, StringFormat='{0:F2}'}" FontSize="14" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding PreviousClosePrice, StringFormat='{0:F2}'}" FontSize="14" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="1" Grid.Column="2" Text="{Binding HighPrice, StringFormat='{0:F2}'}" FontSize="14" TextColor="{StaticResource UpColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="1" Grid.Column="3" Text="{Binding LowPrice, StringFormat='{0:F2}'}" FontSize="14" TextColor="{StaticResource DownColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="1" Grid.Column="4" Text="{Binding TodayVolume, StringFormat='{0:N0}'}" FontSize="14" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                    <Label Grid.Row="1" Grid.Column="5" Text="{Binding TodayAmount, StringFormat='{0:N0}万'}" FontSize="14" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                </Grid>
-            </StackLayout>
+                
+                <!-- 右侧：交易数据 -->
+                <StackLayout Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" BackgroundColor="{DynamicResource TradingDataBackgroundColor}" Padding="12,8" VerticalOptions="Center">
+                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*" ColumnSpacing="12" RowSpacing="8">
+                        <!-- 第一行 -->
+                        <StackLayout Grid.Row="0" Grid.Column="0" Spacing="2">
+                            <Label Text="今开" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding OpenPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                        <StackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
+                            <Label Text="昨收" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding PreviousClosePrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                        <StackLayout Grid.Row="0" Grid.Column="2" Spacing="2">
+                            <Label Text="最高" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding HighPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{StaticResource UpColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                        
+                        <!-- 第二行 -->
+                        <StackLayout Grid.Row="1" Grid.Column="0" Spacing="2">
+                            <Label Text="最低" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding LowPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{StaticResource DownColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                        <StackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                            <Label Text="成交量" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding TodayVolume, StringFormat='{0:N0}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                        <StackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
+                            <Label Text="成交额" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
+                            <Label Text="{Binding TodayAmount, StringFormat='{0:N0}万'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                        </StackLayout>
+                    </Grid>
+                </StackLayout>
+            </Grid>
         </Border>
 
         <!-- K线图 -->
-        <Border Grid.Row="2" Stroke="{DynamicResource BorderColor}" 
+        <Border Grid.Row="1" Stroke="{DynamicResource BorderColor}" 
                 StrokeThickness="1" StrokeShape="RoundRectangle 8" 
                 BackgroundColor="{DynamicResource CardBackgroundColor}" 
                 Margin="0,5" Padding="5"

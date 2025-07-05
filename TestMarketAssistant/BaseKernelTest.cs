@@ -40,15 +40,14 @@ public class BaseKernelTest
         builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
         builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
         builder.Services.AddSingleton<PlaywrightService>();
+        builder.Services.AddHttpClient();
 
         // 从环境变量获取ApiKey
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is not set");
-        var tushareApiToken = Environment.GetEnvironmentVariable("TUSHARE_API_TOKEN") ?? throw new InvalidOperationException("TUSHARE_API_TOKEN environment variable is not set");
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
-
         // 硬编码ModelId和Endpoint
-        var modelId = "deepseek-ai/DeepSeek-V3";//"Qwen/Qwen3-32B";
+        var modelId = "Qwen/Qwen3-32B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -58,7 +57,6 @@ public class BaseKernelTest
             var testUserSetting = new UserSetting
             {
                 ZhiTuApiToken = zhiTuApiToken,
-                TushareApiToken = tushareApiToken,
                 ModelId = modelId,
                 EmbeddingModelId = "BAAI/bge-m3",
                 Endpoint = endpoint,
@@ -66,8 +64,8 @@ public class BaseKernelTest
                 AnalystRoleSettings = new MarketAnalystRoleSettings
                 {
                     EnableFinancialAnalyst = true,
-                    EnableMarketSentimentAnalyst = true,
-                    EnableTechnicalAnalyst = true,
+                    EnableMarketSentimentAnalyst = false,
+                    EnableTechnicalAnalyst = false,
                     EnableNewsEventAnalyst = true
                 }
             };
@@ -76,24 +74,22 @@ public class BaseKernelTest
             return userSettingServiceMock.Object;
         });
 
-        builder.Services.AddSingleton<StockDataPlugin>();
-        builder.Services.AddSingleton<StockKLinePlugin>();
-
         builder.Services.AddKernel().AddOpenAIChatCompletion(
                 modelId,
                 new Uri(endpoint),
                 apiKey)
+            .AddOpenAITextEmbeddingGeneration(
+                "BAAI/bge-m3",
+                endpoint,
+                apiKey)
             .Plugins
-            .AddFromType<StockDataPlugin>()
-            .AddFromType<StockKLinePlugin>()
+            .AddFromType<StockBasicPlugin>()
+            .AddFromType<StockTechnicalPlugin>()
+            .AddFromType<StockFinancialPlugin>()
+            .AddFromType<StockNewsPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
             .AddFromType<TimePlugin>()
             .AddFromType<TextPlugin>();
-
-        // 使用用户设置中的AppKey创建TextEmbeddingGeneration服务
-        //builder.AddOpenAIEmbeddingGenerator(userSetting.EmbeddingModelId,
-        //    userSetting.ApiKey,
-        //    httpClient: new HttpClient(new OpenAIHttpClientHandler()));
 
         builder.Services.AddSqliteVectorStore(_ => "Data Source=:memory:");
 

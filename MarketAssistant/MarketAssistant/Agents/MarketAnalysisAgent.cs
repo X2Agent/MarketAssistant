@@ -18,9 +18,9 @@ public class MarketAnalysisAgent
     public event EventHandler<AnalysisProgressEventArgs> ProgressChanged;
 
     /// <summary>
-    /// 分析消息事件
+    /// 分析完成事件
     /// </summary>
-    public event EventHandler<ChatMessageContent> MessageReceived;
+    public event EventHandler<ChatMessageContent> AnalysisCompleted;
 
     #endregion
 
@@ -33,10 +33,7 @@ public class MarketAnalysisAgent
     // 当前进度信息
     private AnalysisProgressEventArgs _currentProgress = new();
 
-    private List<ChatCompletionAgent> _analysts = new();
-
-    // 存储分析消息
-    private readonly List<ChatMessageContent> _analysisMessages = new();
+    private ChatCompletionAgent _coordinatorAgent;
 
     #endregion
 
@@ -47,8 +44,8 @@ public class MarketAnalysisAgent
         _logger = logger;
         _analystManager = analystManager;
 
-        // 获取分析师团队
-        _analysts = _analystManager.GetAnalysts();
+        // 创建协调分析师
+        _coordinatorAgent = analystManager.CreateCoordinatorAgent();
     }
 
     #endregion
@@ -56,21 +53,11 @@ public class MarketAnalysisAgent
     #region 公共方法
 
     /// <summary>
-    /// 分析股票（供ViewModel调用的方法）
-    /// </summary>
-    /// <param name="stockCode">股票代码</param>
-    /// <returns>分析任务</returns>
-    public async Task AnalyzeStockAsync(string stockCode)
-    {
-        await AnalysisAsync(stockCode);
-    }
-
-    /// <summary>
     /// 执行股票分析
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
     /// <returns>分析消息列表</returns>
-    public async Task<List<ChatMessageContent>> AnalysisAsync(string stockSymbol)
+    public async Task<ChatHistory> AnalysisAsync(string stockSymbol)
     {
         try
         {
@@ -82,12 +69,6 @@ public class MarketAnalysisAgent
 
             // 执行分析过程
             await ExecuteAnalysisProcessAsync(prompt);
-
-            // 更新进度为完成
-            UpdateProgress(_copilot, 100, "分析完成");
-
-            // 返回收集到的分析消息
-            return _analysisMessages;
         }
         catch (Exception ex)
         {
@@ -99,16 +80,10 @@ public class MarketAnalysisAgent
             }
 
             // 更新进度为错误状态
-            UpdateProgress(_copilot, 0, $"分析失败: {errorMessage}");
+            UpdateProgress(_copilot, $"分析失败: {errorMessage}", false);
             _logger.LogError(errorMessage);
-            // 添加错误消息到分析消息列表
-            _analysisMessages.Add(new ChatMessageContent(AuthorRole.System, errorMessage)
-            {
-                AuthorName = _copilot
-            });
-
-            return _analysisMessages;
         }
+        return _analystManager.History;
     }
 
     #endregion
@@ -120,15 +95,12 @@ public class MarketAnalysisAgent
     /// </summary>
     private void InitializeAnalysisEnvironment()
     {
-        // 重置状态
-        _analysisMessages.Clear();
-
         // 初始化进度信息
         _currentProgress = new AnalysisProgressEventArgs
         {
             CurrentAnalyst = "准备中",
-            ProgressPercentage = 0,
-            StageDescription = "正在准备分析环境"
+            StageDescription = "正在准备分析环境",
+            IsInProgress = true
         };
 
         // 触发进度变化事件
@@ -148,38 +120,28 @@ public class MarketAnalysisAgent
     /// </summary>
     private async Task ExecuteAnalysisProcessAsync(string prompt)
     {
-        // 更新进度
-        UpdateProgress(nameof(AnalysisAgents.CoordinatorAnalystAgent), 0, "正在规划分析师任务");
+        UpdateProgress("分析师团队", "分析师分析中");
 
-        int analystCount = _analysts.Count;
+        var analystResults = await _analystManager.ExecuteAnalystDiscussionAsync(prompt, null);
 
-        // 清空分析消息列表
-        _analysisMessages.Clear();
+        UpdateProgress("CoordinatorAnalystAgent", "CoordinatorAnalystAgent总结中");
 
-        // 执行分析师讨论
-        await _analystManager.ExecuteAnalystDiscussionAsync(prompt, messageContent =>
-        {
-            // 保存分析消息
-            _analysisMessages.Add(messageContent);
-            // 记录消息
-            OnMessageReceived(messageContent);
-            // 更新进度
-            int progressPercentage = Math.Min(90, 10 + (_analysisMessages.Count * 80 / analystCount));
-            UpdateProgress(messageContent.AuthorName, progressPercentage, $"{messageContent.AuthorName} 分析中");
-        });
+        var coordinatorResult = await ExecuteCoordinatorAnalysisAsync(analystResults);
 
-        // 更新进度为生成结果阶段
-        UpdateProgress(_copilot, 95, "正在生成分析报告");
+        UpdateProgress("系统", "CoordinatorAnalystAgent总结完成");
+
+        // 触发分析完成事件
+        OnAnalysisCompleted(coordinatorResult);
     }
 
     /// <summary>
     /// 更新进度并触发进度变化事件
     /// </summary>
-    private void UpdateProgress(string analyst, int percentage, string description)
+    private void UpdateProgress(string analyst, string description, bool isInProgress = true)
     {
         _currentProgress.CurrentAnalyst = analyst;
-        _currentProgress.ProgressPercentage = percentage;
         _currentProgress.StageDescription = description;
+        _currentProgress.IsInProgress = isInProgress;
 
         OnProgressChanged(_currentProgress);
     }
@@ -193,11 +155,23 @@ public class MarketAnalysisAgent
     }
 
     /// <summary>
-    /// 触发消息接收事件
+    /// 触发分析完成事件
     /// </summary>
-    protected virtual void OnMessageReceived(ChatMessageContent e)
+    protected virtual void OnAnalysisCompleted(ChatMessageContent result)
     {
-        MessageReceived?.Invoke(this, e);
+        AnalysisCompleted?.Invoke(this, result);
+    }
+
+    /// <summary>
+    /// 执行协调分析师分析
+    /// </summary>
+    private async Task<ChatMessageContent> ExecuteCoordinatorAnalysisAsync(string[] analystResults)
+    {
+        _coordinatorAgent.Arguments!["history"] = analystResults.ToList();
+
+        var agentResponses = await _coordinatorAgent.InvokeAsync().ToListAsync();
+
+        return agentResponses.LastOrDefault() ?? throw new InvalidOperationException("协调分析师未返回任何响应");
     }
 
     #endregion

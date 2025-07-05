@@ -85,7 +85,12 @@ public class StockWebChartView : ContentView
         {
             await WaitForInitializationAsync();
             string escapedTitle = title.Replace("\"", "\\\"");
-            await _webView.EvaluateJavaScriptAsync($"document.title = \"{escapedTitle}\"");
+
+            // 确保在主线程执行UI操作
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await _webView.EvaluateJavaScriptAsync($"document.title = \"{escapedTitle}\"");
+            });
         }
         catch (Exception ex)
         {
@@ -107,44 +112,56 @@ public class StockWebChartView : ContentView
             // 等待WebView初始化完成
             await WaitForInitializationAsync();
 
-            // 设置加载状态
-            await _webView.EvaluateJavaScriptAsync("window.stockChartInterface.setLoading(true);");
+            // 确保在主线程执行所有WebView操作
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                // 设置加载状态
+                await _webView.EvaluateJavaScriptAsync("window.stockChartInterface.setLoading(true);");
 
-            // 将数据序列化为JSON
-            string jsonData = JsonSerializer.Serialize(kLineData);
+                // 将数据序列化为JSON，配置序列化选项
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    WriteIndented = false
+                };
+                string jsonData = JsonSerializer.Serialize(kLineData, options);
 
-            // 使用正确的方式传递JSON数据到JavaScript
-            string script = $"window.stockChartInterface.loadData({jsonData});";
+                // 使用正确的方式传递JSON数据到JavaScript
+                string script = $"window.stockChartInterface.loadData({jsonData});";
 
-            await _webView.EvaluateJavaScriptAsync(script);
+                await _webView.EvaluateJavaScriptAsync(script);
 
-            //var platfromView = _webView.Handler.PlatformView;
-            //if (platfromView != null)
-            //{
-            //    var property = platfromView.GetType().GetProperty("CoreWebView2", BindingFlags.Instance | BindingFlags.Public);
-            //    if (property != null)
-            //    {
-            //        var coreWebView2 = property.GetValue(platfromView);
-            //        if (coreWebView2 != null)
-            //        {
-            //            var openMethod = coreWebView2.GetType().GetMethod("OpenDevToolsWindow");
-            //            if (openMethod != null)
-            //            {
-            //                dynamic r = openMethod.Invoke(coreWebView2, null);
-            //            }
-            //        }
-            //    }
-            //}
+                //var platfromView = _webView.Handler.PlatformView;
+                //if (platfromView != null)
+                //{
+                //    var property = platfromView.GetType().GetProperty("CoreWebView2", BindingFlags.Instance | BindingFlags.Public);
+                //    if (property != null)
+                //    {
+                //        var coreWebView2 = property.GetValue(platfromView);
+                //        if (coreWebView2 != null)
+                //        {
+                //            var openMethod = coreWebView2.GetType().GetMethod("OpenDevToolsWindow");
+                //            if (openMethod != null)
+                //            {
+                //                dynamic r = openMethod.Invoke(coreWebView2, null);
+                //            }
+                //        }
+                //    }
+                //}
 
-            // 设置加载完成状态
-            await _webView.EvaluateJavaScriptAsync("window.stockChartInterface.setLoading(false);");
+                // 设置加载完成状态
+                await _webView.EvaluateJavaScriptAsync("window.stockChartInterface.setLoading(false);");
+            });
         }
         catch (Exception ex)
         {
             Console.WriteLine($"更新图表失败: {ex.Message}");
             // 显示错误信息
             string errorMessage = ex.Message.Replace("\"", "\\\"");
-            await _webView.EvaluateJavaScriptAsync($"window.stockChartInterface.setError(true, \"{errorMessage}\");");
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await _webView.EvaluateJavaScriptAsync($"window.stockChartInterface.setError(true, \"{errorMessage}\");");
+            });
         }
     }
 }

@@ -1,12 +1,16 @@
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Vectors;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
-using Microsoft.SemanticKernel.Agents.Orchestration.GroupChat;
+using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Agents;
 
@@ -19,27 +23,41 @@ public class AnalystManager
     private readonly ILogger<AnalystManager> _logger;
     private readonly IUserSettingService _userSettingService;
     private readonly List<ChatCompletionAgent> _analysts = new();
-    private GroupChatOrchestration _chat;
+    private ConcurrentOrchestration _orchestration;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly VectorStore _vectorStore;
 
     private Action<ChatMessageContent>? _messageCallback;
 
+    /// <summary>
+    /// 添加到历史记录每个AuthorName可能会有多条
+    /// eg.
+    /// 一个AuthorName三条记录
+    /// 对应的Role分别为Assistant、Tool、Assistant
+    /// 分别对应是否调用Plugin的分析(Content="\n\n")、工具调用(Content="Plugin返回数据")和分析师的回复(Content="最终结果")
+    /// </summary>
     public ChatHistory History { get; } = [];
 
-    public AnalystManager(Kernel kernel, ILogger<AnalystManager> logger, IUserSettingService userSettingService)
+    public AnalystManager(Kernel kernel,
+        ILogger<AnalystManager> logger,
+        IUserSettingService userSettingService,
+        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        VectorStore vectorStore)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
-        // 创建分析师团队
-        CreateAnalystTeam();
-        // 初始化Agent聊天组
-        InitializeAgentGroupChat();
+        _embeddingGenerator = embeddingGenerator;
+        _vectorStore = vectorStore;
+
+        // 创建分析师及编排
+        CreateAnalysts();
     }
 
     /// <summary>
     /// 创建分析师团队
     /// </summary>
-    private void CreateAnalystTeam()
+    private void CreateAnalysts()
     {
         // 获取用户设置
         var roleSettings = _userSettingService.CurrentSetting.AnalystRoleSettings;
@@ -59,19 +77,21 @@ public class AnalystManager
         // 新闻事件分析师
         AddAnalystIfEnabled(roleSettings.EnableNewsEventAnalyst, AnalysisAgents.NewsEventAnalystAgent);
 
-        // 协调分析师始终启用，因为它负责引导讨论和总结
-        AddAnalystIfEnabled(roleSettings.EnableAnalysisSynthesizer, AnalysisAgents.CoordinatorAnalystAgent);
-    }
-
-    /// <summary>
-    /// 根据条件添加分析师
-    /// </summary>
-    private void AddAnalystIfEnabled(bool isEnabled, AnalysisAgents agent)
-    {
-        if (isEnabled)
+        /// <summary>
+        /// 根据条件添加分析师
+        /// </summary>
+        void AddAnalystIfEnabled(bool isEnabled, AnalysisAgents agent)
         {
-            _analysts.Add(CreateAnalyst(agent));
+            if (isEnabled)
+            {
+                _analysts.Add(CreateAnalyst(agent));
+            }
         }
+
+        _orchestration = new ConcurrentOrchestration(_analysts.ToArray())
+        {
+            ResponseCallback = responseCallback
+        };
     }
 
     /// <summary>
@@ -102,10 +122,11 @@ public class AnalystManager
         {
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
             {
-                AllowParallelCalls = true,
-                AllowStrictSchemaAdherence = true,
+                AllowParallelCalls = false,
+                AllowStrictSchemaAdherence = false,
                 RetainArgumentTypes = true
-            })
+            }),
+            //TopP = 1
         };
 
         ChatCompletionAgent chatCompletionAgent =
@@ -128,23 +149,7 @@ public class AnalystManager
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>
-    /// 初始化Agent聊天组
-    /// </summary>
-    private void InitializeAgentGroupChat()
-    {
-        var groupChatManager = new AnalysisGroupChatManager()
-        {
-            MaximumInvocationCount = 10
-        };
-
-        _chat = new GroupChatOrchestration(groupChatManager, _analysts.ToArray())
-        {
-            ResponseCallback = responseCallback
-        };
-    }
-
-    public async Task ExecuteAnalystDiscussionAsync(string prompt, Action<ChatMessageContent>? messageCallback)
+    public async Task<string[]> ExecuteAnalystDiscussionAsync(string prompt, Action<ChatMessageContent>? messageCallback)
     {
         _messageCallback = messageCallback;
         if (string.IsNullOrWhiteSpace(prompt))
@@ -157,71 +162,55 @@ public class AnalystManager
         await _runtime.StartAsync();
 
         // 执行分析
-        var result = await _chat.InvokeAsync(prompt, _runtime);
+        var result = await _orchestration.InvokeAsync(prompt, _runtime);
         var response = await result.GetValueAsync(TimeSpan.FromMinutes(10));
 
         // 等待运行时完成
         await _runtime.RunUntilIdleAsync();
         await _runtime.StopAsync();
         _logger.LogInformation("分析已停止。");
+
+        return response;
     }
 
+
+    public ChatCompletionAgent CreateCoordinatorAgent()
+    {
+        var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
+
+        if (_userSettingService.CurrentSetting.LoadKnowledge)
+        {
+            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+
+            var searchPlugin = textSearch.CreateWithGetTextSearchResults("VectorSearchPlugin");
+            coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
+        }
+
+        return coordinatorAgent;
+    }
 
     /// <summary>
-    /// 获取分析师列表
+    ///  创建一个分析师线程，使用ChatHistoryAgentThread来管理分析师之间的对话
     /// </summary>
-    /// <returns>分析师列表</returns>
-    public List<ChatCompletionAgent> GetAnalysts()
+    private ChatHistoryAgentThread CreateAgentThread()
     {
-        return _analysts;
-    }
-
-    // 配置上下文函数提供者
-    //var whiteboardProvider = new WhiteboardProvider(chatClient);
-    //var agentThread = new ChatHistoryAgentThread();
-    //agentThread.AIContextProviders.Add(whiteboardProvider);
-    //agentThread.AIContextProviders.Add(
-    //        new ContextualFunctionProvider(
-    //            vectorStore: new InMemoryVectorStore(new InMemoryVectorStoreOptions()
-    //{
-    //    EmbeddingGenerator = embeddingGenerator
-    //            }),
-    //            vectorDimensions: 1536,
-    //            functions: GetMarketSentimentRelevantFunctions(), // 只包含情绪分析相关函数
-    //            maxNumberOfFunctions: 3, // 限制最多3个相关函数
-    //            loggerFactory: LoggerFactory
-    //        )
-    //    );
-
-    private static IReadOnlyList<AIFunction> GetMarketSentimentRelevantFunctions()
-    {
-        return
-        [
-            // 只包含与市场情绪分析相关的函数
-            AIFunctionFactory.Create(() => "获取资金流向数据", "GetCapitalFlow"),
-            AIFunctionFactory.Create(() => "获取投资者情绪指数", "GetSentimentIndex"),
-            AIFunctionFactory.Create(() => "获取机构持仓变化", "GetInstitutionalHoldings"),
-        ];
-    }
-
-    private static IReadOnlyList<AIFunction> GetTechnicalAnalysisRelevantFunctions()
-    {
-        return
-        [
-            AIFunctionFactory.Create(() => "获取KDJ指标", "GetStockKDJ"),
-            AIFunctionFactory.Create(() => "获取MACD指标", "GetStockMACD"),
-            AIFunctionFactory.Create(() => "获取BOLL指标", "GetStockBOLL"),
-            AIFunctionFactory.Create(() => "获取MA指标", "GetStockMA"),
-        ];
-    }
-
-    private static IReadOnlyList<AIFunction> GetFundamentalAnalysisRelevantFunctions()
-    {
-        return
-        [
-            AIFunctionFactory.Create(() => "获取财务数据", "GetFinancialData"),
-            AIFunctionFactory.Create(() => "获取公司基本信息", "GetCompanyInfo"),
-            // 其他基本面相关函数
-        ];
+        // 这里可以配置更多的上下文提供者，例如白板、函数等
+        var agentThread = new ChatHistoryAgentThread();
+        //var whiteboardProvider = new WhiteboardProvider();
+        //agentThread.AIContextProviders.Add(whiteboardProvider);
+        //agentThread.AIContextProviders.Add(
+        //        new ContextualFunctionProvider(
+        //            vectorStore: new InMemoryVectorStore(new InMemoryVectorStoreOptions()
+        //            {
+        //                EmbeddingGenerator = embeddingGenerator
+        //            }),
+        //            vectorDimensions: 1536,
+        //            functions: [AIFunctionFactory.Create(() => "获取资金流向数据", "GetCapitalFlow")],
+        //            maxNumberOfFunctions: 3, // 限制最多3个相关函数
+        //            loggerFactory: LoggerFactory
+        //        )
+        //    );
+        return agentThread;
     }
 }

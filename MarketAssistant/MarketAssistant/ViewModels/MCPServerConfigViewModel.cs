@@ -104,7 +104,8 @@ public class MCPServerConfigViewModel : ViewModelBase
         }
     }
 
-    public ObservableCollection<KeyValuePair<string, string>> EnvironmentVariables { get; } = new ObservableCollection<KeyValuePair<string, string>>();
+    // 环境变量集合
+    public ObservableCollection<KeyValuePair<string, string?>> EnvironmentVariables { get; } = new();
 
     private string _environmentVariablesText = "";
     public string EnvironmentVariablesText
@@ -307,11 +308,11 @@ public class MCPServerConfigViewModel : ViewModelBase
     }
 
     // 添加环境变量
-    public void AddEnvironmentVariable(string key, string value)
+    public void AddEnvironmentVariable(string key, string? value)
     {
         if (_editingConfig != null && !string.IsNullOrWhiteSpace(key))
         {
-            EnvironmentVariables.Add(new KeyValuePair<string, string>(key, value));
+            EnvironmentVariables.Add(new KeyValuePair<string, string?>(key, value));
         }
     }
 
@@ -321,7 +322,7 @@ public class MCPServerConfigViewModel : ViewModelBase
         if (_editingConfig != null)
         {
             var item = EnvironmentVariables.FirstOrDefault(x => x.Key == key);
-            if (!EqualityComparer<KeyValuePair<string, string>>.Default.Equals(item, default))
+            if (!EqualityComparer<KeyValuePair<string, string?>>.Default.Equals(item, default))
             {
                 EnvironmentVariables.Remove(item);
             }
@@ -398,7 +399,7 @@ public class MCPServerConfigViewModel : ViewModelBase
                     string val = line.Substring(separatorIndex + 1).Trim();
                     if (!string.IsNullOrEmpty(key))
                     {
-                        EnvironmentVariables.Add(new KeyValuePair<string, string>(key, val));
+                        EnvironmentVariables.Add(new KeyValuePair<string, string?>(key, val));
                     }
                 }
             }

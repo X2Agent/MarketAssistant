@@ -6,9 +6,8 @@
 
 ## TODO
 
-- AI分析结果页面展示,分析进度展示优化
+- 增加股票推荐功能
 - 选定目录文档(Pdf,Docx)向量化搜索
-- 优化异常处理
 - SK Web Search 支持
 - MCP Client 支持
 - https://github.com/microsoft/semantic-kernel/blob/main/docs/decisions/0070-declarative-agent-schema.md
@@ -55,11 +54,27 @@
 
 ## 📸 功能截图
 
-*即将添加*
+### 主界面
+![主界面](images/1.png)
 
-## 📊 Star History
+### 股票收藏
+![股票收藏](images/2.png)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=X2Agent/MarketAssistant&type=Date)](https://www.star-history.com/#X2Agent/MarketAssistant&Date)
+### 基本设置
+![基本设置](images/3.png)
+
+### 分析报告
+![分析报告](images/4-1.png)
+
+![分析报告](images/4-2.png)
+
+### 结构化报告 
+![结构化报告](images/5-1.png)
+
+![结构化报告](images/5-2.png)
+
+### K线
+![K线](images/6.png)
 
 ## 🙏 鸣谢
 

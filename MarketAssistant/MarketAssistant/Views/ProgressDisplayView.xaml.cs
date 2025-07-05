@@ -8,17 +8,13 @@ public partial class ProgressDisplayView : ContentView
     public static readonly BindableProperty IsProgressVisibleProperty =
         BindableProperty.Create(nameof(IsProgressVisible), typeof(bool), typeof(ProgressDisplayView), false, propertyChanged: OnIsProgressVisibleChanged);
 
-    // 分析进度
-    public static readonly BindableProperty AnalysisProgressProperty =
-        BindableProperty.Create(nameof(AnalysisProgress), typeof(int), typeof(ProgressDisplayView), 0, propertyChanged: OnAnalysisProgressChanged);
+    // 分析是否进行中
+    public static readonly BindableProperty IsAnalysisInProgressProperty =
+        BindableProperty.Create(nameof(IsAnalysisInProgress), typeof(bool), typeof(ProgressDisplayView), false, propertyChanged: OnIsAnalysisInProgressChanged);
 
     // 分析阶段
     public static readonly BindableProperty AnalysisStageProperty =
         BindableProperty.Create(nameof(AnalysisStage), typeof(string), typeof(ProgressDisplayView), string.Empty, propertyChanged: OnAnalysisStageChanged);
-
-    // 当前分析师
-    public static readonly BindableProperty CurrentAnalystProperty =
-        BindableProperty.Create(nameof(CurrentAnalyst), typeof(string), typeof(ProgressDisplayView), string.Empty, propertyChanged: OnCurrentAnalystChanged);
 
     public bool IsProgressVisible
     {
@@ -26,22 +22,16 @@ public partial class ProgressDisplayView : ContentView
         set => SetValue(IsProgressVisibleProperty, value);
     }
 
-    public int AnalysisProgress
+    public bool IsAnalysisInProgress
     {
-        get => (int)GetValue(AnalysisProgressProperty);
-        set => SetValue(AnalysisProgressProperty, value);
+        get => (bool)GetValue(IsAnalysisInProgressProperty);
+        set => SetValue(IsAnalysisInProgressProperty, value);
     }
 
     public string AnalysisStage
     {
         get => (string)GetValue(AnalysisStageProperty);
         set => SetValue(AnalysisStageProperty, value);
-    }
-
-    public string CurrentAnalyst
-    {
-        get => (string)GetValue(CurrentAnalystProperty);
-        set => SetValue(CurrentAnalystProperty, value);
     }
 
     public ProgressDisplayView()
@@ -68,26 +58,19 @@ public partial class ProgressDisplayView : ContentView
         control.ProgressBorder.IsVisible = isVisible;
     }
 
-    private static void OnAnalysisProgressChanged(BindableObject bindable, object oldValue, object newValue)
+    private static void OnIsAnalysisInProgressChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var control = (ProgressDisplayView)bindable;
-        int progress = (int)newValue;
+        bool isInProgress = (bool)newValue;
 
-        // 更新进度条和进度文本
-        control.AnalysisProgressBar.Progress = progress / 100.0;
-        control.ProgressLabel.Text = $"{progress}%";
+        // 更新圆形进度指示器的运行状态
+        control.LoadingIndicator.IsRunning = isInProgress;
     }
 
     private static void OnAnalysisStageChanged(BindableObject bindable, object oldValue, object newValue)
     {
         var control = (ProgressDisplayView)bindable;
         control.StageLabel.Text = (string)newValue;
-    }
-
-    private static void OnCurrentAnalystChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var control = (ProgressDisplayView)bindable;
-        control.AnalystLabel.Text = (string)newValue;
     }
 
     private static void OnShowDetailsCommandChanged(BindableObject bindable, object oldValue, object newValue)

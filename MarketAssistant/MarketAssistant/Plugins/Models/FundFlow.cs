@@ -1,4 +1,4 @@
-﻿namespace MarketAssistant.Applications.Stocks.Models;
+﻿namespace MarketAssistant.Plugins.Models;
 
 public class FundFlow
 {

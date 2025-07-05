@@ -126,12 +126,69 @@
       </div>
     </div>
 
-    <!-- 引入KLineChart库 -->
-    <script src="https://cdn.jsdelivr.net/npm/klinecharts@latest/dist/klinecharts.min.js"></script>
-
     <script>
-      // 初始化图表
-      const chart = klinecharts.init(document.getElementById('chart-container'), {
+      // CDN地址配置
+      const cdnUrls = [
+        'https://unpkg.com/klinecharts@9.6.0/dist/klinecharts.min.js',
+        'https://cdn.jsdelivr.net/npm/klinecharts@9.6.0/dist/klinecharts.min.js'
+      ];
+
+      // 动态加载脚本函数
+      function loadScript(url) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = url;
+          script.onload = () => {
+            console.log(`成功加载脚本: ${url}`);
+            resolve();
+          };
+          script.onerror = () => {
+            console.error(`加载脚本失败: ${url}`);
+            reject(new Error(`Failed to load script: ${url}`));
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      // 尝试加载KLineChart库
+      async function loadKLineCharts() {
+        for (let i = 0; i < cdnUrls.length; i++) {
+          try {
+            await loadScript(cdnUrls[i]);
+            console.log(`KLineChart库加载成功，使用CDN: ${cdnUrls[i]}`);
+            initializeChart();
+            return;
+          } catch (error) {
+            console.warn(`CDN ${i + 1} 加载失败: ${cdnUrls[i]}`);
+            if (i === cdnUrls.length - 1) {
+              console.error('所有CDN都加载失败');
+              showError('无法加载图表库，请检查网络连接');
+            }
+          }
+        }
+      }
+
+      // 显示错误信息
+      function showError(message) {
+        const errorOverlay = document.getElementById('error-overlay');
+        const errorMessage = document.getElementById('error-message');
+        errorMessage.textContent = message;
+        errorOverlay.style.display = 'flex';
+      }
+
+      // 全局图表变量
+       let chart = null;
+
+       // 初始化图表
+       function initializeChart() {
+         if (typeof klinecharts === 'undefined') {
+           showError('图表库未正确加载');
+           return;
+         }
+
+         try {
+           // 初始化图表
+           chart = klinecharts.init(document.getElementById('chart-container'), {
         // 设置默认主题
         theme: 'light',
         // 设置时区
@@ -362,9 +419,17 @@
         // 加载K线数据
         loadData: function (data) {
           try {
+            if (!chart) {
+              console.warn('图表尚未初始化，等待图表库加载完成');
+              this.setError(true, '图表正在初始化中，请稍候...');
+              return;
+            }
 
+            console.log('接收到的原始数据:', data);
             const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
-
+            console.log('解析后的数据:', parsedData);
+            console.log('数据数量:', parsedData.length);
+              
             // 转换数据格式为KLineChart所需格式
             const klineData = parsedData.map((item) => ({
               timestamp: new Date(item.timestamp).getTime(),
@@ -375,9 +440,15 @@
               volume: item.volume,
               preClose: item.pre_close,
             }));
+            
+            console.log('转换后的K线数据:', klineData);
+            if (klineData.length > 0) {
+              console.log('第一条K线数据:', klineData[0]);
+            }
 
             // 设置数据
             chart.applyNewData(klineData);
+            console.log('图表数据已应用');
 
             // 隐藏错误信息
             this.setError(false);
@@ -403,9 +474,19 @@
         },
       };
 
-      // 响应窗口大小变化
-      window.addEventListener('resize', function () {
-        chart.resize();
+          // 响应窗口大小变化
+          window.addEventListener('resize', function () {
+            chart.resize();
+          });
+        } catch (error) {
+          console.error('初始化图表失败:', error);
+          showError('初始化图表失败: ' + error.message);
+        }
+      }
+
+      // 页面加载完成后开始加载KLineChart库
+      document.addEventListener('DOMContentLoaded', function() {
+        loadKLineCharts();
       });
     </script>
   </body>

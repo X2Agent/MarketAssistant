@@ -1,4 +1,4 @@
-namespace MarketAssistant.Applications.Stocks;
+namespace MarketAssistant.Applications.Stocks.Models;
 
 /// <summary>
 /// 股票基本信息类
@@ -9,7 +9,7 @@ public class StockInfo
     /// 股票代码
     /// </summary>
     public string Code { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// 股票名称
     /// </summary>
