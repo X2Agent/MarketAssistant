@@ -205,8 +205,6 @@ jobs:
       with:
         files: |
           ./MarketAssistant-Windows-x64.zip
-          # ./MarketAssistant-macOS.dmg
-          # ./MarketAssistant-macOS.zip
         fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
