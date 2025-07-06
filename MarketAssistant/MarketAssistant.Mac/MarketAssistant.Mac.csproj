@@ -2,7 +2,8 @@
 
 	<PropertyGroup>
 		<TargetFramework>net9.0-maccatalyst</TargetFramework>
-		<SupportedOSPlatformVersion>15</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion>17.5</SupportedOSPlatformVersion>
+		<MacCatalystVersion>17.5</MacCatalystVersion>
 		<OutputType>Exe</OutputType>
 		<RootNamespace>MarketAssistant</RootNamespace>
 		<Nullable>enable</Nullable>

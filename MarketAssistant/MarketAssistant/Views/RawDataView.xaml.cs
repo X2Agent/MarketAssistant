@@ -38,8 +38,6 @@ public partial class RawDataView : ContentView
         if (newMessages != null)
         {
             newMessages.CollectionChanged += control.OnAnalysisMessagesCollectionChanged;
-            // 初始更新WebView内容
-            control.UpdateWebViewContent(newMessages);
         }
     }
 
