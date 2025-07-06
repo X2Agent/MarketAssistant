@@ -120,6 +120,8 @@ jobs:
           -p:RuntimeIdentifier=maccatalyst-x64 \
           -p:EnableWindowsTargeting=false \
           -p:TargetPlatformIdentifier=maccatalyst \
+          -p:MacCatalystVersion=17.5 \
+          -p:SupportedOSPlatformVersion=15.0 \
           --no-restore \
           --verbosity minimal \
           -o ./publish/macos
