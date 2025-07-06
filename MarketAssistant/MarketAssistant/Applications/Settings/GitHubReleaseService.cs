@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Infrastructure;
@@ -7,24 +6,45 @@ namespace MarketAssistant.Infrastructure;
 public class GitHubReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private const string GITHUB_API_URL = "https://api.github.com/repos/owner/MarketAssistant/releases/latest";
-    
+    private const string GITHUB_API_BASE_URL = "https://api.github.com/repos/X2Agent/MarketAssistant/releases";
+    private const string GITHUB_API_LATEST_URL = "https://api.github.com/repos/X2Agent/MarketAssistant/releases/latest";
+
     public GitHubReleaseService(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     }
 
     /// <summary>
-    /// 获取最新版本信息
+    /// 获取所有发布版本信息（包含正式版和预览版）
     /// </summary>
-    /// <returns>最新版本信息</returns>
+    /// <returns>所有发布版本信息列表</returns>
+    public async Task<List<ReleaseInfo>?> GetAllReleasesAsync()
+    {
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            var response = await httpClient.GetFromJsonAsync<List<ReleaseInfo>>(GITHUB_API_BASE_URL);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"获取所有发布版本信息失败: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 获取最新正式版本信息
+    /// </summary>
+    /// <returns>最新正式版本信息</returns>
     public async Task<ReleaseInfo?> GetLatestReleaseAsync()
     {
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
-            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(GITHUB_API_URL);
+            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(GITHUB_API_LATEST_URL);
             return response;
         }
         catch (Exception ex)
@@ -35,13 +55,45 @@ public class GitHubReleaseService
     }
 
     /// <summary>
+    /// 获取所有正式版本（非预览版）
+    /// </summary>
+    /// <returns>所有正式版本信息列表</returns>
+    public async Task<List<ReleaseInfo>?> GetStableReleasesAsync()
+    {
+        var allReleases = await GetAllReleasesAsync();
+        return allReleases?.Where(r => !r.Prerelease && !r.Draft).ToList();
+    }
+
+    /// <summary>
+    /// 获取所有预览版本
+    /// </summary>
+    /// <returns>所有预览版本信息列表</returns>
+    public async Task<List<ReleaseInfo>?> GetPrereleaseVersionsAsync()
+    {
+        var allReleases = await GetAllReleasesAsync();
+        return allReleases?.Where(r => r.Prerelease && !r.Draft).ToList();
+    }
+
+    /// <summary>
     /// 检查是否有新版本
     /// </summary>
     /// <param name="currentVersion">当前版本</param>
+    /// <param name="includePrerelease">是否包含预览版</param>
     /// <returns>是否有新版本</returns>
-    public async Task<(bool HasNewVersion, ReleaseInfo? ReleaseInfo)> CheckForUpdateAsync(string currentVersion)
+    public async Task<(bool HasNewVersion, ReleaseInfo? ReleaseInfo)> CheckForUpdateAsync(string currentVersion, bool includePrerelease = true)
     {
-        var releaseInfo = await GetLatestReleaseAsync();
+        ReleaseInfo? releaseInfo;
+
+        if (includePrerelease)
+        {
+            var allReleases = await GetAllReleasesAsync();
+            releaseInfo = allReleases?.Where(r => !r.Draft).OrderByDescending(r => r.PublishedAt).FirstOrDefault();
+        }
+        else
+        {
+            releaseInfo = await GetLatestReleaseAsync();
+        }
+
         if (releaseInfo == null)
         {
             return (false, null);
@@ -83,23 +135,96 @@ public class GitHubReleaseService
     }
 
     /// <summary>
-    /// 比较版本号
+    /// 比较版本号（支持语义化版本规范 SemVer）
     /// </summary>
     /// <param name="version1">版本1</param>
     /// <param name="version2">版本2</param>
-    /// <returns>比较结果</returns>
+    /// <returns>比较结果：1表示version1>version2，-1表示version1<version2，0表示相等</returns>
     private int CompareVersions(string version1, string version2)
     {
-        var v1Parts = version1.Split('.').Select(int.Parse).ToArray();
-        var v2Parts = version2.Split('.').Select(int.Parse).ToArray();
+        var v1 = ParseVersion(version1);
+        var v2 = ParseVersion(version2);
 
-        for (int i = 0; i < Math.Max(v1Parts.Length, v2Parts.Length); i++)
+        // 比较主版本号
+        if (v1.Major != v2.Major)
+            return v1.Major.CompareTo(v2.Major);
+
+        // 比较次版本号
+        if (v1.Minor != v2.Minor)
+            return v1.Minor.CompareTo(v2.Minor);
+
+        // 比较修订版本号
+        if (v1.Patch != v2.Patch)
+            return v1.Patch.CompareTo(v2.Patch);
+
+        // 比较预发布版本
+        // 根据 SemVer 规范：正式版本 > 预发布版本
+        if (string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
+            return 1;
+        if (!string.IsNullOrEmpty(v1.Prerelease) && string.IsNullOrEmpty(v2.Prerelease))
+            return -1;
+        if (!string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
+            return ComparePrerelease(v1.Prerelease, v2.Prerelease);
+
+        return 0;
+    }
+
+    /// <summary>
+    /// 解析版本号字符串
+    /// </summary>
+    /// <param name="version">版本号字符串</param>
+    /// <returns>解析后的版本信息</returns>
+    private (int Major, int Minor, int Patch, string Prerelease) ParseVersion(string version)
+    {
+        // 分离主版本号和预发布标识符
+        var parts = version.Split('-', 2);
+        var mainVersion = parts[0];
+        var prerelease = parts.Length > 1 ? parts[1] : string.Empty;
+
+        // 解析主版本号部分
+        var versionParts = mainVersion.Split('.');
+        var major = versionParts.Length > 0 && int.TryParse(versionParts[0], out var maj) ? maj : 0;
+        var minor = versionParts.Length > 1 && int.TryParse(versionParts[1], out var min) ? min : 0;
+        var patch = versionParts.Length > 2 && int.TryParse(versionParts[2], out var pat) ? pat : 0;
+
+        return (major, minor, patch, prerelease);
+    }
+
+    /// <summary>
+    /// 比较预发布版本标识符
+    /// </summary>
+    /// <param name="prerelease1">预发布版本1</param>
+    /// <param name="prerelease2">预发布版本2</param>
+    /// <returns>比较结果</returns>
+    private int ComparePrerelease(string prerelease1, string prerelease2)
+    {
+        var parts1 = prerelease1.Split('.');
+        var parts2 = prerelease2.Split('.');
+
+        for (int i = 0; i < Math.Max(parts1.Length, parts2.Length); i++)
         {
-            var v1 = i < v1Parts.Length ? v1Parts[i] : 0;
-            var v2 = i < v2Parts.Length ? v2Parts[i] : 0;
+            var part1 = i < parts1.Length ? parts1[i] : string.Empty;
+            var part2 = i < parts2.Length ? parts2[i] : string.Empty;
 
-            if (v1 > v2) return 1;
-            if (v1 < v2) return -1;
+            // 如果一个部分为空，另一个不为空，空的部分较小
+            if (string.IsNullOrEmpty(part1) && !string.IsNullOrEmpty(part2))
+                return -1;
+            if (!string.IsNullOrEmpty(part1) && string.IsNullOrEmpty(part2))
+                return 1;
+
+            // 尝试按数字比较
+            if (int.TryParse(part1, out var num1) && int.TryParse(part2, out var num2))
+            {
+                if (num1 != num2)
+                    return num1.CompareTo(num2);
+            }
+            else
+            {
+                // 按字符串比较
+                var result = string.Compare(part1, part2, StringComparison.OrdinalIgnoreCase);
+                if (result != 0)
+                    return result;
+            }
         }
 
         return 0;
@@ -125,6 +250,15 @@ public class ReleaseInfo
 
     [JsonPropertyName("published_at")]
     public DateTime PublishedAt { get; set; }
+
+    [JsonPropertyName("prerelease")]
+    public bool Prerelease { get; set; }
+
+    [JsonPropertyName("draft")]
+    public bool Draft { get; set; }
+
+    [JsonPropertyName("created_at")]
+    public DateTime CreatedAt { get; set; }
 }
 
 public class ReleaseAsset

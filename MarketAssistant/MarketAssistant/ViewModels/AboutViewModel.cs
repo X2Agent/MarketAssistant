@@ -49,6 +49,8 @@ public class AboutViewModel : ViewModelBase
     public IAsyncRelayCommand OpenWebsiteCommand { get; }
     public IAsyncRelayCommand OpenFeedbackCommand { get; }
     public IAsyncRelayCommand OpenLicenseCommand { get; }
+    public IAsyncRelayCommand OpenGitHubCommand { get; }
+
 
     public ObservableCollection<FeatureItem> FeatureItems { get; } = new ObservableCollection<FeatureItem>();
 
@@ -64,6 +66,7 @@ public class AboutViewModel : ViewModelBase
         OpenWebsiteCommand = new AsyncRelayCommand(() => OpenUrlAsync(ApplicationInfo.OfficialWebsite));
         OpenFeedbackCommand = new AsyncRelayCommand(() => OpenUrlAsync(ApplicationInfo.FeedbackUrl));
         OpenLicenseCommand = new AsyncRelayCommand(() => OpenUrlAsync(ApplicationInfo.LicenseUrl));
+        OpenGitHubCommand = new AsyncRelayCommand(() => OpenUrlAsync(ApplicationInfo.GitHubRepo));
 
         // 初始化功能项列表
         InitializeFeatureItems();
@@ -71,7 +74,6 @@ public class AboutViewModel : ViewModelBase
 
     private async Task CheckForUpdateAsync()
     {
-        AppInfo.ShowSettingsUI();
         try
         {
             IsCheckingUpdate = true;
@@ -157,13 +159,13 @@ public class AboutViewModel : ViewModelBase
             Command = OpenLicenseCommand
         });
 
-        FeatureItems.Add(new FeatureItem
-        {
-            IconSource = "email.png",
-            Title = "邮件联系",
-            ButtonText = "邮件",
-            Command = new AsyncRelayCommand(() => Launcher.OpenAsync("mailto:support@example.com"))
-        });
+        //FeatureItems.Add(new FeatureItem
+        //{
+        //    IconSource = "email.png",
+        //    Title = "邮件联系",
+        //    ButtonText = "邮件",
+        //    Command = new AsyncRelayCommand(() => Launcher.OpenAsync("mailto:support@example.com"))
+        //});
     }
 }
 
