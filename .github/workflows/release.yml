@@ -1,7 +1,7 @@
 name: Build and Release
 
 permissions:
-  releases: write
+  contents: write
 
 env:
   DOTNET_VERSION: '9.0.x'
