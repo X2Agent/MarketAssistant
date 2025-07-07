@@ -106,7 +106,7 @@
                     
                     <!-- 协调分析师（必选） -->
                     <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer}" Color="#007bff" IsEnabled="False" />
+                        <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer, Mode=OneWay}" Color="#007bff" IsEnabled="False" />
                         <VerticalStackLayout>
                             <Label Text="协调分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
                             <Label Text="负责引导讨论和总结（必选）" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
@@ -115,7 +115,7 @@
                     
                     <!-- 基本面分析师 -->
                     <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableFundamentalAnalyst}" Color="#007bff" IsEnabled="False" />
+                        <CheckBox IsChecked="{Binding EnableFundamentalAnalyst, Mode=OneWay}" Color="#007bff" IsEnabled="False" />
                         <VerticalStackLayout>
                             <Label Text="基本面分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
                             <Label Text="整合了策略分析师和股票研究分析师的功能" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
@@ -211,7 +211,7 @@
                         <Label Text="启用Web Search功能" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
                     </HorizontalStackLayout>
                     
-                    <!-- Web Search 服务商选择和API Key (放在同一行) -->
+                    <!-- Web Search 服务商选择和API Key -->
                     <VerticalStackLayout Spacing="8" IsEnabled="{Binding UserSetting.EnableWebSearch}">
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                             <VerticalStackLayout Grid.Column="0" Spacing="8">

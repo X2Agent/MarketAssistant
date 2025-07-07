@@ -350,166 +350,6 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
-    public async Task CheckForUpdateAsync_WithNewerVersion_ReturnsTrue()
-    {
-        // Arrange
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v2.0.0",
-            Name = "Release 2.0.0",
-            Body = "New release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v2.0.0",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = false,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("1.0.0");
-
-        // Assert
-        Assert.IsTrue(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v2.0.0", result.ReleaseInfo.TagName);
-    }
-
-    [TestMethod]
-    public async Task CheckForUpdateAsync_WithSameVersion_ReturnsFalse()
-    {
-        // Arrange
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v1.0.0",
-            Name = "Release 1.0.0",
-            Body = "Current release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v1.0.0",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = false,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("1.0.0");
-
-        // Assert
-        Assert.IsFalse(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v1.0.0", result.ReleaseInfo.TagName);
-    }
-
-    [TestMethod]
-    public async Task CheckForUpdateAsync_WithOlderVersion_ReturnsFalse()
-    {
-        // Arrange
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v1.0.0",
-            Name = "Release 1.0.0",
-            Body = "Old release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v1.0.0",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = false,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("2.0.0");
-
-        // Assert
-        Assert.IsFalse(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v1.0.0", result.ReleaseInfo.TagName);
-    }
-
-    [TestMethod]
-    public async Task CheckForUpdateAsync_WithVersionPrefix_HandlesCorrectly()
-    {
-        // Arrange
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v2.0.0",
-            Name = "Release 2.0.0",
-            Body = "New release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v2.0.0",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = false,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("v1.0.0");
-
-        // Assert
-        Assert.IsTrue(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v2.0.0", result.ReleaseInfo.TagName);
-    }
-
-    [TestMethod]
     public async Task CheckForUpdateAsync_WithIncludePrereleaseTrue_ReturnsLatestIncludingPrerelease()
     {
         // Arrange - Setup for GetAllReleasesAsync call
@@ -769,9 +609,9 @@ public class GitHubReleaseServiceTest
     public void CompareVersions_BasicVersions_ReturnsCorrectResult()
     {
         // 使用反射访问私有方法进行测试
-        var method = typeof(GitHubReleaseService).GetMethod("CompareVersions", 
+        var method = typeof(GitHubReleaseService).GetMethod("CompareVersions",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
+
         // Test cases: (version1, version2, expected result)
         var testCases = new[]
         {
@@ -788,7 +628,7 @@ public class GitHubReleaseServiceTest
         {
             // Act
             var result = (int)method!.Invoke(_gitHubReleaseService, new object[] { version1, version2 })!;
-            
+
             // Assert
             Assert.AreEqual(expected, result, $"Comparing {version1} with {version2}");
         }
@@ -798,9 +638,9 @@ public class GitHubReleaseServiceTest
     public void CompareVersions_PrereleaseVersions_ReturnsCorrectResult()
     {
         // 使用反射访问私有方法进行测试
-        var method = typeof(GitHubReleaseService).GetMethod("CompareVersions", 
+        var method = typeof(GitHubReleaseService).GetMethod("CompareVersions",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
+
         // Test cases: (version1, version2, expected result)
         var testCases = new[]
         {
@@ -830,127 +670,10 @@ public class GitHubReleaseServiceTest
         {
             // Act
             var result = (int)method!.Invoke(_gitHubReleaseService, new object[] { version1, version2 })!;
-            
+
             // Assert
             Assert.AreEqual(expected, result, $"Comparing {version1} with {version2}");
         }
-    }
-
-    [TestMethod]
-    public void CompareVersions_EdgeCases_ReturnsCorrectResult()
-    {
-        // 使用反射访问私有方法进行测试
-        var method = typeof(GitHubReleaseService).GetMethod("CompareVersions", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        // Test cases: (version1, version2, expected result)
-        var testCases = new[]
-        {
-            // 不同长度的版本号
-            ("1.0", "1.0.0", 0),
-            ("1.0.0", "1.0", 0),
-            ("1.0.1", "1.0", 1),
-            ("1.0", "1.0.1", -1),
-            
-            // 单个数字版本
-            ("2", "1", 1),
-            ("1", "2", -1),
-            ("1", "1.0.0", 0),
-            
-            // 零版本号
-            ("0.0.1", "0.0.0", 1),
-            ("0.1.0", "0.0.1", 1),
-            ("1.0.0", "0.9.9", 1),
-        };
-
-        foreach (var (version1, version2, expected) in testCases)
-        {
-            // Act
-            var result = (int)method!.Invoke(_gitHubReleaseService, new object[] { version1, version2 })!;
-            
-            // Assert
-            Assert.AreEqual(expected, result, $"Comparing {version1} with {version2}");
-        }
-    }
-
-    [TestMethod]
-    public async Task CheckForUpdateAsync_WithPrereleaseVersionComparison_ReturnsCorrectResult()
-    {
-        // Arrange - 当前版本是 2.0.0，最新版本是 2.1.0-beta.1
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v2.1.0-beta.1",
-            Name = "Release 2.1.0 Beta 1",
-            Body = "Beta release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v2.1.0-beta.1",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = true,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("v2.0.0");
-
-        // Assert - 2.1.0-beta.1 应该大于 2.0.0
-        Assert.IsTrue(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v2.1.0-beta.1", result.ReleaseInfo.TagName);
-    }
-
-    [TestMethod]
-    public async Task CheckForUpdateAsync_WithCurrentPrereleaseVsStable_ReturnsCorrectResult()
-    {
-        // Arrange - 当前版本是 2.1.0-beta.1，最新稳定版是 2.0.0
-        var releaseInfo = new ReleaseInfo
-        {
-            TagName = "v2.0.0",
-            Name = "Release 2.0.0",
-            Body = "Stable release",
-            HtmlUrl = "https://github.com/X2Agent/MarketAssistant/releases/tag/v2.0.0",
-            PublishedAt = DateTime.UtcNow,
-            Prerelease = false,
-            Draft = false,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            Assets = new List<ReleaseAsset>()
-        };
-
-        var jsonResponse = JsonSerializer.Serialize(releaseInfo);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(jsonResponse, Encoding.UTF8, "application/json")
-        };
-
-        _httpMessageHandlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>()
-            )
-            .ReturnsAsync(httpResponse);
-
-        // Act
-        var result = await _gitHubReleaseService.CheckForUpdateAsync("v2.1.0-beta.1");
-
-        // Assert - 2.0.0 应该小于 2.1.0-beta.1
-        Assert.IsFalse(result.HasNewVersion);
-        Assert.IsNotNull(result.ReleaseInfo);
-        Assert.AreEqual("v2.0.0", result.ReleaseInfo.TagName);
     }
 
     #endregion

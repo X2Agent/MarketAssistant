@@ -17,7 +17,12 @@ public class UserSetting : INotifyPropertyChanged
 
     public string ApiKey { get; set; } = "";
 
-    public bool LoadKnowledge { get; set; }
+    private bool _loadKnowledge;
+    public bool LoadKnowledge
+    {
+        get => _loadKnowledge;
+        set => SetProperty(ref _loadKnowledge, value);
+    }
 
     [JsonIgnore]
     public const string VectorCollectionName = "knowledge";
@@ -53,10 +58,15 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _logPath, value);
     }
 
+    private bool _enableWebSearch;
     /// <summary>
     /// 是否启用Web Search功能
     /// </summary>
-    public bool EnableWebSearch { get; set; } = false;
+    public bool EnableWebSearch
+    {
+        get => _enableWebSearch;
+        set => SetProperty(ref _enableWebSearch, value);
+    }
 
     /// <summary>
     /// Web Search API Key

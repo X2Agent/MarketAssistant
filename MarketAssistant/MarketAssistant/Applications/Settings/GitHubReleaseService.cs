@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
@@ -24,12 +25,14 @@ public class GitHubReleaseService
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            
             var response = await httpClient.GetFromJsonAsync<List<ReleaseInfo>>(GITHUB_API_BASE_URL);
             return response;
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"获取所有发布版本信息失败: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"异常详情: {ex}");
             return null;
         }
     }
@@ -135,59 +138,98 @@ public class GitHubReleaseService
     }
 
     /// <summary>
-    /// 比较版本号（支持语义化版本规范 SemVer）
+    /// 比较版本号（支持三位数和四位数版本号格式）
     /// </summary>
     /// <param name="version1">版本1</param>
     /// <param name="version2">版本2</param>
     /// <returns>比较结果：1表示version1>version2，-1表示version1<version2，0表示相等</returns>
     private int CompareVersions(string version1, string version2)
     {
-        var v1 = ParseVersion(version1);
-        var v2 = ParseVersion(version2);
+        try
+        {
+            var v1 = ParseVersionInfo(version1);
+            var v2 = ParseVersionInfo(version2);
 
-        // 比较主版本号
-        if (v1.Major != v2.Major)
-            return v1.Major.CompareTo(v2.Major);
+            // 使用 System.Version 进行版本号比较
+            var result = v1.Version.CompareTo(v2.Version);
+            if (result != 0)
+                return result;
 
-        // 比较次版本号
-        if (v1.Minor != v2.Minor)
-            return v1.Minor.CompareTo(v2.Minor);
+            // 如果主版本号相同，比较预发布版本
+            // 根据 SemVer 规范：正式版本 > 预发布版本
+            if (string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
+                return 1;
+            if (!string.IsNullOrEmpty(v1.Prerelease) && string.IsNullOrEmpty(v2.Prerelease))
+                return -1;
+            if (!string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
+                return ComparePrerelease(v1.Prerelease, v2.Prerelease);
 
-        // 比较修订版本号
-        if (v1.Patch != v2.Patch)
-            return v1.Patch.CompareTo(v2.Patch);
-
-        // 比较预发布版本
-        // 根据 SemVer 规范：正式版本 > 预发布版本
-        if (string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
-            return 1;
-        if (!string.IsNullOrEmpty(v1.Prerelease) && string.IsNullOrEmpty(v2.Prerelease))
-            return -1;
-        if (!string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
-            return ComparePrerelease(v1.Prerelease, v2.Prerelease);
-
-        return 0;
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"版本号比较失败: {ex.Message}");
+            // 如果解析失败，回退到字符串比较
+            return string.Compare(version1, version2, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     /// <summary>
-    /// 解析版本号字符串
+    /// 解析版本号字符串（支持三位数和四位数版本号）
     /// </summary>
     /// <param name="version">版本号字符串</param>
     /// <returns>解析后的版本信息</returns>
-    private (int Major, int Minor, int Patch, string Prerelease) ParseVersion(string version)
+    private (Version Version, string Prerelease) ParseVersionInfo(string version)
     {
+        if (string.IsNullOrWhiteSpace(version))
+            throw new ArgumentException("版本号不能为空", nameof(version));
+
         // 分离主版本号和预发布标识符
         var parts = version.Split('-', 2);
         var mainVersion = parts[0];
         var prerelease = parts.Length > 1 ? parts[1] : string.Empty;
 
-        // 解析主版本号部分
-        var versionParts = mainVersion.Split('.');
-        var major = versionParts.Length > 0 && int.TryParse(versionParts[0], out var maj) ? maj : 0;
-        var minor = versionParts.Length > 1 && int.TryParse(versionParts[1], out var min) ? min : 0;
-        var patch = versionParts.Length > 2 && int.TryParse(versionParts[2], out var pat) ? pat : 0;
+        // 验证版本号格式
+        if (!IsValidVersionFormat(mainVersion))
+            throw new FormatException($"无效的版本号格式: {mainVersion}");
 
-        return (major, minor, patch, prerelease);
+        // 使用 System.Version 解析版本号
+        // System.Version 支持 Major.Minor、Major.Minor.Build、Major.Minor.Build.Revision 格式
+        if (Version.TryParse(mainVersion, out var parsedVersion))
+        {
+            return (parsedVersion, prerelease);
+        }
+
+        // 如果解析失败，尝试补全版本号格式
+        var versionParts = mainVersion.Split('.');
+        if (versionParts.Length >= 2)
+        {
+            // 确保至少有 Major.Minor 格式
+            var normalizedVersion = string.Join(".", versionParts.Take(4));
+            if (Version.TryParse(normalizedVersion, out var normalizedParsedVersion))
+            {
+                return (normalizedParsedVersion, prerelease);
+            }
+        }
+
+        throw new FormatException($"无法解析版本号: {version}");
+    }
+
+    /// <summary>
+    /// 验证版本号格式是否有效
+    /// </summary>
+    /// <param name="version">版本号字符串</param>
+    /// <returns>是否为有效格式</returns>
+    private bool IsValidVersionFormat(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return false;
+
+        var parts = version.Split('.');
+        if (parts.Length < 2 || parts.Length > 4)
+            return false;
+
+        return parts.All(part => int.TryParse(part, out var num) && num >= 0);
     }
 
     /// <summary>
@@ -233,32 +275,56 @@ public class GitHubReleaseService
 
 public class ReleaseInfo
 {
-    [JsonPropertyName("tag_name")]
-    public string TagName { get; set; } = string.Empty;
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
 
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
 
-    [JsonPropertyName("body")]
-    public string Body { get; set; } = string.Empty;
+    [JsonPropertyName("assets_url")]
+    public string AssetsUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("upload_url")]
+    public string UploadUrl { get; set; } = string.Empty;
 
     [JsonPropertyName("html_url")]
     public string HtmlUrl { get; set; } = string.Empty;
 
-    [JsonPropertyName("assets")]
-    public List<ReleaseAsset> Assets { get; set; } = new List<ReleaseAsset>();
+    [JsonPropertyName("node_id")]
+    public string NodeId { get; set; } = string.Empty;
 
-    [JsonPropertyName("published_at")]
-    public DateTime PublishedAt { get; set; }
+    [JsonPropertyName("tag_name")]
+    public string TagName { get; set; } = string.Empty;
 
-    [JsonPropertyName("prerelease")]
-    public bool Prerelease { get; set; }
+    [JsonPropertyName("target_commitish")]
+    public string TargetCommitish { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("draft")]
     public bool Draft { get; set; }
 
+    [JsonPropertyName("prerelease")]
+    public bool Prerelease { get; set; }
+
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
+
+    [JsonPropertyName("published_at")]
+    public DateTime PublishedAt { get; set; }
+
+    [JsonPropertyName("assets")]
+    public List<ReleaseAsset> Assets { get; set; } = new List<ReleaseAsset>();
+
+    [JsonPropertyName("tarball_url")]
+    public string TarballUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("zipball_url")]
+    public string ZipballUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("body")]
+    public string Body { get; set; } = string.Empty;
 }
 
 public class ReleaseAsset
