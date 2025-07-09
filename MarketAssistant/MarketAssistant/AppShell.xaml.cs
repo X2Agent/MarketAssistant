@@ -1,4 +1,4 @@
-﻿using MarketAssistant.Pages;
+using MarketAssistant.Pages;
 
 namespace MarketAssistant
 {
@@ -11,7 +11,6 @@ namespace MarketAssistant
             Routing.RegisterRoute("analysis", typeof(AgentAnalysisPage));
             Routing.RegisterRoute("stock", typeof(StockPage));
             Routing.RegisterRoute("mcpconfig", typeof(MCPServerConfigPage));
-            Routing.RegisterRoute("about", typeof(AboutPage));
         }
     }
 }

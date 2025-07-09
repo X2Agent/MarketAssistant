@@ -13,6 +13,9 @@ namespace TestMarketAssistant;
 public class BaseKernelTest
 {
     protected ILogger? _logger;
+    protected Kernel _kernel = null!;
+    protected IHttpClientFactory _httpClientFactory = null!;
+    protected IUserSettingService _userSettingService = null!;
 
     [TestInitialize]
     public void BaseInitialize()
@@ -23,6 +26,11 @@ public class BaseKernelTest
             builder.SetMinimumLevel(LogLevel.Debug);
         });
         _logger = loggerFactory.CreateLogger<BaseKernelTest>();
+
+        // 初始化测试所需的服务
+        _kernel = CreateKernelWithChatCompletion();
+        _httpClientFactory = _kernel.Services.GetRequiredService<IHttpClientFactory>();
+        _userSettingService = _kernel.Services.GetRequiredService<IUserSettingService>();
     }
 
     protected Kernel CreateKernelWithChatCompletion()

@@ -45,6 +45,18 @@
                     </Trigger>
                 </Style.Triggers>
             </Style>
+            <Style TargetType="FlyoutItem" x:Key="StockSelectionFlyout">
+                <Style.Triggers>
+                    <Trigger TargetType="FlyoutItem"
+                        Property="IsChecked" Value="False">
+                        <Setter Property="FlyoutIcon" Value="tab_analysis.png"/>
+                    </Trigger>
+                    <Trigger TargetType="FlyoutItem"
+                        Property="IsChecked" Value="True">
+                        <Setter Property="FlyoutIcon" Value="tab_analysis_on.png"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
             <Style TargetType="FlyoutItem" x:Key="AboutFlyout">
                 <Style.Triggers>
                     <Trigger TargetType="FlyoutItem"
@@ -79,6 +91,9 @@
     <FlyoutItem Title="Favorites" Style="{StaticResource FavoritesFlyout}">
        <ShellContent ContentTemplate="{DataTemplate local:FavoritesPage}"/>
    </FlyoutItem>
+    <FlyoutItem Title="AI选股" Style="{StaticResource StockSelectionFlyout}">
+        <ShellContent ContentTemplate="{DataTemplate local:StockSelectionPage}"/>
+    </FlyoutItem>
     <FlyoutItem Title="Setting" Style="{StaticResource SettingFlyout}">
         <ShellContent ContentTemplate="{DataTemplate local:SettingPage}"/>
     </FlyoutItem>

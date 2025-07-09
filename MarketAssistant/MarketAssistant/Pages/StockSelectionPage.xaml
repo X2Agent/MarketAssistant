@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:MarketAssistant.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:agents="clr-namespace:MarketAssistant.Agents"
+             x:Class="MarketAssistant.Pages.StockSelectionPage"
+             x:DataType="viewmodels:StockSelectionViewModel">
+    
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <!-- 全局样式参数 -->
+            <Thickness x:Key="PagePadding">16</Thickness>
+            <x:Double x:Key="DefaultSpacing">16</x:Double>
+            <x:Double x:Key="CardSpacing">12</x:Double>
+            <x:Double x:Key="ItemSpacing">8</x:Double>
+
+            <!-- 颜色资源 -->
+            <Color x:Key="CardBackgroundLight">#f8f9fa</Color>
+            <Color x:Key="CardBackgroundDark">#2c2c2c</Color>
+            <Color x:Key="TextPrimaryLight">#212529</Color>
+            <Color x:Key="TextPrimaryDark">#e0e0e0</Color>
+            <Color x:Key="TextSecondaryLight">#6c757d</Color>
+            <Color x:Key="TextSecondaryDark">#a0a0a0</Color>
+
+            <!-- 通用卡片样式 -->
+            <Style x:Key="CardStyle" TargetType="Border">
+                <Setter Property="Padding" Value="16"/>
+                <Setter Property="StrokeShape" Value="RoundRectangle 8"/>
+                <Setter Property="Stroke" Value="Transparent"/>
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"/>
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="#77000000" Offset="0,2" Radius="4" Opacity="0.4"/>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- 标题样式 -->
+            <Style x:Key="TitleStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="FontAttributes" Value="Bold"/>
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+            </Style>
+
+            <!-- 按钮样式 -->
+            <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
+                <Setter Property="TextColor" Value="White"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="16,8"/>
+                <Setter Property="CornerRadius" Value="6"/>
+            </Style>
+
+            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="Transparent"/>
+                <Setter Property="TextColor" Value="{StaticResource Primary}"/>
+                <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
+                <Setter Property="BorderWidth" Value="1"/>
+                <Setter Property="FontSize" Value="14"/>
+                <Setter Property="Padding" Value="16,8"/>
+                <Setter Property="CornerRadius" Value="6"/>
+            </Style>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ScrollView Padding="{StaticResource PagePadding}">
+        <VerticalStackLayout Spacing="{StaticResource DefaultSpacing}">
+            
+            <!-- 页面标题 -->
+            <Label Text="AI智能选股" 
+                   Style="{StaticResource TitleStyle}"
+                   FontSize="20"
+                   HorizontalOptions="Center"
+                   Margin="0,0,0,8"/>
+            
+            <!-- 用户需求输入区域 -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="选股需求" Style="{StaticResource TitleStyle}"/>
+                    <Editor x:Name="RequirementsEditor"
+                            Text="{Binding UserRequirements}"
+                            Placeholder="请描述您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍，近期涨幅不超过10%的价值股"
+                            HeightRequest="100"
+                            BackgroundColor="Transparent"
+                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                    
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Button Grid.Column="0"
+                                Text="开始选股"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding ExecuteSelectionCommand}"
+                                IsEnabled="{Binding IsBusy, Converter={toolkit:InvertedBoolConverter}}"/>
+                        <Button Grid.Column="1"
+                                Text="清除"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ClearResultCommand}"/>
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 快速选股策略 -->
+            <Border Style="{StaticResource CardStyle}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="快速选股策略" Style="{StaticResource TitleStyle}"/>
+                    <Label Text="选择预设的选股策略，快速获得投资建议" 
+                           FontSize="12" 
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+                    
+                    <CollectionView ItemsSource="{Binding QuickStrategies}"
+                                    SelectionMode="None">
+                        <CollectionView.ItemsLayout>
+                            <GridItemsLayout Orientation="Vertical" 
+                                           Span="2" 
+                                           HorizontalItemSpacing="8" 
+                                           VerticalItemSpacing="8"/>
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="agents:QuickSelectionStrategyInfo">
+                                <Border Padding="12"
+                                        StrokeShape="RoundRectangle 6"
+                                        Stroke="{StaticResource Primary}"
+                                        StrokeThickness="1"
+                                        BackgroundColor="Transparent">
+                                    <VerticalStackLayout Spacing="4">
+                                        <Label Text="{Binding Name}" 
+                                               FontSize="14" 
+                                               FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                                        <Label Text="{Binding Description}" 
+                                               FontSize="12" 
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                               LineBreakMode="WordWrap"/>
+                                    </VerticalStackLayout>
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ExecuteQuickSelectionCommand}"
+                                                              CommandParameter="{Binding .}"/>
+                                    </Border.GestureRecognizers>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- 加载指示器 -->
+            <ActivityIndicator IsVisible="{Binding IsBusy}" 
+                               IsRunning="{Binding IsBusy}"
+                               Color="{StaticResource Primary}"
+                               HeightRequest="40"/>
+
+            <!-- 选股结果显示区域 -->
+            <Border Style="{StaticResource CardStyle}" 
+                    IsVisible="{Binding HasResult}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="选股结果" Style="{StaticResource TitleStyle}"/>
+                    <ScrollView HeightRequest="300">
+                        <Label Text="{Binding SelectionResult}"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
+                               LineBreakMode="WordWrap"/>
+                    </ScrollView>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

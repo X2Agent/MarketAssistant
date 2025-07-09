@@ -12,9 +12,8 @@ public class VectorStoreTest : BaseKernelTest
     [TestInitialize]
     public void Initialize()
     {
-        var kernel = CreateKernelWithChatCompletion();
-        var embeddingGenerator = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-        var vectorStore = kernel.GetRequiredService<VectorStore>();
+        var embeddingGenerator = _kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+        var vectorStore = _kernel.GetRequiredService<VectorStore>();
         dataUploader = new DataUploader(vectorStore, embeddingGenerator);
     }
 

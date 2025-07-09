@@ -7,7 +7,7 @@ using Moq;
 namespace TestMarketAssistant
 {
     [TestClass]
-    public sealed class StockNewsPluginTest : BaseKernelTest
+    public sealed class StockNewsPluginTest
     {
         private StockNewsPlugin _stockNewsPlugin = null!;
         private IServiceProvider _serviceProvider = null!;

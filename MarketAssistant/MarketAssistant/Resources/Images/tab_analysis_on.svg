@@ -1,0 +1,6 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 圆形边框 -->
+  <circle cx="12" cy="12" r="9" stroke="#F7B548" stroke-width="1.5" fill="none"/>
+  <!-- AI文字 -->
+  <text x="12" y="13" font-family="Helvetica, Arial, sans-serif" font-size="8" font-weight="600" text-anchor="middle" dominant-baseline="middle" fill="#F7B548">AI</text>
+</svg>

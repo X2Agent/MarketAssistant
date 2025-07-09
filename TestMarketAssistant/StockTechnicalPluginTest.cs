@@ -6,7 +6,7 @@ using Moq;
 namespace TestMarketAssistant
 {
     [TestClass]
-    public sealed class StockTechnicalPluginTest : BaseKernelTest
+    public sealed class StockTechnicalPluginTest
     {
         private StockTechnicalPlugin _stockTechnicalPlugin = null!;
 
