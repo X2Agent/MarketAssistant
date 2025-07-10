@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -187,7 +186,7 @@ public class StockSelectionManager
     private string FindProjectPath()
     {
         var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        
+
         // 向上查找包含MarketAssistant项目的目录
         while (currentDir != null)
         {
@@ -198,7 +197,7 @@ public class StockSelectionManager
             }
             currentDir = currentDir.Parent;
         }
-        
+
         return null;
     }
 

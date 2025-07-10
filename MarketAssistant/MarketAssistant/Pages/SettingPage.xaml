@@ -10,15 +10,17 @@
     
     <ContentPage.Resources>
         <ResourceDictionary>
-            <Thickness x:Key="CardPadding">20</Thickness>
-            <x:Double x:Key="StackSpacing">20</x:Double>
-            <x:Double x:Key="SliderWidth">300</x:Double>
+            <Thickness x:Key="CardPadding">12</Thickness>
+            <x:Double x:Key="StackSpacing">12</x:Double>
             <x:Double x:Key="ButtonWidth">120</x:Double>
             <x:Double x:Key="LabelFontSize">14</x:Double>
             <Color x:Key="LabelTextColor">#6c757d</Color>
             <Color x:Key="PrimaryButtonColor">#007bff</Color>
             <Color x:Key="SuccessButtonColor">#28a745</Color>
-            <Color x:Key="DangerButtonColor">#dc3545</Color>
+            <!-- 市场分析师角色设置区域专用颜色 -->
+            <Color x:Key="CheckBoxColor">#007bff</Color>
+            <Color x:Key="PrimaryTextColor">#212529</Color>
+            <Color x:Key="SecondaryTextColor">#6c757d</Color>
         </ResourceDictionary>
     </ContentPage.Resources>
     <ScrollView>
@@ -101,62 +103,65 @@
             <!-- 市场分析师角色设置区域 -->
             <controls:CardView Header="市场分析师角色设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <Label Text="选择参与分析讨论的角色" FontSize="14" TextColor="#6c757d" Margin="0,0,0,8" />
-                    <Label Text="注意：启用的角色越多，消耗的Token越多" FontSize="12" TextColor="#dc3545" Margin="0,0,0,12" />
+                    <Label Text="选择参与分析讨论的角色" FontSize="14" TextColor="{StaticResource SecondaryTextColor}" Margin="0,0,0,4" />
+                    <Label Text="注意：启用的角色越多，消耗的Token越多" FontSize="12" TextColor="#dc3545" Margin="0,0,0,8" />
                     
-                    <!-- 协调分析师（必选） -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer}" Color="#007bff" IsEnabled="False" />
-                        <VerticalStackLayout>
-                            <Label Text="协调分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="负责引导讨论和总结（必选）" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-                    
-                    <!-- 基本面分析师 -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableFundamentalAnalyst}" Color="#007bff" IsEnabled="False" />
-                        <VerticalStackLayout>
-                            <Label Text="基本面分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="整合了策略分析师和股票研究分析师的功能" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-                    
-                    <!-- 市场情绪分析师 -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableMarketSentimentAnalyst}" Color="#007bff" />
-                        <VerticalStackLayout>
-                            <Label Text="市场情绪分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="整合了行为金融分析师和市场分析师的功能" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-                    
-                    <!-- 财务分析师 -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableFinancialAnalyst}" Color="#007bff" />
-                        <VerticalStackLayout>
-                            <Label Text="财务分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="专注于财务报表和财务健康分析" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-                    
-                    <!-- 技术分析师 -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableTechnicalAnalyst}" Color="#007bff" />
-                        <VerticalStackLayout>
-                            <Label Text="技术分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="专注于图表模式和技术指标分析" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-  
-                    <!-- 新闻事件分析师 -->
-                    <HorizontalStackLayout Margin="0,4">
-                        <CheckBox IsChecked="{Binding EnableNewsEventAnalyst}" Color="#007bff" />
-                        <VerticalStackLayout>
-                            <Label Text="新闻事件分析师" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
-                            <Label Text="专注于新闻事件对股票的影响分析" FontSize="12" TextColor="#6c757d" VerticalOptions="Center" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
+                    <!-- 两列Grid布局 -->
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16" RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
+                        <!-- 左列第1行：协调分析师（必选） -->
+                        <HorizontalStackLayout Grid.Column="0" Grid.Row="0">
+                            <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer}" Color="{StaticResource CheckBoxColor}" IsEnabled="False" />
+                            <VerticalStackLayout>
+                                <Label Text="协调分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="负责引导讨论和总结（必选）" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 右列第1行：基本面分析师 -->
+                        <HorizontalStackLayout Grid.Column="1" Grid.Row="0">
+                            <CheckBox IsChecked="{Binding EnableFinancialAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                            <VerticalStackLayout>
+                                <Label Text="基本面分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="整合了策略分析师和股票研究分析师的功能" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+
+                        <!-- 左列第2行：财务分析师 -->
+                        <HorizontalStackLayout Grid.Column="0" Grid.Row="1">
+                            <CheckBox IsChecked="{Binding EnableFundamentalAnalyst}" Color="{StaticResource CheckBoxColor}" IsEnabled="False" />
+                            <VerticalStackLayout>
+                                <Label Text="财务分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="专注于财务报表和财务健康分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+                        
+                        <!-- 右列第2行：技术分析师 -->
+                        <HorizontalStackLayout Grid.Column="1" Grid.Row="1">
+                            <CheckBox IsChecked="{Binding EnableTechnicalAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                            <VerticalStackLayout>
+                                <Label Text="技术分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="专注于图表模式和技术指标分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+                        
+                        <!-- 左列第3行：市场情绪分析师 -->
+                        <HorizontalStackLayout Grid.Column="0" Grid.Row="2">
+                            <CheckBox IsChecked="{Binding EnableMarketSentimentAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                            <VerticalStackLayout>
+                                <Label Text="市场情绪分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="整合了行为金融分析师和市场分析师的功能" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+                        
+                        <!-- 右列第3行：新闻事件分析师 -->
+                        <HorizontalStackLayout Grid.Column="1" Grid.Row="2">
+                            <CheckBox IsChecked="{Binding EnableNewsEventAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                            <VerticalStackLayout>
+                                <Label Text="新闻事件分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="专注于新闻事件对股票的影响分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                            </VerticalStackLayout>
+                        </HorizontalStackLayout>
+                    </Grid>
                 </VerticalStackLayout>
             </controls:CardView>
 
@@ -174,31 +179,25 @@
             <!-- 浏览器设置区域 -->
             <controls:CardView Header="浏览器设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <!-- 浏览器路径 -->
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="浏览器路径" FontSize="14" TextColor="#6c757d" />
+                    <Label Text="浏览器路径" FontSize="14" TextColor="#6c757d" />
                         <Grid ColumnDefinitions="*,Auto">
                             <Entry Grid.Column="0" Text="{Binding UserSetting.BrowserPath}" Placeholder="请选择浏览器路径（留空则自动检测）" IsReadOnly="True" />
                             <Button Grid.Column="1" Text="浏览" Command="{Binding SelectBrowserPathCommand}" 
                                     BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" />
                         </Grid>
-                        <Label Text="注意：如果留空，系统将自动使用默认浏览器" FontSize="12" TextColor="#6c757d" />
-                    </VerticalStackLayout>
+                    <Label Text="注意：如果留空，系统将自动使用默认浏览器" FontSize="12" TextColor="#6c757d" />
                 </VerticalStackLayout>
             </controls:CardView>
             
             <!-- 日志设置区域 -->
             <controls:CardView Header="日志设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <!-- 日志文件路径 -->
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="日志文件路径" FontSize="14" TextColor="#6c757d" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.LogPath}" Placeholder="请输入日志文件路径" />
-                            <Button Grid.Column="1" Text="浏览" Command="{Binding SelectLogPathCommand}" 
+                    <Label Text="日志文件路径" FontSize="14" TextColor="#6c757d" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Entry Grid.Column="0" Text="{Binding UserSetting.LogPath}" Placeholder="请输入日志文件路径" />
+                        <Button Grid.Column="1" Text="浏览" Command="{Binding SelectLogPathCommand}" 
                                     BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" />
-                        </Grid>
-                    </VerticalStackLayout>
+                    </Grid>
                 </VerticalStackLayout>
             </controls:CardView>
 
