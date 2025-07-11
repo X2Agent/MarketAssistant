@@ -99,7 +99,7 @@ public class AnalystManager
     /// </summary>
     private ChatCompletionAgent CreateAnalyst(AnalysisAgents agent)
     {
-        string agentYamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Agents", "yaml", $"{agent}.yaml");
+        string agentYamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Yaml", $"{agent}.yaml");
         if (!File.Exists(agentYamlPath))
         {
             _logger.Equals($"未找到分析师配置文件: {agentYamlPath}。请确保已正确配置并放置在Agents/yaml目录下。");

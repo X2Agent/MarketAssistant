@@ -74,7 +74,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Update="Agents\yaml\*.yaml">
+	  <None Update="Agents\Yaml\*.yaml">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
 	  <None Update="Plugins\Yaml\*.yaml">

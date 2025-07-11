@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
-using MarketAssistant.Services;
+using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -94,9 +94,15 @@ public class StockSelectionViewModel : ViewModelBase
 
         await SafeExecuteAsync(async () =>
         {
-            var result = await _stockSelectionService.SelectStocksAsync(UserRequirements);
-            SelectionResult = result;
-            HasResult = !string.IsNullOrEmpty(result);
+            // 创建用户需求选股请求
+            var request = new StockRecommendationRequest
+            {
+                UserRequirements = UserRequirements
+            };
+
+            var result = await _stockSelectionService.RecommendStocksByUserRequirementAsync(request);
+            SelectionResult = result.AnalysisSummary;
+            HasResult = !string.IsNullOrEmpty(result.AnalysisSummary);
         }, "执行AI选股");
     }
 
@@ -113,7 +119,7 @@ public class StockSelectionViewModel : ViewModelBase
             var result = await _stockSelectionService.QuickSelectAsync(strategy.Strategy);
             SelectionResult = result;
             HasResult = !string.IsNullOrEmpty(result);
-            
+
             // 更新用户需求显示为所选策略
             UserRequirements = $"快速选股：{strategy.Name}";
         }, $"执行快速选股：{strategy.Name}");
@@ -138,7 +144,7 @@ public class StockSelectionViewModel : ViewModelBase
         {
             var strategies = _stockSelectionService.GetQuickSelectionStrategies();
             QuickStrategies.Clear();
-            
+
             foreach (var strategy in strategies)
             {
                 QuickStrategies.Add(strategy);

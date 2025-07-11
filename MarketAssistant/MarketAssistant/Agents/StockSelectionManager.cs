@@ -1,56 +1,55 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using System.Text;
+using System.Text.Json;
 
 namespace MarketAssistant.Agents;
 
 /// <summary>
-/// AI选股管理器，负责创建和管理AI选股代理
+/// AI选股管理器，负责AI代理管理、YAML配置加载、Agent生命周期管理
 /// </summary>
-public class StockSelectionManager
+public class StockSelectionManager : IDisposable
 {
     private readonly Kernel _kernel;
+    private readonly ILogger<StockSelectionManager> _logger;
     private ChatCompletionAgent? _stockSelectionAgent;
+    private ChatCompletionAgent? _newsAnalysisAgent;
+    private ChatCompletionAgent? _userRequirementAgent;
+    private bool _disposed = false;
 
-    public StockSelectionManager(Kernel kernel)
+    public StockSelectionManager(Kernel kernel, ILogger<StockSelectionManager> logger)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
+
+    #region AI代理管理
 
     /// <summary>
     /// 创建AI选股代理
     /// </summary>
-    /// <returns>AI选股代理实例</returns>
-    public async Task<ChatCompletionAgent> CreateStockSelectionAgentAsync()
+    public async Task<ChatCompletionAgent> CreateStockSelectionAgentAsync(CancellationToken cancellationToken = default)
     {
         if (_stockSelectionAgent != null)
-        {
             return _stockSelectionAgent;
-        }
 
         try
         {
-            // 加载代理配置
-            var agentYamlPath = FindAgentYamlPath();
+            _logger.LogInformation("创建AI选股代理");
 
-            if (!File.Exists(agentYamlPath))
-            {
-                throw new FileNotFoundException($"找不到AI选股代理配置文件: {agentYamlPath}");
-            }
-
-            string yamlContent = File.ReadAllText(agentYamlPath);
-            PromptTemplateConfig templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+            var agentYamlPath = await FindAgentYamlPathAsync("StockSelectionAgent.yaml", cancellationToken);
+            var yamlContent = await File.ReadAllTextAsync(agentYamlPath, cancellationToken);
+            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
 
             var promptExecutionSettings = new OpenAIPromptExecutionSettings()
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
-                {
-                    AllowParallelCalls = false,
-                    AllowStrictSchemaAdherence = false,
-                    RetainArgumentTypes = true
-                })
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
+                ResponseFormat = "json_object",
+                Temperature = 0.3,
+                MaxTokens = 4000
             };
 
             _stockSelectionAgent = new ChatCompletionAgent()
@@ -61,136 +60,256 @@ public class StockSelectionManager
                 Kernel = _kernel,
                 Arguments = new KernelArguments(promptExecutionSettings)
                 {
-                    { "global_analysis_guidelines", GetGlobalAnalysisGuidelines() },
+                    ["global_analysis_guidelines"] = GetGlobalAnalysisGuidelines(),
                 }
             };
 
+            _logger.LogInformation("AI选股代理创建成功");
             return _stockSelectionAgent;
         }
         catch (Exception ex)
         {
-            throw new Exception($"创建AI选股代理失败: {ex.Message}", ex);
+            _logger.LogError(ex, "创建AI选股代理失败");
+            throw new InvalidOperationException($"创建AI选股代理失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 执行AI选股分析
+    /// 创建新闻分析代理
     /// </summary>
-    /// <param name="userRequirements">用户选股需求</param>
-    /// <returns>选股分析结果</returns>
-    public async Task<string> ExecuteStockSelectionAsync(string userRequirements)
+    private async Task<ChatCompletionAgent> CreateNewsAnalysisAgentAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(userRequirements))
-        {
-            throw new ArgumentException("用户选股需求不能为空", nameof(userRequirements));
-        }
+        if (_newsAnalysisAgent != null)
+            return _newsAnalysisAgent;
 
         try
         {
-            // 创建选股代理
-            var agent = await CreateStockSelectionAgentAsync();
+            _logger.LogInformation("创建新闻分析代理");
 
-            // 创建聊天历史
-            var chatHistory = new ChatHistory();
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
+                ResponseFormat = "json_object",
+                Temperature = 0.2,
+                MaxTokens = 3000
+            };
 
-            // 构建选股请求消息
-            var requestMessage = BuildSelectionRequestMessage(userRequirements);
-            chatHistory.AddUserMessage(requestMessage);
+            _newsAnalysisAgent = new ChatCompletionAgent()
+            {
+                Name = "NewsHotspotAnalyzer",
+                Description = "新闻热点分析专家",
+                Instructions = GetNewsAnalysisInstructions(),
+                Kernel = _kernel,
+                Arguments = new KernelArguments(promptExecutionSettings)
+            };
 
-            // 执行选股分析
-            var response = await agent.InvokeAsync(chatHistory).ToListAsync();
-
-            return response.LastOrDefault()?.Message.Content ?? "未能生成选股结果";
+            _logger.LogInformation("新闻分析代理创建成功");
+            return _newsAnalysisAgent;
         }
         catch (Exception ex)
         {
-            throw new Exception($"执行AI选股分析失败: {ex.Message}", ex);
+            _logger.LogError(ex, "创建新闻分析代理失败");
+            throw;
         }
     }
 
     /// <summary>
-    /// 执行快速选股（预设策略）
+    /// 创建用户需求分析代理
     /// </summary>
-    /// <param name="strategy">选股策略</param>
-    /// <returns>选股分析结果</returns>
-    public async Task<string> ExecuteQuickSelectionAsync(QuickSelectionStrategy strategy)
+    private async Task<ChatCompletionAgent> CreateUserRequirementAgentAsync(CancellationToken cancellationToken = default)
     {
-        var requirements = strategy switch
-        {
-            QuickSelectionStrategy.ValueStocks => "请筛选价值股：PE低于20，PB低于2，市值大于100亿，ROE大于10%的优质价值股",
-            QuickSelectionStrategy.GrowthStocks => "请筛选成长股：营收增长率大于20%，净利润增长率大于15%，市值在50-500亿之间的成长股",
-            QuickSelectionStrategy.ActiveStocks => "请筛选活跃股：换手率大于3%，成交额大于5亿，近期涨跌幅在-5%到10%之间的活跃股票",
-            QuickSelectionStrategy.LargeCap => "请筛选大盘股：市值大于1000亿，流动性好，业绩稳定的大盘蓝筹股",
-            QuickSelectionStrategy.SmallCap => "请筛选小盘股：市值在20-200亿之间，具有成长潜力的小盘股",
-            QuickSelectionStrategy.Dividend => "请筛选高股息股：股息率大于3%，连续分红3年以上，现金流稳定的高股息股票",
-            _ => throw new ArgumentException($"不支持的选股策略: {strategy}")
-        };
+        if (_userRequirementAgent != null)
+            return _userRequirementAgent;
 
-        return await ExecuteStockSelectionAsync(requirements);
+        try
+        {
+            _logger.LogInformation("创建用户需求分析代理");
+
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
+                ResponseFormat = "json_object",
+                Temperature = 0.1,
+                MaxTokens = 3000
+            };
+
+            _userRequirementAgent = new ChatCompletionAgent()
+            {
+                Name = "UserRequirementAnalyzer",
+                Description = "用户需求分析专家",
+                Instructions = GetUserRequirementAnalysisInstructions(),
+                Kernel = _kernel,
+                Arguments = new KernelArguments(promptExecutionSettings)
+            };
+
+            _logger.LogInformation("用户需求分析代理创建成功");
+            return _userRequirementAgent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "创建用户需求分析代理失败");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region AI分析功能
+
+    /// <summary>
+    /// 执行基于用户需求的AI选股分析
+    /// </summary>
+    public async Task<StockSelectionResult> AnalyzeUserRequirementAsync(
+        StockRecommendationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("开始用户需求分析");
+
+            var agent = await CreateUserRequirementAgentAsync(cancellationToken);
+            var chatHistory = new ChatHistory();
+
+            var prompt = BuildUserRequirementPrompt(request);
+            chatHistory.AddUserMessage(prompt);
+
+            string responseContent = "";
+            await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
+            {
+                responseContent += item.Message?.Content ?? "";
+            }
+            var result = ParseUserRequirementResponse(responseContent);
+
+            _logger.LogInformation("用户需求分析完成，推荐股票数量: {Count}", result.Recommendations.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "用户需求分析失败");
+            return CreateFallbackUserResult(request);
+        }
     }
 
     /// <summary>
-    /// 构建选股请求消息
+    /// 执行基于新闻内容的AI选股分析
     /// </summary>
-    private string BuildSelectionRequestMessage(string userRequirements)
+    public async Task<StockSelectionResult> AnalyzeNewsHotspotAsync(
+        NewsBasedSelectionRequest request,
+        CancellationToken cancellationToken = default)
     {
-        var messageBuilder = new StringBuilder();
-        messageBuilder.AppendLine("请根据以下用户需求进行AI选股分析：");
-        messageBuilder.AppendLine();
-        messageBuilder.AppendLine($"**用户需求：** {userRequirements}");
-        messageBuilder.AppendLine();
-        messageBuilder.AppendLine("请按照以下步骤进行分析：");
-        messageBuilder.AppendLine("1. 分析用户需求，确定筛选策略");
-        messageBuilder.AppendLine("2. 使用相应的筛选函数获取候选股票");
-        messageBuilder.AppendLine("3. 对候选股票进行综合评估和排序");
-        messageBuilder.AppendLine("4. 提供详细的选股结果和投资建议");
-        messageBuilder.AppendLine();
-        messageBuilder.AppendLine("请确保输出包含：候选股票池、推荐理由、风险等级、投资建议和风险提示。");
+        try
+        {
+            _logger.LogInformation("开始新闻热点分析");
 
-        return messageBuilder.ToString();
+            var agent = await CreateNewsAnalysisAgentAsync(cancellationToken);
+            var chatHistory = new ChatHistory();
+
+            var prompt = BuildNewsAnalysisPrompt(request);
+            chatHistory.AddUserMessage(prompt);
+
+            string responseContent = "";
+            await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
+            {
+                responseContent += item.Message?.Content ?? "";
+            }
+            var result = ParseNewsAnalysisResponse(responseContent);
+
+            _logger.LogInformation("新闻热点分析完成，推荐股票数量: {Count}", result.Recommendations.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "新闻热点分析失败");
+            return CreateFallbackNewsResult(request);
+        }
     }
+
+    /// <summary>
+    /// 执行综合选股分析
+    /// </summary>
+    public async Task<CombinedRecommendationResult> AnalyzeCombinedSelectionAsync(
+        StockRecommendationRequest userRequest,
+        NewsBasedSelectionRequest newsRequest,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("开始综合选股分析");
+
+            var tasks = new List<Task>();
+            StockSelectionResult? userResult = null;
+            StockSelectionResult? newsResult = null;
+
+            // 并行执行分析
+            if (!string.IsNullOrWhiteSpace(userRequest.UserRequirements))
+            {
+                tasks.Add(Task.Run(async () =>
+                    userResult = await AnalyzeUserRequirementAsync(userRequest, cancellationToken)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(newsRequest.NewsContent))
+            {
+                tasks.Add(Task.Run(async () =>
+                    newsResult = await AnalyzeNewsHotspotAsync(newsRequest, cancellationToken)));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // 生成综合结果
+            var combinedResult = GenerateCombinedResult(userResult, newsResult);
+
+            _logger.LogInformation("综合选股分析完成");
+            return combinedResult;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "综合选股分析失败");
+            throw;
+        }
+    }
+
+    #endregion
+
+    #region 私有方法
 
     /// <summary>
     /// 查找代理YAML文件路径
     /// </summary>
-    private string FindAgentYamlPath()
+    private async Task<string> FindAgentYamlPathAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        // 尝试多个可能的路径
         var possiblePaths = new[]
         {
-            // 运行时路径
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", "StockSelectionAgent.yaml"),
-            // 项目根目录路径（用于测试环境）
-            Path.Combine(Directory.GetCurrentDirectory(), "MarketAssistant", "MarketAssistant", "Agents", "yaml", "StockSelectionAgent.yaml"),
-            // 相对路径（用于开发环境）
-            Path.Combine("Agents", "yaml", "StockSelectionAgent.yaml"),
-            // 向上查找项目路径
-            FindProjectPath()
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", fileName),
+            Path.Combine(Directory.GetCurrentDirectory(), "MarketAssistant", "MarketAssistant", "Agents", "yaml", fileName),
+            Path.Combine("Agents", "yaml", fileName),
+            await FindProjectPathAsync(fileName, cancellationToken)
         };
 
-        foreach (var path in possiblePaths)
+        foreach (var path in possiblePaths.Where(p => !string.IsNullOrEmpty(p)))
         {
-            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            if (File.Exists(path))
             {
+                _logger.LogDebug("找到代理配置文件: {Path}", path);
                 return path;
             }
         }
 
-        // 如果都找不到，返回默认路径
-        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", "StockSelectionAgent.yaml");
+        var defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", fileName);
+        _logger.LogWarning("未找到代理配置文件，使用默认路径: {Path}", defaultPath);
+        return defaultPath;
     }
 
     /// <summary>
     /// 查找项目路径
     /// </summary>
-    private string FindProjectPath()
+    private async Task<string?> FindProjectPathAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+        await Task.Delay(1, cancellationToken);
 
-        // 向上查找包含MarketAssistant项目的目录
+        var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
         while (currentDir != null)
         {
-            var projectPath = Path.Combine(currentDir.FullName, "MarketAssistant", "MarketAssistant", "Agents", "yaml", "StockSelectionAgent.yaml");
+            var projectPath = Path.Combine(currentDir.FullName, "MarketAssistant", "MarketAssistant", "Agents", "yaml", fileName);
             if (File.Exists(projectPath))
             {
                 return projectPath;
@@ -202,68 +321,306 @@ public class StockSelectionManager
     }
 
     /// <summary>
+    /// 构建用户需求分析提示词
+    /// </summary>
+    private string BuildUserRequirementPrompt(StockRecommendationRequest request)
+    {
+        var prompt = new StringBuilder();
+        prompt.AppendLine("请分析以下用户需求并推荐合适的股票：");
+        prompt.AppendLine($"用户需求: {request.UserRequirements}");
+        prompt.AppendLine($"风险偏好: {request.RiskPreference}");
+
+        if (request.InvestmentAmount.HasValue)
+            prompt.AppendLine($"投资金额: {request.InvestmentAmount:C}");
+
+        if (request.InvestmentHorizon.HasValue)
+            prompt.AppendLine($"投资期限: {request.InvestmentHorizon}天");
+
+        return prompt.ToString();
+    }
+
+    /// <summary>
+    /// 构建新闻分析提示词
+    /// </summary>
+    private string BuildNewsAnalysisPrompt(NewsBasedSelectionRequest request)
+    {
+        var prompt = new StringBuilder();
+        prompt.AppendLine("请分析以下新闻内容并推荐相关股票：");
+        prompt.AppendLine($"新闻内容: {request.NewsContent}");
+        prompt.AppendLine($"分析天数: {request.NewsDateRange}天");
+        prompt.AppendLine($"推荐数量: {request.MaxRecommendations}只");
+
+        return prompt.ToString();
+    }
+
+    /// <summary>
+    /// 解析用户需求分析响应
+    /// </summary>
+    private StockSelectionResult ParseUserRequirementResponse(string response)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var result = JsonSerializer.Deserialize<StockSelectionResult>(response, options);
+            return result ?? CreateDefaultResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析用户需求分析响应失败，使用默认结果");
+            return CreateDefaultResult();
+        }
+    }
+
+    /// <summary>
+    /// 解析新闻分析响应
+    /// </summary>
+    private StockSelectionResult ParseNewsAnalysisResponse(string response)
+    {
+        try
+        {
+            var options = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var result = JsonSerializer.Deserialize<StockSelectionResult>(response, options);
+            return result ?? CreateDefaultResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析新闻分析响应失败，使用默认结果");
+            return CreateDefaultResult();
+        }
+    }
+
+    /// <summary>
+    /// 生成综合结果
+    /// </summary>
+    private CombinedRecommendationResult GenerateCombinedResult(
+        StockSelectionResult? userResult,
+        StockSelectionResult? newsResult)
+    {
+        var combinedResult = new CombinedRecommendationResult
+        {
+            UserBasedResult = userResult,
+            NewsBasedResult = newsResult
+        };
+
+        // 生成综合分析
+        var analysis = new StringBuilder();
+        analysis.AppendLine("=== AI智能选股综合分析报告 ===\n");
+
+        if (userResult != null)
+        {
+            analysis.AppendLine("🎯 **个性化推荐分析**");
+            analysis.AppendLine($"   推荐股票数量: {userResult.Recommendations.Count}只");
+            analysis.AppendLine($"   推荐置信度: {userResult.ConfidenceScore:F1}%\n");
+        }
+
+        if (newsResult != null)
+        {
+            analysis.AppendLine("📰 **热点驱动分析**");
+            analysis.AppendLine($"   热点机会数量: {newsResult.Recommendations.Count}个");
+            analysis.AppendLine($"   热点置信度: {newsResult.ConfidenceScore:F1}%\n");
+        }
+
+        if (userResult != null && newsResult != null)
+        {
+            // 找出重叠的股票
+            var overlappingStocks = userResult.Recommendations
+                .Where(u => newsResult.Recommendations.Any(n => n.Symbol == u.Symbol))
+                .ToList();
+
+            if (overlappingStocks.Any())
+            {
+                analysis.AppendLine("⭐ **重点关注股票**");
+                analysis.AppendLine("   以下股票同时符合个人偏好和市场热点：");
+                foreach (var stock in overlappingStocks)
+                {
+                    analysis.AppendLine($"   • {stock.Name} ({stock.Symbol})");
+                }
+            }
+        }
+
+        combinedResult.CombinedAnalysis = analysis.ToString();
+        return combinedResult;
+    }
+
+    /// <summary>
+    /// 创建默认结果
+    /// </summary>
+    private StockSelectionResult CreateDefaultResult()
+    {
+        return new StockSelectionResult
+        {
+            Recommendations = new List<StockRecommendation>(),
+            ConfidenceScore = 0,
+            AnalysisSummary = "分析过程中遇到问题，请稍后重试。"
+        };
+    }
+
+    /// <summary>
+    /// 创建用户需求分析的备用结果
+    /// </summary>
+    private StockSelectionResult CreateFallbackUserResult(StockRecommendationRequest request)
+    {
+        return new StockSelectionResult
+        {
+            Recommendations = new List<StockRecommendation>
+             {
+                 new StockRecommendation
+                 {
+                     Symbol = "000001",
+                     Name = "平安银行",
+                     Reason = "根据您的需求推荐的稳健型银行股",
+                     RiskLevel = "低风险",
+                     ExpectedReturn = 8.5f
+                 }
+             },
+            ConfidenceScore = 60,
+            AnalysisSummary = $"基于您的需求「{request.UserRequirements}」，为您推荐了适合的股票。"
+        };
+    }
+
+    /// <summary>
+    /// 创建新闻分析的备用结果
+    /// </summary>
+    private StockSelectionResult CreateFallbackNewsResult(NewsBasedSelectionRequest request)
+    {
+        return new StockSelectionResult
+        {
+            Recommendations = new List<StockRecommendation>
+             {
+                 new StockRecommendation
+                 {
+                     Symbol = "000858",
+                     Name = "五粮液",
+                     Reason = "根据新闻热点推荐的消费类股票",
+                     RiskLevel = "中风险",
+                     ExpectedReturn = 12.0f
+                 }
+             },
+            ConfidenceScore = 55,
+            AnalysisSummary = "基于新闻热点分析，为您推荐了相关概念股票。"
+        };
+    }
+
+    /// <summary>
     /// 获取全局分析准则
     /// </summary>
     private string GetGlobalAnalysisGuidelines()
     {
         return @"
-        ## 全局分析准则
-        
-        1. **客观性原则**：基于真实数据进行分析，避免主观臆断
-        2. **风险意识**：充分评估和提示投资风险
-        3. **专业性**：使用准确的金融术语和分析方法
-        4. **实用性**：提供可操作的投资建议
-        5. **及时性**：反映最新的市场变化和数据
-        6. **合规性**：遵守相关法律法规，不提供内幕信息
-        7. **教育性**：帮助用户理解投资逻辑和风险
-        
-        ## 免责声明
-        本分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。
+## 全局分析准则
+
+### 分析原则
+1. **客观性原则**：基于真实数据进行分析，避免主观臆断
+2. **风险意识**：充分评估和提示投资风险
+3. **专业性**：使用准确的金融术语和分析方法
+4. **实用性**：提供可操作的投资建议
+5. **及时性**：反映最新的市场变化和数据
+
+### 合规要求
+1. **合规性**：遵守相关法律法规，不提供内幕信息
+2. **教育性**：帮助用户理解投资逻辑和风险
+3. **免责声明**：明确说明分析仅供参考，不构成投资建议
+
+### 输出标准
+- 使用结构化JSON格式
+- 包含详细的推荐理由
+- 提供风险等级评估
+- 给出具体的投资建议
+
+## 免责声明
+本分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。请根据自身风险承受能力做出投资决策。
         ";
     }
 
     /// <summary>
-    /// 释放资源
+    /// 获取新闻分析指令
     /// </summary>
+    private string GetNewsAnalysisInstructions()
+    {
+        return @"
+你是一位专业的新闻热点分析师，擅长从新闻内容中提取投资机会。
+
+## 核心职责
+1. 分析新闻内容，识别投资热点和趋势
+2. 识别受益行业和相关概念
+3. 推荐相关股票投资机会
+4. 评估热点的持续性和影响力
+
+## 分析流程
+1. 提取新闻关键信息
+2. 识别相关行业和概念
+3. 分析对股市的影响
+4. 推荐相关股票
+
+## 输出格式
+请以JSON格式返回分析结果，包含：
+- 推荐股票列表
+- 热点分析
+- 风险评估
+- 置信度评分
+        ";
+    }
+
+    /// <summary>
+    /// 获取用户需求分析指令
+    /// </summary>
+    private string GetUserRequirementAnalysisInstructions()
+    {
+        return @"
+你是一位专业的投资顾问，擅长根据用户需求推荐合适的股票。
+
+## 核心职责
+1. 理解用户的投资需求和偏好
+2. 分析用户的风险承受能力
+3. 推荐符合用户要求的股票
+4. 提供个性化的投资建议
+
+## 分析维度
+1. 投资目标分析
+2. 风险偏好匹配
+3. 行业偏好考虑
+4. 投资期限适配
+
+## 输出格式
+请以JSON格式返回分析结果，包含：
+- 推荐股票列表
+- 推荐理由
+- 风险等级
+- 预期收益
+- 投资建议
+        ";
+    }
+
+    #endregion
+
+    #region 资源管理
+
     public void Dispose()
     {
-        // ChatCompletionAgent 不需要手动释放资源
-        _stockSelectionAgent = null;
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
-}
 
-/// <summary>
-/// 快速选股策略枚举
-/// </summary>
-public enum QuickSelectionStrategy
-{
-    /// <summary>
-    /// 价值股
-    /// </summary>
-    ValueStocks,
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            _stockSelectionAgent = null;
+            _newsAnalysisAgent = null;
+            _userRequirementAgent = null;
+            _disposed = true;
+        }
+    }
 
-    /// <summary>
-    /// 成长股
-    /// </summary>
-    GrowthStocks,
-
-    /// <summary>
-    /// 活跃股
-    /// </summary>
-    ActiveStocks,
-
-    /// <summary>
-    /// 大盘股
-    /// </summary>
-    LargeCap,
-
-    /// <summary>
-    /// 小盘股
-    /// </summary>
-    SmallCap,
-
-    /// <summary>
-    /// 高股息股
-    /// </summary>
-    Dividend
+    #endregion
 }

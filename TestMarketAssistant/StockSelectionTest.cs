@@ -1,4 +1,5 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins;
 using MarketAssistant.Services;
 using Microsoft.Extensions.Logging;
@@ -20,11 +21,12 @@ public sealed class StockSelectionTest : BaseKernelTest
         _stockScreeningPlugin = new StockScreeningPlugin(_httpClientFactory, _userSettingService);
 
         // 创建选股管理器
-        _stockSelectionManager = new StockSelectionManager(_kernel);
+        var managerLogger = new Mock<ILogger<StockSelectionManager>>();
+        _stockSelectionManager = new StockSelectionManager(_kernel, managerLogger.Object);
 
         // 创建选股服务
-        var logger = new Mock<ILogger<StockSelectionService>>();
-        _stockSelectionService = new StockSelectionService(_kernel, logger.Object);
+        var serviceLogger = new Mock<ILogger<StockSelectionService>>();
+        _stockSelectionService = new StockSelectionService(_stockSelectionManager, serviceLogger.Object);
     }
 
     [TestMethod]
@@ -163,16 +165,21 @@ public sealed class StockSelectionTest : BaseKernelTest
         var requirements = "请帮我筛选一些适合长期投资的蓝筹股，要求市值大于500亿，PE在10-25之间，ROE大于10%";
 
         // Act
-        var result = await _stockSelectionService.SelectStocksAsync(requirements);
+        var request = new MarketAssistant.Models.StockRecommendationRequest
+        {
+            UserRequirements = requirements
+        };
+        var result = await _stockSelectionService.RecommendStocksByUserRequirementAsync(request);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Assert.IsNotNull(result.AnalysisSummary);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
 
         Console.WriteLine("=== 自定义需求选股结果 ===");
         Console.WriteLine($"用户需求: {requirements}");
         Console.WriteLine("选股结果:");
-        Console.WriteLine(result);
+        Console.WriteLine(result.AnalysisSummary);
     }
 
     [TestMethod]

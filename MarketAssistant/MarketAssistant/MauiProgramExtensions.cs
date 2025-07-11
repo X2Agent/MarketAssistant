@@ -91,6 +91,7 @@ namespace MarketAssistant
             builder.Services.AddSingleton<StockFavoriteService>();
 
             // 注册AI选股相关服务
+            builder.Services.AddSingleton<StockSelectionManager>();
             builder.Services.AddSingleton<StockSelectionService>();
             builder.Services.AddSingleton<IWindowsService, WindowsService>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
