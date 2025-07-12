@@ -29,52 +29,6 @@ public class StockSelectionManager : IDisposable
     #region AI代理管理
 
     /// <summary>
-    /// 创建AI选股代理
-    /// </summary>
-    public async Task<ChatCompletionAgent> CreateStockSelectionAgentAsync(CancellationToken cancellationToken = default)
-    {
-        if (_stockSelectionAgent != null)
-            return _stockSelectionAgent;
-
-        try
-        {
-            _logger.LogInformation("创建AI选股代理");
-
-            var agentYamlPath = await FindAgentYamlPathAsync("StockSelectionAgent.yaml", cancellationToken);
-            var yamlContent = await File.ReadAllTextAsync(agentYamlPath, cancellationToken);
-            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
-                ResponseFormat = "json_object",
-                Temperature = 0.3,
-                MaxTokens = 4000
-            };
-
-            _stockSelectionAgent = new ChatCompletionAgent()
-            {
-                Name = templateConfig.Name,
-                Description = templateConfig.Description,
-                Instructions = templateConfig.Template,
-                Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings)
-                {
-                    ["global_analysis_guidelines"] = GetGlobalAnalysisGuidelines(),
-                }
-            };
-
-            _logger.LogInformation("AI选股代理创建成功");
-            return _stockSelectionAgent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "创建AI选股代理失败");
-            throw new InvalidOperationException($"创建AI选股代理失败: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
     /// 创建新闻分析代理
     /// </summary>
     private async Task<ChatCompletionAgent> CreateNewsAnalysisAgentAsync(CancellationToken cancellationToken = default)
@@ -139,7 +93,8 @@ public class StockSelectionManager : IDisposable
                 Description = "用户需求分析专家",
                 Instructions = GetUserRequirementAnalysisInstructions(),
                 Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings)
+                Arguments = new KernelArguments(promptExecutionSettings),
+                HistoryReducer = new ChatHistoryTruncationReducer(1)
             };
 
             _logger.LogInformation("用户需求分析代理创建成功");
@@ -224,101 +179,9 @@ public class StockSelectionManager : IDisposable
         }
     }
 
-    /// <summary>
-    /// 执行综合选股分析
-    /// </summary>
-    public async Task<CombinedRecommendationResult> AnalyzeCombinedSelectionAsync(
-        StockRecommendationRequest userRequest,
-        NewsBasedSelectionRequest newsRequest,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("开始综合选股分析");
-
-            var tasks = new List<Task>();
-            StockSelectionResult? userResult = null;
-            StockSelectionResult? newsResult = null;
-
-            // 并行执行分析
-            if (!string.IsNullOrWhiteSpace(userRequest.UserRequirements))
-            {
-                tasks.Add(Task.Run(async () =>
-                    userResult = await AnalyzeUserRequirementAsync(userRequest, cancellationToken)));
-            }
-
-            if (!string.IsNullOrWhiteSpace(newsRequest.NewsContent))
-            {
-                tasks.Add(Task.Run(async () =>
-                    newsResult = await AnalyzeNewsHotspotAsync(newsRequest, cancellationToken)));
-            }
-
-            await Task.WhenAll(tasks);
-
-            // 生成综合结果
-            var combinedResult = GenerateCombinedResult(userResult, newsResult);
-
-            _logger.LogInformation("综合选股分析完成");
-            return combinedResult;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "综合选股分析失败");
-            throw;
-        }
-    }
-
     #endregion
 
     #region 私有方法
-
-    /// <summary>
-    /// 查找代理YAML文件路径
-    /// </summary>
-    private async Task<string> FindAgentYamlPathAsync(string fileName, CancellationToken cancellationToken = default)
-    {
-        var possiblePaths = new[]
-        {
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", fileName),
-            Path.Combine(Directory.GetCurrentDirectory(), "MarketAssistant", "MarketAssistant", "Agents", "yaml", fileName),
-            Path.Combine("Agents", "yaml", fileName),
-            await FindProjectPathAsync(fileName, cancellationToken)
-        };
-
-        foreach (var path in possiblePaths.Where(p => !string.IsNullOrEmpty(p)))
-        {
-            if (File.Exists(path))
-            {
-                _logger.LogDebug("找到代理配置文件: {Path}", path);
-                return path;
-            }
-        }
-
-        var defaultPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agents", "yaml", fileName);
-        _logger.LogWarning("未找到代理配置文件，使用默认路径: {Path}", defaultPath);
-        return defaultPath;
-    }
-
-    /// <summary>
-    /// 查找项目路径
-    /// </summary>
-    private async Task<string?> FindProjectPathAsync(string fileName, CancellationToken cancellationToken = default)
-    {
-        await Task.Delay(1, cancellationToken);
-
-        var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (currentDir != null)
-        {
-            var projectPath = Path.Combine(currentDir.FullName, "MarketAssistant", "MarketAssistant", "Agents", "yaml", fileName);
-            if (File.Exists(projectPath))
-            {
-                return projectPath;
-            }
-            currentDir = currentDir.Parent;
-        }
-
-        return null;
-    }
 
     /// <summary>
     /// 构建用户需求分析提示词
@@ -347,7 +210,6 @@ public class StockSelectionManager : IDisposable
         var prompt = new StringBuilder();
         prompt.AppendLine("请分析以下新闻内容并推荐相关股票：");
         prompt.AppendLine($"新闻内容: {request.NewsContent}");
-        prompt.AppendLine($"分析天数: {request.NewsDateRange}天");
         prompt.AppendLine($"推荐数量: {request.MaxRecommendations}只");
 
         return prompt.ToString();
@@ -397,59 +259,6 @@ public class StockSelectionManager : IDisposable
             _logger.LogWarning(ex, "解析新闻分析响应失败，使用默认结果");
             return CreateDefaultResult();
         }
-    }
-
-    /// <summary>
-    /// 生成综合结果
-    /// </summary>
-    private CombinedRecommendationResult GenerateCombinedResult(
-        StockSelectionResult? userResult,
-        StockSelectionResult? newsResult)
-    {
-        var combinedResult = new CombinedRecommendationResult
-        {
-            UserBasedResult = userResult,
-            NewsBasedResult = newsResult
-        };
-
-        // 生成综合分析
-        var analysis = new StringBuilder();
-        analysis.AppendLine("=== AI智能选股综合分析报告 ===\n");
-
-        if (userResult != null)
-        {
-            analysis.AppendLine("🎯 **个性化推荐分析**");
-            analysis.AppendLine($"   推荐股票数量: {userResult.Recommendations.Count}只");
-            analysis.AppendLine($"   推荐置信度: {userResult.ConfidenceScore:F1}%\n");
-        }
-
-        if (newsResult != null)
-        {
-            analysis.AppendLine("📰 **热点驱动分析**");
-            analysis.AppendLine($"   热点机会数量: {newsResult.Recommendations.Count}个");
-            analysis.AppendLine($"   热点置信度: {newsResult.ConfidenceScore:F1}%\n");
-        }
-
-        if (userResult != null && newsResult != null)
-        {
-            // 找出重叠的股票
-            var overlappingStocks = userResult.Recommendations
-                .Where(u => newsResult.Recommendations.Any(n => n.Symbol == u.Symbol))
-                .ToList();
-
-            if (overlappingStocks.Any())
-            {
-                analysis.AppendLine("⭐ **重点关注股票**");
-                analysis.AppendLine("   以下股票同时符合个人偏好和市场热点：");
-                foreach (var stock in overlappingStocks)
-                {
-                    analysis.AppendLine($"   • {stock.Name} ({stock.Symbol})");
-                }
-            }
-        }
-
-        combinedResult.CombinedAnalysis = analysis.ToString();
-        return combinedResult;
     }
 
     /// <summary>

@@ -1,0 +1,69 @@
+using MarketAssistant.Agents;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace TestMarketAssistant;
+
+[TestClass]
+public sealed class StockSelectionManagerTest : BaseKernelTest
+{
+    private StockSelectionManager _stockSelectionManager = null!;
+
+    [TestInitialize]
+    public void Initialize()
+    {
+        // 创建选股管理器，使用基类提供的_kernel
+        var managerLogger = new Mock<ILogger<StockSelectionManager>>();
+        _stockSelectionManager = new StockSelectionManager(_kernel, managerLogger.Object);
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        _stockSelectionManager?.Dispose();
+    }
+
+    [TestMethod]
+    public async Task TestStockSelectionManager_AnalyzeUserRequirementAsync_WithValidRequest_ShouldReturnResult()
+    {
+        // Arrange
+        var request = new StockRecommendationRequest
+        {
+            UserRequirements = "寻找价值股",
+            RiskPreference = "conservative"
+        };
+
+        // Act
+        var result = await _stockSelectionManager.AnalyzeUserRequirementAsync(request);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsNotNull(result.Recommendations);
+        Assert.IsTrue(result.ConfidenceScore >= 0);
+        Assert.IsTrue(result.ConfidenceScore <= 100);
+
+        Console.WriteLine($"用户需求分析完成，推荐股票数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
+    }
+
+    [TestMethod]
+    public async Task TestStockSelectionManager_AnalyzeNewsHotspotAsync_WithValidRequest_ShouldReturnResult()
+    {
+        // Arrange
+        var request = new NewsBasedSelectionRequest
+        {
+            NewsContent = "AI技术获得突破",
+            MaxRecommendations = 5
+        };
+
+        // Act
+        var result = await _stockSelectionManager.AnalyzeNewsHotspotAsync(request);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsNotNull(result.Recommendations);
+        Assert.IsTrue(result.ConfidenceScore >= 0);
+        Assert.IsTrue(result.ConfidenceScore <= 100);
+
+        Console.WriteLine($"新闻热点分析完成，推荐股票数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
+    }
+}

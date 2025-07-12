@@ -114,11 +114,6 @@ public class NewsBasedSelectionRequest
     public string NewsContent { get; set; } = string.Empty;
 
     /// <summary>
-    /// 新闻日期范围（天数）- 保留以便向后兼容
-    /// </summary>
-    public int NewsDateRange { get; set; } = 7;
-
-    /// <summary>
     /// 最大推荐股票数量
     /// </summary>
     public int MaxRecommendations { get; set; } = 10;
