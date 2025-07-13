@@ -68,7 +68,7 @@ internal class UserSemanticKernelService(
             .AddFromType<StockTechnicalPlugin>()
             .AddFromType<StockFinancialPlugin>()
             .AddFromType<StockNewsPlugin>()
-            .AddFromType<StockScreeningPlugin>()
+            .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
             .AddFromType<TextPlugin>();
 
