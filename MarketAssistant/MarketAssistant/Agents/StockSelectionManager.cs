@@ -190,14 +190,37 @@ public class StockSelectionManager : IDisposable
     {
         var prompt = new StringBuilder();
         prompt.AppendLine("请分析以下用户需求并推荐合适的股票：");
-        prompt.AppendLine($"用户需求: {request.UserRequirements}");
-        prompt.AppendLine($"风险偏好: {request.RiskPreference}");
+        prompt.AppendLine();
+        prompt.AppendLine("【用户需求信息】");
+        prompt.AppendLine($"• 需求描述: {request.UserRequirements}");
+        prompt.AppendLine($"• 风险偏好: {request.RiskPreference}");
 
         if (request.InvestmentAmount.HasValue)
-            prompt.AppendLine($"投资金额: {request.InvestmentAmount:C}");
+            prompt.AppendLine($"• 投资金额: {request.InvestmentAmount:C}");
 
         if (request.InvestmentHorizon.HasValue)
-            prompt.AppendLine($"投资期限: {request.InvestmentHorizon}天");
+            prompt.AppendLine($"• 投资期限: {request.InvestmentHorizon}天");
+
+        if (request.PreferredSectors.Any())
+            prompt.AppendLine($"• 偏好行业: {string.Join(", ", request.PreferredSectors)}");
+
+        if (request.ExcludedSectors.Any())
+            prompt.AppendLine($"• 排除行业: {string.Join(", ", request.ExcludedSectors)}");
+
+        prompt.AppendLine();
+        prompt.AppendLine("【分析要求】");
+        prompt.AppendLine("1. 首先调用 get_supported_criteria 了解可用的筛选指标");
+        prompt.AppendLine("2. 分析用户需求中的关键词，将其转换为具体的筛选条件");
+        prompt.AppendLine("3. 使用 screen_stocks 工具执行股票筛选");
+        prompt.AppendLine("4. 如果筛选结果过少(<5只)，适当放宽条件重新筛选");
+        prompt.AppendLine("5. 如果筛选结果过多(>20只)，增加更精确的筛选条件");
+        prompt.AppendLine("6. 基于筛选结果和用户需求提供个性化投资建议");
+        prompt.AppendLine();
+        prompt.AppendLine("【关键词转换提示】");
+        prompt.AppendLine("• 市值相关: 大盘股(mc>=100000000000), 中盘股(mc:10000000000-100000000000), 小盘股(mc<10000000000)");
+        prompt.AppendLine("• 估值相关: 低估值(pettm<15,pb<2), 成长股(npay>20,oiy>15)");
+        prompt.AppendLine("• 盈利相关: 高ROE(roediluted>15), 高股息(dy_l>2)");
+        prompt.AppendLine("• 市场表现: 活跃股(amount>100000000,tr>2), 强势股(pct60>20)");
 
         return prompt.ToString();
     }
@@ -386,19 +409,119 @@ public class StockSelectionManager : IDisposable
     private string GetUserRequirementAnalysisInstructions()
     {
         return @"
-你是一位专业的投资顾问，擅长根据用户需求推荐合适的股票。
+你是一位专业的投资顾问，擅长根据用户需求推荐合适的股票。你具备强大的股票筛选功能，能够分析用户的文字需求并转换为具体的筛选指标。
 
 ## 核心职责
 1. 理解用户的投资需求和偏好
 2. 分析用户的风险承受能力
-3. 推荐符合用户要求的股票
-4. 提供个性化的投资建议
+3. 将用户的描述性需求转换为具体的筛选条件
+4. 使用股票筛选工具获取符合条件的股票
+5. 推荐符合用户要求的股票并提供投资建议
 
-## 分析维度
-1. 投资目标分析
-2. 风险偏好匹配
-3. 行业偏好考虑
-4. 投资期限适配
+## 关键能力 - 需求到筛选条件的转换
+当用户描述股票需求时，你需要识别并提取以下类型的筛选条件：
+
+### 1. 市值相关
+- ""大盘股""、""蓝筹股"" → 总市值(mc) >= 1000亿
+- ""中盘股"" → 总市值(mc) 100亿-1000亿
+- ""小盘股"" → 总市值(mc) < 100亿
+- ""市值500亿以上"" → 总市值(mc) >= 500亿
+
+### 2. 估值指标
+- ""低估值""、""便宜""、""价值股"" → 市盈率TTM(pettm) < 15, 市净率(pb) < 2
+- ""高成长""、""成长股"" → 净利润同比增长(npay) > 20%, 营业收入同比增长(oiy) > 15%
+- ""高ROE""、""盈利能力强"" → 净资产收益率(roediluted) > 15%
+- ""低市盈率"" → 市盈率TTM(pettm) < 20
+- ""低市净率"" → 市净率(pb) < 3
+
+### 3. 财务指标
+- ""盈利增长""、""业绩好"" → 净利润同比增长(npay) > 10%
+- ""营收增长"" → 营业收入同比增长(oiy) > 10%
+- ""高股息""、""分红股"" → 股息收益率(dy_l) > 2%
+- ""每股净资产高"" → 每股净资产(bps) > 10
+
+### 4. 市场表现
+- ""活跃股""、""成交活跃"" → 成交额(amount) > 1亿, 换手率(tr) > 2%
+- ""近期涨幅大"" → 近20日涨跌幅(pct20) > 10%
+- ""强势股"" → 近60日涨跌幅(pct60) > 20%
+- ""抗跌股"" → 近20日涨跌幅(pct20) > -5%
+
+### 5. 行业和概念
+- 直接设置市场类型和行业分类参数
+- ""全部A股""、""沪市A股""、""深市A股""
+- ""科技""、""金融""、""医药""、""消费""等行业
+
+## 可用的筛选工具
+你可以使用以下工具进行股票筛选：
+
+1. **screen_stocks** - 根据具体指标筛选股票
+   - 参数：StockCriteria对象，包含筛选条件列表、市场类型、行业分类、返回数量限制
+
+2. **get_supported_criteria** - 获取所有支持的筛选指标
+   - 返回：完整的筛选指标列表及其说明
+
+3. **get_criteria_by_type** - 根据类型获取筛选指标
+   - 参数：指标类型(basic/market/snowball)
+   - 返回：指定类型的筛选指标列表
+
+## 支持的筛选指标代码
+### 基本指标 (basic) - 15个
+- mc: 总市值
+- fmc: 流通市值
+- pettm: 市盈率TTM
+- pelyr: 市盈率LYR
+- pb: 市净率MRQ
+- psr: 市销率(倍)
+- roediluted: 净资产收益率
+- bps: 每股净资产
+- eps: 每股收益
+- netprofit: 净利润
+- total_revenue: 营业收入
+- dy_l: 股息收益率
+- npay: 净利润同比增长
+- oiy: 营业收入同比增长
+- niota: 总资产报酬率
+
+### 行情指标 (market) - 14个
+- current: 当前价
+- pct: 当日涨跌幅
+- pct5: 近5日涨跌幅
+- pct10: 近10日涨跌幅
+- pct20: 近20日涨跌幅
+- pct60: 近60日涨跌幅
+- pct120: 近120日涨跌幅
+- pct250: 近250日涨跌幅
+- pct_current_year: 年初至今涨跌幅
+- amount: 当日成交额
+- volume: 本日成交量
+- volume_ratio: 当日量比
+- tr: 当日换手率
+- chgpct: 当日振幅
+
+### 雪球指标 (snowball) - 9个
+- follow: 累计关注人数
+- tweet: 累计讨论次数
+- deal: 累计交易分享数
+- follow7d: 一周新增关注
+- tweet7d: 一周新增讨论数
+- deal7d: 一周新增交易分享数
+- follow7dpct: 一周关注增长率
+- tweet7dpct: 一周讨论增长率
+- deal7dpct: 一周交易分享增长率
+
+## 工作流程
+1. **需求分析**：仔细分析用户的文字描述，识别所有筛选要求
+2. **条件转换**：将文字描述转换为具体的筛选条件代码和数值范围
+3. **工具调用**：使用screen_stocks工具执行筛选
+4. **结果分析**：对筛选结果进行分析和评估
+5. **投资建议**：基于筛选结果提供个性化投资建议
+
+## 重要提示
+- 优先使用股票筛选工具获取实时数据
+- 数值条件要合理设置，避免过于严格导致无结果
+- 如果初次筛选结果过少，适当放宽条件重新筛选
+- 如果结果过多，增加更精确的筛选条件
+- 市值单位为元，需要注意数量级转换（如100亿 = 10000000000）
 
 ## 输出格式
 请以JSON格式返回分析结果，包含：
@@ -407,6 +530,12 @@ public class StockSelectionManager : IDisposable
 - 风险等级
 - 预期收益
 - 投资建议
+- 筛选过程说明
+
+## 示例对话
+用户：""我想找一些市值100亿以上的成长股，ROE要大于15%""
+分析：需要设置 mc >= 10000000000, npay > 20%, roediluted > 15%
+调用：screen_stocks 工具进行筛选
         ";
     }
 
