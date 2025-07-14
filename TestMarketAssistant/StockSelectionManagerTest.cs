@@ -1,6 +1,4 @@
 using MarketAssistant.Agents;
-using Microsoft.Extensions.Logging;
-using Moq;
 
 namespace TestMarketAssistant;
 
@@ -12,9 +10,7 @@ public sealed class StockSelectionManagerTest : BaseKernelTest
     [TestInitialize]
     public void Initialize()
     {
-        // 创建选股管理器，使用基类提供的_kernel
-        var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        _stockSelectionManager = new StockSelectionManager(_kernel, managerLogger.Object);
+        _stockSelectionManager = _kernel.Services.GetRequiredService<StockSelectionManager>();
     }
 
     [TestCleanup]

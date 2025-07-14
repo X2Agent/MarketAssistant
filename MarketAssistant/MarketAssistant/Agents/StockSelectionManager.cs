@@ -31,7 +31,7 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 创建新闻分析代理
     /// </summary>
-    private async Task<ChatCompletionAgent> CreateNewsAnalysisAgentAsync(CancellationToken cancellationToken = default)
+    private ChatCompletionAgent CreateNewsAnalysisAgent(CancellationToken cancellationToken = default)
     {
         if (_newsAnalysisAgent != null)
             return _newsAnalysisAgent;
@@ -70,7 +70,7 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 创建用户需求分析代理
     /// </summary>
-    private async Task<ChatCompletionAgent> CreateUserRequirementAgentAsync(CancellationToken cancellationToken = default)
+    private ChatCompletionAgent CreateUserRequirementAgent(CancellationToken cancellationToken = default)
     {
         if (_userRequirementAgent != null)
             return _userRequirementAgent;
@@ -79,9 +79,11 @@ public class StockSelectionManager : IDisposable
         {
             _logger.LogInformation("创建用户需求分析代理");
 
+            var screenStocks = _kernel.Plugins.GetFunction(nameof(StockScreenerPlugin), "screen_stocks");
+
             var promptExecutionSettings = new OpenAIPromptExecutionSettings()
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), //FunctionChoiceBehavior.Required([screenStocks]),
                 ResponseFormat = "json_object",
                 Temperature = 0.1,
                 MaxTokens = 3000
@@ -96,7 +98,7 @@ public class StockSelectionManager : IDisposable
                 Arguments = new KernelArguments(promptExecutionSettings),
                 HistoryReducer = new ChatHistoryTruncationReducer(1)
             };
-            _userRequirementAgent.Kernel.Plugins.AddFromType<StockScreenerPlugin>();
+
             _logger.LogInformation("用户需求分析代理创建成功");
             return _userRequirementAgent;
         }
@@ -122,7 +124,7 @@ public class StockSelectionManager : IDisposable
         {
             _logger.LogInformation("开始用户需求分析");
 
-            var agent = await CreateUserRequirementAgentAsync(cancellationToken);
+            var agent = CreateUserRequirementAgent(cancellationToken);
             var chatHistory = new ChatHistory();
 
             var prompt = BuildUserRequirementPrompt(request);
@@ -156,7 +158,7 @@ public class StockSelectionManager : IDisposable
         {
             _logger.LogInformation("开始新闻热点分析");
 
-            var agent = await CreateNewsAnalysisAgentAsync(cancellationToken);
+            var agent = CreateNewsAnalysisAgent(cancellationToken);
             var chatHistory = new ChatHistory();
 
             var prompt = BuildNewsAnalysisPrompt(request);
@@ -206,21 +208,6 @@ public class StockSelectionManager : IDisposable
 
         if (request.ExcludedSectors.Any())
             prompt.AppendLine($"• 排除行业: {string.Join(", ", request.ExcludedSectors)}");
-
-        prompt.AppendLine();
-        prompt.AppendLine("【分析要求】");
-        prompt.AppendLine("1. 首先调用 get_supported_criteria 了解可用的筛选指标");
-        prompt.AppendLine("2. 分析用户需求中的关键词，将其转换为具体的筛选条件");
-        prompt.AppendLine("3. 使用 screen_stocks 工具执行股票筛选");
-        prompt.AppendLine("4. 如果筛选结果过少(<5只)，适当放宽条件重新筛选");
-        prompt.AppendLine("5. 如果筛选结果过多(>20只)，增加更精确的筛选条件");
-        prompt.AppendLine("6. 基于筛选结果和用户需求提供个性化投资建议");
-        prompt.AppendLine();
-        prompt.AppendLine("【关键词转换提示】");
-        prompt.AppendLine("• 市值相关: 大盘股(mc>=100000000000), 中盘股(mc:10000000000-100000000000), 小盘股(mc<10000000000)");
-        prompt.AppendLine("• 估值相关: 低估值(pettm<15,pb<2), 成长股(npay>20,oiy>15)");
-        prompt.AppendLine("• 盈利相关: 高ROE(roediluted>15), 高股息(dy_l>2)");
-        prompt.AppendLine("• 市场表现: 活跃股(amount>100000000,tr>2), 强势股(pct60>20)");
 
         return prompt.ToString();
     }
@@ -515,6 +502,12 @@ public class StockSelectionManager : IDisposable
 3. **工具调用**：使用screen_stocks工具执行筛选
 4. **结果分析**：对筛选结果进行分析和评估
 5. **投资建议**：基于筛选结果提供个性化投资建议
+
+【关键词转换提示】
+• 市值相关: 大盘股(mc>=100000000000), 中盘股(mc:10000000000-100000000000), 小盘股(mc<10000000000)
+• 估值相关: 低估值(pettm<15,pb<2), 成长股(npay>20,oiy>15)
+• 盈利相关: 高ROE(roediluted>15), 高股息(dy_l>2)
+• 市场表现: 活跃股(amount>100000000,tr>2), 强势股(pct60>20)
 
 ## 重要提示
 - 优先使用股票筛选工具获取实时数据

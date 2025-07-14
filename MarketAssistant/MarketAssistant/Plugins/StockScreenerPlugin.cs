@@ -46,6 +46,7 @@ public class StockCriteria
     /// <summary>
     /// 筛选条件列表
     /// </summary>
+    [Description("筛选条件")]
     public List<StockScreeningCriteria> Criteria { get; set; } = new();
 
     /// <summary>
@@ -56,6 +57,7 @@ public class StockCriteria
     /// <summary>
     /// 行业分类：全部、科技、金融等
     /// </summary>
+    [Description("行业分类")]
     public string Industry { get; set; } = "全部";
 
     /// <summary>
