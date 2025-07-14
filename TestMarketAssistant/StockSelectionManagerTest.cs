@@ -29,7 +29,7 @@ public sealed class StockSelectionManagerTest : BaseKernelTest
         // Arrange
         var request = new StockRecommendationRequest
         {
-            UserRequirements = "寻找价值股",
+            UserRequirements = "市值大于1000万的旅游行业股票",
             RiskPreference = "conservative"
         };
 

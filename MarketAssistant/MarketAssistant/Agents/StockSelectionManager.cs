@@ -1,3 +1,4 @@
+using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -15,7 +16,6 @@ public class StockSelectionManager : IDisposable
 {
     private readonly Kernel _kernel;
     private readonly ILogger<StockSelectionManager> _logger;
-    private ChatCompletionAgent? _stockSelectionAgent;
     private ChatCompletionAgent? _newsAnalysisAgent;
     private ChatCompletionAgent? _userRequirementAgent;
     private bool _disposed = false;
@@ -96,7 +96,7 @@ public class StockSelectionManager : IDisposable
                 Arguments = new KernelArguments(promptExecutionSettings),
                 HistoryReducer = new ChatHistoryTruncationReducer(1)
             };
-
+            _userRequirementAgent.Kernel.Plugins.AddFromType<StockScreenerPlugin>();
             _logger.LogInformation("用户需求分析代理创建成功");
             return _userRequirementAgent;
         }
@@ -424,7 +424,6 @@ public class StockSelectionManager : IDisposable
     {
         if (!_disposed && disposing)
         {
-            _stockSelectionAgent = null;
             _newsAnalysisAgent = null;
             _userRequirementAgent = null;
             _disposed = true;

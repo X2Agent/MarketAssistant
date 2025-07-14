@@ -55,7 +55,7 @@ public class BaseKernelTest
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-32B";
+        var modelId = "moonshotai/Kimi-K2-Instruct";//"Qwen/Qwen3-32B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务

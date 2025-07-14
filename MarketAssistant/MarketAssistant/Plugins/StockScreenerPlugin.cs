@@ -1,5 +1,4 @@
 using MarketAssistant.Infrastructure;
-using MarketAssistant.Plugins.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 using Microsoft.SemanticKernel;
@@ -9,14 +8,331 @@ using System.Text.RegularExpressions;
 namespace MarketAssistant.Plugins;
 
 /// <summary>
-/// 投资网站股票筛选插件，通过Playwright自动化操作investing.com股票筛选器
-/// TODO https://xueqiu.com/stock/screener
+/// 股票筛选条件
+/// </summary>
+public class StockScreeningCriteria
+{
+    /// <summary>
+    /// 指标代码（如 "mc", "pettm", "roediluted" 等）
+    /// </summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 指标显示名称
+    /// </summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 最小值
+    /// </summary>
+    public decimal? MinValue { get; set; }
+
+    /// <summary>
+    /// 最大值
+    /// </summary>
+    public decimal? MaxValue { get; set; }
+
+    /// <summary>
+    /// 指标类型（basic, market, snowball）
+    /// </summary>
+    public string Type { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 股票筛选参数
+/// </summary>
+public class StockCriteria
+{
+    /// <summary>
+    /// 筛选条件列表
+    /// </summary>
+    public List<StockScreeningCriteria> Criteria { get; set; } = new();
+
+    /// <summary>
+    /// 市场类型：全部A股、沪市A股、深市A股等
+    /// </summary>
+    public string Market { get; set; } = "全部A股";
+
+    /// <summary>
+    /// 行业分类：全部、科技、金融等
+    /// </summary>
+    public string Industry { get; set; } = "全部";
+
+    /// <summary>
+    /// 返回数量限制
+    /// </summary>
+    public int Limit { get; set; } = 20;
+}
+
+/// <summary>
+/// 雪球网股票筛选结果实体
+/// </summary>
+public class ScreenerStockInfo
+{
+    /// <summary>
+    /// 股票名称
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 股票代码（如：SZ300316）
+    /// </summary>
+    public string Symbol { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 当前价
+    /// </summary>
+    public decimal Current { get; set; }
+
+    /// <summary>
+    /// 当日涨跌幅(%)
+    /// </summary>
+    public decimal Pct { get; set; }
+
+    /// <summary>
+    /// 当日成交额
+    /// </summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>
+    /// 总市值（元）
+    /// </summary>
+    public decimal Mc { get; set; }
+
+    /// <summary>
+    /// 流通市值（元）
+    /// </summary>
+    public decimal Fmc { get; set; }
+
+    /// <summary>
+    /// 本日成交量(万)
+    /// </summary>
+    public decimal Volume { get; set; }
+
+    /// <summary>
+    /// 当日量比
+    /// </summary>
+    public decimal VolumeRatio { get; set; }
+
+    /// <summary>
+    /// 当日换手率(%)
+    /// </summary>
+    public decimal Tr { get; set; }
+
+    /// <summary>
+    /// 市盈率TTM
+    /// </summary>
+    public decimal PeTtm { get; set; }
+
+    /// <summary>
+    /// 市盈率LYR
+    /// </summary>
+    public decimal PeLyr { get; set; }
+
+    /// <summary>
+    /// 市净率MRQ
+    /// </summary>
+    public decimal Pb { get; set; }
+
+    /// <summary>
+    /// 市销率(倍)
+    /// </summary>
+    public decimal Psr { get; set; }
+
+    /// <summary>
+    /// 净资产收益率(%)
+    /// </summary>
+    public decimal RoeDiluted { get; set; }
+
+    /// <summary>
+    /// 每股净资产
+    /// </summary>
+    public decimal Bps { get; set; }
+
+    /// <summary>
+    /// 每股收益
+    /// </summary>
+    public decimal Eps { get; set; }
+
+    /// <summary>
+    /// 净利润（元）
+    /// </summary>
+    public decimal NetProfit { get; set; }
+
+    /// <summary>
+    /// 营业收入（元）
+    /// </summary>
+    public decimal TotalRevenue { get; set; }
+
+    /// <summary>
+    /// 股息收益率(%)
+    /// </summary>
+    public decimal DyL { get; set; }
+
+    /// <summary>
+    /// 净利润同比增长(%)
+    /// </summary>
+    public decimal Npay { get; set; }
+
+    /// <summary>
+    /// 营业收入同比增长(%)
+    /// </summary>
+    public decimal Oiy { get; set; }
+
+    /// <summary>
+    /// 总资产报酬率(%)
+    /// </summary>
+    public decimal Niota { get; set; }
+
+    /// <summary>
+    /// 累计关注人数
+    /// </summary>
+    public decimal Follow { get; set; }
+
+    /// <summary>
+    /// 累计讨论次数
+    /// </summary>
+    public decimal Tweet { get; set; }
+
+    /// <summary>
+    /// 累计交易分享数
+    /// </summary>
+    public decimal Deal { get; set; }
+
+    /// <summary>
+    /// 一周新增关注
+    /// </summary>
+    public decimal Follow7d { get; set; }
+
+    /// <summary>
+    /// 一周新增讨论数
+    /// </summary>
+    public decimal Tweet7d { get; set; }
+
+    /// <summary>
+    /// 一周新增交易分享数
+    /// </summary>
+    public decimal Deal7d { get; set; }
+
+    /// <summary>
+    /// 一周关注增长率(%)
+    /// </summary>
+    public decimal Follow7dPct { get; set; }
+
+    /// <summary>
+    /// 一周讨论增长率(%)
+    /// </summary>
+    public decimal Tweet7dPct { get; set; }
+
+    /// <summary>
+    /// 一周交易分享增长率(%)
+    /// </summary>
+    public decimal Deal7dPct { get; set; }
+
+    /// <summary>
+    /// 近5日涨跌幅(%)
+    /// </summary>
+    public decimal Pct5 { get; set; }
+
+    /// <summary>
+    /// 近10日涨跌幅(%)
+    /// </summary>
+    public decimal Pct10 { get; set; }
+
+    /// <summary>
+    /// 近20日涨跌幅(%)
+    /// </summary>
+    public decimal Pct20 { get; set; }
+
+    /// <summary>
+    /// 近60日涨跌幅(%)
+    /// </summary>
+    public decimal Pct60 { get; set; }
+
+    /// <summary>
+    /// 近120日涨跌幅(%)
+    /// </summary>
+    public decimal Pct120 { get; set; }
+
+    /// <summary>
+    /// 近250日涨跌幅(%)
+    /// </summary>
+    public decimal Pct250 { get; set; }
+
+    /// <summary>
+    /// 年初至今涨跌幅(%)
+    /// </summary>
+    public decimal PctCurrentYear { get; set; }
+
+    /// <summary>
+    /// 当日振幅(%)
+    /// </summary>
+    public decimal ChgPct { get; set; }
+
+    /// <summary>
+    /// 动态数据字典，存储其他指标
+    /// </summary>
+    public Dictionary<string, string> ExtraData { get; set; } = new();
+}
+
+/// <summary>
+/// 雪球网股票筛选插件，通过Playwright自动化操作xueqiu.com股票筛选器
 /// </summary>
 public sealed class StockScreenerPlugin
 {
     private readonly PlaywrightService _playwrightService;
     private readonly ILogger<StockScreenerPlugin> _logger;
-    private const string INVESTING_SCREENER_URL = "https://cn.investing.com/stock-screener";
+    private const string XUEQIU_SCREENER_URL = "https://xueqiu.com/stock/screener";
+
+    /// <summary>
+    /// 雪球网支持的所有筛选指标定义（根据实际HTML结构更新）
+    /// </summary>
+    private static readonly Dictionary<string, StockScreeningCriteria> SupportedCriteria = new()
+    {
+        // 基本指标 (15个)
+        { "pettm", new StockScreeningCriteria { Code = "pettm", DisplayName = "市盈率TTM", Type = "basic" } },
+        { "roediluted", new StockScreeningCriteria { Code = "roediluted", DisplayName = "净资产收益率", Type = "basic" } },
+        { "bps", new StockScreeningCriteria { Code = "bps", DisplayName = "每股净资产", Type = "basic" } },
+        { "pelyr", new StockScreeningCriteria { Code = "pelyr", DisplayName = "市盈率LYR", Type = "basic" } },
+        { "npay", new StockScreeningCriteria { Code = "npay", DisplayName = "净利润同比增长", Type = "basic" } },
+        { "eps", new StockScreeningCriteria { Code = "eps", DisplayName = "每股收益", Type = "basic" } },
+        { "netprofit", new StockScreeningCriteria { Code = "netprofit", DisplayName = "净利润", Type = "basic" } },
+        { "dy_l", new StockScreeningCriteria { Code = "dy_l", DisplayName = "股息收益率", Type = "basic" } },
+        { "psr", new StockScreeningCriteria { Code = "psr", DisplayName = "市销率(倍)", Type = "basic" } },
+        { "pb", new StockScreeningCriteria { Code = "pb", DisplayName = "市净率MRQ", Type = "basic" } },
+        { "total_revenue", new StockScreeningCriteria { Code = "total_revenue", DisplayName = "营业收入", Type = "basic" } },
+        { "mc", new StockScreeningCriteria { Code = "mc", DisplayName = "总市值", Type = "basic" } },
+        { "fmc", new StockScreeningCriteria { Code = "fmc", DisplayName = "流通市值", Type = "basic" } },
+        { "niota", new StockScreeningCriteria { Code = "niota", DisplayName = "总资产报酬率", Type = "basic" } },
+        { "oiy", new StockScreeningCriteria { Code = "oiy", DisplayName = "营业收入同比增长", Type = "basic" } },
+        
+        // 雪球指标 (9个)
+        { "deal", new StockScreeningCriteria { Code = "deal", DisplayName = "累计交易分享数", Type = "snowball" } },
+        { "follow7d", new StockScreeningCriteria { Code = "follow7d", DisplayName = "一周新增关注", Type = "snowball" } },
+        { "deal7dpct", new StockScreeningCriteria { Code = "deal7dpct", DisplayName = "一周交易分享增长率", Type = "snowball" } },
+        { "deal7d", new StockScreeningCriteria { Code = "deal7d", DisplayName = "一周新增交易分享数", Type = "snowball" } },
+        { "tweet7dpct", new StockScreeningCriteria { Code = "tweet7dpct", DisplayName = "一周讨论增长率", Type = "snowball" } },
+        { "tweet", new StockScreeningCriteria { Code = "tweet", DisplayName = "累计讨论次数", Type = "snowball" } },
+        { "follow7dpct", new StockScreeningCriteria { Code = "follow7dpct", DisplayName = "一周关注增长率", Type = "snowball" } },
+        { "follow", new StockScreeningCriteria { Code = "follow", DisplayName = "累计关注人数", Type = "snowball" } },
+        { "tweet7d", new StockScreeningCriteria { Code = "tweet7d", DisplayName = "一周新增讨论数", Type = "snowball" } },
+        
+        // 行情指标 (14个)
+        { "pct", new StockScreeningCriteria { Code = "pct", DisplayName = "当日涨跌幅", Type = "market" } },
+        { "pct5", new StockScreeningCriteria { Code = "pct5", DisplayName = "近5日涨跌幅", Type = "market" } },
+        { "pct60", new StockScreeningCriteria { Code = "pct60", DisplayName = "近60日涨跌幅", Type = "market" } },
+        { "amount", new StockScreeningCriteria { Code = "amount", DisplayName = "当日成交额", Type = "market" } },
+        { "chgpct", new StockScreeningCriteria { Code = "chgpct", DisplayName = "当日振幅", Type = "market" } },
+        { "pct20", new StockScreeningCriteria { Code = "pct20", DisplayName = "近20日涨跌幅", Type = "market" } },
+        { "pct120", new StockScreeningCriteria { Code = "pct120", DisplayName = "近120日涨跌幅", Type = "market" } },
+        { "pct250", new StockScreeningCriteria { Code = "pct250", DisplayName = "近250日涨跌幅", Type = "market" } },
+        { "volume", new StockScreeningCriteria { Code = "volume", DisplayName = "本日成交量", Type = "market" } },
+        { "current", new StockScreeningCriteria { Code = "current", DisplayName = "当前价", Type = "market" } },
+        { "volume_ratio", new StockScreeningCriteria { Code = "volume_ratio", DisplayName = "当日量比", Type = "market" } },
+        { "pct_current_year", new StockScreeningCriteria { Code = "pct_current_year", DisplayName = "年初至今涨跌幅", Type = "market" } },
+        { "pct10", new StockScreeningCriteria { Code = "pct10", DisplayName = "近10日涨跌幅", Type = "market" } },
+        { "tr", new StockScreeningCriteria { Code = "tr", DisplayName = "当日换手率", Type = "market" } }
+    };
 
     public StockScreenerPlugin(
         PlaywrightService playwrightService,
@@ -27,28 +343,23 @@ public sealed class StockScreenerPlugin
     }
 
     /// <summary>
-    /// 根据筛选条件获取股票列表
+    /// 从雪球网筛选股票
     /// </summary>
-    [KernelFunction("screen_stocks_by_criteria"), Description("根据用户指定的筛选条件从investing.com获取股票列表")]
-    public async Task<List<InvestingStockInfo>> ScreenStocksByCriteriaAsync(
-        [Description("国家/地区，如：中国、美国、日本等")] string country = "中国",
-        [Description("最小市值，单位亿美元")] decimal? minMarketCap = null,
-        [Description("最大市值，单位亿美元")] decimal? maxMarketCap = null,
-        [Description("最小市盈率PE")] decimal? minPE = null,
-        [Description("最大市盈率PE")] decimal? maxPE = null,
-        [Description("最小股息率，百分比")] decimal? minDividend = null,
-        [Description("最大股息率，百分比")] decimal? maxDividend = null,
-        [Description("行业筛选，如：科技、金融、医疗等")] string? sector = null,
-        [Description("股票类型，如：大盘股、小盘股等")] string? stockType = null,
-        [Description("返回数量限制")] int limit = 20)
+    [KernelFunction("screen_stocks"), Description("根据具体指标筛选股票")]
+    public async Task<List<ScreenerStockInfo>> ScreenStocksAsync(
+        [Description("筛选条件")] StockCriteria criteria)
     {
+        if (criteria == null)
+            throw new ArgumentNullException(nameof(criteria));
+
         try
         {
-            _logger.LogInformation("开始从investing.com筛选股票，国家: {Country}, 限制: {Limit}", country, limit);
+            _logger.LogInformation("开始筛选股票，共 {Count} 个条件", criteria.Criteria.Count);
 
             return await _playwrightService.ExecuteWithPageAsync(async page =>
             {
-                await page.GotoAsync(INVESTING_SCREENER_URL, new PageGotoOptions
+                // 访问雪球选股器
+                await page.GotoAsync(XUEQIU_SCREENER_URL, new PageGotoOptions
                 {
                     WaitUntil = WaitUntilState.NetworkIdle,
                     Timeout = 30000
@@ -56,14 +367,34 @@ public sealed class StockScreenerPlugin
 
                 // 等待页面加载完成
                 await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                await Task.Delay(2000); // 等待动态内容加载
+                await Task.Delay(1000);
 
-                // 设置筛选条件
-                await SetScreeningCriteria(page, country, minMarketCap, maxMarketCap,
-                    minPE, maxPE, minDividend, maxDividend, sector, stockType);
+                // 设置市场和行业
+                await SetMarketType(page, criteria.Market);
+                await SetIndustry(page, criteria.Industry);
+
+                // 设置所有指标条件
+                foreach (var criterion in criteria.Criteria)
+                {
+                    if (SupportedCriteria.ContainsKey(criterion.Code))
+                    {
+                        var supportedCriterion = SupportedCriteria[criterion.Code];
+                        await SetSpecificCriteria(page, criterion.Code, criterion.MinValue, criterion.MaxValue, supportedCriterion.DisplayName);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("不支持的指标代码: {Code}", criterion.Code);
+                    }
+                }
+
+                // 开始选股
+                await TriggerScreening(page);
+
+                // 等待结果加载
+                await Task.Delay(2000);
 
                 // 获取股票列表
-                var stocks = await ExtractStockList(page, limit);
+                var stocks = await ExtractXueqiuStockList(page, criteria.Limit);
 
                 _logger.LogInformation("成功获取 {Count} 只股票", stocks.Count);
                 return stocks;
@@ -77,396 +408,522 @@ public sealed class StockScreenerPlugin
     }
 
     /// <summary>
-    /// 快速筛选热门股票
+    /// 获取所有支持的筛选指标
     /// </summary>
-    [KernelFunction("screen_hot_stocks"), Description("快速获取热门股票列表")]
-    public async Task<List<InvestingStockInfo>> ScreenHotStocksAsync(
-        [Description("国家/地区")] string country = "中国",
-        [Description("排序方式：涨幅、成交量、市值等")] string sortBy = "涨幅",
-        [Description("返回数量")] int limit = 20)
+    [KernelFunction("get_supported_criteria"), Description("获取支持的所有筛选指标列表")]
+    public List<StockScreeningCriteria> GetSupportedCriteria()
     {
-        try
-        {
-            _logger.LogInformation("获取热门股票，国家: {Country}, 排序: {SortBy}", country, sortBy);
-
-            return await _playwrightService.ExecuteWithPageAsync(async page =>
-            {
-                await page.GotoAsync(INVESTING_SCREENER_URL, new PageGotoOptions
-                {
-                    WaitUntil = WaitUntilState.NetworkIdle,
-                    Timeout = 30000
-                });
-
-                await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                await Task.Delay(2000);
-
-                // 设置国家筛选
-                await SetCountryFilter(page, country);
-
-                // 设置排序
-                await SetSortingOrder(page, sortBy);
-
-                // 获取股票列表
-                var stocks = await ExtractStockList(page, limit);
-
-                _logger.LogInformation("成功获取 {Count} 只热门股票", stocks.Count);
-                return stocks;
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "获取热门股票时发生错误");
-            throw new InvalidOperationException($"获取热门股票失败: {ex.Message}", ex);
-        }
+        return SupportedCriteria.Values.ToList();
     }
 
     /// <summary>
-    /// 根据行业筛选股票
+    /// 根据指标类型获取支持的筛选指标
     /// </summary>
-    [KernelFunction("screen_stocks_by_sector"), Description("根据指定行业筛选股票")]
-    public async Task<List<InvestingStockInfo>> ScreenStocksBySectorAsync(
-        [Description("行业名称，如：科技、金融、医疗、能源等")] string sector,
-        [Description("国家/地区")] string country = "中国",
-        [Description("返回数量")] int limit = 30)
+    [KernelFunction("get_criteria_by_type"), Description("根据指标类型获取支持的筛选指标")]
+    public List<StockScreeningCriteria> GetCriteriaByType(
+        [Description("指标类型：basic(基本指标)、market(行情指标)、snowball(雪球指标)")] string type)
     {
-        try
-        {
-            _logger.LogInformation("按行业筛选股票，行业: {Sector}, 国家: {Country}", sector, country);
-
-            return await _playwrightService.ExecuteWithPageAsync(async page =>
-            {
-                await page.GotoAsync(INVESTING_SCREENER_URL, new PageGotoOptions
-                {
-                    WaitUntil = WaitUntilState.NetworkIdle,
-                    Timeout = 30000
-                });
-
-                await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                await Task.Delay(2000);
-
-                // 设置国家和行业筛选
-                await SetCountryFilter(page, country);
-                await SetSectorFilter(page, sector);
-
-                // 获取股票列表
-                var stocks = await ExtractStockList(page, limit);
-
-                _logger.LogInformation("成功获取 {Count} 只 {Sector} 行业股票", stocks.Count, sector);
-                return stocks;
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "按行业筛选股票时发生错误");
-            throw new InvalidOperationException($"按行业筛选股票失败: {ex.Message}", ex);
-        }
+        return SupportedCriteria.Values.Where(c => c.Type == type).ToList();
     }
 
     #region 私有方法
 
     /// <summary>
-    /// 设置筛选条件
+    /// 设置市场类型
     /// </summary>
-    private async Task SetScreeningCriteria(IPage page, string country, decimal? minMarketCap, decimal? maxMarketCap,
-        decimal? minPE, decimal? maxPE, decimal? minDividend, decimal? maxDividend, string? sector, string? stockType)
+    private async Task SetMarketType(IPage page, string market)
     {
         try
         {
-            // 设置国家筛选
-            await SetCountryFilter(page, country);
-
-            // 设置市值范围
-            if (minMarketCap.HasValue || maxMarketCap.HasValue)
+            // 根据实际HTML结构选择市场
+            var marketSelect = await page.QuerySelectorAsync(".stockScreener-range-market select");
+            if (marketSelect != null)
             {
-                await SetMarketCapFilter(page, minMarketCap, maxMarketCap);
-            }
+                var marketValue = market switch
+                {
+                    "全部A股" => "sh_sz",
+                    "沪市A股" => "sha",
+                    "深市A股" => "sza",
+                    _ => "sh_sz" // 默认全部A股
+                };
 
-            // 设置市盈率范围
-            if (minPE.HasValue || maxPE.HasValue)
-            {
-                await SetPEFilter(page, minPE, maxPE);
+                await marketSelect.SelectOptionAsync([marketValue]);
+                await Task.Delay(1000);
+                _logger.LogInformation("已设置市场类型: {Market} -> {Value}", market, marketValue);
             }
-
-            // 设置股息率范围
-            if (minDividend.HasValue || maxDividend.HasValue)
-            {
-                await SetDividendFilter(page, minDividend, maxDividend);
-            }
-
-            // 设置行业筛选
-            if (!string.IsNullOrEmpty(sector))
-            {
-                await SetSectorFilter(page, sector);
-            }
-
-            // 设置股票类型
-            if (!string.IsNullOrEmpty(stockType))
-            {
-                await SetStockTypeFilter(page, stockType);
-            }
-
-            // 等待筛选结果加载
-            await Task.Delay(3000);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "设置筛选条件时发生警告");
+            _logger.LogWarning(ex, "设置市场类型时发生错误: {Market}", market);
         }
     }
 
     /// <summary>
-    /// 设置国家筛选
+    /// 设置行业
     /// </summary>
-    private async Task SetCountryFilter(IPage page, string country)
+    private async Task SetIndustry(IPage page, string industry)
     {
         try
         {
-            // 查找国家选择器并设置
-            var countrySelector = "select[name='country'], .country-filter, [data-test='country-select']";
-            var element = await page.QuerySelectorAsync(countrySelector);
-
-            if (element != null)
+            if (string.IsNullOrEmpty(industry) || industry == "全部")
             {
-                await element.SelectOptionAsync(new[] { country });
-                await Task.Delay(1000);
+                _logger.LogDebug("使用默认行业筛选条件：全部");
+                return;
+            }
+
+            // 查找行业选择下拉框
+            var industrySelect = await page.QuerySelectorAsync(".stockScreener-range-industry select");
+            if (industrySelect == null)
+            {
+                _logger.LogWarning("未找到行业选择下拉框");
+                return;
+            }
+
+            // 根据行业名称获取对应的值
+            var industryValue = GetIndustryValue(industry);
+            if (string.IsNullOrEmpty(industryValue))
+            {
+                _logger.LogWarning("未找到行业 '{Industry}' 对应的值，使用模糊匹配", industry);
+
+                // 尝试模糊匹配
+                var options = await industrySelect.QuerySelectorAllAsync("option");
+                foreach (var option in options)
+                {
+                    var text = await option.InnerTextAsync();
+                    if (text.Contains(industry))
+                    {
+                        industryValue = await option.GetAttributeAsync("value") ?? "";
+                        _logger.LogInformation("通过模糊匹配找到行业: {Industry} -> {Value}", text, industryValue);
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(industryValue))
+            {
+                await industrySelect.SelectOptionAsync(industryValue);
+                _logger.LogInformation("已选择行业: {Industry} (值: {Value})", industry, industryValue);
+
+                // 等待页面更新
+                await page.WaitForTimeoutAsync(500);
             }
             else
             {
-                _logger.LogWarning("未找到国家筛选器");
+                _logger.LogWarning("无法找到匹配的行业: {Industry}", industry);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "设置国家筛选时发生错误: {Country}", country);
+            _logger.LogWarning(ex, "设置行业时发生错误: {Industry}", industry);
         }
     }
 
     /// <summary>
-    /// 设置市值筛选
+    /// 根据行业名称获取对应的雪球行业代码
     /// </summary>
-    private async Task SetMarketCapFilter(IPage page, decimal? minMarketCap, decimal? maxMarketCap)
+    private string GetIndustryValue(string industryName)
+    {
+        // 雪球行业代码映射表
+        var industryMapping = new Dictionary<string, string>
+        {
+            // 农林牧渔
+            { "种植业", "S1101" },
+            { "渔业", "S1102" },
+            { "林业", "S1103" },
+            { "饲料", "S1104" },
+            { "农产品加工", "S1105" },
+            { "养殖业", "S1107" },
+            { "动物保健", "S1108" },
+            { "农业综合", "S1109" },
+            
+            // 化工
+            { "化学原料", "S2202" },
+            { "化学制品", "S2203" },
+            { "化学纤维", "S2204" },
+            { "塑料", "S2205" },
+            { "橡胶", "S2206" },
+            { "农化制品", "S2208" },
+            { "非金属材料", "S2209" },
+            
+            // 钢铁
+            { "冶钢原料", "S2303" },
+            { "普钢", "S2304" },
+            { "特钢", "S2305" },
+            
+            // 有色金属
+            { "金属新材料", "S2402" },
+            { "工业金属", "S2403" },
+            { "贵金属", "S2404" },
+            { "小金属", "S2405" },
+            { "能源金属", "S2406" },
+            
+            // 电子
+            { "半导体", "S2701" },
+            { "元件", "S2702" },
+            { "光学光电子", "S2703" },
+            { "其他电子", "S2704" },
+            { "消费电子", "S2705" },
+            { "电子化学品", "S2706" },
+            
+            // 汽车
+            { "汽车零部件", "S2802" },
+            { "汽车服务", "S2803" },
+            { "摩托车及其他", "S2804" },
+            { "乘用车", "S2805" },
+            { "商用车", "S2806" },
+            
+            // 家用电器
+            { "白色家电", "S3301" },
+            { "黑色家电", "S3302" },
+            { "小家电", "S3303" },
+            { "厨卫电器", "S3304" },
+            { "照明设备", "S3305" },
+            { "家电零部件", "S3306" },
+            { "其他家电", "S3307" },
+            
+            // 食品饮料
+            { "食品加工", "S3404" },
+            { "白酒", "S3405" },
+            { "非白酒", "S3406" },
+            { "饮料乳品", "S3407" },
+            { "休闲食品", "S3408" },
+            { "调味发酵品", "S3409" },
+            
+            // 纺织服装
+            { "纺织制造", "S3501" },
+            { "服装家纺", "S3502" },
+            { "饰品", "S3503" },
+            
+            // 轻工制造
+            { "造纸", "S3601" },
+            { "包装印刷", "S3602" },
+            { "家居用品", "S3603" },
+            { "文娱用品", "S3605" },
+            
+            // 医药生物
+            { "化学制药", "S3701" },
+            { "中药", "S3702" },
+            { "生物制品", "S3703" },
+            { "医药商业", "S3704" },
+            { "医疗器械", "S3705" },
+            { "医疗服务", "S3706" },
+            
+            // 公用事业
+            { "电力", "S4101" },
+            { "燃气", "S4103" },
+            
+            // 交通运输
+            { "物流", "S4208" },
+            { "铁路公路", "S4209" },
+            { "航空机场", "S4210" },
+            { "航运港口", "S4211" },
+            
+            // 房地产
+            { "房地产开发", "S4301" },
+            { "房地产服务", "S4303" },
+            
+            // 商业贸易
+            { "贸易", "S4502" },
+            { "一般零售", "S4503" },
+            { "专业连锁", "S4504" },
+            { "互联网电商", "S4506" },
+            { "旅游零售", "S4507" },
+            
+            // 社会服务
+            { "体育", "S4606" },
+            { "本地生活服务", "S4607" },
+            { "专业服务", "S4608" },
+            { "酒店餐饮", "S4609" },
+            { "旅游及景区", "S4610" },
+            { "教育", "S4611" },
+            
+            // 银行
+            { "国有大型银行", "S4802" },
+            { "股份制银行", "S4803" },
+            { "城商行", "S4804" },
+            { "农商行", "S4805" },
+            { "其他银行", "S4806" },
+            
+            // 非银金融
+            { "证券", "S4901" },
+            { "保险", "S4902" },
+            { "多元金融", "S4903" },
+            
+            // 综合
+            { "综合", "S5101" },
+            
+            // 建筑材料
+            { "水泥", "S6101" },
+            { "玻璃玻纤", "S6102" },
+            { "装修建材", "S6103" },
+            
+            // 建筑装饰
+            { "房屋建设", "S6201" },
+            { "装修装饰", "S6202" },
+            { "基础建设", "S6203" },
+            { "专业工程", "S6204" },
+            { "工程咨询服务", "S6206" },
+            
+            // 电力设备
+            { "电机", "S6301" },
+            { "其他电源设备", "S6303" },
+            { "光伏设备", "S6305" },
+            { "风电设备", "S6306" },
+            { "电池", "S6307" },
+            { "电网设备", "S6308" },
+            
+            // 机械设备
+            { "通用设备", "S6401" },
+            { "专用设备", "S6402" },
+            { "轨交设备", "S6405" },
+            { "工程机械", "S6406" },
+            { "自动化设备", "S6407" },
+            
+            // 国防军工
+            { "航天装备", "S6501" },
+            { "航空装备", "S6502" },
+            { "地面兵装", "S6503" },
+            { "航海装备", "S6504" },
+            { "军工电子", "S6505" },
+            
+            // 计算机
+            { "计算机设备", "S7101" },
+            { "IT服务", "S7103" },
+            { "软件开发", "S7104" },
+            
+            // 传媒
+            { "游戏", "S7204" },
+            { "广告营销", "S7205" },
+            { "影视院线", "S7206" },
+            { "数字媒体", "S7207" },
+            { "社交", "S7208" },
+            { "出版", "S7209" },
+            { "电视广播", "S7210" },
+            
+            // 通信
+            { "通信服务", "S7301" },
+            { "通信设备", "S7302" },
+            
+            // 煤炭
+            { "煤炭开采", "S7401" },
+            { "焦炭", "S7402" },
+            
+            // 石油石化
+            { "油气开采", "S7501" },
+            { "油服工程", "S7502" },
+            { "炼化及贸易", "S7503" },
+            
+            // 环保
+            { "环境治理", "S7601" },
+            { "环保设备", "S7602" },
+            
+            // 美容护理
+            { "个护用品", "S7701" },
+            { "化妆品", "S7702" },
+            { "医疗美容", "S7703" }
+        };
+
+        return industryMapping.TryGetValue(industryName, out var value) ? value : "";
+    }
+
+    /// <summary>
+    /// 设置特定指标的筛选条件，支持隐藏元素的强制点击
+    /// </summary>
+    private async Task SetSpecificCriteria(IPage page, string value, decimal? min, decimal? max, string displayName)
     {
         try
         {
-            if (minMarketCap.HasValue)
+            // 第1步：尝试多种选择器找到复选框
+            var checkbox = await FindCheckboxElement(page, value, displayName);
+            if (checkbox == null)
             {
-                var minInput = await page.QuerySelectorAsync("input[name='minMarketCap'], .market-cap-min");
-                if (minInput != null)
-                {
-                    await minInput.FillAsync(minMarketCap.Value.ToString());
-                }
+                _logger.LogWarning("未找到 {DisplayName} (value={Value}) 复选框", displayName, value);
+                return;
             }
 
-            if (maxMarketCap.HasValue)
-            {
-                var maxInput = await page.QuerySelectorAsync("input[name='maxMarketCap'], .market-cap-max");
-                if (maxInput != null)
-                {
-                    await maxInput.FillAsync(maxMarketCap.Value.ToString());
-                }
-            }
+            // 第2步：勾选复选框
+            await CheckElementWithFallback(checkbox, displayName);
+            await Task.Delay(1000); // 等待条件输入框出现
 
-            await Task.Delay(500);
+            // 第3步：设置条件值
+            await SetConditionValues(page, value, min, max, displayName);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "设置市值筛选时发生错误");
+            _logger.LogWarning(ex, "设置 {DisplayName} 筛选条件时发生错误", displayName);
         }
     }
 
     /// <summary>
-    /// 设置市盈率筛选
+    /// 查找复选框元素
     /// </summary>
-    private async Task SetPEFilter(IPage page, decimal? minPE, decimal? maxPE)
+    private async Task<IElementHandle?> FindCheckboxElement(IPage page, string value, string displayName)
     {
+        // 尝试精确选择器
+        var checkbox = await page.QuerySelectorAsync($"label[title='{displayName}'] input[type='checkbox'][value='{value}']");
+
+        // 如果没找到，尝试通用选择器
+        if (checkbox == null)
+        {
+            checkbox = await page.QuerySelectorAsync($"input[type='checkbox'][value='{value}']");
+        }
+
+        return checkbox;
+    }
+
+    /// <summary>
+    /// 勾选元素，支持JavaScript fallback
+    /// </summary>
+    private async Task CheckElementWithFallback(IElementHandle checkbox, string displayName)
+    {
+        _logger.LogInformation("正在设置 {DisplayName} 指标", displayName);
+
         try
         {
-            if (minPE.HasValue)
-            {
-                var minInput = await page.QuerySelectorAsync("input[name='minPE'], .pe-min");
-                if (minInput != null)
-                {
-                    await minInput.FillAsync(minPE.Value.ToString());
-                }
-            }
-
-            if (maxPE.HasValue)
-            {
-                var maxInput = await page.QuerySelectorAsync("input[name='maxPE'], .pe-max");
-                if (maxInput != null)
-                {
-                    await maxInput.FillAsync(maxPE.Value.ToString());
-                }
-            }
-
-            await Task.Delay(500);
+            // 首先尝试普通点击
+            await checkbox.CheckAsync();
+            _logger.LogInformation("通过CheckAsync成功勾选 {DisplayName}", displayName);
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.LogWarning(ex, "设置市盈率筛选时发生错误");
+            // 如果普通点击失败，使用JavaScript强制点击
+            _logger.LogInformation("CheckAsync失败，尝试JavaScript强制点击 {DisplayName}", displayName);
+            await checkbox.EvaluateAsync("element => element.click()");
+            _logger.LogInformation("通过JavaScript成功勾选 {DisplayName}", displayName);
         }
     }
 
     /// <summary>
-    /// 设置股息率筛选
+    /// 设置条件输入框的值（最小值和最大值）
     /// </summary>
-    private async Task SetDividendFilter(IPage page, decimal? minDividend, decimal? maxDividend)
+    private async Task SetConditionValues(IPage page, string value, decimal? min, decimal? max, string displayName)
     {
-        try
+        var conditionElement = await FindConditionElement(page, value, displayName);
+        if (conditionElement == null)
         {
-            if (minDividend.HasValue)
+            // 延迟重试一次
+            await Task.Delay(1000);
+            conditionElement = await FindConditionElement(page, value, displayName);
+            if (conditionElement == null)
             {
-                var minInput = await page.QuerySelectorAsync("input[name='minDividend'], .dividend-min");
-                if (minInput != null)
-                {
-                    await minInput.FillAsync(minDividend.Value.ToString());
-                }
+                _logger.LogWarning("延迟后仍未找到 {DisplayName} 条件输入框", displayName);
+                return;
             }
-
-            if (maxDividend.HasValue)
-            {
-                var maxInput = await page.QuerySelectorAsync("input[name='maxDividend'], .dividend-max");
-                if (maxInput != null)
-                {
-                    await maxInput.FillAsync(maxDividend.Value.ToString());
-                }
-            }
-
-            await Task.Delay(500);
+            _logger.LogInformation("延迟后找到了 {DisplayName} 条件输入框", displayName);
         }
-        catch (Exception ex)
+
+        // 设置最小值和最大值
+        await SetInputValue(conditionElement, "input.min", min, "最小值", displayName);
+        await SetInputValue(conditionElement, "input.max", max, "最大值", displayName);
+    }
+
+    /// <summary>
+    /// 查找条件输入框元素
+    /// </summary>
+    private async Task<IElementHandle?> FindConditionElement(IPage page, string value, string displayName)
+    {
+        var conditionElement = await page.QuerySelectorAsync($".stockScreener-selected-condition[data-field='{value}']");
+        if (conditionElement == null)
         {
-            _logger.LogWarning(ex, "设置股息率筛选时发生错误");
+            _logger.LogWarning("未找到 {DisplayName} 条件输入框，可能需要等待更长时间", displayName);
+        }
+        return conditionElement;
+    }
+
+    /// <summary>
+    /// 设置输入框的值
+    /// </summary>
+    private async Task SetInputValue(IElementHandle conditionElement, string inputSelector, decimal? value, string valueType, string displayName)
+    {
+        if (!value.HasValue) return;
+
+        var input = await conditionElement.QuerySelectorAsync(inputSelector);
+        if (input != null)
+        {
+            await input.FillAsync(value.Value.ToString());
+            _logger.LogInformation("已设置 {DisplayName} {ValueType}: {Value}", displayName, valueType, value.Value);
+        }
+        else
+        {
+            _logger.LogWarning("未找到 {DisplayName} 的 {ValueType} 输入框", displayName, valueType);
         }
     }
 
     /// <summary>
-    /// 设置行业筛选
+    /// 触发选股
     /// </summary>
-    private async Task SetSectorFilter(IPage page, string sector)
+    private async Task TriggerScreening(IPage page)
     {
         try
         {
-            var sectorSelector = "select[name='sector'], .sector-filter, [data-test='sector-select']";
-            var element = await page.QuerySelectorAsync(sectorSelector);
-
-            if (element != null)
+            // 根据实际HTML结构点击开始选股按钮：<input type="button" value="开始选股" class="submit search">
+            var startButton = await page.QuerySelectorAsync("input[type='button'][value='开始选股'].submit.search");
+            if (startButton != null)
             {
-                await element.SelectOptionAsync(new[] { sector });
-                await Task.Delay(1000);
+                _logger.LogInformation("找到开始选股按钮，准备点击");
+                await startButton.ClickAsync();
             }
             else
             {
-                _logger.LogWarning("未找到行业筛选器");
+                _logger.LogWarning("未找到开始选股按钮");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "设置行业筛选时发生错误: {Sector}", sector);
+            _logger.LogWarning(ex, "触发选股时发生错误");
         }
     }
 
     /// <summary>
-    /// 设置股票类型筛选
+    /// 提取雪球股票列表 - 动态解析表头和数据
     /// </summary>
-    private async Task SetStockTypeFilter(IPage page, string stockType)
+    private async Task<List<ScreenerStockInfo>> ExtractXueqiuStockList(IPage page, int limit)
     {
-        try
-        {
-            var typeSelector = "select[name='stockType'], .stock-type-filter";
-            var element = await page.QuerySelectorAsync(typeSelector);
-
-            if (element != null)
-            {
-                await element.SelectOptionAsync(new[] { stockType });
-                await Task.Delay(1000);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "设置股票类型筛选时发生错误: {StockType}", stockType);
-        }
-    }
-
-    /// <summary>
-    /// 设置排序方式
-    /// </summary>
-    private async Task SetSortingOrder(IPage page, string sortBy)
-    {
-        try
-        {
-            var sortMapping = new Dictionary<string, string>
-            {
-                { "涨幅", "change" },
-                { "成交量", "volume" },
-                { "市值", "market_cap" },
-                { "价格", "price" },
-                { "市盈率", "pe_ratio" }
-            };
-
-            if (sortMapping.TryGetValue(sortBy, out var sortValue))
-            {
-                var sortSelector = $"[data-sort='{sortValue}'], .sort-{sortValue}";
-                var element = await page.QuerySelectorAsync(sortSelector);
-
-                if (element != null)
-                {
-                    await element.ClickAsync();
-                    await Task.Delay(2000);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "设置排序方式时发生错误: {SortBy}", sortBy);
-        }
-    }
-
-    /// <summary>
-    /// 提取股票列表
-    /// </summary>
-    private async Task<List<InvestingStockInfo>> ExtractStockList(IPage page, int limit)
-    {
-        var stocks = new List<InvestingStockInfo>();
+        var stocks = new List<ScreenerStockInfo>();
 
         try
         {
-            // 等待表格加载
-            await page.WaitForSelectorAsync("table, .stock-table, .screener-table", new PageWaitForSelectorOptions
+            // 等待雪球的筛选结果表格加载 - 使用更精确的选择器
+            var resultTableSelector = ".stockScreener-search-result-table.mainTable.overflowx table.portfolio";
+            await page.WaitForSelectorAsync(resultTableSelector, new PageWaitForSelectorOptions
             {
                 Timeout = 10000
             });
 
-            // 多种可能的行选择器
-            var rowSelectors = new[]
-            {
-                "table tbody tr",
-                ".stock-table tbody tr",
-                ".screener-table tbody tr",
-                "[data-test='stock-row']",
-                ".stock-row"
-            };
+            // 首先获取表头信息，确定列的顺序 - 只从结果表格中获取
+            var headers = await page.QuerySelectorAllAsync($"{resultTableSelector} thead tr th");
+            var columnMap = new Dictionary<int, string>();
 
-            IReadOnlyList<IElementHandle> rows = null!;
-
-            foreach (var selector in rowSelectors)
+            for (int i = 0; i < headers.Count; i++)
             {
-                rows = await page.QuerySelectorAllAsync(selector);
-                if (rows.Count > 0) break;
+                var dataKey = await headers[i].GetAttributeAsync("data-key");
+                if (!string.IsNullOrEmpty(dataKey))
+                {
+                    columnMap[i] = dataKey;
+                    _logger.LogDebug("列 {Index}: {DataKey}", i, dataKey);
+                }
             }
 
-            if (rows == null || rows.Count == 0)
+            _logger.LogInformation("检测到 {Count} 列数据", columnMap.Count);
+
+            // 获取所有股票行 - 只从结果表格中获取
+            var rows = await page.QuerySelectorAllAsync($"{resultTableSelector} tbody tr");
+
+            if (rows.Count == 0)
             {
                 _logger.LogWarning("未找到股票数据行");
                 return stocks;
             }
 
+            _logger.LogInformation("找到 {Count} 行股票数据", rows.Count);
+
+            // 处理每一行，但限制数量
             var processedCount = 0;
             foreach (var row in rows.Take(limit))
             {
                 try
                 {
-                    var stock = await ExtractStockInfoFromRow(row);
+                    var stock = await ExtractXueqiuStockInfo(row, columnMap);
                     if (stock != null)
                     {
                         stocks.Add(stock);
@@ -483,111 +940,314 @@ public sealed class StockScreenerPlugin
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "提取股票列表时发生错误");
+            _logger.LogError(ex, "提取雪球股票列表时发生错误");
         }
 
         return stocks;
     }
 
     /// <summary>
-    /// 从表格行提取股票信息
+    /// 从表格行提取雪球股票信息 - 根据列映射动态解析
     /// </summary>
-    private async Task<InvestingStockInfo?> ExtractStockInfoFromRow(IElementHandle row)
+    private async Task<ScreenerStockInfo?> ExtractXueqiuStockInfo(IElementHandle row, Dictionary<int, string> columnMap)
     {
         try
         {
             var cells = await row.QuerySelectorAllAsync("td");
-            if (cells.Count < 3) return null;
+            if (cells.Count == 0) return null;
 
-            var stock = new InvestingStockInfo();
+            var stock = new ScreenerStockInfo();
 
-            // 提取股票名称和代码（通常在第一列）
-            var nameCell = cells[0];
-            var nameText = await nameCell.InnerTextAsync();
-
-            // 尝试分离股票名称和代码
-            var nameMatch = Regex.Match(nameText, @"(.+?)\s*\(([^)]+)\)");
-            if (nameMatch.Success)
+            // 根据列映射动态解析数据
+            for (int i = 0; i < cells.Count && i < columnMap.Count; i++)
             {
-                stock.Name = nameMatch.Groups[1].Value.Trim();
-                stock.Symbol = nameMatch.Groups[2].Value.Trim();
-            }
-            else
-            {
-                stock.Name = nameText.Trim();
-                stock.Symbol = nameText.Trim();
-            }
+                if (!columnMap.ContainsKey(i)) continue;
 
-            // 提取其他信息（价格、涨跌幅等）
-            if (cells.Count > 1)
-            {
-                var priceText = await cells[1].InnerTextAsync();
-                if (decimal.TryParse(priceText.Replace(",", "").Replace("$", ""), out var price))
+                var dataKey = columnMap[i];
+                var cellText = await cells[i].InnerTextAsync();
+
+                try
                 {
-                    stock.Price = price;
+                    await ParseCellValue(stock, dataKey, cells[i], cellText.Trim());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "解析列 {DataKey} 时发生错误: {Value}", dataKey, cellText);
+                    // 将无法解析的数据存储到 ExtraData 中
+                    stock.ExtraData[dataKey] = cellText.Trim();
                 }
             }
 
-            if (cells.Count > 2)
+            // 验证基本字段是否存在
+            if (string.IsNullOrEmpty(stock.Name))
             {
-                var changeText = await cells[2].InnerTextAsync();
-                var changeMatch = Regex.Match(changeText, @"([+-]?\d+\.?\d*)");
-                if (changeMatch.Success && decimal.TryParse(changeMatch.Groups[1].Value, out var change))
-                {
-                    stock.ChangePercent = change;
-                }
+                _logger.LogWarning("股票名称为空，跳过此行");
+                return null;
             }
-
-            // 提取更多列的数据
-            await ExtractAdditionalStockData(stock, cells);
 
             return stock;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "从行提取股票信息时发生错误");
+            _logger.LogWarning(ex, "提取雪球股票信息时发生错误");
             return null;
         }
     }
 
     /// <summary>
-    /// 提取额外的股票数据
+    /// 解析单元格数据并设置到股票对象相应属性
     /// </summary>
-    private async Task ExtractAdditionalStockData(InvestingStockInfo stock, IReadOnlyList<IElementHandle> cells)
+    private async Task ParseCellValue(ScreenerStockInfo stock, string dataKey, IElementHandle cell, string cellText)
     {
-        try
+        switch (dataKey)
         {
-            // 根据实际的表格结构提取更多数据
-            for (int i = 3; i < Math.Min(cells.Count, 10); i++)
-            {
-                var cellText = await cells[i].InnerTextAsync();
-
-                // 尝试识别不同类型的数据
-                if (decimal.TryParse(cellText.Replace(",", "").Replace("$", "").Replace("%", ""), out var value))
+            case "symbol":
+                // 股票名称和代码
+                var linkElement = await cell.QuerySelectorAsync("a");
+                if (linkElement != null)
                 {
-                    switch (i)
+                    stock.Name = await linkElement.InnerTextAsync();
+
+                    // 从title属性中提取股票代码，格式如："泓淋电力 (SZ301439)"
+                    var title = await linkElement.GetAttributeAsync("title");
+                    if (!string.IsNullOrEmpty(title))
                     {
-                        case 3: // 可能是市值
-                            stock.MarketCap = value;
-                            break;
-                        case 4: // 可能是PE
-                            stock.PERatio = value;
-                            break;
-                        case 5: // 可能是股息率
-                            stock.DividendYield = value;
-                            break;
-                        case 6: // 可能是成交量
-                            stock.Volume = value;
-                            break;
+                        var codeMatch = Regex.Match(title, @"\(([^)]+)\)");
+                        if (codeMatch.Success)
+                        {
+                            stock.Symbol = codeMatch.Groups[1].Value;
+                        }
                     }
                 }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "提取额外股票数据时发生错误");
+                break;
+
+            case "current":
+                stock.Current = ParseDecimalValue(cellText);
+                break;
+
+            case "pct":
+                stock.Pct = ParsePercentageValue(cellText);
+                break;
+
+            case "amount":
+                stock.Amount = ParseChineseAmountValue(cellText);
+                break;
+
+            case "mc":
+                stock.Mc = ParseChineseAmountValue(cellText);
+                break;
+
+            case "fmc":
+                stock.Fmc = ParseChineseAmountValue(cellText);
+                break;
+
+            case "volume":
+                stock.Volume = ParseChineseAmountValue(cellText);
+                break;
+
+            case "volume_ratio":
+                stock.VolumeRatio = ParseDecimalValue(cellText);
+                break;
+
+            case "tr":
+                stock.Tr = ParsePercentageValue(cellText);
+                break;
+
+            case "pettm":
+                stock.PeTtm = ParseDecimalValue(cellText);
+                break;
+
+            case "pelyr":
+                stock.PeLyr = ParseDecimalValue(cellText);
+                break;
+
+            case "pb":
+                stock.Pb = ParseDecimalValue(cellText);
+                break;
+
+            case "psr":
+                stock.Psr = ParseDecimalValue(cellText);
+                break;
+
+            case "roediluted":
+                stock.RoeDiluted = ParsePercentageValue(cellText);
+                break;
+
+            case "bps":
+                stock.Bps = ParseDecimalValue(cellText);
+                break;
+
+            case "eps":
+                stock.Eps = ParseDecimalValue(cellText);
+                break;
+
+            case "netprofit":
+                stock.NetProfit = ParseChineseAmountValue(cellText);
+                break;
+
+            case "total_revenue":
+                stock.TotalRevenue = ParseChineseAmountValue(cellText);
+                break;
+
+            case "dy_l":
+                stock.DyL = ParsePercentageValue(cellText);
+                break;
+
+            case "npay":
+                stock.Npay = ParsePercentageValue(cellText);
+                break;
+
+            case "oiy":
+                stock.Oiy = ParsePercentageValue(cellText);
+                break;
+
+            case "niota":
+                stock.Niota = ParsePercentageValue(cellText);
+                break;
+
+            case "follow":
+                stock.Follow = ParseDecimalValue(cellText);
+                break;
+
+            case "tweet":
+                stock.Tweet = ParseDecimalValue(cellText);
+                break;
+
+            case "deal":
+                stock.Deal = ParseDecimalValue(cellText);
+                break;
+
+            case "follow7d":
+                stock.Follow7d = ParseDecimalValue(cellText);
+                break;
+
+            case "tweet7d":
+                stock.Tweet7d = ParseDecimalValue(cellText);
+                break;
+
+            case "deal7d":
+                stock.Deal7d = ParseDecimalValue(cellText);
+                break;
+
+            case "follow7dpct":
+                stock.Follow7dPct = ParsePercentageValue(cellText);
+                break;
+
+            case "tweet7dpct":
+                stock.Tweet7dPct = ParsePercentageValue(cellText);
+                break;
+
+            case "deal7dpct":
+                stock.Deal7dPct = ParsePercentageValue(cellText);
+                break;
+
+            case "pct5":
+                stock.Pct5 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct10":
+                stock.Pct10 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct20":
+                stock.Pct20 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct60":
+                stock.Pct60 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct120":
+                stock.Pct120 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct250":
+                stock.Pct250 = ParsePercentageValue(cellText);
+                break;
+
+            case "pct_current_year":
+                stock.PctCurrentYear = ParsePercentageValue(cellText);
+                break;
+
+            case "chgpct":
+                stock.ChgPct = ParsePercentageValue(cellText);
+                break;
+
+            default:
+                // 其他未定义的字段存储到 ExtraData 中
+                stock.ExtraData[dataKey] = cellText;
+                break;
         }
     }
+
+    /// <summary>
+    /// 解析普通数值
+    /// </summary>
+    private decimal ParseDecimalValue(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text == "-") return 0;
+
+        // 移除可能的颜色span标签中的内容
+        var cleanText = Regex.Replace(text, @"<[^>]*>", "");
+        cleanText = cleanText.Replace(",", "").Trim();
+
+        if (decimal.TryParse(cleanText, out var value))
+        {
+            return value;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// 解析百分比值
+    /// </summary>
+    private decimal ParsePercentageValue(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text == "-") return 0;
+
+        // 移除可能的颜色span标签中的内容
+        var cleanText = Regex.Replace(text, @"<[^>]*>", "");
+        var match = Regex.Match(cleanText, @"([+-]?\d+\.?\d*)%");
+
+        if (match.Success && decimal.TryParse(match.Groups[1].Value, out var value))
+        {
+            return value;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// 解析中文金额（转换为不带单位的真实数值）
+    /// </summary>
+    private decimal ParseChineseAmountValue(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text == "-") return 0;
+
+        // 移除可能的颜色span标签中的内容
+        var cleanText = Regex.Replace(text, @"<[^>]*>", "");
+
+        // 提取数字部分
+        var numberMatch = Regex.Match(cleanText, @"([+-]?\d+\.?\d*)");
+        if (!numberMatch.Success) return 0;
+
+        if (!decimal.TryParse(numberMatch.Groups[1].Value, out var value)) return 0;
+
+        // 根据单位进行转换为原始数值（不带单位）
+        if (cleanText.Contains("亿"))
+        {
+            return value * 100000000; // 亿转换为原始数值
+        }
+        else if (cleanText.Contains("万"))
+        {
+            return value * 10000; // 万转换为原始数值
+        }
+        else
+        {
+            return value; // 无单位，直接返回
+        }
+    }
+
+
 
     #endregion
 }

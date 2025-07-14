@@ -33,7 +33,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     #region 构造函数测试
 
     [TestMethod]
-    public void TestInvestingStockScreenerPlugin_Constructor_WithValidParameters_ShouldCreateInstance()
+    public void TestXueqiuStockScreenerPlugin_Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act & Assert
         Assert.IsNotNull(_plugin);
@@ -41,7 +41,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void TestInvestingStockScreenerPlugin_Constructor_WithNullPlaywrightService_ShouldThrowArgumentNullException()
+    public void TestXueqiuStockScreenerPlugin_Constructor_WithNullPlaywrightService_ShouldThrowArgumentNullException()
     {
         // Act
         new StockScreenerPlugin(null!, _mockLogger.Object);
@@ -49,7 +49,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void TestInvestingStockScreenerPlugin_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
+    public void TestXueqiuStockScreenerPlugin_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
         new StockScreenerPlugin(_playwrightService, null!);
@@ -57,143 +57,371 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     #endregion
 
-    #region 基本筛选功能测试
+    #region 新的统一API测试
 
     [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithDefaultParameters_ShouldReturnStocks()
-    {
-        // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync();
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0); // 可能返回空列表（如网站不可访问）
-
-        Console.WriteLine($"=== 默认条件筛选测试结果 ===");
-        Console.WriteLine($"返回股票数量: {result.Count}");
-
-        foreach (var stock in result.Take(5))
-        {
-            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Price}, 涨跌: {stock.ChangePercent:F2}%");
-        }
-    }
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithSpecificCriteria_ShouldReturnFilteredStocks()
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithDefaultCriteria_ShouldReturnStocks()
     {
         // Arrange
-        var country = "中国";
-        var minMarketCap = 100m; // 100亿
-        var maxMarketCap = 1000m; // 1000亿
-        var limit = 20;
-
-        // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync(
-            country: country,
-            minMarketCap: minMarketCap,
-            maxMarketCap: maxMarketCap,
-            limit: limit);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= limit);
-
-        Console.WriteLine($"=== 特定条件筛选测试结果 ===");
-        Console.WriteLine($"筛选条件: 国家={country}, 市值范围={minMarketCap}-{maxMarketCap}亿");
-        Console.WriteLine($"返回股票数量: {result.Count}");
-
-        foreach (var stock in result.Take(5))
+        var criteria = new StockCriteria
         {
-            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 市值: {stock.MarketCap}亿");
-
-            // 验证市值在范围内（如果有数据）
-            if (stock.MarketCap > 0)
-            {
-                Assert.IsTrue(stock.MarketCap >= minMarketCap);
-                Assert.IsTrue(stock.MarketCap <= maxMarketCap);
-            }
-        }
-    }
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithPEFilter_ShouldReturnValidStocks()
-    {
-        // Arrange
-        var minPE = 10m;
-        var maxPE = 30m;
-        var limit = 15;
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 10,
+            Criteria = new List<StockScreeningCriteria>()
+        };
 
         // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync(
-            minPE: minPE,
-            maxPE: maxPE,
-            limit: limit);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= limit);
-
-        Console.WriteLine($"=== PE筛选测试结果 ===");
-        Console.WriteLine($"PE范围: {minPE}-{maxPE}");
-        Console.WriteLine($"返回股票数量: {result.Count}");
-
-        foreach (var stock in result.Take(5))
-        {
-            Console.WriteLine($"股票: {stock.Name} - PE: {stock.PERatio}");
-
-            // 验证PE在范围内（如果有数据）
-            if (stock.PERatio > 0)
-            {
-                Assert.IsTrue(stock.PERatio >= minPE);
-                Assert.IsTrue(stock.PERatio <= maxPE);
-            }
-        }
-    }
-
-    #endregion
-
-    #region 热门股票测试
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenHotStocksAsync_WithDefaultParameters_ShouldReturnHotStocks()
-    {
-        // Act
-        var result = await _plugin.ScreenHotStocksAsync();
+        var result = await _plugin.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count >= 0);
 
-        Console.WriteLine($"=== 热门股票测试结果 ===");
+        Console.WriteLine($"=== 雪球默认条件筛选测试结果 ===");
         Console.WriteLine($"返回股票数量: {result.Count}");
 
-        foreach (var stock in result.Take(10))
+        foreach (var stock in result.Take(5))
         {
-            Console.WriteLine($"热门股票: {stock.Name} ({stock.Symbol}) - 涨跌: {stock.ChangePercent:F2}%");
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}, 涨跌: {stock.Pct:F2}%, 市值: {stock.Mc / 100000000:F0}亿元");
         }
     }
 
     [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenHotStocksAsync_WithDifferentSorting_ShouldReturnSortedStocks()
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMarketCapFilter_ShouldReturnFilteredStocks()
     {
         // Arrange
-        var sortBy = "成交量";
-        var limit = 10;
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 15,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "mc",
+                    DisplayName = "总市值",
+                    Type = "basic",
+                    MinValue = 5000000000m,  // 50亿元
+                    MaxValue = 25000000000m  // 250亿元
+                }
+            }
+        };
 
         // Act
-        var result = await _plugin.ScreenHotStocksAsync(sortBy: sortBy, limit: limit);
+        var result = await _plugin.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= limit);
+        Assert.IsTrue(result.Count <= criteria.Limit);
 
-        Console.WriteLine($"=== 按{sortBy}排序热门股票测试结果 ===");
+        Console.WriteLine($"=== 雪球市值筛选测试结果 ===");
+        Console.WriteLine($"筛选条件: 市值范围={criteria.Criteria[0].MinValue / 100000000:F0}-{criteria.Criteria[0].MaxValue / 100000000:F0}亿元");
         Console.WriteLine($"返回股票数量: {result.Count}");
 
-        foreach (var stock in result)
+        foreach (var stock in result.Take(5))
         {
-            Console.WriteLine($"股票: {stock.Name} - 成交量: {stock.Volume}");
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 市值: {stock.Mc / 100000000:F0}亿元");
         }
+    }
+
+    [TestMethod]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithPEFilter_ShouldReturnValidStocks()
+    {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 12,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "pettm",
+                    DisplayName = "市盈率TTM",
+                    Type = "basic",
+                    MinValue = 10m,
+                    MaxValue = 30m
+                }
+            }
+        };
+
+        // Act
+        var result = await _plugin.ScreenStocksAsync(criteria);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
+
+        Console.WriteLine($"=== 雪球PE筛选测试结果 ===");
+        Console.WriteLine($"PE范围: {criteria.Criteria[0].MinValue}-{criteria.Criteria[0].MaxValue}");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(5))
+        {
+            Console.WriteLine($"股票: {stock.Name} - 价格: {stock.Current}");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMultipleIndicators_ShouldReturnValidStocks()
+    {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 20,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "mc",
+                    DisplayName = "总市值",
+                    Type = "basic",
+                    MinValue = 50000000000m,   // 500亿元
+                    MaxValue = 1000000000000m  // 1万亿元
+                },
+                new()
+                {
+                    Code = "pettm",
+                    DisplayName = "市盈率TTM",
+                    Type = "basic",
+                    MinValue = 5m,
+                    MaxValue = 50m
+                },
+                new()
+                {
+                    Code = "roediluted",
+                    DisplayName = "净资产收益率",
+                    Type = "basic",
+                    MinValue = 8m,
+                    MaxValue = null // 无上限
+                }
+            }
+        };
+
+        // Act
+        var result = await _plugin.ScreenStocksAsync(criteria);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
+
+        Console.WriteLine($"=== 雪球多指标筛选测试结果 ===");
+        Console.WriteLine($"筛选条件数量: {criteria.Criteria.Count}");
+        foreach (var criterion in criteria.Criteria)
+        {
+            Console.WriteLine($"  - {criterion.DisplayName}: {criterion.MinValue} ~ {criterion.MaxValue}");
+        }
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(3))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}, 市值: {stock.Mc / 100000000:F0}亿元");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithSnowballIndicators_ShouldReturnValidStocks()
+    {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 15,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "follow",
+                    DisplayName = "累计关注人数",
+                    Type = "snowball",
+                    MinValue = 1000m,
+                    MaxValue = null
+                },
+                new()
+                {
+                    Code = "tweet",
+                    DisplayName = "累计讨论次数",
+                    Type = "snowball",
+                    MinValue = 500m,
+                    MaxValue = null
+                }
+            }
+        };
+
+        // Act
+        var result = await _plugin.ScreenStocksAsync(criteria);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
+
+        Console.WriteLine($"=== 雪球热度指标筛选测试结果 ===");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(3))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMarketIndicators_ShouldReturnValidStocks()
+    {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "全部",
+            Limit = 10,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "pct",
+                    DisplayName = "当日涨跌幅",
+                    Type = "market",
+                    MinValue = -2m,
+                    MaxValue = 5m
+                },
+                new()
+                {
+                    Code = "volume_ratio",
+                    DisplayName = "当日量比",
+                    Type = "market",
+                    MinValue = 1.5m,
+                    MaxValue = null
+                }
+            }
+        };
+
+        // Act
+        var result = await _plugin.ScreenStocksAsync(criteria);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
+
+        Console.WriteLine($"=== 雪球行情指标筛选测试结果 ===");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(3))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 涨跌: {stock.Pct:F2}%, 成交量: {stock.Volume}万");
+        }
+    }
+
+    [TestMethod]
+    [ExpectedException(typeof(ArgumentNullException))]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithNullCriteria_ShouldThrowArgumentNullException()
+    {
+        // Act
+        await _plugin.ScreenStocksAsync(null!);
+    }
+
+    #endregion
+
+    #region 支持的指标查询测试
+
+    [TestMethod]
+    public void TestXueqiuStockScreenerPlugin_GetSupportedCriteria_ShouldReturnAllSupportedIndicators()
+    {
+        // Act
+        var result = _plugin.GetSupportedCriteria();
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0);
+        Assert.AreEqual(38, result.Count, "应该返回38个支持的指标");
+
+        Console.WriteLine($"=== 支持的指标列表 ===");
+        Console.WriteLine($"总数量: {result.Count}");
+
+        var groupedByType = result.GroupBy(c => c.Type);
+        foreach (var group in groupedByType.OrderBy(g => g.Key))
+        {
+            Console.WriteLine($"\n{group.Key} 指标 ({group.Count()} 个):");
+            foreach (var criterion in group.OrderBy(c => c.DisplayName))
+            {
+                Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithBasicType_ShouldReturnBasicIndicators()
+    {
+        // Act
+        var result = _plugin.GetCriteriaByType("basic");
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0);
+        Assert.AreEqual(15, result.Count, "应该返回15个基本指标");
+        Assert.IsTrue(result.All(c => c.Type == "basic"));
+
+        Console.WriteLine($"=== 基本指标列表 ===");
+        Console.WriteLine($"数量: {result.Count}");
+        foreach (var criterion in result.OrderBy(c => c.DisplayName))
+        {
+            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
+        }
+    }
+
+    [TestMethod]
+    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithMarketType_ShouldReturnMarketIndicators()
+    {
+        // Act
+        var result = _plugin.GetCriteriaByType("market");
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0);
+        Assert.AreEqual(14, result.Count, "应该返回14个行情指标");
+        Assert.IsTrue(result.All(c => c.Type == "market"));
+
+        Console.WriteLine($"=== 行情指标列表 ===");
+        Console.WriteLine($"数量: {result.Count}");
+        foreach (var criterion in result.OrderBy(c => c.DisplayName))
+        {
+            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
+        }
+    }
+
+    [TestMethod]
+    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithSnowballType_ShouldReturnSnowballIndicators()
+    {
+        // Act
+        var result = _plugin.GetCriteriaByType("snowball");
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0);
+        Assert.AreEqual(9, result.Count, "应该返回9个雪球指标");
+        Assert.IsTrue(result.All(c => c.Type == "snowball"));
+
+        Console.WriteLine($"=== 雪球指标列表 ===");
+        Console.WriteLine($"数量: {result.Count}");
+        foreach (var criterion in result.OrderBy(c => c.DisplayName))
+        {
+            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
+        }
+    }
+
+    [TestMethod]
+    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithInvalidType_ShouldReturnEmptyList()
+    {
+        // Act
+        var result = _plugin.GetCriteriaByType("invalid");
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.AreEqual(0, result.Count);
     }
 
     #endregion
@@ -201,179 +429,100 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     #region 行业筛选测试
 
     [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksBySectorAsync_WithTechSector_ShouldReturnTechStocks()
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithIndustryFilter_ShouldReturnFilteredStocks()
     {
         // Arrange
-        var sector = "科技";
-        var limit = 15;
-
-        // Act
-        var result = await _plugin.ScreenStocksBySectorAsync(sector, limit: limit);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= limit);
-
-        Console.WriteLine($"=== {sector}行业筛选测试结果 ===");
-        Console.WriteLine($"返回股票数量: {result.Count}");
-
-        foreach (var stock in result.Take(10))
+        var criteria = new StockCriteria
         {
-            Console.WriteLine($"{sector}股票: {stock.Name} ({stock.Symbol}) - 行业: {stock.Sector}");
-        }
-    }
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksBySectorAsync_WithFinanceSector_ShouldReturnFinanceStocks()
-    {
-        // Arrange
-        var sector = "金融";
-        var country = "中国";
-        var limit = 10;
-
-        // Act
-        var result = await _plugin.ScreenStocksBySectorAsync(sector, country, limit);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= limit);
-
-        Console.WriteLine($"=== {country}{sector}行业筛选测试结果 ===");
-        Console.WriteLine($"返回股票数量: {result.Count}");
-
-        foreach (var stock in result)
-        {
-            Console.WriteLine($"{sector}股票: {stock.Name} - 国家: {stock.Country}");
-        }
-    }
-
-    #endregion
-
-    #region 错误处理测试
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithInvalidCountry_ShouldHandleGracefully()
-    {
-        // Arrange
-        var invalidCountry = "不存在的国家";
-
-        // Act & Assert
-        try
-        {
-            var result = await _plugin.ScreenStocksByCriteriaAsync(country: invalidCountry, limit: 5);
-
-            // 应该返回空列表或默认结果，而不是抛出异常
-            Assert.IsNotNull(result);
-
-            Console.WriteLine($"=== 无效国家处理测试 ===");
-            Console.WriteLine($"国家: {invalidCountry}, 返回结果数量: {result.Count}");
-        }
-        catch (Exception ex)
-        {
-            // 如果抛出异常，验证是预期的异常类型
-            Assert.IsTrue(ex is InvalidOperationException);
-            Console.WriteLine($"预期异常: {ex.Message}");
-        }
-    }
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithExtremeValues_ShouldHandleGracefully()
-    {
-        // Arrange - 使用极端值
-        var minMarketCap = 999999m; // 极大市值
-        var maxMarketCap = 1000000m;
-
-        // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync(
-            minMarketCap: minMarketCap,
-            maxMarketCap: maxMarketCap,
-            limit: 5);
-
-        // Assert
-        Assert.IsNotNull(result);
-        // 可能返回空列表，这是正常的
-
-        Console.WriteLine($"=== 极端值处理测试 ===");
-        Console.WriteLine($"极大市值筛选: {minMarketCap}-{maxMarketCap}亿");
-        Console.WriteLine($"返回结果数量: {result.Count}");
-    }
-
-    #endregion
-
-    #region 边界条件测试
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithZeroLimit_ShouldReturnEmptyList()
-    {
-        // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync(limit: 0);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
-
-        Console.WriteLine("=== 零限制测试：返回空列表 ===");
-    }
-
-    [TestMethod]
-    public async Task TestInvestingStockScreenerPlugin_ScreenStocksByCriteriaAsync_WithNegativeLimit_ShouldHandleGracefully()
-    {
-        // Act
-        var result = await _plugin.ScreenStocksByCriteriaAsync(limit: -5);
-
-        // Assert
-        Assert.IsNotNull(result);
-        // 应该处理负数限制，可能返回空列表或默认数量
-
-        Console.WriteLine($"=== 负数限制测试：返回结果数量 {result.Count} ===");
-    }
-
-    #endregion
-
-    #region 数据模型测试
-
-    [TestMethod]
-    public void TestInvestingStockInfo_ToString_ShouldReturnFormattedString()
-    {
-        // Arrange
-        var stock = new InvestingStockInfo
-        {
-            Name = "测试股票",
-            Symbol = "TEST",
-            Price = 100.50m,
-            ChangePercent = 5.25m,
-            MarketCap = 500.75m,
-            PERatio = 15.8m
+            Market = "全部A股",
+            Industry = "半导体", // 测试半导体行业
+            Limit = 15,
+            Criteria = new List<StockScreeningCriteria>
+            {
+                new()
+                {
+                    Code = "mc",
+                    DisplayName = "总市值",
+                    Type = "basic",
+                    MinValue = 10000000000m,  // 100亿元
+                    MaxValue = null
+                }
+            }
         };
 
         // Act
-        var result = stock.ToString();
+        var result = await _plugin.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Contains("测试股票"));
-        Assert.IsTrue(result.Contains("TEST"));
-        Assert.IsTrue(result.Contains("100.50"));
-        Assert.IsTrue(result.Contains("5.25"));
+        Assert.IsTrue(result.Count <= criteria.Limit);
 
-        Console.WriteLine($"=== 股票信息格式化测试 ===");
-        Console.WriteLine($"格式化结果: {result}");
+        Console.WriteLine($"=== 雪球行业筛选测试结果 ===");
+        Console.WriteLine($"筛选行业: {criteria.Industry}");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(5))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}, 市值: {stock.Mc / 100000000:F0}亿元");
+        }
     }
 
     [TestMethod]
-    public void TestStockScreeningRequest_DefaultValues_ShouldBeValid()
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithBankIndustry_ShouldReturnBankStocks()
     {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "股份制银行", // 测试银行行业
+            Limit = 10,
+            Criteria = new List<StockScreeningCriteria>()
+        };
+
         // Act
-        var request = new StockScreeningRequest();
+        var result = await _plugin.ScreenStocksAsync(criteria);
 
         // Assert
-        Assert.AreEqual("中国", request.Country);
-        Assert.AreEqual("涨幅", request.SortBy);
-        Assert.AreEqual(50, request.Limit);
-        Assert.IsNull(request.MinMarketCap);
-        Assert.IsNull(request.MaxMarketCap);
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
 
-        Console.WriteLine("=== 筛选请求默认值测试通过 ===");
+        Console.WriteLine($"=== 雪球银行行业筛选测试结果 ===");
+        Console.WriteLine($"筛选行业: {criteria.Industry}");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(5))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithInvalidIndustry_ShouldUseDefaultAndReturnStocks()
+    {
+        // Arrange
+        var criteria = new StockCriteria
+        {
+            Market = "全部A股",
+            Industry = "不存在的行业", // 测试无效行业名称
+            Limit = 5,
+            Criteria = new List<StockScreeningCriteria>()
+        };
+
+        // Act
+        var result = await _plugin.ScreenStocksAsync(criteria);
+
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count <= criteria.Limit);
+
+        Console.WriteLine($"=== 雪球无效行业筛选测试结果 ===");
+        Console.WriteLine($"筛选行业: {criteria.Industry} (应使用默认'全部')");
+        Console.WriteLine($"返回股票数量: {result.Count}");
+
+        foreach (var stock in result.Take(3))
+        {
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 价格: {stock.Current}");
+        }
     }
 
     #endregion
