@@ -10,6 +10,5 @@ public enum AnalysisAgents
     MarketSentimentAnalystAgent,
     FinancialAnalystAgent,
     TechnicalAnalystAgent,
-    NewsEventAnalystAgent,
-    StockSelectionAgent
+    NewsEventAnalystAgent
 }

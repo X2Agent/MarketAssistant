@@ -31,11 +31,6 @@ public class StockScreeningCriteria
     /// 最大值
     /// </summary>
     public decimal? MaxValue { get; set; }
-
-    /// <summary>
-    /// 指标类型（basic, market, snowball）
-    /// </summary>
-    public string Type { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -292,48 +287,48 @@ public sealed class StockScreenerPlugin
     private static readonly Dictionary<string, StockScreeningCriteria> SupportedCriteria = new()
     {
         // 基本指标 (15个)
-        { "pettm", new StockScreeningCriteria { Code = "pettm", DisplayName = "市盈率TTM", Type = "basic" } },
-        { "roediluted", new StockScreeningCriteria { Code = "roediluted", DisplayName = "净资产收益率", Type = "basic" } },
-        { "bps", new StockScreeningCriteria { Code = "bps", DisplayName = "每股净资产", Type = "basic" } },
-        { "pelyr", new StockScreeningCriteria { Code = "pelyr", DisplayName = "市盈率LYR", Type = "basic" } },
-        { "npay", new StockScreeningCriteria { Code = "npay", DisplayName = "净利润同比增长", Type = "basic" } },
-        { "eps", new StockScreeningCriteria { Code = "eps", DisplayName = "每股收益", Type = "basic" } },
-        { "netprofit", new StockScreeningCriteria { Code = "netprofit", DisplayName = "净利润", Type = "basic" } },
-        { "dy_l", new StockScreeningCriteria { Code = "dy_l", DisplayName = "股息收益率", Type = "basic" } },
-        { "psr", new StockScreeningCriteria { Code = "psr", DisplayName = "市销率(倍)", Type = "basic" } },
-        { "pb", new StockScreeningCriteria { Code = "pb", DisplayName = "市净率MRQ", Type = "basic" } },
-        { "total_revenue", new StockScreeningCriteria { Code = "total_revenue", DisplayName = "营业收入", Type = "basic" } },
-        { "mc", new StockScreeningCriteria { Code = "mc", DisplayName = "总市值", Type = "basic" } },
-        { "fmc", new StockScreeningCriteria { Code = "fmc", DisplayName = "流通市值", Type = "basic" } },
-        { "niota", new StockScreeningCriteria { Code = "niota", DisplayName = "总资产报酬率", Type = "basic" } },
-        { "oiy", new StockScreeningCriteria { Code = "oiy", DisplayName = "营业收入同比增长", Type = "basic" } },
+        { "pettm", new StockScreeningCriteria { Code = "pettm", DisplayName = "市盈率TTM" } },
+        { "roediluted", new StockScreeningCriteria { Code = "roediluted", DisplayName = "净资产收益率" } },
+        { "bps", new StockScreeningCriteria { Code = "bps", DisplayName = "每股净资产" } },
+        { "pelyr", new StockScreeningCriteria { Code = "pelyr", DisplayName = "市盈率LYR" } },
+        { "npay", new StockScreeningCriteria { Code = "npay", DisplayName = "净利润同比增长" } },
+        { "eps", new StockScreeningCriteria { Code = "eps", DisplayName = "每股收益" } },
+        { "netprofit", new StockScreeningCriteria { Code = "netprofit", DisplayName = "净利润" } },
+        { "dy_l", new StockScreeningCriteria { Code = "dy_l", DisplayName = "股息收益率" } },
+        { "psr", new StockScreeningCriteria { Code = "psr", DisplayName = "市销率(倍)" } },
+        { "pb", new StockScreeningCriteria { Code = "pb", DisplayName = "市净率MRQ" } },
+        { "total_revenue", new StockScreeningCriteria { Code = "total_revenue", DisplayName = "营业收入" } },
+        { "mc", new StockScreeningCriteria { Code = "mc", DisplayName = "总市值" } },
+        { "fmc", new StockScreeningCriteria { Code = "fmc", DisplayName = "流通市值" } },
+        { "niota", new StockScreeningCriteria { Code = "niota", DisplayName = "总资产报酬率" } },
+        { "oiy", new StockScreeningCriteria { Code = "oiy", DisplayName = "营业收入同比增长" } },
         
         // 雪球指标 (9个)
-        { "deal", new StockScreeningCriteria { Code = "deal", DisplayName = "累计交易分享数", Type = "snowball" } },
-        { "follow7d", new StockScreeningCriteria { Code = "follow7d", DisplayName = "一周新增关注", Type = "snowball" } },
-        { "deal7dpct", new StockScreeningCriteria { Code = "deal7dpct", DisplayName = "一周交易分享增长率", Type = "snowball" } },
-        { "deal7d", new StockScreeningCriteria { Code = "deal7d", DisplayName = "一周新增交易分享数", Type = "snowball" } },
-        { "tweet7dpct", new StockScreeningCriteria { Code = "tweet7dpct", DisplayName = "一周讨论增长率", Type = "snowball" } },
-        { "tweet", new StockScreeningCriteria { Code = "tweet", DisplayName = "累计讨论次数", Type = "snowball" } },
-        { "follow7dpct", new StockScreeningCriteria { Code = "follow7dpct", DisplayName = "一周关注增长率", Type = "snowball" } },
-        { "follow", new StockScreeningCriteria { Code = "follow", DisplayName = "累计关注人数", Type = "snowball" } },
-        { "tweet7d", new StockScreeningCriteria { Code = "tweet7d", DisplayName = "一周新增讨论数", Type = "snowball" } },
+        { "deal", new StockScreeningCriteria { Code = "deal", DisplayName = "累计交易分享数" } },
+        { "follow7d", new StockScreeningCriteria { Code = "follow7d", DisplayName = "一周新增关注" } },
+        { "deal7dpct", new StockScreeningCriteria { Code = "deal7dpct", DisplayName = "一周交易分享增长率" } },
+        { "deal7d", new StockScreeningCriteria { Code = "deal7d", DisplayName = "一周新增交易分享数" } },
+        { "tweet7dpct", new StockScreeningCriteria { Code = "tweet7dpct", DisplayName = "一周讨论增长率" } },
+        { "tweet", new StockScreeningCriteria { Code = "tweet", DisplayName = "累计讨论次数" } },
+        { "follow7dpct", new StockScreeningCriteria { Code = "follow7dpct", DisplayName = "一周关注增长率" } },
+        { "follow", new StockScreeningCriteria { Code = "follow", DisplayName = "累计关注人数" } },
+        { "tweet7d", new StockScreeningCriteria { Code = "tweet7d", DisplayName = "一周新增讨论数" } },
         
         // 行情指标 (14个)
-        { "pct", new StockScreeningCriteria { Code = "pct", DisplayName = "当日涨跌幅", Type = "market" } },
-        { "pct5", new StockScreeningCriteria { Code = "pct5", DisplayName = "近5日涨跌幅", Type = "market" } },
-        { "pct60", new StockScreeningCriteria { Code = "pct60", DisplayName = "近60日涨跌幅", Type = "market" } },
-        { "amount", new StockScreeningCriteria { Code = "amount", DisplayName = "当日成交额", Type = "market" } },
-        { "chgpct", new StockScreeningCriteria { Code = "chgpct", DisplayName = "当日振幅", Type = "market" } },
-        { "pct20", new StockScreeningCriteria { Code = "pct20", DisplayName = "近20日涨跌幅", Type = "market" } },
-        { "pct120", new StockScreeningCriteria { Code = "pct120", DisplayName = "近120日涨跌幅", Type = "market" } },
-        { "pct250", new StockScreeningCriteria { Code = "pct250", DisplayName = "近250日涨跌幅", Type = "market" } },
-        { "volume", new StockScreeningCriteria { Code = "volume", DisplayName = "本日成交量", Type = "market" } },
-        { "current", new StockScreeningCriteria { Code = "current", DisplayName = "当前价", Type = "market" } },
-        { "volume_ratio", new StockScreeningCriteria { Code = "volume_ratio", DisplayName = "当日量比", Type = "market" } },
-        { "pct_current_year", new StockScreeningCriteria { Code = "pct_current_year", DisplayName = "年初至今涨跌幅", Type = "market" } },
-        { "pct10", new StockScreeningCriteria { Code = "pct10", DisplayName = "近10日涨跌幅", Type = "market" } },
-        { "tr", new StockScreeningCriteria { Code = "tr", DisplayName = "当日换手率", Type = "market" } }
+        { "pct", new StockScreeningCriteria { Code = "pct", DisplayName = "当日涨跌幅" } },
+        { "pct5", new StockScreeningCriteria { Code = "pct5", DisplayName = "近5日涨跌幅" } },
+        { "pct60", new StockScreeningCriteria { Code = "pct60", DisplayName = "近60日涨跌幅" } },
+        { "amount", new StockScreeningCriteria { Code = "amount", DisplayName = "当日成交额" } },
+        { "chgpct", new StockScreeningCriteria { Code = "chgpct", DisplayName = "当日振幅" } },
+        { "pct20", new StockScreeningCriteria { Code = "pct20", DisplayName = "近20日涨跌幅" } },
+        { "pct120", new StockScreeningCriteria { Code = "pct120", DisplayName = "近120日涨跌幅" } },
+        { "pct250", new StockScreeningCriteria { Code = "pct250", DisplayName = "近250日涨跌幅" } },
+        { "volume", new StockScreeningCriteria { Code = "volume", DisplayName = "本日成交量" } },
+        { "current", new StockScreeningCriteria { Code = "current", DisplayName = "当前价" } },
+        { "volume_ratio", new StockScreeningCriteria { Code = "volume_ratio", DisplayName = "当日量比" } },
+        { "pct_current_year", new StockScreeningCriteria { Code = "pct_current_year", DisplayName = "年初至今涨跌幅" } },
+        { "pct10", new StockScreeningCriteria { Code = "pct10", DisplayName = "近10日涨跌幅" } },
+        { "tr", new StockScreeningCriteria { Code = "tr", DisplayName = "当日换手率" } }
     };
 
     public StockScreenerPlugin(
@@ -407,25 +402,6 @@ public sealed class StockScreenerPlugin
             _logger.LogError(ex, "筛选股票时发生错误");
             throw new InvalidOperationException($"筛选股票失败: {ex.Message}", ex);
         }
-    }
-
-    /// <summary>
-    /// 获取所有支持的筛选指标
-    /// </summary>
-    [KernelFunction("get_supported_criteria"), Description("获取支持的所有筛选指标列表")]
-    public List<StockScreeningCriteria> GetSupportedCriteria()
-    {
-        return SupportedCriteria.Values.ToList();
-    }
-
-    /// <summary>
-    /// 根据指标类型获取支持的筛选指标
-    /// </summary>
-    [KernelFunction("get_criteria_by_type"), Description("根据指标类型获取支持的筛选指标")]
-    public List<StockScreeningCriteria> GetCriteriaByType(
-        [Description("指标类型：basic(基本指标)、market(行情指标)、snowball(雪球指标)")] string type)
-    {
-        return SupportedCriteria.Values.Where(c => c.Type == type).ToList();
     }
 
     #region 私有方法

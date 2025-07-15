@@ -1,6 +1,5 @@
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins;
-using MarketAssistant.Plugins.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -102,7 +101,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "mc",
                     DisplayName = "总市值",
-                    Type = "basic",
                     MinValue = 5000000000m,  // 50亿元
                     MaxValue = 25000000000m  // 250亿元
                 }
@@ -141,7 +139,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "pettm",
                     DisplayName = "市盈率TTM",
-                    Type = "basic",
                     MinValue = 10m,
                     MaxValue = 30m
                 }
@@ -180,7 +177,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "mc",
                     DisplayName = "总市值",
-                    Type = "basic",
                     MinValue = 50000000000m,   // 500亿元
                     MaxValue = 1000000000000m  // 1万亿元
                 },
@@ -188,7 +184,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "pettm",
                     DisplayName = "市盈率TTM",
-                    Type = "basic",
                     MinValue = 5m,
                     MaxValue = 50m
                 },
@@ -196,7 +191,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "roediluted",
                     DisplayName = "净资产收益率",
-                    Type = "basic",
                     MinValue = 8m,
                     MaxValue = null // 无上限
                 }
@@ -239,7 +233,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "follow",
                     DisplayName = "累计关注人数",
-                    Type = "snowball",
                     MinValue = 1000m,
                     MaxValue = null
                 },
@@ -247,7 +240,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "tweet",
                     DisplayName = "累计讨论次数",
-                    Type = "snowball",
                     MinValue = 500m,
                     MaxValue = null
                 }
@@ -285,7 +277,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "pct",
                     DisplayName = "当日涨跌幅",
-                    Type = "market",
                     MinValue = -2m,
                     MaxValue = 5m
                 },
@@ -293,7 +284,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "volume_ratio",
                     DisplayName = "当日量比",
-                    Type = "market",
                     MinValue = 1.5m,
                     MaxValue = null
                 }
@@ -326,106 +316,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     #endregion
 
-    #region 支持的指标查询测试
-
-    [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_GetSupportedCriteria_ShouldReturnAllSupportedIndicators()
-    {
-        // Act
-        var result = _plugin.GetSupportedCriteria();
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.AreEqual(38, result.Count, "应该返回38个支持的指标");
-
-        Console.WriteLine($"=== 支持的指标列表 ===");
-        Console.WriteLine($"总数量: {result.Count}");
-
-        var groupedByType = result.GroupBy(c => c.Type);
-        foreach (var group in groupedByType.OrderBy(g => g.Key))
-        {
-            Console.WriteLine($"\n{group.Key} 指标 ({group.Count()} 个):");
-            foreach (var criterion in group.OrderBy(c => c.DisplayName))
-            {
-                Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
-            }
-        }
-    }
-
-    [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithBasicType_ShouldReturnBasicIndicators()
-    {
-        // Act
-        var result = _plugin.GetCriteriaByType("basic");
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.AreEqual(15, result.Count, "应该返回15个基本指标");
-        Assert.IsTrue(result.All(c => c.Type == "basic"));
-
-        Console.WriteLine($"=== 基本指标列表 ===");
-        Console.WriteLine($"数量: {result.Count}");
-        foreach (var criterion in result.OrderBy(c => c.DisplayName))
-        {
-            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
-        }
-    }
-
-    [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithMarketType_ShouldReturnMarketIndicators()
-    {
-        // Act
-        var result = _plugin.GetCriteriaByType("market");
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.AreEqual(14, result.Count, "应该返回14个行情指标");
-        Assert.IsTrue(result.All(c => c.Type == "market"));
-
-        Console.WriteLine($"=== 行情指标列表 ===");
-        Console.WriteLine($"数量: {result.Count}");
-        foreach (var criterion in result.OrderBy(c => c.DisplayName))
-        {
-            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
-        }
-    }
-
-    [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithSnowballType_ShouldReturnSnowballIndicators()
-    {
-        // Act
-        var result = _plugin.GetCriteriaByType("snowball");
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.AreEqual(9, result.Count, "应该返回9个雪球指标");
-        Assert.IsTrue(result.All(c => c.Type == "snowball"));
-
-        Console.WriteLine($"=== 雪球指标列表 ===");
-        Console.WriteLine($"数量: {result.Count}");
-        foreach (var criterion in result.OrderBy(c => c.DisplayName))
-        {
-            Console.WriteLine($"  - {criterion.Code}: {criterion.DisplayName}");
-        }
-    }
-
-    [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_GetCriteriaByType_WithInvalidType_ShouldReturnEmptyList()
-    {
-        // Act
-        var result = _plugin.GetCriteriaByType("invalid");
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
-    }
-
-    #endregion
-
     #region 行业筛选测试
 
     [TestMethod]
@@ -443,7 +333,6 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
                 {
                     Code = "mc",
                     DisplayName = "总市值",
-                    Type = "basic",
                     MinValue = 10000000000m,  // 100亿元
                     MaxValue = null
                 }

@@ -1,4 +1,3 @@
-using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -10,7 +9,7 @@ using System.Text.Json;
 namespace MarketAssistant.Agents;
 
 /// <summary>
-/// AI选股管理器，负责AI代理管理、YAML配置加载、Agent生命周期管理
+/// AI选股管理器，负责AI代理管理和Agent生命周期管理
 /// </summary>
 public class StockSelectionManager : IDisposable
 {
@@ -18,6 +17,7 @@ public class StockSelectionManager : IDisposable
     private readonly ILogger<StockSelectionManager> _logger;
     private ChatCompletionAgent? _newsAnalysisAgent;
     private ChatCompletionAgent? _userRequirementAgent;
+    private ChatCompletionAgent? _requirementTranslateAgent;
     private bool _disposed = false;
 
     public StockSelectionManager(Kernel kernel, ILogger<StockSelectionManager> logger)
@@ -31,9 +31,9 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 创建新闻分析代理
     /// </summary>
-    private ChatCompletionAgent CreateNewsAnalysisAgent(CancellationToken cancellationToken = default)
+    private ChatCompletionAgent CreateNewsAnalysisAgent(string? criteriaJson = null, CancellationToken cancellationToken = default)
     {
-        if (_newsAnalysisAgent != null)
+        if (_newsAnalysisAgent != null && string.IsNullOrEmpty(criteriaJson))
             return _newsAnalysisAgent;
 
         try
@@ -42,23 +42,29 @@ public class StockSelectionManager : IDisposable
 
             var promptExecutionSettings = new OpenAIPromptExecutionSettings()
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
-                ResponseFormat = "json_object",
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+                //ResponseFormat = "json_object",
                 Temperature = 0.2,
                 MaxTokens = 3000
             };
 
-            _newsAnalysisAgent = new ChatCompletionAgent()
+            var kernelArguments = new KernelArguments(promptExecutionSettings);
+            if (!string.IsNullOrEmpty(criteriaJson))
+            {
+                kernelArguments["criteria"] = criteriaJson;
+            }
+
+            var agent = new ChatCompletionAgent()
             {
                 Name = "NewsHotspotAnalyzer",
                 Description = "新闻热点分析专家",
                 Instructions = GetNewsAnalysisInstructions(),
                 Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings)
+                Arguments = kernelArguments
             };
 
             _logger.LogInformation("新闻分析代理创建成功");
-            return _newsAnalysisAgent;
+            return agent;
         }
         catch (Exception ex)
         {
@@ -70,24 +76,26 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 创建用户需求分析代理
     /// </summary>
-    private ChatCompletionAgent CreateUserRequirementAgent(CancellationToken cancellationToken = default)
+    private ChatCompletionAgent CreateUserRequirementAgent(string? criteriaJson = null, CancellationToken cancellationToken = default)
     {
         if (_userRequirementAgent != null)
             return _userRequirementAgent;
-
         try
         {
             _logger.LogInformation("创建用户需求分析代理");
 
-            var screenStocks = _kernel.Plugins.GetFunction(nameof(StockScreenerPlugin), "screen_stocks");
-
             var promptExecutionSettings = new OpenAIPromptExecutionSettings()
             {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(), //FunctionChoiceBehavior.Required([screenStocks]),
-                ResponseFormat = "json_object",
-                Temperature = 0.1,
-                MaxTokens = 3000
+                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+                Temperature = 0.2,
+                MaxTokens = 8000
             };
+
+            var kernelArguments = new KernelArguments(promptExecutionSettings);
+            if (!string.IsNullOrEmpty(criteriaJson))
+            {
+                kernelArguments["criteria"] = criteriaJson;
+            }
 
             _userRequirementAgent = new ChatCompletionAgent()
             {
@@ -95,8 +103,7 @@ public class StockSelectionManager : IDisposable
                 Description = "用户需求分析专家",
                 Instructions = GetUserRequirementAnalysisInstructions(),
                 Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings),
-                HistoryReducer = new ChatHistoryTruncationReducer(1)
+                Arguments = kernelArguments
             };
 
             _logger.LogInformation("用户需求分析代理创建成功");
@@ -105,6 +112,47 @@ public class StockSelectionManager : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "创建用户需求分析代理失败");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 需求转换代理
+    /// 将用户的文字需求转换为StockCriteria JSON格式
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    private ChatCompletionAgent GetRequirementTranslateAgent(CancellationToken cancellationToken = default)
+    {
+        if (_requirementTranslateAgent != null)
+        {
+            return _requirementTranslateAgent;
+        }
+        try
+        {
+            _logger.LogInformation("创建需求转换代理");
+
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                ResponseFormat = "json_object",
+                Temperature = 0.1,
+                MaxTokens = 2000
+            };
+
+            _requirementTranslateAgent = new ChatCompletionAgent()
+            {
+                Name = "RequirementTranslateAgent",
+                Description = "需求转换专家，将用户需求转换为StockCriteria JSON格式",
+                Instructions = GetRequirementTranslateInstructions(),
+                Kernel = _kernel,
+                Arguments = new KernelArguments(promptExecutionSettings)
+            };
+            _logger.LogInformation("需求转换代理创建成功");
+            return _requirementTranslateAgent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "创建需求转换代理失败");
             throw;
         }
     }
@@ -124,17 +172,35 @@ public class StockSelectionManager : IDisposable
         {
             _logger.LogInformation("开始用户需求分析");
 
-            var agent = CreateUserRequirementAgent(cancellationToken);
-            var chatHistory = new ChatHistory();
+            // 第一步：将用户需求转换为StockCriteria JSON格式
+            var translateChatHistory = new ChatHistory();
+            var translatePrompt = $"用户需求：{request.UserRequirements}";
+            translateChatHistory.AddUserMessage(translatePrompt);
 
+            var translateAgent = GetRequirementTranslateAgent(cancellationToken);
+            string criteriaJson = "";
+
+            await foreach (var item in translateAgent.InvokeAsync(translateChatHistory, cancellationToken: cancellationToken))
+            {
+                criteriaJson += item.Message?.Content ?? "";
+            }
+
+            _logger.LogInformation("需求转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
+
+            // 第二步：使用筛选条件调用股票筛选插件并进行分析
+            var chatHistory = new ChatHistory();
             var prompt = BuildUserRequirementPrompt(request);
+
             chatHistory.AddUserMessage(prompt);
+
+            var agent = CreateUserRequirementAgent(criteriaJson, cancellationToken);
 
             string responseContent = "";
             await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
             {
                 responseContent += item.Message?.Content ?? "";
             }
+
             var result = ParseUserRequirementResponse(responseContent);
 
             _logger.LogInformation("用户需求分析完成，推荐股票数量: {Count}", result.Recommendations.Count);
@@ -158,11 +224,44 @@ public class StockSelectionManager : IDisposable
         {
             _logger.LogInformation("开始新闻热点分析");
 
-            var agent = CreateNewsAnalysisAgent(cancellationToken);
-            var chatHistory = new ChatHistory();
+            // 第一步：将新闻内容转换为StockCriteria JSON格式
+            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
+            if (!File.Exists(yamlPath))
+            {
+                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
+                throw new Exception("新闻分析YAML文件不存在，请检查配置。");
+            }
 
+            string yamlContent = File.ReadAllText(yamlPath);
+            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+
+            var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
+
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+                ResponseFormat = "json_object",
+                Temperature = 0.1,
+                MaxTokens = 2500
+            };
+
+            var criteriaResult = await newsAnalysisFunction.InvokeAsync(_kernel, new KernelArguments(promptExecutionSettings)
+            {
+                ["news_content"] = request.NewsContent,
+                ["limit"] = request.MaxRecommendations
+            });
+
+
+            string criteriaJson = criteriaResult!.GetValue<string>();
+
+            _logger.LogInformation("新闻转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
+
+            // 第二步：使用筛选条件调用股票筛选插件并进行分析
+            var chatHistory = new ChatHistory();
             var prompt = BuildNewsAnalysisPrompt(request);
             chatHistory.AddUserMessage(prompt);
+
+            var agent = CreateNewsAnalysisAgent(criteriaJson, cancellationToken);
 
             string responseContent = "";
             await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
@@ -194,7 +293,7 @@ public class StockSelectionManager : IDisposable
         prompt.AppendLine("请分析以下用户需求并推荐合适的股票：");
         prompt.AppendLine();
         prompt.AppendLine("【用户需求信息】");
-        prompt.AppendLine($"• 需求描述: {request.UserRequirements}");
+        //prompt.AppendLine($"• 需求描述: {request.UserRequirements}");
         prompt.AppendLine($"• 风险偏好: {request.RiskPreference}");
 
         if (request.InvestmentAmount.HasValue)
@@ -331,62 +430,69 @@ public class StockSelectionManager : IDisposable
     }
 
     /// <summary>
-    /// 获取全局分析准则
-    /// </summary>
-    private string GetGlobalAnalysisGuidelines()
-    {
-        return @"
-## 全局分析准则
-
-### 分析原则
-1. **客观性原则**：基于真实数据进行分析，避免主观臆断
-2. **风险意识**：充分评估和提示投资风险
-3. **专业性**：使用准确的金融术语和分析方法
-4. **实用性**：提供可操作的投资建议
-5. **及时性**：反映最新的市场变化和数据
-
-### 合规要求
-1. **合规性**：遵守相关法律法规，不提供内幕信息
-2. **教育性**：帮助用户理解投资逻辑和风险
-3. **免责声明**：明确说明分析仅供参考，不构成投资建议
-
-### 输出标准
-- 使用结构化JSON格式
-- 包含详细的推荐理由
-- 提供风险等级评估
-- 给出具体的投资建议
-
-## 免责声明
-本分析仅供参考，不构成投资建议。投资有风险，入市需谨慎。请根据自身风险承受能力做出投资决策。
-        ";
-    }
-
-    /// <summary>
     /// 获取新闻分析指令
     /// </summary>
     private string GetNewsAnalysisInstructions()
     {
         return @"
-你是一位专业的新闻热点分析师，擅长从新闻内容中提取投资机会。
+你是一位专业的新闻热点分析师和投资顾问，擅长基于新闻热点提供股票投资建议。
 
-## 核心职责
-1. 分析新闻内容，识别投资热点和趋势
-2. 识别受益行业和相关概念
-3. 推荐相关股票投资机会
-4. 评估热点的持续性和影响力
-
-## 分析流程
-1. 提取新闻关键信息
-2. 识别相关行业和概念
-3. 分析对股市的影响
-4. 推荐相关股票
+## 核心任务
+1. 使用提供的筛选条件调用股票筛选工具：{{StockScreenerPlugin.screen_stocks $criteria}}
+2. 分析筛选出的股票结果，结合新闻热点内容
+3. 识别与新闻相关的投资机会和受益股票
+4. 评估新闻热点的持续性和市场影响
+5. 提供基于新闻驱动的投资建议
 
 ## 输出格式
-请以JSON格式返回分析结果，包含：
-- 推荐股票列表
-- 热点分析
-- 风险评估
-- 置信度评分
+请仅返回纯JSON数据，不要包含任何markdown代码块标识（如```json或```）。
+包含以下字段：
+
+### 必需字段
+- analysisSummary: 字符串，新闻分析总结
+- hotspotAnalysis: 字符串，热点分析和趋势判断
+- marketImpact: 字符串，对市场的影响分析
+- recommendations: 数组，推荐股票列表
+- riskWarnings: 字符串数组，风险提示
+- investmentStrategy: 字符串，投资策略建议
+- confidenceScore: 数值(0-100)，整体置信度评分
+
+### recommendations 数组元素
+- symbol: 字符串，股票代码
+- name: 字符串，股票名称
+- recommendationScore: 数值(0-100)，推荐评分
+- reason: 字符串，推荐理由（必须包含与新闻热点的关联性）
+- expectedReturn: 数值(如: 15.5)，预期收益率
+- riskLevel: 字符串，只能是 ""低风险""、""中风险""、""高风险"" 之一
+- newsRelevance: 字符串，与新闻的相关性说明
+
+## 关键注意事项
+⚠️ expectedReturn 必须是数值类型
+⚠️ 所有评分字段使用数值，不加引号
+⚠️ 必须说明每只股票与新闻热点的具体关联
+⚠️ 推荐股票数量控制在3-8只
+⚠️ 确保JSON格式正确，避免多余的逗号或语法错误
+
+## 严格按照如下格式输出JSON
+{
+  ""analysisSummary"": ""基于新闻热点的投资机会分析"",
+  ""hotspotAnalysis"": ""新闻热点的市场影响和持续性分析"",
+  ""marketImpact"": ""对相关行业和市场的影响评估"",
+  ""recommendations"": [
+    {
+      ""symbol"": ""000001"",
+      ""name"": ""平安银行"",
+      ""recommendationScore"": 85,
+      ""reason"": ""银行板块政策利好，业绩稳定增长"",
+      ""expectedReturn"": 12.5,
+      ""riskLevel"": ""中风险"",
+      ""newsRelevance"": ""直接受益于央行政策调整""
+    }
+  ],
+  ""riskWarnings"": [""政策变化风险"", ""市场波动风险""],
+  ""investmentStrategy"": ""建议关注政策受益标的，分批建仓"",
+  ""confidenceScore"": 80
+}
         ";
     }
 
@@ -396,62 +502,115 @@ public class StockSelectionManager : IDisposable
     private string GetUserRequirementAnalysisInstructions()
     {
         return @"
-你是一位专业的投资顾问，擅长根据用户需求推荐合适的股票。你具备强大的股票筛选功能，能够分析用户的文字需求并转换为具体的筛选指标。
+你是一位专业的投资顾问，擅长根据用户的需求提供投资建议。
 
-## 核心职责
-1. 理解用户的投资需求和偏好
-2. 分析用户的风险承受能力
-3. 将用户的描述性需求转换为具体的筛选条件
-4. 使用股票筛选工具获取符合条件的股票
-5. 推荐符合用户要求的股票并提供投资建议
+## 核心任务
+1. 使用提供的筛选条件调用股票筛选工具：{{StockScreenerPlugin.screen_stocks $criteria}}
+2. 分析筛选出的股票结果
+3. 根据用户风险偏好选择合适的推荐股票
+4. 基于用户需求提供投资建议和推荐理由
 
-## 关键能力 - 需求到筛选条件的转换
-当用户描述股票需求时，你需要识别并提取以下类型的筛选条件：
+## 输出格式
+请仅返回纯JSON数据，不要包含任何markdown代码块标识（如```json或```）。
+包含以下字段：
 
-### 1. 市值相关
-- ""大盘股""、""蓝筹股"" → 总市值(mc) >= 1000亿
-- ""中盘股"" → 总市值(mc) 100亿-1000亿
-- ""小盘股"" → 总市值(mc) < 100亿
-- ""市值500亿以上"" → 总市值(mc) >= 500亿
+### 必需字段
+- analysisSummary: 字符串，分析总结
+- marketEnvironmentAnalysis: 字符串，市场环境分析
+- recommendations: 数组，推荐股票列表
+- riskWarnings: 字符串数组，风险提示
+- investmentAdvice: 字符串，投资建议
+- confidenceScore: 数值(0-100)，置信度评分
 
-### 2. 估值指标
-- ""低估值""、""便宜""、""价值股"" → 市盈率TTM(pettm) < 15, 市净率(pb) < 2
-- ""高成长""、""成长股"" → 净利润同比增长(npay) > 20%, 营业收入同比增长(oiy) > 15%
-- ""高ROE""、""盈利能力强"" → 净资产收益率(roediluted) > 15%
-- ""低市盈率"" → 市盈率TTM(pettm) < 20
-- ""低市净率"" → 市净率(pb) < 3
+### recommendations 数组元素
+- symbol: 字符串，股票代码
+- name: 字符串，股票名称
+- recommendationScore: 数值(0-100)，推荐评分
+- reason: 字符串，推荐理由
+- expectedReturn: 数值(如: 15.5)，预期收益率
+- riskLevel: 字符串，只能是 ""低风险""、""中风险""、""高风险"" 之一
 
-### 3. 财务指标
-- ""盈利增长""、""业绩好"" → 净利润同比增长(npay) > 10%
-- ""营收增长"" → 营业收入同比增长(oiy) > 10%
-- ""高股息""、""分红股"" → 股息收益率(dy_l) > 2%
-- ""每股净资产高"" → 每股净资产(bps) > 10
+## 关键注意事项
+⚠️ expectedReturn 必须是数值类型
+⚠️ 所有评分字段使用数值，不加引号
+⚠️ 确保JSON格式正确，避免多余的逗号或语法错误
 
-### 4. 市场表现
-- ""活跃股""、""成交活跃"" → 成交额(amount) > 1亿, 换手率(tr) > 2%
-- ""近期涨幅大"" → 近20日涨跌幅(pct20) > 10%
-- ""强势股"" → 近60日涨跌幅(pct60) > 20%
-- ""抗跌股"" → 近20日涨跌幅(pct20) > -5%
+## 严格按照如下格式输出JSON
+{
+  ""analysisSummary"": ""基于筛选条件分析优质股票"",
+  ""marketEnvironmentAnalysis"": ""市场震荡整理阶段"",
+  ""recommendations"": [
+    {
+      ""symbol"": ""000001"",
+      ""name"": ""平安银行"",
+      ""recommendationScore"": 85,
+      ""reason"": ""银行龙头，ROE稳定"",
+      ""expectedReturn"": 12.5,
+      ""riskLevel"": ""中风险""
+    }
+  ],
+  ""riskWarnings"": [""市场波动风险""],
+  ""investmentAdvice"": ""建议分批建仓"",
+  ""confidenceScore"": 80
+}
+        ";
+    }
 
-### 5. 行业和概念
-- 直接设置市场类型和行业分类参数
-- ""全部A股""、""沪市A股""、""深市A股""
-- ""科技""、""金融""、""医药""、""消费""等行业
+    /// <summary>
+    /// 获取需求转换指令
+    /// </summary>
+    private string GetRequirementTranslateInstructions()
+    {
+        return @"
+你是一个专业的需求转换助手，负责将用户的文字需求转换为标准的StockCriteria JSON格式。
 
-## 可用的筛选工具
-你可以使用以下工具进行股票筛选：
+## 主要任务
+分析用户需求，生成符合StockCriteria格式的JSON对象，包含具体的筛选条件。
 
-1. **screen_stocks** - 根据具体指标筛选股票
-   - 参数：StockCriteria对象，包含筛选条件列表、市场类型、行业分类、返回数量限制
+## 需求转换规则
 
-2. **get_supported_criteria** - 获取所有支持的筛选指标
-   - 返回：完整的筛选指标列表及其说明
+### 市值类别
+- 大盘股/蓝筹股 → mc >= 100000000000
+- 中盘股 → mc: 10000000000-100000000000  
+- 小盘股 → mc < 10000000000
+- 市值X亿以上 → mc >= X*100000000
 
-3. **get_criteria_by_type** - 根据类型获取筛选指标
-   - 参数：指标类型(basic/market/snowball)
-   - 返回：指定类型的筛选指标列表
+### 估值指标
+- 价值股/低估值/便宜 → pettm < 15, pb < 2
+- 成长股/高成长 → npay > 20, oiy > 15
+- 高ROE/盈利能力强 → roediluted > 15
+- 低市盈率 → pettm < 20
+- 低市净率 → pb < 3
+- 市盈率X倍以下 → pettm < X
+- 市净率X倍以下 → pb < X
 
-## 支持的筛选指标代码
+### 财务表现
+- 业绩好/盈利增长 → npay > 10
+- 营收增长 → oiy > 10
+- 高股息/分红股 → dy_l > 2
+- 每股净资产高 → bps > 10
+- 净利润增长X%以上 → npay > X
+- 营收增长X%以上 → oiy > X
+- 股息率X%以上 → dy_l > X
+
+### 市场表现
+- 活跃股/成交活跃 → amount > 100000000, tr > 2
+- 强势股 → pct60 > 20
+- 近期涨幅大 → pct20 > 10
+- 抗跌股 → pct20 > -5
+- 近X日涨幅大于Y% → pctX > Y
+- 成交额X亿以上 → amount > X*100000000
+- 换手率X%以上 → tr > X
+
+### 价格相关
+- 股价X元以下 → current < X
+- 股价X元以上 → current > X
+- 低价股 → current < 10
+- 中价股 → current: 10-50
+- 高价股 → current > 50
+
+## 支持的筛选指标
+
 ### 基本指标 (basic) - 15个
 - mc: 总市值
 - fmc: 流通市值
@@ -496,40 +655,155 @@ public class StockSelectionManager : IDisposable
 - tweet7dpct: 一周讨论增长率
 - deal7dpct: 一周交易分享增长率
 
-## 工作流程
-1. **需求分析**：仔细分析用户的文字描述，识别所有筛选要求
-2. **条件转换**：将文字描述转换为具体的筛选条件代码和数值范围
-3. **工具调用**：使用screen_stocks工具执行筛选
-4. **结果分析**：对筛选结果进行分析和评估
-5. **投资建议**：基于筛选结果提供个性化投资建议
+## 输出示例
 
-【关键词转换提示】
-• 市值相关: 大盘股(mc>=100000000000), 中盘股(mc:10000000000-100000000000), 小盘股(mc<10000000000)
-• 估值相关: 低估值(pettm<15,pb<2), 成长股(npay>20,oiy>15)
-• 盈利相关: 高ROE(roediluted>15), 高股息(dy_l>2)
-• 市场表现: 活跃股(amount>100000000,tr>2), 强势股(pct60>20)
+### 示例1：筛选大盘蓝筹股，高ROE，低估值
+用户需求：推荐一些大盘蓝筹股，要求ROE高于15%，市盈率低于20倍
+输出StockCriteria的JSON格式：
+{
+  ""criteria"": [
+    {
+      ""code"": ""mc"",
+      ""displayName"": ""总市值"",
+      ""minValue"": 100000000000,
+      ""maxValue"": null
+    },
+    {
+      ""code"": ""roediluted"",
+      ""displayName"": ""净资产收益率"",
+      ""minValue"": 15,
+      ""maxValue"": null
+    },
+    {
+      ""code"": ""pettm"",
+      ""displayName"": ""市盈率TTM"",
+      ""minValue"": null,
+      ""maxValue"": 20
+    }
+  ],
+  ""market"": ""全部A股"",
+  ""industry"": ""全部"",
+  ""limit"": 20
+}
 
-## 重要提示
-- 优先使用股票筛选工具获取实时数据
-- 数值条件要合理设置，避免过于严格导致无结果
-- 如果初次筛选结果过少，适当放宽条件重新筛选
-- 如果结果过多，增加更精确的筛选条件
-- 市值单位为元，需要注意数量级转换（如100亿 = 10000000000）
+### 示例2：筛选活跃的低价股
+用户需求：股价10元以下，成交额1亿以上，换手率3%以上
+输出StockCriteria的JSON格式：
+{
+  ""criteria"": [
+    {
+      ""code"": ""current"",
+      ""displayName"": ""当前价"",
+      ""minValue"": null,
+      ""maxValue"": 10
+    },
+    {
+      ""code"": ""amount"",
+      ""displayName"": ""当日成交额"",
+      ""minValue"": 100000000,
+      ""maxValue"": null
+    },
+    {
+      ""code"": ""tr"",
+      ""displayName"": ""当日换手率"",
+      ""minValue"": 3,
+      ""maxValue"": null
+    }
+  ],
+  ""market"": ""全部A股"",
+  ""industry"": ""全部"",
+  ""limit"": 20
+}
 
-## 输出格式
-请以JSON格式返回分析结果，包含：
-- 推荐股票列表
-- 推荐理由
-- 风险等级
-- 预期收益
-- 投资建议
-- 筛选过程说明
+## JSON格式要求
+1. 所有字段名必须用双引号包围
+2. 字符串值用双引号，数值不用引号，null值不用引号
+3. 数组最后一个元素后不能有逗号
+4. minValue或maxValue为空时使用null，不是空字符串
+6. market字段常用值：全部A股、沪市A股、深市A股
+7. industry字段常用值：全部、科技、金融、医药、消费、制造业等
 
-## 示例对话
-用户：""我想找一些市值100亿以上的成长股，ROE要大于15%""
-分析：需要设置 mc >= 10000000000, npay > 20%, roediluted > 15%
-调用：screen_stocks 工具进行筛选
+## 重要提醒
+- 市值单位为元（100亿 = 10000000000）
+- 成交额单位为元（1亿 = 100000000）  
+- 百分比指标输入数值不带%号（如15%输入15）
+
+## 输出要求
+- 只输出符合StockCriteria格式的JSON对象
+- 不需要额外的解释说明
+- 确保JSON格式完全正确，避免序列化错误
         ";
+    }
+
+    /// <summary>
+    /// 加载新闻分析YAML功能
+    /// </summary>
+    private void LoadNewsAnalysisFunction()
+    {
+        try
+        {
+            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
+            if (File.Exists(yamlPath))
+            {
+                string yamlContent = File.ReadAllText(yamlPath);
+                var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+
+                var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
+
+                // 将功能添加到Kernel的插件中
+                var plugin = KernelPluginFactory.CreateFromFunctions("NewsAnalysis",
+                    "新闻分析转股票筛选功能",
+                    new[] { newsAnalysisFunction });
+
+                _newsAnalysisAgent!.Kernel.Plugins.Add(plugin);
+
+                _logger.LogInformation("成功加载新闻分析YAML功能");
+            }
+            else
+            {
+                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载新闻分析YAML功能失败");
+        }
+    }
+
+    /// <summary>
+    /// 加载新闻分析YAML功能到指定代理
+    /// </summary>
+    /// <param name="agent"></param>
+    private void LoadNewsAnalysisFunction(ChatCompletionAgent agent)
+    {
+        try
+        {
+            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
+            if (File.Exists(yamlPath))
+            {
+                string yamlContent = File.ReadAllText(yamlPath);
+                var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+
+                var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
+
+                // 将功能添加到指定代理的插件中
+                var plugin = KernelPluginFactory.CreateFromFunctions("NewsAnalysis",
+                    "新闻分析转股票筛选功能",
+                    new[] { newsAnalysisFunction });
+
+                agent.Kernel.Plugins.Add(plugin);
+
+                _logger.LogInformation("成功加载新闻分析YAML功能到代理: {AgentName}", agent.Name);
+            }
+            else
+            {
+                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载新闻分析YAML功能到代理失败: {AgentName}", agent.Name);
+        }
     }
 
     #endregion
@@ -548,6 +822,7 @@ public class StockSelectionManager : IDisposable
         {
             _newsAnalysisAgent = null;
             _userRequirementAgent = null;
+            _requirementTranslateAgent = null;
             _disposed = true;
         }
     }

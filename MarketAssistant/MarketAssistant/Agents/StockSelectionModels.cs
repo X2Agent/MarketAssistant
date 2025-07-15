@@ -117,11 +117,6 @@ public class NewsBasedSelectionRequest
     /// 最大推荐股票数量
     /// </summary>
     public int MaxRecommendations { get; set; } = 10;
-
-    /// <summary>
-    /// 最低热度评分
-    /// </summary>
-    public float MinHotspotScore { get; set; } = 60;
 }
 
 /// <summary>

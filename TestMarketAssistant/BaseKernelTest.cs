@@ -48,6 +48,8 @@ public class BaseKernelTest
         // Add filters with logging.
         builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
         builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
+        builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
+
         builder.Services.AddSingleton<PlaywrightService>();
         builder.Services.AddSingleton<StockSelectionManager>();
         builder.Services.AddHttpClient();
@@ -57,7 +59,7 @@ public class BaseKernelTest
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-32B";//"moonshotai/Kimi-K2-Instruct";
+        var modelId = "Qwen/Qwen3-235B-A22B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -99,7 +101,6 @@ public class BaseKernelTest
             .AddFromType<StockNewsPlugin>()
             .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
-            .AddFromType<TimePlugin>()
             .AddFromType<TextPlugin>();
 
         builder.Services.AddSqliteVectorStore(_ => "Data Source=:memory:");
