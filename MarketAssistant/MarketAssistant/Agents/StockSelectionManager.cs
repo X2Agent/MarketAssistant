@@ -17,7 +17,6 @@ public class StockSelectionManager : IDisposable
     private readonly ILogger<StockSelectionManager> _logger;
     private ChatCompletionAgent? _newsAnalysisAgent;
     private ChatCompletionAgent? _userRequirementAgent;
-    private ChatCompletionAgent? _requirementTranslateAgent;
     private bool _disposed = false;
 
     public StockSelectionManager(Kernel kernel, ILogger<StockSelectionManager> logger)
@@ -116,47 +115,6 @@ public class StockSelectionManager : IDisposable
         }
     }
 
-    /// <summary>
-    /// 需求转换代理
-    /// 将用户的文字需求转换为StockCriteria JSON格式
-    /// </summary>
-    /// <param name="cancellationToken"></param>
-    /// <returns></returns>
-    private ChatCompletionAgent GetRequirementTranslateAgent(CancellationToken cancellationToken = default)
-    {
-        if (_requirementTranslateAgent != null)
-        {
-            return _requirementTranslateAgent;
-        }
-        try
-        {
-            _logger.LogInformation("创建需求转换代理");
-
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                ResponseFormat = "json_object",
-                Temperature = 0.1,
-                MaxTokens = 2000
-            };
-
-            _requirementTranslateAgent = new ChatCompletionAgent()
-            {
-                Name = "RequirementTranslateAgent",
-                Description = "需求转换专家，将用户需求转换为StockCriteria JSON格式",
-                Instructions = GetRequirementTranslateInstructions(),
-                Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings)
-            };
-            _logger.LogInformation("需求转换代理创建成功");
-            return _requirementTranslateAgent;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "创建需求转换代理失败");
-            throw;
-        }
-    }
-
     #endregion
 
     #region AI分析功能
@@ -173,17 +131,33 @@ public class StockSelectionManager : IDisposable
             _logger.LogInformation("开始用户需求分析");
 
             // 第一步：将用户需求转换为StockCriteria JSON格式
-            var translateChatHistory = new ChatHistory();
-            var translatePrompt = $"用户需求：{request.UserRequirements}";
-            translateChatHistory.AddUserMessage(translatePrompt);
-
-            var translateAgent = GetRequirementTranslateAgent(cancellationToken);
-            string criteriaJson = "";
-
-            await foreach (var item in translateAgent.InvokeAsync(translateChatHistory, cancellationToken: cancellationToken))
+            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "user_requirement_to_stock_criteria.yaml");
+            if (!File.Exists(yamlPath))
             {
-                criteriaJson += item.Message?.Content ?? "";
+                _logger.LogWarning("用户需求分析YAML文件不存在: {YamlPath}", yamlPath);
+                throw new Exception("用户需求分析YAML文件不存在，请检查配置。");
             }
+
+            string yamlContent = File.ReadAllText(yamlPath);
+            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+
+            var requirementAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
+
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+                ResponseFormat = "json_object",
+                Temperature = 0.1,
+                MaxTokens = 2000
+            };
+
+            var criteriaResult = await requirementAnalysisFunction.InvokeAsync(_kernel, new KernelArguments(promptExecutionSettings)
+            {
+                ["user_requirements"] = request.UserRequirements,
+                ["limit"] = request.MaxRecommendations
+            });
+
+            string criteriaJson = criteriaResult?.GetValue<string>() ?? "";
 
             _logger.LogInformation("需求转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
 
@@ -252,7 +226,7 @@ public class StockSelectionManager : IDisposable
             });
 
 
-            string criteriaJson = criteriaResult!.GetValue<string>();
+            string criteriaJson = criteriaResult?.GetValue<string>() ?? "";
 
             _logger.LogInformation("新闻转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
 
@@ -556,256 +530,6 @@ public class StockSelectionManager : IDisposable
         ";
     }
 
-    /// <summary>
-    /// 获取需求转换指令
-    /// </summary>
-    private string GetRequirementTranslateInstructions()
-    {
-        return @"
-你是一个专业的需求转换助手，负责将用户的文字需求转换为标准的StockCriteria JSON格式。
-
-## 主要任务
-分析用户需求，生成符合StockCriteria格式的JSON对象，包含具体的筛选条件。
-
-## 需求转换规则
-
-### 市值类别
-- 大盘股/蓝筹股 → mc >= 100000000000
-- 中盘股 → mc: 10000000000-100000000000  
-- 小盘股 → mc < 10000000000
-- 市值X亿以上 → mc >= X*100000000
-
-### 估值指标
-- 价值股/低估值/便宜 → pettm < 15, pb < 2
-- 成长股/高成长 → npay > 20, oiy > 15
-- 高ROE/盈利能力强 → roediluted > 15
-- 低市盈率 → pettm < 20
-- 低市净率 → pb < 3
-- 市盈率X倍以下 → pettm < X
-- 市净率X倍以下 → pb < X
-
-### 财务表现
-- 业绩好/盈利增长 → npay > 10
-- 营收增长 → oiy > 10
-- 高股息/分红股 → dy_l > 2
-- 每股净资产高 → bps > 10
-- 净利润增长X%以上 → npay > X
-- 营收增长X%以上 → oiy > X
-- 股息率X%以上 → dy_l > X
-
-### 市场表现
-- 活跃股/成交活跃 → amount > 100000000, tr > 2
-- 强势股 → pct60 > 20
-- 近期涨幅大 → pct20 > 10
-- 抗跌股 → pct20 > -5
-- 近X日涨幅大于Y% → pctX > Y
-- 成交额X亿以上 → amount > X*100000000
-- 换手率X%以上 → tr > X
-
-### 价格相关
-- 股价X元以下 → current < X
-- 股价X元以上 → current > X
-- 低价股 → current < 10
-- 中价股 → current: 10-50
-- 高价股 → current > 50
-
-## 支持的筛选指标
-
-### 基本指标 (basic) - 15个
-- mc: 总市值
-- fmc: 流通市值
-- pettm: 市盈率TTM
-- pelyr: 市盈率LYR
-- pb: 市净率MRQ
-- psr: 市销率(倍)
-- roediluted: 净资产收益率
-- bps: 每股净资产
-- eps: 每股收益
-- netprofit: 净利润
-- total_revenue: 营业收入
-- dy_l: 股息收益率
-- npay: 净利润同比增长
-- oiy: 营业收入同比增长
-- niota: 总资产报酬率
-
-### 行情指标 (market) - 14个
-- current: 当前价
-- pct: 当日涨跌幅
-- pct5: 近5日涨跌幅
-- pct10: 近10日涨跌幅
-- pct20: 近20日涨跌幅
-- pct60: 近60日涨跌幅
-- pct120: 近120日涨跌幅
-- pct250: 近250日涨跌幅
-- pct_current_year: 年初至今涨跌幅
-- amount: 当日成交额
-- volume: 本日成交量
-- volume_ratio: 当日量比
-- tr: 当日换手率
-- chgpct: 当日振幅
-
-### 雪球指标 (snowball) - 9个
-- follow: 累计关注人数
-- tweet: 累计讨论次数
-- deal: 累计交易分享数
-- follow7d: 一周新增关注
-- tweet7d: 一周新增讨论数
-- deal7d: 一周新增交易分享数
-- follow7dpct: 一周关注增长率
-- tweet7dpct: 一周讨论增长率
-- deal7dpct: 一周交易分享增长率
-
-## 输出示例
-
-### 示例1：筛选大盘蓝筹股，高ROE，低估值
-用户需求：推荐一些大盘蓝筹股，要求ROE高于15%，市盈率低于20倍
-输出StockCriteria的JSON格式：
-{
-  ""criteria"": [
-    {
-      ""code"": ""mc"",
-      ""displayName"": ""总市值"",
-      ""minValue"": 100000000000,
-      ""maxValue"": null
-    },
-    {
-      ""code"": ""roediluted"",
-      ""displayName"": ""净资产收益率"",
-      ""minValue"": 15,
-      ""maxValue"": null
-    },
-    {
-      ""code"": ""pettm"",
-      ""displayName"": ""市盈率TTM"",
-      ""minValue"": null,
-      ""maxValue"": 20
-    }
-  ],
-  ""market"": ""全部A股"",
-  ""industry"": ""全部"",
-  ""limit"": 20
-}
-
-### 示例2：筛选活跃的低价股
-用户需求：股价10元以下，成交额1亿以上，换手率3%以上
-输出StockCriteria的JSON格式：
-{
-  ""criteria"": [
-    {
-      ""code"": ""current"",
-      ""displayName"": ""当前价"",
-      ""minValue"": null,
-      ""maxValue"": 10
-    },
-    {
-      ""code"": ""amount"",
-      ""displayName"": ""当日成交额"",
-      ""minValue"": 100000000,
-      ""maxValue"": null
-    },
-    {
-      ""code"": ""tr"",
-      ""displayName"": ""当日换手率"",
-      ""minValue"": 3,
-      ""maxValue"": null
-    }
-  ],
-  ""market"": ""全部A股"",
-  ""industry"": ""全部"",
-  ""limit"": 20
-}
-
-## JSON格式要求
-1. 所有字段名必须用双引号包围
-2. 字符串值用双引号，数值不用引号，null值不用引号
-3. 数组最后一个元素后不能有逗号
-4. minValue或maxValue为空时使用null，不是空字符串
-6. market字段常用值：全部A股、沪市A股、深市A股
-7. industry字段常用值：全部、科技、金融、医药、消费、制造业等
-
-## 重要提醒
-- 市值单位为元（100亿 = 10000000000）
-- 成交额单位为元（1亿 = 100000000）  
-- 百分比指标输入数值不带%号（如15%输入15）
-
-## 输出要求
-- 只输出符合StockCriteria格式的JSON对象
-- 不需要额外的解释说明
-- 确保JSON格式完全正确，避免序列化错误
-        ";
-    }
-
-    /// <summary>
-    /// 加载新闻分析YAML功能
-    /// </summary>
-    private void LoadNewsAnalysisFunction()
-    {
-        try
-        {
-            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
-            if (File.Exists(yamlPath))
-            {
-                string yamlContent = File.ReadAllText(yamlPath);
-                var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-                var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
-
-                // 将功能添加到Kernel的插件中
-                var plugin = KernelPluginFactory.CreateFromFunctions("NewsAnalysis",
-                    "新闻分析转股票筛选功能",
-                    new[] { newsAnalysisFunction });
-
-                _newsAnalysisAgent!.Kernel.Plugins.Add(plugin);
-
-                _logger.LogInformation("成功加载新闻分析YAML功能");
-            }
-            else
-            {
-                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载新闻分析YAML功能失败");
-        }
-    }
-
-    /// <summary>
-    /// 加载新闻分析YAML功能到指定代理
-    /// </summary>
-    /// <param name="agent"></param>
-    private void LoadNewsAnalysisFunction(ChatCompletionAgent agent)
-    {
-        try
-        {
-            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
-            if (File.Exists(yamlPath))
-            {
-                string yamlContent = File.ReadAllText(yamlPath);
-                var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-                var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
-
-                // 将功能添加到指定代理的插件中
-                var plugin = KernelPluginFactory.CreateFromFunctions("NewsAnalysis",
-                    "新闻分析转股票筛选功能",
-                    new[] { newsAnalysisFunction });
-
-                agent.Kernel.Plugins.Add(plugin);
-
-                _logger.LogInformation("成功加载新闻分析YAML功能到代理: {AgentName}", agent.Name);
-            }
-            else
-            {
-                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载新闻分析YAML功能到代理失败: {AgentName}", agent.Name);
-        }
-    }
-
     #endregion
 
     #region 资源管理
@@ -822,7 +546,6 @@ public class StockSelectionManager : IDisposable
         {
             _newsAnalysisAgent = null;
             _userRequirementAgent = null;
-            _requirementTranslateAgent = null;
             _disposed = true;
         }
     }

@@ -17,7 +17,7 @@ public partial class StockSelectionPage : ContentPage
     {
         base.OnAppearing();
 
-        // 页面出现时聚焦到需求输入框
-        RequirementsEditor.Focus();
+        // 页面出现时聚焦到内容输入框
+        ContentEditor.Focus();
     }
 }

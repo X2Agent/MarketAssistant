@@ -1,6 +1,5 @@
 using MarketAssistant.Agents;
 using Microsoft.Extensions.Logging;
-using System.Text;
 
 namespace MarketAssistant.Infrastructure;
 
@@ -61,9 +60,9 @@ public class StockSelectionService : IDisposable
     }
 
     /// <summary>
-    /// 功能2: 根据热点新闻推荐股票
+    /// 功能2: 根据新闻推荐股票
     /// </summary>
-    public async Task<StockSelectionResult> RecommendStocksByNewsHotspotAsync(
+    public async Task<StockSelectionResult> RecommendStocksByNewsAsync(
         NewsBasedSelectionRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -100,7 +99,7 @@ public class StockSelectionService : IDisposable
     /// <summary>
     /// 功能4: 快速选股（预设策略）
     /// </summary>
-    public async Task<string> QuickSelectAsync(
+    public async Task<StockSelectionResult> QuickSelectAsync(
         QuickSelectionStrategy strategy,
         CancellationToken cancellationToken = default)
     {
@@ -114,13 +113,10 @@ public class StockSelectionService : IDisposable
             // 调用用户需求分析
             var result = await RecommendStocksByUserRequirementAsync(request, cancellationToken);
 
-            // 业务逻辑：格式化输出
-            var formattedResult = FormatQuickSelectionResult(result, strategy);
-
             _logger.LogInformation("快速选股完成，策略: {Strategy}，结果长度: {Length}",
-                strategy, formattedResult.Length);
+                strategy, result.Recommendations.Count);
 
-            return formattedResult;
+            return result;
         }
         catch (Exception ex)
         {
@@ -248,12 +244,6 @@ public class StockSelectionService : IDisposable
                 .ToList();
         }
 
-        // 业务逻辑：限制推荐数量
-        if (result.Recommendations.Count > 10)
-        {
-            result.Recommendations = result.Recommendations.Take(10).ToList();
-        }
-
         return result;
     }
 
@@ -306,42 +296,6 @@ public class StockSelectionService : IDisposable
             UserRequirements = requirements,
             RiskPreference = riskPreference
         };
-    }
-
-    /// <summary>
-    /// 格式化快速选股结果
-    /// </summary>
-    private string FormatQuickSelectionResult(StockSelectionResult result, QuickSelectionStrategy strategy)
-    {
-        var output = new StringBuilder();
-        output.AppendLine($"=== {GetStrategyName(strategy)} 分析结果 ===\n");
-
-        output.AppendLine($"📊 **分析摘要**");
-        output.AppendLine($"   推荐股票数量: {result.Recommendations.Count}只");
-        output.AppendLine($"   分析置信度: {result.ConfidenceScore:F1}%\n");
-
-        if (result.Recommendations.Any())
-        {
-            output.AppendLine("📈 **推荐股票列表**");
-            for (int i = 0; i < result.Recommendations.Count; i++)
-            {
-                var stock = result.Recommendations[i];
-                output.AppendLine($"   {i + 1}. {stock.Name} ({stock.Symbol})");
-                output.AppendLine($"      推荐理由: {stock.Reason}");
-                output.AppendLine($"      风险等级: {stock.RiskLevel}");
-                if (stock.ExpectedReturn.HasValue)
-                {
-                    output.AppendLine($"      预期收益: {stock.ExpectedReturn:F1}%");
-                }
-                output.AppendLine();
-            }
-        }
-
-        output.AppendLine("⚠️ **风险提示**");
-        output.AppendLine("   以上分析仅供参考，不构成投资建议。");
-        output.AppendLine("   投资有风险，请根据个人风险承受能力谨慎决策。");
-
-        return output.ToString();
     }
 
     /// <summary>

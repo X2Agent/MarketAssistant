@@ -101,6 +101,11 @@ public class StockRecommendationRequest
     /// 排除行业
     /// </summary>
     public List<string> ExcludedSectors { get; set; } = new();
+
+    /// <summary>
+    /// 最大推荐股票数量
+    /// </summary>
+    public int MaxRecommendations { get; set; } = 10;
 }
 
 /// <summary>

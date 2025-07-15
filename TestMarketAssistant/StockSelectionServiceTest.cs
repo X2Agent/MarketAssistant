@@ -139,7 +139,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         };
 
         // Act
-        var result = await _stockSelectionService.RecommendStocksByNewsHotspotAsync(request);
+        var result = await _stockSelectionService.RecommendStocksByNewsAsync(request);
 
         // Assert
         Assert.IsNotNull(result);
@@ -163,7 +163,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     public async Task TestStockSelectionService_RecommendStocksByNewsHotspotAsync_WithNullRequest_ShouldUseDefaultRequest()
     {
         // Act
-        var result = await _stockSelectionService.RecommendStocksByNewsHotspotAsync(null!);
+        var result = await _stockSelectionService.RecommendStocksByNewsAsync(null!);
 
         // Assert
         Assert.IsNotNull(result);
@@ -186,13 +186,15 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
-        Assert.IsTrue(result.Contains("价值股筛选"));
-        Assert.IsTrue(result.Contains("分析结果"));
-        Assert.IsTrue(result.Contains("风险提示"));
+        Assert.IsNotNull(result.Recommendations);
+        Assert.IsTrue(result.Recommendations.Count >= 0);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
+        Assert.AreEqual("user_request", result.SelectionType);
 
         Console.WriteLine($"=== 价值股快速选股测试结果 ===");
-        Console.WriteLine(result.Substring(0, Math.Min(200, result.Length)) + "...");
+        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
+        Console.WriteLine($"分析摘要: {result.AnalysisSummary.Substring(0, Math.Min(100, result.AnalysisSummary.Length))}...");
+        Console.WriteLine($"置信度: {result.ConfidenceScore}%");
     }
 
     [TestMethod]
@@ -203,10 +205,13 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Contains("成长股筛选"));
+        Assert.IsNotNull(result.Recommendations);
+        Assert.IsTrue(result.Recommendations.Count >= 0);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
 
         Console.WriteLine($"=== 成长股快速选股测试结果 ===");
-        Console.WriteLine(result.Substring(0, Math.Min(200, result.Length)) + "...");
+        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
+        Console.WriteLine($"分析摘要: {result.AnalysisSummary.Substring(0, Math.Min(100, result.AnalysisSummary.Length))}...");
     }
 
     [TestMethod]
@@ -228,9 +233,10 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         {
             var result = await _stockSelectionService.QuickSelectAsync(strategy);
             Assert.IsNotNull(result);
-            Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+            Assert.IsNotNull(result.Recommendations);
+            Assert.IsTrue(result.Recommendations.Count >= 0);
 
-            Console.WriteLine($"策略 {strategy} 测试通过，结果长度: {result.Length}");
+            Console.WriteLine($"策略 {strategy} 测试通过，推荐股票数量: {result.Recommendations.Count}");
         }
     }
 
