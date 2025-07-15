@@ -1,5 +1,6 @@
 using MarketAssistant.Views.Models;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -46,8 +47,16 @@ public class AIAnalystDataParser : IAnalystDataParser
 
         try
         {
+            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
+            {
+                FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+                ResponseFormat = "json_object",
+                Temperature = 0.1,
+                MaxTokens = 4000
+            };
+
             // 设置AI解析参数
-            var arguments = new KernelArguments
+            var arguments = new KernelArguments(promptExecutionSettings)
             {
                 ["content"] = content
             };

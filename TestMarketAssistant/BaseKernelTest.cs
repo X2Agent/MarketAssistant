@@ -1,3 +1,4 @@
+using MarketAssistant.Agents;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
@@ -13,6 +14,9 @@ namespace TestMarketAssistant;
 public class BaseKernelTest
 {
     protected ILogger? _logger;
+    protected Kernel _kernel = null!;
+    protected IHttpClientFactory _httpClientFactory = null!;
+    protected IUserSettingService _userSettingService = null!;
 
     [TestInitialize]
     public void BaseInitialize()
@@ -23,6 +27,11 @@ public class BaseKernelTest
             builder.SetMinimumLevel(LogLevel.Debug);
         });
         _logger = loggerFactory.CreateLogger<BaseKernelTest>();
+
+        // 初始化测试所需的服务
+        _kernel = CreateKernelWithChatCompletion();
+        _httpClientFactory = _kernel.Services.GetRequiredService<IHttpClientFactory>();
+        _userSettingService = _kernel.Services.GetRequiredService<IUserSettingService>();
     }
 
     protected Kernel CreateKernelWithChatCompletion()
@@ -39,7 +48,10 @@ public class BaseKernelTest
         // Add filters with logging.
         builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
         builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
+        builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
+
         builder.Services.AddSingleton<PlaywrightService>();
+        builder.Services.AddSingleton<StockSelectionManager>();
         builder.Services.AddHttpClient();
 
         // 从环境变量获取ApiKey
@@ -47,7 +59,7 @@ public class BaseKernelTest
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-32B";
+        var modelId = "Qwen/Qwen3-235B-A22B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -87,8 +99,8 @@ public class BaseKernelTest
             .AddFromType<StockTechnicalPlugin>()
             .AddFromType<StockFinancialPlugin>()
             .AddFromType<StockNewsPlugin>()
+            .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
-            .AddFromType<TimePlugin>()
             .AddFromType<TextPlugin>();
 
         builder.Services.AddSqliteVectorStore(_ => "Data Source=:memory:");

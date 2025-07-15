@@ -89,6 +89,10 @@ namespace MarketAssistant
             builder.Services.AddSingleton<StockKLineService>();
             builder.Services.AddSingleton<StockSearchHistory>();
             builder.Services.AddSingleton<StockFavoriteService>();
+
+            // 注册AI选股相关服务
+            builder.Services.AddSingleton<StockSelectionManager>();
+            builder.Services.AddSingleton<StockSelectionService>();
             builder.Services.AddSingleton<IWindowsService, WindowsService>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
             builder.Services.AddSingleton<PlaywrightService>();
@@ -107,6 +111,7 @@ namespace MarketAssistant
             builder.Services.AddTransient<MCPServerConfigViewModel>();
             builder.Services.AddTransient<FavoritesViewModel>();
             builder.Services.AddTransient<AboutViewModel>();
+            builder.Services.AddTransient<StockSelectionViewModel>();
 
             builder.Services.AddSingleton<GlobalExceptionHandler>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();

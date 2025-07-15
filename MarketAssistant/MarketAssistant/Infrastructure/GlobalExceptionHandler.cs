@@ -106,8 +106,7 @@ public class GlobalExceptionHandler
         // 过滤掉一些常见的、不需要记录的异常
         return exception is not (
             OperationCanceledException or
-            TaskCanceledException or
-            ObjectDisposedException
+            TaskCanceledException
         );
     }
 

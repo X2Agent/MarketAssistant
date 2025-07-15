@@ -7,12 +7,11 @@ namespace TestMarketAssistant;
 public class ChatCompletionTest : BaseKernelTest
 {
     IChatCompletionService _chatCompletionService;
-    Kernel _kernel;
 
     [TestInitialize]
     public void Initialize()
     {
-        _kernel = CreateKernelWithChatCompletion();
+        BaseInitialize(); // 调用基类初始化方法
         _chatCompletionService = _kernel.GetRequiredService<IChatCompletionService>();
     }
 

@@ -1,5 +1,4 @@
 using MarketAssistant.Views.Parsers;
-using Microsoft.SemanticKernel;
 
 namespace TestMarketAssistant;
 
@@ -10,13 +9,11 @@ namespace TestMarketAssistant;
 public class AIAnalystDataParserTest : BaseKernelTest
 {
     private IAnalystDataParser _aiParser;
-    private Kernel _kernel = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         BaseInitialize(); // 调用基类初始化方法
-        _kernel = CreateKernelWithChatCompletion();
         _aiParser = new AIAnalystDataParser(_kernel);
     }
 
