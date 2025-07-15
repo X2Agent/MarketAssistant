@@ -20,7 +20,7 @@ public static class ApplicationInfo
     /// <summary>
     /// 官方网站
     /// </summary>
-    public const string OfficialWebsite = "https://github.com/X2Agent/MarketAssistant";
+    public const string OfficialWebsite = "https://haoai.xyz/market-assistant.html";
 
     /// <summary>
     /// 更新日志地址

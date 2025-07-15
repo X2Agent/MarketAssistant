@@ -210,7 +210,7 @@
                         <Label Text="启用Web Search功能" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
                     </HorizontalStackLayout>
                     
-                    <!-- Web Search 服务商选择和API Key (放在同一行) -->
+                    <!-- Web Search 服务商选择和API Key -->
                     <VerticalStackLayout Spacing="8" IsEnabled="{Binding UserSetting.EnableWebSearch}">
                         <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
                             <VerticalStackLayout Grid.Column="0" Spacing="8">
