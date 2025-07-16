@@ -40,7 +40,7 @@ SiliconCloud为MarketAssistant提供了强大的大语言模型支持，本指�
 4. 若需获取股票数据，请前往 [智兔官网](https://www.zhituapi.com/) 注册并获取Token，然后在此处填写对应的Token
 5. 点击"保存"按钮
 
-![alt text](../../images/3.png)
+![alt text](../images/3.png)
 
 ### 步骤3: 验证配置
 1. 保存配置后，尝试进行一次股票分析
