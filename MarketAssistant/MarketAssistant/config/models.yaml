@@ -1,8 +1,8 @@
 # 支持的AI模型配置
 models:
-  - Tongyi-Zhiwen/QwenLong-L1-32B
   - Qwen/Qwen3-32B
   - Qwen/Qwen3-235B-A22B
+  - Tongyi-Zhiwen/QwenLong-L1-32B
   - deepseek-ai/DeepSeek-R1
   - deepseek-ai/DeepSeek-V3
   - THUDM/GLM-4-32B-0414
