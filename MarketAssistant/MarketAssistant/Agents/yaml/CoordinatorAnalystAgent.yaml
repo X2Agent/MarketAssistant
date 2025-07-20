@@ -48,11 +48,11 @@ input_variables:
   - name: history
     description: The conclusions of various analysts.
     is_required: true
-# execution_settings:
-#   default:
-#     temperature: 0.0
-#     top_p: 0.0
-#     top_k: 1
-#     function_choice_behavior:
-#       type: auto
-#       allow_strict_schema_adherence: true
+execution_settings:
+  default:
+    temperature: 0.1
+    top_p: 0.7
+    top_k: 5
+    function_choice_behavior:
+      type: auto
+      allow_strict_schema_adherence: true

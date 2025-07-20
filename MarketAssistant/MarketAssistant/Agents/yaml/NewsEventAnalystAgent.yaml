@@ -38,13 +38,13 @@ input_variables:
     is_required: true
 execution_settings:
   default:
-    temperature: 0.25
-    top_p: 0.25
-    top_k: 6
+    temperature: 0.3
+    top_p: 0.6
+    top_k: 10
     function_choice_behavior:
       allow_parallel_calls: false
       allow_concurrent_invocation: false
-      type: required
-      functions:
-        - StockNewsPlugin.GetNewsListAsync
-        - StockNewsPlugin.GetNewsContentAsync
+      type: auto
+      # functions:
+      #   - StockNewsPlugin.get_news_list
+      #   - StockNewsPlugin.get_news_content

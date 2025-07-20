@@ -40,8 +40,8 @@ input_variables:
     is_required: true
 execution_settings:
   default:
-    temperature: 0.3
-    top_p: 0.3
-    top_k: 8
+    temperature: 0.4
+    top_p: 0.7
+    top_k: 10
     function_choice_behavior:
       type: auto

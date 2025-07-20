@@ -9,7 +9,6 @@ using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Agents;
@@ -118,27 +117,12 @@ public class AnalystManager
         - 直接输出专业分析，无需询问
         ";
 
-        var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-        {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
-            {
-                AllowParallelCalls = false,
-                AllowStrictSchemaAdherence = false,
-                RetainArgumentTypes = true
-            }),
-            //TopP = 1
-        };
-
         ChatCompletionAgent chatCompletionAgent =
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
-                Kernel = _kernel,
-                // Provide default values for template parameters
-                Arguments = new KernelArguments(promptExecutionSettings)
-                {
-                    { "global_analysis_guidelines", globalGuidelines },
-                }
+                Kernel = _kernel
             };
+        chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
         return chatCompletionAgent;
     }
 

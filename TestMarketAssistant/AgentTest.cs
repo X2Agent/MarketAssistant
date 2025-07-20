@@ -1,7 +1,6 @@
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace TestMarketAssistant;
 
@@ -194,25 +193,13 @@ public class AgentTest : BaseKernelTest
         - 直接输出专业分析，无需询问
         ";
 
-        var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-        {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(options: new()
-            {
-                AllowParallelCalls = false,
-                AllowStrictSchemaAdherence = false,
-                RetainArgumentTypes = true
-            }),
-            //TopP = 1
-        };
         ChatCompletionAgent chatCompletionAgent =
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
-                Kernel = _kernel,
-                Arguments = new KernelArguments(promptExecutionSettings)
-                {
-                    { "global_analysis_guidelines", globalGuidelines },
-                }
+                Kernel = _kernel
             };
+
+        chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
 
         return chatCompletionAgent;
     }
