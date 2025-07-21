@@ -78,7 +78,30 @@
                    FontSize="20"
                    HorizontalOptions="Center"
                    Margin="0,0,0,8"/>
-            
+
+            <!-- 优雅的加载指示器 -->
+            <Border Style="{StaticResource CardStyle}" 
+                IsVisible="{Binding IsBusy}"
+                Margin="0,8">
+                <Grid Padding="20" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                    <ActivityIndicator Grid.Column="0"
+                           IsRunning="{Binding IsBusy}"
+                           Color="{StaticResource Primary}"
+                           WidthRequest="24"
+                           HeightRequest="24"
+                           VerticalOptions="Center"/>
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4">
+                        <Label Text="正在分析中..."
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                        <Label Text="AI正在为您精选优质股票，请稍候"
+                           FontSize="12"
+                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
             <!-- 智能选股输入区域 -->
             <Border Style="{StaticResource CardStyle}">
                 <VerticalStackLayout Spacing="12">
@@ -157,7 +180,7 @@
                     <Label Text="选择预设的选股策略，快速获得投资建议" 
                            FontSize="12" 
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
-                    
+
                     <CollectionView ItemsSource="{Binding QuickStrategies}"
                                     SelectionMode="None">
                         <CollectionView.ItemsLayout>
@@ -193,13 +216,7 @@
                     </CollectionView>
                 </VerticalStackLayout>
             </Border>
-
-            <!-- 加载指示器 -->
-            <ActivityIndicator IsVisible="{Binding IsBusy}" 
-                               IsRunning="{Binding IsBusy}"
-                               Color="{StaticResource Primary}"
-                               HeightRequest="40"/>
-
+            
             <!-- 选股结果显示区域 -->
             <Border Style="{StaticResource CardStyle}" 
                     IsVisible="{Binding HasResult}">

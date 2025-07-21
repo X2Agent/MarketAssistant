@@ -8,12 +8,6 @@
     
     <!-- 排除 Windows 项目的构建 -->
     <DefaultItemExcludes Condition="'$(OS)' != 'Windows_NT'">$(DefaultItemExcludes);**/*WinUI*/**</DefaultItemExcludes>
-    
-    <!-- 全局版本管理 -->
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <Version>1.0.0-beta.1</Version>
-    <InformationalVersion>1.0.0-beta.1</InformationalVersion>
   </PropertyGroup>
   
   <!-- 条件性排除 Windows 项目引用 -->
