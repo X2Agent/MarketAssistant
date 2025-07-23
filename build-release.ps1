@@ -1,15 +1,17 @@
-# MarketAssistant Build Script
-# Build Windows and macOS versions locally
+# MarketAssistant Build Script v2.0
+# Build optimized Windows and macOS versions locally
+# Features: Single-file builds, size optimization, automatic cleanup
 
 param(
     [string]$Platform = "All",  # All, Windows, macOS
     [string]$Configuration = "Release"
 )
 
-Write-Host "Starting MarketAssistant build..." -ForegroundColor Green
+Write-Host "🚀 MarketAssistant Build Script v2.0" -ForegroundColor Green
+Write-Host "Platform: $Platform | Configuration: $Configuration" -ForegroundColor Cyan
 
 # Check .NET and MAUI workload
-Write-Host "Checking .NET environment..." -ForegroundColor Yellow
+Write-Host "🔍 Checking prerequisites..." -ForegroundColor Yellow
 try {
     $dotnetVersion = dotnet --version
     Write-Host "✓ .NET version: $dotnetVersion" -ForegroundColor Green
@@ -38,22 +40,69 @@ if ($Platform -eq "All" -or $Platform -eq "Windows") {
     Write-Host "Building Windows version..." -ForegroundColor Yellow
     
     try {
+        # 使用框架依赖部署（推荐用于 WinUI 3 应用）
+        # 禁用多语言资源生成以减少包大小
         dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
-            -c $Configuration `
-            -f net9.0-windows10.0.19041.0 `
-            -p:Platform=x64 `
-            -p:PublishSingleFile=true `
-            -p:SelfContained=true `
-            -p:RuntimeIdentifier=win-x64 `
-            -o "$outputDir/Windows"
+             -c $Configuration `
+             -f net9.0-windows10.0.19041.0 `
+             -p:Platform=x64 `
+             -p:SelfContained=false `
+             -p:PublishReadyToRun=true `
+             -o "$outputDir/Windows"
             
         if ($LASTEXITCODE -eq 0) {
             Write-Host "✓ Windows build successful" -ForegroundColor Green
             
+            # 📊 显示构建前的大小
+            $buildSize = (Get-ChildItem -Path "$outputDir/Windows" -Recurse | Measure-Object -Property Length -Sum).Sum
+            Write-Host "🔍 Build size before optimization: $([math]::Round($buildSize/1MB, 2)) MB" -ForegroundColor Yellow
+            
+            # 🗑️ 清理不必要的文件来减少大小
+            Write-Host "🧹 Optimizing single-file build..." -ForegroundColor Yellow
+            $removedItems = 0
+            $savedSize = 0
+            
+            # 删除调试文件
+            $debugFiles = @("*.pdb", "*.xml", "*.deps.json")
+            foreach ($pattern in $debugFiles) {
+                $files = Get-ChildItem -Path "$outputDir/Windows" -Filter $pattern -Recurse
+                foreach ($file in $files) {
+                    $savedSize += $file.Length
+                    Remove-Item $file.FullName -Force
+                    $removedItems++
+                }
+            }
+            
+            # 删除本地化资源文件（如果不需要多语言支持）
+            $localePattern = @("*/af/*", "*/ar/*", "*/bg/*", "*/ca/*", "*/cs/*", "*/da/*", "*/de/*", "*/el/*", "*/es/*", "*/et/*", "*/eu/*", "*/fa/*", "*/fi/*", "*/fr/*", "*/gl/*", "*/he/*", "*/hi/*", "*/hr/*", "*/hu/*", "*/id/*", "*/it/*", "*/ja/*", "*/kk/*", "*/ko/*", "*/lt/*", "*/lv/*", "*/ms/*", "*/nb/*", "*/nl/*", "*/pl/*", "*/pt/*", "*/pt-BR/*", "*/ro/*", "*/ru/*", "*/sk/*", "*/sl/*", "*/sv/*", "*/th/*", "*/tr/*", "*/uk/*", "*/vi/*", "*/zh-Hans/*", "*/zh-Hant/*")
+            foreach ($pattern in $localePattern) {
+                $localeDirs = Get-ChildItem -Path "$outputDir/Windows" -Directory -Recurse | Where-Object { $_.FullName -like "*$($pattern.Replace('*/', ''))" }
+                foreach ($dir in $localeDirs) {
+                    $dirSize = (Get-ChildItem -Path $dir.FullName -Recurse | Measure-Object -Property Length -Sum).Sum
+                    $savedSize += $dirSize
+                    Remove-Item $dir.FullName -Recurse -Force
+                    $removedItems++
+                }
+            }
+            
+            # 📊 显示优化结果
+            $finalSize = (Get-ChildItem -Path "$outputDir/Windows" -Recurse | Measure-Object -Property Length -Sum).Sum
+            Write-Host "   ✓ Removed $removedItems items, saved $([math]::Round($savedSize/1MB, 2)) MB" -ForegroundColor Green
+            Write-Host "   ✓ Final size: $([math]::Round($finalSize/1MB, 2)) MB" -ForegroundColor Green
+            
+            # 检查是否有单个可执行文件
+            $exeFile = Get-ChildItem -Path "$outputDir/Windows" -Filter "*.exe" | Select-Object -First 1
+            if ($exeFile) {
+                Write-Host "   ✓ Single executable: $($exeFile.Name) ($([math]::Round($exeFile.Length/1MB, 2)) MB)" -ForegroundColor Green
+            }
+            
             # Create ZIP package
+            Write-Host "📦 Creating ZIP package..." -ForegroundColor Yellow
             $zipPath = "$outputDir/MarketAssistant-Windows-x64.zip"
             Compress-Archive -Path "$outputDir/Windows/*" -DestinationPath $zipPath -Force
-            Write-Host "✓ Windows ZIP created: $zipPath" -ForegroundColor Green
+            $zipSize = (Get-Item $zipPath).Length
+            Write-Host "✓ Windows ZIP created: ./Release/MarketAssistant-Windows-x64.zip" -ForegroundColor Green
+            Write-Host "   ZIP size: $([math]::Round($zipSize/1MB, 2)) MB" -ForegroundColor Green
         } else {
             Write-Host "✗ Windows build failed" -ForegroundColor Red
         }
@@ -107,5 +156,26 @@ if ($Platform -eq "All" -or $Platform -eq "macOS") {
     }
 }
 
-Write-Host "Build completed! Output directory: $outputDir" -ForegroundColor Green
+Write-Host "🎉 Build process completed!" -ForegroundColor Green
+Write-Host "📁 Output directory: $outputDir" -ForegroundColor Cyan
+
+# 📊 显示最终文件统计
+if (Test-Path "$outputDir") {
+    Write-Host "📋 Generated files:" -ForegroundColor Cyan
+    $allFiles = Get-ChildItem -Path "$outputDir" -File -Recurse
+    $totalSize = 0
+    foreach ($file in $allFiles) {
+        if ($file.Extension -eq ".zip" -or $file.Extension -eq ".exe" -or $file.Extension -eq ".dmg") {
+            Write-Host "   📦 $($file.Name) ($([math]::Round($file.Length/1MB, 2)) MB)" -ForegroundColor Yellow
+            $totalSize += $file.Length
+        }
+    }
+    Write-Host "📊 Total output size: $([math]::Round($totalSize/1MB, 2)) MB" -ForegroundColor Green
+}
+
+Write-Host "`n📈 Build Summary:" -ForegroundColor Cyan
+Write-Host "   Platform: $Platform" -ForegroundColor White
+Write-Host "   Configuration: $Configuration" -ForegroundColor White
+Write-Host "   Build Time: $(Get-Date -Format 'MM/dd/yyyy HH:mm:ss')" -ForegroundColor White
+
 Write-Host "`nUsage:" -ForegroundColor Cyan
