@@ -1,5 +1,5 @@
 name: Build and Release
-
+# 脚本能优化吗，加快发布速度
 permissions:
   contents: write
 
