@@ -70,7 +70,6 @@ jobs:
           dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
             -c ${{ env.BUILD_CONFIGURATION }} `
             -f net9.0-windows10.0.19041.0 `
-            -r win-x64 `
             -p:Platform=x64 `
             -p:SelfContained=false `
             -p:PublishReadyToRun=true `
