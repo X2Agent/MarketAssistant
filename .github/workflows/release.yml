@@ -87,10 +87,10 @@ jobs:
         run: |
           # 创建安装包目录
           New-Item -ItemType Directory -Force -Path "./installer/windows"
-          
+
           # 复制文件
           Copy-Item -Path "./publish/windows/*" -Destination "./installer/windows/" -Recurse
-          
+
           # 创建安装脚本
           @'
           @echo off
@@ -100,7 +100,7 @@ jobs:
           echo Installation completed!
           pause
           '@ | Out-File -FilePath "./installer/windows/install.bat" -Encoding ASCII
-          
+
           # 使用更快的压缩方式
           Compress-Archive -Path "./installer/windows/*" -DestinationPath "./MarketAssistant-Windows-x64.zip" -CompressionLevel Optimal
 
@@ -114,6 +114,7 @@ jobs:
   # 并行构建macOS版本
   build-macos:
     runs-on: macos-14
+
     strategy:
       matrix:
         platform: [x64]
@@ -169,6 +170,11 @@ jobs:
           NUGET_XMLDOC_MODE: skip
           EnableWindowsTargeting: false
         run: |
+          # 显示项目信息
+          echo "Building macOS app..."
+          dotnet --info
+
+          # 执行构建
           dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj \
             -c ${{ env.BUILD_CONFIGURATION }} \
             -f net9.0-maccatalyst \
@@ -176,19 +182,23 @@ jobs:
             -p:CreatePackage=true \
             -p:EnableWindowsTargeting=false \
             -p:TargetPlatformIdentifier=maccatalyst \
-            -p:MacCatalystVersion=17.5 \
             -p:SupportedOSPlatformVersion=15.0 \
             -p:DebugType=None \
             -p:DebugSymbols=false \
+            -p:SelfContained=false \
             --no-restore \
-            --verbosity minimal \
+            --verbosity normal \
             -o ./publish/macos
+            
+          # 显示构建结果
+          echo "Build completed. Contents of publish directory:"
+          ls -la ./publish/macos
 
       - name: Create macOS package
         run: |
           # 查找生成的 .app 文件
           APP_PATH=$(find ./publish/macos -name "*.app" -type d | head -1)
-          
+
           if [ -n "$APP_PATH" ]; then
             echo "Found app at: $APP_PATH"
             
@@ -223,7 +233,7 @@ jobs:
     # 修改依赖关系：总是运行，但需要至少一个构建job完成
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && (success() || failure())
+    if: (success() || failure()) && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Download Windows artifact
@@ -240,56 +250,114 @@ jobs:
           path: ./macos-artifacts
         continue-on-error: true
 
+      - name: Debug - List all artifacts
+        run: |
+          echo "=== Debugging artifact download ==="
+          echo "Current directory contents:"
+          ls -la ./
+
+          echo "Windows artifacts directory:"
+          if [ -d "./windows-artifacts" ]; then
+            ls -la ./windows-artifacts/
+          else
+            echo "Windows artifacts directory not found"
+          fi
+
+          echo "macOS artifacts directory:"
+          if [ -d "./macos-artifacts" ]; then
+            ls -la ./macos-artifacts/
+          else
+            echo "macOS artifacts directory not found"
+          fi
+
       - name: Prepare release assets
         run: |
           echo "Preparing release assets..."
-          
+
+          # 创建发布目录
+          mkdir -p ./release-assets
+
           # 检查Windows构建结果
+          WINDOWS_SUCCESS=false
           if [ -d "./windows-artifacts" ] && [ -f "./windows-artifacts/MarketAssistant-Windows-x64.zip" ]; then
-            cp ./windows-artifacts/MarketAssistant-Windows-x64.zip ./MarketAssistant-Windows-x64.zip
+            cp ./windows-artifacts/MarketAssistant-Windows-x64.zip ./release-assets/
             echo "✅ Windows artifact prepared"
             WINDOWS_SUCCESS=true
           else
             echo "❌ Windows build artifact not found"
-            WINDOWS_SUCCESS=false
           fi
-          
+
           # 检查macOS构建结果
           MACOS_SUCCESS=false
           if [ -d "./macos-artifacts" ]; then
             if [ -f "./macos-artifacts/MarketAssistant-macOS.dmg" ]; then
-              cp ./macos-artifacts/MarketAssistant-macOS.dmg ./MarketAssistant-macOS.dmg
+              cp ./macos-artifacts/MarketAssistant-macOS.dmg ./release-assets/
               echo "✅ macOS DMG prepared"
               MACOS_SUCCESS=true
             fi
             if [ -f "./macos-artifacts/MarketAssistant-macOS.zip" ]; then
-              cp ./macos-artifacts/MarketAssistant-macOS.zip ./MarketAssistant-macOS.zip
+              cp ./macos-artifacts/MarketAssistant-macOS.zip ./release-assets/
               echo "✅ macOS ZIP prepared"
               MACOS_SUCCESS=true
             fi
           fi
-          
+
           if [ "$MACOS_SUCCESS" = false ]; then
             echo "⚠️ macOS build artifact not found - will proceed with available platforms"
           fi
-          
+
           # 至少需要一个平台成功
           if [ "$WINDOWS_SUCCESS" = false ] && [ "$MACOS_SUCCESS" = false ]; then
             echo "❌ No build artifacts found - release cannot proceed"
             exit 1
           fi
-          
+
           echo "📦 Release will proceed with available platforms:"
           [ "$WINDOWS_SUCCESS" = true ] && echo "  - Windows ✅"
           [ "$MACOS_SUCCESS" = true ] && echo "  - macOS ✅"
 
+          # 列出实际可用的文件
+          echo "📋 Available release files:"
+          ls -la ./release-assets/
+
       - name: Upload release assets
-        uses: softprops/action-gh-release@v1
+        run: |
+          echo "=== Preparing files for release ==="
+
+          # 检查文件是否存在
+          if [ -d "./release-assets" ]; then
+            echo "Release assets directory contents:"
+            ls -la ./release-assets/
+            
+            # 收集所有文件到一个数组
+            FILES=""
+            for file in ./release-assets/*; do
+              if [ -f "$file" ]; then
+                FILES="$FILES$file\n"
+                echo "Found file: $file"
+              fi
+            done
+            
+            if [ -n "$FILES" ]; then
+              echo "Files ready for upload:"
+              echo -e "$FILES"
+            else
+              echo "No files found in release-assets directory"
+              exit 1
+            fi
+          else
+            echo "Release assets directory not found"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ./MarketAssistant-Windows-x64.zip
-            ./MarketAssistant-macOS.dmg
-            ./MarketAssistant-macOS.zip
+          files: ./release-assets/*
           fail_on_unmatched_files: false
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: false
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.run_number) || github.ref_name }}
+          name: ${{ github.event_name == 'workflow_dispatch' && format('Release v{0}', github.run_number) || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
