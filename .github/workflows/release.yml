@@ -59,19 +59,18 @@ jobs:
 
       # 恢复依赖
       - name: Restore dependencies
-        run: dotnet restore MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj --verbosity minimal
+        run: dotnet restore MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj --runtime win-x64 --verbosity minimal
 
       # 优化构建配置
       - name: Build Windows app
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: 1
+          NUGET_XMLDOC_MODE: skip
         run: |
-          # 设置环境变量优化构建性能
-          $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
-          $env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
-          $env:NUGET_XMLDOC_MODE = "skip"
-          
           dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
             -c ${{ env.BUILD_CONFIGURATION }} `
             -f net9.0-windows10.0.19041.0 `
+            -r win-x64 `
             -p:Platform=x64 `
             -p:SelfContained=false `
             -p:PublishReadyToRun=true `
@@ -153,31 +152,28 @@ jobs:
             ${{ runner.os }}-maui-workload-
 
       - name: Install MAUI workload
-        run: |
-          export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-          export DOTNET_CLI_TELEMETRY_OPTOUT=1
-          export NUGET_XMLDOC_MODE=skip
-          export EnableWindowsTargeting=false
-          
-          dotnet workload install maui-maccatalyst
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: 1
+          NUGET_XMLDOC_MODE: skip
+          EnableWindowsTargeting: false
+        run: dotnet workload install maui-maccatalyst
 
       - name: Restore dependencies
-        run: |
-          export EnableWindowsTargeting=false
-          dotnet restore MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj --verbosity minimal
+        env:
+          EnableWindowsTargeting: false
+        run: dotnet restore MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj --runtime maccatalyst-x64 --verbosity minimal
 
       - name: Build macOS app
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: 1
+          NUGET_XMLDOC_MODE: skip
+          EnableWindowsTargeting: false
         run: |
-          export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-          export DOTNET_CLI_TELEMETRY_OPTOUT=1
-          export NUGET_XMLDOC_MODE=skip
-          export EnableWindowsTargeting=false
-          
           dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj \
             -c ${{ env.BUILD_CONFIGURATION }} \
             -f net9.0-maccatalyst \
+            -r maccatalyst-x64 \
             -p:CreatePackage=true \
-            -p:RuntimeIdentifier=maccatalyst-x64 \
             -p:EnableWindowsTargeting=false \
             -p:TargetPlatformIdentifier=maccatalyst \
             -p:MacCatalystVersion=17.5 \
