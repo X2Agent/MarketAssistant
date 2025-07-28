@@ -28,6 +28,7 @@ public class AnalystManager
     private ConcurrentOrchestration _orchestration;
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
     private readonly VectorStore _vectorStore;
+    private readonly IKernelPluginConfig _kernelPluginConfig;
 
     private Action<ChatMessageContent>? _messageCallback;
 
@@ -44,13 +45,15 @@ public class AnalystManager
         ILogger<AnalystManager> logger,
         IUserSettingService userSettingService,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore)
+        VectorStore vectorStore,
+        IKernelPluginConfig kernelPluginConfig)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
         _embeddingGenerator = embeddingGenerator;
         _vectorStore = vectorStore;
+        _kernelPluginConfig = kernelPluginConfig;
 
         // 创建分析师及编排
         CreateAnalysts();
@@ -120,12 +123,15 @@ public class AnalystManager
         - 直接输出专业分析，无需询问
         ";
 
+        var kernel = _kernelPluginConfig.PluginConfig(_kernel, agent);
+
         ChatCompletionAgent chatCompletionAgent =
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
-                Kernel = _kernel
+                Kernel = kernel
             };
         chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
+
         return chatCompletionAgent;
     }
 
