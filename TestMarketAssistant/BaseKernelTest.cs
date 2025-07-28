@@ -57,6 +57,7 @@ public class BaseKernelTest
         // 从环境变量获取ApiKey
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is not set");
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
+        var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
 
         // 硬编码ModelId和Endpoint
         var modelId = "Qwen/Qwen3-235B-A22B";
@@ -79,7 +80,10 @@ public class BaseKernelTest
                     EnableMarketSentimentAnalyst = false,
                     EnableTechnicalAnalyst = false,
                     EnableNewsEventAnalyst = true
-                }
+                },
+                EnableWebSearch = true,
+                WebSearchApiKey = searchApiKey,
+                WebSearchProvider = "Tavily",
             };
             var userSettingServiceMock = new Mock<IUserSettingService>();
             userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);

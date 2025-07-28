@@ -1,10 +1,6 @@
 using MarketAssistant.Plugins;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Data;
 using Microsoft.SemanticKernel.Plugins.Core;
-using Microsoft.SemanticKernel.Plugins.Web.Bing;
-using Microsoft.SemanticKernel.Plugins.Web.Brave;
-using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace MarketAssistant.Infrastructure;
 
@@ -40,28 +36,6 @@ internal class UserSemanticKernelService(
            userSetting.ModelId,
            new Uri(userSetting.Endpoint),
            userSetting.ApiKey);
-
-        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
-        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
-        {
-            ITextSearch textSearch = null;
-            // 根据用户选择的搜索服务商添加相应的搜索服务
-            switch (userSetting.WebSearchProvider)
-            {
-                case "Bing":
-                    textSearch = new BingTextSearch(apiKey: userSetting.WebSearchApiKey);
-                    break;
-                case "Brave":
-                    textSearch = new BraveTextSearch(apiKey: userSetting.WebSearchApiKey);
-                    break;
-                case "Tavily":
-                    textSearch = new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey);
-                    break;
-            }
-
-            var searchPlugin = textSearch.CreateWithSearch("SearchPlugin");
-            builder.Plugins.Add(searchPlugin);
-        }
 
         builder.Plugins
             .AddFromType<StockBasicPlugin>()

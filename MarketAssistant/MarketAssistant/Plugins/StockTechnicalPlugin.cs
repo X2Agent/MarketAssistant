@@ -18,116 +18,55 @@ public sealed class StockTechnicalPlugin
         _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
     }
 
-    [KernelFunction("get_stock_kdj"), Description("获取最新日线KDJ")]
-    public async Task<StockKDJ> GetStockKDJAsync(string stockSymbol)
+    private string ConvertStockSymbol(string stockCode)
     {
-        try
+        // 提取所有数字字符
+        string digits = new string(stockCode.Where(char.IsDigit).ToArray());
+
+        // 解析交易所标识
+        string suffix = GetExchangeSuffix(digits);
+
+        return $"{digits}.{suffix}";
+
+        string GetExchangeSuffix(string digits)
         {
-            // 只保留 stockSymbol 中的数字部分
-            stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
+            // 沪市逻辑：60开头、688开头（科创板）、900开头（B股）
+            if (digits.StartsWith("60") ||
+                digits.StartsWith("688") ||
+                digits.StartsWith("900"))
+                return "SH";
 
-            var url = $"https://api.zhituapi.com/hs/latest/kdj/{stockSymbol}/d?token={_zhiTuToken}";
-
-            using var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<StockKDJ>(response);
-
-            if (info == null)
-            {
-                throw new Exception($"获取KDJ数据失败: 返回数据为空");
-            }
-
-            return info;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"处理KDJ数据时发生错误: {ex.Message}", ex);
+            // 深市逻辑（其他所有情况）：00开头、300开头（创业板）、200开头（B股）
+            return "SZ";
         }
     }
 
-    [KernelFunction("get_stock_macd"), Description("获取最新日线MACD")]
-    public async Task<StockMACD> GetStockMACDAsync(string stockSymbol)
+    private async Task<T> GetStockIndicatorAsync<T>(string indicator, string stockSymbol)
     {
-        try
-        {
+        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{ConvertStockSymbol(stockSymbol)}/d/n?token={_zhiTuToken}&lt=30";
+        using var httpClient = _httpClientFactory.CreateClient();
+        var response = await httpClient.GetStringAsync(url);
+        var items = JsonSerializer.Deserialize<List<T>>(response);
 
-            // 只保留 stockSymbol 中的数字部分
-            stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
+        if (items == null || !items.Any())
+            throw new Exception($"获取{indicator.ToUpper()}数据失败: 返回数据为空或无有效数据");
 
-            var url = $"https://api.zhituapi.com/hs/latest/macd/{stockSymbol}/d?token={_zhiTuToken}";
-
-            using var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<StockMACD>(response);
-
-            if (info == null)
-            {
-                throw new Exception($"获取MACD数据失败: 返回数据为空");
-            }
-
-            return info;
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"处理MACD数据时发生错误: {ex.Message}", ex);
-        }
+        return items.Last();
     }
 
-    //最新分时BOLL
-    [KernelFunction("get_stock_boll"), Description("获取最新日线BOLL")]
-    public async Task<StockBoll> GetStockBOLLAsync(string stockSymbol)
-    {
-        try
-        {
+    [KernelFunction("get_stock_kdj"), Description("获取近30日最新日线KDJ")]
+    public Task<StockKDJ> GetStockKDJAsync(string stockSymbol)
+    => GetStockIndicatorAsync<StockKDJ>("kdj", stockSymbol);
 
-            // 只保留 stockSymbol 中的数字部分
-            stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
+    [KernelFunction("get_stock_macd"), Description("获取近30日最新日线MACD")]
+    public Task<StockMACD> GetStockMACDAsync(string stockSymbol)
+        => GetStockIndicatorAsync<StockMACD>("macd", stockSymbol);
 
-            var url = $"https://api.zhituapi.com/hs/latest/boll/{stockSymbol}/d?token={_zhiTuToken}";
+    [KernelFunction("get_stock_boll"), Description("获取近30日最新日线BOLL")]
+    public Task<StockBoll> GetStockBOLLAsync(string stockSymbol)
+        => GetStockIndicatorAsync<StockBoll>("boll", stockSymbol);
 
-            using var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<StockBoll>(response);
-
-            if (info == null)
-            {
-                throw new Exception($"获取BOLL数据失败: 返回数据为空");
-            }
-
-            return info;
-        }
-        catch (Exception ex)
-        {
-
-            throw new Exception($"处理BOLL数据时发生错误: {ex.Message}", ex);
-        }
-    }
-
-    [KernelFunction("get_stock_ma"), Description("获取最新日线MA")]
-    public async Task<StockMA> GetStockMAAsync(string stockSymbol)
-    {
-        try
-        {
-            // 只保留 stockSymbol 中的数字部分
-            stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
-
-            var url = $"https://api.zhituapi.com/hs/latest/ma/{stockSymbol}/d?token={_zhiTuToken}";
-
-            using var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<StockMA>(response);
-
-            if (info == null)
-            {
-                throw new Exception($"获取MA数据失败: 返回数据为空");
-            }
-
-            return info;
-        }
-        catch (Exception ex)
-        {
-
-            throw new Exception($"处理MA数据时发生错误: {ex.Message}", ex);
-        }
-    }
+    [KernelFunction("get_stock_ma"), Description("获取近30日最新日线MA")]
+    public Task<StockMA> GetStockMAAsync(string stockSymbol)
+        => GetStockIndicatorAsync<StockMA>("ma", stockSymbol);
 }

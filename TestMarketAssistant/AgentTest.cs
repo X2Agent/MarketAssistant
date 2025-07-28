@@ -1,6 +1,11 @@
+using MarketAssistant.Infrastructure;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Data;
+using Microsoft.SemanticKernel.Plugins.Web.Bing;
+using Microsoft.SemanticKernel.Plugins.Web.Brave;
+using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace TestMarketAssistant;
 
@@ -194,12 +199,31 @@ public class AgentTest : BaseKernelTest
         ";
 
         ChatCompletionAgent chatCompletionAgent =
-            new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
-            {
-                Kernel = _kernel
-            };
+        new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
+        {
+            Kernel = _kernel
+        };
 
         chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
+        var userSettingService = _kernel.GetRequiredService<IUserSettingService>();
+        var userSetting = userSettingService.CurrentSetting;
+        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
+        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
+        {
+            // 根据用户选择的搜索服务商添加相应的搜索服务
+            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
+            {
+                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
+                _ => null
+            };
+            if (textSearch != null)
+            {
+                var searchPlugin = textSearch.CreateWithGetTextSearchResults("SearchPlugin");
+                chatCompletionAgent.Kernel.Plugins.Add(searchPlugin);
+            }
+        }
 
         return chatCompletionAgent;
     }
