@@ -3,6 +3,7 @@ using MarketAssistant.Plugins.Models;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
 using System.Text.Json;
+
 namespace MarketAssistant.Plugins;
 
 public sealed class StockBasicPlugin
