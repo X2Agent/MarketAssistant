@@ -14,17 +14,17 @@ public class StockBoll
     /// 上轨
     /// </summary>
     [JsonPropertyName("u")]
-    public decimal U { get; set; }
+    public decimal? U { get; set; }
 
     /// <summary>
     /// 下轨
     /// </summary>
     [JsonPropertyName("d")]
-    public decimal D { get; set; }
+    public decimal? D { get; set; }
 
     /// <summary>
     /// 中轨
     /// </summary>
     [JsonPropertyName("m")]
-    public decimal M { get; set; }
+    public decimal? M { get; set; }
 }

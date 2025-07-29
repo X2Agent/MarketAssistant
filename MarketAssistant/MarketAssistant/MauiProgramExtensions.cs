@@ -61,6 +61,7 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IUserSemanticKernelService, UserSemanticKernelService>();
             // 注册嵌入服务
             builder.Services.AddSingleton<IUserEmbeddingService, UserEmbeddingService>();
+            builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
             // 注册Kernel服务，从用户设置中动态创建
             builder.Services.AddSingleton(serviceProvider =>
@@ -89,13 +90,14 @@ namespace MarketAssistant
             builder.Services.AddSingleton<StockKLineService>();
             builder.Services.AddSingleton<StockSearchHistory>();
             builder.Services.AddSingleton<StockFavoriteService>();
+            builder.Services.AddSingleton<PlaywrightService>();
 
             // 注册AI选股相关服务
             builder.Services.AddSingleton<StockSelectionManager>();
             builder.Services.AddSingleton<StockSelectionService>();
             builder.Services.AddSingleton<IWindowsService, WindowsService>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
-            builder.Services.AddSingleton<PlaywrightService>();
+
             builder.Services.AddSingleton<GitHubReleaseService>();
 
             // 注册AI解析器

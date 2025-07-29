@@ -10,6 +10,9 @@ using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Data;
+using Microsoft.SemanticKernel.Plugins.Web.Bing;
+using Microsoft.SemanticKernel.Plugins.Web.Brave;
+using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace MarketAssistant.Agents;
 
@@ -25,6 +28,7 @@ public class AnalystManager
     private ConcurrentOrchestration _orchestration;
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
     private readonly VectorStore _vectorStore;
+    private readonly IKernelPluginConfig _kernelPluginConfig;
 
     private Action<ChatMessageContent>? _messageCallback;
 
@@ -41,13 +45,15 @@ public class AnalystManager
         ILogger<AnalystManager> logger,
         IUserSettingService userSettingService,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore)
+        VectorStore vectorStore,
+        IKernelPluginConfig kernelPluginConfig)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
         _embeddingGenerator = embeddingGenerator;
         _vectorStore = vectorStore;
+        _kernelPluginConfig = kernelPluginConfig;
 
         // 创建分析师及编排
         CreateAnalysts();
@@ -117,12 +123,15 @@ public class AnalystManager
         - 直接输出专业分析，无需询问
         ";
 
+        var kernel = _kernelPluginConfig.PluginConfig(_kernel, agent);
+
         ChatCompletionAgent chatCompletionAgent =
             new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
             {
-                Kernel = _kernel
+                Kernel = kernel
             };
         chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
+
         return chatCompletionAgent;
     }
 
@@ -161,6 +170,25 @@ public class AnalystManager
     public ChatCompletionAgent CreateCoordinatorAgent()
     {
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
+        var userSetting = _userSettingService.CurrentSetting;
+
+        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
+        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
+        {
+            // 根据用户选择的搜索服务商添加相应的搜索服务
+            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
+            {
+                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
+                _ => null
+            };
+            if (textSearch != null)
+            {
+                var searchPlugin = textSearch.CreateWithSearch("SearchPlugin");
+                coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
+            }
+        }
 
         if (_userSettingService.CurrentSetting.LoadKnowledge)
         {

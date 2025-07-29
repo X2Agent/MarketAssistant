@@ -47,7 +47,7 @@ namespace TestMarketAssistant
         [TestMethod]
         public async Task TestGetStockBOLLAsync()
         {
-            var result = await _stockTechnicalPlugin.GetStockBOLLAsync("sz002594");
+            var result = await _stockTechnicalPlugin.GetStockBOLLAsync("002594");
             Assert.IsNotNull(result);
         }
 

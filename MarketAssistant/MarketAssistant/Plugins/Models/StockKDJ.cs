@@ -14,17 +14,17 @@ public class StockKDJ
     /// K值
     /// </summary>
     [JsonPropertyName("k")]
-    public decimal K { get; set; }
+    public decimal? K { get; set; }
 
     /// <summary>
     /// D值
     /// </summary>
     [JsonPropertyName("d")]
-    public decimal D { get; set; }
+    public decimal? D { get; set; }
 
     /// <summary>
     /// J值
     /// </summary>
     [JsonPropertyName("j")]
-    public decimal J { get; set; }
+    public decimal? J { get; set; }
 }

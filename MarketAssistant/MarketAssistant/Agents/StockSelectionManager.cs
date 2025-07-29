@@ -1,3 +1,5 @@
+using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -19,10 +21,14 @@ public class StockSelectionManager : IDisposable
     private ChatCompletionAgent? _userRequirementAgent;
     private bool _disposed = false;
 
-    public StockSelectionManager(Kernel kernel, ILogger<StockSelectionManager> logger)
+    public StockSelectionManager(IServiceProvider serviceProvider, Kernel kernel, ILogger<StockSelectionManager> logger)
     {
-        _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+        var playwrightService = serviceProvider.GetRequiredService<PlaywrightService>();
+        var stockScreenerPlugin = new StockScreenerPlugin(playwrightService,
+                                serviceProvider.GetRequiredService<ILogger<StockScreenerPlugin>>());
+        _kernel = kernel.Clone() ?? throw new ArgumentNullException(nameof(kernel));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _kernel.Plugins.AddFromObject(stockScreenerPlugin);
     }
 
     #region AI代理管理
@@ -183,7 +189,7 @@ public class StockSelectionManager : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "用户需求分析失败");
-            return CreateFallbackUserResult(request);
+            return new();
         }
     }
 
@@ -250,7 +256,7 @@ public class StockSelectionManager : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "新闻热点分析失败");
-            return CreateFallbackNewsResult(request);
+            return new();
         }
     }
 
@@ -354,52 +360,6 @@ public class StockSelectionManager : IDisposable
             Recommendations = new List<StockRecommendation>(),
             ConfidenceScore = 0,
             AnalysisSummary = "分析过程中遇到问题，请稍后重试。"
-        };
-    }
-
-    /// <summary>
-    /// 创建用户需求分析的备用结果
-    /// </summary>
-    private StockSelectionResult CreateFallbackUserResult(StockRecommendationRequest request)
-    {
-        return new StockSelectionResult
-        {
-            Recommendations = new List<StockRecommendation>
-             {
-                 new StockRecommendation
-                 {
-                     Symbol = "000001",
-                     Name = "平安银行",
-                     Reason = "根据您的需求推荐的稳健型银行股",
-                     RiskLevel = "低风险",
-                     ExpectedReturn = 8.5f
-                 }
-             },
-            ConfidenceScore = 60,
-            AnalysisSummary = $"基于您的需求「{request.UserRequirements}」，为您推荐了适合的股票。"
-        };
-    }
-
-    /// <summary>
-    /// 创建新闻分析的备用结果
-    /// </summary>
-    private StockSelectionResult CreateFallbackNewsResult(NewsBasedSelectionRequest request)
-    {
-        return new StockSelectionResult
-        {
-            Recommendations = new List<StockRecommendation>
-             {
-                 new StockRecommendation
-                 {
-                     Symbol = "000858",
-                     Name = "五粮液",
-                     Reason = "根据新闻热点推荐的消费类股票",
-                     RiskLevel = "中风险",
-                     ExpectedReturn = 12.0f
-                 }
-             },
-            ConfidenceScore = 55,
-            AnalysisSummary = "基于新闻热点分析，为您推荐了相关概念股票。"
         };
     }
 

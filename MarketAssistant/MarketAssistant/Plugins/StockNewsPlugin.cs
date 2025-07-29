@@ -23,28 +23,28 @@ public class StockNewsPlugin
     }
 
     /// <summary>
-    /// 获取财联社股票代码格式
+    /// 获取财联社股票代码格式（如 SH600000、SZ000001）
     /// </summary>
     private string GetStockCodeWithPrefix(string stockCode)
     {
-        if (stockCode.Length != 6)
-        {
-            return stockCode;
-        }
+        // 提取所有数字字符
+        string digits = new string(stockCode.Where(char.IsDigit).ToArray());
 
-        // 上海证券交易所股票代码前缀为SH，深圳证券交易所股票代码前缀为SZ
-        if (stockCode.StartsWith("6"))
-        {
-            return $"SH{stockCode}";
-        }
-        else if (stockCode.StartsWith("0") || stockCode.StartsWith("3"))
-        {
-            return $"SZ{stockCode}";
-        }
+        string prefix = GetExchangePrefix(digits);
+        return $"{prefix}{digits}";
 
-        return stockCode;
+        static string GetExchangePrefix(string digits)
+        {
+            // 沪市逻辑：60开头、688开头（科创板）、900开头（B股）
+            if (digits.StartsWith("60") ||
+                digits.StartsWith("688") ||
+                digits.StartsWith("900"))
+                return "SH";
+
+            // 深市逻辑（其他所有情况）：00开头、300开头（创业板）、200开头（B股）
+            return "SZ";
+        }
     }
-
 
     [KernelFunction("get_news_content"), Description("根据新闻Url获取新闻详情")]
     public async Task<string> GetNewsContentAsync(string url)
