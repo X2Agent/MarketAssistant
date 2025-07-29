@@ -46,11 +46,11 @@ public class StockKLineService
     private string BuildZhiTuApiUrl(string symbol, string interval, string adjustType = "n", DateTime? startDate = null, DateTime? endDate = null)
     {
         var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={_zhiTuApiToken}";
-        
+
         // 如果没有指定时间范围，根据不同的interval设置合理的默认时间范围
         DateTime defaultStartDate;
         DateTime defaultEndDate = DateTime.Now;
-        
+
         if (!startDate.HasValue && !endDate.HasValue)
         {
             switch (interval.ToLower())
@@ -78,21 +78,21 @@ public class StockKLineService
                     defaultStartDate = DateTime.Now.AddYears(-1);
                     break;
             }
-            
+
             startDate = defaultStartDate;
             endDate = defaultEndDate;
         }
-        
+
         if (startDate.HasValue)
         {
             url += $"&st={startDate.Value:yyyyMMdd}";
         }
-        
+
         if (endDate.HasValue)
         {
             url += $"&et={endDate.Value:yyyyMMdd}";
         }
-        
+
         return url;
     }
 
@@ -539,6 +539,6 @@ public class ZhiTuKLineData
     /// <summary>
     /// 停牌标志（1停牌，0不停牌）
     /// </summary>
-    [JsonPropertyName("sf")]
-    public int Sf { get; set; }
+    ///[JsonPropertyName("sf")]
+    ///public int Sf { get; set; }
 }

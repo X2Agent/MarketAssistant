@@ -108,48 +108,6 @@ namespace MarketAssistant.ViewModels
             set => SetProperty(ref _priceChange, value);
         }
 
-        private decimal _todayVolume;
-        public decimal TodayVolume
-        {
-            get => _todayVolume;
-            set => SetProperty(ref _todayVolume, value);
-        }
-
-        private decimal _highPrice;
-        public decimal HighPrice
-        {
-            get => _highPrice;
-            set => SetProperty(ref _highPrice, value);
-        }
-
-        private decimal _lowPrice;
-        public decimal LowPrice
-        {
-            get => _lowPrice;
-            set => SetProperty(ref _lowPrice, value);
-        }
-
-        private decimal _openPrice;
-        public decimal OpenPrice
-        {
-            get => _openPrice;
-            set => SetProperty(ref _openPrice, value);
-        }
-
-        private decimal _previousClosePrice;
-        public decimal PreviousClosePrice
-        {
-            get => _previousClosePrice;
-            set => SetProperty(ref _previousClosePrice, value);
-        }
-
-        private decimal _todayAmount;
-        public decimal TodayAmount
-        {
-            get => _todayAmount;
-            set => SetProperty(ref _todayAmount, value);
-        }
-
         public IRelayCommand RefreshDataCommand { get; private set; }
         public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
 
@@ -229,22 +187,12 @@ namespace MarketAssistant.ViewModels
                     var previousData = kLineDataSet.Data.Count > 1 ? kLineDataSet.Data[kLineDataSet.Data.Count - 2] : null;
 
                     CurrentPrice = latestData.Close;
-                    HighPrice = latestData.High;
-                    LowPrice = latestData.Low;
-                    OpenPrice = latestData.Open;
-                    TodayVolume = latestData.Volume;
-                    TodayAmount = latestData.Amount / 10000;
 
                     if (previousData != null)
                     {
-                        PreviousClosePrice = previousData.Close;
                         PriceChange = latestData.Close - previousData.Close;
                         PriceChangePercent = previousData.Close != 0 ?
                             Math.Round((latestData.Close - previousData.Close) / previousData.Close * 100, 2) : 0;
-                    }
-                    else
-                    {
-                        PreviousClosePrice = latestData.Open;
                     }
                 }
             }

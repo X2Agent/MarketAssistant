@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -20,11 +21,14 @@ public class StockSelectionManager : IDisposable
     private ChatCompletionAgent? _userRequirementAgent;
     private bool _disposed = false;
 
-    public StockSelectionManager(Kernel kernel, ILogger<StockSelectionManager> logger)
+    public StockSelectionManager(IServiceProvider serviceProvider, Kernel kernel, ILogger<StockSelectionManager> logger)
     {
+        var playwrightService = serviceProvider.GetRequiredService<PlaywrightService>();
+        var stockScreenerPlugin = new StockScreenerPlugin(playwrightService,
+                                serviceProvider.GetRequiredService<ILogger<StockScreenerPlugin>>());
         _kernel = kernel.Clone() ?? throw new ArgumentNullException(nameof(kernel));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _kernel.Plugins.AddFromType<StockScreenerPlugin>();
+        _kernel.Plugins.AddFromObject(stockScreenerPlugin);
     }
 
     #region AI代理管理

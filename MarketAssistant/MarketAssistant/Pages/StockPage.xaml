@@ -6,138 +6,270 @@
              xmlns:converts="clr-namespace:MarketAssistant.Converts"
              x:Class="MarketAssistant.Pages.StockPage"
              x:DataType="viewmodels:StockViewModel"
-             Title="{Binding StockName}"
-             BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundColor}, Dark=#121212}">
+             Title="{Binding StockName}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 定义颜色资源 -->
-            <Color x:Key="PrimaryColor">#3498db</Color>
-            <Color x:Key="SecondaryColor">#2ecc71</Color>
-            <Color x:Key="ErrorColor">#e74c3c</Color>
-            <Color x:Key="UpColor">#e74c3c</Color>
-            <Color x:Key="DownColor">#2ecc71</Color>
+            <!-- 现代化颜色系统 -->
+            <Color x:Key="PrimaryColor">#007bff</Color>
+            <Color x:Key="PrimaryLightColor">#4dabf7</Color>
+            <Color x:Key="SecondaryColor">#28a745</Color>
+            <Color x:Key="AccentColor">#6f42c1</Color>
+            <Color x:Key="UpColor">#dc3545</Color>
+            <Color x:Key="DownColor">#28a745</Color>
             <Color x:Key="NeutralColor">#6c757d</Color>
             <Color x:Key="BackgroundColor">#f8f9fa</Color>
-            <Color x:Key="CardBackgroundLight">#ffffff</Color>
-            <Color x:Key="CardBackgroundDark">#1e1e1e</Color>
-            <Color x:Key="TextColorLight">#212529</Color>
-            <Color x:Key="TextColorDark">#f8f9fa</Color>
-            <Color x:Key="BorderColorLight">#e9ecef</Color>
-            <Color x:Key="BorderColorDark">#343a40</Color>
+            <Color x:Key="SurfaceColor">#ffffff</Color>
+            <Color x:Key="ErrorColor">#dc3545</Color>
+            <Color x:Key="WarningColor">#ffc107</Color>
+            <Color x:Key="InfoColor">#17a2b8</Color>
+            <Color x:Key="TextPrimaryColor">#212529</Color>
+            <Color x:Key="TextSecondaryColor">#6c757d</Color>
+            <Color x:Key="BorderColor">#e9ecef</Color>
+            <Color x:Key="ShadowColor">#00000010</Color>
             
-            <!-- 动态颜色资源 -->
-            <AppThemeBinding x:Key="CardBackgroundColor" Light="{StaticResource CardBackgroundLight}" Dark="{StaticResource CardBackgroundDark}"/>
-            <AppThemeBinding x:Key="TextColor" Light="{StaticResource TextColorLight}" Dark="{StaticResource TextColorDark}"/>
-            <AppThemeBinding x:Key="BorderColor" Light="{StaticResource BorderColorLight}" Dark="{StaticResource BorderColorDark}"/>
-            <AppThemeBinding x:Key="TradingDataBackgroundColor" Light="#f8f9fa" Dark="#2d2d2d"/>
+            <!-- 渐变色定义 -->
+            <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#ffffff" Offset="0" />
+                <GradientStop Color="#f8f9fa" Offset="1" />
+            </LinearGradientBrush>
+            
+            <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#007bff" Offset="0" />
+                <GradientStop Color="#4dabf7" Offset="1" />
+            </LinearGradientBrush>
+
+            <!-- 现代化样式定义 -->
+            <Style x:Key="CompactCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Margin" Value="0,4" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{StaticResource ShadowColor}" 
+                                Offset="0,2" 
+                                Radius="4" 
+                                Opacity="0.1" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="SmallCardStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 6" />
+                <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="Padding" Value="8" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{StaticResource ShadowColor}" 
+                                Offset="0,1" 
+                                Radius="2" 
+                                Opacity="0.08" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="ChartCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{StaticResource ShadowColor}" 
+                                Offset="0,4" 
+                                Radius="8" 
+                                Opacity="0.15" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="ActiveButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{StaticResource PrimaryGradient}" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="BorderWidth" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontAttributes" Value="Bold" />
+            </Style>
+
+            <Style x:Key="CompactTitleStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="{StaticResource TextPrimaryColor}" />
+            </Style>
+
+            <Style x:Key="PriceStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontAttributes" Value="Bold" />
+            </Style>
+
+            <Style x:Key="SmallLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="TextColor" Value="{StaticResource TextSecondaryColor}" />
+            </Style>
+
+            <Style x:Key="DataLabelStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="{StaticResource TextPrimaryColor}" />
+            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid Padding="10,5" VerticalOptions="Fill">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <!-- 股票标题信息和交易数据合并区域 -->
-            <RowDefinition Height="*" /> <!-- K线图 -->
-        </Grid.RowDefinitions>
+    <!-- 现代化渐变背景 -->
+    <ContentPage.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#f8f9fa" Offset="0" />
+            <GradientStop Color="#e9ecef" Offset="1" />
+        </LinearGradientBrush>
+    </ContentPage.Background>
 
-        <!-- 股票标题信息和交易数据合并区域 -->
-        <Border Grid.Row="0" Stroke="{DynamicResource BorderColor}" StrokeThickness="1" StrokeShape="RoundRectangle 8" 
-                BackgroundColor="{DynamicResource CardBackgroundColor}" Margin="0,5" Padding="15,12">
-            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="20">
-                <!-- 左侧：股票标题和价格信息 -->
-                <StackLayout Grid.Row="0" Grid.Column="0" Grid.RowSpan="2" Spacing="8" VerticalOptions="Center">
-                    <StackLayout Orientation="Horizontal" Spacing="8">
-                        <Label Text="{Binding StockName}" FontSize="20" FontAttributes="Bold" TextColor="{DynamicResource TextColor}" VerticalOptions="Center" />
-                        <Label Text="{Binding StockCode}" FontSize="14" TextColor="{StaticResource NeutralColor}" VerticalOptions="Center" />
-                    </StackLayout>
-                    
-                    <StackLayout Orientation="Horizontal" Spacing="12">
-                        <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" FontSize="28" FontAttributes="Bold" 
-                               TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" VerticalOptions="Center" />
-                        <StackLayout Spacing="0" VerticalOptions="Center">
-                            <StackLayout Orientation="Horizontal" Spacing="4">
-                                <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" FontSize="14" 
+    <Grid Padding="12" RowDefinitions="Auto,*" RowSpacing="12">
+        
+        <!-- 股票基本信息卡片 - 紧凑版 -->
+        <Border Grid.Row="0" Style="{StaticResource CompactCardStyle}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <!-- 左侧：股票名称和价格 -->
+                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                    <HorizontalStackLayout Spacing="8">
+                        <Label Text="{Binding StockName}" Style="{StaticResource CompactTitleStyle}" />
+                        <Border BackgroundColor="{StaticResource InfoColor}" 
+                                StrokeShape="RoundRectangle 3" 
+                                Padding="6,2">
+                            <Label Text="{Binding StockCode}" 
+                                   FontSize="11" 
+                                   FontAttributes="Bold" 
+                                   TextColor="White" />
+                        </Border>
+                    </HorizontalStackLayout>
+
+                    <HorizontalStackLayout Spacing="12">
+                        <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" 
+                               Style="{StaticResource PriceStyle}"
+                               TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+                        <VerticalStackLayout Spacing="2">
+                            <HorizontalStackLayout Spacing="4">
+                                <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" 
+                                       FontSize="14" 
+                                       FontAttributes="Bold"
                                        TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                                <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" FontSize="14" 
+                                <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" 
+                                       FontSize="14" 
+                                       FontAttributes="Bold"
                                        TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                            </StackLayout>
-                            <Label Text="较昨收" FontSize="12" TextColor="{StaticResource NeutralColor}" />
-                        </StackLayout>
-                    </StackLayout>
-                </StackLayout>
-                
-                <!-- 右侧：交易数据 -->
-                <StackLayout Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" BackgroundColor="{DynamicResource TradingDataBackgroundColor}" Padding="12,8" VerticalOptions="Center">
-                    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,*,*" ColumnSpacing="12" RowSpacing="8">
-                        <!-- 第一行 -->
-                        <StackLayout Grid.Row="0" Grid.Column="0" Spacing="2">
-                            <Label Text="今开" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding OpenPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                        <StackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
-                            <Label Text="昨收" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding PreviousClosePrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                        <StackLayout Grid.Row="0" Grid.Column="2" Spacing="2">
-                            <Label Text="最高" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding HighPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{StaticResource UpColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                        
-                        <!-- 第二行 -->
-                        <StackLayout Grid.Row="1" Grid.Column="0" Spacing="2">
-                            <Label Text="最低" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding LowPrice, StringFormat='{0:F2}'}" FontSize="13" TextColor="{StaticResource DownColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                        <StackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
-                            <Label Text="成交量" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding TodayVolume, StringFormat='{0:N0}'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                        <StackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
-                            <Label Text="成交额" FontSize="11" TextColor="{StaticResource NeutralColor}" HorizontalTextAlignment="Center" />
-                            <Label Text="{Binding TodayAmount, StringFormat='{0:N0}万'}" FontSize="13" TextColor="{DynamicResource TextColor}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                        </StackLayout>
-                    </Grid>
-                </StackLayout>
+                            </HorizontalStackLayout>
+                            <Label Text="较昨收" Style="{StaticResource SmallLabelStyle}" />
+                        </VerticalStackLayout>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- 右侧：刷新按钮 -->
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                    <Button Text="🔄 刷新" 
+                            Command="{Binding RefreshDataCommand}" 
+                            Style="{StaticResource ActiveButtonStyle}" />
+                </VerticalStackLayout>
             </Grid>
         </Border>
 
-        <!-- K线图 -->
-        <Border Grid.Row="1" Stroke="{DynamicResource BorderColor}" 
-                StrokeThickness="1" StrokeShape="RoundRectangle 8" 
-                BackgroundColor="{DynamicResource CardBackgroundColor}" 
-                Margin="0,5" Padding="5"
-                VerticalOptions="FillAndExpand">
+        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand">
             <StackLayout VerticalOptions="FillAndExpand" Spacing="10">
-                <StackLayout Orientation="Horizontal" Margin="0,5,0,10" Spacing="10">
-                    <Button Text="刷新" Command="{Binding RefreshDataCommand}" BackgroundColor="#6c8ebf" TextColor="White" CornerRadius="4" FontSize="12"/>
-                    
-                    <StackLayout Orientation="Horizontal" HorizontalOptions="CenterAndExpand" Spacing="10">
-                        <StackLayout Orientation="Horizontal" Spacing="5">
-                            <BoxView Color="{StaticResource UpColor}" WidthRequest="12" HeightRequest="12" CornerRadius="2" VerticalOptions="Center" />
-                            <Label Text="上涨" FontSize="14" TextColor="{StaticResource NeutralColor}" VerticalOptions="Center" />
-                        </StackLayout>
-                        <StackLayout Orientation="Horizontal" Spacing="5">
-                            <BoxView Color="{StaticResource DownColor}" WidthRequest="12" HeightRequest="12" CornerRadius="2" VerticalOptions="Center" />
-                            <Label Text="下跌" FontSize="14" TextColor="{StaticResource NeutralColor}" VerticalOptions="Center" />
-                        </StackLayout>
-                    </StackLayout>
 
-                    <StackLayout Orientation="Horizontal" Spacing="2">
-                        <Button Text="分时" Command="{Binding ChangeKLineTypeCommand}" CommandParameter="minute" BackgroundColor="{Binding IsMinuteSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#6c8ebf}" TextColor="White" CornerRadius="4" Padding="8,4" FontSize="12" />
-                        <Button Text="日K" Command="{Binding ChangeKLineTypeCommand}" CommandParameter="daily" BackgroundColor="{Binding IsDailySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#6c8ebf}" TextColor="White" CornerRadius="4" Padding="8,4" FontSize="12" />
-                        <Button Text="周K" Command="{Binding ChangeKLineTypeCommand}" CommandParameter="weekly" BackgroundColor="{Binding IsWeeklySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#6c8ebf}" TextColor="White" CornerRadius="4" Padding="8,4" FontSize="12" />
-                        <Button Text="月K" Command="{Binding ChangeKLineTypeCommand}" CommandParameter="monthly" BackgroundColor="{Binding IsMonthlySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter=#6c8ebf}" TextColor="White" CornerRadius="4" Padding="8,4" FontSize="12" />
-                    </StackLayout>
-                </StackLayout>
-                
+                <!-- 图表控制区域 -->
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                    <!-- 图例 -->
+                    <HorizontalStackLayout Grid.Column="0" Spacing="12">
+                        <HorizontalStackLayout Spacing="6">
+                            <Border BackgroundColor="{StaticResource UpColor}" 
+                                    WidthRequest="12" 
+                                    HeightRequest="12" 
+                                    StrokeShape="RoundRectangle 3" />
+                            <Label Text="上涨" Style="{StaticResource SmallLabelStyle}" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <HorizontalStackLayout Spacing="6">
+                            <Border BackgroundColor="{StaticResource DownColor}" 
+                                    WidthRequest="12" 
+                                    HeightRequest="12" 
+                                    StrokeShape="RoundRectangle 3" />
+                            <Label Text="下跌" Style="{StaticResource SmallLabelStyle}" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                    </HorizontalStackLayout>
+
+                    <!-- 时间周期按钮组 -->
+                    <HorizontalStackLayout Grid.Column="2" Spacing="4">
+                        <Button Text="分时" 
+                                Command="{Binding ChangeKLineTypeCommand}" 
+                                CommandParameter="minute"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                BorderWidth="1"
+                                BorderColor="{StaticResource PrimaryColor}"
+                                BackgroundColor="{Binding IsMinuteSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
+                                TextColor="{Binding IsMinuteSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White,#007bff'}" />
+
+                        <Button Text="日K" 
+                                Command="{Binding ChangeKLineTypeCommand}" 
+                                CommandParameter="daily"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                BorderWidth="1"
+                                BorderColor="{StaticResource PrimaryColor}"
+                                BackgroundColor="{Binding IsDailySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
+                                TextColor="{Binding IsDailySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White,#007bff'}" />
+
+                        <Button Text="周K" 
+                                Command="{Binding ChangeKLineTypeCommand}" 
+                                CommandParameter="weekly"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                BorderWidth="1"
+                                BorderColor="{StaticResource PrimaryColor}"
+                                BackgroundColor="{Binding IsWeeklySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
+                                TextColor="{Binding IsWeeklySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White,#007bff'}" />
+
+                        <Button Text="月K" 
+                                Command="{Binding ChangeKLineTypeCommand}" 
+                                CommandParameter="monthly"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                CornerRadius="6"
+                                Padding="10,6"
+                                BorderWidth="1"
+                                BorderColor="{StaticResource PrimaryColor}"
+                                BackgroundColor="{Binding IsMonthlySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
+                                TextColor="{Binding IsMonthlySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='White,#007bff'}" />
+                    </HorizontalStackLayout>
+                </Grid>
+
                 <StackLayout VerticalOptions="FillAndExpand">
                     <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" HorizontalOptions="Center" VerticalOptions="Center" Scale="1.5" />
-                    
-                    <StackLayout IsVisible="{Binding HasError}" HorizontalOptions="Center" VerticalOptions="Center" Spacing="10">
-                        <Image Source="error_icon.png" HeightRequest="48" WidthRequest="48" />
-                        <Label Text="{Binding ErrorMessage}" TextColor="{StaticResource ErrorColor}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
-                        <Button Text="重试" Command="{Binding RefreshDataCommand}" BackgroundColor="#6c8ebf" TextColor="White" CornerRadius="4" Padding="15,8" Margin="0,10,0,0" />
-                    </StackLayout>
+
+                    <!-- 错误提示 -->
+                    <VerticalStackLayout IsVisible="{Binding HasError}" 
+                       HorizontalOptions="Center" 
+                       VerticalOptions="Center" 
+                       Spacing="12">
+                        <Label Text="⚠️" FontSize="40" HorizontalOptions="Center" />
+                        <Label Text="{Binding ErrorMessage}" 
+                           FontSize="14"
+                           TextColor="{StaticResource ErrorColor}"
+                           HorizontalOptions="Center" 
+                           HorizontalTextAlignment="Center" />
+                        <Button Text="重新加载" 
+                            Command="{Binding RefreshDataCommand}" 
+                            Style="{StaticResource ActiveButtonStyle}" />
+                    </VerticalStackLayout>
 
                     <controls:StockWebChartView x:Name="WebChartView" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" />
                 </StackLayout>
