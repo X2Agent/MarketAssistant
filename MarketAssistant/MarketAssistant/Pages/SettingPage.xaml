@@ -10,21 +10,12 @@
     
     <ContentPage.Resources>
         <ResourceDictionary>
-            <Thickness x:Key="CardPadding">12</Thickness>
-            <x:Double x:Key="StackSpacing">12</x:Double>
+            <!-- 页面特有资源 -->
             <x:Double x:Key="ButtonWidth">120</x:Double>
-            <x:Double x:Key="LabelFontSize">14</x:Double>
-            <Color x:Key="LabelTextColor">#6c757d</Color>
-            <Color x:Key="PrimaryButtonColor">#007bff</Color>
-            <Color x:Key="SuccessButtonColor">#28a745</Color>
-            <!-- 市场分析师角色设置区域专用颜色 -->
-            <Color x:Key="CheckBoxColor">#007bff</Color>
-            <Color x:Key="PrimaryTextColor">#212529</Color>
-            <Color x:Key="SecondaryTextColor">#6c757d</Color>
         </ResourceDictionary>
     </ContentPage.Resources>
     <ScrollView>
-        <VerticalStackLayout Padding="{StaticResource CardPadding}" Spacing="{StaticResource StackSpacing}">
+        <VerticalStackLayout Padding="{StaticResource SmallCardPadding}" Spacing="{StaticResource SmallSpacing}">
             <!-- 模型设置区域 -->
             <controls:CardView ShadowOpacity="0.4" Header="模型设置(硅基流动)">
                 <Grid RowDefinitions="Auto,Auto" RowSpacing="16">

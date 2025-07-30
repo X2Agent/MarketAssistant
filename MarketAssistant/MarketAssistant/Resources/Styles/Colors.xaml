@@ -28,6 +28,44 @@
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
 
+    <!-- 扩展颜色定义 - 页面通用颜色 -->
+    <Color x:Key="CardBackgroundLight">#f8f9fa</Color>
+    <Color x:Key="CardBackgroundDark">#2c2c2c</Color>
+    <Color x:Key="ItemBackgroundLight">White</Color>
+    <Color x:Key="ItemBackgroundDark">#3c3c3c</Color>
+    <Color x:Key="SurfaceVariantLight">#f1f3f4</Color>
+    <Color x:Key="SurfaceVariantDark">#3c3c3c</Color>
+    
+    <!-- 文本颜色 -->
+    <Color x:Key="TextPrimaryLight">#212529</Color>
+    <Color x:Key="TextPrimaryDark">#e0e0e0</Color>
+    <Color x:Key="TextSecondaryLight">#6c757d</Color>
+    <Color x:Key="TextSecondaryDark">#a0a0a0</Color>
+    
+    <!-- 功能性颜色 -->
+    <Color x:Key="Success">#28a745</Color>
+    <Color x:Key="Warning">#ffc107</Color>
+    <Color x:Key="Info">#17a2b8</Color>
+    <Color x:Key="Error">#dc3545</Color>
+    <Color x:Key="UpColor">#dc3545</Color>
+    <Color x:Key="DownColor">#28a745</Color>
+    
+    <!-- 警告相关颜色 -->
+    <Color x:Key="WarningLight">#fff3cd</Color>
+    <Color x:Key="WarningDark">#664d03</Color>
+    <Color x:Key="OnWarningLight">#856404</Color>
+    <Color x:Key="OnWarningDark">#ffecb5</Color>
+    
+    <!-- 边框和分割线 -->
+    <Color x:Key="BorderLight">#e9ecef</Color>
+    <Color x:Key="BorderDark">#404040</Color>
+    <Color x:Key="DividerLight">#e9ecef</Color>
+    <Color x:Key="DividerDark">#404040</Color>
+    
+    <!-- 阴影颜色 -->
+    <Color x:Key="ShadowLight">#77000000</Color>
+    <Color x:Key="ShadowDark">#00000010</Color>
+
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
     <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
@@ -42,4 +80,14 @@
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+    
+    <!-- 扩展画刷定义 -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}"/>
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"/>
+    <SolidColorBrush x:Key="ItemBackgroundBrush" Color="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
 </ResourceDictionary>

@@ -10,87 +10,32 @@
     
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 全局样式参数 -->
-            <Thickness x:Key="PagePadding">16</Thickness>
-            <x:Double x:Key="DefaultSpacing">16</x:Double>
-
-            <!-- 颜色资源 -->
-            <Color x:Key="CardBackgroundLight">#f8f9fa</Color>
-            <Color x:Key="CardBackgroundDark">#2c2c2c</Color>
-            <Color x:Key="TextPrimaryLight">#212529</Color>
-            <Color x:Key="TextPrimaryDark">#e0e0e0</Color>
-            <Color x:Key="TextSecondaryLight">#6c757d</Color>
-            <Color x:Key="TextSecondaryDark">#a0a0a0</Color>
-            <Color x:Key="SurfaceVariantLight">#f1f3f4</Color>
-            <Color x:Key="SurfaceVariantDark">#3c3c3c</Color>
-            <Color x:Key="WarningLight">#fff3cd</Color>
-            <Color x:Key="WarningDark">#664d03</Color>
-            <Color x:Key="OnWarningLight">#856404</Color>
-            <Color x:Key="OnWarningDark">#ffecb5</Color>
-
-            <!-- 通用卡片样式 -->
-            <Style x:Key="CardStyle" TargetType="Border">
-                <Setter Property="Padding" Value="16"/>
-                <Setter Property="StrokeShape" Value="RoundRectangle 8"/>
-                <Setter Property="Stroke" Value="Transparent"/>
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"/>
-                <Setter Property="Shadow">
-                    <Setter.Value>
-                        <Shadow Brush="#77000000" Offset="0,2" Radius="4" Opacity="0.4"/>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <!-- 标题样式 -->
-            <Style x:Key="TitleStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="16"/>
-                <Setter Property="FontAttributes" Value="Bold"/>
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
-            </Style>
-
-            <!-- 按钮样式 -->
-            <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource Primary}"/>
-                <Setter Property="TextColor" Value="White"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="Padding" Value="16,8"/>
-                <Setter Property="CornerRadius" Value="6"/>
-            </Style>
-
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="Transparent"/>
-                <Setter Property="TextColor" Value="{StaticResource Primary}"/>
-                <Setter Property="BorderColor" Value="{StaticResource Primary}"/>
-                <Setter Property="BorderWidth" Value="1"/>
-                <Setter Property="FontSize" Value="14"/>
-                <Setter Property="Padding" Value="16,8"/>
-                <Setter Property="CornerRadius" Value="6"/>
-            </Style>
+            <!-- 页面特有资源 - 保留选股页面特有的资源定义 -->
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <ScrollView Padding="{StaticResource PagePadding}">
-        <VerticalStackLayout Spacing="{StaticResource DefaultSpacing}">
+        <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
             
             <!-- 页面标题 -->
             <Label Text="AI智能选股" 
-                   Style="{StaticResource TitleStyle}"
+                   Style="{StaticResource PageTitleStyle}"
                    FontSize="20"
                    HorizontalOptions="Center"
-                   Margin="0,0,0,8"/>
+                   Margin="{StaticResource BottomSmallMargin}"/>
 
             <!-- 优雅的加载指示器 -->
-            <Border Style="{StaticResource CardStyle}" 
+            <Border Style="{StaticResource PrimaryCardStyle}" 
                 IsVisible="{Binding IsBusy}"
-                Margin="0,8">
-                <Grid Padding="20" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                Margin="{StaticResource TopSmallMargin}">
+                <Grid Padding="{StaticResource LargeSpacing}" ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource LargeSpacing}">
                     <ActivityIndicator Grid.Column="0"
                            IsRunning="{Binding IsBusy}"
                            Color="{StaticResource Primary}"
                            WidthRequest="24"
                            HeightRequest="24"
                            VerticalOptions="Center"/>
-                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="4">
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="{StaticResource TinySpacing}">
                         <Label Text="正在分析中..."
                            FontSize="16"
                            FontAttributes="Bold"
@@ -103,8 +48,8 @@
             </Border>
 
             <!-- 智能选股输入区域 -->
-            <Border Style="{StaticResource CardStyle}">
-                <VerticalStackLayout Spacing="12">
+            <Border Style="{StaticResource PrimaryCardStyle}">
+                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
                     <!-- 选股模式选择器 -->
                     <Label Text="选股模式" FontSize="14" FontAttributes="Bold" 
                            TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
@@ -113,16 +58,16 @@
                                     SelectionMode="Single"
                                     HeightRequest="80">
                         <CollectionView.ItemsLayout>
-                            <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8"/>
+                            <LinearItemsLayout Orientation="Horizontal" ItemSpacing="{StaticResource SmallSpacing}"/>
                         </CollectionView.ItemsLayout>
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="viewmodels:SelectionModeItem">
-                                <Border Padding="16,8"
+                                <Border Padding="{StaticResource LargeSpacing},{StaticResource SmallSpacing}"
                                         StrokeShape="RoundRectangle 6"
                                         Stroke="{StaticResource Primary}"
                                         StrokeThickness="{Binding IsSelected, Converter={toolkit:BoolToObjectConverter TrueObject=2, FalseObject=1}}"
                                         BackgroundColor="{Binding IsSelected, Converter={toolkit:BoolToObjectConverter TrueObject={StaticResource Primary}, FalseObject=Transparent}}">
-                                    <VerticalStackLayout Spacing="4" HorizontalOptions="Center">
+                                    <VerticalStackLayout Spacing="{StaticResource TinySpacing}" HorizontalOptions="Center">
                                         <Label Text="{Binding Icon}" 
                                                FontSize="20" 
                                                HorizontalOptions="Center"/>
@@ -151,7 +96,7 @@
                             IsVisible="{Binding IsInputAreaVisible}"/>
                     
                     <!-- 操作按钮 -->
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{StaticResource SmallSpacing}"
                           IsVisible="{Binding IsInputAreaVisible}">
                         <Button Grid.Column="0"
                                 Text="{Binding CurrentButtonText}"
@@ -173,10 +118,10 @@
             </Border>
 
             <!-- 快速选股策略 -->
-            <Border Style="{StaticResource CardStyle}"
+            <Border Style="{StaticResource PrimaryCardStyle}"
                     IsVisible="{Binding IsQuickStrategyAreaVisible}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="快速选股策略" Style="{StaticResource TitleStyle}"/>
+                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
+                    <Label Text="快速选股策略" Style="{StaticResource SectionTitleStyle}"/>
                     <Label Text="选择预设的选股策略，快速获得投资建议" 
                            FontSize="12" 
                            TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
@@ -186,17 +131,17 @@
                         <CollectionView.ItemsLayout>
                             <GridItemsLayout Orientation="Vertical" 
                                            Span="2" 
-                                           HorizontalItemSpacing="8" 
-                                           VerticalItemSpacing="8"/>
+                                           HorizontalItemSpacing="{StaticResource SmallSpacing}" 
+                                           VerticalItemSpacing="{StaticResource SmallSpacing}"/>
                         </CollectionView.ItemsLayout>
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="agents:QuickSelectionStrategyInfo">
-                                <Border Padding="12"
+                                <Border Padding="{StaticResource SmallCardPadding}"
                                         StrokeShape="RoundRectangle 6"
                                         Stroke="{StaticResource Primary}"
                                         StrokeThickness="1"
                                         BackgroundColor="Transparent">
-                                    <VerticalStackLayout Spacing="4">
+                                    <VerticalStackLayout Spacing="{StaticResource TinySpacing}">
                                         <Label Text="{Binding Name}" 
                                                FontSize="14" 
                                                FontAttributes="Bold"
@@ -218,14 +163,14 @@
             </Border>
             
             <!-- 选股结果显示区域 -->
-            <Border Style="{StaticResource CardStyle}" 
+            <Border Style="{StaticResource PrimaryCardStyle}" 
                     IsVisible="{Binding HasResult}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="选股结果" Style="{StaticResource TitleStyle}"/>
+                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
+                    <Label Text="选股结果" Style="{StaticResource SectionTitleStyle}"/>
                     
                     <!-- 分析摘要 -->
-                    <Border Style="{StaticResource CardStyle}" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}">
-                        <VerticalStackLayout Spacing="8">
+                    <Border Style="{StaticResource PrimaryCardStyle}" BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}">
+                        <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
                             <Label Text="分析摘要" FontSize="16" FontAttributes="Bold"/>
                             <Label Text="{Binding SelectionResult.AnalysisSummary}"
                                    FontSize="14"
@@ -235,17 +180,17 @@
                     </Border>
                     
                     <!-- 推荐股票列表 -->
-                    <Label Text="推荐股票" FontSize="16" FontAttributes="Bold" Margin="0,8,0,4"/>
+                    <Label Text="推荐股票" FontSize="16" FontAttributes="Bold" Margin="{StaticResource TopSmallMargin}"/>
                     <CollectionView ItemsSource="{Binding RecommendedStocks}" 
                                     HeightRequest="400">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="agents:StockRecommendation">
-                                <Border Style="{StaticResource CardStyle}" 
-                                        Margin="0,6,0,0"
+                                <Border Style="{StaticResource PrimaryCardStyle}" 
+                                        Margin="{StaticResource TopSmallMargin}"
                                         BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto" Padding="12" ColumnSpacing="12">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Padding="{StaticResource SmallCardPadding}" ColumnSpacing="{StaticResource SmallCardPadding}">
                                         <!-- 第一列：股票代码和名称 -->
-                                        <VerticalStackLayout Grid.Column="0" Spacing="2" VerticalOptions="Center">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}" VerticalOptions="Center">
                                             <Label Text="{Binding Symbol}" 
                                                    FontSize="16" 
                                                    FontAttributes="Bold"
@@ -258,7 +203,7 @@
                                         <!-- 第二列：推荐理由 -->
                                         <VerticalStackLayout Grid.Column="1" 
                                                            VerticalOptions="Center" 
-                                                           Spacing="2">
+                                                           Spacing="{StaticResource TinySpacing}">
                                             <Label Text="💡 推荐理由" 
                                                    FontSize="11" 
                                                    FontAttributes="Bold"
@@ -274,7 +219,7 @@
                                         <VerticalStackLayout Grid.Column="2" 
                                                            HorizontalOptions="End" 
                                                            VerticalOptions="Center"
-                                                           Spacing="2">
+                                                           Spacing="{StaticResource TinySpacing}">
                                             <Label Text="{Binding RecommendationScore, StringFormat='评分: {0:F1}'}" 
                                                    FontSize="14" 
                                                    FontAttributes="Bold"
@@ -292,11 +237,11 @@
                     </CollectionView>
                     
                     <!-- 风险提示 -->
-                    <Border Style="{StaticResource CardStyle}" 
-                            Margin="0,16,0,0"
+                    <Border Style="{StaticResource PrimaryCardStyle}" 
+                            Margin="{StaticResource TopLargeMargin}"
                             BackgroundColor="{AppThemeBinding Light={StaticResource WarningLight}, Dark={StaticResource WarningDark}}"
                             IsVisible="{Binding HasRiskWarnings}">
-                        <VerticalStackLayout Spacing="8">
+                        <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
                             <Label Text="⚠️ 风险提示" 
                                    FontSize="16" 
                                    FontAttributes="Bold"

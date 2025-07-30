@@ -14,7 +14,7 @@
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
             <converters:DoubleConverter x:Key="DoubleConverter" />
             
-            <!-- FAB按钮样式 -->
+            <!-- 页面特有资源 - FAB按钮样式 -->
             <Style x:Key="FabButtonStyle" TargetType="Button">
                 <Setter Property="BackgroundColor" Value="#2196F3" />
                 <Setter Property="TextColor" Value="White" />
@@ -23,7 +23,7 @@
                 <Setter Property="WidthRequest" Value="56" />
                 <Setter Property="HeightRequest" Value="56" />
                 <Setter Property="Padding" Value="0" />
-                <Setter Property="Margin" Value="20" />
+                <Setter Property="Margin" Value="{StaticResource LargeMargin}" />
             </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
@@ -63,7 +63,7 @@
             
             <!-- 浮动操作按钮(FAB) -->
             <StackLayout HorizontalOptions="End" VerticalOptions="End" 
-                         ZIndex="1000" Margin="0,0,20,20">
+                         ZIndex="1000" Margin="{StaticResource BottomRightLargeMargin}">
                 <!-- 查看K线图按钮 -->
                 <Button 
                     Style="{StaticResource FabButtonStyle}"

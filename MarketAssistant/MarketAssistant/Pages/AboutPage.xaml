@@ -8,30 +8,20 @@
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <Color x:Key="TextPrimary">Black</Color>
-            <!--通用标题样式-->
-            <Style x:Key="TitleStyle"
-               TargetType="Label">
-                <Setter Property="FontSize"
-                    Value="16"/>
-                <Setter Property="FontAttributes"
-                    Value="Bold"/>
-                <Setter Property="TextColor"
-                    Value="{StaticResource TextPrimary}"/>
-            </Style>
+            <!-- 页面特有资源 - 保留页面特有的样式定义 -->
         </ResourceDictionary>
     </ContentPage.Resources>
     
-    <VerticalStackLayout Spacing="24" Padding="16">
+    <VerticalStackLayout Spacing="{StaticResource LargeSpacing}" Padding="{StaticResource PagePadding}">
         <!-- 顶部应用信息区域 -->
         <controls:CardView>
             <controls:CardView.Header>
                 <Grid ColumnDefinitions="*,Auto">
-                    <Label Grid.Column="0" Text="关于我们" Style="{StaticResource TitleStyle}"/>
+                    <Label Grid.Column="0" Text="关于我们" Style="{StaticResource SectionTitleStyle}"/>
                     <Image Grid.Column="1" Source="github.png"
                        HeightRequest="24"
                        WidthRequest="24"
-                       Margin="10,0,0,0">
+                       Margin="{StaticResource LeftSmallMargin}">
                         <Image.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding OpenGitHubCommand}"/>
                         </Image.GestureRecognizers>
@@ -39,7 +29,7 @@
                 </Grid>
             </controls:CardView.Header>
             <!-- Logo和应用信息 -->
-            <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto" Margin="0,10,0,10">
+            <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto" Margin="{StaticResource TopBottomSmallMargin}">
                 <!-- Logo -->
                 <Image Grid.Column="0"
                        Source="logo.jpg"
@@ -51,8 +41,8 @@
                 <!-- 应用信息 -->
                 <VerticalStackLayout Grid.Column="1" 
                                      VerticalOptions="Center" 
-                                     Spacing="6"
-                                     Margin="20,0,0,0">
+                                     Spacing="{StaticResource SmallSpacing}"
+                                     Margin="{StaticResource LeftLargeMargin}">
                     <Label Text="{Binding AppName}"
                            FontSize="28"
                            FontAttributes="Bold"
@@ -60,8 +50,8 @@
                     <Label Text="{Binding Description}"
                            FontSize="16"
                            TextColor="#666666"
-                           Margin="0,2,0,4"/>
-                    <HorizontalStackLayout Spacing="2">
+                           Margin="{StaticResource TopBottomTinyMargin}"/>
+                    <HorizontalStackLayout Spacing="{StaticResource TinySpacing}">
                         <Label Text="v"
                                FontSize="15"
                                TextColor="#888888"
@@ -77,8 +67,8 @@
                 <!-- 更新按钮区域 -->
                 <VerticalStackLayout Grid.Column="2" 
                                      VerticalOptions="Center" 
-                                     Spacing="8"
-                                     Margin="20,0,0,0">
+                                     Spacing="{StaticResource SmallSpacing}"
+                                     Margin="{StaticResource LeftLargeMargin}">
                     <!-- 更新状态显示 -->
                     <Label Text="{Binding UpdateStatus}"
                            FontSize="12"
@@ -123,7 +113,7 @@
                     <DataTemplate x:DataType="vm:FeatureItem">
                         <ViewCell>
                             <Grid ColumnDefinitions="Auto, *, Auto"
-                                  Padding="12">
+                                  Padding="{StaticResource SmallCardPadding}">
                                 <Image Source="{Binding IconSource}"
                                        HeightRequest="24"
                                        WidthRequest="24"
@@ -131,7 +121,7 @@
                                 <Label Grid.Column="1"
                                        Text="{Binding Title}"
                                        VerticalOptions="Center"
-                                       Margin="16,0,0,0"
+                                       Margin="{StaticResource LeftLargeMargin}"
                                        FontSize="16"
                                        TextColor="#333333"/>
                                 <Button Grid.Column="2"
@@ -142,7 +132,7 @@
                                         BorderColor="#4CAF50"
                                         BorderWidth="1"
                                         FontSize="14"
-                                        Padding="12,4"
+                                        Padding="{StaticResource SmallCardPadding},{StaticResource TinySpacing}"
                                         HeightRequest="32"
                                         Command="{Binding Command}"/>
                                 <Grid.GestureRecognizers>

@@ -8,27 +8,40 @@
         </ResourceDictionary>
     </ContentView.Resources>
     
-    <Border x:Name="ProgressBorder" BackgroundColor="#f8f9fa" Stroke="Transparent"
-           StrokeShape="RoundRectangle 8" Margin="16" Padding="16" VerticalOptions="Center" HorizontalOptions="Center">
+    <Border x:Name="ProgressBorder" 
+            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}" 
+            Stroke="Transparent"
+            StrokeShape="RoundRectangle 8" 
+            Margin="{StaticResource LargeMargin}" 
+            Padding="{StaticResource CardPadding}" 
+            VerticalOptions="Center" 
+            HorizontalOptions="Center">
         <Border.Shadow>
-            <Shadow Brush="#22000000" Offset="0,3" Radius="6" />
+            <Shadow Brush="{AppThemeBinding Light={StaticResource ShadowLight}, Dark={StaticResource ShadowDark}}" Offset="0,3" Radius="6" />
         </Border.Shadow>
-        <VerticalStackLayout Spacing="16" WidthRequest="400">
-            <Label Text="AI分析中..." FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" />
+        <VerticalStackLayout Spacing="{StaticResource LargeSpacing}" WidthRequest="400">
+            <Label Text="AI分析中..." FontSize="18" FontAttributes="Bold" HorizontalOptions="Center" 
+                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
 
             <!-- 圆形进度指示器 -->
             <Grid WidthRequest="80" HeightRequest="80" HorizontalOptions="Center">
-                <Ellipse Fill="Transparent" Stroke="#E0E0E0" StrokeThickness="6" />
-                <Ellipse x:Name="ProgressCircle" Fill="Transparent" Stroke="#007bff" StrokeThickness="6"
+                <Ellipse Fill="Transparent" 
+                         Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}" 
+                         StrokeThickness="6" />
+                <Ellipse x:Name="ProgressCircle" Fill="Transparent" 
+                         Stroke="{StaticResource Primary}" 
+                         StrokeThickness="6"
                          StrokeDashArray="251.2" StrokeDashOffset="0" />
-                <ActivityIndicator x:Name="LoadingIndicator" IsRunning="True" Color="#007bff" 
+                <ActivityIndicator x:Name="LoadingIndicator" IsRunning="True" 
+                                   Color="{StaticResource Primary}" 
                                    WidthRequest="40" HeightRequest="40" />
             </Grid>
 
-            <Label x:Name="StageLabel" FontSize="14" HorizontalOptions="Center" />
+            <Label x:Name="StageLabel" FontSize="14" HorizontalOptions="Center" 
+                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
             <Button x:Name="ShowDetailsButton" Text="查看分析过程" 
-                BackgroundColor="#007bff" TextColor="White" CornerRadius="4" />
+                    Style="{StaticResource PrimaryButtonStyle}" />
 
         </VerticalStackLayout>
     </Border>

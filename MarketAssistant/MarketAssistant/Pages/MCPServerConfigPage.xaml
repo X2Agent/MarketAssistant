@@ -11,34 +11,32 @@
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 桌面端布局参数 -->
-            <Thickness x:Key="CardPadding">20</Thickness>
-            <x:Double x:Key="StackSpacing">20</x:Double>
+            <!-- 页面特有资源 -->
             <x:Double x:Key="ButtonWidth">120</x:Double>
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <Grid ColumnDefinitions="300,*" Padding="0">
         <!-- 左侧服务器列表 -->
-        <Grid Grid.Column="0" RowDefinitions="Auto,*" Padding="{StaticResource CardPadding}" BackgroundColor="{AppThemeBinding Light=#f8f9fa, Dark=#212529}">
+        <Grid Grid.Column="0" RowDefinitions="Auto,*" Padding="{StaticResource LargeMargin}" BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
             <!-- 添加服务器按钮 -->
             <Button Grid.Row="0" Text="添加服务器" Command="{Binding AddServerCommand}" 
-                    BackgroundColor="#28a745" TextColor="White" Margin="0,0,0,16" />
+                    Style="{StaticResource SuccessButtonStyle}" Margin="{StaticResource BottomSmallMargin}" />
 
             <!-- 服务器列表 -->
             <CollectionView Grid.Row="1" ItemsSource="{Binding ServerConfigs}" SelectedItem="{Binding SelectedConfig}" SelectionMode="Single">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="settings:MCPServerConfig">
-                        <Grid Padding="12" Margin="0,4">
+                        <Grid Padding="{StaticResource SmallCardPadding}" Margin="{StaticResource TinyMargin}">
                             <Grid.GestureRecognizers>
                                 <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:MCPServerConfigViewModel}}, Path=EditServerCommand}" />
                             </Grid.GestureRecognizers>
                             <VerticalStackLayout>
                                 <Label Text="{Binding Name}" FontAttributes="Bold" />
-                                <Label Text="{Binding Description}" FontSize="12" TextColor="#6c757d" LineBreakMode="TailTruncation" />
-                                <HorizontalStackLayout Spacing="8">
-                                    <Label Text="{Binding TransportType}" FontSize="10" TextColor="#007bff" />
-                                    <Label Text="{Binding IsEnabled, StringFormat='{0}启用'}" FontSize="10" TextColor="#28a745" />
+                                <Label Text="{Binding Description}" FontSize="12" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" LineBreakMode="TailTruncation" />
+                                <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
+                                    <Label Text="{Binding TransportType}" FontSize="10" TextColor="{StaticResource Primary}" />
+                                    <Label Text="{Binding IsEnabled, StringFormat='{0}启用'}" FontSize="10" TextColor="{StaticResource Success}" />
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
                         </Grid>
@@ -46,28 +44,28 @@
                 </CollectionView.ItemTemplate>
                 <CollectionView.EmptyView>
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
-                        <Label Text="暂无服务器配置" TextColor="#6c757d" HorizontalOptions="Center" />
-                        <Label Text="点击上方按钮添加" TextColor="#6c757d" HorizontalOptions="Center" />
+                        <Label Text="暂无服务器配置" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" HorizontalOptions="Center" />
+                        <Label Text="点击上方按钮添加" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" HorizontalOptions="Center" />
                     </VerticalStackLayout>
                 </CollectionView.EmptyView>
             </CollectionView>
         </Grid>
 
         <!-- 右侧配置详情 -->
-        <ScrollView Grid.Column="1" Padding="{StaticResource CardPadding}">
+        <ScrollView Grid.Column="1" Padding="{StaticResource LargeMargin}">
             <Grid>
                 <Grid IsVisible="{Binding IsEditing}">
-                    <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                    <VerticalStackLayout Spacing="{StaticResource LargeSpacing}">
                         <!-- 服务器基本信息 -->
                         <controls:CardView Header="基本信息">
-                            <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                            <VerticalStackLayout Spacing="{StaticResource LargeSpacing}">
                                 <!-- 服务器名称 -->
-                                <VerticalStackLayout Spacing="8">
-                                    <Label FontSize="14" TextColor="#6c757d">
+                                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
+                                    <Label FontSize="14" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}">
                                         <Label.FormattedText>
                                             <FormattedString>
-                                                <Span Text="*" TextColor="#dc3545" />
-                                                <Span Text="名称" TextColor="#6c757d" />
+                                                <Span Text="*" TextColor="{StaticResource Error}" />
+                                                <Span Text="名称" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                             </FormattedString>
                                         </Label.FormattedText>
                                     </Label>
@@ -75,22 +73,22 @@
                                 </VerticalStackLayout>
 
                                 <!-- 服务器描述 -->
-                                <VerticalStackLayout Spacing="8">
-                                    <Label Text="描述" FontSize="14" TextColor="#6c757d" />
+                                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
+                                    <Label Text="描述" FontSize="14" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                     <Editor Text="{Binding Description}" Placeholder="请输入服务器描述" HeightRequest="100" />
                                 </VerticalStackLayout>
 
                                 <!-- 服务器类型 -->
-                                <VerticalStackLayout Spacing="8">
-                                    <Label FontSize="14" TextColor="#6c757d">
+                                <VerticalStackLayout Spacing="{StaticResource SmallSpacing}">
+                                    <Label FontSize="14" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}">
                                         <Label.FormattedText>
                                             <FormattedString>
-                                                <Span Text="*" TextColor="#dc3545" />
-                                                <Span Text="类型" TextColor="#6c757d" />
+                                                <Span Text="*" TextColor="{StaticResource Error}" />
+                                                <Span Text="类型" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
                                             </FormattedString>
                                         </Label.FormattedText>
                                     </Label>
-                                    <HorizontalStackLayout Spacing="16">
+                                    <HorizontalStackLayout Spacing="{StaticResource LargeSpacing}">
                                         <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio', Mode=TwoWay}" 
                                      Value="stdio" GroupName="transportType" />
                                         <Label Text="标准输入/输出(stdio)" VerticalOptions="Center" />

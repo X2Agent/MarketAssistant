@@ -11,66 +11,18 @@
              x:DataType="viewmodels:HomeViewModel">
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 全局样式参数 -->
-            <Thickness x:Key="PagePadding">16</Thickness>
-            <x:Double x:Key="DefaultSpacing">16</x:Double>
-            <x:Double x:Key="CardSpacing">12</x:Double>
-            <x:Double x:Key="ItemSpacing">8</x:Double>
+            <!-- 页面特有资源 -->
             <x:Int32 x:Key="GridSpan">2</x:Int32>
             <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
-
-            <!-- 颜色资源 -->
-            <Color x:Key="CardBackgroundLight">#f8f9fa</Color>
-            <Color x:Key="CardBackgroundDark">#2c2c2c</Color>
-            <Color x:Key="ItemBackgroundLight">White</Color>
-            <Color x:Key="ItemBackgroundDark">#3c3c3c</Color>
-            <Color x:Key="TextPrimaryLight">#212529</Color>
-            <Color x:Key="TextPrimaryDark">#e0e0e0</Color>
-            <Color x:Key="TextSecondaryLight">#6c757d</Color>
-            <Color x:Key="TextSecondaryDark">#a0a0a0</Color>
-            <Color x:Key="DividerLight">#e9ecef</Color>
-            <Color x:Key="DividerDark">#404040</Color>
-
-            <!-- 动态颜色资源 -->
-            <!-- 注意：这些资源在使用时需要通过DynamicResource引用 -->
-            <Color x:Key="CardBackground">Transparent</Color>
-            <Color x:Key="ItemBackground">Transparent</Color>
-            <Color x:Key="TextPrimary">Black</Color>
-            <Color x:Key="TextSecondary">Gray</Color>
-            <Color x:Key="Divider">LightGray</Color>
-
-            <!-- 通用卡片样式 -->
-            <Style x:Key="CardStyle"
-                   TargetType="Border">
-                <Setter Property="Padding"
-                        Value="16"/>
-                <Setter Property="StrokeShape"
-                        Value="RoundRectangle 8"/>
-                <Setter Property="Stroke"
-                        Value="Transparent"/>
-                <Setter Property="BackgroundColor"
-                        Value="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"/>
-            </Style>
-
-            <!--通用标题样式-->
-            <Style x:Key="TitleStyle"
-                   TargetType="Label">
-                <Setter Property="FontSize"
-                        Value="16"/>
-                <Setter Property="FontAttributes"
-                        Value="Bold"/>
-                <Setter Property="TextColor"
-                        Value="{StaticResource TextPrimary}"/>
-            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <Grid Padding="{StaticResource PagePadding}"
-          RowSpacing="{StaticResource DefaultSpacing}"
+          RowSpacing="{StaticResource SmallSpacing}"
           RowDefinitions="Auto,*">
           
         <!-- 顶部搜索区域 -->
-        <Border Grid.Row="0" Style="{StaticResource CardStyle}"
+        <Border Grid.Row="0" Style="{StaticResource PrimaryCardStyle}"
                     Padding="0">
             <Border.Shadow>
                 <Shadow Brush="#77000000"
@@ -84,8 +36,8 @@
                            SearchCommandParameter="{Binding Text, Source={x:Reference searchBar}}"
                            BackgroundColor="Transparent"
                            CancelButtonColor="{StaticResource Primary}"
-                           PlaceholderColor="{StaticResource TextSecondary}"
-                           TextColor="{StaticResource TextPrimary}"
+                           PlaceholderColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                           TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"
                            FontSize="16"/>
         </Border>
 
@@ -93,18 +45,18 @@
         <Grid Grid.Row="1"
                   ColumnDefinitions="2*,3*,1*"
                   RowDefinitions="*" 
-                  ColumnSpacing="{StaticResource ItemSpacing}">
+                  ColumnSpacing="{StaticResource SmallSpacing}">
             <!--7*24小时新闻快讯区域 (左侧)-->
             <controls:CardView Grid.Column="0" ShadowOpacity="0.4">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
-                        <Label Text="7*24小时快讯" Style="{StaticResource TitleStyle}"/>
+                        <Label Text="7*24小时快讯" Style="{StaticResource SectionTitleStyle}"/>
                         <Label Grid.Column="1"
                                    Text="{Binding TelegraphRefreshCountdown}"
                                    FontSize="12"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                    VerticalOptions="Center"
-                                   Margin="0,0,8,0"/>
+                                   Margin="{StaticResource RightSmallMargin}"/>
                     </Grid>
                 </controls:CardView.Header>
                 <!--新闻快讯列表-->
@@ -114,22 +66,22 @@
                                     VerticalScrollBarVisibility="Always">
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Vertical"
-                                               ItemSpacing="{StaticResource ItemSpacing}"/>
+                                               ItemSpacing="{StaticResource SmallSpacing}"/>
                     </CollectionView.ItemsLayout>
                     <CollectionView.EmptyView>
                         <Label Text="暂无快讯数据"
-                                   TextColor="{StaticResource TextSecondary}"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                    HorizontalOptions="Center"/>
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="telegrams:Telegram">
-                            <Border Padding="4"
+                            <Border Padding="{StaticResource ItemPadding}"
                                         StrokeShape="RoundRectangle 6"
                                         Stroke="Transparent"
                                         BackgroundColor="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <VerticalStackLayout Grid.Column="0"
-                                                             Spacing="4">
+                                                             Spacing="{StaticResource TinySpacing}">
                                         <Label Text="{Binding Title}"
                                                    FontSize="14"
                                                    TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
@@ -139,17 +91,17 @@
                                                    LineBreakMode="CharacterWrap"
                                                    HorizontalTextAlignment="Start"/>
 
-                                        <HorizontalStackLayout Spacing="4"
+                                        <HorizontalStackLayout Spacing="{StaticResource TinySpacing}"
                                                                    BindableLayout.ItemsSource="{Binding Stocks}">
                                             <BindableLayout.ItemTemplate>
                                                 <DataTemplate x:DataType="x:String">
-                                                    <Border Padding="4"
-                                                                Margin="4"
+                                                    <Border Padding="{StaticResource ItemPadding}"
+                                                                Margin="{StaticResource TinyMargin}"
                                                                 Stroke="Gray"
                                                                 StrokeThickness="0.5">
                                                         <Label Text="{Binding .}"
                                                                    FontSize="12"
-                                                                   TextColor="{StaticResource TextSecondary}"/>
+                                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
                                                     </Border>
                                                 </DataTemplate>
                                             </BindableLayout.ItemTemplate>
@@ -160,7 +112,7 @@
                                                FontSize="14"
                                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                                VerticalOptions="Center"
-                                               Margin="8,0,0,0"/>
+                                               Margin="{StaticResource LeftSmallMargin}"/>
                                 </Grid>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenNewsCommand}"
@@ -179,7 +131,7 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Grid.Column="0"
            Text="热门推荐"
-           Style="{StaticResource TitleStyle}"/>
+           Style="{StaticResource SectionTitleStyle}"/>
                         <Image Grid.Column="1"
            Source="trending_icon.png"
            HeightRequest="20"
@@ -196,17 +148,17 @@
                         <GridItemsLayout
             Orientation="Vertical"
             Span="2"
-            HorizontalItemSpacing="8"
-            VerticalItemSpacing="8"/>
+            HorizontalItemSpacing="{StaticResource SmallSpacing}"
+            VerticalItemSpacing="{StaticResource SmallSpacing}"/>
                     </CollectionView.ItemsLayout>
                     <CollectionView.EmptyView>
                         <Label Text="暂无热门股票数据"
-               TextColor="{StaticResource TextSecondary}"
+               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                HorizontalOptions="Center"/>
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="stocks:HotStock">
-                            <Border Padding="12"
+                            <Border Padding="{StaticResource SmallCardPadding}"
                         Margin="0"
                         StrokeShape="RoundRectangle 6"
                         Stroke="Transparent"
@@ -216,14 +168,14 @@
                                 <Grid ColumnDefinitions="*,Auto">
                                     <StackLayout Grid.Column="0"
                                      Orientation="Vertical"
-                                     Spacing="2">
+                                     Spacing="{StaticResource TinySpacing}">
                                         <!--股票代码/名称-->
                                         <Grid ColumnDefinitions="Auto,*">
                                             <Label Grid.Column="0"
                                        Text="{Binding Market}"
                                        FontSize="12"
                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                       Margin="0,0,4,0"/>
+                                       Margin="{StaticResource RightTinyMargin}"/>
                                             <Label Grid.Column="1"
                                        Text="{Binding Code}"
                                        FontSize="12"
@@ -236,13 +188,13 @@
 
                                         <!--价格和涨跌幅-->
                                         <Grid ColumnDefinitions="Auto,*"
-                                  Margin="0,4,0,0">
+                                  Margin="{StaticResource TopTinyMargin}">
                                             <Label Grid.Column="0"
                                        Text="{Binding CurrentPrice}"
                                        FontSize="16"
                                        FontAttributes="Bold"
                                        TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}"
-                                       Margin="0,0,8,0"/>
+                                       Margin="{StaticResource RightSmallMargin}"/>
                                             <Label Grid.Column="1"
                                        Text="{Binding ChangePercentage}"
                                        FontSize="14"
@@ -258,10 +210,10 @@
                                         <StackLayout Grid.Row="0"
                                          Orientation="Vertical"
                                          HorizontalOptions="End"
-                                         Spacing="2">
+                                         Spacing="{StaticResource TinySpacing}">
                                             <Label Text="热度"
                                        FontSize="10"
-                                       TextColor="{StaticResource TextSecondary}"
+                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                        HorizontalOptions="Center"/>
                                             <Label Text="{Binding HeatIndex}"
                                        FontSize="14"
@@ -316,39 +268,39 @@
                     <CollectionView.EmptyView>
                         <VerticalStackLayout HorizontalOptions="Center"
                                                      VerticalOptions="Center"
-                                                     Spacing="8">
+                                                     Spacing="{StaticResource SmallSpacing}">
                             <Image Source="empty_data.png"
                                            HeightRequest="64"
                                            WidthRequest="64"
                                            Opacity="0.6"/>
                             <Label Text="暂无查看记录"
-                                           TextColor="{StaticResource TextSecondary}"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                            HorizontalOptions="Center"/>
                             <Label Text="搜索或浏览热门股票以添加记录"
                                            FontSize="12"
-                                           TextColor="{StaticResource TextSecondary}"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                            HorizontalOptions="Center"/>
                         </VerticalStackLayout>
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="stocks:StockItem">
-                            <Border Margin="0,4"
-                                            Padding="12"
+                            <Border Margin="{StaticResource TopTinyMargin}"
+                                            Padding="{StaticResource SmallCardPadding}"
                                             StrokeShape="RoundRectangle 6"
                                             Stroke="Transparent"
                                             BackgroundColor="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <StackLayout Grid.Column="0"
                                                          Orientation="Vertical"
-                                                         Spacing="4"
+                                                         Spacing="{StaticResource TinySpacing}"
                                                          VerticalOptions="Center">
                                         <Label Text="{Binding Name}"
                                                        FontSize="14"
                                                        FontAttributes="Bold"
-                                                       TextColor="{StaticResource TextPrimary}"/>
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
                                         <Label Text="{Binding Code}"
                                                        FontSize="12"
-                                                       TextColor="{StaticResource TextSecondary}"/>
+                                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
                                     </StackLayout>
 
                                     <!-- 收藏按钮 -->

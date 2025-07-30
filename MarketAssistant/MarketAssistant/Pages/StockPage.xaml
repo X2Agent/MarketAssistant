@@ -10,25 +10,8 @@
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 现代化颜色系统 -->
-            <Color x:Key="PrimaryColor">#007bff</Color>
-            <Color x:Key="PrimaryLightColor">#4dabf7</Color>
-            <Color x:Key="SecondaryColor">#28a745</Color>
-            <Color x:Key="AccentColor">#6f42c1</Color>
-            <Color x:Key="UpColor">#dc3545</Color>
-            <Color x:Key="DownColor">#28a745</Color>
-            <Color x:Key="NeutralColor">#6c757d</Color>
-            <Color x:Key="BackgroundColor">#f8f9fa</Color>
-            <Color x:Key="SurfaceColor">#ffffff</Color>
-            <Color x:Key="ErrorColor">#dc3545</Color>
-            <Color x:Key="WarningColor">#ffc107</Color>
-            <Color x:Key="InfoColor">#17a2b8</Color>
-            <Color x:Key="TextPrimaryColor">#212529</Color>
-            <Color x:Key="TextSecondaryColor">#6c757d</Color>
-            <Color x:Key="BorderColor">#e9ecef</Color>
-            <Color x:Key="ShadowColor">#00000010</Color>
-            
-            <!-- 渐变色定义 -->
+            <!-- 页面特有资源 -->
+            <!-- 渐变色定义 - 页面特有 -->
             <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Color="#ffffff" Offset="0" />
                 <GradientStop Color="#f8f9fa" Offset="1" />
@@ -39,16 +22,16 @@
                 <GradientStop Color="#4dabf7" Offset="1" />
             </LinearGradientBrush>
 
-            <!-- 现代化样式定义 -->
-            <Style x:Key="CompactCardStyle" TargetType="Border">
+            <!-- 页面特有样式 -->
+            <Style x:Key="StockCompactCardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource CardGradient}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Padding" Value="12" />
-                <Setter Property="Margin" Value="0,4" />
+                <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
+                <Setter Property="Margin" Value="{StaticResource TinyMargin}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
-                        <Shadow Brush="{StaticResource ShadowColor}" 
+                        <Shadow Brush="{AppThemeBinding Light={StaticResource ShadowLight}, Dark={StaticResource ShadowDark}}" 
                                 Offset="0,2" 
                                 Radius="4" 
                                 Opacity="0.1" />
@@ -56,30 +39,14 @@
                 </Setter>
             </Style>
 
-            <Style x:Key="SmallCardStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
-                <Setter Property="StrokeShape" Value="RoundRectangle 6" />
-                <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
-                <Setter Property="StrokeThickness" Value="1" />
-                <Setter Property="Padding" Value="8" />
-                <Setter Property="Shadow">
-                    <Setter.Value>
-                        <Shadow Brush="{StaticResource ShadowColor}" 
-                                Offset="0,1" 
-                                Radius="2" 
-                                Opacity="0.08" />
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <Style x:Key="ChartCardStyle" TargetType="Border">
+            <Style x:Key="StockChartCardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource CardGradient}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 12" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Padding" Value="12" />
+                <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
-                        <Shadow Brush="{StaticResource ShadowColor}" 
+                        <Shadow Brush="{AppThemeBinding Light={StaticResource ShadowLight}, Dark={StaticResource ShadowDark}}" 
                                 Offset="0,4" 
                                 Radius="8" 
                                 Opacity="0.15" />
@@ -87,20 +54,20 @@
                 </Setter>
             </Style>
 
-            <Style x:Key="ActiveButtonStyle" TargetType="Button">
+            <Style x:Key="StockActiveButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{StaticResource PrimaryGradient}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="BorderWidth" Value="0" />
                 <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="Padding" Value="{StaticResource SmallCardPadding},{StaticResource SmallSpacing}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
 
-            <Style x:Key="CompactTitleStyle" TargetType="Label">
+            <Style x:Key="StockCompactTitleStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="20" />
                 <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="TextColor" Value="{StaticResource TextPrimaryColor}" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
             </Style>
 
             <Style x:Key="PriceStyle" TargetType="Label">
@@ -108,15 +75,15 @@
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
 
-            <Style x:Key="SmallLabelStyle" TargetType="Label">
+            <Style x:Key="StockSmallLabelStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="11" />
-                <Setter Property="TextColor" Value="{StaticResource TextSecondaryColor}" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
             </Style>
 
-            <Style x:Key="DataLabelStyle" TargetType="Label">
+            <Style x:Key="StockDataLabelStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="TextColor" Value="{StaticResource TextPrimaryColor}" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" />
             </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
@@ -129,18 +96,18 @@
         </LinearGradientBrush>
     </ContentPage.Background>
 
-    <Grid Padding="12" RowDefinitions="Auto,*" RowSpacing="12">
+    <Grid Padding="{StaticResource SmallCardPadding}" RowDefinitions="Auto,*" RowSpacing="{StaticResource SmallSpacing}">
         
         <!-- 股票基本信息卡片 - 紧凑版 -->
-        <Border Grid.Row="0" Style="{StaticResource CompactCardStyle}">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <Border Grid.Row="0" Style="{StaticResource StockCompactCardStyle}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
                 <!-- 左侧：股票名称和价格 -->
-                <VerticalStackLayout Grid.Column="0" Spacing="4">
-                    <HorizontalStackLayout Spacing="8">
-                        <Label Text="{Binding StockName}" Style="{StaticResource CompactTitleStyle}" />
-                        <Border BackgroundColor="{StaticResource InfoColor}" 
+                <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                    <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
+                        <Label Text="{Binding StockName}" Style="{StaticResource StockCompactTitleStyle}" />
+                        <Border BackgroundColor="{StaticResource Info}" 
                                 StrokeShape="RoundRectangle 3" 
-                                Padding="6,2">
+                                Padding="{StaticResource SmallSpacing},{StaticResource TinySpacing}">
                             <Label Text="{Binding StockCode}" 
                                    FontSize="11" 
                                    FontAttributes="Bold" 
@@ -148,7 +115,7 @@
                         </Border>
                     </HorizontalStackLayout>
 
-                    <HorizontalStackLayout Spacing="12">
+                    <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
                         <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" 
                                Style="{StaticResource PriceStyle}"
                                TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />

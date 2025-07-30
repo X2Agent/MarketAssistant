@@ -38,11 +38,11 @@
               IsVisible="{Binding IsLoading, Converter={toolkit:InvertedBoolConverter}}">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical" Span="5" 
-                       HorizontalItemSpacing="8" 
-                       VerticalItemSpacing="8" />
+                       HorizontalItemSpacing="{StaticResource SmallSpacing}" 
+                       VerticalItemSpacing="{StaticResource SmallSpacing}" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.EmptyView>
-                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="12">
+                    <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="{StaticResource SmallSpacing}">
                         <Image Source="tab_favorites.png" HeightRequest="48" WidthRequest="48" />
                         <Label Text="暂无收藏股票" HorizontalOptions="Center" 
                    TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" />
@@ -52,15 +52,15 @@
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="stocks:StockInfo">
-                        <Border Padding="16" Margin="4" 
+                        <Border Padding="{StaticResource CardPadding}" Margin="{StaticResource TinyMargin}" 
                                 StrokeShape="RoundRectangle 6" 
                                 Stroke="Transparent" 
                                 BackgroundColor="{AppThemeBinding Light=White, Dark=#3c3c3c}">
                             <Grid ColumnDefinitions="*,Auto">
                                 <!-- 股票信息区域 -->
-                                <VerticalStackLayout Grid.Column="0" Spacing="4">
+                                <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}">
                                     <!-- 市场和代码 -->
-                                    <HorizontalStackLayout Spacing="4">
+                                    <HorizontalStackLayout Spacing="{StaticResource TinySpacing}">
                                         <Label Text="{Binding Market}" 
                                                FontSize="12" 
                                                TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" />
@@ -76,7 +76,7 @@
                                            TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}" />
                                     
                                     <!-- 价格和涨跌幅 -->
-                                    <HorizontalStackLayout Spacing="8">
+                                    <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
                                         <Label Text="{Binding CurrentPrice}" 
                                                FontSize="16" 
                                                FontAttributes="Bold" 
