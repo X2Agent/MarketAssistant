@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:settings="clr-namespace:MarketAssistant.Applications.Settings"
+             xmlns:controls="clr-namespace:MarketAssistant.Controls"
+             x:Class="MarketAssistant.Pages.DataSourceSelectionPage"
+             x:DataType="viewmodels:DataSourceSelectionViewModel"
+             Title="选择数据源">
+    
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <Thickness x:Key="CardPadding">20</Thickness>
+            <x:Double x:Key="StackSpacing">16</x:Double>
+            <x:Double x:Key="ButtonWidth">200</x:Double>
+            <Color x:Key="PrimaryColor">#007bff</Color>
+            <Color x:Key="SuccessColor">#28a745</Color>
+            <Color x:Key="CardBackgroundColor">#ffffff</Color>
+            <Color x:Key="TextColor">#212529</Color>
+            <Color x:Key="SecondaryTextColor">#6c757d</Color>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*" BackgroundColor="#f8f9fa">
+        <!-- 标题区域 -->
+        <VerticalStackLayout Grid.Row="0" Padding="{StaticResource CardPadding}" Spacing="12">
+            <Label Text="欢迎使用 Market Assistant" 
+                   FontSize="28" 
+                   FontAttributes="Bold" 
+                   TextColor="{StaticResource PrimaryColor}"
+                   HorizontalOptions="Center" />
+            <Label Text="请选择您要分析的数据源类型" 
+                   FontSize="16" 
+                   TextColor="{StaticResource SecondaryTextColor}"
+                   HorizontalOptions="Center" />
+        </VerticalStackLayout>
+
+        <!-- 数据源选择区域 -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="{StaticResource CardPadding}" Spacing="{StaticResource StackSpacing}">
+                <!-- A股卡片 -->
+                <controls:CardView ShadowOpacity="0.3" 
+                                  BackgroundColor="{StaticResource CardBackgroundColor}"
+                                  HeightRequest="120">
+                    <Grid Padding="16" ColumnDefinitions="Auto,*" RowSpacing="8">
+                        <CheckBox Grid.Column="0" 
+                                  IsChecked="{Binding IsAStocksSelected}" 
+                                  Color="{StaticResource PrimaryColor}"
+                                  VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="A股 (中国股市)" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{StaticResource TextColor}" />
+                            <Label Text="支持上海、深圳证券交易所的股票数据" 
+                                   FontSize="14" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                            <Label Text="包含基本面、技术面、新闻分析" 
+                                   FontSize="12" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </controls:CardView>
+
+                <!-- 港股卡片 -->
+                <controls:CardView ShadowOpacity="0.3" 
+                                  BackgroundColor="{StaticResource CardBackgroundColor}"
+                                  HeightRequest="120">
+                    <Grid Padding="16" ColumnDefinitions="Auto,*" RowSpacing="8">
+                        <CheckBox Grid.Column="0" 
+                                  IsChecked="{Binding IsHKStocksSelected}" 
+                                  Color="{StaticResource PrimaryColor}"
+                                  VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="港股 (香港股市)" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{StaticResource TextColor}" />
+                            <Label Text="支持香港交易所的股票数据" 
+                                   FontSize="14" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                            <Label Text="包含基本面、技术面、新闻分析" 
+                                   FontSize="12" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </controls:CardView>
+
+                <!-- 美股卡片 -->
+                <controls:CardView ShadowOpacity="0.3" 
+                                  BackgroundColor="{StaticResource CardBackgroundColor}"
+                                  HeightRequest="120">
+                    <Grid Padding="16" ColumnDefinitions="Auto,*" RowSpacing="8">
+                        <CheckBox Grid.Column="0" 
+                                  IsChecked="{Binding IsUSStocksSelected}" 
+                                  Color="{StaticResource PrimaryColor}"
+                                  VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="美股 (美国股市)" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{StaticResource TextColor}" />
+                            <Label Text="支持纽约、纳斯达克交易所的股票数据" 
+                                   FontSize="14" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                            <Label Text="包含基本面、技术面、新闻分析" 
+                                   FontSize="12" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </controls:CardView>
+
+                <!-- 虚拟币卡片 -->
+                <controls:CardView ShadowOpacity="0.3" 
+                                  BackgroundColor="{StaticResource CardBackgroundColor}"
+                                  HeightRequest="120">
+                    <Grid Padding="16" ColumnDefinitions="Auto,*" RowSpacing="8">
+                        <CheckBox Grid.Column="0" 
+                                  IsChecked="{Binding IsCryptoSelected}" 
+                                  Color="{StaticResource PrimaryColor}"
+                                  VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="4">
+                            <Label Text="虚拟币 (加密货币)" 
+                                   FontSize="18" 
+                                   FontAttributes="Bold" 
+                                   TextColor="{StaticResource TextColor}" />
+                            <Label Text="支持主流加密货币数据" 
+                                   FontSize="14" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                            <Label Text="包含价格、技术指标、市场情绪分析" 
+                                   FontSize="12" 
+                                   TextColor="{StaticResource SecondaryTextColor}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </controls:CardView>
+
+                <!-- 提示信息 -->
+                <Label Text="注意：您可以在设置页面随时更改数据源" 
+                       FontSize="12" 
+                       TextColor="{StaticResource SecondaryTextColor}"
+                       HorizontalOptions="Center" />
+
+                <!-- 确认按钮 -->
+                <Button Text="确认选择" 
+                        Command="{Binding ConfirmSelectionCommand}"
+                        BackgroundColor="{StaticResource SuccessColor}" 
+                        TextColor="White"
+                        WidthRequest="{StaticResource ButtonWidth}"
+                        HorizontalOptions="Center"
+                        HeightRequest="50" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

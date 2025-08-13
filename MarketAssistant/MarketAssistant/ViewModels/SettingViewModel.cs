@@ -29,6 +29,17 @@ public partial class SettingViewModel : ViewModelBase
             if (SetProperty(ref _userSetting, value))
             {
                 OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
+                // 监听数据源变更
+                if (_userSetting != null)
+                {
+                    _userSetting.PropertyChanged += (sender, e) =>
+                    {
+                        if (e.PropertyName == nameof(UserSetting.SelectedDataSource))
+                        {
+                            OnPropertyChanged(nameof(CurrentDataSourceDescription));
+                        }
+                    };
+                }
             }
         }
     }
@@ -54,6 +65,25 @@ public partial class SettingViewModel : ViewModelBase
 
     // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
+
+    // 可用数据源列表
+    public List<MarketDataSource> AvailableDataSources { get; } = Enum.GetValues<MarketDataSource>().ToList();
+
+    // 当前数据源描述
+    public string CurrentDataSourceDescription
+    {
+        get
+        {
+            return UserSetting.SelectedDataSource switch
+            {
+                MarketDataSource.A股 => "A股市场数据",
+                MarketDataSource.港股 => "港股市场数据",
+                MarketDataSource.美股 => "美股市场数据",
+                MarketDataSource.虚拟币 => "虚拟币市场数据",
+                _ => "未知数据源"
+            };
+        }
+    }
 
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
@@ -367,6 +397,7 @@ public partial class SettingViewModel : ViewModelBase
             OnPropertyChanged(nameof(EnableTechnicalAnalyst));
             OnPropertyChanged(nameof(EnableNewsEventAnalyst));
             OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
+            OnPropertyChanged(nameof(CurrentDataSourceDescription));
         }
         catch (Exception ex)
         {

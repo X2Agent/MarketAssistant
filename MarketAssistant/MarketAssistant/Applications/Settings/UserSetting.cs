@@ -5,6 +5,29 @@ using System.Text.Json.Serialization;
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
+/// 数据源类型枚举
+/// </summary>
+public enum MarketDataSource
+{
+    /// <summary>
+    /// A股
+    /// </summary>
+    AStocks,
+    /// <summary>
+    /// 港股
+    /// </summary>
+    HKStocks,
+    /// <summary>
+    /// 美股
+    /// </summary>
+    USStocks,
+    /// <summary>
+    /// 虚拟币
+    /// </summary>
+    Crypto
+}
+
+/// <summary>
 /// 用户设置类
 /// </summary>
 public class UserSetting : INotifyPropertyChanged
@@ -82,6 +105,26 @@ public class UserSetting : INotifyPropertyChanged
     /// 市场分析师角色配置
     /// </summary>
     public MarketAnalystRoleSettings AnalystRoleSettings { get; set; } = new MarketAnalystRoleSettings();
+
+    /// <summary>
+    /// 当前选择的数据源
+    /// </summary>
+    private MarketDataSource _selectedDataSource = MarketDataSource.AStocks;
+    public MarketDataSource SelectedDataSource
+    {
+        get => _selectedDataSource;
+        set => SetProperty(ref _selectedDataSource, value);
+    }
+
+    /// <summary>
+    /// 是否首次启动应用
+    /// </summary>
+    private bool _isFirstLaunch = true;
+    public bool IsFirstLaunch
+    {
+        get => _isFirstLaunch;
+        set => SetProperty(ref _isFirstLaunch, value);
+    }
 
     #region INotifyPropertyChanged Implementation
 

@@ -11,6 +11,7 @@ namespace MarketAssistant
             Routing.RegisterRoute("analysis", typeof(AgentAnalysisPage));
             Routing.RegisterRoute("stock", typeof(StockPage));
             Routing.RegisterRoute("mcpconfig", typeof(MCPServerConfigPage));
+            Routing.RegisterRoute("datasource", typeof(DataSourceSelectionPage));
         }
     }
 }

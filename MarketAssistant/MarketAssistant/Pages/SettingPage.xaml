@@ -228,6 +228,30 @@
                 </VerticalStackLayout>
             </controls:CardView>
             
+            <!-- 数据源设置区域 -->
+            <controls:CardView Header="数据源设置">
+                <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
+                    <Label Text="选择当前要分析的数据源类型" FontSize="14" TextColor="#6c757d" />
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                        <VerticalStackLayout Grid.Column="0" Spacing="8">
+                            <Label Text="数据源选择" FontSize="14" TextColor="#6c757d" />
+                            <Picker ItemsSource="{Binding AvailableDataSources}" 
+                                    SelectedItem="{Binding UserSetting.SelectedDataSource}" 
+                                    Title="选择数据源" 
+                                    WidthRequest="150" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="8">
+                            <Label Text="当前数据源" FontSize="14" TextColor="#6c757d" />
+                            <Label Text="{Binding CurrentDataSourceDescription}" 
+                                   FontSize="12" 
+                                   TextColor="#28a745" 
+                                   VerticalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <Label Text="注意：更改数据源后需要重启应用才能生效" FontSize="12" TextColor="#dc3545" />
+                </VerticalStackLayout>
+            </controls:CardView>
+            
             <!-- MCP服务器配置区域 -->
             <controls:CardView Header="MCP服务器配置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">

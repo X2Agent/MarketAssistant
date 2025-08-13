@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Services;
 
@@ -107,6 +108,34 @@ namespace MarketAssistant
             if (serviceProvider != null)
             {
                 GlobalExceptionHandler.Initialize(serviceProvider);
+                
+                // 检查是否为首次启动，如果是则显示数据源选择页面
+                _ = CheckFirstLaunchAndNavigateAsync(serviceProvider);
+            }
+        }
+
+        /// <summary>
+        /// 检查是否为首次启动并导航到相应页面
+        /// </summary>
+        /// <param name="serviceProvider">服务提供者</param>
+        private async Task CheckFirstLaunchAndNavigateAsync(IServiceProvider serviceProvider)
+        {
+            try
+            {
+                var userSettingService = serviceProvider.GetService<IUserSettingService>();
+                if (userSettingService != null && userSettingService.CurrentSetting.IsFirstLaunch)
+                {
+                    // 等待Shell初始化完成
+                    await Task.Delay(500);
+                    
+                    // 导航到数据源选择页面
+                    await Shell.Current.GoToAsync("//datasource");
+                }
+            }
+            catch (Exception ex)
+            {
+                // 记录错误但不影响应用启动
+                System.Diagnostics.Debug.WriteLine($"检查首次启动时出错: {ex.Message}");
             }
         }
     }

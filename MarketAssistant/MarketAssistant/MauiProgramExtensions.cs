@@ -114,6 +114,7 @@ namespace MarketAssistant
             builder.Services.AddTransient<FavoritesViewModel>();
             builder.Services.AddTransient<AboutViewModel>();
             builder.Services.AddTransient<StockSelectionViewModel>();
+            builder.Services.AddTransient<DataSourceSelectionViewModel>();
 
             builder.Services.AddSingleton<GlobalExceptionHandler>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
