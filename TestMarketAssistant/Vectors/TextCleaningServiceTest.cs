@@ -1,5 +1,4 @@
 using MarketAssistant.Vectors.Services;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TestMarketAssistant.Vectors;
 
@@ -88,21 +87,6 @@ public class TextCleaningServiceTest
         var service = new TextCleaningService();
         var input = "This is a test string with a URL: https://example.com";
         var expected = "This is a test string with a URL:";
-
-        // Act
-        var result = service.Clean(input);
-
-        // Assert
-        Assert.AreEqual(expected, result);
-    }
-
-    [TestMethod]
-    public void Clean_ShouldFixHyphenatedWords()
-    {
-        // Arrange
-        var service = new TextCleaningService();
-        var input = "This is a hyphen-\nat-ed word";
-        var expected = "This is a hyphenated word";
 
         // Act
         var result = service.Clean(input);

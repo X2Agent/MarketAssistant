@@ -107,7 +107,16 @@ public class BaseKernelTest
             .AddFromType<ConversationSummaryPlugin>()
             .AddFromType<TextPlugin>();
 
-        builder.Services.AddSqliteVectorStore(_ => "Data Source=:memory:");
+        var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
+        builder.Services.AddSqliteVectorStore(_ => $"Data Source={store}");
+
+        builder.Services.AddSingleton<IUserEmbeddingService, UserEmbeddingService>();
+        builder.Services.AddSingleton(serviceProvider =>
+        {
+            var userEmbeddingService = serviceProvider.GetRequiredService<IUserEmbeddingService>();
+            var embeddingGenerator = userEmbeddingService.CreateEmbeddingGenerator();
+            return embeddingGenerator;
+        });
 
         return builder.Build();
     }

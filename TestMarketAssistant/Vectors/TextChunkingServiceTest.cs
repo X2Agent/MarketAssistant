@@ -1,6 +1,4 @@
 using MarketAssistant.Vectors.Services;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Linq;
 
 namespace TestMarketAssistant.Vectors;
 
