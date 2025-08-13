@@ -5,6 +5,7 @@ using MarketAssistant.Applications;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Vectors;
+using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
@@ -18,6 +19,7 @@ public partial class SettingViewModel : ViewModelBase
     private readonly IBrowserService _browserService;
     private readonly VectorStore _vectorStore;
     private readonly IUserEmbeddingService _dynamicEmbeddingService;
+    private readonly IRagIngestionService _ingestionService;
 
     // UserSetting对象，包含所有用户设置
     private UserSetting _userSetting = new();
@@ -154,12 +156,14 @@ public partial class SettingViewModel : ViewModelBase
         IUserSettingService userSettingService,
         IBrowserService browserService,
         VectorStore vectorStore,
-        IUserEmbeddingService dynamicEmbeddingService) : base(logger)
+        IUserEmbeddingService dynamicEmbeddingService,
+        IRagIngestionService ingestionService) : base(logger)
     {
         _userSettingService = userSettingService;
         _browserService = browserService;
         _vectorStore = vectorStore;
         _dynamicEmbeddingService = dynamicEmbeddingService;
+        _ingestionService = ingestionService;
 
         // 初始化命令
         SelectKnowledgeDirectoryCommand = new RelayCommand(SelectKnowledgeDirectory);
@@ -406,8 +410,6 @@ public partial class SettingViewModel : ViewModelBase
             // 使用动态服务创建嵌入生成器
             var embeddingGenerator = _dynamicEmbeddingService.CreateEmbeddingGenerator();
 
-            var dataUploader = new DataUploader(_vectorStore, embeddingGenerator);
-
             // 获取目录中的所有PDF和DOCX文件
             var pdfFiles = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.pdf", SearchOption.AllDirectories);
             var docxFiles = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.docx", SearchOption.AllDirectories);
@@ -426,9 +428,9 @@ public partial class SettingViewModel : ViewModelBase
             {
                 try
                 {
-                    using var fileStream = new FileStream(pdfFile, FileMode.Open, FileAccess.Read);
-                    var paragraphs = PdfReader.ReadParagraphs(fileStream, pdfFile);
-                    await dataUploader.GenerateEmbeddingsAndUploadAsync(UserSetting.VectorCollectionName, paragraphs);
+                    var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+                    await collection.EnsureCollectionExistsAsync();
+                    await _ingestionService.IngestFileAsync(collection, pdfFile, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
                 }
@@ -443,9 +445,9 @@ public partial class SettingViewModel : ViewModelBase
             {
                 try
                 {
-                    using var fileStream = new FileStream(docxFile, FileMode.Open, FileAccess.Read);
-                    var paragraphs = DocumentReader.ReadParagraphs(fileStream, docxFile);
-                    await dataUploader.GenerateEmbeddingsAndUploadAsync(UserSetting.VectorCollectionName, paragraphs);
+                    var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+                    await collection.EnsureCollectionExistsAsync();
+                    await _ingestionService.IngestFileAsync(collection, docxFile, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
                 }
