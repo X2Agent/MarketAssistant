@@ -15,9 +15,11 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     [TestInitialize]
     public void Initialize()
     {
+        BaseInitialize(); // 调用基类初始化
+        
         // 创建选股管理器，使用基类提供的_kernel
         var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        _stockSelectionManager = new StockSelectionManager(_kernel, managerLogger.Object);
+        _stockSelectionManager = new StockSelectionManager(_kernel.Services, _kernel, managerLogger.Object);
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();

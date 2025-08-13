@@ -1,5 +1,5 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Plugins;
+using MarketAssistant.Plugins.Models;
 using System.Text.Json;
 
 namespace TestMarketAssistant;

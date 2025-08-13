@@ -1,4 +1,5 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 
@@ -12,12 +13,13 @@ public class MarketAnalysisAgentTest : BaseKernelTest
     [TestInitialize]
     public void Initialize()
     {
-        BaseInitialize(); // 调用基类初始化方法
+        BaseInitialize();
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketAnalysisAgent>();
         var analystManagerLogger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<AnalystManager>();
         var embeddingGenerator = _kernel.Services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         var vectorStore = _kernel.Services.GetService<VectorStore>();
-        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, embeddingGenerator, vectorStore);
+        var kernelPluginConfig = _kernel.Services.GetService<IKernelPluginConfig>();
+        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, embeddingGenerator, vectorStore, kernelPluginConfig);
         _marketAnalysisAgent = new MarketAnalysisAgent(logger, analystManager);
     }
 
