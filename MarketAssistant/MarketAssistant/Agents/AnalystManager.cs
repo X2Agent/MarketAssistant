@@ -185,7 +185,7 @@ public class AnalystManager
             };
             if (textSearch != null)
             {
-                var searchPlugin = textSearch.CreateWithSearch("SearchPlugin");
+                var searchPlugin = textSearch.CreateWithGetTextSearchResults("WebSearchPlugin");
                 coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
             }
         }
@@ -196,6 +196,7 @@ public class AnalystManager
             // 确保集合已创建（同步等待避免更改方法签名）
             collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
 
+            // 创建向量存储文本搜索实例，用于从内部知识库检索内容
             var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
 
             // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
@@ -212,10 +213,9 @@ public class AnalystManager
                 ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
             };
 
-            var searchPlugin = textSearch.CreateWithGetTextSearchResults(
-                "VectorSearchPlugin",
-                "Search internal knowledge base for grounding.",
-                [textSearch.CreateSearch(options)]);
+            var searchPlugin = KernelPluginFactory.CreateFromFunctions(
+                "VectorSearchPlugin", "Search internal knowledge base for grounding",
+                [textSearch.CreateGetTextSearchResults(options)]);
 
             coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
         }
