@@ -423,13 +423,14 @@ public partial class SettingViewModel : ViewModelBase
                 return;
             }
 
+            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            await collection.EnsureCollectionExistsAsync();
+
             // 处理PDF文件
             foreach (var pdfFile in pdfFiles)
             {
                 try
                 {
-                    var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-                    await collection.EnsureCollectionExistsAsync();
                     await _ingestionService.IngestFileAsync(collection, pdfFile, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
@@ -445,8 +446,6 @@ public partial class SettingViewModel : ViewModelBase
             {
                 try
                 {
-                    var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-                    await collection.EnsureCollectionExistsAsync();
                     await _ingestionService.IngestFileAsync(collection, docxFile, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));

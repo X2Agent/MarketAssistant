@@ -193,9 +193,30 @@ public class AnalystManager
         if (_userSettingService.CurrentSetting.LoadKnowledge)
         {
             var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            // 确保集合已创建（同步等待避免更改方法签名）
+            collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
+
             var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
 
-            var searchPlugin = textSearch.CreateWithGetTextSearchResults("VectorSearchPlugin");
+            // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
+            var options = new KernelFunctionFromMethodOptions()
+            {
+                FunctionName = "SearchKnowledge",
+                Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
+                Parameters =
+                [
+                    new KernelParameterMetadata("query") { Description = "搜索关键字或问题", IsRequired = true },
+                    new KernelParameterMetadata("top") { Description = "返回条数", IsRequired = false, DefaultValue = 3 },
+                    new KernelParameterMetadata("skip") { Description = "跳过条数（分页）", IsRequired = false, DefaultValue = 0 },
+                ],
+                ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
+            };
+
+            var searchPlugin = textSearch.CreateWithGetTextSearchResults(
+                "VectorSearchPlugin",
+                "Search internal knowledge base for grounding.",
+                [textSearch.CreateSearch(options)]);
+
             coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
         }
 

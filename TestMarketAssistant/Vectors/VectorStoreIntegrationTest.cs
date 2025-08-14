@@ -61,9 +61,19 @@ public class VectorStoreIntegrationTest : BaseKernelTest
         Assert.AreEqual("1", storedParagraph.Key);
         Assert.AreEqual("This is the first test paragraph about artificial intelligence and machine learning.", storedParagraph.Text);
 
+
+        // Act - Search for similar paragraphs using vector search
+        var searchVector = await _embeddingGenerator.GenerateAsync("first test paragraph");
+        var vectorSearchResults = collection.SearchAsync(searchVector, 1);
+        var vectorSearchResultsList = await vectorSearchResults.ToListAsync();
+
+        // Assert - Verify vector search results
+        Assert.IsNotNull(vectorSearchResultsList);
+        Assert.AreEqual(1, vectorSearchResultsList.Count);
+
         // Act - Search for similar paragraphs
         var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
-        var searchResults = await textSearch.GetTextSearchResultsAsync("artificial intelligence", new TextSearchOptions { Top = 2 });
+        var searchResults = await textSearch.GetTextSearchResultsAsync("artificial intelligence", new TextSearchOptions { Top = 1 });
 
         // Assert - Verify search results
         Assert.IsNotNull(searchResults);
