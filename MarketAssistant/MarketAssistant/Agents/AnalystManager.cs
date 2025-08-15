@@ -21,6 +21,11 @@ namespace MarketAssistant.Agents;
 /// </summary>
 public class AnalystManager
 {
+    #region 常量定义
+    private const string WEB_SEARCH_PLUGIN_NAME = "WebSearchPlugin";
+    private const string VECTOR_SEARCH_PLUGIN_NAME = "VectorSearchPlugin";
+    #endregion
+
     private readonly Kernel _kernel;
     private readonly ILogger<AnalystManager> _logger;
     private readonly IUserSettingService _userSettingService;
@@ -142,6 +147,94 @@ public class AnalystManager
         return ValueTask.CompletedTask;
     }
 
+    #region 私有辅助方法
+
+    /// <summary>
+    /// 配置Web搜索插件
+    /// </summary>
+    private void ConfigureWebSearchPlugin(ChatCompletionAgent agent, UserSetting userSetting)
+    {
+        if (!userSetting.EnableWebSearch || string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
+        {
+            return;
+        }
+
+        try
+        {
+            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
+            {
+                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
+                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
+                _ => null
+            };
+
+            if (textSearch != null)
+            {
+                var searchPlugin = textSearch.CreateWithGetTextSearchResults(WEB_SEARCH_PLUGIN_NAME);
+                agent.Kernel.Plugins.Add(searchPlugin);
+                _logger.LogInformation("成功添加 {Provider} Web搜索插件到协调分析师", userSetting.WebSearchProvider);
+            }
+            else
+            {
+                _logger.LogWarning("不支持的Web搜索提供商: {Provider}", userSetting.WebSearchProvider);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置Web搜索插件失败，提供商: {Provider}", userSetting.WebSearchProvider);
+        }
+    }
+
+    /// <summary>
+    /// 配置向量知识库搜索插件
+    /// </summary>
+    private void ConfigureVectorSearchPlugin(ChatCompletionAgent agent)
+    {
+        if (!_userSettingService.CurrentSetting.LoadKnowledge)
+        {
+            return;
+        }
+
+        try
+        {
+            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+
+            // 确保集合已创建（同步等待避免更改方法签名）
+            collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
+
+            // 创建向量存储文本搜索实例，用于从内部知识库检索内容
+            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+
+            // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
+            var options = new KernelFunctionFromMethodOptions()
+            {
+                FunctionName = "SearchKnowledge",
+                Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
+                Parameters =
+                [
+                    new KernelParameterMetadata("query") { Description = "搜索关键字或问题", IsRequired = true },
+                    new KernelParameterMetadata("top") { Description = "返回条数", IsRequired = false, DefaultValue = 3 },
+                    new KernelParameterMetadata("skip") { Description = "跳过条数（分页）", IsRequired = false, DefaultValue = 0 },
+                ],
+                ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
+            };
+
+            var searchPlugin = KernelPluginFactory.CreateFromFunctions(
+                VECTOR_SEARCH_PLUGIN_NAME, "Search internal knowledge base for grounding",
+                [textSearch.CreateGetTextSearchResults(options)]);
+
+            agent.Kernel.Plugins.Add(searchPlugin);
+            _logger.LogInformation("成功添加向量知识库搜索插件到协调分析师");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置向量知识库搜索插件失败");
+        }
+    }
+
+    #endregion
+
     public async Task<string[]> ExecuteAnalystDiscussionAsync(string prompt, Action<ChatMessageContent>? messageCallback)
     {
         _messageCallback = messageCallback;
@@ -169,56 +262,19 @@ public class AnalystManager
 
     public ChatCompletionAgent CreateCoordinatorAgent()
     {
+        _logger.LogInformation("开始创建协调分析师");
+
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
         var userSetting = _userSettingService.CurrentSetting;
 
-        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
-        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
-        {
-            // 根据用户选择的搜索服务商添加相应的搜索服务
-            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
-            {
-                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
-                _ => null
-            };
-            if (textSearch != null)
-            {
-                var searchPlugin = textSearch.CreateWithGetTextSearchResults("WebSearchPlugin");
-                coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
-            }
-        }
+        // 配置Web搜索插件
+        ConfigureWebSearchPlugin(coordinatorAgent, userSetting);
 
-        if (_userSettingService.CurrentSetting.LoadKnowledge)
-        {
-            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-            // 确保集合已创建（同步等待避免更改方法签名）
-            collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
+        // 配置向量知识库搜索插件
+        ConfigureVectorSearchPlugin(coordinatorAgent);
 
-            // 创建向量存储文本搜索实例，用于从内部知识库检索内容
-            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
-
-            // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
-            var options = new KernelFunctionFromMethodOptions()
-            {
-                FunctionName = "SearchKnowledge",
-                Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
-                Parameters =
-                [
-                    new KernelParameterMetadata("query") { Description = "搜索关键字或问题", IsRequired = true },
-                    new KernelParameterMetadata("top") { Description = "返回条数", IsRequired = false, DefaultValue = 3 },
-                    new KernelParameterMetadata("skip") { Description = "跳过条数（分页）", IsRequired = false, DefaultValue = 0 },
-                ],
-                ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
-            };
-
-            var searchPlugin = KernelPluginFactory.CreateFromFunctions(
-                "VectorSearchPlugin", "Search internal knowledge base for grounding",
-                [textSearch.CreateGetTextSearchResults(options)]);
-
-            coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
-        }
+        _logger.LogInformation("协调分析师创建完成，已配置 {PluginCount} 个插件",
+            coordinatorAgent.Kernel.Plugins.Count);
 
         return coordinatorAgent;
     }

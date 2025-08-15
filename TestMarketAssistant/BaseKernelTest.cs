@@ -84,6 +84,7 @@ public class BaseKernelTest
                 EnableWebSearch = true,
                 WebSearchApiKey = searchApiKey,
                 WebSearchProvider = "Tavily",
+                LoadKnowledge = true,
             };
             var userSettingServiceMock = new Mock<IUserSettingService>();
             userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);

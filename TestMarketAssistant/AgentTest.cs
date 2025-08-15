@@ -1,4 +1,8 @@
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Vectors;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -106,9 +110,10 @@ public class AgentTest : BaseKernelTest
     [TestMethod]
     public async Task TestCoordinatorAnalystAsync()
     {
+        var prompt = "请对股票 sh601606 进行综合分析，提供投资建议。";
         var agent = CreateAgentFromYaml("CoordinatorAnalystAgent");
         agent.Arguments.Add("history", new List<string> { FundamentalAnalystContent, NewsEventAnalystContent, FinancialAnalystContent });
-        var content = await agent.InvokeAsync().ToListAsync();
+        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User, prompt)).ToListAsync();
 
         Assert.IsTrue(content.Count > 0);
         Console.WriteLine(content.First().Message);
@@ -220,9 +225,42 @@ public class AgentTest : BaseKernelTest
             };
             if (textSearch != null)
             {
-                var searchPlugin = textSearch.CreateWithGetTextSearchResults("SearchPlugin");
+                var searchPlugin = textSearch.CreateWithGetTextSearchResults("WebSearchPlugin");
                 chatCompletionAgent.Kernel.Plugins.Add(searchPlugin);
             }
+        }
+
+        // 如果启用了知识库搜索功能，则添加VectorSearchPlugin
+        if (userSetting.LoadKnowledge)
+        {
+            var vectorStore = _kernel.Services.GetRequiredService<VectorStore>();
+            var embeddingGenerator = _kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+            var collection = vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            // 确保集合已创建（同步等待避免更改方法签名）
+            collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
+
+            // 创建向量存储文本搜索实例，用于从内部知识库检索内容
+            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, embeddingGenerator);
+
+            // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
+            var options = new KernelFunctionFromMethodOptions()
+            {
+                FunctionName = "SearchKnowledge",
+                Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
+                Parameters =
+                [
+                    new KernelParameterMetadata("query") { Description = "搜索关键字或问题", IsRequired = true },
+                    new KernelParameterMetadata("top") { Description = "返回条数", IsRequired = false, DefaultValue = 3 },
+                    new KernelParameterMetadata("skip") { Description = "跳过条数（分页）", IsRequired = false, DefaultValue = 0 },
+                ],
+                ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
+            };
+
+            var searchPlugin = KernelPluginFactory.CreateFromFunctions(
+                "VectorSearchPlugin", "Search internal knowledge base for grounding",
+                [textSearch.CreateGetTextSearchResults(options)]);
+
+            chatCompletionAgent.Kernel.Plugins.Add(searchPlugin);
         }
 
         return chatCompletionAgent;
