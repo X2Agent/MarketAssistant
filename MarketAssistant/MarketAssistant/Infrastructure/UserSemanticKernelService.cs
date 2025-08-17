@@ -1,3 +1,4 @@
+using MarketAssistant.Plugins;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 
@@ -36,7 +37,17 @@ internal class UserSemanticKernelService(
             .AddFromType<TextPlugin>();
 
         builder.Plugins.AddFromPromptDirectory(Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml"));
-        //builder.Plugins.AddFromFunctions("mcp", await McpPlugin.GetKernelFunctionsAsync());
+
+        // 加载已启用的 MCP 服务器暴露的工具
+        try
+        {
+            var mcpFunctions = McpPlugin.GetKernelFunctionsAsync().GetAwaiter().GetResult();
+            builder.Plugins.AddFromFunctions("mcp", mcpFunctions);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"加载 MCP 插件失败: {ex.Message}");
+        }
 
         return builder.Build();
     }

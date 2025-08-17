@@ -2,8 +2,6 @@
 using MarketAssistant.Infrastructure;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
-using System.IO.Pipelines;
 
 namespace MarketAssistant.Plugins;
 
@@ -11,13 +9,22 @@ public sealed class McpPlugin
 {
     public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync()
     {
-        var allFunctions = new List<KernelFunction>();
         var configService = MCPServerConfigService.Instance;
-
-        // 获取所有启用的MCP服务器配置
         var enabledConfigs = configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
+        return await GetKernelFunctionsAsync(enabledConfigs).ConfigureAwait(false);
+    }
 
-        foreach (var config in enabledConfigs)
+    public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(MCPServerConfig mCPServerConfig)
+    {
+        return await GetKernelFunctionsAsync([mCPServerConfig]).ConfigureAwait(false);
+    }
+
+    public static async Task<IEnumerable<KernelFunction>> GetKernelFunctionsAsync(
+        IEnumerable<MCPServerConfig> configs)
+    {
+        var kernelFuns = new List<KernelFunction>();
+
+        foreach (var config in configs)
         {
             try
             {
@@ -48,14 +55,11 @@ public sealed class McpPlugin
                 // 创建MCP客户端
                 await using var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
 
-                // 获取可用工具列表
+                // 获取可用工具列表（暂不映射为 SK 函数，仅验证可用性）
                 var tools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
+                Console.WriteLine($"从 {config.Name} 加载了 {tools.Count} 个工具");
 
-                // 将工具转换为KernelFunction并添加到结果列表
-                var functions = tools.Select(tool => tool.AsKernelFunction()).ToList();
-                allFunctions.AddRange(functions);
-
-                Console.WriteLine($"从 {config.Name} 加载了 {functions.Count} 个工具");
+                kernelFuns.AddRange(tools.Select(aiFunction => aiFunction.AsKernelFunction()));
             }
             catch (Exception ex)
             {
@@ -63,7 +67,7 @@ public sealed class McpPlugin
             }
         }
 
-        return allFunctions;
+        return kernelFuns;
     }
 
     private static IClientTransport CreateStdioTransport(MCPServerConfig config)
@@ -81,19 +85,25 @@ public sealed class McpPlugin
         });
     }
 
-    private static IClientTransport CreateSseTransport(MCPServerConfig config)
+    internal static IClientTransport CreateSseTransport(MCPServerConfig config)
     {
+        // 明确以 SSE 模式连接
         return new SseClientTransport(new()
         {
             Name = config.Name,
             TransportMode = HttpTransportMode.AutoDetect,
-            Endpoint = new Uri(config.Command)// 对于SSE，Command字段存储URL
+            Endpoint = new Uri(config.Command) // 对于SSE，Command字段存储URL
         });
     }
 
-    private static IClientTransport CreateStreamableHttpTransport(MCPServerConfig config)
+    internal static IClientTransport CreateStreamableHttpTransport(MCPServerConfig config)
     {
-        Pipe clientToServerPipe = new(), serverToClientPipe = new();
-        return new StreamClientTransport(clientToServerPipe.Writer.AsStream(), serverToClientPipe.Reader.AsStream());
+        // 使用 Streamable HTTP 模式（同一实现通过传输模式区分）
+        return new SseClientTransport(new()
+        {
+            Name = config.Name,
+            TransportMode = HttpTransportMode.StreamableHttp,
+            Endpoint = new Uri(config.Command) // 对于StreamableHttp，Command字段存储URL
+        });
     }
 }
