@@ -17,7 +17,8 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     {
         // 创建选股管理器，使用基类提供的_kernel
         var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        _stockSelectionManager = new StockSelectionManager(_kernel, managerLogger.Object);
+        var mockServiceProvider = new Mock<IServiceProvider>();
+        _stockSelectionManager = new StockSelectionManager(mockServiceProvider.Object, _kernel, managerLogger.Object);
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();

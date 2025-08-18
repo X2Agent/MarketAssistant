@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -61,6 +62,7 @@ public class MCPServerConfigViewModel : ViewModelBase
             if (SetProperty(ref _transportType, value) && _editingConfig != null)
             {
                 _editingConfig.TransportType = value;
+                TestConnectionCommand?.NotifyCanExecuteChanged();
             }
         }
     }
@@ -74,6 +76,7 @@ public class MCPServerConfigViewModel : ViewModelBase
             if (SetProperty(ref _command, value) && _editingConfig != null)
             {
                 _editingConfig.Command = value;
+                TestConnectionCommand?.NotifyCanExecuteChanged();
             }
         }
     }
@@ -159,6 +162,7 @@ public class MCPServerConfigViewModel : ViewModelBase
     public IRelayCommand CancelEditCommand { get; }
     public IRelayCommand ConfirmDeleteCommand { get; }
     public IRelayCommand CancelDeleteCommand { get; }
+    public IRelayCommand TestConnectionCommand { get; }
 
     public MCPServerConfigViewModel(ILogger<MCPServerConfigViewModel> logger) : base(logger)
     {
@@ -172,6 +176,7 @@ public class MCPServerConfigViewModel : ViewModelBase
         CancelEditCommand = new RelayCommand(CancelEdit);
         ConfirmDeleteCommand = new RelayCommand(ConfirmDelete);
         CancelDeleteCommand = new RelayCommand(CancelDelete);
+        TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, CanTestConnection);
 
         // 加载服务器配置
         LoadServerConfigs();
@@ -280,6 +285,36 @@ public class MCPServerConfigViewModel : ViewModelBase
     private bool CanSaveServer()
     {
         return _editingConfig != null;
+    }
+
+    private bool CanTestConnection()
+    {
+        return _editingConfig != null && !string.IsNullOrWhiteSpace(Command);
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        try
+        {
+            if (_editingConfig == null)
+            {
+                WeakReferenceMessenger.Default.Send(new ToastMessage("请先选择或新建服务器配置"));
+                return;
+            }
+
+            var kernelFunctions = await McpPlugin.GetKernelFunctionsAsync(_editingConfig);
+            var count = kernelFunctions.Count();
+            if (count == 0)
+            {
+                throw new Exception("未发现任何工具");
+            }
+
+            WeakReferenceMessenger.Default.Send(new ToastMessage($"连接成功，发现 {count} 个工具"));
+        }
+        catch (Exception ex)
+        {
+            WeakReferenceMessenger.Default.Send(new ToastMessage($"连接失败：{ex.Message}"));
+        }
     }
 
     // 取消编辑
