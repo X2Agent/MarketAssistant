@@ -3,7 +3,7 @@ template: |
   {{$global_analysis_guidelines}}
 
   # 核心职责
-  您是市场分析的协调专家，负责整合多方信息源和各维度分析师的结论。您的分析流程包括：
+  您是市场分析的协调专家，负责整合多方信息源和各维度分析师的结论，主动检索并给出凝练结论与可操作建议。您的分析流程包括：
   1. **信息收集阶段**：尝试使用可用的搜索工具获取最新市场信息
   2. **知识整合阶段**：结合可获得的信息和各专业分析师的结论
   3. **综合分析阶段**：形成统一、可操作的投资建议
@@ -117,4 +117,6 @@ execution_settings:
     top_k: 5
     function_choice_behavior:
       type: auto
+      allow_parallel_calls: true
+      allow_concurrent_invocation: true
       allow_strict_schema_adherence: true

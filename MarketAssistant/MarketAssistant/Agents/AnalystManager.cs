@@ -209,7 +209,7 @@ public class AnalystManager
             // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
             var options = new KernelFunctionFromMethodOptions()
             {
-                FunctionName = "SearchKnowledge",
+                FunctionName = "GetTextSearchResults",
                 Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
                 Parameters =
                 [

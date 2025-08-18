@@ -1,6 +1,5 @@
 using MarketAssistant.Vectors.Interfaces;
 using MarketAssistant.Vectors.Services;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MarketAssistant.Vectors.Extensions;
 

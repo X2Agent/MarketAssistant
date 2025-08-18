@@ -6,7 +6,6 @@ using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Services;
-using MarketAssistant.Vectors;
 using MarketAssistant.Vectors.Extensions;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Parsers;
