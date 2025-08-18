@@ -304,7 +304,7 @@ public class MCPServerConfigViewModel : ViewModelBase
 
             var kernelFunctions = await McpPlugin.GetKernelFunctionsAsync(_editingConfig);
             var count = kernelFunctions.Count();
-            if (count < 0)
+            if (count == 0)
             {
                 throw new Exception("未发现任何工具");
             }

@@ -57,8 +57,6 @@ public sealed class McpPlugin
 
                 // 获取可用工具列表（暂不映射为 SK 函数，仅验证可用性）
                 var tools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
-                Console.WriteLine($"从 {config.Name} 加载了 {tools.Count} 个工具");
-
                 kernelFuns.AddRange(tools.Select(aiFunction => aiFunction.AsKernelFunction()));
             }
             catch (Exception ex)

@@ -51,7 +51,6 @@ public class McpPluginTests
     public async Task MCP_StreamableHttp_ListTools()
     {
         var url = Environment.GetEnvironmentVariable("MCP_STREAM_URL");
-        url = "https://open.bigmodel.cn/api/mcp/web_search/sse?Authorization=bb93f39a2f6f9dc68baaea4bcaa9120b.DixiZ0Gx0jkzaWQ5";
 
         if (string.IsNullOrWhiteSpace(url))
         {
