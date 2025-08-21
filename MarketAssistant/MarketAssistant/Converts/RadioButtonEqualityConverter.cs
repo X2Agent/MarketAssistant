@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Maui.Controls;
 
 namespace MarketAssistant.Converts
 {
@@ -33,10 +34,17 @@ namespace MarketAssistant.Converts
         /// <returns>如果布尔值为true，则返回参数值，否则返回null</returns>
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is bool isChecked && isChecked && parameter != null)
-                return parameter.ToString();
+            if (value is bool isChecked)
+            {
+                if (isChecked && parameter != null)
+                {
+                    return parameter.ToString();
+                }
+                // 重要：未选中时不回写源，避免被置为 null 导致界面不刷新
+                return Binding.DoNothing;
+            }
 
-            return null;
+            return Binding.DoNothing;
         }
     }
 }

@@ -2,6 +2,7 @@ using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
+using Moq;
 
 namespace TestMarketAssistant;
 

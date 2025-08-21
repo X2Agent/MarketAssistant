@@ -52,10 +52,11 @@
         </Grid>
 
         <!-- 右侧配置详情 -->
-        <ScrollView Grid.Column="1" Padding="{StaticResource LargeMargin}">
-            <Grid>
-                <Grid IsVisible="{Binding IsEditing}">
-                    <VerticalStackLayout Spacing="{StaticResource LargeSpacing}">
+        <Grid Grid.Column="1" RowDefinitions="*">
+            <ScrollView Grid.Row="0" Padding="{StaticResource LargeMargin}">
+                <Grid>
+                    <Grid IsVisible="{Binding IsEditing}">
+                        <VerticalStackLayout Spacing="{StaticResource LargeSpacing}">
                         <!-- 服务器基本信息 -->
                         <controls:CardView Header="基本信息">
                             <VerticalStackLayout Spacing="{StaticResource LargeSpacing}">
@@ -89,17 +90,12 @@
                                         </Label.FormattedText>
                                     </Label>
                                     <HorizontalStackLayout Spacing="{StaticResource LargeSpacing}">
-                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio', Mode=TwoWay}" 
-                                     Value="stdio" GroupName="transportType" />
-                                        <Label Text="标准输入/输出(stdio)" VerticalOptions="Center" />
-
-                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse', Mode=TwoWay}" 
-                                     Value="sse" GroupName="transportType" />
-                                        <Label Text="服务器发送事件(sse)" VerticalOptions="Center" />
-
-                                        <RadioButton IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp', Mode=TwoWay}" 
-                                    Value="streamableHttp" GroupName="transportType" />
-                                        <Label Text="可流式传输的HTTP(streamableHttp)" VerticalOptions="Center" />
+                                        <RadioButton GroupName="transportType" Value="stdio" Content="标准输入/输出(stdio)"
+                                                     IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio', Mode=TwoWay}" />
+                                        <RadioButton GroupName="transportType" Value="sse" Content="服务器发送事件(sse)"
+                                                     IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse', Mode=TwoWay}" />
+                                        <RadioButton GroupName="transportType" Value="streamableHttp" Content="可流式传输的HTTP(streamableHttp)"
+                                                     IsChecked="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp', Mode=TwoWay}" />
                                     </HorizontalStackLayout>
                                 </VerticalStackLayout>
 
@@ -171,14 +167,15 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
                             </VerticalStackLayout>
                         </controls:CardView>
 
-                        <!-- 操作按钮区域 -->
-                        <HorizontalStackLayout HorizontalOptions="End" Spacing="{StaticResource StackSpacing}" Margin="0,16,0,0">
-                            <Button Text="取消" Command="{Binding CancelEditCommand}" 
-                    BackgroundColor="#6c757d" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
-                            <Button Text="保存" Command="{Binding SaveServerCommand}" 
-                    BackgroundColor="#007bff" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
+                            <!-- 操作按钮区域 -->
+                            <HorizontalStackLayout HorizontalOptions="End" Spacing="{StaticResource StackSpacing}" Margin="0,16,0,0">
+                                <Button Text="取消" Command="{Binding CancelEditCommand}" 
+                        BackgroundColor="#6c757d" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                                <Button Text="测试连接" Command="{Binding TestConnectionCommand}" WidthRequest="{StaticResource ButtonWidth}" />
+                                <Button Text="保存" Command="{Binding SaveServerCommand}" 
+                        BackgroundColor="#007bff" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
 
                     <!-- 删除确认对话框 -->
                     <Border IsVisible="{Binding ShowDeleteConfirmation}" 
@@ -201,18 +198,19 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
                             </HorizontalStackLayout>
                         </VerticalStackLayout>
                     </Border>
-                </Grid>
+                    </Grid>
 
-                <!-- 未选择服务器时的提示 -->
-                <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={toolkit:InvertedBoolConverter}}" 
-                     HorizontalOptions="Center" 
-                     VerticalOptions="Center">
-                    <Label Text="请选择或添加MCP服务器" 
-           TextColor="#6c757d" 
-           FontSize="18" 
-           HorizontalOptions="Center" />
-                </VerticalStackLayout>
-            </Grid>
-        </ScrollView>
+                    <!-- 未选择服务器时的提示 -->
+                    <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={toolkit:InvertedBoolConverter}}" 
+                         HorizontalOptions="Center" 
+                         VerticalOptions="Center">
+                        <Label Text="请选择或添加MCP服务器" 
+               TextColor="#6c757d" 
+               FontSize="18" 
+               HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </Grid>
+            </ScrollView>
+        </Grid>
     </Grid>
 </ContentPage>
