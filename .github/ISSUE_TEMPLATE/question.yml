@@ -1,0 +1,23 @@
+name: 使用求助 / 问题咨询
+description: 与使用相关的问题或一次性帮助
+labels: [question]
+title: "question: [简要标题]"
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 你的问题
+      placeholder: 清晰描述你的疑问
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: 你尝试过的方案
+  - type: input
+    id: env
+    attributes:
+      label: 环境信息
+      placeholder: OS / .NET / 版本号
+
+
