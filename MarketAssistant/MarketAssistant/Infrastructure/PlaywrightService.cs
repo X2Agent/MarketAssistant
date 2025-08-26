@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 using IBrowser = Microsoft.Playwright.IBrowser;
 
@@ -10,6 +11,7 @@ public class PlaywrightService
 {
 
     private readonly IUserSettingService _userSettingService;
+    private readonly ILogger<PlaywrightService>? _logger;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
     private readonly SemaphoreSlim _initLock = new SemaphoreSlim(1, 1);
@@ -17,10 +19,16 @@ public class PlaywrightService
     private bool _isInitializing = false;
     private DateTime _lastHealthCheck = DateTime.MinValue;
     private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(5);
+    private const string _defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-    public PlaywrightService(IUserSettingService userSettingService)
+    public PlaywrightService(IUserSettingService userSettingService) : this(userSettingService, null)
+    {
+    }
+
+    public PlaywrightService(IUserSettingService userSettingService, ILogger<PlaywrightService>? logger)
     {
         _userSettingService = userSettingService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -29,6 +37,9 @@ public class PlaywrightService
     /// <returns>Browser实例</returns>
     private async Task<IBrowser> GetBrowserAsync()
     {
+        // 定期健康检查
+        await PerformHealthCheckIfNeeded();
+
         // 检查现有浏览器是否仍然有效
         if (_browser != null && !_browser.IsConnected)
         {
@@ -78,11 +89,39 @@ public class PlaywrightService
             // 等待获取Page槽位
             await _pageLock.WaitAsync(cancellationToken);
 
+            IBrowserContext? context = null;
             IPage? page = null;
             try
             {
                 var browser = await GetBrowserAsync();
-                page = await browser.NewPageAsync();
+                context = await browser.NewContextAsync(new BrowserNewContextOptions
+                {
+                    BypassCSP = true,
+                    UserAgent = _defaultUserAgent
+                });
+
+                // 轻量请求策略：阻止图片/媒体/字体，降低崩溃概率与资源开销
+                await context.RouteAsync("**/*", async route =>
+                {
+                    try
+                    {
+                        var rt = route.Request.ResourceType;
+                        if (rt == "image" || rt == "media" || rt == "font")
+                        {
+                            await route.AbortAsync();
+                        }
+                        else
+                        {
+                            await route.ContinueAsync();
+                        }
+                    }
+                    catch
+                    {
+                        // 在路由回调中忽略异常，避免影响主流程
+                        try { await route.ContinueAsync(); } catch { }
+                    }
+                });
+                page = await context.NewPageAsync();
 
                 // 设置页面超时
                 page.SetDefaultTimeout((float)timeout.Value.TotalMilliseconds);
@@ -96,15 +135,22 @@ public class PlaywrightService
             {
                 throw;
             }
-            catch (Exception) when (attempt < maxRetries)
+            catch (PlaywrightException ex) when (attempt < maxRetries)
             {
-                // 指数退避
+                _logger?.LogWarning(ex, "Playwright 异常，准备重建浏览器后重试，第 {Attempt} 次", attempt);
+                await ForceReinitializeBrowserAsync();
+                var delay = TimeSpan.FromMilliseconds(Math.Pow(2, attempt - 1) * 1000);
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (Exception ex) when (attempt < maxRetries)
+            {
+                _logger?.LogWarning(ex, "执行页面操作失败，准备重试，第 {Attempt} 次", attempt);
                 var delay = TimeSpan.FromMilliseconds(Math.Pow(2, attempt - 1) * 1000);
                 await Task.Delay(delay, cancellationToken);
             }
             finally
             {
-                // 确保Page被释放
+                // 确保Page/Context被释放
                 if (page != null)
                 {
                     try
@@ -113,7 +159,17 @@ public class PlaywrightService
                     }
                     catch
                     {
-                        // 忽略关闭异常
+                    }
+                }
+
+                if (context != null)
+                {
+                    try
+                    {
+                        await context.CloseAsync();
+                    }
+                    catch
+                    {
                     }
                 }
 
@@ -218,8 +274,27 @@ public class PlaywrightService
 
         try
         {
-            // 创建Playwright实例
-            _playwright = await Playwright.CreateAsync();
+            // 创建Playwright实例（失败时尝试安装后重试）
+            int createAttempts = 0;
+            while (true)
+            {
+                try
+                {
+                    _playwright = await Playwright.CreateAsync();
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    createAttempts++;
+                    _logger?.LogWarning(ex, "创建 Playwright 失败（第 {Attempt} 次），尝试执行安装后重试", createAttempts);
+                    if (createAttempts >= 2)
+                    {
+                        throw;
+                    }
+                    await TryInstallPlaywrightRuntimeAsync();
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+            }
 
             // 获取用户设置中的浏览器路径
             string? browserPath = _userSettingService.CurrentSetting.BrowserPath;
@@ -230,24 +305,31 @@ public class PlaywrightService
                 Headless = true
             };
 
-            // 如果用户配置了浏览器路径，则使用该路径
-            if (!string.IsNullOrEmpty(browserPath))
+            // 启动策略：优先通道，其次显式路径，最后回退到内置Chromium
+            if (!string.IsNullOrWhiteSpace(browserPath))
             {
-                options.ExecutablePath = browserPath;
-                // 使用用户指定的浏览器
-                _browser = await LaunchBrowserByPathAsync(browserPath, options);
+                _browser = await TryLaunchByPreferredStrategyAsync(browserPath!, options);
             }
             else
             {
                 // 用户未指定浏览器路径，确保Playwright内置浏览器已安装
                 await EnsureBrowserInstalledAsync();
-                // 使用Playwright内置的Chromium
                 _browser = await _playwright.Chromium.LaunchAsync(options);
+            }
+
+            // 监听断连，便于后续自愈
+            if (_browser != null)
+            {
+                _browser.Disconnected += (_, __) =>
+                {
+                    _logger?.LogWarning("Playwright 浏览器已断开连接");
+                    _browser = null;
+                };
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"初始化Playwright时发生异常: {ex.Message}");
+            _logger?.LogError(ex, "初始化 Playwright 时发生异常: {Message}", ex.Message);
             throw;
         }
         finally
@@ -257,30 +339,127 @@ public class PlaywrightService
     }
 
     /// <summary>
+    /// 安装 Playwright 运行时与浏览器（容错执行，不抛异常）
+    /// </summary>
+    private Task TryInstallPlaywrightRuntimeAsync()
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                _logger?.LogInformation("尝试安装 Playwright 运行时与 Chromium 浏览器...");
+                _ = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "执行 Playwright 安装时出现异常（已忽略）");
+            }
+        });
+    }
+
+    /// <summary>
+    /// 优先使用通道启动，失败后再尝试显式路径与内置浏览器
+    /// </summary>
+    private async Task<IBrowser> TryLaunchByPreferredStrategyAsync(string browserPath, BrowserTypeLaunchOptions baseOptions)
+    {
+        if (_playwright == null)
+        {
+            throw new InvalidOperationException("Playwright实例未初始化");
+        }
+
+        // 复制一份选项对象，避免副作用
+        BrowserTypeLaunchOptions CloneOptions(BrowserTypeLaunchOptions src) => new BrowserTypeLaunchOptions
+        {
+            Args = src.Args,
+            ChromiumSandbox = src.ChromiumSandbox,
+            Devtools = src.Devtools,
+            DownloadsPath = src.DownloadsPath,
+            Env = src.Env,
+            ExecutablePath = src.ExecutablePath,
+            HandleSIGHUP = src.HandleSIGHUP,
+            HandleSIGINT = src.HandleSIGINT,
+            HandleSIGTERM = src.HandleSIGTERM,
+            Headless = src.Headless,
+            IgnoreAllDefaultArgs = src.IgnoreAllDefaultArgs,
+            IgnoreDefaultArgs = src.IgnoreDefaultArgs,
+            Proxy = src.Proxy,
+            SlowMo = src.SlowMo,
+            Timeout = src.Timeout,
+            TracesDir = src.TracesDir,
+            Channel = src.Channel
+        };
+
+        string fileName = Path.GetFileName(browserPath).ToLowerInvariant();
+
+        // 1) 通道优先（msedge/chrome/firefox/webkit）
+        string? channel = null;
+        if (fileName.Contains("msedge") || fileName.Contains("edge")) channel = "msedge";
+        else if (fileName.Contains("chrome")) channel = "chrome";
+        else if (fileName.Contains("firefox") || fileName.Contains("mozilla")) channel = "firefox";
+        else if (fileName.Contains("safari") || fileName.Contains("webkit")) channel = "webkit";
+
+        if (!string.IsNullOrEmpty(channel))
+        {
+            var channelOptions = CloneOptions(baseOptions);
+            channelOptions.Channel = channel;
+            channelOptions.ExecutablePath = null; // 通道模式不需要显式路径
+            try
+            {
+                _logger?.LogInformation("尝试通过通道 {Channel} 启动浏览器（Headless={Headless})", channel, channelOptions.Headless);
+                if (channel == "firefox")
+                {
+                    return await _playwright.Firefox.LaunchAsync(channelOptions);
+                }
+                if (channel == "webkit")
+                {
+                    return await _playwright.Webkit.LaunchAsync(channelOptions);
+                }
+                return await _playwright.Chromium.LaunchAsync(channelOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "通过通道 {Channel} 启动失败，准备回退到显式路径", channel);
+            }
+        }
+
+        // 2) 显式路径（Chromium/Firefox/Webkit）
+        try
+        {
+            var pathOptions = CloneOptions(baseOptions);
+            pathOptions.ExecutablePath = browserPath;
+            _logger?.LogInformation("尝试通过显式路径启动浏览器: {Path}", browserPath);
+            return await LaunchBrowserByPathAsync(browserPath, pathOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "通过显式路径启动失败，准备回退到内置Chromium");
+        }
+
+        // 3) 最后回退：内置Chromium
+        await EnsureBrowserInstalledAsync();
+        _logger?.LogInformation("回退到内置Chromium 启动（Headless={Headless})", baseOptions.Headless);
+        return await _playwright.Chromium.LaunchAsync(baseOptions);
+    }
+
+    /// <summary>
     /// 确保Playwright浏览器已安装
     /// </summary>
     private async Task EnsureBrowserInstalledAsync()
     {
         try
         {
-            using var playwright = await Playwright.CreateAsync();
-
-            // 检查 Chromium
-            if (!File.Exists(playwright.Chromium.ExecutablePath))
+            _logger?.LogInformation("确保 Chromium 安装...");
+            var exitCode = await Task.Run(() => Microsoft.Playwright.Program.Main(new[] { "install", "chromium" }));
+            if (exitCode != 0)
             {
-                Console.WriteLine("Chromium 未安装，正在安装...");
-                var exitCode = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
-                if (exitCode != 0)
-                {
-                    throw new PlaywrightException($"Playwright 安装失败，退出代码: {exitCode}");
-                }
+                throw new PlaywrightException($"Playwright 安装失败，退出代码: {exitCode}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"安装Playwright时发生未知异常: {ex.Message}");
-            Console.WriteLine("请尝试手动执行: dotnet tool update --global playwright");
-            Console.WriteLine("或设置镜像源: set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright");
+            _logger?.LogError(ex, "安装 Playwright 时发生异常: {Message}", ex.Message);
+            _logger?.LogInformation("请尝试手动执行: dotnet tool update --global Microsoft.Playwright.CLI");
+            _logger?.LogInformation("或设置镜像源: set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright");
             throw;
         }
     }
@@ -304,28 +483,28 @@ public class PlaywrightService
         // 检测浏览器类型
         if (fileName.Contains("chrome") || fileName.Contains("chromium"))
         {
-            Console.WriteLine("使用Chrome/Chromium浏览器");
+            _logger?.LogInformation("使用 Chrome/Chromium 浏览器（路径）");
             return await _playwright.Chromium.LaunchAsync(options);
         }
         else if (fileName.Contains("firefox") || fileName.Contains("mozilla"))
         {
-            Console.WriteLine("使用Firefox浏览器");
+            _logger?.LogInformation("使用 Firefox 浏览器（路径）");
             return await _playwright.Firefox.LaunchAsync(options);
         }
         else if (fileName.Contains("msedge") || fileName.Contains("edge"))
         {
-            Console.WriteLine("使用Edge浏览器");
+            _logger?.LogInformation("使用 Edge 浏览器（路径，Chromium 内核）");
             return await _playwright.Chromium.LaunchAsync(options); // Edge基于Chromium
         }
         else if (fileName.Contains("safari") || fileName.Contains("webkit"))
         {
-            Console.WriteLine("使用Safari/WebKit浏览器");
+            _logger?.LogInformation("使用 Safari/WebKit 浏览器（路径）");
             return await _playwright.Webkit.LaunchAsync(options);
         }
         else
         {
             // 默认尝试使用Chromium启动
-            Console.WriteLine($"未识别的浏览器类型: {fileName}，尝试使用Chromium启动");
+            _logger?.LogWarning("未识别的浏览器类型: {FileName}，尝试使用Chromium启动", fileName);
             return await _playwright.Chromium.LaunchAsync(options);
         }
     }

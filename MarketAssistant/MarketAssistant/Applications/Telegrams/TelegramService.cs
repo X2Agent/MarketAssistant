@@ -30,8 +30,17 @@ public class TelegramService
             {
                 var telegraphs = new List<Telegram>();
 
-                await page.GotoAsync(url);
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                try
+                {
+                    await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+                    // DOM ready 后再等待关键节点出现，避免 NetworkIdle 阻塞
+                    await page.WaitForSelectorAsync("ul.newsText.all", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "打开实时新闻页面失败或超时，返回空列表");
+                    return telegraphs;
+                }
 
                 // 获取快讯列表
                 var newsElements = await page.QuerySelectorAllAsync("ul.newsText.all > li");
@@ -91,8 +100,9 @@ public class TelegramService
         }
         catch (Exception ex)
         {
+            // 降级为空结果，不向上抛出，避免影响应用稳定性
             _logger.LogError(ex, $"GetRealtimeNewsAsync 发生异常: {ex.Message}");
-            throw;
+            return new List<Telegram>();
         }
     }
 }
