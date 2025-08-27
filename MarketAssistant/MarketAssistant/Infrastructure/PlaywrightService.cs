@@ -21,10 +21,6 @@ public class PlaywrightService
     private readonly TimeSpan _healthCheckInterval = TimeSpan.FromMinutes(5);
     private const string _defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-    public PlaywrightService(IUserSettingService userSettingService) : this(userSettingService, null)
-    {
-    }
-
     public PlaywrightService(IUserSettingService userSettingService, ILogger<PlaywrightService>? logger)
     {
         _userSettingService = userSettingService;
@@ -229,17 +225,6 @@ public class PlaywrightService
     }
 
     /// <summary>
-    /// 执行健康检查
-    /// </summary>
-    private async Task PerformHealthCheckAsync()
-    {
-        if (_browser == null || !_browser.IsConnected)
-        {
-            await ForceReinitializeBrowserAsync();
-        }
-    }
-
-    /// <summary>
     /// 执行健康检查（如果需要）
     /// </summary>
     private async Task PerformHealthCheckIfNeeded()
@@ -255,8 +240,8 @@ public class PlaywrightService
         // 检查Browser连接状态
         if (_browser != null && !_browser.IsConnected)
         {
-            // Browser连接已断开，重新初始化
-            await DisposeAsync();
+            // Browser连接已断开，只关闭浏览器，避免处置信号量
+            await CloseBrowserAsync();
         }
     }
 
@@ -274,62 +259,70 @@ public class PlaywrightService
 
         try
         {
-            // 创建Playwright实例（失败时尝试安装后重试）
-            int createAttempts = 0;
-            while (true)
-            {
-                try
-                {
-                    _playwright = await Playwright.CreateAsync();
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    createAttempts++;
-                    _logger?.LogWarning(ex, "创建 Playwright 失败（第 {Attempt} 次），尝试执行安装后重试", createAttempts);
-                    if (createAttempts >= 2)
-                    {
-                        throw;
-                    }
-                    await TryInstallPlaywrightRuntimeAsync();
-                    await Task.Delay(TimeSpan.FromSeconds(1));
-                }
-            }
+            _logger?.LogInformation("初始化 Playwright...");
+
+            // 配置环境变量
+            ConfigurePlaywrightEnvironment(false);
+
+            // 创建Playwright实例
+            _playwright = await Playwright.CreateAsync();
 
             // 获取用户设置中的浏览器路径
             string? browserPath = _userSettingService.CurrentSetting.BrowserPath;
 
-            // 创建Browser实例的选项
+            // 创建浏览器启动选项
             var options = new BrowserTypeLaunchOptions
             {
-                Headless = true
+                Headless = true,
+                Args = new[]
+                {
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--disable-dev-shm-usage",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-background-networking",
+                    "--disable-background-timer-throttling"
+                }
             };
 
-            // 启动策略：优先通道，其次显式路径，最后回退到内置Chromium
-            if (!string.IsNullOrWhiteSpace(browserPath))
+            // 如果指定了浏览器路径，使用该路径
+            if (!string.IsNullOrWhiteSpace(browserPath) && File.Exists(browserPath))
             {
-                _browser = await TryLaunchByPreferredStrategyAsync(browserPath!, options);
+                options.ExecutablePath = browserPath;
+                _logger?.LogInformation("使用自定义浏览器路径: {Path}", browserPath);
             }
             else
             {
-                // 用户未指定浏览器路径，确保Playwright内置浏览器已安装
-                await EnsureBrowserInstalledAsync();
-                _browser = await _playwright.Chromium.LaunchAsync(options);
+                // 没有路径或路径不存在，使用内置Chromium
+                _logger?.LogInformation("使用内置 Chromium");
+                await Task.Run(() => Microsoft.Playwright.Program.Main(new[] { "install", "chromium" }));
             }
 
-            // 监听断连，便于后续自愈
+            // 启动浏览器
+            _browser = await _playwright.Chromium.LaunchAsync(options);
+
+            // 监听断连事件
             if (_browser != null)
             {
                 _browser.Disconnected += (_, __) =>
                 {
-                    _logger?.LogWarning("Playwright 浏览器已断开连接");
+                    _logger?.LogWarning("浏览器连接断开");
                     _browser = null;
                 };
             }
+
+            _logger?.LogInformation("Playwright 初始化完成");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "初始化 Playwright 时发生异常: {Message}", ex.Message);
+            _logger?.LogError(ex, "Playwright 初始化失败: {Message}", ex.Message);
+            
+            // 清理失败状态
+            _playwright?.Dispose();
+            _playwright = null;
+            _browser = null;
+            
             throw;
         }
         finally
@@ -343,12 +336,28 @@ public class PlaywrightService
     /// </summary>
     private Task TryInstallPlaywrightRuntimeAsync()
     {
+        return TryInstallPlaywrightRuntimeAsync(false);
+    }
+
+    private Task TryInstallPlaywrightRuntimeAsync(bool useMirror)
+    {
         return Task.Run(() =>
         {
             try
             {
-                _logger?.LogInformation("尝试安装 Playwright 运行时与 Chromium 浏览器...");
-                _ = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+                ConfigurePlaywrightEnvironment(useMirror);
+                _logger?.LogInformation("安装 Playwright 运行时与 Chromium 浏览器（mirror={Mirror}）...", useMirror);
+                var exit = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+                if (exit != 0)
+                {
+                    _logger?.LogWarning("Playwright 安装返回非零退出码: {Exit}", exit);
+                    CleanupPlaywrightCacheSafe();
+                    exit = Microsoft.Playwright.Program.Main(new[] { "install", "chromium" });
+                    if (exit != 0)
+                    {
+                        _logger?.LogWarning("Playwright 安装在清理缓存后仍返回非零退出码: {Exit}", exit);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -357,157 +366,51 @@ public class PlaywrightService
         });
     }
 
-    /// <summary>
-    /// 优先使用通道启动，失败后再尝试显式路径与内置浏览器
-    /// </summary>
-    private async Task<IBrowser> TryLaunchByPreferredStrategyAsync(string browserPath, BrowserTypeLaunchOptions baseOptions)
+    private void ConfigurePlaywrightEnvironment(bool useMirror)
     {
-        if (_playwright == null)
-        {
-            throw new InvalidOperationException("Playwright实例未初始化");
-        }
-
-        // 复制一份选项对象，避免副作用
-        BrowserTypeLaunchOptions CloneOptions(BrowserTypeLaunchOptions src) => new BrowserTypeLaunchOptions
-        {
-            Args = src.Args,
-            ChromiumSandbox = src.ChromiumSandbox,
-            Devtools = src.Devtools,
-            DownloadsPath = src.DownloadsPath,
-            Env = src.Env,
-            ExecutablePath = src.ExecutablePath,
-            HandleSIGHUP = src.HandleSIGHUP,
-            HandleSIGINT = src.HandleSIGINT,
-            HandleSIGTERM = src.HandleSIGTERM,
-            Headless = src.Headless,
-            IgnoreAllDefaultArgs = src.IgnoreAllDefaultArgs,
-            IgnoreDefaultArgs = src.IgnoreDefaultArgs,
-            Proxy = src.Proxy,
-            SlowMo = src.SlowMo,
-            Timeout = src.Timeout,
-            TracesDir = src.TracesDir,
-            Channel = src.Channel
-        };
-
-        string fileName = Path.GetFileName(browserPath).ToLowerInvariant();
-
-        // 1) 通道优先（msedge/chrome/firefox/webkit）
-        string? channel = null;
-        if (fileName.Contains("msedge") || fileName.Contains("edge")) channel = "msedge";
-        else if (fileName.Contains("chrome")) channel = "chrome";
-        else if (fileName.Contains("firefox") || fileName.Contains("mozilla")) channel = "firefox";
-        else if (fileName.Contains("safari") || fileName.Contains("webkit")) channel = "webkit";
-
-        if (!string.IsNullOrEmpty(channel))
-        {
-            var channelOptions = CloneOptions(baseOptions);
-            channelOptions.Channel = channel;
-            channelOptions.ExecutablePath = null; // 通道模式不需要显式路径
-            try
-            {
-                _logger?.LogInformation("尝试通过通道 {Channel} 启动浏览器（Headless={Headless})", channel, channelOptions.Headless);
-                if (channel == "firefox")
-                {
-                    return await _playwright.Firefox.LaunchAsync(channelOptions);
-                }
-                if (channel == "webkit")
-                {
-                    return await _playwright.Webkit.LaunchAsync(channelOptions);
-                }
-                return await _playwright.Chromium.LaunchAsync(channelOptions);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "通过通道 {Channel} 启动失败，准备回退到显式路径", channel);
-            }
-        }
-
-        // 2) 显式路径（Chromium/Firefox/Webkit）
         try
         {
-            var pathOptions = CloneOptions(baseOptions);
-            pathOptions.ExecutablePath = browserPath;
-            _logger?.LogInformation("尝试通过显式路径启动浏览器: {Path}", browserPath);
-            return await LaunchBrowserByPathAsync(browserPath, pathOptions);
+            var browsersPath = GetBrowsersPath();
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_BROWSERS_PATH", browsersPath, EnvironmentVariableTarget.Process);
+            Environment.SetEnvironmentVariable("PLAYWRIGHT_CLI_LOG", "1", EnvironmentVariableTarget.Process);
+            if (useMirror)
+            {
+                Environment.SetEnvironmentVariable("PLAYWRIGHT_DOWNLOAD_HOST", "https://npmmirror.com/mirrors/playwright", EnvironmentVariableTarget.Process);
+            }
         }
-        catch (Exception ex)
+        catch
         {
-            _logger?.LogWarning(ex, "通过显式路径启动失败，准备回退到内置Chromium");
         }
-
-        // 3) 最后回退：内置Chromium
-        await EnsureBrowserInstalledAsync();
-        _logger?.LogInformation("回退到内置Chromium 启动（Headless={Headless})", baseOptions.Headless);
-        return await _playwright.Chromium.LaunchAsync(baseOptions);
     }
 
-    /// <summary>
-    /// 确保Playwright浏览器已安装
-    /// </summary>
-    private async Task EnsureBrowserInstalledAsync()
+    private static string GetBrowsersPath()
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(local, "ms-playwright");
+    }
+
+    private void CleanupPlaywrightCacheSafe()
     {
         try
         {
-            _logger?.LogInformation("确保 Chromium 安装...");
-            var exitCode = await Task.Run(() => Microsoft.Playwright.Program.Main(new[] { "install", "chromium" }));
-            if (exitCode != 0)
+            var path = GetBrowsersPath();
+            if (Directory.Exists(path))
             {
-                throw new PlaywrightException($"Playwright 安装失败，退出代码: {exitCode}");
+                _logger?.LogWarning("清理本地 Playwright 浏览器缓存: {Path}", path);
+                Directory.Delete(path, true);
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "安装 Playwright 时发生异常: {Message}", ex.Message);
-            _logger?.LogInformation("请尝试手动执行: dotnet tool update --global Microsoft.Playwright.CLI");
-            _logger?.LogInformation("或设置镜像源: set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright");
-            throw;
+            _logger?.LogWarning(ex, "清理 Playwright 缓存目录时出现异常（已忽略）");
         }
     }
 
-    /// <summary>
-    /// 根据浏览器路径智能选择并启动正确的浏览器类型
-    /// </summary>
-    /// <param name="browserPath">浏览器可执行文件路径</param>
-    /// <param name="options">浏览器启动选项</param>
-    /// <returns>浏览器实例</returns>
-    private async Task<IBrowser> LaunchBrowserByPathAsync(string browserPath, BrowserTypeLaunchOptions options)
-    {
-        if (_playwright == null)
-        {
-            throw new InvalidOperationException("Playwright实例未初始化");
-        }
 
-        // 根据路径判断浏览器类型
-        string fileName = Path.GetFileName(browserPath).ToLowerInvariant();
 
-        // 检测浏览器类型
-        if (fileName.Contains("chrome") || fileName.Contains("chromium"))
-        {
-            _logger?.LogInformation("使用 Chrome/Chromium 浏览器（路径）");
-            return await _playwright.Chromium.LaunchAsync(options);
-        }
-        else if (fileName.Contains("firefox") || fileName.Contains("mozilla"))
-        {
-            _logger?.LogInformation("使用 Firefox 浏览器（路径）");
-            return await _playwright.Firefox.LaunchAsync(options);
-        }
-        else if (fileName.Contains("msedge") || fileName.Contains("edge"))
-        {
-            _logger?.LogInformation("使用 Edge 浏览器（路径，Chromium 内核）");
-            return await _playwright.Chromium.LaunchAsync(options); // Edge基于Chromium
-        }
-        else if (fileName.Contains("safari") || fileName.Contains("webkit"))
-        {
-            _logger?.LogInformation("使用 Safari/WebKit 浏览器（路径）");
-            return await _playwright.Webkit.LaunchAsync(options);
-        }
-        else
-        {
-            // 默认尝试使用Chromium启动
-            _logger?.LogWarning("未识别的浏览器类型: {FileName}，尝试使用Chromium启动", fileName);
-            return await _playwright.Chromium.LaunchAsync(options);
-        }
-    }
+
+
+
 
     /// <summary>
     /// 优雅关闭服务
@@ -534,26 +437,42 @@ public class PlaywrightService
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        // 关闭浏览器
-        if (_browser != null)
-        {
-            try
-            {
-                await _browser.CloseAsync();
-            }
-            catch
-            {
-                // 忽略关闭异常
-            }
-            _browser = null;
-        }
+        await CloseBrowserAsync();
 
-        // 释放 Playwright
-        _playwright?.Dispose();
-        _playwright = null;
-
-        // 释放信号量
+        // 释放信号量（仅应用退出时调用）
         _initLock.Dispose();
         _pageLock.Dispose();
+    }
+
+    /// <summary>
+    /// 仅关闭浏览器与 Playwright（不释放信号量），用于健康检查/自愈
+    /// </summary>
+    private async Task CloseBrowserAsync()
+    {
+        await _initLock.WaitAsync();
+        try
+        {
+            // 关闭浏览器
+            if (_browser != null)
+            {
+                try
+                {
+                    await _browser.CloseAsync();
+                }
+                catch
+                {
+                    // 忽略关闭异常
+                }
+                _browser = null;
+            }
+
+            // 释放 Playwright
+            _playwright?.Dispose();
+            _playwright = null;
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 }
