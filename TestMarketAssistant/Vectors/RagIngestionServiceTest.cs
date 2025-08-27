@@ -48,7 +48,10 @@ public class RagIngestionServiceTest
             cleaningServiceMock.Object,
             chunkingServiceMock.Object,
             serviceProviderMock.Object,
-            loggerMock.Object);
+            loggerMock.Object,
+            Enumerable.Empty<IDocumentBlockReader>(),
+            Mock.Of<IImageEmbeddingService>(),
+            Mock.Of<IImageStorageService>());
 
         var filePath = "test.txt";
 
@@ -83,7 +86,10 @@ public class RagIngestionServiceTest
             cleaningServiceMock.Object,
             chunkingServiceMock.Object,
             serviceProviderMock.Object,
-            loggerMock.Object);
+            loggerMock.Object,
+            Enumerable.Empty<IDocumentBlockReader>(),
+            Mock.Of<IImageEmbeddingService>(),
+            Mock.Of<IImageStorageService>());
 
         var filePath = "test.txt";
 

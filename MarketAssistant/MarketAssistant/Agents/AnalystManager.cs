@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Vectors;
+using MarketAssistant.Vectors.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -24,6 +25,7 @@ public class AnalystManager
     #region 常量定义
     private const string WEB_SEARCH_PLUGIN_NAME = "WebSearchPlugin";
     private const string VECTOR_SEARCH_PLUGIN_NAME = "VectorSearchPlugin";
+    private const string GROUNDING_SEARCH_PLUGIN_NAME = "GroundingSearchPlugin";
     #endregion
 
     private readonly Kernel _kernel;
@@ -34,6 +36,7 @@ public class AnalystManager
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
     private readonly VectorStore _vectorStore;
     private readonly IKernelPluginConfig _kernelPluginConfig;
+    private readonly GroundingSearchPlugin _groundingSearchPlugin;
 
     private Action<ChatMessageContent>? _messageCallback;
 
@@ -51,7 +54,8 @@ public class AnalystManager
         IUserSettingService userSettingService,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         VectorStore vectorStore,
-        IKernelPluginConfig kernelPluginConfig)
+        IKernelPluginConfig kernelPluginConfig,
+        GroundingSearchPlugin groundingSearchPlugin)
     {
         _kernel = kernel;
         _logger = logger;
@@ -59,6 +63,7 @@ public class AnalystManager
         _embeddingGenerator = embeddingGenerator;
         _vectorStore = vectorStore;
         _kernelPluginConfig = kernelPluginConfig;
+        _groundingSearchPlugin = groundingSearchPlugin;
 
         // 创建分析师及编排
         CreateAnalysts();
@@ -233,6 +238,19 @@ public class AnalystManager
         }
     }
 
+    private void ConfigureGroundingSearchPlugin(ChatCompletionAgent agent)
+    {
+        try
+        {
+            agent.Kernel.Plugins.AddFromObject(_groundingSearchPlugin, GROUNDING_SEARCH_PLUGIN_NAME);
+            _logger.LogInformation("成功添加 Grounding 搜索插件到协调分析师");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "配置 Grounding 搜索插件失败");
+        }
+    }
+
     #endregion
 
     public async Task<string[]> ExecuteAnalystDiscussionAsync(string prompt, Action<ChatMessageContent>? messageCallback)
@@ -267,6 +285,9 @@ public class AnalystManager
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
         var userSetting = _userSettingService.CurrentSetting;
 
+        // Grounding 插件（优先使用）
+        ConfigureGroundingSearchPlugin(coordinatorAgent);
+
         // 配置Web搜索插件
         ConfigureWebSearchPlugin(coordinatorAgent, userSetting);
 
@@ -277,29 +298,5 @@ public class AnalystManager
             coordinatorAgent.Kernel.Plugins.Count);
 
         return coordinatorAgent;
-    }
-
-    /// <summary>
-    ///  创建一个分析师线程，使用ChatHistoryAgentThread来管理分析师之间的对话
-    /// </summary>
-    private ChatHistoryAgentThread CreateAgentThread()
-    {
-        // 这里可以配置更多的上下文提供者，例如白板、函数等
-        var agentThread = new ChatHistoryAgentThread();
-        //var whiteboardProvider = new WhiteboardProvider();
-        //agentThread.AIContextProviders.Add(whiteboardProvider);
-        //agentThread.AIContextProviders.Add(
-        //        new ContextualFunctionProvider(
-        //            vectorStore: new InMemoryVectorStore(new InMemoryVectorStoreOptions()
-        //            {
-        //                EmbeddingGenerator = embeddingGenerator
-        //            }),
-        //            vectorDimensions: 1536,
-        //            functions: [AIFunctionFactory.Create(() => "获取资金流向数据", "GetCapitalFlow")],
-        //            maxNumberOfFunctions: 3, // 限制最多3个相关函数
-        //            loggerFactory: LoggerFactory
-        //        )
-        //    );
-        return agentThread;
     }
 }

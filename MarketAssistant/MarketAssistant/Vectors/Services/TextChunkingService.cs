@@ -1,5 +1,7 @@
 using MarketAssistant.Vectors.Interfaces;
 using Microsoft.SemanticKernel.Text;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace MarketAssistant.Vectors.Services;
 
@@ -31,17 +33,42 @@ public class TextChunkingService : ITextChunkingService
             overlapTokens,
             tokenCounter: null);
 
+        int order = 0;
         foreach (var para in paragraphs)
         {
             if (string.IsNullOrWhiteSpace(para)) continue;
+            var trimmed = para.Trim();
+            var hash = Sha256Hex(trimmed);
+            var key = $"{Sha256Hex(documentUri)}:{order}:{hash[..8]}";
+
             yield return new TextParagraph
             {
-                Key = Guid.NewGuid().ToString(),
+                Key = key,
                 DocumentUri = documentUri,
-                ParagraphId = Guid.NewGuid().ToString("N"),
-                Text = para.Trim()
+                ParagraphId = order.ToString(),
+                Text = trimmed,
+                Order = order,
+                Section = null,
+                SourceType = GetSourceTypeFromUri(documentUri),
+                ContentHash = hash,
+                PublishedAt = null
             };
+
+            order++;
         }
+    }
+
+    private static string GetSourceTypeFromUri(string uri)
+        => uri.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "pdf"
+         : uri.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) ? "docx"
+         : uri.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? "web"
+         : "text";
+
+    private static string Sha256Hex(string input)
+    {
+        using var sha = SHA256.Create();
+        var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(bytes);
     }
 }
 

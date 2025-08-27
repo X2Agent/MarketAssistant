@@ -1,5 +1,6 @@
 using MarketAssistant.Vectors.Interfaces;
 using MarketAssistant.Vectors.Services;
+using MarketAssistant.Infrastructure;
 
 namespace MarketAssistant.Vectors.Extensions;
 
@@ -17,6 +18,22 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITextChunkingService, TextChunkingService>();
         services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
         services.AddSingleton<IRagIngestionService, RagIngestionService>();
+
+        // 多模态：使用 CLIP 服务替换占位实现
+        services.AddSingleton<IImageEmbeddingService, ClipImageEmbeddingService>();
+        services.AddSingleton<IImageStorageService, LocalImageStorageService>();
+        services.AddSingleton<IDocumentBlockReader, PdfBlockReader>();
+        services.AddSingleton<IDocumentBlockReader, DocxBlockReader>();
+
+        // 注册重排服务 - 使用装饰器模式实现降级
+        services.AddKeyedSingleton<IRerankerService, OnnxCrossEncoderRerankerService>("primary");
+        services.AddKeyedSingleton<IRerankerService, RerankerService>("fallback");
+        services.AddSingleton<IRerankerService, FallbackRerankerService>();
+
+        services.AddSingleton<RetrievalOrchestrator>();
+        services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
+        services.AddSingleton<GroundingSearchPlugin>();
+
         // 使用 Keyed Services 注册多实现，按扩展名作为 key
         services.AddKeyedSingleton<IRawDocumentReader, PdfRawReader>("pdf");
         services.AddKeyedSingleton<IRawDocumentReader, DocxRawReader>("docx");
