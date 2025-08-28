@@ -29,7 +29,7 @@ public class StockService
 
             try
             {
-                await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+                await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
                 await page.WaitForSelectorAsync(".search-stock-list", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
             }
             catch (Exception ex)
@@ -78,7 +78,7 @@ public class StockService
             {
                 try
                 {
-                    await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+                    await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
                     await page.WaitForSelectorAsync(".stock-detail", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
                 }
                 catch (Exception ex)
