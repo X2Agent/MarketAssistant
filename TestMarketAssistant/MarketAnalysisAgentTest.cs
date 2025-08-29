@@ -1,5 +1,7 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
+using MarketAssistant.Vectors.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Moq;
@@ -20,7 +22,8 @@ public class MarketAnalysisAgentTest : BaseKernelTest
         var embeddingGenerator = _kernel.Services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         var vectorStore = _kernel.Services.GetService<VectorStore>();
         var kernelPluginConfig = _kernel.Services.GetService<IKernelPluginConfig>();
-        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, embeddingGenerator, vectorStore, kernelPluginConfig);
+        var groundingSearchPlugin = _kernel.Services.GetService<GroundingSearchPlugin>();
+        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, embeddingGenerator, vectorStore, kernelPluginConfig, groundingSearchPlugin);
         _marketAnalysisAgent = new MarketAnalysisAgent(logger, analystManager);
     }
 

@@ -1,5 +1,6 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
 using MarketAssistant.Vectors;
 using MarketAssistant.Vectors.Services;
 using Microsoft.Extensions.AI;

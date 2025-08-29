@@ -9,11 +9,24 @@ using System.Text;
 namespace MarketAssistant.Vectors.Services;
 
 /// <summary>
-/// DOCX 读取器：按文档顺序提取文本段落、表格和图片
+/// DOCX 读取器：支持结构化块读取和原始文本读取的统一实现
 /// </summary>
-public class DocxBlockReader : IDocumentBlockReader
+public class DocxReader : IDocumentBlockReader, IRawDocumentReader
 {
     public bool CanRead(string filePath) => filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 实现 IRawDocumentReader：提取纯文本内容（降级方案）
+    /// </summary>
+    public string ReadAllText(Stream stream)
+    {
+        var textBlocks = ReadBlocks(stream, string.Empty)
+            .Where(block => block.Type == DocumentBlockType.Text && !string.IsNullOrWhiteSpace(block.Text))
+            .OrderBy(block => block.Order)
+            .Select(block => block.Text);
+
+        return string.Join(Environment.NewLine, textBlocks);
+    }
 
     public IEnumerable<DocumentBlock> ReadBlocks(Stream stream, string filePath)
     {
@@ -43,11 +56,11 @@ public class DocxBlockReader : IDocumentBlockReader
                     var text = ExtractParagraphText(paragraph);
                     if (!string.IsNullOrWhiteSpace(text))
                     {
-                        yield return new DocumentBlock 
-                        { 
-                            Type = DocumentBlockType.Text, 
-                            Text = text, 
-                            Order = order++ 
+                        yield return new DocumentBlock
+                        {
+                            Type = DocumentBlockType.Text,
+                            Text = text,
+                            Order = order++
                         };
                     }
                     break;
@@ -91,31 +104,31 @@ public class DocxBlockReader : IDocumentBlockReader
     /// 从段落中提取图片（简化逻辑）
     /// </summary>
     private static IEnumerable<DocumentBlock> ExtractImagesFromParagraph(
-        Paragraph paragraph, 
-        Dictionary<string, ImagePart> imageRelationMap, 
+        Paragraph paragraph,
+        Dictionary<string, ImagePart> imageRelationMap,
         HashSet<string> processedImages,
         int order)
     {
         // 查找段落中的所有图片引用
         var blips = paragraph.Descendants<DocumentFormat.OpenXml.Drawing.Blip>();
-        
+
         foreach (var blip in blips)
         {
             var embed = blip.Embed?.Value;
             if (string.IsNullOrEmpty(embed)) continue;
-            
+
             // 避免重复处理同一图片
             if (!processedImages.Add(embed)) continue;
-            
+
             if (imageRelationMap.TryGetValue(embed, out var imagePart))
             {
                 var imageBytes = ExtractImageBytes(imagePart);
                 if (imageBytes != null && imageBytes.Length > 0)
                 {
-                    yield return new DocumentBlock 
-                    { 
-                        Type = DocumentBlockType.Image, 
-                        ImageBytes = imageBytes, 
+                    yield return new DocumentBlock
+                    {
+                        Type = DocumentBlockType.Image,
+                        ImageBytes = imageBytes,
                         Order = order
                     };
                 }
@@ -132,7 +145,7 @@ public class DocxBlockReader : IDocumentBlockReader
         {
             using var imageStream = imagePart.GetStream();
             if (imageStream.Length == 0) return null;
-            
+
             using var ms = new MemoryStream((int)imageStream.Length);
             imageStream.CopyTo(ms);
             return ms.ToArray();
@@ -149,7 +162,7 @@ public class DocxBlockReader : IDocumentBlockReader
     private static DocumentBlock? ProcessTable(Table table, int order)
     {
         var rows = new List<List<string>>();
-        
+
         foreach (var tableRow in table.Elements<TableRow>())
         {
             var row = ExtractTableRow(tableRow);
@@ -195,13 +208,13 @@ public class DocxBlockReader : IDocumentBlockReader
     private static List<string> ExtractTableRow(TableRow tableRow)
     {
         var row = new List<string>();
-        
+
         foreach (var tableCell in tableRow.Elements<TableCell>())
         {
             var cellText = ExtractTableCellText(tableCell);
             row.Add(cellText);
         }
-        
+
         return row;
     }
 
@@ -213,7 +226,7 @@ public class DocxBlockReader : IDocumentBlockReader
         var paragraphs = cell.Elements<Paragraph>()
             .Select(p => p.InnerText?.Trim())
             .Where(text => !string.IsNullOrWhiteSpace(text));
-        
+
         return string.Join('\n', paragraphs);
     }
 
@@ -223,14 +236,14 @@ public class DocxBlockReader : IDocumentBlockReader
     private static string? DetermineTableCaption(IReadOnlyList<List<string>> rows)
     {
         if (rows.Count == 0) return null;
-        
+
         var firstRow = rows[0];
-        
+
         // 判断是否为标题行的启发式规则
         var isLikelyHeader = firstRow.Count <= 8 && // 列数不太多
                            firstRow.All(cell => cell.Length <= 30) && // 单元格内容不太长
                            firstRow.Count(cell => !string.IsNullOrWhiteSpace(cell)) >= 2; // 至少有2个非空单元格
-        
+
         return isLikelyHeader ? string.Join(" | ", firstRow.Where(c => !string.IsNullOrWhiteSpace(c))) : null;
     }
 
@@ -240,23 +253,23 @@ public class DocxBlockReader : IDocumentBlockReader
     private static string GenerateTableMarkdown(IReadOnlyList<List<string>> rows)
     {
         if (rows.Count == 0) return string.Empty;
-        
+
         var sb = new StringBuilder();
         sb.AppendLine("[TABLE]");
-        
+
         // 表头
         var header = rows[0];
         sb.Append("| ").AppendJoin(" | ", header.Select(EscapeMarkdown)).AppendLine(" |");
-        
+
         // 分隔线
         sb.Append("| ").AppendJoin(" | ", header.Select(_ => "---")).AppendLine(" |");
-        
+
         // 数据行
         foreach (var row in rows.Skip(1))
         {
             sb.Append("| ").AppendJoin(" | ", row.Select(EscapeMarkdown)).AppendLine(" |");
         }
-        
+
         return sb.ToString();
     }
 
@@ -266,7 +279,7 @@ public class DocxBlockReader : IDocumentBlockReader
     private static string EscapeMarkdown(string text)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
-        
+
         return text.Replace("|", "\\|")
                   .Replace("\n", "<br>")
                   .Replace("\r", "");
@@ -278,7 +291,7 @@ public class DocxBlockReader : IDocumentBlockReader
     private static string ComputeHash(string input)
     {
         if (string.IsNullOrEmpty(input)) return string.Empty;
-        
+
         using var sha = SHA256.Create();
         var hashBytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hashBytes);

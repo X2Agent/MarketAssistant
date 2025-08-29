@@ -9,9 +9,9 @@ using System.Text;
 namespace MarketAssistant.Vectors.Services;
 
 /// <summary>
-/// PDF 块读取器：高效提取文本段落、图片，并进行简化的表格检测
+/// PDF 读取器：支持结构化块读取和原始文本读取的统一实现
 /// </summary>
-public class PdfBlockReader : IDocumentBlockReader
+public class PdfReader : IDocumentBlockReader, IRawDocumentReader
 {
     private static readonly Regex ParagraphSeparator = new(@"\n\s*\n", RegexOptions.Compiled);
     private static readonly Regex WhitespaceNormalizer = new(@"\s+", RegexOptions.Compiled);
@@ -24,6 +24,37 @@ public class PdfBlockReader : IDocumentBlockReader
 
     public bool CanRead(string filePath) => 
         filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 实现 IRawDocumentReader：提取纯文本内容（降级方案）
+    /// </summary>
+    public string ReadAllText(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        
+        stream.Position = 0;
+        using var pdf = PdfDocument.Open(stream);
+        var sb = new StringBuilder();
+        
+        for (int i = 1; i <= pdf.NumberOfPages; i++)
+        {
+            var page = pdf.GetPage(i);
+            var text = page.Text;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // 将 PDF 页内的单行换行转为空格，页与页之间保留空行
+                text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+                var lines = text.Split('\n');
+                var line = string.Join(' ', lines.Select(s => s.Trim()).Where(s => s.Length > 0));
+                if (line.Length > 0)
+                {
+                    sb.AppendLine(line);
+                    sb.AppendLine();
+                }
+            }
+        }
+        return sb.ToString();
+    }
 
     public IEnumerable<DocumentBlock> ReadBlocks(Stream stream, string filePath)
     {
