@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using System.Diagnostics;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 
@@ -30,9 +29,9 @@ public abstract class ViewModelBase : ObservableObject
     protected async Task SafeExecuteAsync(Func<Task> operation, string? operationName = null)
     {
         await GlobalExceptionHandler.SafeExecuteAsync(
-            operation, 
-            setBusy: (busy) => IsBusy = busy, 
-            operationName, 
+            operation,
+            setBusy: (busy) => IsBusy = busy,
+            operationName,
             Logger
         );
     }
@@ -43,9 +42,9 @@ public abstract class ViewModelBase : ObservableObject
     protected async Task<T?> SafeExecuteAsync<T>(Func<Task<T>> operation, string? operationName = null)
     {
         return await GlobalExceptionHandler.SafeExecuteAsync(
-            operation, 
-            setBusy: (busy) => IsBusy = busy, 
-            operationName, 
+            operation,
+            setBusy: (busy) => IsBusy = busy,
+            operationName,
             Logger
         );
     }
@@ -56,9 +55,9 @@ public abstract class ViewModelBase : ObservableObject
     protected void SafeExecute(Action operation, string? operationName = null)
     {
         GlobalExceptionHandler.SafeExecute(
-            operation, 
-            setBusy: (busy) => IsBusy = busy, 
-            operationName, 
+            operation,
+            setBusy: (busy) => IsBusy = busy,
+            operationName,
             Logger
         );
     }

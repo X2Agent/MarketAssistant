@@ -7,7 +7,7 @@
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="MarketAssistant.Pages.SettingPage"
              x:DataType="viewmodels:SettingViewModel">
-    
+
     <ContentPage.Resources>
         <ResourceDictionary>
             <!-- 页面特有资源 -->
@@ -15,28 +15,54 @@
         </ResourceDictionary>
     </ContentPage.Resources>
     <ScrollView>
-        <VerticalStackLayout Padding="{StaticResource SmallCardPadding}" Spacing="{StaticResource SmallSpacing}">
+        <VerticalStackLayout Padding="{StaticResource SmallCardPadding}"
+                Spacing="{StaticResource SmallSpacing}">
             <!-- 模型设置区域 -->
-            <controls:CardView ShadowOpacity="0.4" Header="模型设置(硅基流动)">
-                <Grid RowDefinitions="Auto,Auto" RowSpacing="16">
+            <controls:CardView ShadowOpacity="0.4"
+                    Header="模型设置(硅基流动)">
+                <Grid RowDefinitions="Auto,Auto"
+                        RowSpacing="16">
                     <!-- 模型选择 -->
-                    <StackLayout Grid.Row="0" Spacing="8">
-                        <Picker ItemsSource="{Binding Models}" SelectedItem="{Binding UserSetting.ModelId}" Title="模型选择">
+                    <StackLayout Grid.Row="0"
+                            Spacing="8">
+                        <Picker ItemsSource="{Binding Models}"
+                                SelectedItem="{Binding UserSetting.ModelId}"
+                                Title="模型选择">
                             <Picker.Triggers>
-                                <DataTrigger TargetType="Picker" Binding="{Binding Models.Count}" Value="0">
-                                    <Setter Property="IsEnabled" Value="False" />
+                                <DataTrigger TargetType="Picker"
+                                        Binding="{Binding Models.Count}"
+                                        Value="0">
+                                    <Setter Property="IsEnabled"
+                                            Value="False"/>
                                 </DataTrigger>
                             </Picker.Triggers>
                         </Picker>
                     </StackLayout>
 
                     <!-- API密钥 -->
-                    <Grid Grid.Row="1" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnDefinitions="*,Auto">
-                        <Label Grid.Row="0" Grid.ColumnSpan="2" Text="API密钥" FontSize="{StaticResource LabelFontSize}" TextColor="{StaticResource LabelTextColor}" />
-                        <Entry Grid.Row="1" Grid.Column="0" Text="{Binding UserSetting.ApiKey}" Placeholder="请输入API密钥" IsPassword="True" />
-                        <Button Grid.Row="1" Grid.Column="1" Text="获取密钥" Command="{Binding OpenModelApiWebsiteCommand}" 
-                                BackgroundColor="{StaticResource PrimaryButtonColor}" TextColor="White" Margin="8,0,0,0" 
-                                WidthRequest="100" HeightRequest="40" />
+                    <Grid Grid.Row="1"
+                            RowDefinitions="Auto,Auto"
+                            RowSpacing="8"
+                            ColumnDefinitions="*,Auto">
+                        <Label Grid.Row="0"
+                                Grid.ColumnSpan="2"
+                                Text="API密钥"
+                                FontSize="{StaticResource LabelFontSize}"
+                                TextColor="{StaticResource LabelTextColor}"/>
+                        <Entry Grid.Row="1"
+                                Grid.Column="0"
+                                Text="{Binding UserSetting.ApiKey}"
+                                Placeholder="请输入API密钥"
+                                IsPassword="True"/>
+                        <Button Grid.Row="1"
+                                Grid.Column="1"
+                                Text="获取密钥"
+                                Command="{Binding OpenModelApiWebsiteCommand}"
+                                BackgroundColor="{StaticResource PrimaryButtonColor}"
+                                TextColor="White"
+                                Margin="8,0,0,0"
+                                WidthRequest="100"
+                                HeightRequest="40"/>
                     </Grid>
                 </Grid>
             </controls:CardView>
@@ -46,47 +72,85 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <!-- 智图API令牌 -->
                     <VerticalStackLayout Spacing="8">
-                        <Label Text="ZhiTu API令牌" FontSize="14" TextColor="#6c757d" />
+                        <Label Text="ZhiTu API令牌"
+                                FontSize="14"
+                                TextColor="#6c757d"/>
                         <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.ZhiTuApiToken}" Placeholder="请输入ZhiTu API令牌" />
-                            <Button Grid.Column="1" Text="获取令牌" Command="{Binding OpenZhiTuApiWebsiteCommand}" 
-                                BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" 
-                                WidthRequest="100" HeightRequest="40" />
+                            <Entry Grid.Column="0"
+                                    Text="{Binding UserSetting.ZhiTuApiToken}"
+                                    Placeholder="请输入ZhiTu API令牌"/>
+                            <Button Grid.Column="1"
+                                    Text="获取令牌"
+                                    Command="{Binding OpenZhiTuApiWebsiteCommand}"
+                                    BackgroundColor="#007bff"
+                                    TextColor="White"
+                                    Margin="8,0,0,0"
+                                    WidthRequest="100"
+                                    HeightRequest="40"/>
                         </Grid>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>
-            
+
             <!-- 知识库设置区域 -->
-            <controls:CardView ShadowOpacity="0.4" Header="知识库设置">
-                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
+            <controls:CardView ShadowOpacity="0.4"
+                    Header="知识库设置">
+                <Grid RowDefinitions="Auto,Auto,Auto"
+                        RowSpacing="16">
                     <!-- 是否加载知识库 -->
                     <HorizontalStackLayout Grid.Row="0">
-                        <CheckBox IsChecked="{Binding UserSetting.LoadKnowledge}" Color="{StaticResource PrimaryButtonColor}" />
-                        <Label Text="加载知识库" FontSize="{StaticResource LabelFontSize}" TextColor="#212529" VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding UserSetting.LoadKnowledge}"
+                                Color="{StaticResource PrimaryButtonColor}"/>
+                        <Label Text="加载知识库"
+                                FontSize="{StaticResource LabelFontSize}"
+                                TextColor="#212529"
+                                VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
                     <!-- 知识文件目录 -->
-                    <StackLayout Grid.Row="1" Spacing="8" IsEnabled="{Binding UserSetting.LoadKnowledge}">
-                        <Label Text="知识文件目录" FontSize="{StaticResource LabelFontSize}" TextColor="{StaticResource LabelTextColor}" />
+                    <StackLayout Grid.Row="1"
+                            Spacing="8"
+                            IsEnabled="{Binding UserSetting.LoadKnowledge}">
+                        <Label Text="知识文件目录"
+                                FontSize="{StaticResource LabelFontSize}"
+                                TextColor="{StaticResource LabelTextColor}"/>
                         <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.KnowledgeFileDirectory}" Placeholder="请选择知识库目录" IsReadOnly="True" />
-                            <Button Grid.Column="1" Text="浏览" Command="{Binding SelectKnowledgeDirectoryCommand}" 
-                                    BackgroundColor="{StaticResource PrimaryButtonColor}" TextColor="White" Margin="8,0,0,0" />
+                            <Entry Grid.Column="0"
+                                    Text="{Binding UserSetting.KnowledgeFileDirectory}"
+                                    Placeholder="请选择知识库目录"
+                                    IsReadOnly="True"/>
+                            <Button Grid.Column="1"
+                                    Text="浏览"
+                                    Command="{Binding SelectKnowledgeDirectoryCommand}"
+                                    BackgroundColor="{StaticResource PrimaryButtonColor}"
+                                    TextColor="White"
+                                    Margin="8,0,0,0"/>
                         </Grid>
                     </StackLayout>
 
                     <!-- 向量化按钮 -->
-                    <StackLayout Grid.Row="2" Spacing="8" IsEnabled="{Binding UserSetting.LoadKnowledge}">
-                        <Label Text="知识库向量化" FontSize="{StaticResource LabelFontSize}" TextColor="{StaticResource LabelTextColor}" />
+                    <StackLayout Grid.Row="2"
+                            Spacing="8"
+                            IsEnabled="{Binding UserSetting.LoadKnowledge}">
+                        <Label Text="知识库向量化"
+                                FontSize="{StaticResource LabelFontSize}"
+                                TextColor="{StaticResource LabelTextColor}"/>
                         <Grid ColumnDefinitions="Auto,Auto,*">
-                            <Button Grid.Column="0" Text="向量化文档" Command="{Binding VectorizeDocumentsCommand}" 
-                                    BackgroundColor="{StaticResource SuccessButtonColor}" TextColor="White" 
-                                    IsEnabled="{Binding IsKnowledgeDirectoryValid}" />
-                            <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsVectorizing}" IsVisible="{Binding IsVectorizing}" 
-                                               Color="{StaticResource PrimaryButtonColor}" Margin="10,0,0,0" />
+                            <Button Grid.Column="0"
+                                    Text="向量化文档"
+                                    Command="{Binding VectorizeDocumentsCommand}"
+                                    BackgroundColor="{StaticResource SuccessButtonColor}"
+                                    TextColor="White"
+                                    IsEnabled="{Binding IsKnowledgeDirectoryValid}"/>
+                            <ActivityIndicator Grid.Column="1"
+                                    IsRunning="{Binding IsVectorizing}"
+                                    IsVisible="{Binding IsVectorizing}"
+                                               Color="{StaticResource PrimaryButtonColor}"
+                                    Margin="10,0,0,0"/>
                         </Grid>
-                        <Label Text="将读取知识文件夹中的PDF和DOCX文件并进行向量化存储" FontSize="12" TextColor="{StaticResource LabelTextColor}" />
+                        <Label Text="将读取知识文件夹中的PDF和DOCX文件并进行向量化存储"
+                                FontSize="12"
+                                TextColor="{StaticResource LabelTextColor}"/>
                     </StackLayout>
                 </Grid>
             </controls:CardView>
@@ -94,62 +158,123 @@
             <!-- 市场分析师角色设置区域 -->
             <controls:CardView Header="市场分析师角色设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <Label Text="选择参与分析讨论的角色" FontSize="14" TextColor="{StaticResource SecondaryTextColor}" Margin="0,0,0,4" />
-                    <Label Text="注意：启用的角色越多，消耗的Token越多" FontSize="12" TextColor="#dc3545" Margin="0,0,0,8" />
-                    
+                    <Label Text="选择参与分析讨论的角色"
+                            FontSize="14"
+                            TextColor="{StaticResource SecondaryTextColor}"
+                            Margin="0,0,0,4"/>
+                    <Label Text="注意：启用的角色越多，消耗的Token越多"
+                            FontSize="12"
+                            TextColor="#dc3545"
+                            Margin="0,0,0,8"/>
+
                     <!-- 两列Grid布局 -->
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16" RowDefinitions="Auto,Auto,Auto" RowSpacing="16">
+                    <Grid ColumnDefinitions="*,*"
+                            ColumnSpacing="16"
+                            RowDefinitions="Auto,Auto,Auto"
+                            RowSpacing="16">
                         <!-- 左列第1行：协调分析师（必选） -->
-                        <HorizontalStackLayout Grid.Column="0" Grid.Row="0">
-                            <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer}" Color="{StaticResource CheckBoxColor}" IsEnabled="False" />
+                        <HorizontalStackLayout Grid.Column="0"
+                                Grid.Row="0">
+                            <!-- 只读计算属性，使用 OneWay 绑定 -->
+                            <CheckBox IsChecked="{Binding EnableAnalysisSynthesizer, Mode=OneWay}"
+                                    Color="{StaticResource CheckBoxColor}"
+                                    IsEnabled="False"/>
                             <VerticalStackLayout>
-                                <Label Text="协调分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="负责引导讨论和总结（必选）" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="协调分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="负责引导讨论和总结（必选）"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
 
                         <!-- 右列第1行：基本面分析师 -->
-                        <HorizontalStackLayout Grid.Column="1" Grid.Row="0">
-                            <CheckBox IsChecked="{Binding EnableFinancialAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                        <HorizontalStackLayout Grid.Column="1"
+                                Grid.Row="0">
+                            <CheckBox IsChecked="{Binding EnableFinancialAnalyst}"
+                                    Color="{StaticResource CheckBoxColor}"/>
                             <VerticalStackLayout>
-                                <Label Text="基本面分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="整合了策略分析师和股票研究分析师的功能" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="基本面分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="整合了策略分析师和股票研究分析师的功能"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
 
                         <!-- 左列第2行：财务分析师 -->
-                        <HorizontalStackLayout Grid.Column="0" Grid.Row="1">
-                            <CheckBox IsChecked="{Binding EnableFundamentalAnalyst}" Color="{StaticResource CheckBoxColor}" IsEnabled="False" />
+                        <HorizontalStackLayout Grid.Column="0"
+                                Grid.Row="1">
+                            <!-- 只读计算属性，使用 OneWay 绑定 -->
+                            <CheckBox IsChecked="{Binding EnableFundamentalAnalyst, Mode=OneWay}"
+                                    Color="{StaticResource CheckBoxColor}"
+                                    IsEnabled="False"/>
                             <VerticalStackLayout>
-                                <Label Text="财务分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="专注于财务报表和财务健康分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="财务分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="专注于财务报表和财务健康分析"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
-                        
+
                         <!-- 右列第2行：技术分析师 -->
-                        <HorizontalStackLayout Grid.Column="1" Grid.Row="1">
-                            <CheckBox IsChecked="{Binding EnableTechnicalAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                        <HorizontalStackLayout Grid.Column="1"
+                                Grid.Row="1">
+                            <CheckBox IsChecked="{Binding EnableTechnicalAnalyst}"
+                                    Color="{StaticResource CheckBoxColor}"/>
                             <VerticalStackLayout>
-                                <Label Text="技术分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="专注于图表模式和技术指标分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="技术分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="专注于图表模式和技术指标分析"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
-                        
+
                         <!-- 左列第3行：市场情绪分析师 -->
-                        <HorizontalStackLayout Grid.Column="0" Grid.Row="2">
-                            <CheckBox IsChecked="{Binding EnableMarketSentimentAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                        <HorizontalStackLayout Grid.Column="0"
+                                Grid.Row="2">
+                            <CheckBox IsChecked="{Binding EnableMarketSentimentAnalyst}"
+                                    Color="{StaticResource CheckBoxColor}"/>
                             <VerticalStackLayout>
-                                <Label Text="市场情绪分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="整合了行为金融分析师和市场分析师的功能" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="市场情绪分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="整合了行为金融分析师和市场分析师的功能"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
-                        
+
                         <!-- 右列第3行：新闻事件分析师 -->
-                        <HorizontalStackLayout Grid.Column="1" Grid.Row="2">
-                            <CheckBox IsChecked="{Binding EnableNewsEventAnalyst}" Color="{StaticResource CheckBoxColor}" />
+                        <HorizontalStackLayout Grid.Column="1"
+                                Grid.Row="2">
+                            <CheckBox IsChecked="{Binding EnableNewsEventAnalyst}"
+                                    Color="{StaticResource CheckBoxColor}"/>
                             <VerticalStackLayout>
-                                <Label Text="新闻事件分析师" FontSize="14" TextColor="{StaticResource PrimaryTextColor}" VerticalOptions="Center" />
-                                <Label Text="专注于新闻事件对股票的影响分析" FontSize="12" TextColor="{StaticResource SecondaryTextColor}" VerticalOptions="Center" />
+                                <Label Text="新闻事件分析师"
+                                        FontSize="14"
+                                        TextColor="{StaticResource PrimaryTextColor}"
+                                        VerticalOptions="Center"/>
+                                <Label Text="专注于新闻事件对股票的影响分析"
+                                        FontSize="12"
+                                        TextColor="{StaticResource SecondaryTextColor}"
+                                        VerticalOptions="Center"/>
                             </VerticalStackLayout>
                         </HorizontalStackLayout>
                     </Grid>
@@ -161,8 +286,12 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <!-- 是否开启通知 -->
                     <HorizontalStackLayout>
-                        <CheckBox IsChecked="{Binding UserSetting.Notification}" Color="#007bff" />
-                        <Label Text="开启通知" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding UserSetting.Notification}"
+                                Color="#007bff"/>
+                        <Label Text="开启通知"
+                                FontSize="14"
+                                TextColor="#212529"
+                                VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>
@@ -170,24 +299,43 @@
             <!-- 浏览器设置区域 -->
             <controls:CardView Header="浏览器设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <Label Text="浏览器路径" FontSize="14" TextColor="#6c757d" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Entry Grid.Column="0" Text="{Binding UserSetting.BrowserPath}" Placeholder="请选择浏览器路径（留空则自动检测）" IsReadOnly="True" />
-                            <Button Grid.Column="1" Text="浏览" Command="{Binding SelectBrowserPathCommand}" 
-                                    BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" />
-                        </Grid>
-                    <Label Text="注意：如果留空，系统将自动使用默认浏览器" FontSize="12" TextColor="#6c757d" />
+                    <Label Text="浏览器路径"
+                            FontSize="14"
+                            TextColor="#6c757d"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Entry Grid.Column="0"
+                                Text="{Binding UserSetting.BrowserPath}"
+                                Placeholder="请选择浏览器路径（留空则自动检测）"
+                                IsReadOnly="True"/>
+                        <Button Grid.Column="1"
+                                Text="浏览"
+                                Command="{Binding SelectBrowserPathCommand}"
+                                BackgroundColor="#007bff"
+                                TextColor="White"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+                    <Label Text="注意：如果留空，系统将自动使用默认浏览器"
+                            FontSize="12"
+                            TextColor="#6c757d"/>
                 </VerticalStackLayout>
             </controls:CardView>
-            
+
             <!-- 日志设置区域 -->
             <controls:CardView Header="日志设置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <Label Text="日志文件路径" FontSize="14" TextColor="#6c757d" />
+                    <Label Text="日志文件路径"
+                            FontSize="14"
+                            TextColor="#6c757d"/>
                     <Grid ColumnDefinitions="*,Auto">
-                        <Entry Grid.Column="0" Text="{Binding UserSetting.LogPath}" Placeholder="请输入日志文件路径" />
-                        <Button Grid.Column="1" Text="浏览" Command="{Binding SelectLogPathCommand}" 
-                                    BackgroundColor="#007bff" TextColor="White" Margin="8,0,0,0" />
+                        <Entry Grid.Column="0"
+                                Text="{Binding UserSetting.LogPath}"
+                                Placeholder="请输入日志文件路径"/>
+                        <Button Grid.Column="1"
+                                Text="浏览"
+                                Command="{Binding SelectLogPathCommand}"
+                                BackgroundColor="#007bff"
+                                TextColor="White"
+                                Margin="8,0,0,0"/>
                     </Grid>
                 </VerticalStackLayout>
             </controls:CardView>
@@ -197,43 +345,74 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <!-- 是否启用Web Search -->
                     <HorizontalStackLayout>
-                        <CheckBox IsChecked="{Binding UserSetting.EnableWebSearch}" Color="#007bff" />
-                        <Label Text="启用Web Search功能" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding UserSetting.EnableWebSearch}"
+                                Color="#007bff"/>
+                        <Label Text="启用Web Search功能"
+                                FontSize="14"
+                                TextColor="#212529"
+                                VerticalOptions="Center"/>
                     </HorizontalStackLayout>
-                    
+
                     <!-- Web Search 服务商选择和API Key -->
-                    <VerticalStackLayout Spacing="8" IsEnabled="{Binding UserSetting.EnableWebSearch}">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
-                            <VerticalStackLayout Grid.Column="0" Spacing="8">
-                                <Label Text="搜索平台选择" FontSize="14" TextColor="#6c757d" />
-                                <Picker ItemsSource="{Binding WebSearchProviders}" SelectedItem="{Binding UserSetting.WebSearchProvider}" Title="" WidthRequest="150" />
+                    <VerticalStackLayout Spacing="8"
+                            IsEnabled="{Binding UserSetting.EnableWebSearch}">
+                        <Grid ColumnDefinitions="Auto,*"
+                                ColumnSpacing="16">
+                            <VerticalStackLayout Grid.Column="0"
+                                    Spacing="8">
+                                <Label Text="搜索平台选择"
+                                        FontSize="14"
+                                        TextColor="#6c757d"/>
+                                <Picker ItemsSource="{Binding WebSearchProviders}"
+                                        SelectedItem="{Binding UserSetting.WebSearchProvider}"
+                                        Title=""
+                                        WidthRequest="150"/>
                             </VerticalStackLayout>
-                            
-                            <VerticalStackLayout Grid.Column="1" Spacing="8">
-                                <Label Text="Web Search API Key" FontSize="14" TextColor="#6c757d" />
-                                <Entry Text="{Binding UserSetting.WebSearchApiKey}" Placeholder="请输入Web Search API Key" />
+
+                            <VerticalStackLayout Grid.Column="1"
+                                    Spacing="8">
+                                <Label Text="Web Search API Key"
+                                        FontSize="14"
+                                        TextColor="#6c757d"/>
+                                <Entry Text="{Binding UserSetting.WebSearchApiKey}"
+                                        Placeholder="请输入Web Search API Key"/>
                             </VerticalStackLayout>
                         </Grid>
-                        <Label Text="注意：启用Web Search功能需要配置有效的API Key" FontSize="12" TextColor="#dc3545" />
+                        <Label Text="注意：启用Web Search功能需要配置有效的API Key"
+                                FontSize="12"
+                                TextColor="#dc3545"/>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>
-            
+
             <!-- MCP服务器配置区域 -->
             <controls:CardView Header="MCP服务器配置">
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
-                    <Label Text="配置MCP服务器，用于连接外部服务" FontSize="14" TextColor="#6c757d" />
-                    <Button Text="MCP服务器配置" Command="{Binding NavigateToMCPConfigCommand}" 
-                            BackgroundColor="#007bff" TextColor="White" HorizontalOptions="Start" />
+                    <Label Text="配置MCP服务器，用于连接外部服务"
+                            FontSize="14"
+                            TextColor="#6c757d"/>
+                    <Button Text="MCP服务器配置"
+                            Command="{Binding NavigateToMCPConfigCommand}"
+                            BackgroundColor="#007bff"
+                            TextColor="White"
+                            HorizontalOptions="Start"/>
                 </VerticalStackLayout>
             </controls:CardView>
-            
+
             <!-- 操作按钮区域 -->
-            <HorizontalStackLayout HorizontalOptions="End" Spacing="{StaticResource StackSpacing}" Margin="0,16,0,0">
-                <Button Text="重置" Command="{Binding ResetCommand}" 
-                        BackgroundColor="#6c757d" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
-                <Button Text="保存" Command="{Binding SaveCommand}" 
-                        BackgroundColor="#007bff" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+            <HorizontalStackLayout HorizontalOptions="End"
+                    Spacing="{StaticResource StackSpacing}"
+                    Margin="0,16,0,0">
+                <Button Text="重置"
+                        Command="{Binding ResetCommand}"
+                        BackgroundColor="#6c757d"
+                        TextColor="White"
+                        WidthRequest="{StaticResource ButtonWidth}"/>
+                <Button Text="保存"
+                        Command="{Binding SaveCommand}"
+                        BackgroundColor="#007bff"
+                        TextColor="White"
+                        WidthRequest="{StaticResource ButtonWidth}"/>
             </HorizontalStackLayout>
         </VerticalStackLayout>
     </ScrollView>
