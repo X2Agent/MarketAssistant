@@ -2,6 +2,7 @@ using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Microsoft.SemanticKernel;
 
 namespace TestMarketAssistant;
 
@@ -17,8 +18,9 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     {
         // 创建选股管理器，使用基类提供的_kernel
         var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        var mockServiceProvider = new Mock<IServiceProvider>();
-        _stockSelectionManager = new StockSelectionManager(mockServiceProvider.Object, _kernel, managerLogger.Object);
+        var lazyKernel = new Lazy<Kernel>(() => _kernel);
+        // 使用 kernel 内部的 ServiceProvider，包含 PlaywrightService 与 IUserSettingService
+        _stockSelectionManager = new StockSelectionManager(_kernel.Services, lazyKernel, managerLogger.Object);
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();

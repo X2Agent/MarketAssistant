@@ -4,8 +4,7 @@ models:
   - Qwen/Qwen3-235B-A22B
   - Tongyi-Zhiwen/QwenLong-L1-32B
   - deepseek-ai/DeepSeek-R1
-  - deepseek-ai/DeepSeek-V3
-  - THUDM/GLM-4-32B-0414
-  - THUDM/GLM-Z1-Rumination-32B-0414
-  - tencent/Hunyuan-A13B-Instruct
+  - deepseek-ai/DeepSeek-V3.1
+  - zai-org/GLM-4.5
+  - zai-org/GLM-4.5-Air
   - moonshotai/Kimi-K2-Instruct

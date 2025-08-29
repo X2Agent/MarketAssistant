@@ -15,20 +15,33 @@ namespace MarketAssistant.Agents;
 /// </summary>
 public class StockSelectionManager : IDisposable
 {
-    private readonly Kernel _kernel;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly Lazy<Kernel> _lazyKernel;
+    private Kernel? _kernel; // 实际使用的克隆 Kernel（注册本 Manager 所需插件）
     private readonly ILogger<StockSelectionManager> _logger;
     private ChatCompletionAgent? _newsAnalysisAgent;
     private ChatCompletionAgent? _userRequirementAgent;
     private bool _disposed = false;
 
-    public StockSelectionManager(IServiceProvider serviceProvider, Kernel kernel, ILogger<StockSelectionManager> logger)
+    // YAML 模板文件名称常量
+    private const string UserRequirementYaml = "user_requirement_to_stock_criteria.yaml";
+    private const string NewsAnalysisYaml = "news_analysis_to_stock_criteria.yaml";
+
+    // 统一的 JSON 反序列化配置，避免重复创建
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        var playwrightService = serviceProvider.GetRequiredService<PlaywrightService>();
-        var stockScreenerPlugin = new StockScreenerPlugin(playwrightService,
-                                serviceProvider.GetRequiredService<ILogger<StockScreenerPlugin>>());
-        _kernel = kernel.Clone() ?? throw new ArgumentNullException(nameof(kernel));
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
+    public StockSelectionManager(
+        IServiceProvider serviceProvider,
+        Lazy<Kernel> lazyKernel,
+        ILogger<StockSelectionManager> logger)
+    {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _lazyKernel = lazyKernel ?? throw new ArgumentNullException(nameof(lazyKernel));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _kernel.Plugins.AddFromObject(stockScreenerPlugin);
     }
 
     #region AI代理管理
@@ -44,32 +57,20 @@ public class StockSelectionManager : IDisposable
         try
         {
             _logger.LogInformation("创建新闻分析代理");
+            if (!TryEnsureKernel(out var error))
+                throw new InvalidOperationException($"Kernel 未就绪：{error}");
 
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
-                //ResponseFormat = "json_object",
-                Temperature = 0.2,
-                MaxTokens = 3000
-            };
-
-            var kernelArguments = new KernelArguments(promptExecutionSettings);
-            if (!string.IsNullOrEmpty(criteriaJson))
-            {
-                kernelArguments["criteria"] = criteriaJson;
-            }
-
-            var agent = new ChatCompletionAgent()
-            {
-                Name = "NewsHotspotAnalyzer",
-                Description = "新闻热点分析专家",
-                Instructions = GetNewsAnalysisInstructions(),
-                Kernel = _kernel,
-                Arguments = kernelArguments
-            };
+            _newsAnalysisAgent = CreateOrUpdateAgent(
+                existing: _newsAnalysisAgent,
+                name: "NewsHotspotAnalyzer",
+                description: "新闻热点分析专家",
+                instructions: GetNewsAnalysisInstructions(),
+                maxTokens: 3000,
+                temperature: 0.2,
+                criteriaJson: criteriaJson);
 
             _logger.LogInformation("新闻分析代理创建成功");
-            return agent;
+            return _newsAnalysisAgent;
         }
         catch (Exception ex)
         {
@@ -88,29 +89,17 @@ public class StockSelectionManager : IDisposable
         try
         {
             _logger.LogInformation("创建用户需求分析代理");
+            if (!TryEnsureKernel(out var error))
+                throw new InvalidOperationException($"Kernel 未就绪：{error}");
 
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
-                Temperature = 0.2,
-                MaxTokens = 8000
-            };
-
-            var kernelArguments = new KernelArguments(promptExecutionSettings);
-            if (!string.IsNullOrEmpty(criteriaJson))
-            {
-                kernelArguments["criteria"] = criteriaJson;
-            }
-
-            _userRequirementAgent = new ChatCompletionAgent()
-            {
-                Name = "UserRequirementAnalyzer",
-                Description = "用户需求分析专家",
-                Instructions = GetUserRequirementAnalysisInstructions(),
-                Kernel = _kernel,
-                Arguments = kernelArguments
-            };
-
+            _userRequirementAgent = CreateOrUpdateAgent(
+                existing: _userRequirementAgent,
+                name: "UserRequirementAnalyzer",
+                description: "用户需求分析专家",
+                instructions: GetUserRequirementAnalysisInstructions(),
+                maxTokens: 8000,
+                temperature: 0.2,
+                criteriaJson: criteriaJson);
             _logger.LogInformation("用户需求分析代理创建成功");
             return _userRequirementAgent;
         }
@@ -135,37 +124,21 @@ public class StockSelectionManager : IDisposable
         try
         {
             _logger.LogInformation("开始用户需求分析");
-
-            // 第一步：将用户需求转换为StockCriteria JSON格式
-            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "user_requirement_to_stock_criteria.yaml");
-            if (!File.Exists(yamlPath))
+            if (!TryEnsureKernel(out var kernelError))
             {
-                _logger.LogWarning("用户需求分析YAML文件不存在: {YamlPath}", yamlPath);
-                throw new Exception("用户需求分析YAML文件不存在，请检查配置。");
+                _logger.LogWarning("用户需求分析提前终止：Kernel 未就绪 {Error}", kernelError);
+                return CreateDefaultResult(problem: kernelError);
             }
 
-            string yamlContent = File.ReadAllText(yamlPath);
-            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-            var requirementAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
-
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
-                ResponseFormat = "json_object",
-                Temperature = 0.1,
-                MaxTokens = 2000
-            };
-
-            var criteriaResult = await requirementAnalysisFunction.InvokeAsync(_kernel, new KernelArguments(promptExecutionSettings)
-            {
-                ["user_requirements"] = request.UserRequirements,
-                ["limit"] = request.MaxRecommendations
-            });
-
-            string criteriaJson = criteriaResult?.GetValue<string>() ?? "";
-
-            _logger.LogInformation("需求转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
+            string criteriaJson = await BuildCriteriaJsonAsync(
+                yamlFileName: UserRequirementYaml,
+                argumentBuilder: args =>
+                {
+                    args["user_requirements"] = request.UserRequirements;
+                    args["limit"] = request.MaxRecommendations;
+                },
+                maxTokens: 2000,
+                cancellationToken: cancellationToken);
 
             // 第二步：使用筛选条件调用股票筛选插件并进行分析
             var chatHistory = new ChatHistory();
@@ -175,13 +148,8 @@ public class StockSelectionManager : IDisposable
 
             var agent = CreateUserRequirementAgent(criteriaJson, cancellationToken);
 
-            string responseContent = "";
-            await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
-            {
-                responseContent += item.Message?.Content ?? "";
-            }
-
-            var result = ParseUserRequirementResponse(responseContent);
+            var responseContent = await InvokeAgentAndAggregateAsync(agent, chatHistory, cancellationToken);
+            var result = ParseResponse(responseContent);
 
             _logger.LogInformation("用户需求分析完成，推荐股票数量: {Count}", result.Recommendations.Count);
             return result;
@@ -203,38 +171,21 @@ public class StockSelectionManager : IDisposable
         try
         {
             _logger.LogInformation("开始新闻热点分析");
-
-            // 第一步：将新闻内容转换为StockCriteria JSON格式
-            string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "news_analysis_to_stock_criteria.yaml");
-            if (!File.Exists(yamlPath))
+            if (!TryEnsureKernel(out var kernelError))
             {
-                _logger.LogWarning("新闻分析YAML文件不存在: {YamlPath}", yamlPath);
-                throw new Exception("新闻分析YAML文件不存在，请检查配置。");
+                _logger.LogWarning("新闻热点分析提前终止：Kernel 未就绪 {Error}", kernelError);
+                return CreateDefaultResult(problem: kernelError);
             }
 
-            string yamlContent = File.ReadAllText(yamlPath);
-            var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-            var newsAnalysisFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
-
-            var promptExecutionSettings = new OpenAIPromptExecutionSettings()
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
-                ResponseFormat = "json_object",
-                Temperature = 0.1,
-                MaxTokens = 2500
-            };
-
-            var criteriaResult = await newsAnalysisFunction.InvokeAsync(_kernel, new KernelArguments(promptExecutionSettings)
-            {
-                ["news_content"] = request.NewsContent,
-                ["limit"] = request.MaxRecommendations
-            });
-
-
-            string criteriaJson = criteriaResult?.GetValue<string>() ?? "";
-
-            _logger.LogInformation("新闻转换完成，生成的筛选条件JSON: {CriteriaJson}", criteriaJson);
+            string criteriaJson = await BuildCriteriaJsonAsync(
+                yamlFileName: NewsAnalysisYaml,
+                argumentBuilder: args =>
+                {
+                    args["news_content"] = request.NewsContent;
+                    args["limit"] = request.MaxRecommendations;
+                },
+                maxTokens: 2500,
+                cancellationToken: cancellationToken);
 
             // 第二步：使用筛选条件调用股票筛选插件并进行分析
             var chatHistory = new ChatHistory();
@@ -243,12 +194,8 @@ public class StockSelectionManager : IDisposable
 
             var agent = CreateNewsAnalysisAgent(criteriaJson, cancellationToken);
 
-            string responseContent = "";
-            await foreach (var item in agent.InvokeAsync(chatHistory, cancellationToken: cancellationToken))
-            {
-                responseContent += item.Message?.Content ?? "";
-            }
-            var result = ParseNewsAnalysisResponse(responseContent);
+            var responseContent = await InvokeAgentAndAggregateAsync(agent, chatHistory, cancellationToken);
+            var result = ParseResponse(responseContent);
 
             _logger.LogInformation("新闻热点分析完成，推荐股票数量: {Count}", result.Recommendations.Count);
             return result;
@@ -307,45 +254,21 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 解析用户需求分析响应
     /// </summary>
-    private StockSelectionResult ParseUserRequirementResponse(string response)
+    private StockSelectionResult ParseResponse(string response)
     {
-        try
+        if (string.IsNullOrWhiteSpace(response))
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                PropertyNameCaseInsensitive = true
-            };
-
-            var result = JsonSerializer.Deserialize<StockSelectionResult>(response, options);
-            return result ?? CreateDefaultResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "解析用户需求分析响应失败，使用默认结果");
+            _logger.LogWarning("响应内容为空，返回默认结果");
             return CreateDefaultResult();
         }
-    }
-
-    /// <summary>
-    /// 解析新闻分析响应
-    /// </summary>
-    private StockSelectionResult ParseNewsAnalysisResponse(string response)
-    {
         try
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                PropertyNameCaseInsensitive = true
-            };
-
-            var result = JsonSerializer.Deserialize<StockSelectionResult>(response, options);
+            var result = JsonSerializer.Deserialize<StockSelectionResult>(response, JsonOptions);
             return result ?? CreateDefaultResult();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "解析新闻分析响应失败，使用默认结果");
+            _logger.LogWarning(ex, "解析响应JSON失败，返回默认结果。原始片段: {Snippet}", SafeSnippet(response));
             return CreateDefaultResult();
         }
     }
@@ -353,14 +276,140 @@ public class StockSelectionManager : IDisposable
     /// <summary>
     /// 创建默认结果
     /// </summary>
-    private StockSelectionResult CreateDefaultResult()
+    private StockSelectionResult CreateDefaultResult(string? problem = null)
     {
         return new StockSelectionResult
         {
             Recommendations = new List<StockRecommendation>(),
             ConfidenceScore = 0,
-            AnalysisSummary = "分析过程中遇到问题，请稍后重试。"
+            AnalysisSummary = problem ?? "分析过程中遇到问题，请稍后重试。"
         };
+    }
+
+    /// <summary>
+    /// 安全截取字符串片段用于日志
+    /// </summary>
+    private static string SafeSnippet(string text, int max = 200)
+        => string.IsNullOrEmpty(text) ? string.Empty : (text.Length <= max ? text : text.Substring(0, max) + "...");
+
+    /// <summary>
+    /// 汇总 Agent 流式输出
+    /// </summary>
+    private static async Task<string> InvokeAgentAndAggregateAsync(ChatCompletionAgent agent, ChatHistory history, CancellationToken cancellationToken)
+    {
+        var sb = new StringBuilder();
+        await foreach (var item in agent.InvokeAsync(history, cancellationToken: cancellationToken))
+        {
+            if (!string.IsNullOrEmpty(item.Message?.Content))
+                sb.Append(item.Message.Content);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// 统一构建/更新 Agent
+    /// </summary>
+    private ChatCompletionAgent CreateOrUpdateAgent(
+        ChatCompletionAgent? existing,
+        string name,
+        string description,
+        string instructions,
+        int maxTokens,
+        double temperature,
+        string? criteriaJson)
+    {
+        // 如果已有且不需要更新 criteria 则直接返回
+        if (existing != null && string.IsNullOrEmpty(criteriaJson))
+            return existing;
+
+        var settings = new OpenAIPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+            Temperature = temperature,
+            MaxTokens = maxTokens
+        };
+
+        var args = new KernelArguments(settings);
+        if (!string.IsNullOrWhiteSpace(criteriaJson))
+            args["criteria"] = criteriaJson;
+
+        return new ChatCompletionAgent
+        {
+            Name = name,
+            Description = description,
+            Instructions = instructions,
+            Kernel = _kernel!,
+            Arguments = args
+        };
+    }
+
+    /// <summary>
+    /// 通用：执行 YAML Prompt -> 得到 criteria JSON
+    /// </summary>
+    private async Task<string> BuildCriteriaJsonAsync(
+        string yamlFileName,
+        Action<KernelArguments> argumentBuilder,
+        int maxTokens,
+        CancellationToken cancellationToken)
+    {
+        if (!TryEnsureKernel(out var ensureError))
+            throw new InvalidOperationException($"Kernel 未初始化：{ensureError}");
+
+        string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", yamlFileName);
+        if (!File.Exists(yamlPath))
+        {
+            _logger.LogWarning("YAML 文件不存在: {YamlPath}", yamlPath);
+            throw new FileNotFoundException($"YAML 文件不存在: {yamlFileName}", yamlPath);
+        }
+
+        string yamlContent = await File.ReadAllTextAsync(yamlPath, cancellationToken);
+        var templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
+        var kernelFunction = KernelFunctionFactory.CreateFromPrompt(templateConfig);
+
+        var execSettings = new OpenAIPromptExecutionSettings
+        {
+            FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
+            ResponseFormat = "json_object",
+            Temperature = 0.1,
+            MaxTokens = maxTokens
+        };
+
+        var args = new KernelArguments(execSettings);
+        argumentBuilder(args);
+
+        var criteriaResult = await kernelFunction.InvokeAsync(_kernel!, args, cancellationToken: cancellationToken);
+        var criteriaJson = criteriaResult?.GetValue<string>() ?? string.Empty;
+        _logger.LogInformation("转换完成[{Yaml}]，生成筛选条件JSON长度: {Length}", yamlFileName, criteriaJson.Length);
+        return criteriaJson;
+    }
+
+    /// <summary>
+    /// 确保 Kernel 初始化并添加插件（惰性）
+    /// </summary>
+    private bool TryEnsureKernel(out string error)
+    {
+        error = string.Empty;
+        if (_kernel != null) return true;
+
+        try
+        {
+            var baseKernel = _lazyKernel.Value; // 可能抛异常（例如 OpenAI 配置错误）
+            _kernel = baseKernel.Clone();
+
+            // 添加插件
+            var playwrightService = _serviceProvider.GetRequiredService<PlaywrightService>();
+            var pluginLogger = _serviceProvider.GetRequiredService<ILogger<StockScreenerPlugin>>();
+            var stockScreenerPlugin = new StockScreenerPlugin(playwrightService, pluginLogger);
+            _kernel.Plugins.AddFromObject(stockScreenerPlugin);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "初始化 Kernel 失败");
+            error = ex.Message;
+            _kernel = null;
+            return false;
+        }
     }
 
     /// <summary>

@@ -9,11 +9,8 @@ public interface IUserSemanticKernelService
     Kernel GetKernel();
 }
 
-internal class UserSemanticKernelService(
-        IUserSettingService userSettingService,
-        PlaywrightService playwrightService) : IUserSemanticKernelService
+internal class UserSemanticKernelService(IUserSettingService userSettingService) : IUserSemanticKernelService
 {
-
     public Kernel GetKernel()
     {
         var userSetting = userSettingService.CurrentSetting;
