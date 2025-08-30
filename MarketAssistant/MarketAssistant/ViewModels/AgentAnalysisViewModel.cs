@@ -64,6 +64,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
     public ICommand ToggleViewCommand { get; private set; }
     public ICommand ViewKLineChartCommand { get; private set; }
+    public ICommand ShowAnalysisDetailsCommand { get; private set; }
 
     private readonly IWindowsService _windowsService;
 
@@ -80,6 +81,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
         ViewKLineChartCommand = new RelayCommand(ViewKLineChart);
+        ShowAnalysisDetailsCommand = new RelayCommand(ShowAnalysisDetails);
     }
 
     private void SubscribeToEvents()
@@ -157,6 +159,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             AnalysisReportViewModel.ProcessAnalysisMessage(message);
             AnalysisReportViewModel.IsReportVisible = true;
         });
+    }
+
+    private async void ShowAnalysisDetails()
+    {
+        await Shell.Current.DisplayAlert("功能提示", "查看分析详情功能正在开发中，敬请期待！", "确定");
     }
 
     public async Task LoadAnalysisDataAsync()

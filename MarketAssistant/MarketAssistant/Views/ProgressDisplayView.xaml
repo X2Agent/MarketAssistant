@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="MarketAssistant.Views.ProgressDisplayView">
+             x:Class="MarketAssistant.Views.ProgressDisplayView"
+             x:Name="Root">
     <ContentView.Resources>
         <ResourceDictionary>
             <!-- 可以在这里添加特定于此视图的资源 -->
@@ -41,7 +42,8 @@
                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
             <Button x:Name="ShowDetailsButton" Text="查看分析过程" 
-                    Style="{StaticResource PrimaryButtonStyle}" />
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding ShowDetailsCommand, Source={x:Reference Root}}" />
 
         </VerticalStackLayout>
     </Border>

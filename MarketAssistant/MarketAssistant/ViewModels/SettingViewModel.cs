@@ -17,7 +17,8 @@ public partial class SettingViewModel : ViewModelBase
     private readonly IUserSettingService _userSettingService;
     private readonly IBrowserService _browserService;
     private readonly VectorStore _vectorStore;
-    private readonly IUserEmbeddingService _dynamicEmbeddingService;
+    private readonly IEmbeddingFactory _embeddingFactory;
+    private readonly IKernelFactory _kernelFactory;
 
     // UserSetting对象，包含所有用户设置
     private UserSetting _userSetting = new();
@@ -154,12 +155,14 @@ public partial class SettingViewModel : ViewModelBase
         IUserSettingService userSettingService,
         IBrowserService browserService,
         VectorStore vectorStore,
-        IUserEmbeddingService dynamicEmbeddingService) : base(logger)
+    IEmbeddingFactory embeddingFactory,
+    IKernelFactory kernelFactory) : base(logger)
     {
         _userSettingService = userSettingService;
         _browserService = browserService;
         _vectorStore = vectorStore;
-        _dynamicEmbeddingService = dynamicEmbeddingService;
+        _embeddingFactory = embeddingFactory;
+        _kernelFactory = kernelFactory;
 
         // 初始化命令
         SelectKnowledgeDirectoryCommand = new RelayCommand(SelectKnowledgeDirectory);
@@ -263,6 +266,8 @@ public partial class SettingViewModel : ViewModelBase
 
             // 直接使用UserSetting对象更新设置
             _userSettingService.UpdateSettings(UserSetting);
+            // 使已有 Kernel 失效，下一次按需重新创建
+            _kernelFactory.Invalidate();
 
             // 检测日志路径是否发生变更
             if (!string.Equals(currentLogPath, UserSetting.LogPath, StringComparison.OrdinalIgnoreCase))
@@ -404,7 +409,7 @@ public partial class SettingViewModel : ViewModelBase
             IsVectorizing = true;
 
             // 使用动态服务创建嵌入生成器
-            var embeddingGenerator = _dynamicEmbeddingService.CreateEmbeddingGenerator();
+            var embeddingGenerator = _embeddingFactory.Create();
 
             var dataUploader = new DataUploader(_vectorStore, embeddingGenerator);
 

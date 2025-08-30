@@ -189,5 +189,5 @@ public class FeatureItem
     /// <summary>
     /// 功能项命令
     /// </summary>
-    public IAsyncRelayCommand Command { get; set; }
+    public IAsyncRelayCommand Command { get; set; } = null!;
 }

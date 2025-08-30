@@ -27,8 +27,16 @@ public class StockService
         {
             var stockList = new List<(string Name, string Code)>();
 
-            await page.GotoAsync(url);
-            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            try
+            {
+                await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
+                await page.WaitForSelectorAsync(".search-stock-list", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "搜索页打开失败或超时，返回空结果");
+                return stockList;
+            }
             var stockElements = await page.QuerySelectorAllAsync(".search-stock-list");
 
             foreach (var stockElement in stockElements)
@@ -65,11 +73,19 @@ public class StockService
             var fullCode = string.IsNullOrEmpty(market) ? stockCode : $"{market}{stockCode}".ToLower();
             var url = $"https://www.cls.cn/stock?code={fullCode}";
 
-            // 使用Playwright获取股票详情页
-            await _playwrightService.ExecuteWithPageAsync(async page =>
+            // 使用Playwright获取股票详情页（强制使用泛型重载，返回最新的 stockInfo）
+            stockInfo = await _playwrightService.ExecuteWithPageAsync(async page =>
             {
-                await page.GotoAsync(url);
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                try
+                {
+                    await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
+                    await page.WaitForSelectorAsync(".stock-detail", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "股票详情页打开失败或超时，降级返回已有字段");
+                    return stockInfo;
+                }
 
                 // 获取股票名称和代码 - 根据提供的HTML结构
                 var stockDetailElement = await page.QuerySelectorAsync(".stock-detail");

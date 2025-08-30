@@ -4,16 +4,22 @@ using System.ClientModel;
 
 namespace MarketAssistant.Infrastructure;
 
-public interface IUserEmbeddingService
+public interface IEmbeddingFactory
 {
-    IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator();
+    IEmbeddingGenerator<string, Embedding<float>> Create();
 }
 
-public class UserEmbeddingService(IUserSettingService userSettingService) : IUserEmbeddingService
+public class EmbeddingFactory : IEmbeddingFactory
 {
-    public IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator()
+    private readonly IUserSettingService _userSettingService;
+    public EmbeddingFactory(IUserSettingService userSettingService)
     {
-        var userSetting = userSettingService.CurrentSetting;
+        _userSettingService = userSettingService;
+    }
+
+    public IEmbeddingGenerator<string, Embedding<float>> Create()
+    {
+        var userSetting = _userSettingService.CurrentSetting;
         var modelId = userSetting.EmbeddingModelId;
         var apiKey = userSetting.ApiKey;
         var endpoint = userSetting.Endpoint;

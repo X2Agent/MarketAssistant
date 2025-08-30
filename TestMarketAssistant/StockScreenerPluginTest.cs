@@ -17,7 +17,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     public void Initialize()
     {
         _mockLogger = new Mock<ILogger<StockScreenerPlugin>>();
-        _playwrightService = new PlaywrightService(_userSettingService);
+        _playwrightService = new PlaywrightService(_userSettingService, null);
         _plugin = new StockScreenerPlugin(_playwrightService, _mockLogger.Object);
     }
 

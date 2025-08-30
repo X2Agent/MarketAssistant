@@ -19,6 +19,15 @@ public class StockNewsPlugin
 
     private Kernel GetKernel()
     {
+        // 优先使用用户 Kernel 服务，失败时再尝试直接解析（兼容旧逻辑）
+        var userSvc = serviceProvider.GetService<IKernelFactory>();
+        if (userSvc != null)
+        {
+            if (userSvc.TryCreateKernel(out var k, out var errMsg))
+                return k;
+            if (!string.IsNullOrEmpty(errMsg))
+                throw new InvalidOperationException($"Kernel 未就绪: {errMsg}");
+        }
         return serviceProvider.GetRequiredService<Kernel>();
     }
 

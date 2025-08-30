@@ -11,7 +11,7 @@ public class UserSettingService : IUserSettingService
     private const string PreferenceKey = "UserSettings";
     private readonly IBrowserService? _browserService;
 
-    private UserSetting _currentSetting;
+    private UserSetting _currentSetting = new();
 
     /// <summary>
     /// 当前用户设置
@@ -21,7 +21,7 @@ public class UserSettingService : IUserSettingService
     public UserSettingService(IBrowserService? browserService = null)
     {
         // 从存储中加载设置
-        _browserService = browserService ?? IPlatformApplication.Current?.Services.GetService<IBrowserService>();
+        _browserService = browserService;
         LoadSettings();
     }
 
@@ -41,6 +41,12 @@ public class UserSettingService : IUserSettingService
             else
             {
                 _currentSetting = new UserSetting();
+            }
+
+            // 如果日志路径为空，设置为默认日志目录（与启动阶段保持一致）
+            if (string.IsNullOrWhiteSpace(_currentSetting.LogPath))
+            {
+                _currentSetting.LogPath = Path.Combine(FileSystem.Current.AppDataDirectory, "logs");
             }
 
             // 如果浏览器路径为空，则使用IBrowserService自动检测

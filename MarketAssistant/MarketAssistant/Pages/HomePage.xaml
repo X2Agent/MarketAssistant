@@ -165,75 +165,57 @@
                         BackgroundColor="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}"
                         HorizontalOptions="Fill"
                         VerticalOptions="Fill">
+                                <!-- 精简: 两列 Grid, 左信息 右热度+收藏 -->
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <StackLayout Grid.Column="0"
-                                     Orientation="Vertical"
-                                     Spacing="{StaticResource TinySpacing}">
-                                        <!--股票代码/名称-->
-                                        <Grid ColumnDefinitions="Auto,*">
-                                            <Label Grid.Column="0"
-                                       Text="{Binding Market}"
-                                       FontSize="12"
-                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                       Margin="{StaticResource RightTinyMargin}"/>
-                                            <Label Grid.Column="1"
-                                       Text="{Binding Code}"
-                                       FontSize="12"
-                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
-                                        </Grid>
+                                    <!-- 左侧信息 -->
+                                    <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                        <HorizontalStackLayout Spacing="2">
+                                            <Label Text="{Binding Market}"
+                                                   FontSize="12"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                                                   Margin="{StaticResource RightTinyMargin}"/>
+                                            <Label Text="{Binding Code}"
+                                                   FontSize="12"
+                                                   TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+                                        </HorizontalStackLayout>
                                         <Label Text="{Binding Name}"
-                                   FontSize="14"
-                                   FontAttributes="Bold"
-                                   TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                                        <HorizontalStackLayout Spacing="4" Margin="{StaticResource TopTinyMargin}">
+                                            <Label Text="{Binding CurrentPrice}"
+                                                   FontSize="16"
+                                                   FontAttributes="Bold"
+                                                   TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}"
+                                                   Margin="{StaticResource RightSmallMargin}"/>
+                                            <Label Text="{Binding ChangePercentage}"
+                                                   FontSize="14"
+                                                   TextColor="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                        </HorizontalStackLayout>
+                                    </VerticalStackLayout>
 
-                                        <!--价格和涨跌幅-->
-                                        <Grid ColumnDefinitions="Auto,*"
-                                  Margin="{StaticResource TopTinyMargin}">
-                                            <Label Grid.Column="0"
-                                       Text="{Binding CurrentPrice}"
-                                       FontSize="16"
-                                       FontAttributes="Bold"
-                                       TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}"
-                                       Margin="{StaticResource RightSmallMargin}"/>
-                                            <Label Grid.Column="1"
-                                       Text="{Binding ChangePercentage}"
-                                       FontSize="14"
-                                       TextColor="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                        </Grid>
-                                    </StackLayout>
-
-                                    <!--热度信息和收藏按钮-->
-                                    <Grid Grid.Column="1"
-                              RowDefinitions="Auto,Auto"
-                              HorizontalOptions="End"
-                              VerticalOptions="Center">
-                                        <StackLayout Grid.Row="0"
-                                         Orientation="Vertical"
-                                         HorizontalOptions="End"
-                                         Spacing="{StaticResource TinySpacing}">
-                                            <Label Text="热度"
-                                       FontSize="10"
-                                       TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
-                                       HorizontalOptions="Center"/>
-                                            <Label Text="{Binding HeatIndex}"
-                                       FontSize="14"
-                                       FontAttributes="Bold"
-                                       TextColor="{AppThemeBinding Light=#17a2b8, Dark=#0dcaf0}"
-                                       HorizontalOptions="Center"/>
-                                        </StackLayout>
-
-                                        <!--收藏按钮-->
-                                        <ImageButton Grid.Row="1"
-                                         BackgroundColor="Transparent"
-                                         Source="tab_favorites.png"
-                                         Scale="0.6"
-                                         HorizontalOptions="Center"
-                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddToFavoriteCommand}"
-                                         CommandParameter="{Binding .}"
-                                         x:Name="favoriteButton"
-                                         IsVisible="false"/>
-                                    </Grid>
+                                    <!-- 右侧热度与收藏 -->
+                                    <VerticalStackLayout Grid.Column="1" Spacing="{StaticResource TinySpacing}" HorizontalOptions="End" VerticalOptions="Center">
+                                        <Label Text="热度"
+                                               FontSize="10"
+                                               HorizontalOptions="Center"
+                                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+                                        <Label Text="{Binding HeatIndex}"
+                                               FontSize="14"
+                                               FontAttributes="Bold"
+                                               HorizontalOptions="Center"
+                                               TextColor="{AppThemeBinding Light=#17a2b8, Dark=#0dcaf0}"/>
+                                        <ImageButton BackgroundColor="Transparent"
+                                                     Source="tab_favorites.png"
+                                                     Scale="0.6"
+                                                     HorizontalOptions="Center"
+                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddToFavoriteCommand}"
+                                                     CommandParameter="{Binding .}"
+                                                     x:Name="favoriteButton"
+                                                     Opacity="0" />
+                                    </VerticalStackLayout>
                                 </Grid>
+
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectHotStockCommand}"
                                               CommandParameter="{Binding .}"/>
@@ -242,12 +224,14 @@
                                 <!--视觉状态管理-->
                                 <VisualStateManager.VisualStateGroups>
                                     <VisualStateGroup Name="CommonStates">
-                                        <VisualState Name="Normal"/>
+                                        <VisualState Name="Normal">
+                                            <VisualState.Setters>
+                                                <Setter TargetName="favoriteButton" Property="Opacity" Value="0" />
+                                            </VisualState.Setters>
+                                        </VisualState>
                                         <VisualState Name="PointerOver">
                                             <VisualState.Setters>
-                                                <Setter TargetName="favoriteButton"
-                                            Property="IsVisible"
-                                            Value="True"/>
+                                                <Setter TargetName="favoriteButton" Property="Opacity" Value="1" />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
@@ -290,10 +274,7 @@
                                             Stroke="Transparent"
                                             BackgroundColor="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}">
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <StackLayout Grid.Column="0"
-                                                         Orientation="Vertical"
-                                                         Spacing="{StaticResource TinySpacing}"
-                                                         VerticalOptions="Center">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}" VerticalOptions="Center">
                                         <Label Text="{Binding Name}"
                                                        FontSize="14"
                                                        FontAttributes="Bold"
@@ -301,7 +282,7 @@
                                         <Label Text="{Binding Code}"
                                                        FontSize="12"
                                                        TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
-                                    </StackLayout>
+                                    </VerticalStackLayout>
 
                                     <!-- 收藏按钮 -->
                                     <ImageButton Grid.Column="1"
@@ -312,7 +293,7 @@
                                                          Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddToFavoriteCommand}"
                                                          CommandParameter="{Binding .}"
                                                          x:Name="recentFavoriteButton"
-                                                         IsVisible="False"/>
+                                                         Opacity="0"/>
                                 </Grid>
                                 <Border.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectRecentStockCommand}"
@@ -322,12 +303,14 @@
                                 <!-- 视觉状态管理 -->
                                 <VisualStateManager.VisualStateGroups>
                                     <VisualStateGroup Name="CommonStates">
-                                        <VisualState Name="Normal"/>
+                                        <VisualState Name="Normal">
+                                            <VisualState.Setters>
+                                                <Setter TargetName="recentFavoriteButton" Property="Opacity" Value="0" />
+                                            </VisualState.Setters>
+                                        </VisualState>
                                         <VisualState Name="PointerOver">
                                             <VisualState.Setters>
-                                                <Setter TargetName="recentFavoriteButton"
-                                                                Property="IsVisible"
-                                                                Value="True"/>
+                                                <Setter TargetName="recentFavoriteButton" Property="Opacity" Value="1" />
                                             </VisualState.Setters>
                                         </VisualState>
                                     </VisualStateGroup>
