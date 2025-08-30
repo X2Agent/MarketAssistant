@@ -35,8 +35,8 @@ public class StockSelectionManager : IDisposable
     };
 
     public StockSelectionManager(
-    IServiceProvider serviceProvider,
-    IKernelFactory kernelFactory,
+        IServiceProvider serviceProvider,
+        IKernelFactory kernelFactory,
         ILogger<StockSelectionManager> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
