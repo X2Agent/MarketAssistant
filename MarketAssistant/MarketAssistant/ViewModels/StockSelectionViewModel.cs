@@ -282,7 +282,9 @@ public class StockSelectionViewModel : ViewModelBase
 
             var result = await _stockSelectionService.RecommendStocksByUserRequirementAsync(request);
             SelectionResult = result;
-            HasResult = result != null && result.Recommendations.Count > 0;
+            HasResult = result != null && (
+                (result.Recommendations?.Count ?? 0) > 0 ||
+                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
         }, "执行AI选股");
     }
 
@@ -309,7 +311,9 @@ public class StockSelectionViewModel : ViewModelBase
 
             var result = await _stockSelectionService.RecommendStocksByNewsAsync(request);
             SelectionResult = result;
-            HasResult = result != null && result.Recommendations.Count > 0;
+            HasResult = result != null && (
+                (result.Recommendations?.Count ?? 0) > 0 ||
+                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
         }, "执行新闻选股");
     }
 
@@ -325,7 +329,9 @@ public class StockSelectionViewModel : ViewModelBase
         {
             var result = await _stockSelectionService.QuickSelectAsync(strategy.Strategy);
             SelectionResult = result;
-            HasResult = result != null && result.Recommendations.Count > 0;
+            HasResult = result != null && (
+                (result.Recommendations?.Count ?? 0) > 0 ||
+                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
 
             // 更新用户需求显示为所选策略
             UserRequirements = $"快速选股：{strategy.Name}";

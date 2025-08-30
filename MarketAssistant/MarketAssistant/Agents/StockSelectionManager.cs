@@ -16,7 +16,7 @@ namespace MarketAssistant.Agents;
 public class StockSelectionManager : IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly Lazy<Kernel> _lazyKernel;
+    private readonly IKernelFactory _kernelFactory;
     private Kernel? _kernel; // 实际使用的克隆 Kernel（注册本 Manager 所需插件）
     private readonly ILogger<StockSelectionManager> _logger;
     private ChatCompletionAgent? _newsAnalysisAgent;
@@ -35,12 +35,12 @@ public class StockSelectionManager : IDisposable
     };
 
     public StockSelectionManager(
-        IServiceProvider serviceProvider,
-        Lazy<Kernel> lazyKernel,
+    IServiceProvider serviceProvider,
+    IKernelFactory kernelFactory,
         ILogger<StockSelectionManager> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _lazyKernel = lazyKernel ?? throw new ArgumentNullException(nameof(lazyKernel));
+        _kernelFactory = kernelFactory ?? throw new ArgumentNullException(nameof(kernelFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -157,7 +157,8 @@ public class StockSelectionManager : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "用户需求分析失败");
-            return new();
+            // 返回带有错误信息的默认结果，供UI展示
+            return CreateDefaultResult(ex.Message);
         }
     }
 
@@ -203,7 +204,8 @@ public class StockSelectionManager : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "新闻热点分析失败");
-            return new();
+            // 返回带有错误信息的默认结果，供UI展示
+            return CreateDefaultResult(ex.Message);
         }
     }
 
@@ -393,7 +395,10 @@ public class StockSelectionManager : IDisposable
 
         try
         {
-            var baseKernel = _lazyKernel.Value; // 可能抛异常（例如 OpenAI 配置错误）
+            if (!_kernelFactory.TryCreateKernel(out var baseKernel, out var svcError))
+            {
+                throw new InvalidOperationException($"无法获取基础 Kernel: {svcError}");
+            }
             _kernel = baseKernel.Clone();
 
             // 添加插件

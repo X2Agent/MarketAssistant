@@ -62,53 +62,23 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
             builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
             builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
-            // 注册UserSpecificKernelProvider服务
-            builder.Services.AddSingleton<IUserSemanticKernelService, UserSemanticKernelService>();
+            // 注册用户 Kernel 服务（可失效重建）
+            builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
             // 注册嵌入服务
-            builder.Services.AddSingleton<IUserEmbeddingService, UserEmbeddingService>();
+            builder.Services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
             builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
-            // 注册Kernel服务，从用户设置中动态创建
-            // 使用延迟初始化避免在依赖注入阶段因配置问题导致页面空白
-            builder.Services.AddSingleton<Lazy<Kernel>>(serviceProvider =>
-            {
-                return new Lazy<Kernel>(() =>
-                {
-                    try
-                    {
-                        var userSemanticKernelService = serviceProvider.GetRequiredService<IUserSemanticKernelService>();
-                        return userSemanticKernelService.GetKernel();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Fatal(ex, "在创建Kernel实例时发生致命错误");
-                        
-                        // 在主线程上显示错误信息，但不阻塞UI
-                        MainThread.BeginInvokeOnMainThread(async () =>
-                        {
-                            try
-                            {
-                                await Shell.Current.DisplayAlert("配置错误", 
-                                    $"AI服务配置有误，请检查设置：{ex.Message}", "确定");
-                            }
-                            catch { }
-                        });
-                        throw;
-                    }
-                });
-            });
-
-            // 为向后兼容提供直接Kernel注册
+            // 提供 Kernel 访问。不要在启动阶段构造，首次需要时再创建。
             builder.Services.AddSingleton(serviceProvider =>
             {
-                var lazyKernel = serviceProvider.GetRequiredService<Lazy<Kernel>>();
-                return lazyKernel.Value;
+                var svc = serviceProvider.GetRequiredService<IKernelFactory>();
+                return svc.CreateKernel();
             });
 
             builder.Services.AddSingleton(serviceProvider =>
             {
-                var userEmbeddingService = serviceProvider.GetRequiredService<IUserEmbeddingService>();
-                var embeddingGenerator = userEmbeddingService.CreateEmbeddingGenerator();
+                var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
+                var embeddingGenerator = embeddingFactory.Create();
                 return embeddingGenerator;
             });
 

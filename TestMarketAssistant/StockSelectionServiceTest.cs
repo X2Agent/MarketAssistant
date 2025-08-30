@@ -16,11 +16,10 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     [TestInitialize]
     public void Initialize()
     {
-        // 创建选股管理器，使用基类提供的_kernel
         var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        var lazyKernel = new Lazy<Kernel>(() => _kernel);
-        // 使用 kernel 内部的 ServiceProvider，包含 PlaywrightService 与 IUserSettingService
-        _stockSelectionManager = new StockSelectionManager(_kernel.Services, lazyKernel, managerLogger.Object);
+        // 直接使用测试 Kernel 上下文中的 IKernelFactory
+        var factory = _kernel.Services.GetRequiredService<IKernelFactory>();
+        _stockSelectionManager = new StockSelectionManager(_kernel.Services, factory, managerLogger.Object);
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();
@@ -28,6 +27,8 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         // 创建选股服务
         _stockSelectionService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
     }
+
+    // 不再需要回调委托
 
     [TestCleanup]
     public void Cleanup()

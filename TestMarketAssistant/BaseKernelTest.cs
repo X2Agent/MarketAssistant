@@ -51,6 +51,7 @@ public class BaseKernelTest
         builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
 
         builder.Services.AddSingleton<PlaywrightService>();
+        builder.Services.AddSingleton<IKernelFactory, TestKernelFactory>();
         builder.Services.AddSingleton<StockSelectionManager>();
         builder.Services.AddHttpClient();
 
@@ -111,4 +112,13 @@ public class BaseKernelTest
 
         return builder.Build();
     }
+}
+
+internal class TestKernelFactory : IKernelFactory
+{
+    private readonly Kernel _kernel;
+    public TestKernelFactory(Kernel kernel) { _kernel = kernel; }
+    public Kernel CreateKernel() => _kernel;
+    public bool TryCreateKernel(out Kernel kernel, out string error) { kernel = _kernel; error = string.Empty; return true; }
+    public void Invalidate() { }
 }

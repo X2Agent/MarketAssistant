@@ -34,15 +34,16 @@
             IsVisible="{Binding IsBusy}"
             IsProgressVisible="{Binding IsBusy}"
             IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
-            AnalysisStage="{Binding AnalysisStage}"/>
+            AnalysisStage="{Binding AnalysisStage}"
+            ShowDetailsCommand="{Binding ShowAnalysisDetailsCommand}"/>
 
         <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
         <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
             <!-- 智能分析报告区域 -->
-            <views:AnalysisReportView 
-                BindingContext="{Binding AnalysisReportViewModel}"
-                IsVisible="{Binding IsRawDataViewVisible, Converter={StaticResource InvertedBoolConverter}}" 
-                />
+            <ContentView BindingContext="{Binding AnalysisReportViewModel}"
+                         IsVisible="{Binding Source={x:Reference ParentPage}, Path=BindingContext.IsRawDataViewVisible, Converter={StaticResource InvertedBoolConverter}}">
+                <views:AnalysisReportView />
+            </ContentView>
 
             <!-- 原始数据展示区域 -->
             <views:RawDataView
