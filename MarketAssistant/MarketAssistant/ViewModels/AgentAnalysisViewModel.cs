@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
-using MarketAssistant.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -63,24 +62,18 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     }
 
     public ICommand ToggleViewCommand { get; private set; }
-    public ICommand ViewKLineChartCommand { get; private set; }
     public ICommand ShowAnalysisDetailsCommand { get; private set; }
-
-    private readonly IWindowsService _windowsService;
 
     public AgentAnalysisViewModel(
         MarketAnalysisAgent marketAnalysisAgent,
-        IWindowsService windowsService,
         AnalysisReportViewModel analysisReportViewModel,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _marketAnalysisAgent = marketAnalysisAgent;
-        _windowsService = windowsService;
         _analysisReportViewModel = analysisReportViewModel;
 
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
-        ViewKLineChartCommand = new RelayCommand(ViewKLineChart);
         ShowAnalysisDetailsCommand = new RelayCommand(ShowAnalysisDetails);
     }
 
@@ -95,41 +88,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         IsRawDataViewVisible = !IsRawDataViewVisible;
     }
 
-    private async void ViewKLineChart()
-    {
-        if (string.IsNullOrEmpty(StockCode))
-            return;
-
-        await SafeExecuteAsync(async () =>
-        {
-            // 首先尝试激活已存在的StockPage窗口
-            if (_windowsService.ActivateWindowByPageType(typeof(Pages.StockPage)))
-            {
-                // 如果成功激活了已存在的窗口，直接返回
-                return;
-            }
-
-            // 如果没有已存在的窗口，创建新窗口
-            var stockViewModel = Application.Current.Handler.MauiContext.Services.GetService<StockViewModel>();
-            if (stockViewModel != null)
-            {
-                stockViewModel.StockCode = StockCode;
-                var stockPage = new Pages.StockPage(stockViewModel)
-                {
-                    Title = $"K线图 - {StockCode}"
-                };
-
-                // 优先返回主窗口
-                var parentWindow = Shell.Current.GetParentWindow();
-                if (parentWindow == null)
-                {
-                    parentWindow = Application.Current?.Windows?.FirstOrDefault();
-                }
-
-                var window = await _windowsService.ShowWindowAsync(stockPage, parentWindow);
-            }
-        }, "打开K线图窗口");
-    }
 
     private void OnAnalysisProgressChanged(object sender, AnalysisProgressEventArgs e)
     {

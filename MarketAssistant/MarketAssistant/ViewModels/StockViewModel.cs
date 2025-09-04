@@ -110,6 +110,7 @@ namespace MarketAssistant.ViewModels
 
         public IRelayCommand RefreshDataCommand { get; private set; }
         public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
+        public IRelayCommand NavigateToAnalysisCommand { get; private set; }
 
         public StockViewModel(
             ILogger<StockViewModel> logger,
@@ -120,6 +121,18 @@ namespace MarketAssistant.ViewModels
 
             RefreshDataCommand = new RelayCommand(async () => await LoadStockDataAsync(StockCode));
             ChangeKLineTypeCommand = new RelayCommand<string>(async (type) => await ChangeKLineTypeAsync(type));
+            NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysis);
+        }
+
+        private async void NavigateToAnalysis()
+        {
+            if (string.IsNullOrEmpty(StockCode))
+                return;
+
+            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+            {
+                { "code", StockCode }
+            });
         }
 
         private async Task ChangeKLineTypeAsync(string? type)

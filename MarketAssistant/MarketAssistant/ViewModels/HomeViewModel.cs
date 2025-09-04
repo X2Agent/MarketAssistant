@@ -124,7 +124,7 @@ public class HomeViewModel : ViewModelBase, IDisposable
             // 刷新最近查看列表
             InitializeRecentStocks();
 
-            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
             {
                 { "code", stock.Code }
             });
@@ -141,7 +141,7 @@ public class HomeViewModel : ViewModelBase, IDisposable
             // 刷新最近查看列表
             InitializeRecentStocks();
 
-            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
             {
                 { "code", stockCode }
             });
@@ -152,7 +152,7 @@ public class HomeViewModel : ViewModelBase, IDisposable
     {
         await SafeExecuteAsync(async () =>
         {
-            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
             {
                 { "code", stock.Code }
             });

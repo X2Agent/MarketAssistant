@@ -65,14 +65,6 @@
             <!-- 浮动操作按钮(FAB) -->
             <StackLayout HorizontalOptions="End" VerticalOptions="End" 
                          ZIndex="1000" Margin="{StaticResource BottomRightLargeMargin}">
-                <!-- 查看K线图按钮 -->
-                <Button 
-                    Style="{StaticResource FabButtonStyle}"
-                    Text="📈" 
-                    FontSize="24"
-                    Command="{Binding ViewKLineChartCommand}"
-                    ToolTipProperties.Text="查看K线图" />
-                    
                 <!-- 切换视图按钮 -->
                 <Button 
                     Style="{StaticResource FabButtonStyle}"

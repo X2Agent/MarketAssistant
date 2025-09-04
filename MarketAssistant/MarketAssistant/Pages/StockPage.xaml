@@ -4,12 +4,15 @@
              xmlns:controls="clr-namespace:MarketAssistant.Controls"
              xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
              xmlns:converts="clr-namespace:MarketAssistant.Converts"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="MarketAssistant.Pages.StockPage"
-             x:DataType="viewmodels:StockViewModel"
-             Title="{Binding StockName}">
+             x:DataType="viewmodels:StockViewModel">
 
     <ContentPage.Resources>
         <ResourceDictionary>
+            <!-- 转换器 -->
+            <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
+            
             <!-- 页面特有资源 -->
             <!-- 渐变色定义 - 页面特有 -->
             <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
@@ -98,57 +101,79 @@
 
     <Grid Padding="{StaticResource SmallCardPadding}" RowDefinitions="Auto,*" RowSpacing="{StaticResource SmallSpacing}">
         
-        <!-- 股票基本信息卡片 - 紧凑版 -->
+        <!-- 股票基本信息卡片 - 水平布局版 -->
         <Border Grid.Row="0" Style="{StaticResource StockCompactCardStyle}">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
-                <!-- 左侧：股票名称和价格 -->
-                <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                    <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
-                        <Label Text="{Binding StockName}" Style="{StaticResource StockCompactTitleStyle}" />
-                        <Border BackgroundColor="{StaticResource Info}" 
-                                StrokeShape="RoundRectangle 3" 
-                                Padding="{StaticResource SmallSpacing},{StaticResource TinySpacing}">
-                            <Label Text="{Binding StockCode}" 
-                                   FontSize="11" 
-                                   FontAttributes="Bold" 
-                                   TextColor="White" />
-                        </Border>
-                    </HorizontalStackLayout>
-
-                    <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
-                        <Label Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" 
-                               Style="{StaticResource PriceStyle}"
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="{StaticResource ItemPadding}">
+                
+                <!-- 股票名称 -->
+                <Label Grid.Column="0"
+                       Text="{Binding StockName}" 
+                       Style="{StaticResource StockCompactTitleStyle}" 
+                       VerticalOptions="Center" />
+                
+                <!-- 股票代码 -->
+                <Border Grid.Column="1"
+                        BackgroundColor="{StaticResource Info}" 
+                        StrokeShape="RoundRectangle 4" 
+                        Padding="{StaticResource SmallSpacing},{StaticResource TinySpacing}"
+                        VerticalOptions="Center">
+                    <Label Text="{Binding StockCode}" 
+                           FontSize="11" 
+                           FontAttributes="Bold" 
+                           TextColor="White" />
+                </Border>
+                
+                <!-- 当前价格 -->
+                <Label Grid.Column="2"
+                       Text="{Binding CurrentPrice, StringFormat='{0:F2}'}" 
+                       Style="{StaticResource PriceStyle}"
+                       TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" 
+                       VerticalOptions="Center"
+                       Margin="16,0,0,0" />
+                
+                <!-- 涨跌信息 -->
+                <StackLayout Grid.Column="3" Orientation="Vertical" Spacing="2" VerticalOptions="Center">
+                    <StackLayout Orientation="Horizontal" Spacing="4">
+                        <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" 
+                               FontSize="14" 
+                               FontAttributes="Bold"
                                TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                        <VerticalStackLayout Spacing="2">
-                            <HorizontalStackLayout Spacing="4">
-                                <Label Text="{Binding PriceChange, StringFormat='{0:F2}'}" 
-                                       FontSize="14" 
-                                       FontAttributes="Bold"
-                                       TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                                <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" 
-                                       FontSize="14" 
-                                       FontAttributes="Bold"
-                                       TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                            </HorizontalStackLayout>
-                            <Label Text="较昨收" Style="{StaticResource SmallLabelStyle}" />
-                        </VerticalStackLayout>
-                    </HorizontalStackLayout>
-                </VerticalStackLayout>
-
-                <!-- 右侧：刷新按钮 -->
-                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                    <Button Text="🔄 刷新" 
-                            Command="{Binding RefreshDataCommand}" 
-                            Style="{StaticResource ActiveButtonStyle}" />
-                </VerticalStackLayout>
+                        <Label Text="{Binding PriceChangePercent, StringFormat='({0:F2}%)'}" 
+                               FontSize="14" 
+                               FontAttributes="Bold"
+                               TextColor="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+                    </StackLayout>
+                    <Label Text="较昨收" 
+                           Style="{StaticResource SmallLabelStyle}" 
+                           HorizontalOptions="Center" />
+                </StackLayout>
+                
+                <!-- 填充空间 -->
+                <BoxView Grid.Column="4" IsVisible="False" />
+                
+                <!-- AI分析按钮 -->
+                <Button Grid.Column="5"
+                        Text="🤖 AI分析" 
+                        Command="{Binding NavigateToAnalysisCommand}" 
+                        Style="{StaticResource ActiveButtonStyle}"
+                        VerticalOptions="Center" />
+                
+                <!-- 刷新按钮 -->
+                <Button Grid.Column="6"
+                        Text="🔄 刷新" 
+                        Command="{Binding RefreshDataCommand}" 
+                        Style="{StaticResource ActiveButtonStyle}"
+                        VerticalOptions="Center" />
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand">
+        <!-- K线图表区域 - 只在数据加载成功时显示 -->
+        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand"
+                IsVisible="{Binding HasError, Converter={StaticResource InvertedBoolConverter}}">
             <StackLayout VerticalOptions="FillAndExpand" Spacing="10">
 
                 <!-- 图表控制区域 -->
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <Grid Padding="{StaticResource ItemPadding}" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <!-- 图例 -->
                     <HorizontalStackLayout Grid.Column="0" Spacing="12">
                         <HorizontalStackLayout Spacing="6">
@@ -222,25 +247,35 @@
                 <StackLayout VerticalOptions="FillAndExpand">
                     <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}" HorizontalOptions="Center" VerticalOptions="Center" Scale="1.5" />
 
-                    <!-- 错误提示 -->
-                    <VerticalStackLayout IsVisible="{Binding HasError}" 
-                       HorizontalOptions="Center" 
-                       VerticalOptions="Center" 
-                       Spacing="12">
-                        <Label Text="⚠️" FontSize="40" HorizontalOptions="Center" />
-                        <Label Text="{Binding ErrorMessage}" 
-                           FontSize="14"
-                           TextColor="{StaticResource ErrorColor}"
-                           HorizontalOptions="Center" 
-                           HorizontalTextAlignment="Center" />
-                        <Button Text="重新加载" 
-                            Command="{Binding RefreshDataCommand}" 
-                            Style="{StaticResource ActiveButtonStyle}" />
-                    </VerticalStackLayout>
-
-                    <controls:StockWebChartView x:Name="WebChartView" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" />
+                    <controls:StockWebChartView x:Name="WebChartView" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" 
+                                              IsVisible="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}" />
                 </StackLayout>
             </StackLayout>
+        </Border>
+        
+        <!-- 错误状态显示区域 -->
+        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand"
+                IsVisible="{Binding HasError}">
+            <VerticalStackLayout HorizontalOptions="Center" 
+                               VerticalOptions="Center" 
+                               Spacing="{StaticResource ItemPadding}">
+                <Label Text="⚠️" FontSize="48" HorizontalOptions="Center" />
+                <Label Text="数据加载失败" 
+                       FontSize="18"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource ErrorColor}"
+                       HorizontalOptions="Center" />
+                <Label Text="{Binding ErrorMessage}" 
+                       FontSize="14"
+                       TextColor="{StaticResource ErrorColor}"
+                       HorizontalOptions="Center" 
+                       HorizontalTextAlignment="Center"
+                       MaxLines="3" />
+                <Button Text="🔄 重新加载" 
+                        Command="{Binding RefreshDataCommand}" 
+                        Style="{StaticResource ActiveButtonStyle}"
+                        Margin="0,16,0,0" />
+            </VerticalStackLayout>
         </Border>
     </Grid>
 </ContentPage>
