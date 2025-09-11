@@ -18,7 +18,6 @@ public partial class SettingViewModel : ViewModelBase
     private readonly IUserSettingService _userSettingService;
     private readonly IBrowserService _browserService;
     private readonly VectorStore _vectorStore;
-    private readonly IUserEmbeddingService _dynamicEmbeddingService;
     private readonly IRagIngestionService _ingestionService;
     private readonly IEmbeddingFactory _embeddingFactory;
     private readonly IKernelFactory _kernelFactory;
@@ -158,15 +157,13 @@ public partial class SettingViewModel : ViewModelBase
         IUserSettingService userSettingService,
         IBrowserService browserService,
         VectorStore vectorStore,
-        IUserEmbeddingService dynamicEmbeddingService,
-        IRagIngestionService ingestionService) : base(logger)
-    IEmbeddingFactory embeddingFactory,
-    IKernelFactory kernelFactory) : base(logger)
+        IRagIngestionService ingestionService,
+        IEmbeddingFactory embeddingFactory,
+        IKernelFactory kernelFactory) : base(logger)
     {
         _userSettingService = userSettingService;
         _browserService = browserService;
         _vectorStore = vectorStore;
-        _dynamicEmbeddingService = dynamicEmbeddingService;
         _ingestionService = ingestionService;
         _embeddingFactory = embeddingFactory;
         _kernelFactory = kernelFactory;
@@ -434,33 +431,18 @@ public partial class SettingViewModel : ViewModelBase
             var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
             await collection.EnsureCollectionExistsAsync();
 
-            // 处理PDF文件
-            foreach (var pdfFile in pdfFiles)
+            // 处理文件
+            foreach (var file in pdfFiles.Concat(docxFiles))
             {
                 try
                 {
-                    await _ingestionService.IngestFileAsync(collection, pdfFile, embeddingGenerator);
+                    await _ingestionService.IngestFileAsync(collection, file, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
                 }
                 catch (Exception ex)
                 {
-                    Logger?.LogError(ex, "处理PDF文件时出错: {pdfFile}", pdfFile);
-                }
-            }
-
-            // 处理DOCX文件
-            foreach (var docxFile in docxFiles)
-            {
-                try
-                {
-                    await _ingestionService.IngestFileAsync(collection, docxFile, embeddingGenerator);
-                    processedFiles++;
-                    WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
-                }
-                catch (Exception ex)
-                {
-                    Logger?.LogError(ex, "处理DOCX文件时出错: {docxFile}", docxFile);
+                    Logger?.LogError(ex, "处理PDF文件时出错: {file}", file);
                 }
             }
 

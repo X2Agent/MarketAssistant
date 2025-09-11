@@ -10,6 +10,7 @@ public class KernelPluginConfig : IKernelPluginConfig
     private readonly StockTechnicalPlugin _stockTechnicalPlugin;
     private readonly StockFinancialPlugin _stockFinancialPlugin;
     private readonly StockNewsPlugin _stockNewsPlugin;
+    private readonly GroundingSearchPlugin _groundingSearchPlugin;
 
     public KernelPluginConfig(
         IHttpClientFactory httpClientFactory,
@@ -20,6 +21,7 @@ public class KernelPluginConfig : IKernelPluginConfig
         _stockTechnicalPlugin = new StockTechnicalPlugin(httpClientFactory, userSettingService);
         _stockFinancialPlugin = new StockFinancialPlugin(httpClientFactory, userSettingService);
         _stockNewsPlugin = new StockNewsPlugin(serviceProvider);
+        _groundingSearchPlugin = new GroundingSearchPlugin();
     }
     public Kernel PluginConfig(Kernel kernel, AnalysisAgents analysisAgent)
     {
@@ -37,6 +39,9 @@ public class KernelPluginConfig : IKernelPluginConfig
                 break;
             case AnalysisAgents.NewsEventAnalystAgent:
                 k.Plugins.AddFromObject(_stockNewsPlugin);
+                break;
+            case AnalysisAgents.CoordinatorAnalystAgent:
+                k.Plugins.AddFromObject(_groundingSearchPlugin);
                 break;
             default:
                 break;

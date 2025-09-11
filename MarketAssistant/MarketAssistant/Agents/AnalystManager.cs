@@ -1,8 +1,6 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
-using MarketAssistant.Plugins;
 using MarketAssistant.Vectors;
-using MarketAssistant.Vectors.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -37,7 +35,6 @@ public class AnalystManager
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
     private readonly VectorStore _vectorStore;
     private readonly IKernelPluginConfig _kernelPluginConfig;
-    private readonly GroundingSearchPlugin _groundingSearchPlugin;
 
     private Action<ChatMessageContent>? _messageCallback;
 
@@ -55,8 +52,7 @@ public class AnalystManager
         IUserSettingService userSettingService,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         VectorStore vectorStore,
-        IKernelPluginConfig kernelPluginConfig,
-        GroundingSearchPlugin groundingSearchPlugin)
+        IKernelPluginConfig kernelPluginConfig)
     {
         _kernel = kernel;
         _logger = logger;
@@ -64,7 +60,6 @@ public class AnalystManager
         _embeddingGenerator = embeddingGenerator;
         _vectorStore = vectorStore;
         _kernelPluginConfig = kernelPluginConfig;
-        _groundingSearchPlugin = groundingSearchPlugin;
 
         // 创建分析师及编排
         CreateAnalysts();

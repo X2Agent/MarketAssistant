@@ -52,7 +52,7 @@ public class BaseKernelTest
         builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
 
         builder.Services.AddSingleton<PlaywrightService>();
-        builder.Services.AddSingleton<IKernelFactory, TestKernelFactory>();
+        builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
         builder.Services.AddSingleton<StockSelectionManager>();
         builder.Services.AddHttpClient();
 
@@ -116,23 +116,15 @@ public class BaseKernelTest
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
         builder.Services.AddSqliteVectorStore(_ => $"Data Source={store}");
 
-        builder.Services.AddSingleton<IUserEmbeddingService, UserEmbeddingService>();
+        builder.Services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
+
         builder.Services.AddSingleton(serviceProvider =>
         {
-            var userEmbeddingService = serviceProvider.GetRequiredService<IUserEmbeddingService>();
-            var embeddingGenerator = userEmbeddingService.CreateEmbeddingGenerator();
+            var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
+            var embeddingGenerator = embeddingFactory.Create();
             return embeddingGenerator;
         });
 
         return builder.Build();
     }
-}
-
-internal class TestKernelFactory : IKernelFactory
-{
-    private readonly Kernel _kernel;
-    public TestKernelFactory(Kernel kernel) { _kernel = kernel; }
-    public Kernel CreateKernel() => _kernel;
-    public bool TryCreateKernel(out Kernel kernel, out string error) { kernel = _kernel; error = string.Empty; return true; }
-    public void Invalidate() { }
 }

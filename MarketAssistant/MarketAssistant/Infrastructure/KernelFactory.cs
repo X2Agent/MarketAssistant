@@ -11,7 +11,7 @@ public interface IKernelFactory
     void Invalidate();
 }
 
-internal class KernelFactory : IKernelFactory
+public class KernelFactory : IKernelFactory
 {
     private readonly IUserSettingService _userSettingService;
     private readonly object _lock = new();
