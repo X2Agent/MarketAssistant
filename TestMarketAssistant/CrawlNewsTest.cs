@@ -1,7 +1,10 @@
 using MarketAssistant.Applications.Telegrams;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Net.Http;
 
 namespace TestMarketAssistant;
 
@@ -10,14 +13,20 @@ public class CrawlNewsTest
 {
     private TelegramService _telegramService = null!;
     private Mock<ILogger<TelegramService>> _loggerMock = null!;
-    private Mock<PlaywrightService> _playwrightServiceMock = null!;
+    private IHttpClientFactory _httpClientFactory = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         _loggerMock = new Mock<ILogger<TelegramService>>();
-        _playwrightServiceMock = new Mock<PlaywrightService>();
-        _telegramService = new TelegramService(_loggerMock.Object, _playwrightServiceMock.Object);
+        
+        // 创建真实的 IHttpClientFactory 实例
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        var provider = services.BuildServiceProvider();
+        _httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+
+        _telegramService = new TelegramService(_loggerMock.Object, _httpClientFactory);
     }
 
     [TestMethod]

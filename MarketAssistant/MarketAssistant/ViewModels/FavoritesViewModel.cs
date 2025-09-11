@@ -56,7 +56,7 @@ public class FavoritesViewModel : ViewModelBase, IRecipient<StockFavoritesChange
     {
         if (stock == null) return;
 
-        await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+        await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
         {
             { "code", stock.FullCode }
         });

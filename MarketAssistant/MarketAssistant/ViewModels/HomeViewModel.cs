@@ -114,40 +114,49 @@ public class HomeViewModel : ViewModelBase, IDisposable
 
     private async void OnSelectStock(StockItem stock)
     {
-        // 导航到股票详情页
-        IsSearchResultVisible = false;
-
-        // 添加到最近查看历史记录
-        _searchHistory.AddSearchHistory(stock);
-        // 刷新最近查看列表
-        InitializeRecentStocks();
-
-        await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+        await SafeExecuteAsync(async () =>
         {
-            { "code", stock.Code }
-        });
+            // 导航到股票详情页
+            IsSearchResultVisible = false;
+
+            // 添加到最近查看历史记录
+            _searchHistory.AddSearchHistory(stock);
+            // 刷新最近查看列表
+            InitializeRecentStocks();
+
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
+            {
+                { "code", stock.Code }
+            });
+        }, "导航到股票详情页");
     }
 
     private async void OnSelectHotStock(HotStock stock)
     {
-        var stockCode = $"{stock.Market}{stock.Code}".ToLower();
-        // 添加到最近查看历史记录
-        _searchHistory.AddSearchHistory(new StockItem { Name = stock.Name, Code = stockCode });
-        // 刷新最近查看列表
-        InitializeRecentStocks();
-
-        await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+        await SafeExecuteAsync(async () =>
         {
-            { "code", stockCode }
-        });
+            var stockCode = $"{stock.Market}{stock.Code}".ToLower();
+            // 添加到最近查看历史记录
+            _searchHistory.AddSearchHistory(new StockItem { Name = stock.Name, Code = stockCode });
+            // 刷新最近查看列表
+            InitializeRecentStocks();
+
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
+            {
+                { "code", stockCode }
+            });
+        }, "OnSelectHotStock");
     }
 
     private async void OnSelectRecentStock(StockItem stock)
     {
-        await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+        await SafeExecuteAsync(async () =>
         {
-            { "code", stock.Code }
-        });
+            await Shell.Current.GoToAsync("stock", new Dictionary<string, object>
+            {
+                { "code", stock.Code }
+            });
+        }, "OnSelectRecentStock");
     }
 
     private async void InitializeHotStocks()

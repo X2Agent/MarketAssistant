@@ -1,0 +1,45 @@
+name: Bug 报告
+description: 报告一个问题或回归缺陷
+labels: [bug]
+title: "bug: [简要标题]"
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰描述问题现象与影响
+      placeholder: 发生了什么？对使用造成什么影响？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开 ...
+        2. 点击 ...
+        3. 看到 ...
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志/截图
+      description: 附上关键信息（日志、截图、视频、崩溃堆栈）
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: 版本与环境
+      placeholder: 版本号、操作系统等
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已搜索重复问题
+        - label: 我已尽量提供最小可复现
+
+

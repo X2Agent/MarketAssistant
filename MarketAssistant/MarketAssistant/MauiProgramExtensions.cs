@@ -1,6 +1,5 @@
 using CommunityToolkit.Maui;
 using MarketAssistant.Agents;
-using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
@@ -20,18 +19,6 @@ namespace MarketAssistant
     {
         public static MauiAppBuilder UseSharedMauiApp(this MauiAppBuilder builder)
         {
-            var logPath = GetUserLogPath() ?? Path.Combine(FileSystem.Current.AppDataDirectory, "logs");
-            Directory.CreateDirectory(logPath);
-
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Information()
-                .WriteTo.Console()
-                .WriteTo.File(Path.Combine(logPath, "log.txt"),
-                    rollingInterval: RollingInterval.Day,
-                    fileSizeLimitBytes: 10000000,
-                    retainedFileCountLimit: 7)
-                .CreateLogger();
-
             builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit(options =>
@@ -44,37 +31,54 @@ namespace MarketAssistant
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
-            // 配置 MAUI 使用 Serilog
-            builder.Logging.ClearProviders();
-            builder.Logging.AddSerilog(Log.Logger);
-
             // 注册HttpClient服务
             builder.Services.AddHttpClient();
 
             // 注册用户设置服务为单例
             builder.Services.AddSingleton<IUserSettingService, UserSettingService>();
+
+            // 构建一个临时 ServiceProvider 以便在真正 Build 之前初始化日志（避免重复默认路径逻辑）
+            using (var tempProvider = builder.Services.BuildServiceProvider())
+            {
+                var userSettingService = tempProvider.GetRequiredService<IUserSettingService>();
+                // UserSettingService.LoadSettings 已保证为空时写入默认值
+                var logPath = userSettingService.CurrentSetting.LogPath;
+                try { Directory.CreateDirectory(logPath); } catch { }
+
+                Log.Logger = new LoggerConfiguration()
+                    .MinimumLevel.Information()
+                    .WriteTo.Console()
+                    .WriteTo.File(Path.Combine(logPath, "log.txt"),
+                        rollingInterval: RollingInterval.Day,
+                        fileSizeLimitBytes: 10_000_000,
+                        retainedFileCountLimit: 7)
+                    .CreateLogger();
+
+                builder.Logging.ClearProviders();
+                builder.Logging.AddSerilog(Log.Logger);
+            }
+
             // Add filters with logging.
             builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
             builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
             builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
-            // 注册UserSpecificKernelProvider服务
-            builder.Services.AddSingleton<IUserSemanticKernelService, UserSemanticKernelService>();
+            // 注册用户 Kernel 服务（可失效重建）
+            builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
             // 注册嵌入服务
-            builder.Services.AddSingleton<IUserEmbeddingService, UserEmbeddingService>();
+            builder.Services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
             builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
-            // 注册Kernel服务，从用户设置中动态创建
+            // 提供 Kernel 访问。不要在启动阶段构造，首次需要时再创建。
             builder.Services.AddSingleton(serviceProvider =>
             {
-                var userSemanticKernelService = serviceProvider.GetRequiredService<IUserSemanticKernelService>();
-                var kernel = userSemanticKernelService.GetKernel();
-                return kernel;
+                var svc = serviceProvider.GetRequiredService<IKernelFactory>();
+                return svc.CreateKernel();
             });
 
             builder.Services.AddSingleton(serviceProvider =>
             {
-                var userEmbeddingService = serviceProvider.GetRequiredService<IUserEmbeddingService>();
-                var embeddingGenerator = userEmbeddingService.CreateEmbeddingGenerator();
+                var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
+                var embeddingGenerator = embeddingFactory.Create();
                 return embeddingGenerator;
             });
 
@@ -95,7 +99,6 @@ namespace MarketAssistant
             // 注册AI选股相关服务
             builder.Services.AddSingleton<StockSelectionManager>();
             builder.Services.AddSingleton<StockSelectionService>();
-            builder.Services.AddSingleton<IWindowsService, WindowsService>();
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
 
             builder.Services.AddSingleton<GitHubReleaseService>();
@@ -119,34 +122,6 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IApplicationExitService, ApplicationExitService>();
 
             return builder;
-        }
-
-        /// <summary>
-        /// 获取用户设置的日志路径
-        /// </summary>
-        /// <returns>用户设置的日志路径，如果未设置则返回null</returns>
-        private static string? GetUserLogPath()
-        {
-            try
-            {
-                // 尝试从Preferences中读取用户设置
-                var settingsJson = Preferences.Default.Get("UserSettings", string.Empty);
-                if (!string.IsNullOrEmpty(settingsJson))
-                {
-                    var userSetting = System.Text.Json.JsonSerializer.Deserialize<UserSetting>(settingsJson);
-                    if (!string.IsNullOrEmpty(userSetting?.LogPath))
-                    {
-                        return userSetting.LogPath;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // 如果读取用户设置失败，记录错误但不影响应用启动
-                System.Diagnostics.Debug.WriteLine($"读取用户日志路径设置失败: {ex.Message}");
-            }
-
-            return null;
         }
     }
 }

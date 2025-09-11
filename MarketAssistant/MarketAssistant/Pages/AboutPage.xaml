@@ -8,141 +8,229 @@
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <!-- 页面特有资源 - 保留页面特有的样式定义 -->
+            <!-- 页面特有资源 -->
+            <Style x:Key="FeatureItemStyle"
+                   TargetType="Grid">
+                <Setter Property="BackgroundColor"
+                        Value="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}"/>
+                <Setter Property="Padding"
+                        Value="{StaticResource SmallCardPadding}"/>
+                <Setter Property="Margin"
+                        Value="{StaticResource BottomSmallMargin}"/>
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{AppThemeBinding Light={StaticResource ShadowLight}, Dark={StaticResource ShadowDark}}"
+                                Offset="0,1"
+                                Radius="2"
+                                Opacity="0.3"/>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="FeatureIconStyle"
+                   TargetType="Border">
+                <Setter Property="BackgroundColor"
+                        Value="{AppThemeBinding Light={StaticResource SurfaceVariantLight}, Dark={StaticResource SurfaceVariantDark}}"/>
+                <Setter Property="StrokeShape"
+                        Value="RoundRectangle 8"/>
+                <Setter Property="Padding"
+                        Value="{StaticResource CompactCardPadding}"/>
+                <Setter Property="Stroke"
+                        Value="Transparent"/>
+            </Style>
+
+            <Style x:Key="FeatureTitleStyle"
+                   TargetType="Label"
+                   BasedOn="{StaticResource SectionTitleStyle}">
+                <Setter Property="VerticalOptions"
+                        Value="Center"/>
+            </Style>
+
+            <Style x:Key="FeatureButtonStyle"
+                   TargetType="Button"
+                   BasedOn="{StaticResource SuccessButtonStyle}">
+                <Setter Property="FontSize"
+                        Value="12"/>
+                <Setter Property="FontAttributes"
+                        Value="Bold"/>
+                <Setter Property="HeightRequest"
+                        Value="32"/>
+                <Setter Property="Padding"
+                        Value="{StaticResource LeftRightSmallMargin}"/>
+            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
-    
-    <VerticalStackLayout Spacing="{StaticResource LargeSpacing}" Padding="{StaticResource PagePadding}">
-        <!-- 顶部应用信息区域 -->
-        <controls:CardView>
-            <controls:CardView.Header>
-                <Grid ColumnDefinitions="*,Auto">
-                    <Label Grid.Column="0" Text="关于我们" Style="{StaticResource SectionTitleStyle}"/>
-                    <Image Grid.Column="1" Source="github.png"
-                       HeightRequest="24"
-                       WidthRequest="24"
-                       Margin="{StaticResource LeftSmallMargin}">
-                        <Image.GestureRecognizers>
-                            <TapGestureRecognizer Command="{Binding OpenGitHubCommand}"/>
-                        </Image.GestureRecognizers>
-                    </Image>
-                </Grid>
-            </controls:CardView.Header>
-            <!-- Logo和应用信息 -->
-            <Grid ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto" Margin="{StaticResource TopBottomSmallMargin}">
-                <!-- Logo -->
-                <Image Grid.Column="0"
-                       Source="logo.jpg"
-                       HeightRequest="90"
-                       WidthRequest="90"
-                       Aspect="AspectFit"
-                       VerticalOptions="Center"/>
 
-                <!-- 应用信息 -->
-                <VerticalStackLayout Grid.Column="1" 
-                                     VerticalOptions="Center" 
-                                     Spacing="{StaticResource SmallSpacing}"
-                                     Margin="{StaticResource LeftLargeMargin}">
-                    <Label Text="{Binding AppName}"
-                           FontSize="28"
-                           FontAttributes="Bold"
-                           TextColor="#333333"/>
-                    <Label Text="{Binding Description}"
-                           FontSize="16"
-                           TextColor="#666666"
-                           Margin="{StaticResource TopBottomTinyMargin}"/>
-                    <HorizontalStackLayout Spacing="{StaticResource TinySpacing}">
-                        <Label Text="v"
-                               FontSize="15"
-                               TextColor="#888888"
+    <ScrollView BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
+        <VerticalStackLayout Spacing="{StaticResource LargeSpacing}"
+                             Padding="{StaticResource PagePadding}">
+            <!-- 顶部应用信息区域 -->
+            <controls:CardView>
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Grid.Column="0"
+                               Text="关于我们"
+                               Style="{StaticResource SectionTitleStyle}"
                                VerticalOptions="Center"/>
-                        <Label Text="{Binding Version}"
-                               FontSize="15"
-                               TextColor="#888888"
+                        <Border Grid.Column="1"
+                                BackgroundColor="Transparent"
+                                StrokeShape="RoundRectangle 12"
+                                Padding="{StaticResource CompactCardPadding}"
+                                Stroke="Transparent">
+                            <Image Source="github.png"
+                                   HeightRequest="20"
+                                   WidthRequest="20">
+                                <Image.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding OpenGitHubCommand}"/>
+                                </Image.GestureRecognizers>
+                            </Image>
+                        </Border>
+                    </Grid>
+                </controls:CardView.Header>
+                <!-- Logo和应用信息 -->
+                <Grid ColumnDefinitions="Auto, *, Auto"
+                      RowDefinitions="Auto"
+                      Padding="{StaticResource CardPadding}"
+                      BackgroundColor="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}">
+                    <!-- Logo -->
+                    <Border Grid.Column="0"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                            StrokeShape="RoundRectangle 12"
+                            Padding="{StaticResource SmallCardPadding}"
+                            Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
+                            StrokeThickness="1">
+                        <Image Source="logo.jpg"
+                               HeightRequest="80"
+                               WidthRequest="80"
+                               Aspect="AspectFit"/>
+                    </Border>
+
+                    <!-- 应用信息 -->
+                    <VerticalStackLayout Grid.Column="1"
+                                         VerticalOptions="Center"
+                                         Spacing="{StaticResource SmallSpacing}"
+                                         Margin="{StaticResource LeftRightLargeMargin}">
+                        <Label Text="{Binding AppName}"
+                               FontSize="24"
                                FontAttributes="Bold"
-                               VerticalOptions="Center"/>
-                    </HorizontalStackLayout>
-                </VerticalStackLayout>
-
-                <!-- 更新按钮区域 -->
-                <VerticalStackLayout Grid.Column="2" 
-                                     VerticalOptions="Center" 
-                                     Spacing="{StaticResource SmallSpacing}"
-                                     Margin="{StaticResource LeftLargeMargin}">
-                    <!-- 更新状态显示 -->
-                    <Label Text="{Binding UpdateStatus}"
-                           FontSize="12"
-                           TextColor="#666666"
-                           HorizontalOptions="Center"
-                           WidthRequest="100"
-                           HorizontalTextAlignment="Center"/>
-                    
-                    <!-- 检查更新按钮 -->
-                    <Button Text="检查更新"
-                            BackgroundColor="#4CAF50"
-                            TextColor="White"
-                            CornerRadius="6"
-                            FontSize="14"
-                            HeightRequest="36"
-                            WidthRequest="100"
-                            Command="{Binding CheckUpdateCommand}"
-                            IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"/>
-                    
-                    <!-- 下载更新按钮 -->
-                    <Button Text="下载更新"
-                            BackgroundColor="#FF9800"
-                            TextColor="White"
-                            CornerRadius="6"
-                            FontSize="14"
-                            HeightRequest="36"
-                            WidthRequest="100"
-                            Command="{Binding DownloadUpdateCommand}"
-                            IsVisible="{Binding HasNewVersion}"/>
-                </VerticalStackLayout>
-            </Grid>
-        </controls:CardView>
-        
-        <!-- 功能选项列表 -->
-        <controls:CardView>
-            <ListView ItemsSource="{Binding FeatureItems}"
-                      SelectionMode="None"
-                      HasUnevenRows="True"
-                      SeparatorVisibility="Default"
-                      SeparatorColor="#EEEEEE">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FeatureItem">
-                        <ViewCell>
-                            <Grid ColumnDefinitions="Auto, *, Auto"
-                                  Padding="{StaticResource SmallCardPadding}">
-                                <Image Source="{Binding IconSource}"
-                                       HeightRequest="24"
-                                       WidthRequest="24"
+                               TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+                        <Label Text="{Binding Description}"
+                               FontSize="14"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                               LineBreakMode="WordWrap"/>
+                        <Border BackgroundColor="{AppThemeBinding Light={StaticResource Info}, Dark={StaticResource Info}}"
+                                StrokeShape="RoundRectangle 12"
+                                Padding="{StaticResource CompactCardPadding}"
+                                Stroke="Transparent"
+                                HorizontalOptions="Start">
+                            <HorizontalStackLayout Spacing="{StaticResource TinySpacing}">
+                                <Label Text="v"
+                                       FontSize="12"
+                                       TextColor="{StaticResource White}"
+                                       FontAttributes="Bold"
                                        VerticalOptions="Center"/>
-                                <Label Grid.Column="1"
-                                       Text="{Binding Title}"
-                                       VerticalOptions="Center"
-                                       Margin="{StaticResource LeftLargeMargin}"
-                                       FontSize="16"
-                                       TextColor="#333333"/>
+                                <Label Text="{Binding Version}"
+                                       FontSize="12"
+                                       TextColor="{StaticResource White}"
+                                       FontAttributes="Bold"
+                                       VerticalOptions="Center"/>
+                            </HorizontalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+
+                    <!-- 更新按钮区域 -->
+                    <VerticalStackLayout Grid.Column="2"
+                                         VerticalOptions="Center"
+                                         Spacing="{StaticResource SmallSpacing}"
+                                         Margin="{StaticResource LeftRightLargeMargin}">
+                        <!-- 更新状态显示 -->
+                        <Label Text="{Binding UpdateStatus}"
+                               FontSize="11"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
+                               HorizontalOptions="Center"
+                               WidthRequest="100"
+                               HorizontalTextAlignment="Center"/>
+
+                        <!-- 检查更新按钮 -->
+                        <Button Text="检查更新"
+                                Style="{StaticResource SuccessButtonStyle}"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                HeightRequest="36"
+                                WidthRequest="100"
+                                Command="{Binding CheckUpdateCommand}"
+                                IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"/>
+
+                        <!-- 下载更新按钮 -->
+                        <Button Text="下载更新"
+                                BackgroundColor="{StaticResource Warning}"
+                                TextColor="{StaticResource White}"
+                                CornerRadius="8"
+                                FontSize="12"
+                                FontAttributes="Bold"
+                                HeightRequest="36"
+                                WidthRequest="100"
+                                Command="{Binding DownloadUpdateCommand}"
+                                IsVisible="{Binding HasNewVersion}">
+                            <Button.Shadow>
+                                <Shadow Brush="{StaticResource Warning}"
+                                        Offset="0,2"
+                                        Radius="4"
+                                        Opacity="0.3"/>
+                            </Button.Shadow>
+                        </Button>
+                    </VerticalStackLayout>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 功能选项列表 -->
+            <controls:CardView>
+                <controls:CardView.Header>
+                    <Label Text="功能与支持"
+                       Style="{StaticResource SectionTitleStyle}"
+                       VerticalOptions="Center"/>
+                </controls:CardView.Header>
+                <CollectionView ItemsSource="{Binding FeatureItems}"
+                                BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FeatureItem">
+                            <Grid Style="{StaticResource FeatureItemStyle}"
+                                  ColumnDefinitions="Auto, *, Auto">
+                                <!-- 图标容器 -->
+                                <Border Grid.Column="0"
+                                        Style="{StaticResource FeatureIconStyle}">
+                                    <Image Source="{Binding IconSource}"
+                                           HeightRequest="20"
+                                           WidthRequest="20"/>
+                                </Border>
+
+                                <!-- 标题和描述 -->
+                                <VerticalStackLayout Grid.Column="1"
+                                                     VerticalOptions="Center"
+                                                     Spacing="{StaticResource TinySpacing}"
+                                                     Margin="{StaticResource LeftRightLargeMargin}">
+                                    <Label Text="{Binding Title}"
+                                           Style="{StaticResource FeatureTitleStyle}"/>
+                                    <Label Text="{Binding Title, StringFormat='查看{0}相关信息'}"
+                                           FontSize="12"
+                                           TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+                                </VerticalStackLayout>
+
+                                <!-- 操作按钮 -->
                                 <Button Grid.Column="2"
                                         Text="{Binding ButtonText}"
-                                        CornerRadius="4"
-                                        BackgroundColor="White"
-                                        TextColor="#4CAF50"
-                                        BorderColor="#4CAF50"
-                                        BorderWidth="1"
-                                        FontSize="14"
-                                        Padding="{StaticResource TinySpacing}"
-                                        HeightRequest="32"
+                                        Style="{StaticResource FeatureButtonStyle}"
                                         Command="{Binding Command}"/>
+
+                                <!-- 点击手势 -->
                                 <Grid.GestureRecognizers>
                                     <TapGestureRecognizer Command="{Binding Command}"/>
                                 </Grid.GestureRecognizers>
                             </Grid>
-                        </ViewCell>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </controls:CardView>
-    </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </controls:CardView>
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
