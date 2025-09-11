@@ -132,7 +132,7 @@
                                         BorderColor="#4CAF50"
                                         BorderWidth="1"
                                         FontSize="14"
-                                        Padding="{StaticResource SmallCardPadding},{StaticResource TinySpacing}"
+                                        Padding="{StaticResource TinySpacing}"
                                         HeightRequest="32"
                                         Command="{Binding Command}"/>
                                 <Grid.GestureRecognizers>

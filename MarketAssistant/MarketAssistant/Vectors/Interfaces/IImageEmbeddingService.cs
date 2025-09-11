@@ -12,5 +12,5 @@ public interface IImageEmbeddingService
     /// <summary>
     /// 生成简单占位 Caption（可留空字符串）。
     /// </summary>
-    Task<string> GenerateCaptionAsync(byte[] imageBytes, CancellationToken ct = default);
+    Task<string> CaptionAsync(byte[] imageBytes, CancellationToken ct = default);
 }

@@ -27,7 +27,7 @@ public class TextParagraph
 
     /// <summary>The embedding generated from the Text.</summary>
     [VectorStoreVector(1024, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
-    public Embedding<float> TextEmbedding { get; set; }
+    public Embedding<float> TextEmbedding { get; set; } = default!;
 
     /// <summary>
     /// Optional associated image uri (for cross-modal retrieval).
@@ -51,12 +51,12 @@ public class TextParagraph
     /// Optional section name or heading that this paragraph belongs to.
     /// </summary>
     [VectorStoreData]
-    public string? Section { get; init; }
+    public string? Section { get; set; }
 
     /// <summary>
     /// Source type, e.g. "pdf", "docx", "web", "note".
     /// </summary>
-    [VectorStoreData]
+    [VectorStoreData(IsIndexed = true)]
     public string? SourceType { get; init; }
 
     /// <summary>
@@ -66,24 +66,26 @@ public class TextParagraph
     public string? ContentHash { get; init; }
 
     /// <summary>
-    /// 64-bit perceptual hash (aHash) for image duplicate / near-duplicate detection.
+    /// Optional published or last-updated time if known (stored as ISO string).
     /// </summary>
     [VectorStoreData]
-    public string? ImagePerceptualHash { get; init; }
+    public string? PublishedAt { get; init; }
 
     /// <summary>
-    /// Optional published or last-updated time if known.
+    /// Block 类型编码：0=Text, 1=Heading, 2=List, 3=Table, 4=Image。用于查询与分析。
     /// </summary>
     [VectorStoreData]
-    public DateTimeOffset? PublishedAt { get; init; }
+    public int BlockKind { get; set; }
 
-    // Table metadata
+    /// <summary>
+    /// 如果是标题块，标题级别（1-6）。
+    /// </summary>
     [VectorStoreData]
-    public bool IsTable { get; init; }
+    public int? HeadingLevel { get; set; }
 
+    /// <summary>
+    /// 如果是列表块，列表类型编码：0=Unordered, 1=Ordered。
+    /// </summary>
     [VectorStoreData]
-    public string? TableCaption { get; init; }
-
-    [VectorStoreData]
-    public string? TableHash { get; init; }
+    public int? ListType { get; set; }
 }

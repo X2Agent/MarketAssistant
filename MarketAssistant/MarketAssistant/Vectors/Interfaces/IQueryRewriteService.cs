@@ -11,7 +11,7 @@ public interface IQueryRewriteService
     /// <param name="query">原始查询</param>
     /// <param name="maxCandidates">最大候选数</param>
     /// <returns>改写后的候选查询集合（去重）</returns>
-    Task<IReadOnlyList<string>> RewriteAsync(string query, int maxCandidates = 3);
+    IReadOnlyList<string> Rewrite(string query, int maxCandidates = 3);
 }
 
 

@@ -70,7 +70,14 @@ public sealed class FunctionInvocationLoggingFilter(ILogger<FunctionInvocationLo
         }
         else if (result is not null)
         {
-            logger.LogTrace("Function result: {Result}", JsonSerializer.Serialize(result));
+            try
+            {
+                logger.LogTrace("Function result: {Result}", JsonSerializer.Serialize(result));
+            }
+            catch (NotSupportedException)
+            {
+                logger.LogTrace("Function result: <Contains async enumerable - cannot serialize: {Type}>", result.GetType().Name);
+            }
         }
 
         object? usage = functionResult.Metadata?["Usage"];

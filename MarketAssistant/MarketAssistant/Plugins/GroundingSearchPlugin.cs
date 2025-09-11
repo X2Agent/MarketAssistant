@@ -1,61 +1,72 @@
+using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure;
+using MarketAssistant.Vectors.Interfaces;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Data;
-using Microsoft.Extensions.Logging;
 using System.ComponentModel;
-using MarketAssistant.Vectors.Services;
-using MarketAssistant.Applications.Settings;
 
 namespace MarketAssistant.Plugins;
 
 /// <summary>
-/// ÖÇÄÜËÑË÷²å¼ş£º¸ù¾İÓÃ»§ÉèÖÃ×Ô¶¯Ñ¡Ôñ×îÊÊºÏµÄËÑË÷²ßÂÔ
-/// - ½öÖªÊ¶¿âËÑË÷£ºµ±ÓÃ»§ÆôÓÃÖªÊ¶¿âµ«½ûÓÃÍøÂçËÑË÷Ê±
-/// - ½öÍøÂçËÑË÷£ºµ±ÓÃ»§½ûÓÃÖªÊ¶¿âµ«ÆôÓÃÍøÂçËÑË÷Ê±  
-/// - »ìºÏËÑË÷£ºµ±ÓÃ»§Í¬Ê±ÆôÓÃÖªÊ¶¿âºÍÍøÂçËÑË÷Ê±
-/// - ÎŞËÑË÷£ºµ±ÓÃ»§¶¼½ûÓÃÊ±·µ»Ø¿Õ½á¹û
+/// æ™ºèƒ½æœç´¢æ’ä»¶ï¼Œæ ¹æ®ç”¨æˆ·è®¾ç½®è‡ªåŠ¨é€‰æ‹©æœ€é€‚åˆçš„æœç´¢ç­–ç•¥ï¼š
+/// - ä»…çŸ¥è¯†åº“ï¼šå½“ç”¨æˆ·å¯ç”¨çŸ¥è¯†åº“ä½†ç¦ç”¨ç½‘ç»œæœç´¢æ—¶
+/// - ä»…ç½‘ç»œæœç´¢ï¼šå½“ç”¨æˆ·ç¦ç”¨çŸ¥è¯†åº“ä½†å¯ç”¨ç½‘ç»œæœç´¢æ—¶  
+/// - æ··åˆæœç´¢ï¼šå½“ç”¨æˆ·åŒæ—¶å¯ç”¨çŸ¥è¯†åº“å’Œç½‘ç»œæœç´¢æ—¶
+/// - ç©ºç»“æœï¼šå½“ç”¨æˆ·éƒ½æœªå¯ç”¨æ—¶ï¼Œè¿”å›ç©ºç»“æœ
 /// </summary>
 public class GroundingSearchPlugin
 {
-    private readonly RetrievalOrchestrator _orchestrator;
+    private readonly IRetrievalOrchestrator _orchestrator;
+    private readonly IWebTextSearchFactory _webTextSearchFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<GroundingSearchPlugin> _logger;
 
     public GroundingSearchPlugin(
-        RetrievalOrchestrator orchestrator,
+        IRetrievalOrchestrator orchestrator,
+        IWebTextSearchFactory webTextSearchFactory,
         IUserSettingService userSettingService,
         ILogger<GroundingSearchPlugin> logger)
     {
         _orchestrator = orchestrator;
+        _webTextSearchFactory = webTextSearchFactory;
         _userSettingService = userSettingService;
         _logger = logger;
     }
 
-    [KernelFunction, Description("ÖÇÄÜËÑË÷£º¸ù¾İÓÃ»§ÉèÖÃ×Ô¶¯Ñ¡ÔñÖªÊ¶¿â¼ìË÷¡¢ÍøÂçËÑË÷»ò»ìºÏ¼ìË÷£¬·µ»Ø¸ßÖÊÁ¿Ö¤¾İÆ¬¶Î")]
+    [KernelFunction, Description("ä¿¡æ¯æœç´¢ï¼šå½“ç°æœ‰ä¿¡æ¯ç¼ºå¤±ã€éœ€å®æ—¶è¡¥å……æˆ–æ›´æ–°åŠ¨æ€æ—¶ä½¿ç”¨ã€‚è¿”å›æ ¼å¼åŒ–è¯æ®ç‰‡æ®µï¼Œå« Name/Link/Valueã€‚")]
     public async Task<KernelSearchResults<TextSearchResult>> SearchAsync(
-        [Description("²éÑ¯ÎÊÌâ»ò¹Ø¼ü×Ö")] string query,
-        [Description("·µ»ØÌõÊı")] int top = 6)
+        [Description("æœç´¢çš„æŸ¥è¯¢è¯­å¥æˆ–å…³é”®è¯ï¼Œå¦‚'å…¬å¸å è´¢åŠ¡æ•°æ®'ã€'è¡Œä¸š è¶‹åŠ¿å˜åŒ–'ç­‰")] string query,
+        [Description("è¿”å›ç»“æœæ•°é‡ï¼Œå»ºè®®3-6ä¸ª")] int top = 6)
     {
+        // å‚æ•°çº¦æŸï¼šé¿å…æç«¯æ¨¡å¼ä½¿ç”¨å’Œæç«¯å‚æ•°
+        if (top <= 0) top = 3;
+        if (top > 6) top = 6;
+
         var userSetting = _userSettingService.CurrentSetting;
         var hasKnowledgeEnabled = userSetting.LoadKnowledge;
         var hasWebSearchEnabled = userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey);
 
-        _logger.LogDebug("ËÑË÷²ßÂÔ - ÖªÊ¶¿â: {KnowledgeEnabled}, ÍøÂçËÑË÷: {WebEnabled}",
+        _logger.LogDebug("æœç´¢é…ç½® - çŸ¥è¯†åº“: {KnowledgeEnabled}, ç½‘ç»œæœç´¢: {WebEnabled}",
             hasKnowledgeEnabled, hasWebSearchEnabled);
 
         try
         {
             var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top);
-            return new KernelSearchResults<TextSearchResult>(AsAsync(searchResults));
+            return new KernelSearchResults<TextSearchResult>(AsAsync(searchResults.Take(top)), searchResults.Count, new Dictionary<string, object?>
+            {
+                {"query", query}
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "ËÑË÷Ö´ĞĞÊ§°Ü: {Query}", query);
+            _logger.LogError(ex, "æœç´¢æ‰§è¡Œå¤±è´¥: {Query}", query);
             return new KernelSearchResults<TextSearchResult>(AsAsync([]));
         }
     }
 
     /// <summary>
-    /// ¸ù¾İÅäÖÃÖ´ĞĞÏàÓ¦µÄËÑË÷²ßÂÔ
+    /// æ ¹æ®é…ç½®æ‰§è¡Œå¯¹åº”çš„æœç´¢ç­–ç•¥
     /// </summary>
     private async Task<IReadOnlyList<TextSearchResult>> ExecuteSearchStrategy(
         string query,
@@ -63,69 +74,112 @@ public class GroundingSearchPlugin
         bool hasWebSearchEnabled,
         int top)
     {
-        var collectionName = UserSetting.VectorCollectionName;
-
-        return (hasKnowledgeEnabled, hasWebSearchEnabled) switch
-        {
-            // »ìºÏËÑË÷£ºÖªÊ¶¿â + ÍøÂçËÑË÷£¨×î¼ÑÌåÑé£©
-            (true, true) => await _orchestrator.RetrieveWithWebAsync(query, collectionName, top),
-
-            // ½öÖªÊ¶¿âËÑË÷
-            (true, false) => await _orchestrator.RetrieveAsync(query, collectionName, top),
-
-            // ½öÍøÂçËÑË÷£¨ĞèÒªÌØÊâ´¦Àí£¬ÒòÎªÏÖÓĞ·½·¨¶¼ĞèÒªÖªÊ¶¿â£©
-            (false, true) => await ExecuteWebOnlySearch(query, top),
-
-            // ÎŞËÑË÷£ºÓÃ»§½ûÓÃÁËËùÓĞËÑË÷¹¦ÄÜ
-            (false, false) => []
-        };
-    }
-
-    /// <summary>
-    /// Ö´ĞĞ½öÍøÂçËÑË÷£¨µ±ÖªÊ¶¿â±»½ûÓÃÊ±£©
-    /// ×¢Òâ£ºÕâÊÇÒ»¸öÌØÊâÇé¿ö£¬ĞèÒªÈÆ¹ıÖªÊ¶¿âÖ±½Ó½øĞĞÍøÂçËÑË÷
-    /// </summary>
-    private async Task<IReadOnlyList<TextSearchResult>> ExecuteWebOnlySearch(string query, int top)
-    {
-        _logger.LogInformation("Ö´ĞĞ½öÍøÂçËÑË÷Ä£Ê½: {Query}", query);
+        _logger.LogInformation("æ‰§è¡Œæœç´¢ç­–ç•¥ - çŸ¥è¯†åº“: {Knowledge}, ç½‘ç»œ: {Web}, æŸ¥è¯¢: {Query}",
+            hasKnowledgeEnabled, hasWebSearchEnabled, query);
 
         try
         {
-            // Ê¹ÓÃ»ìºÏËÑË÷·½·¨£¬µ«¹ıÂË³ö½öÍøÂçËÑË÷½á¹û
-            var collectionName = UserSetting.VectorCollectionName;
-            var allResults = await _orchestrator.RetrieveWithWebAsync(query, collectionName, top * 2);
+            // å¹¶è¡Œæ‰§è¡Œå¯ç”¨çš„æœç´¢æ–¹å¼
+            var tasks = new List<Task<IReadOnlyList<TextSearchResult>>>();
 
-            // ¹ıÂË³öÍøÂçËÑË÷½á¹û£¨ÓĞÁ´½ÓÇÒ²»ÊÇ±¾µØÖªÊ¶¿âµÄ½á¹û£©
-            var webOnlyResults = allResults.Where(r =>
-                !string.IsNullOrEmpty(r.Link) &&
-                r.Link.StartsWith("http", StringComparison.OrdinalIgnoreCase) &&
-                r.Name != "Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ")
-                .Take(top)
-                .ToList();
-
-            if (webOnlyResults.Count == 0)
+            if (hasKnowledgeEnabled)
             {
-                return new List<TextSearchResult>
-                {
-                    new("Î´¼ìË÷µ½Ïà¹ØÍøÂç×ÊÁÏ¡£Çë¸ü»»¹Ø¼ü´Ê»òÉÔºóÖØÊÔ¡£") { Name = "Î´¼ìË÷µ½Ïà¹ØÍøÂç×ÊÁÏ" }
-                };
+                tasks.Add(ExecuteKnowledgeSearch(query, top));
             }
 
-            _logger.LogInformation("½öÍøÂçËÑË÷·µ»Ø {Count} Ìõ½á¹û", webOnlyResults.Count);
-            return webOnlyResults;
+            if (hasWebSearchEnabled)
+            {
+                tasks.Add(ExecuteWebSearch(query, top));
+            }
+
+            // å¦‚æœæ²¡æœ‰å¯ç”¨ä»»ä½•æœç´¢æ–¹å¼
+            if (tasks.Count == 0)
+            {
+                return [];
+            }
+
+            // ç­‰å¾…æ‰€æœ‰ä»»åŠ¡å®Œæˆ
+            var results = await Task.WhenAll(tasks);
+
+            // åˆå¹¶æ‰€æœ‰ç»“æœ
+            return CombineResults(results);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "½öÍøÂçËÑË÷Ö´ĞĞÊ§°Ü: {Query}", query);
-            return new List<TextSearchResult>
-            {
-                new("ÍøÂçËÑË÷Ê§°Ü£¬ÇëÉÔºóÖØÊÔ¡£") { Name = "ÍøÂçËÑË÷Ê§°Ü" }
-            };
+            _logger.LogError(ex, "æœç´¢ç­–ç•¥æ‰§è¡Œå¤±è´¥: {Query}", query);
+            return [];
         }
     }
 
     /// <summary>
-    /// ×ª»»ÎªÒì²½Ã¶¾Ù£¨Kernel ÒªÇóµÄ¸ñÊ½£©
+    /// æ‰§è¡ŒçŸ¥è¯†åº“æœç´¢
+    /// </summary>
+    private async Task<IReadOnlyList<TextSearchResult>> ExecuteKnowledgeSearch(string query, int top)
+    {
+        try
+        {
+            var collectionName = UserSetting.VectorCollectionName;
+            return await _orchestrator.RetrieveAsync(query, collectionName, top);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "çŸ¥è¯†åº“æœç´¢å¤±è´¥: {Query}", query);
+            return new List<TextSearchResult>();
+        }
+    }
+
+    /// <summary>
+    /// æ‰§è¡Œç½‘ç»œæœç´¢
+    /// </summary>
+    private async Task<IReadOnlyList<TextSearchResult>> ExecuteWebSearch(string query, int top)
+    {
+        var textSearch = _webTextSearchFactory.Create();
+        if (textSearch is null)
+        {
+            _logger.LogWarning("ç½‘ç»œæœç´¢æœåŠ¡ä¸å¯ç”¨");
+            return new List<TextSearchResult>();
+        }
+
+        try
+        {
+            var testSearchResults = await textSearch.GetTextSearchResultsAsync(query, new TextSearchOptions
+            {
+                Top = top
+            });
+            var results = new List<TextSearchResult>();
+            await foreach (var r in testSearchResults.Results)
+            {
+                results.Add(r);
+            }
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ç½‘ç»œæœç´¢å¤±è´¥: {Query}", query);
+        }
+
+        return new List<TextSearchResult>();
+    }
+
+    /// <summary>
+    /// åˆå¹¶å¤šä¸ªæœç´¢ç»“æœé›†
+    /// </summary>
+    private static IReadOnlyList<TextSearchResult> CombineResults(IReadOnlyList<TextSearchResult>[] results)
+    {
+        var combined = results.SelectMany(r => r);
+
+        // å»é‡ï¼šåŸºäºé“¾æ¥ã€åç§°å’Œå†…å®¹
+        var deduped = combined
+            .GroupBy(r => $"{r.Link}|{r.Name}|{r.Value}", StringComparer.Ordinal)
+            .Select(g => g.First())
+            .ToList();
+
+        return deduped;
+    }
+
+    /// <summary>
+    /// è½¬æ¢ä¸ºå¼‚æ­¥æšä¸¾ï¼ŒKernel è¦æ±‚çš„æ ¼å¼
     /// </summary>
     private static async IAsyncEnumerable<TextSearchResult> AsAsync(IEnumerable<TextSearchResult> items)
     {

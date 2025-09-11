@@ -1,20 +1,29 @@
+using MarketAssistant.Vectors.Interfaces;
 using MarketAssistant.Vectors.Services;
 
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class TextChunkingServiceTest
+public class TextChunkingServiceTest : BaseKernelTest
 {
+    private ITextChunkingService _service = null!;
+
+    [TestInitialize]
+    public void Setup()
+    {
+        base.BaseInitialize();
+        _service = _kernel.Services.GetRequiredService<ITextChunkingService>();
+    }
+
     [TestMethod]
     public void Chunk_ShouldSplitTextIntoParagraphs()
     {
         // Arrange
-        var service = new TextChunkingService();
         var documentUri = "test://document";
         var input = "This is the first paragraph. It contains some text.\n\nThis is the second paragraph. It also contains some text.\n\nThis is the third paragraph. It has more text.";
 
         // Act
-        var result = service.Chunk(documentUri, input).ToArray();
+        var result = _service.Chunk(documentUri, input).ToArray();
 
         // Assert
         Assert.IsNotNull(result);
@@ -27,12 +36,11 @@ public class TextChunkingServiceTest
     public void Chunk_ShouldHandleEmptyString()
     {
         // Arrange
-        var service = new TextChunkingService();
         var documentUri = "test://document";
         var input = "";
 
         // Act
-        var result = service.Chunk(documentUri, input).ToArray();
+        var result = _service.Chunk(documentUri, input).ToArray();
 
         // Assert
         Assert.IsNotNull(result);
@@ -43,12 +51,11 @@ public class TextChunkingServiceTest
     public void Chunk_ShouldHandleNullString()
     {
         // Arrange
-        var service = new TextChunkingService();
         var documentUri = "test://document";
         string? input = null;
 
         // Act
-        var result = service.Chunk(documentUri, input!).ToArray();
+        var result = _service.Chunk(documentUri, input!).ToArray();
 
         // Assert
         Assert.IsNotNull(result);
@@ -59,12 +66,11 @@ public class TextChunkingServiceTest
     public void Chunk_ShouldGenerateUniqueKeys()
     {
         // Arrange
-        var service = new TextChunkingService();
         var documentUri = "test://document";
         var input = "This is the first paragraph. It contains some text.\n\nThis is the second paragraph. It also contains some text.";
 
         // Act
-        var result = service.Chunk(documentUri, input).ToArray();
+        var result = _service.Chunk(documentUri, input).ToArray();
 
         // Assert
         Assert.IsNotNull(result);

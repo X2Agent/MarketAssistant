@@ -1,11 +1,7 @@
-using CoenM.ImageHash.HashAlgorithms;
 using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
-using SixLabors.ImageSharp.PixelFormats;
-using System.Numerics;
-using Image = SixLabors.ImageSharp.Image;
 
 namespace MarketAssistant.Vectors.Services;
 
@@ -14,50 +10,42 @@ namespace MarketAssistant.Vectors.Services;
 /// </summary>
 /// <remarks>
 /// 流程概览：
-/// 1) 若存在 <see cref="IDocumentBlockReader"/>：按块读取文档（文本/表格/图片）。
-///    - 文本块：调用 <see cref="ITextCleaningService"/> 清洗文本，使用 <see cref="ITextChunkingService"/> 分块，
-///      然后为每个段落生成文本向量并 Upsert 到向量库。
-///    - 表格块：将表格 Markdown 与可选标题拼接为文本，生成文本向量并 Upsert。
-///    - 图片块：先用精确哈希（SHA-256）进行完全重复过滤，再用感知哈希（占位实现）判断近重复；
-///      之后生成图片 Caption 与图像向量，并通过 <see cref="IImageStorageService"/> 持久化图片资源。
-/// 2) 否则：使用 <see cref="IRawDocumentReader"/> 读取全文，清洗、分块后逐段生成向量并 Upsert。
+/// 使用 <see cref="IDocumentBlockReader"/> 按块读取文档（文本/表格/图片）：
+/// - 文本块：调用 <see cref="ITextCleaningService"/> 清洗文本，使用 <see cref="ITextChunkingService"/> 分块，
+///   然后为每个段落生成文本向量并 Upsert 到向量库。
+/// - 表格块：将表格 Markdown 与可选标题拼接为文本，生成文本向量并 Upsert。
+/// - 图片块：仅用精确哈希（SHA-256）进行同一文档内的完全重复过滤；
+///   之后生成图片 Caption 与图像向量。图片路径由 <see cref="MarkdownDocumentBlockReader"/> 解析提供。
 ///
 /// 去重策略：
-/// - 精确去重：对图片字节做 SHA-256，过滤完全重复。
-/// - 感知去重：<see cref="ComputePerceptualHash(byte[])"/> 生成感知哈希，并由 <see cref="IsPerceptualDuplicate(string, System.Collections.Generic.HashSet{string})"/>
-///   判断是否与已见集合足够接近（当前实现为占位，建议替换为 PHash/DHash 并按海明距离阈值判定）。
+/// - 精确去重：对图片字节做 SHA-256，过滤同一文档内的完全重复。
 ///
 /// 设计原则：
 /// - 摄取职责单一，吞吐/并发优化可在更高层实现；
 /// - 元数据完备，<see cref="TextParagraph"/> 包含必要上下文（文档 URI、段落序号、表格/图片标记等）。
+/// - 使用LRU缓存管理感知哈希，避免内存泄漏。
+/// - 图片路径解析由文档读取器负责，避免重复处理。
 /// </remarks>
 public class RagIngestionService : IRagIngestionService
 {
-    private readonly ITextCleaningService _cleaning;
-    private readonly ITextChunkingService _chunking;
-    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<RagIngestionService> _logger;
-    private readonly IEnumerable<IDocumentBlockReader> _blockReaders;
+    private readonly DocumentBlockReaderFactory _readerFactory;
     private readonly IImageEmbeddingService _imageEmbeddingService;
-    private readonly IImageStorageService _imageStorageService;
-    private readonly HashSet<string> _seenPHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly DocumentBlockMapper _blockMapper;
+
+    // 保留：如未来扩展跨文档级别的去重，可在此处引入相关缓存
 
     public RagIngestionService(
         ITextCleaningService cleaning,
         ITextChunkingService chunking,
-        IServiceProvider serviceProvider,
         ILogger<RagIngestionService> logger,
-        IEnumerable<IDocumentBlockReader> blockReaders,
-        IImageEmbeddingService imageEmbeddingService,
-        IImageStorageService imageStorageService)
+        DocumentBlockReaderFactory readerFactory,
+        IImageEmbeddingService imageEmbeddingService)
     {
-        _cleaning = cleaning;
-        _chunking = chunking;
-        _serviceProvider = serviceProvider;
         _logger = logger;
-        _blockReaders = blockReaders;
+        _readerFactory = readerFactory;
         _imageEmbeddingService = imageEmbeddingService;
-        _imageStorageService = imageStorageService;
+        _blockMapper = new DocumentBlockMapper(cleaning, chunking);
     }
 
     /// <summary>
@@ -71,31 +59,14 @@ public class RagIngestionService : IRagIngestionService
         string filePath,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
     {
-        var ext = Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant();
-        var blockReader = _blockReaders.FirstOrDefault(r => r.CanRead(filePath));
-        if (blockReader != null)
+        var blockReader = _readerFactory.GetReader(filePath);
+        if (blockReader == null)
         {
-            await IngestWithBlocksAsync(collection, filePath, embeddingGenerator, blockReader);
+            _logger.LogError("No block reader found for file: {File}", filePath);
             return;
         }
 
-        using var stream = File.OpenRead(filePath);
-        var reader = _serviceProvider.GetKeyedService<IRawDocumentReader>(ext);
-        if (reader is null)
-        {
-            _logger.LogError("No reader found for extension '{Ext}'. File: {File}", ext, filePath);
-            return;
-        }
-
-        var allText = reader.ReadAllText(stream);
-        var cleaned = _cleaning.Clean(allText);
-        var chunks = _chunking.Chunk(filePath, cleaned).ToArray();
-
-        foreach (var chunk in chunks)
-        {
-            chunk.TextEmbedding = await embeddingGenerator.GenerateAsync(chunk.Text);
-            await collection.UpsertAsync(chunk);
-        }
+        await IngestWithBlocksAsync(collection, filePath, embeddingGenerator, blockReader);
     }
 
     /// <summary>
@@ -111,133 +82,82 @@ public class RagIngestionService : IRagIngestionService
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         IDocumentBlockReader blockReader)
     {
-        using var stream = File.OpenRead(filePath);
-        var blocks = blockReader.ReadBlocks(stream, filePath).OrderBy(b => b.Order).ToList();
+        var blocks = (await blockReader.ReadBlocksAsync(filePath)).OrderBy(b => b.Order).ToList();
         if (blocks.Count == 0) return;
 
-        int textOrder = 0;
-        // 已见图片的 SHA-256（精确）哈希，用于快速过滤完全重复图片。
+        int currentOrder = 0;
+        string? currentSection = null;
         var seenImageHashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var block in blocks)
         {
-            if (block.Type == DocumentBlockType.Text && !string.IsNullOrWhiteSpace(block.Text))
+            try
             {
-                var cleaned = _cleaning.Clean(block.Text);
-                foreach (var para in _chunking.Chunk(filePath, cleaned))
+                ImageMetadata? imageMetadata = null;
+
+                // 处理图片块的去重和嵌入生成
+                if (block is ImageBlock imageBlock && imageBlock.ImageBytes.Length > 0)
                 {
-                    para.Order = textOrder++;
-                    para.TextEmbedding = await embeddingGenerator.GenerateAsync(para.Text);
-                    await collection.UpsertAsync(para);
+                    imageMetadata = await ProcessImageBlockAsync(imageBlock, seenImageHashes);
+                    if (imageMetadata == null) continue; // 跳过重复或处理失败的图片
                 }
-            }
-            else if (block.Type == DocumentBlockType.Table && !string.IsNullOrWhiteSpace(block.TableMarkdown))
-            {
-                var tableText = (block.TableCaption is not null ? block.TableCaption + "\n" : string.Empty) + block.TableMarkdown;
-                var hash = block.TableHash ?? Sha256Hex(tableText);
-                var paragraph = new TextParagraph
+
+                // 使用DocumentBlockMapper处理所有类型的块
+                var (paragraphs, nextOrder, updatedSection) = _blockMapper.MapBlock(
+                    block, filePath, currentOrder, currentSection, imageMetadata);
+
+                currentOrder = nextOrder;
+                currentSection = updatedSection;
+
+                // 为所有段落生成文本嵌入并存储
+                foreach (var paragraph in paragraphs)
                 {
-                    Key = $"{Sha256Hex(filePath)}:tbl:{hash[..8]}",
-                    DocumentUri = filePath,
-                    ParagraphId = $"tbl_{textOrder}",
-                    Text = tableText,
-                    Order = textOrder++,
-                    Section = null,
-                    SourceType = "table",
-                    ContentHash = hash,
-                    IsTable = true,
-                    TableCaption = block.TableCaption,
-                    TableHash = hash,
-                    PublishedAt = null
-                };
-                paragraph.TextEmbedding = await embeddingGenerator.GenerateAsync(paragraph.Text);
-                await collection.UpsertAsync(paragraph);
-            }
-            else if (block.Type == DocumentBlockType.Image && block.ImageBytes is not null && block.ImageBytes.Length > 0)
-            {
-                var imageHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(block.ImageBytes));
-                var phash = ComputePerceptualHash(block.ImageBytes);
-                if (!seenImageHashes.Add(imageHash) || IsPerceptualDuplicate(phash, _seenPHashes))
-                {
-                    continue; // skip duplicate or near-duplicate
-                }
-                try
-                {
-                    var caption = await _imageEmbeddingService.GenerateCaptionAsync(block.ImageBytes);
-                    var embedding = await _imageEmbeddingService.GenerateAsync(block.ImageBytes);
-                    var keyHash = imageHash;
-                    // persist image using configured storage
-                    string relative;
-                    try
-                    {
-                        relative = await _imageStorageService.SaveImageAsync(block.ImageBytes, keyHash + ".png", CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to save image for ingestion: {File}", filePath);
-                        continue;
-                    }
-                    var paragraph = new TextParagraph
-                    {
-                        Key = $"{Sha256Hex(filePath)}:img:{keyHash[..8]}",
-                        DocumentUri = filePath,
-                        ParagraphId = $"img_{textOrder}",
-                        Text = caption,
-                        Order = textOrder++,
-                        Section = null,
-                        SourceType = Path.GetExtension(filePath).Trim('.'),
-                        ContentHash = keyHash,
-                        ImagePerceptualHash = phash,
-                        PublishedAt = null,
-                        ImageUri = relative,
-                        ImageEmbedding = embedding
-                    };
                     paragraph.TextEmbedding = await embeddingGenerator.GenerateAsync(paragraph.Text);
                     await collection.UpsertAsync(paragraph);
-                    if (!string.IsNullOrEmpty(phash)) _seenPHashes.Add(phash);
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Image block ingestion failed: {File}", filePath);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process block at order {Order} in file {File}",
+                    block.Order, filePath);
             }
         }
     }
 
-    private static string Sha256Hex(string input)
+    /// <summary>
+    /// 处理图片块，包括去重检查和嵌入生成
+    /// </summary>
+    /// <param name="imageBlock">图片块</param>
+    /// <param name="seenImageHashes">当前文档已见的图片哈希集合</param>
+    /// <returns>图片元数据，如果跳过则返回null</returns>
+    private async Task<ImageMetadata?> ProcessImageBlockAsync(ImageBlock imageBlock, HashSet<string> seenImageHashes)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
-        return Convert.ToHexString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input)));
-    }
+        var imageHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(imageBlock.ImageBytes));
 
-    private static string ComputePerceptualHash(byte[] imageBytes)
-    {
-        if (imageBytes == null || imageBytes.Length == 0) return string.Empty;
+        // 检查重复：仅在当前文档内进行精确重复过滤
+        if (!seenImageHashes.Add(imageHash))
+        {
+            return null; // 跳过当前文档内的精确重复图片
+        }
+
         try
         {
-            using var image = Image.Load<Rgba32>(imageBytes);
-            var hasher = new PerceptualHash();
-            ulong hash = hasher.Hash(image);
-            return hash.ToString("X16");
+            // 生成图片说明和嵌入
+            var caption = await _imageEmbeddingService.CaptionAsync(imageBlock.ImageBytes);
+            var imageEmbedding = await _imageEmbeddingService.GenerateAsync(imageBlock.ImageBytes);
+
+            // 使用已解析的路径或生成默认路径
+            var imagePath = imageBlock.ImagePath ?? $"image_{imageHash}.png";
+
+            return new ImageMetadata(caption, imagePath, imageEmbedding);
         }
-        catch
+        catch (Exception ex)
         {
-            return string.Empty;
+            _logger.LogWarning(ex, "Failed to process image metadata for image hash {ImageHash}", imageHash);
+            return null;
         }
     }
 
-    private bool IsPerceptualDuplicate(string phashHex, HashSet<string> seenHashes)
-    {
-        if (string.IsNullOrEmpty(phashHex) || seenHashes.Count == 0) return false;
-        if (!ulong.TryParse(phashHex, System.Globalization.NumberStyles.HexNumber, null, out var current)) return false;
-        const int threshold = 12; // 可配置
-        foreach (var s in seenHashes)
-        {
-            if (!ulong.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out var other)) continue;
-            int dist = BitOperations.PopCount(current ^ other);
-            if (dist <= threshold) return true;
-        }
-        return false;
-    }
 }
 
 

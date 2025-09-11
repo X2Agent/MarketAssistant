@@ -1,0 +1,35 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build solution",
+			"type": "shell",
+			"command": "dotnet build .\\MarketAssistant.sln -c Debug --nologo",
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run tests (subset)",
+			"type": "shell",
+			"command": "dotnet test .\\TestMarketAssistant\\TestMarketAssistant.csproj -c Debug --filter FullyQualifiedName~Vectors.ClipImageEmbeddingServiceTest --no-build --nologo",
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "Run ClipImageEmbeddingServiceTest",
+			"type": "shell",
+			"command": "dotnet test .\\TestMarketAssistant\\TestMarketAssistant.csproj -c Debug --filter \"FullyQualifiedName~ClipImageEmbeddingServiceTest\" --no-build --nologo",
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		}
+	]
+}

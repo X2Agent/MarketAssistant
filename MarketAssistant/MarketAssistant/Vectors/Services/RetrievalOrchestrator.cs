@@ -1,87 +1,100 @@
-using MarketAssistant.Infrastructure;
 using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Vectors.Services;
 
 /// <summary>
-/// RAG ¼ìË÷±àÅÅÆ÷£¬¸ºÔğ¶Ëµ½¶ËµÄ¼ìË÷Á÷³Ì¡£
-/// ²½Öè£º
-/// 1) ²éÑ¯¸ÄĞ´£º»ùÓÚÔ­Ê¼²éÑ¯Éú³É¶à¸öºòÑ¡£¬ÌáÉıÕÙ»Ø¡£
-/// 2) ÏòÁ¿¼ìË÷£º¶ÔÃ¿¸öºòÑ¡ÔÚÄÚ²¿¼¯ºÏ¼ìË÷²¢ºÏ²¢½á¹û¡£
-/// 3) ¿ÉÑ¡ÍíÈÚºÏ£º¶Ô°üº¬Í¼Æ¬µÄÏî°´¡°ÎÄ±¾ÏàËÆ¶È + Í¼ÏñÏàËÆ¶È¡±¼ÓÈ¨ÈÚºÏ´ò·Ö¡£
-/// 4) È¥ÖØÓëÖØÅÅ£ºÈ¥³ıÈßÓàÌõÄ¿£¬µ÷ÓÃÖØÅÅ·şÎñµÃµ½×îÖÕÅÅĞò¡£
-/// 5) ¿ÉÑ¡ Web À©³ä£ºÔÚĞèÒªÊ±¼ÓÈëÍâ²¿¿ÉĞÅÀ´Ô´¼ìË÷½á¹û¡£
+/// RAG æ£€ç´¢ç¼–æ’å™¨ï¼Œä¸“æ³¨äºçŸ¥è¯†åº“æ£€ç´¢çš„æ ¸å¿ƒç®¡ç†
+/// åŒ…å«ç»å…¸çš„æ£€ç´¢ä¼˜åŒ–ï¼š
+/// 1) æŸ¥è¯¢é‡å†™â€”â€”å°†åŸå§‹æŸ¥è¯¢ç”Ÿæˆå¤šä¸ªå€™é€‰ï¼Œæé«˜å¬å›ã€‚
+/// 2) å‘é‡æ£€ç´¢â€”â€”å¯¹æ¯ä¸ªå€™é€‰åœ¨å†…éƒ¨å‘é‡é›†åˆä¸­æ£€ç´¢ã€‚
+/// 3) å»é‡ä¸é‡æ’ï¼šå»é‡ç›¸ä¼¼æ¡ç›®ï¼Œé‡æ’è·å¾—ä¼˜è´¨ç»“æœã€‚
 /// </summary>
-public class RetrievalOrchestrator
+public class RetrievalOrchestrator : IRetrievalOrchestrator
 {
     private readonly IQueryRewriteService _queryRewrite;
     private readonly IRerankerService _reranker;
     private readonly VectorStore _vectorStore;
     private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-    private readonly IWebTextSearchFactory _webTextSearchFactory;
     private readonly ILogger<RetrievalOrchestrator> _logger;
-
-    // ÍíÈÚºÏµÄÈ¨ÖØÉèÖÃ£º
-    // ÎÄ±¾Õ¼±È 0.7£¬Í¼ÏñÕ¼±È 0.3£¨ÔÚ¶àÄ£Ì¬ÌõÄ¿´æÔÚÊ±¸üÎÈ½¡£©¡£
-    private const double TextWeight = 0.7;
-    private const double ImageWeight = 0.3;
 
     public RetrievalOrchestrator(
         IQueryRewriteService queryRewrite,
         IRerankerService reranker,
         VectorStore vectorStore,
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        IWebTextSearchFactory webTextSearchFactory,
         ILogger<RetrievalOrchestrator> logger)
     {
         _queryRewrite = queryRewrite;
         _reranker = reranker;
         _vectorStore = vectorStore;
         _embeddingGenerator = embeddingGenerator;
-        _webTextSearchFactory = webTextSearchFactory;
         _logger = logger;
     }
 
     /// <summary>
-    /// ÔÚÄÚ²¿ÏòÁ¿¿âÖĞ¼ìË÷Óë²éÑ¯Ïà¹ØµÄ¶ÎÂä¡£
+    /// ä»å†…éƒ¨å‘é‡é›†åˆä¸­æ£€ç´¢æŸ¥è¯¢ç›¸å…³çš„æ®µè½ã€‚
     /// </summary>
-    /// <param name="query">ÓÃ»§²éÑ¯ÎÄ±¾¡£</param>
-    /// <param name="collectionName">ÏòÁ¿¼¯ºÏÃû³Æ¡£</param>
-    /// <param name="top">ÖØÅÅºó·µ»ØµÄÌõÊı¡£</param>
-    /// <param name="enableLateFusion">ÊÇ·ñÆôÓÃÎÄ±¾/Í¼ÏñÏàËÆ¶ÈµÄÍíÈÚºÏ¡£</param>
-    /// <param name="cancellationToken">È¡ÏûÁîÅÆ¡£</param>
-    /// <returns>°´Ïà¹ØĞÔÖØÅÅºóµÄ¼ìË÷½á¹û¡£</returns>
+    /// <param name="query">ç”¨æˆ·æŸ¥è¯¢æ–‡æœ¬ã€‚</param>
+    /// <param name="collectionName">å‘é‡é›†åˆåç§°ã€‚</param>
+    /// <param name="top">é‡æ’åè¿”å›çš„æ¡ç›®æ•°ã€‚</param>
+    /// <param name="cancellationToken">å–æ¶ˆä»¤ç‰Œã€‚</param>
+    /// <returns>æ’åºä¼˜åŒ–é‡æ’åçš„æ£€ç´¢ç»“æœé›†ã€‚</returns>
     public async Task<IReadOnlyList<TextSearchResult>> RetrieveAsync(
         string query,
         string collectionName,
         int top = 8,
-        bool enableLateFusion = true,
         CancellationToken cancellationToken = default)
     {
         var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
         await collection.EnsureCollectionExistsAsync(cancellationToken);
 
-        // 1) ¶à²éÑ¯¸ÄĞ´£º°üº¬Ô­Ê¼²éÑ¯Óë¸ÄĞ´ºòÑ¡£¬ÒÔÌáÉıÕÙ»Ø¡£
-        var rewrites = await _queryRewrite.RewriteAsync(query, maxCandidates: 4);
+        // 1) æŸ¥è¯¢é‡å†™â€”â€”å°†åŸå§‹æŸ¥è¯¢é‡å†™å‡ºå€™é€‰ï¼Œæé«˜å¬å›ã€‚
+        var rewrites = _queryRewrite.Rewrite(query, maxCandidates: 3);
         var queries = new List<string> { query };
         queries.AddRange(rewrites);
 
-        // 2) »ìºÏÏòÁ¿¼ìË÷£º¶ÔÃ¿¸ö²éÑ¯±äÌå½øĞĞ¼ìË÷£¬²¢ºÏ²¢½á¹û¡£
+        // 2) å‘é‡æ£€ç´¢â€”â€”å¯¹æ¯ä¸ªæŸ¥è¯¢åœ¨å‘é‡é›†åˆä¸­æ£€ç´¢ï¼Œåˆå¹¶ç»“æœã€‚
         var merged = new List<TextSearchResult>();
-        var vectorTextSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+
+        // VectorStoreTextSearch æ— æ³•è‡ªåŠ¨æ¨æ–­å‘é‡å­—æ®µçš„ç±»å‹é—®é¢˜ï¼Œæ¨è SearchAsync æ—¶æŒ‡å®š VectorPropertyã€‚
+        //var vectorTextSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+
+        // æŒ‡å®šä½¿ç”¨TextEmbeddingå­—æ®µè¿›è¡Œå‘é‡æœç´¢ï¼ˆé¿å…å‘é‡å­—æ®µæ¨æ–­é—®é¢˜ï¼‰
+        var vectorSearchOptions = new VectorSearchOptions<TextParagraph>
+        {
+            VectorProperty = r => r.TextEmbedding
+        };
+
+        // å¯¹äºæ¯ä¸ªæŸ¥è¯¢çš„æ£€ç´¢é‡ï¼Œç¡®ä¿è·å¾—è¶³å¤Ÿå€™é€‰é¡¹ä¾›åç»­å»é‡å’Œé‡æ’
+        // å¤šæŸ¥è¯¢ç­–ç•¥ + å‘é‡æœç´¢ï¼Œèƒ½è®©æŸ¥è¯¢è·å¾—æ›´ä½çš„ç»“æœé—æ¼
+        var perQueryLimit = Math.Max(top / 2, 3); // è‡³å°‘3ä¸ªï¼Œå¤„ç†topå¾ˆå°æ—¶çš„è¾¹ç•Œæƒ…å†µ
+
         foreach (var q in queries.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             try
             {
-                var results = await vectorTextSearch.GetTextSearchResultsAsync(q, new() { Top = top / 2 + 2 }, cancellationToken);
-                await foreach (var r in results.Results)
+                // ç”ŸæˆæŸ¥è¯¢å‘é‡
+                var queryVector = await _embeddingGenerator.GenerateAsync(q);
+
+                // ä½¿ç”¨SearchAsyncæ–¹æ³•ï¼Œæ˜¾å¼æŒ‡å®šä½¿ç”¨TextEmbeddingå‘é‡å­—æ®µ
+                var searchResults = collection.SearchAsync(
+                    queryVector.Vector,
+                    perQueryLimit,
+                    vectorSearchOptions,
+                    cancellationToken);
+
+                await foreach (var searchResult in searchResults)
                 {
-                    merged.Add(r);
+                    var textResult = new TextSearchResult(searchResult.Record.Text)
+                    {
+                        Name = searchResult.Record.ParagraphId,
+                        Link = searchResult.Record.DocumentUri
+                    };
+                    merged.Add(textResult);
                 }
             }
             catch (Exception ex)
@@ -90,201 +103,20 @@ public class RetrievalOrchestrator
             }
         }
 
-        // 3) ±¾µØ¼ìË÷Îª¿ÕµÄ¶µµ×ÌáÊ¾¡£
+        // 3) å¦‚æœæ£€ç´¢ä¸ºç©ºçš„å…œåº•æç¤ºã€‚
         if (merged.Count == 0)
         {
-            return new List<TextSearchResult>
-            {
-                new("Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ¡£Çë¸ü»»¹Ø¼ü´Ê»ò¼ì²éÖªÊ¶¿âÊÇ·ñÒÑÍê³ÉÉãÈ¡¡£") { Name = "Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ" }
-            };
+            return Array.Empty<TextSearchResult>();
         }
 
-        // 4) ¿ÉÑ¡¡°ÍíÈÚºÏ¡±£ºÈôÌõÄ¿°üº¬Í¼ÏñÏòÁ¿£¬Ôò½«¡°ÎÄ±¾ÏàËÆ¶È¡±ºÍ¡°Í¼ÏñÏàËÆ¶È¡±¼ÓÈ¨ÈÚºÏ¡£
-        //    Í¨¹ı·´Éä·ÃÎÊ¿ÉÑ¡ÊôĞÔ£¬¼æÈİ²»Í¬ SDK °æ±¾ÏÂµÄ×Ö¶Î±ä»¯¡£
-        if (enableLateFusion)
-        {
-            try
-            {
-                var queryTextEmbedding = await _embeddingGenerator.GenerateAsync(query);
-                var qt = queryTextEmbedding.Vector.ToArray();
-                foreach (var res in merged)
-                {
-                    var imgVec = TryGetEmbeddingFromProperties(res, "ImageEmbedding");
-                    if (imgVec.Length == 0) continue;
-
-                    var textVec = TryGetEmbeddingFromProperties(res, "Embedding");
-                    double textScore = TryGetNullableDouble(res, "Score") ?? Cosine(qt, textVec);
-                    var imgScore = Cosine(qt, imgVec);
-                    var fused = TextWeight * textScore + ImageWeight * imgScore;
-                    TrySetNullableDouble(res, "Score", fused);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Late fusion failed; continue without image adjustment");
-            }
-        }
-
-        // 5) È¥ÖØ£ºÓÃ link+name+snippet ×÷Îª¼ü£¬±ÜÃâÖØ¸´ÌõÄ¿¡£
+        // 4) æ ‡å‡†å»é‡ï¼šé€šè¿‡æ–‡æœ¬å†…å®¹åˆå¹¶é‡å¤é¡¹î¡£
         var dedup = merged
             .GroupBy(r => $"{r.Link}|{r.Name}|{r.Value}", StringComparer.Ordinal)
             .Select(g => g.First())
             .ToList();
 
-        // 6) ÖØÅÅÓë½Ø¶Ï£ºµ÷ÓÃÖØÅÅ·şÎñµÃµ½×îÖÕÅÅĞòºó£¬È¡Ç° N Ìõ¡£
-        var reranked = await _reranker.RerankAsync(query, dedup, cancellationToken);
+        // 5) é‡æ’ï¼ˆæ”¯æŒRankGPT/å¯å‘å¼æ¨¡å‹è¿›ä¸€æ­¥ä¼˜åŒ–é‡æ’ï¼‰
+        var reranked = _reranker.Rerank(query, dedup);
         return reranked.Take(top).ToList();
-    }
-
-    /// <summary>
-    /// ³¢ÊÔ´Ó½á¹ûµÄ¿ÉÑ¡ Properties ×Ö¶Î¶ÁÈ¡ Embedding<float>£¬²¢·µ»ØÆäÏòÁ¿¡£
-    /// ÈôÈ±Ê§»òÀàĞÍ²»Æ¥Åä£¬·µ»Ø¿ÕÊı×é¡£
-    /// </summary>
-    private static float[] TryGetEmbeddingFromProperties(TextSearchResult r, string key)
-    {
-        try
-        {
-            var props = r.GetType().GetProperty("Properties")?.GetValue(r) as IReadOnlyDictionary<string, object?>;
-            if (props != null && props.TryGetValue(key, out var obj) && obj is Embedding<float> emb)
-            {
-                return emb.Vector.ToArray();
-            }
-        }
-        catch { }
-        return Array.Empty<float>();
-    }
-
-    /// <summary>
-    /// Í¨¹ı·´Éä°²È«¶ÁÈ¡¿É¿Õ double ÊôĞÔ£¨Èç Score£©¡£
-    /// </summary>
-    private static double? TryGetNullableDouble(object obj, string propertyName)
-    {
-        try
-        {
-            var p = obj.GetType().GetProperty(propertyName);
-            if (p != null && p.PropertyType == typeof(double?))
-            {
-                return (double?)p.GetValue(obj);
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    /// <summary>
-    /// Í¨¹ı·´Éä°²È«ÉèÖÃ¿É¿Õ double ÊôĞÔ£¨Èç Score£©¡£
-    /// </summary>
-    private static void TrySetNullableDouble(object obj, string propertyName, double value)
-    {
-        try
-        {
-            var p = obj.GetType().GetProperty(propertyName);
-            if (p != null && p.PropertyType == typeof(double?) && p.CanWrite)
-            {
-                p.SetValue(obj, value);
-            }
-        }
-        catch { }
-    }
-
-    private static double Cosine(IReadOnlyList<float> a, IReadOnlyList<float> b)
-    {
-        if (a.Count == 0 || b.Count == 0 || a.Count != b.Count) return 0;
-        double dot = 0, na = 0, nb = 0;
-        for (int i = 0; i < a.Count; i++)
-        {
-            dot += a[i] * b[i];
-            na += a[i] * a[i];
-            nb += b[i] * b[i];
-        }
-        if (na == 0 || nb == 0) return 0;
-        return dot / (Math.Sqrt(na) * Math.Sqrt(nb));
-    }
-
-    /// <summary>
-    /// ÏÈ´Ó±¾µØÏòÁ¿¿â¼ìË÷£¬ÔÙ°´Ğè²¢ÈëÉ¸Ñ¡ºóµÄ Web ½á¹û¡£
-    /// </summary>
-    /// <param name="query">ÓÃ»§²éÑ¯ÎÄ±¾¡£</param>
-    /// <param name="collectionName">ÏòÁ¿¼¯ºÏÃû³Æ¡£</param>
-    /// <param name="top">ÖØÅÅºó·µ»ØµÄÌõÊı¡£</param>
-    /// <param name="cancellationToken">È¡ÏûÁîÅÆ¡£</param>
-    public async Task<IReadOnlyList<TextSearchResult>> RetrieveWithWebAsync(
-        string query,
-        string collectionName,
-        int top = 8,
-        CancellationToken cancellationToken = default)
-    {
-        var local = await RetrieveAsync(query, collectionName, top, enableLateFusion: true, cancellationToken);
-        if (local.Count == 1 && local[0].Name == "Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ")
-        {
-            // ±£Áô fallback ÎÄ±¾£¬µ«¼ÌĞø³¢ÊÔ Web ½á¹û
-        }
-
-        // Èô¿ÉÓÃÔò½øĞĞ Web ¼ìË÷
-        var textSearch = _webTextSearchFactory.Create();
-        if (textSearch is null)
-        {
-            return local;
-        }
-
-        // Óë±¾µØ¼ìË÷±£³ÖÒ»ÖÂ£º»ùÓÚ¸ÄĞ´ºòÑ¡½øĞĞ¶à²éÑ¯ Web ¼ìË÷¡£
-        var rewrites = await _queryRewrite.RewriteAsync(query, maxCandidates: 3);
-        var queries = new List<string> { query };
-        queries.AddRange(rewrites);
-
-        var webResults = new List<TextSearchResult>();
-        foreach (var q in queries.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var plugin = textSearch.CreateWithGetTextSearchResults("WebSearchPlugin");
-                var fr = await plugin["GetTextSearchResults"].InvokeAsync(
-                    new Kernel(), new() { ["query"] = q }, cancellationToken: cancellationToken);
-                var ksr = fr.GetValue<KernelSearchResults<TextSearchResult>>();
-                if (ksr is not null)
-                {
-                    await foreach (var r in ksr.Results)
-                    {
-                        webResults.Add(r);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Web search failed for subquery: {Query}", q);
-            }
-        }
-
-        // ¿ÉĞÅÀ´Ô´¹ıÂË£¬²¢Óë±¾µØ½á¹ûºÏ²¢È¥ÖØ¡£
-        var trusted = webResults.Where(IsTrustedSource).ToList();
-        var dedup = trusted
-            .Concat(local)
-            .GroupBy(r => $"{r.Link}|{r.Name}|{r.Value}", StringComparer.Ordinal)
-            .Select(g => g.First())
-            .ToList();
-
-        if (dedup.Count == 0)
-        {
-            return new List<TextSearchResult>
-            {
-                new("Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ£¨ÍøÂçÓë±¾µØ¾ùÎ´ÃüÖĞ£©¡£Çë¸ü»»¹Ø¼ü´Ê»òÉÔºóÖØÊÔ¡£") { Name = "Î´¼ìË÷µ½Ïà¹Ø×ÊÁÏ" }
-            };
-        }
-
-        var reranked = await _reranker.RerankAsync(query, dedup, cancellationToken);
-        return reranked.Take(top).ToList();
-    }
-
-    private static bool IsTrustedSource(TextSearchResult r)
-    {
-        var uri = r.Link ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(uri)) return false;
-
-        string[] trusted = [
-            "reuters.com", "bloomberg.com", "ft.com", "wsj.com",
-            "csrc.gov.cn", "sse.com.cn", "szse.cn", "sec.gov", "nasdaq.com",
-            "imf.org", "worldbank.org", "ecb.europa.eu"
-        ];
-        return trusted.Any(d => uri.Contains(d, StringComparison.OrdinalIgnoreCase));
     }
 }

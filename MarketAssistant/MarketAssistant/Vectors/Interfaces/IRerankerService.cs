@@ -3,9 +3,9 @@ using Microsoft.SemanticKernel.Data;
 namespace MarketAssistant.Vectors.Interfaces;
 
 /// <summary>
-/// ¶ÔÕÙ»Ø½á¹û½øĞĞÖØÅÅµÄ³éÏó½Ó¿Ú
+/// æ£€ç´¢ç»“æœé‡æ’åºçš„é‡æ’æ¥å£
 /// </summary>
 public interface IRerankerService
 {
-    Task<IReadOnlyList<TextSearchResult>> RerankAsync(string query, IEnumerable<TextSearchResult> items, CancellationToken cancellationToken = default);
+    IReadOnlyList<TextSearchResult> Rerank(string query, IEnumerable<TextSearchResult> items);
 }

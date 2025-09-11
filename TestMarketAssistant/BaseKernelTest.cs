@@ -3,6 +3,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins;
+using MarketAssistant.Vectors.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
@@ -60,7 +61,7 @@ public class BaseKernelTest
         var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-235B-A22B";
+        var modelId = "Qwen/Qwen3-32B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -91,6 +92,8 @@ public class BaseKernelTest
             return userSettingServiceMock.Object;
         });
 
+        builder.Services.AddRagServices();
+
         builder.Services.AddKernel().AddOpenAIChatCompletion(
                 modelId,
                 new Uri(endpoint),
@@ -106,6 +109,7 @@ public class BaseKernelTest
             .AddFromType<StockNewsPlugin>()
             .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
+            .AddFromType<GroundingSearchPlugin>()
             .AddFromType<TextPlugin>();
 
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";

@@ -1,6 +1,10 @@
 ## TODO
 
 - 选定目录文档(Pdf,Docx)向量化搜索
+   pandoc.net 文档转换
+   Mammoth.NET - DOCX 到 HTML
+   ReverseMarkdown - HTML 到 Markdown
+
 - SK Web Search 支持
 - MCP Client 支持
    问题：所有 MCP 工具被合并在一个 mcp 命名空间下，模型可自动调用，但“无法限制/引导只调用某个 MCP 或某类 MCP 工具”，特别是用户可添加任意 MCP 时，缺少选择性暴露与强约束。

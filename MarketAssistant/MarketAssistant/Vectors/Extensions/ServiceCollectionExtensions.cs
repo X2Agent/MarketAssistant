@@ -1,6 +1,6 @@
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Vectors.Interfaces;
 using MarketAssistant.Vectors.Services;
-using MarketAssistant.Infrastructure;
 
 namespace MarketAssistant.Vectors.Extensions;
 
@@ -16,28 +16,41 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton<ITextCleaningService, TextCleaningService>();
         services.AddSingleton<ITextChunkingService, TextChunkingService>();
-        services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
-        services.AddSingleton<IRagIngestionService, RagIngestionService>();
 
         // 多模态：使用 CLIP 服务替换占位实现
         services.AddSingleton<IImageEmbeddingService, ClipImageEmbeddingService>();
         services.AddSingleton<IImageStorageService, LocalImageStorageService>();
-        services.AddSingleton<IDocumentBlockReader, PdfReader>();
-        services.AddSingleton<IDocumentBlockReader, DocxReader>();
 
-        // 注册重排服务 - 使用装饰器模式实现降级
-        services.AddKeyedSingleton<IRerankerService, OnnxCrossEncoderRerankerService>("primary");
-        services.AddKeyedSingleton<IRerankerService, RerankerService>("fallback");
-        services.AddSingleton<IRerankerService, FallbackRerankerService>();
+        // 注册改进的转换器
+        services.AddSingleton<IMarkdownConverter, DocxMarkdownConverter>();
+        services.AddSingleton<IMarkdownConverter, PdfMarkdownConverter>();
 
-        services.AddSingleton<RetrievalOrchestrator>();
+        // 注册转换器工厂
+        services.AddSingleton<MarkdownConverterFactory>();
+
+        // 先注册具体的 MarkdownDocumentBlockReader
+        services.AddSingleton<MarkdownDocumentBlockReader>();
+
+        // 再注册依赖于它的其他读取器
+        services.AddSingleton<IDocumentBlockReader, MarkdownDocumentBlockReader>(provider =>
+            provider.GetRequiredService<MarkdownDocumentBlockReader>());
+        services.AddSingleton<IDocumentBlockReader, DocxBlockReader>();
+        services.AddSingleton<IDocumentBlockReader, PdfBlockReader>();
+
+
+        // 注册统一的文档块读取器工厂
+        services.AddSingleton<DocumentBlockReaderFactory>();
+
+        // 注册重排服务 - 已重构为纯启发式算法，无AI调用成本
+        // 专为金融场景优化：信任度评分 + 关键词加成 + 时效性 + 多样性优化
+        services.AddSingleton<IRerankerService, RerankerService>();
+        services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
+
+        services.AddSingleton<IRetrievalOrchestrator, RetrievalOrchestrator>();
         services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
-        services.AddSingleton<MarketAssistant.Plugins.GroundingSearchPlugin>();
 
-        // 使用 Keyed Services 注册多实现，按扩展名作为 key
-        // PdfReader 和 DocxReader 同时实现了 IRawDocumentReader 和 IDocumentBlockReader
-        services.AddKeyedSingleton<IRawDocumentReader, PdfReader>("pdf");
-        services.AddKeyedSingleton<IRawDocumentReader, DocxReader>("docx");
+        services.AddSingleton<IRagIngestionService, RagIngestionService>();
+
         return services;
     }
 }
