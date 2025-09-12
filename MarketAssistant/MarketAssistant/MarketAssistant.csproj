@@ -43,14 +43,14 @@
 		<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
 		<PackageReference Include="Microsoft.Maui.Graphics.Text.Markdig" Version="9.0.100" />
 		<PackageReference Include="Microsoft.Playwright" Version="1.54.0" />
-		<PackageReference Include="Microsoft.SemanticKernel" Version="1.64.0" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.64.0" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration" Version="1.64.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess" Version="1.64.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.64.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.64.0-preview" />
-		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.64.0-alpha" />
-		<PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.64.0" />
+		<PackageReference Include="Microsoft.SemanticKernel" Version="1.65.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.65.0" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Orchestration" Version="1.65.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Agents.Runtime.InProcess" Version="1.65.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.65.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.65.0-preview" />
+		<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.65.0-alpha" />
+		<PackageReference Include="Microsoft.SemanticKernel.Yaml" Version="1.65.0" />
 		<PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.4" />
 		<PackageReference Include="PdfPig" Version="0.1.11" />
 		<PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
@@ -63,7 +63,6 @@
 		<PackageReference Include="System.Numerics.Tensors" Version="9.0.8" />
 		<!-- Added for image processing -->
 		<PackageReference Include="SkiaSharp" Version="3.119.0" />
-		<PackageReference Include="Verify.ImageHash" Version="2.1.2" />
 	</ItemGroup>
 
 	<ItemGroup>

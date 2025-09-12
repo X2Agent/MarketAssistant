@@ -26,9 +26,8 @@ public class GroundingSearchPluginTest : BaseKernelTest
         try
         {
             var result = await plugin.SearchAsync("测试查询", 5);
-            Assert.IsNotNull(result);
-            var items = await result.Results.ToListAsync();
-            foreach (var item in items)
+            Assert.IsNotNull(result); ;
+            foreach (var item in result)
             {
                 Console.WriteLine($"Name: {item.Name}, Link: {item.Link}, Value: {item.Value}");
             }

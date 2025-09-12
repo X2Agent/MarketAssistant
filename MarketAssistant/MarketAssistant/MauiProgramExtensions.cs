@@ -4,6 +4,7 @@ using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
 using MarketAssistant.Services;
 using MarketAssistant.Vectors.Extensions;
 using MarketAssistant.ViewModels;
@@ -88,6 +89,7 @@ namespace MarketAssistant
             // DataUploader 已废弃，摄取统一走 IRagIngestionService
             builder.Services.AddRagServices();
             builder.Services.AddSingleton<TelegramService>();
+            builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
             builder.Services.AddSingleton<MarketAnalysisAgent>();
             builder.Services.AddSingleton<StockService>();

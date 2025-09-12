@@ -1,18 +1,10 @@
-using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
-using MarketAssistant.Vectors;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Data;
-using Microsoft.SemanticKernel.Plugins.Web.Bing;
-using Microsoft.SemanticKernel.Plugins.Web.Brave;
-using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace MarketAssistant.Agents;
 
@@ -21,19 +13,11 @@ namespace MarketAssistant.Agents;
 /// </summary>
 public class AnalystManager
 {
-    #region 常量定义
-    private const string WEB_SEARCH_PLUGIN_NAME = "WebSearchPlugin";
-    private const string VECTOR_SEARCH_PLUGIN_NAME = "VectorSearchPlugin";
-    private const string GROUNDING_SEARCH_PLUGIN_NAME = "GroundingSearchPlugin";
-    #endregion
-
     private readonly Kernel _kernel;
     private readonly ILogger<AnalystManager> _logger;
     private readonly IUserSettingService _userSettingService;
     private readonly List<ChatCompletionAgent> _analysts = new();
     private ConcurrentOrchestration _orchestration;
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-    private readonly VectorStore _vectorStore;
     private readonly IKernelPluginConfig _kernelPluginConfig;
 
     private Action<ChatMessageContent>? _messageCallback;
@@ -50,15 +34,11 @@ public class AnalystManager
     public AnalystManager(Kernel kernel,
         ILogger<AnalystManager> logger,
         IUserSettingService userSettingService,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore,
         IKernelPluginConfig kernelPluginConfig)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
-        _embeddingGenerator = embeddingGenerator;
-        _vectorStore = vectorStore;
         _kernelPluginConfig = kernelPluginConfig;
 
         // 创建分析师及编排
@@ -148,107 +128,6 @@ public class AnalystManager
         return ValueTask.CompletedTask;
     }
 
-    #region 私有辅助方法
-
-    /// <summary>
-    /// 配置Web搜索插件
-    /// </summary>
-    private void ConfigureWebSearchPlugin(ChatCompletionAgent agent, UserSetting userSetting)
-    {
-        if (!userSetting.EnableWebSearch || string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
-        {
-            return;
-        }
-
-        try
-        {
-            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
-            {
-                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
-                _ => null
-            };
-
-            if (textSearch != null)
-            {
-                var searchPlugin = textSearch.CreateWithGetTextSearchResults(WEB_SEARCH_PLUGIN_NAME);
-                agent.Kernel.Plugins.Add(searchPlugin);
-                _logger.LogInformation("成功添加 {Provider} Web搜索插件到协调分析师", userSetting.WebSearchProvider);
-            }
-            else
-            {
-                _logger.LogWarning("不支持的Web搜索提供商: {Provider}", userSetting.WebSearchProvider);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "配置Web搜索插件失败，提供商: {Provider}", userSetting.WebSearchProvider);
-        }
-    }
-
-    /// <summary>
-    /// 配置向量知识库搜索插件
-    /// </summary>
-    private void ConfigureVectorSearchPlugin(ChatCompletionAgent agent)
-    {
-        if (!_userSettingService.CurrentSetting.LoadKnowledge)
-        {
-            return;
-        }
-
-        try
-        {
-            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-
-            // 确保集合已创建（同步等待避免更改方法签名）
-            collection.EnsureCollectionExistsAsync().GetAwaiter().GetResult();
-
-            // 创建向量存储文本搜索实例，用于从内部知识库检索内容
-            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
-
-            // 自定义一个更易被模型选择的搜索函数（名称/说明/参数）
-            var options = new KernelFunctionFromMethodOptions()
-            {
-                FunctionName = "GetTextSearchResults",
-                Description = "从内部投研知识库检索与查询相关的高可信内容，返回可引用的片段。",
-                Parameters =
-                [
-                    new KernelParameterMetadata("query") { Description = "搜索关键字或问题", IsRequired = true },
-                    new KernelParameterMetadata("top") { Description = "返回条数", IsRequired = false, DefaultValue = 3 },
-                    new KernelParameterMetadata("skip") { Description = "跳过条数（分页）", IsRequired = false, DefaultValue = 0 },
-                ],
-                ReturnParameter = new() { ParameterType = typeof(KernelSearchResults<TextSearchResult>) },
-            };
-
-            var searchPlugin = KernelPluginFactory.CreateFromFunctions(
-                VECTOR_SEARCH_PLUGIN_NAME, "Search internal knowledge base for grounding",
-                [textSearch.CreateGetTextSearchResults(options)]);
-
-            agent.Kernel.Plugins.Add(searchPlugin);
-            _logger.LogInformation("成功添加向量知识库搜索插件到协调分析师");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "配置向量知识库搜索插件失败");
-        }
-    }
-
-    private void ConfigureGroundingSearchPlugin(ChatCompletionAgent agent)
-    {
-        try
-        {
-            agent.Kernel.Plugins.AddFromObject(_groundingSearchPlugin, GROUNDING_SEARCH_PLUGIN_NAME);
-            _logger.LogInformation("成功添加 Grounding 搜索插件到协调分析师");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "配置 Grounding 搜索插件失败");
-        }
-    }
-
-    #endregion
-
     public async Task<string[]> ExecuteAnalystDiscussionAsync(string prompt, Action<ChatMessageContent>? messageCallback)
     {
         _messageCallback = messageCallback;
@@ -273,26 +152,16 @@ public class AnalystManager
         return response;
     }
 
-
-    public ChatCompletionAgent CreateCoordinatorAgent()
+    /// <summary>
+    /// 执行协调分析师分析
+    /// </summary>
+    public async Task<ChatMessageContent> ExecuteCoordinatorAnalysisAsync(string[] analystResults)
     {
-        _logger.LogInformation("开始创建协调分析师");
-
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
-        var userSetting = _userSettingService.CurrentSetting;
+        coordinatorAgent.Arguments!["history"] = analystResults.ToList();
 
-        // Grounding 插件（优先使用）
-        ConfigureGroundingSearchPlugin(coordinatorAgent);
+        var agentResponses = await coordinatorAgent.InvokeAsync().ToListAsync();
 
-        // 配置Web搜索插件
-        ConfigureWebSearchPlugin(coordinatorAgent, userSetting);
-
-        // 配置向量知识库搜索插件
-        ConfigureVectorSearchPlugin(coordinatorAgent);
-
-        _logger.LogInformation("协调分析师创建完成，已配置 {PluginCount} 个插件",
-            coordinatorAgent.Kernel.Plugins.Count);
-
-        return coordinatorAgent;
+        return agentResponses.LastOrDefault() ?? throw new InvalidOperationException("协调分析师未返回任何响应");
     }
 }

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace MarketAssistant.Agents;
@@ -33,8 +32,6 @@ public class MarketAnalysisAgent
     // 当前进度信息
     private AnalysisProgressEventArgs _currentProgress = new();
 
-    private ChatCompletionAgent _coordinatorAgent;
-
     #endregion
 
     #region 构造函数
@@ -43,9 +40,6 @@ public class MarketAnalysisAgent
     {
         _logger = logger;
         _analystManager = analystManager;
-
-        // 创建协调分析师
-        _coordinatorAgent = analystManager.CreateCoordinatorAgent();
     }
 
     #endregion
@@ -126,12 +120,12 @@ public class MarketAnalysisAgent
 
         UpdateProgress("CoordinatorAnalystAgent", "CoordinatorAnalystAgent总结中");
 
-        var coordinatorResult = await ExecuteCoordinatorAnalysisAsync(analystResults);
+        var coordinatorResult = await _analystManager.ExecuteCoordinatorAnalysisAsync(analystResults);
 
         UpdateProgress("系统", "CoordinatorAnalystAgent总结完成");
 
         // 触发分析完成事件
-        OnAnalysisCompleted(coordinatorResult);
+        AnalysisCompleted?.Invoke(this, coordinatorResult);
     }
 
     /// <summary>
@@ -152,26 +146,6 @@ public class MarketAnalysisAgent
     protected virtual void OnProgressChanged(AnalysisProgressEventArgs e)
     {
         ProgressChanged?.Invoke(this, e);
-    }
-
-    /// <summary>
-    /// 触发分析完成事件
-    /// </summary>
-    protected virtual void OnAnalysisCompleted(ChatMessageContent result)
-    {
-        AnalysisCompleted?.Invoke(this, result);
-    }
-
-    /// <summary>
-    /// 执行协调分析师分析
-    /// </summary>
-    private async Task<ChatMessageContent> ExecuteCoordinatorAnalysisAsync(string[] analystResults)
-    {
-        _coordinatorAgent.Arguments!["history"] = analystResults.ToList();
-
-        var agentResponses = await _coordinatorAgent.InvokeAsync().ToListAsync();
-
-        return agentResponses.LastOrDefault() ?? throw new InvalidOperationException("协调分析师未返回任何响应");
     }
 
     #endregion

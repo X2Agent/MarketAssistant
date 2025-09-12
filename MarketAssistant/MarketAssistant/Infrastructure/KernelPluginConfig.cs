@@ -1,5 +1,7 @@
 ﻿using MarketAssistant.Agents;
 using MarketAssistant.Plugins;
+using MarketAssistant.Vectors.Interfaces;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
 namespace MarketAssistant.Infrastructure;
@@ -21,7 +23,13 @@ public class KernelPluginConfig : IKernelPluginConfig
         _stockTechnicalPlugin = new StockTechnicalPlugin(httpClientFactory, userSettingService);
         _stockFinancialPlugin = new StockFinancialPlugin(httpClientFactory, userSettingService);
         _stockNewsPlugin = new StockNewsPlugin(serviceProvider);
-        _groundingSearchPlugin = new GroundingSearchPlugin();
+
+        // 获取GroundingSearchPlugin的依赖
+        var orchestrator = serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
+        var webTextSearchFactory = serviceProvider.GetRequiredService<IWebTextSearchFactory>();
+        var logger = serviceProvider.GetService<ILogger<GroundingSearchPlugin>>();
+
+        _groundingSearchPlugin = new GroundingSearchPlugin(orchestrator!, webTextSearchFactory!, userSettingService, logger!);
     }
     public Kernel PluginConfig(Kernel kernel, AnalysisAgents analysisAgent)
     {

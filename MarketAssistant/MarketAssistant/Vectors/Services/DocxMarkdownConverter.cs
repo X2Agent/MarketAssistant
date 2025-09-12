@@ -2,7 +2,6 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using MarketAssistant.Vectors.Interfaces;
 using System.Text;
-using System.Text.RegularExpressions;
 using IOPath = System.IO.Path;
 
 namespace MarketAssistant.Vectors.Services;
@@ -437,7 +436,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
                     // 使用 IImageStorageService 保存图片
                     var imageFileName = $"doc_image{_imageCounter}.{GetImageExtension(imagePart.ContentType)}";
-                    
+
                     using var stream = imagePart.GetStream();
                     using var memoryStream = new MemoryStream();
                     await stream.CopyToAsync(memoryStream);

@@ -68,13 +68,13 @@ public sealed class FunctionInvocationLoggingFilter(ILogger<FunctionInvocationLo
         {
             logger.LogTrace("Function result: {Result}", resultString);
         }
-        else if (result is not null)
+        else
         {
             try
             {
                 logger.LogTrace("Function result: {Result}", JsonSerializer.Serialize(result));
             }
-            catch (NotSupportedException)
+            catch
             {
                 logger.LogTrace("Function result: <Contains async enumerable - cannot serialize: {Type}>", result.GetType().Name);
             }

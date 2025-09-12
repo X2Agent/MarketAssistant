@@ -35,7 +35,7 @@ public class GroundingSearchPlugin
     }
 
     [KernelFunction, Description("信息搜索：当现有信息缺失、需实时补充或更新动态时使用。返回格式化证据片段，含 Name/Link/Value。")]
-    public async Task<KernelSearchResults<TextSearchResult>> SearchAsync(
+    public async Task<List<TextSearchResult>> SearchAsync(
         [Description("搜索的查询语句或关键词，如'公司名 财务数据'、'行业 趋势变化'等")] string query,
         [Description("返回结果数量，建议3-6个")] int top = 6)
     {
@@ -53,15 +53,16 @@ public class GroundingSearchPlugin
         try
         {
             var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top);
-            return new KernelSearchResults<TextSearchResult>(AsAsync(searchResults.Take(top)), searchResults.Count, new Dictionary<string, object?>
-            {
-                {"query", query}
-            });
+            return searchResults.Take(top).ToList();
+            //return new KernelSearchResults<TextSearchResult>(AsAsync(searchResults.Take(top)), searchResults.Count, new Dictionary<string, object?>
+            //{
+            //    {"query", query}
+            //});
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "搜索执行失败: {Query}", query);
-            return new KernelSearchResults<TextSearchResult>(AsAsync([]));
+            return [];
         }
     }
 
@@ -176,17 +177,5 @@ public class GroundingSearchPlugin
             .ToList();
 
         return deduped;
-    }
-
-    /// <summary>
-    /// 转换为异步枚举，Kernel 要求的格式
-    /// </summary>
-    private static async IAsyncEnumerable<TextSearchResult> AsAsync(IEnumerable<TextSearchResult> items)
-    {
-        foreach (var item in items)
-        {
-            yield return item;
-            await Task.CompletedTask;
-        }
     }
 }
