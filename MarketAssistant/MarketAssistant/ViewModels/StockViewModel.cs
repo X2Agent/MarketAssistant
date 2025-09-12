@@ -129,10 +129,13 @@ namespace MarketAssistant.ViewModels
             if (string.IsNullOrEmpty(StockCode))
                 return;
 
-            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+            await SafeExecuteAsync(async () =>
             {
-                { "code", StockCode }
-            });
+                await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
+                {
+                    { "code", StockCode }
+                });
+            }, "导航到股票分析页");
         }
 
         private async Task ChangeKLineTypeAsync(string? type)
@@ -213,7 +216,7 @@ namespace MarketAssistant.ViewModels
             {
                 HasError = true;
                 ErrorMessage = $"加载K线数据失败: {ex.Message}";
-                Console.WriteLine($"加载K线数据异常: {ex}");
+                Logger?.LogError(ex, "加载K线数据异常");
             }
             finally
             {
