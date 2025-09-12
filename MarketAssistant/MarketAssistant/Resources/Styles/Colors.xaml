@@ -50,6 +50,16 @@
     <Color x:Key="UpColor">#dc3545</Color>
     <Color x:Key="DownColor">#28a745</Color>
     
+    <!-- 设置页面专用颜色 -->
+    <Color x:Key="LabelTextColor">#6c757d</Color>
+    <Color x:Key="PrimaryTextColor">#212529</Color>
+    <Color x:Key="SecondaryTextColor">#6c757d</Color>
+    <Color x:Key="PrimaryColor">#007bff</Color>
+    <Color x:Key="PrimaryButtonColor">#007bff</Color>
+    <Color x:Key="SuccessButtonColor">#28a745</Color>
+    <Color x:Key="CheckBoxColor">#007bff</Color>
+    <Color x:Key="ErrorColor">#dc3545</Color>
+    
     <!-- 警告相关颜色 -->
     <Color x:Key="WarningLight">#fff3cd</Color>
     <Color x:Key="WarningDark">#664d03</Color>
