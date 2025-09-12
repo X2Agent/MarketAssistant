@@ -16,7 +16,7 @@
             
             <!-- 页面特有资源 - FAB按钮样式 -->
             <Style x:Key="FabButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="#2196F3" />
+                <Setter Property="BackgroundColor" Value="{StaticResource InfoBlue}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="FontSize" Value="22" />
                 <Setter Property="CornerRadius" Value="28" />

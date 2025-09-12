@@ -74,7 +74,7 @@
                     <VerticalStackLayout Spacing="8">
                         <Label Text="ZhiTu API令牌"
                                 FontSize="14"
-                                TextColor="#6c757d"/>
+                                TextColor="{StaticResource MediumGray}"/>
                         <Grid ColumnDefinitions="*,Auto">
                             <Entry Grid.Column="0"
                                     Text="{Binding UserSetting.ZhiTuApiToken}"
@@ -82,7 +82,7 @@
                             <Button Grid.Column="1"
                                     Text="获取令牌"
                                     Command="{Binding OpenZhiTuApiWebsiteCommand}"
-                                    BackgroundColor="#007bff"
+                                    BackgroundColor="{StaticResource PrimaryBlue}"
                                     TextColor="White"
                                     Margin="8,0,0,0"
                                     WidthRequest="100"
@@ -103,7 +103,7 @@
                                 Color="{StaticResource PrimaryButtonColor}"/>
                         <Label Text="加载知识库"
                                 FontSize="{StaticResource LabelFontSize}"
-                                TextColor="#212529"
+                                TextColor="{StaticResource DarkText}"
                                 VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
@@ -164,7 +164,7 @@
                             Margin="0,0,0,4"/>
                     <Label Text="注意：启用的角色越多，消耗的Token越多"
                             FontSize="12"
-                            TextColor="#dc3545"
+                            TextColor="{StaticResource Error}"
                             Margin="0,0,0,8"/>
 
                     <!-- 两列Grid布局 -->
@@ -287,10 +287,10 @@
                     <!-- 是否开启通知 -->
                     <HorizontalStackLayout>
                         <CheckBox IsChecked="{Binding UserSetting.Notification}"
-                                Color="#007bff"/>
+                                Color="{StaticResource PrimaryBlue}"/>
                         <Label Text="开启通知"
                                 FontSize="14"
-                                TextColor="#212529"
+                                TextColor="{StaticResource DarkText}"
                                 VerticalOptions="Center"/>
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
@@ -310,7 +310,7 @@
                         <Button Grid.Column="1"
                                 Text="浏览"
                                 Command="{Binding SelectBrowserPathCommand}"
-                                BackgroundColor="#007bff"
+                                BackgroundColor="{StaticResource PrimaryBlue}"
                                 TextColor="White"
                                 Margin="8,0,0,0"/>
                     </Grid>
@@ -333,7 +333,7 @@
                         <Button Grid.Column="1"
                                 Text="浏览"
                                 Command="{Binding SelectLogPathCommand}"
-                                BackgroundColor="#007bff"
+                                BackgroundColor="{StaticResource PrimaryBlue}"
                                 TextColor="White"
                                 Margin="8,0,0,0"/>
                     </Grid>
@@ -346,10 +346,10 @@
                     <!-- 是否启用Web Search -->
                     <HorizontalStackLayout>
                         <CheckBox IsChecked="{Binding UserSetting.EnableWebSearch}"
-                                Color="#007bff"/>
+                                Color="{StaticResource PrimaryBlue}"/>
                         <Label Text="启用Web Search功能"
                                 FontSize="14"
-                                TextColor="#212529"
+                                TextColor="{StaticResource DarkText}"
                                 VerticalOptions="Center"/>
                     </HorizontalStackLayout>
 
@@ -362,7 +362,7 @@
                                     Spacing="8">
                                 <Label Text="搜索平台选择"
                                         FontSize="14"
-                                        TextColor="#6c757d"/>
+                                        TextColor="{StaticResource MediumGray}"/>
                                 <Picker ItemsSource="{Binding WebSearchProviders}"
                                         SelectedItem="{Binding UserSetting.WebSearchProvider}"
                                         Title=""
@@ -373,14 +373,14 @@
                                     Spacing="8">
                                 <Label Text="Web Search API Key"
                                         FontSize="14"
-                                        TextColor="#6c757d"/>
+                                        TextColor="{StaticResource MediumGray}"/>
                                 <Entry Text="{Binding UserSetting.WebSearchApiKey}"
                                         Placeholder="请输入Web Search API Key"/>
                             </VerticalStackLayout>
                         </Grid>
                         <Label Text="注意：启用Web Search功能需要配置有效的API Key"
                                 FontSize="12"
-                                TextColor="#dc3545"/>
+                                TextColor="{StaticResource Error}"/>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
             </controls:CardView>

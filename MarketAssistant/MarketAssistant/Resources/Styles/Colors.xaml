@@ -75,6 +75,25 @@
     <!-- 阴影颜色 -->
     <Color x:Key="ShadowLight">#77000000</Color>
     <Color x:Key="ShadowDark">#00000010</Color>
+    
+    <!-- 渐变色定义 -->
+    <Color x:Key="GradientWhite">#ffffff</Color>
+    <Color x:Key="GradientLightGray">#f8f9fa</Color>
+    <Color x:Key="GradientMediumGray">#e9ecef</Color>
+    <Color x:Key="PrimaryBlue">#007bff</Color>
+    <Color x:Key="PrimaryBlueLight">#4dabf7</Color>
+    
+    <!-- 常用硬编码颜色 -->
+    <Color x:Key="MediumGray">#6c757d</Color>
+    <Color x:Key="DarkText">#212529</Color>
+    <Color x:Key="InfoBlue">#17a2b8</Color>
+    <Color x:Key="InfoBlueLight">#0dcaf0</Color>
+    <Color x:Key="MediumDarkGray">#495057</Color>
+    <Color x:Key="SemiTransparentWhite">#80FFFFFF</Color>
+    
+    <!-- 特殊用途颜色 -->
+    <Color x:Key="MaterialBlue">#2196F3</Color>
+    <Color x:Key="ErrorRed">#ff6b6b</Color>
 
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
@@ -100,4 +119,12 @@
     <SolidColorBrush x:Key="ItemBackgroundBrush" Color="{AppThemeBinding Light={StaticResource ItemBackgroundLight}, Dark={StaticResource ItemBackgroundDark}}"/>
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+    
+    <!-- 新增画刷定义 -->
+    <SolidColorBrush x:Key="MediumGrayBrush" Color="{StaticResource MediumGray}"/>
+    <SolidColorBrush x:Key="DarkTextBrush" Color="{StaticResource DarkText}"/>
+    <SolidColorBrush x:Key="InfoBlueBrush" Color="{StaticResource InfoBlue}"/>
+    <SolidColorBrush x:Key="InfoBlueLightBrush" Color="{StaticResource InfoBlueLight}"/>
+    <SolidColorBrush x:Key="PrimaryBlueBrush" Color="{StaticResource PrimaryBlue}"/>
+    <SolidColorBrush x:Key="SemiTransparentWhiteBrush" Color="{StaticResource SemiTransparentWhite}"/>
 </ResourceDictionary>

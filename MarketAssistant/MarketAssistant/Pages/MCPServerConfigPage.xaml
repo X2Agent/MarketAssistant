@@ -102,27 +102,27 @@
                                 <!-- 命令或URL -->
                                 <VerticalStackLayout Spacing="8">
                                     <!-- 使用多个Label，根据条件显示不同的Label -->
-                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}">
+                                    <Label FontSize="14" TextColor="{StaticResource MediumGray}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}">
                                         <Label.FormattedText>
                                             <FormattedString>
-                                                <Span Text="*" TextColor="#dc3545" />
-                                                <Span Text="命令" TextColor="#6c757d" />
+                                                <Span Text="*" TextColor="{StaticResource Error}" />
+                                                <Span Text="命令" TextColor="{StaticResource MediumGray}" />
                                             </FormattedString>
                                         </Label.FormattedText>
                                     </Label>
-                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}">
+                                    <Label FontSize="14" TextColor="{StaticResource MediumGray}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}">
                                         <Label.FormattedText>
                                             <FormattedString>
-                                                <Span Text="*" TextColor="#dc3545" />
-                                                <Span Text="URL" TextColor="#6c757d" />
+                                                <Span Text="*" TextColor="{StaticResource Error}" />
+                                                <Span Text="URL" TextColor="{StaticResource MediumGray}" />
                                             </FormattedString>
                                         </Label.FormattedText>
                                     </Label>
-                                    <Label FontSize="14" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}">
+                                    <Label FontSize="14" TextColor="{StaticResource MediumGray}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}">
                                         <Label.FormattedText>
                                             <FormattedString>
-                                                <Span Text="*" TextColor="#dc3545" />
-                                                <Span Text="URL" TextColor="#6c757d" />
+                                                <Span Text="*" TextColor="{StaticResource Error}" />
+                                                <Span Text="URL" TextColor="{StaticResource MediumGray}" />
                                             </FormattedString>
                                         </Label.FormattedText>
                                     </Label>
@@ -139,20 +139,20 @@
                                             </DataTrigger>
                                         </Entry.Triggers>
                                     </Entry>
-                                    <Label Text="提示：URL示例 http://localhost:3000/sse" FontSize="12" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}" />
-                                    <Label Text="提示：URL示例 http://localhost:3000/mcp" FontSize="12" TextColor="#6c757d" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}" />
+                                    <Label Text="提示：URL示例 http://localhost:3000/sse" FontSize="12" TextColor="{StaticResource MediumGray}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='sse'}" />
+                                    <Label Text="提示：URL示例 http://localhost:3000/mcp" FontSize="12" TextColor="{StaticResource MediumGray}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='streamableHttp'}" />
                                 </VerticalStackLayout>
 
                                 <!-- 参数 -->
                                 <VerticalStackLayout Spacing="8" IsVisible="{Binding TransportType, Converter={toolkit:IsEqualConverter}, ConverterParameter='stdio'}">
-                                    <Label Text="参数" FontSize="14" TextColor="#6c757d" />
+                                    <Label Text="参数" FontSize="14" TextColor="{StaticResource MediumGray}" />
                                     <Editor Text="{Binding Arguments}" Placeholder="请输入命令参数，如-y @modelcontextprotocol/server-github" HeightRequest="100" />
-                                    <Label Text="提示：多个参数请用空格分隔" FontSize="12" TextColor="#6c757d" />
+                                    <Label Text="提示：多个参数请用空格分隔" FontSize="12" TextColor="{StaticResource MediumGray}" />
                                 </VerticalStackLayout>
 
                                 <!-- 环境变量设置 -->
                                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}" IsVisible="{Binding TransportType, Converter={converts:RadioButtonEqualityConverter}, ConverterParameter='stdio'}">
-                                    <Label Text="环境变量" ToolTipProperties.Text="每行一个环境变量，格式为KEY=value" FontSize="14" TextColor="#6c757d" />
+                                    <Label Text="环境变量" ToolTipProperties.Text="每行一个环境变量，格式为KEY=value" FontSize="14" TextColor="{StaticResource MediumGray}" />
                                     <Editor x:Name="environmentVariablesEditor"
 Placeholder="KEY1=value1&#x0a;KEY2=value2" 
 HeightRequest="150"
@@ -161,8 +161,8 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
 
                                 <!-- 是否启用 -->
                                 <HorizontalStackLayout>
-                                    <CheckBox IsChecked="{Binding IsEnabled}" Color="#007bff" />
-                                    <Label Text="启用" FontSize="14" TextColor="#212529" VerticalOptions="Center" />
+                                    <CheckBox IsChecked="{Binding IsEnabled}" Color="{StaticResource PrimaryBlue}" />
+                                    <Label Text="启用" FontSize="14" TextColor="{StaticResource DarkText}" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                             </VerticalStackLayout>
                         </controls:CardView>
@@ -170,10 +170,10 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
                             <!-- 操作按钮区域 -->
                             <HorizontalStackLayout HorizontalOptions="End" Spacing="{StaticResource StackSpacing}" Margin="0,16,0,0">
                                 <Button Text="取消" Command="{Binding CancelEditCommand}" 
-                        BackgroundColor="#6c757d" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                        BackgroundColor="{StaticResource MediumGray}" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
                                 <Button Text="测试连接" Command="{Binding TestConnectionCommand}" WidthRequest="{StaticResource ButtonWidth}" />
                                 <Button Text="保存" Command="{Binding SaveServerCommand}" 
-                        BackgroundColor="#007bff" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
+                        BackgroundColor="{StaticResource PrimaryBlue}" TextColor="White" WidthRequest="{StaticResource ButtonWidth}" />
                             </HorizontalStackLayout>
                         </VerticalStackLayout>
 
@@ -192,7 +192,7 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
                             <Label Text="确定要删除此服务器配置吗？此操作无法撤销。" HorizontalOptions="Center" />
                             <HorizontalStackLayout HorizontalOptions="Center" Spacing="20">
                                 <Button Text="取消" Command="{Binding CancelDeleteCommand}" 
-                        BackgroundColor="#6c757d" TextColor="White" WidthRequest="120" />
+                        BackgroundColor="{StaticResource MediumGray}" TextColor="White" WidthRequest="120" />
                                 <Button Text="删除" Command="{Binding ConfirmDeleteCommand}" 
                         BackgroundColor="#dc3545" TextColor="White" WidthRequest="120" />
                             </HorizontalStackLayout>
@@ -205,7 +205,7 @@ Text="{Binding EnvironmentVariablesText, Mode=TwoWay}" />
                          HorizontalOptions="Center" 
                          VerticalOptions="Center">
                         <Label Text="请选择或添加MCP服务器" 
-               TextColor="#6c757d" 
+               TextColor="{StaticResource MediumGray}" 
                FontSize="18" 
                HorizontalOptions="Center" />
                     </VerticalStackLayout>

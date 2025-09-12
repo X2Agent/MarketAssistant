@@ -16,13 +16,13 @@
             <!-- 页面特有资源 -->
             <!-- 渐变色定义 - 页面特有 -->
             <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#ffffff" Offset="0" />
-                <GradientStop Color="#f8f9fa" Offset="1" />
+                <GradientStop Color="{StaticResource GradientWhite}" Offset="0" />
+                <GradientStop Color="{StaticResource GradientLightGray}" Offset="1" />
             </LinearGradientBrush>
             
             <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#007bff" Offset="0" />
-                <GradientStop Color="#4dabf7" Offset="1" />
+                <GradientStop Color="{StaticResource PrimaryBlue}" Offset="0" />
+                <GradientStop Color="{StaticResource PrimaryBlueLight}" Offset="1" />
             </LinearGradientBrush>
 
             <!-- 页面特有样式 -->
@@ -94,8 +94,8 @@
     <!-- 现代化渐变背景 -->
     <ContentPage.Background>
         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#f8f9fa" Offset="0" />
-            <GradientStop Color="#e9ecef" Offset="1" />
+            <GradientStop Color="{StaticResource GradientLightGray}" Offset="0" />
+            <GradientStop Color="{StaticResource GradientMediumGray}" Offset="1" />
         </LinearGradientBrush>
     </ContentPage.Background>
 

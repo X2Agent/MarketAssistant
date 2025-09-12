@@ -55,6 +55,22 @@
     <!-- 字体大小定义 -->
     <x:Double x:Key="LabelFontSize">14</x:Double>
     
+    <!-- 常用渐变画刷定义 -->
+    <LinearGradientBrush x:Key="CardGradientBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource GradientWhite}" Offset="0" />
+        <GradientStop Color="{StaticResource GradientLightGray}" Offset="1" />
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="PageBackgroundGradientBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource GradientLightGray}" Offset="0" />
+        <GradientStop Color="{StaticResource GradientMediumGray}" Offset="1" />
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource PrimaryBlue}" Offset="0" />
+        <GradientStop Color="{StaticResource PrimaryBlueLight}" Offset="1" />
+    </LinearGradientBrush>
+    
     <!-- 通用卡片样式 -->
     <Style x:Key="PrimaryCardStyle" TargetType="Border">
         <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
@@ -586,6 +602,33 @@
         <Setter Property="BarTextColor" Value="{AppThemeBinding Light={StaticResource Magenta}, Dark={StaticResource White}}" />
         <Setter Property="UnselectedTabColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray950}}" />
         <Setter Property="SelectedTabColor" Value="{AppThemeBinding Light={StaticResource Gray950}, Dark={StaticResource Gray200}}" />
+    </Style>
+
+    <!-- 扩展文本样式 -->
+    <Style x:Key="TinyLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+    </Style>
+    
+    <Style x:Key="MediumLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+    </Style>
+    
+    <Style x:Key="LargeLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+    </Style>
+    
+    <!-- 特殊用途按钮样式 -->
+    <Style x:Key="MaterialButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource MaterialBlue}"/>
+        <Setter Property="TextColor" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderWidth" Value="0"/>
     </Style>
 
 </ResourceDictionary>
