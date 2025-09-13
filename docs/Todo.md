@@ -2,11 +2,14 @@
  
 - 管理windows下图片平铺到根目录的问题
 - 发布裁剪
+- 分析结果缓存：避免短时间内重复分析同一股票
+- 会话内Token管理：当单次会话过长时进行压缩
+- 缺少分析质量的自我评估和改进机制
+- 分析结果缓存：避免短时间内重复分析同一股票
+- 会话内Token管理：当单次会话过长时进行压缩
 
 - 选定目录文档(Pdf,Docx)向量化搜索
    pandoc.net 文档转换
-   Mammoth.NET - DOCX 到 HTML
-   ReverseMarkdown - HTML 到 Markdown
 
 - SK Web Search 支持
 - MCP Client 支持
