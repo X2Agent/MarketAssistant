@@ -1,0 +1,36 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- 需要保留的语言（分号分隔）。可在 csproj 覆盖 -->
+    <ExcludedLanguages>en-us;zh-Hans</ExcludedLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MSBuild 属性以分号为分隔，直接 Include 即可生成多项 -->
+    <LanguageItems Include="$(ExcludedLanguages)" />
+  </ItemGroup>
+
+  <!-- 构建后移除非白名单语言目录 -->
+  <Target Name="RemoveLanguageFoldersAfterBuild" AfterTargets="Build">
+    <PropertyGroup>
+      <OutputLanguagesToKeep>@(LanguageItems->'$(OutDir)%(Identity)\*.mui')</OutputLanguagesToKeep>
+    </PropertyGroup>
+    <ItemGroup>
+      <RemovingFiles Include="$(OutDir)*\*.mui" Exclude="$(OutputLanguagesToKeep)" />
+      <RemovingFolders Include="@(RemovingFiles->'%(RootDir)%(Directory)')" />
+    </ItemGroup>
+    <RemoveDir Directories="@(RemovingFolders)" Condition="'@(RemovingFolders)' != ''" />
+  </Target>
+
+  <!-- 发布后移除非白名单语言目录 -->
+  <Target Name="RemoveLanguageFoldersAfterPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <PublishLanguagesToKeep>@(LanguageItems->'$(PublishDir)%(Identity)\*.mui')</PublishLanguagesToKeep>
+    </PropertyGroup>
+    <ItemGroup>
+      <PublishRemovingFiles Include="$(PublishDir)*\*.mui" Exclude="$(PublishLanguagesToKeep)" />
+      <PublishRemovingFolders Include="@(PublishRemovingFiles->'%(RootDir)%(Directory)')" />
+    </ItemGroup>
+    <RemoveDir Directories="@(PublishRemovingFolders)" Condition="'@(PublishRemovingFolders)' != ''" />
+  </Target>
+</Project>
+

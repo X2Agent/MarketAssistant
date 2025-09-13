@@ -194,8 +194,6 @@ public class StockService
     {
         try
         {
-            Console.WriteLine("GetHotStocksAsync: 获取今日A股热搜股票数据");
-
             // 获取当前日期
             DateTime today = DateTime.Now;
 
@@ -222,7 +220,7 @@ public class StockService
             // 检查API返回状态
             if (!root.TryGetProperty("Result", out var resultElement))
             {
-                Console.WriteLine("GetHotStocksAsync: API返回数据格式不正确，缺少Result字段");
+                _logger.LogError("GetHotStocksAsync: API返回数据格式不正确，缺少Result字段");
                 return new List<HotStock>();
             }
 
@@ -230,7 +228,7 @@ public class StockService
             if (!resultElement.TryGetProperty("header", out var headerElement) ||
                 !resultElement.TryGetProperty("body", out var bodyElement))
             {
-                Console.WriteLine("GetHotStocksAsync: API返回数据格式不正确，缺少header或body字段");
+                _logger.LogError("GetHotStocksAsync: API返回数据格式不正确，缺少header或body字段");
                 return new List<HotStock>();
             }
 
@@ -250,7 +248,7 @@ public class StockService
                 // 确保数组长度与header长度一致
                 if (stockArray.GetArrayLength() != headerIndices.Count)
                 {
-                    Console.WriteLine("GetHotStocksAsync: 股票数据数组长度与header不匹配");
+                    _logger.LogError("GetHotStocksAsync: 股票数据数组长度与header不匹配");
                     continue;
                 }
 
@@ -276,17 +274,17 @@ public class StockService
         }
         catch (HttpRequestException ex)
         {
-            Console.WriteLine($"GetHotStocksAsync HTTP请求异常: {ex.Message}");
+            _logger.LogError(ex, "GetHotStocksAsync HTTP请求异常: {Message}", ex.Message);
             throw;
         }
         catch (JsonException ex)
         {
-            Console.WriteLine($"GetHotStocksAsync JSON解析异常: {ex.Message}");
+            _logger.LogError(ex, "GetHotStocksAsync JSON解析异常: {Message}", ex.Message);
             throw;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"GetHotStocksAsync未知异常: {ex.Message}");
+            _logger.LogError(ex, "GetHotStocksAsync未知异常: {Message}", ex.Message);
             throw;
         }
     }

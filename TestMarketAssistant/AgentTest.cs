@@ -1,25 +1,12 @@
-using MarketAssistant.Infrastructure;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Data;
-using Microsoft.SemanticKernel.Plugins.Web.Bing;
-using Microsoft.SemanticKernel.Plugins.Web.Brave;
-using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace TestMarketAssistant;
 
 [TestClass]
 public class AgentTest : BaseKernelTest
 {
-    private Kernel _kernel = null!;
-
-    [TestInitialize]
-    public void Initialize()
-    {
-        _kernel = CreateKernelWithChatCompletion();
-    }
-
     public const string FundamentalAnalystContent = @"
         股票代码/名称：sh601606 长城军工  
         当前价格：29.3 CNY  
@@ -106,9 +93,10 @@ public class AgentTest : BaseKernelTest
     [TestMethod]
     public async Task TestCoordinatorAnalystAsync()
     {
+        var prompt = "请对股票 sh601606 进行综合分析，提供投资建议。";
         var agent = CreateAgentFromYaml("CoordinatorAnalystAgent");
         agent.Arguments.Add("history", new List<string> { FundamentalAnalystContent, NewsEventAnalystContent, FinancialAnalystContent });
-        var content = await agent.InvokeAsync().ToListAsync();
+        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User, prompt)).ToListAsync();
 
         Assert.IsTrue(content.Count > 0);
         Console.WriteLine(content.First().Message);
@@ -203,27 +191,6 @@ public class AgentTest : BaseKernelTest
         {
             Kernel = _kernel
         };
-
-        chatCompletionAgent.Arguments!["global_analysis_guidelines"] = globalGuidelines;
-        var userSettingService = _kernel.GetRequiredService<IUserSettingService>();
-        var userSetting = userSettingService.CurrentSetting;
-        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
-        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
-        {
-            // 根据用户选择的搜索服务商添加相应的搜索服务
-            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
-            {
-                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
-                _ => null
-            };
-            if (textSearch != null)
-            {
-                var searchPlugin = textSearch.CreateWithGetTextSearchResults("SearchPlugin");
-                chatCompletionAgent.Kernel.Plugins.Add(searchPlugin);
-            }
-        }
 
         return chatCompletionAgent;
     }

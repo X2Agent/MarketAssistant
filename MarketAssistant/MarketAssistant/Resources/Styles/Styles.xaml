@@ -40,11 +40,46 @@
     <!-- 特殊组合Margin定义 -->
     <Thickness x:Key="BottomRightLargeMargin">0,0,16,16</Thickness>
     
+    <!-- 特殊Padding定义 -->
+    <Thickness x:Key="SmallHorizontalTinyVerticalPadding">8,4</Thickness>
+    <Thickness x:Key="ButtonPadding">12,8</Thickness>
+    <Thickness x:Key="SmallButtonPadding">8,4</Thickness>
+    
     <!-- Spacing定义 - 仅用于容器间距 -->
     <x:Double x:Key="LargeSpacing">16</x:Double>
     <x:Double x:Key="DefaultSpacing">12</x:Double>
     <x:Double x:Key="SmallSpacing">8</x:Double>
     <x:Double x:Key="TinySpacing">4</x:Double>
+    <x:Double x:Key="StackSpacing">12</x:Double>
+    
+    <!-- 字体大小定义 -->
+    <x:Double x:Key="LabelFontSize">14</x:Double>
+    
+    <!-- 常用按钮尺寸定义 -->
+    <x:Double x:Key="StandardButtonWidth">100</x:Double>
+    <x:Double x:Key="StandardButtonHeight">40</x:Double>
+    <x:Double x:Key="FabButtonSize">56</x:Double>
+    
+    <!-- 常用图标尺寸定义 -->
+    <x:Double x:Key="SmallIconSize">20</x:Double>
+    <x:Double x:Key="MediumIconSize">24</x:Double>
+    <x:Double x:Key="LargeIconSize">32</x:Double>
+    
+    <!-- 常用渐变画刷定义 -->
+    <LinearGradientBrush x:Key="CardGradientBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource GradientWhite}" Offset="0" />
+        <GradientStop Color="{StaticResource GradientLightGray}" Offset="1" />
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="PageBackgroundGradientBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource GradientLightGray}" Offset="0" />
+        <GradientStop Color="{StaticResource GradientMediumGray}" Offset="1" />
+    </LinearGradientBrush>
+    
+    <LinearGradientBrush x:Key="PrimaryGradientBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource PrimaryBlue}" Offset="0" />
+        <GradientStop Color="{StaticResource PrimaryBlueLight}" Offset="1" />
+    </LinearGradientBrush>
     
     <!-- 通用卡片样式 -->
     <Style x:Key="PrimaryCardStyle" TargetType="Border">
@@ -134,6 +169,11 @@
     </Style>
     
     <Style x:Key="DescriptionStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+    </Style>
+    
+    <Style x:Key="SmallLabelStyle" TargetType="Label">
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
     </Style>
@@ -572,6 +612,45 @@
         <Setter Property="BarTextColor" Value="{AppThemeBinding Light={StaticResource Magenta}, Dark={StaticResource White}}" />
         <Setter Property="UnselectedTabColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray950}}" />
         <Setter Property="SelectedTabColor" Value="{AppThemeBinding Light={StaticResource Gray950}, Dark={StaticResource Gray200}}" />
+    </Style>
+
+    <!-- 扩展文本样式 -->
+    <Style x:Key="TinyLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"/>
+    </Style>
+    
+    <Style x:Key="MediumLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+    </Style>
+    
+    <Style x:Key="LargeLabelStyle" TargetType="Label">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontAttributes" Value="Bold"/>
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}"/>
+    </Style>
+    
+    <!-- 特殊用途按钮样式 -->
+    <Style x:Key="MaterialButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource MaterialBlue}"/>
+        <Setter Property="TextColor" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderWidth" Value="0"/>
+    </Style>
+    
+    <!-- 浮动操作按钮样式 -->
+    <Style x:Key="FabButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource InfoBlue}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="CornerRadius" Value="28" />
+        <Setter Property="WidthRequest" Value="{StaticResource FabButtonSize}" />
+        <Setter Property="HeightRequest" Value="{StaticResource FabButtonSize}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="{StaticResource LargeMargin}" />
     </Style>
 
 </ResourceDictionary>

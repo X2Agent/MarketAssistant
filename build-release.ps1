@@ -26,7 +26,7 @@ dotnet workload install maui-windows maui-maccatalyst
 
 # Restore dependencies
 Write-Host "Restoring project dependencies..." -ForegroundColor Yellow
-dotnet restore MarketAssistant.sln
+dotnet restore MarketAssistant.slnx
 
 # Create output directory
 $outputDir = "./Release"
@@ -41,7 +41,6 @@ if ($Platform -eq "All" -or $Platform -eq "Windows") {
     
     try {
         # 使用框架依赖部署（推荐用于 WinUI 3 应用）
-        # 禁用多语言资源生成以减少包大小
         dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
              -c $Configuration `
              -f net9.0-windows10.0.19041.0 `
@@ -72,23 +71,6 @@ if ($Platform -eq "All" -or $Platform -eq "Windows") {
                     $removedItems++
                 }
             }
-            
-            # 删除本地化资源文件（如果不需要多语言支持）
-            $localePattern = @("*/af/*", "*/ar/*", "*/bg/*", "*/ca/*", "*/cs/*", "*/da/*", "*/de/*", "*/el/*", "*/es/*", "*/et/*", "*/eu/*", "*/fa/*", "*/fi/*", "*/fr/*", "*/gl/*", "*/he/*", "*/hi/*", "*/hr/*", "*/hu/*", "*/id/*", "*/it/*", "*/ja/*", "*/kk/*", "*/ko/*", "*/lt/*", "*/lv/*", "*/ms/*", "*/nb/*", "*/nl/*", "*/pl/*", "*/pt/*", "*/pt-BR/*", "*/ro/*", "*/ru/*", "*/sk/*", "*/sl/*", "*/sv/*", "*/th/*", "*/tr/*", "*/uk/*", "*/vi/*", "*/zh-Hans/*", "*/zh-Hant/*")
-            foreach ($pattern in $localePattern) {
-                $localeDirs = Get-ChildItem -Path "$outputDir/Windows" -Directory -Recurse | Where-Object { $_.FullName -like "*$($pattern.Replace('*/', ''))" }
-                foreach ($dir in $localeDirs) {
-                    $dirSize = (Get-ChildItem -Path $dir.FullName -Recurse | Measure-Object -Property Length -Sum).Sum
-                    $savedSize += $dirSize
-                    Remove-Item $dir.FullName -Recurse -Force
-                    $removedItems++
-                }
-            }
-            
-            # 📊 显示优化结果
-            $finalSize = (Get-ChildItem -Path "$outputDir/Windows" -Recurse | Measure-Object -Property Length -Sum).Sum
-            Write-Host "   ✓ Removed $removedItems items, saved $([math]::Round($savedSize/1MB, 2)) MB" -ForegroundColor Green
-            Write-Host "   ✓ Final size: $([math]::Round($finalSize/1MB, 2)) MB" -ForegroundColor Green
             
             # 检查是否有单个可执行文件
             $exeFile = Get-ChildItem -Path "$outputDir/Windows" -Filter "*.exe" | Select-Object -First 1

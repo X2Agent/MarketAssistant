@@ -6,7 +6,7 @@
 
 ## 一、项目概览
 
-- 解决方案：`MarketAssistant.sln`
+- 解决方案：`MarketAssistant.slnx`
 - 共享 MAUI 项目：`MarketAssistant/MarketAssistant/`
 - Windows 头项目（WinUI）：`MarketAssistant/MarketAssistant.WinUI/`
 - Mac 头项目（Mac Catalyst）：`MarketAssistant/MarketAssistant.Mac/`
@@ -47,8 +47,8 @@ playwright install
 ### 2. 还原与编译
 
 ```bash
-dotnet restore MarketAssistant.sln
-dotnet build MarketAssistant.sln -c Debug
+dotnet restore MarketAssistant.slnx
+dotnet build MarketAssistant.slnx -c Debug
 ```
 
 ### 3. 运行（开发）

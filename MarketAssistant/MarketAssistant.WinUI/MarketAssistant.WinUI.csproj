@@ -26,8 +26,12 @@
 		<NeutralLanguage>zh</NeutralLanguage>
 		<SupportedOSPlatformVersion>8.0</SupportedOSPlatformVersion>
 	</PropertyGroup>
+
+		<!-- 引入构建/发布后的语言目录清理目标 -->
+	<Import Project="RemoveLanguageFolders.targets" />
+	
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.80" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.100" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -25,7 +25,7 @@
         <Border Grid.Row="0" Style="{StaticResource PrimaryCardStyle}"
                     Padding="0">
             <Border.Shadow>
-                <Shadow Brush="#77000000"
+                <Shadow Brush="{StaticResource ShadowLight}"
                             Offset="0,2"
                             Radius="4"
                             Opacity="0.4"/>
@@ -97,7 +97,7 @@
                                                 <DataTemplate x:DataType="x:String">
                                                     <Border Padding="{StaticResource ItemPadding}"
                                                                 Margin="{StaticResource TinyMargin}"
-                                                                Stroke="Gray"
+                                                                Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
                                                                 StrokeThickness="0.5">
                                                         <Label Text="{Binding .}"
                                                                    FontSize="12"
@@ -134,8 +134,8 @@
            Style="{StaticResource SectionTitleStyle}"/>
                         <Image Grid.Column="1"
            Source="trending_icon.png"
-           HeightRequest="20"
-           WidthRequest="20"
+           HeightRequest="{StaticResource SmallIconSize}"
+           WidthRequest="{StaticResource SmallIconSize}"
            VerticalOptions="Center"/>
                     </Grid>
                 </controls:CardView.Header>
@@ -186,7 +186,7 @@
                                             <Label Text="{Binding CurrentPrice}"
                                                    FontSize="16"
                                                    FontAttributes="Bold"
-                                                   TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}"
+                                                   TextColor="{AppThemeBinding Light={StaticResource DarkText}, Dark={StaticResource TextPrimaryDark}}"
                                                    Margin="{StaticResource RightSmallMargin}"/>
                                             <Label Text="{Binding ChangePercentage}"
                                                    FontSize="14"
@@ -204,7 +204,7 @@
                                                FontSize="14"
                                                FontAttributes="Bold"
                                                HorizontalOptions="Center"
-                                               TextColor="{AppThemeBinding Light=#17a2b8, Dark=#0dcaf0}"/>
+                                               TextColor="{AppThemeBinding Light={StaticResource InfoBlue}, Dark={StaticResource InfoBlueLight}}"/>
                                         <ImageButton BackgroundColor="Transparent"
                                                      Source="tab_favorites.png"
                                                      Scale="0.6"

@@ -4,8 +4,9 @@ using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Plugins;
 using MarketAssistant.Services;
-using MarketAssistant.Vectors;
+using MarketAssistant.Vectors.Extensions;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.AI;
@@ -85,9 +86,10 @@ namespace MarketAssistant
             var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
             builder.Services.AddSqliteVectorStore(_ => $"Data Source={store}");
 
-            // Register the data uploader.
-            builder.Services.AddSingleton<DataUploader>();
+            // DataUploader 已废弃，摄取统一走 IRagIngestionService
+            builder.Services.AddRagServices();
             builder.Services.AddSingleton<TelegramService>();
+            builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
             builder.Services.AddSingleton<MarketAnalysisAgent>();
             builder.Services.AddSingleton<StockService>();

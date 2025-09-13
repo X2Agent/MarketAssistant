@@ -1,18 +1,10 @@
-using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
-using MarketAssistant.Vectors;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Data;
-using Microsoft.SemanticKernel.Plugins.Web.Bing;
-using Microsoft.SemanticKernel.Plugins.Web.Brave;
-using Microsoft.SemanticKernel.Plugins.Web.Tavily;
 
 namespace MarketAssistant.Agents;
 
@@ -26,8 +18,6 @@ public class AnalystManager
     private readonly IUserSettingService _userSettingService;
     private readonly List<ChatCompletionAgent> _analysts = new();
     private ConcurrentOrchestration _orchestration;
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
-    private readonly VectorStore _vectorStore;
     private readonly IKernelPluginConfig _kernelPluginConfig;
 
     private Action<ChatMessageContent>? _messageCallback;
@@ -44,15 +34,11 @@ public class AnalystManager
     public AnalystManager(Kernel kernel,
         ILogger<AnalystManager> logger,
         IUserSettingService userSettingService,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore,
         IKernelPluginConfig kernelPluginConfig)
     {
         _kernel = kernel;
         _logger = logger;
         _userSettingService = userSettingService;
-        _embeddingGenerator = embeddingGenerator;
-        _vectorStore = vectorStore;
         _kernelPluginConfig = kernelPluginConfig;
 
         // 创建分析师及编排
@@ -166,63 +152,16 @@ public class AnalystManager
         return response;
     }
 
-
-    public ChatCompletionAgent CreateCoordinatorAgent()
+    /// <summary>
+    /// 执行协调分析师分析
+    /// </summary>
+    public async Task<ChatMessageContent> ExecuteCoordinatorAnalysisAsync(string[] analystResults)
     {
         var coordinatorAgent = CreateAnalyst(AnalysisAgents.CoordinatorAnalystAgent);
-        var userSetting = _userSettingService.CurrentSetting;
+        coordinatorAgent.Arguments!["history"] = analystResults.ToList();
 
-        // 如果启用了Web Search功能且提供了有效的API Key，则添加Web Search服务
-        if (userSetting.EnableWebSearch && !string.IsNullOrWhiteSpace(userSetting.WebSearchApiKey))
-        {
-            // 根据用户选择的搜索服务商添加相应的搜索服务
-            ITextSearch textSearch = userSetting.WebSearchProvider.ToLower() switch
-            {
-                "bing" => new BingTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "brave" => new BraveTextSearch(apiKey: userSetting.WebSearchApiKey),
-                "tavily" => new TavilyTextSearch(apiKey: userSetting.WebSearchApiKey),
-                _ => null
-            };
-            if (textSearch != null)
-            {
-                var searchPlugin = textSearch.CreateWithSearch("SearchPlugin");
-                coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
-            }
-        }
+        var agentResponses = await coordinatorAgent.InvokeAsync().ToListAsync();
 
-        if (_userSettingService.CurrentSetting.LoadKnowledge)
-        {
-            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
-            var textSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
-
-            var searchPlugin = textSearch.CreateWithGetTextSearchResults("VectorSearchPlugin");
-            coordinatorAgent.Kernel.Plugins.Add(searchPlugin);
-        }
-
-        return coordinatorAgent;
-    }
-
-    /// <summary>
-    ///  创建一个分析师线程，使用ChatHistoryAgentThread来管理分析师之间的对话
-    /// </summary>
-    private ChatHistoryAgentThread CreateAgentThread()
-    {
-        // 这里可以配置更多的上下文提供者，例如白板、函数等
-        var agentThread = new ChatHistoryAgentThread();
-        //var whiteboardProvider = new WhiteboardProvider();
-        //agentThread.AIContextProviders.Add(whiteboardProvider);
-        //agentThread.AIContextProviders.Add(
-        //        new ContextualFunctionProvider(
-        //            vectorStore: new InMemoryVectorStore(new InMemoryVectorStoreOptions()
-        //            {
-        //                EmbeddingGenerator = embeddingGenerator
-        //            }),
-        //            vectorDimensions: 1536,
-        //            functions: [AIFunctionFactory.Create(() => "获取资金流向数据", "GetCapitalFlow")],
-        //            maxNumberOfFunctions: 3, // 限制最多3个相关函数
-        //            loggerFactory: LoggerFactory
-        //        )
-        //    );
-        return agentThread;
+        return agentResponses.LastOrDefault() ?? throw new InvalidOperationException("协调分析师未返回任何响应");
     }
 }

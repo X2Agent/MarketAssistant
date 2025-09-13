@@ -3,6 +3,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins;
+using MarketAssistant.Vectors.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
@@ -51,7 +52,7 @@ public class BaseKernelTest
         builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
 
         builder.Services.AddSingleton<PlaywrightService>();
-        builder.Services.AddSingleton<IKernelFactory, TestKernelFactory>();
+        builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
         builder.Services.AddSingleton<StockSelectionManager>();
         builder.Services.AddHttpClient();
 
@@ -61,7 +62,7 @@ public class BaseKernelTest
         var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-235B-A22B";
+        var modelId = "Qwen/Qwen3-32B";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -85,11 +86,14 @@ public class BaseKernelTest
                 EnableWebSearch = true,
                 WebSearchApiKey = searchApiKey,
                 WebSearchProvider = "Tavily",
+                LoadKnowledge = true,
             };
             var userSettingServiceMock = new Mock<IUserSettingService>();
             userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);
             return userSettingServiceMock.Object;
         });
+
+        builder.Services.AddRagServices();
 
         builder.Services.AddKernel().AddOpenAIChatCompletion(
                 modelId,
@@ -106,19 +110,21 @@ public class BaseKernelTest
             .AddFromType<StockNewsPlugin>()
             .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
+            .AddFromType<GroundingSearchPlugin>()
             .AddFromType<TextPlugin>();
 
-        builder.Services.AddSqliteVectorStore(_ => "Data Source=:memory:");
+        var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
+        builder.Services.AddSqliteVectorStore(_ => $"Data Source={store}");
+
+        builder.Services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
+
+        builder.Services.AddSingleton(serviceProvider =>
+        {
+            var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
+            var embeddingGenerator = embeddingFactory.Create();
+            return embeddingGenerator;
+        });
 
         return builder.Build();
     }
-}
-
-internal class TestKernelFactory : IKernelFactory
-{
-    private readonly Kernel _kernel;
-    public TestKernelFactory(Kernel kernel) { _kernel = kernel; }
-    public Kernel CreateKernel() => _kernel;
-    public bool TryCreateKernel(out Kernel kernel, out string error) { kernel = _kernel; error = string.Empty; return true; }
-    public void Invalidate() { }
 }

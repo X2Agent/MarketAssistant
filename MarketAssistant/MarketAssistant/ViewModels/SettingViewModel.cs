@@ -5,6 +5,7 @@ using MarketAssistant.Applications;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Vectors;
+using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
@@ -17,6 +18,7 @@ public partial class SettingViewModel : ViewModelBase
     private readonly IUserSettingService _userSettingService;
     private readonly IBrowserService _browserService;
     private readonly VectorStore _vectorStore;
+    private readonly IRagIngestionService _ingestionService;
     private readonly IEmbeddingFactory _embeddingFactory;
     private readonly IKernelFactory _kernelFactory;
 
@@ -155,12 +157,14 @@ public partial class SettingViewModel : ViewModelBase
         IUserSettingService userSettingService,
         IBrowserService browserService,
         VectorStore vectorStore,
-    IEmbeddingFactory embeddingFactory,
-    IKernelFactory kernelFactory) : base(logger)
+        IRagIngestionService ingestionService,
+        IEmbeddingFactory embeddingFactory,
+        IKernelFactory kernelFactory) : base(logger)
     {
         _userSettingService = userSettingService;
         _browserService = browserService;
         _vectorStore = vectorStore;
+        _ingestionService = ingestionService;
         _embeddingFactory = embeddingFactory;
         _kernelFactory = kernelFactory;
 
@@ -411,8 +415,6 @@ public partial class SettingViewModel : ViewModelBase
             // 使用动态服务创建嵌入生成器
             var embeddingGenerator = _embeddingFactory.Create();
 
-            var dataUploader = new DataUploader(_vectorStore, embeddingGenerator);
-
             // 获取目录中的所有PDF和DOCX文件
             var pdfFiles = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.pdf", SearchOption.AllDirectories);
             var docxFiles = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.docx", SearchOption.AllDirectories);
@@ -426,37 +428,21 @@ public partial class SettingViewModel : ViewModelBase
                 return;
             }
 
-            // 处理PDF文件
-            foreach (var pdfFile in pdfFiles)
-            {
-                try
-                {
-                    using var fileStream = new FileStream(pdfFile, FileMode.Open, FileAccess.Read);
-                    var paragraphs = PdfReader.ReadParagraphs(fileStream, pdfFile);
-                    await dataUploader.GenerateEmbeddingsAndUploadAsync(UserSetting.VectorCollectionName, paragraphs);
-                    processedFiles++;
-                    WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
-                }
-                catch (Exception ex)
-                {
-                    Logger?.LogError(ex, "处理PDF文件时出错: {pdfFile}", pdfFile);
-                }
-            }
+            var collection = _vectorStore.GetCollection<string, TextParagraph>(UserSetting.VectorCollectionName);
+            await collection.EnsureCollectionExistsAsync();
 
-            // 处理DOCX文件
-            foreach (var docxFile in docxFiles)
+            // 处理文件
+            foreach (var file in pdfFiles.Concat(docxFiles))
             {
                 try
                 {
-                    using var fileStream = new FileStream(docxFile, FileMode.Open, FileAccess.Read);
-                    var paragraphs = DocumentReader.ReadParagraphs(fileStream, docxFile);
-                    await dataUploader.GenerateEmbeddingsAndUploadAsync(UserSetting.VectorCollectionName, paragraphs);
+                    await _ingestionService.IngestFileAsync(collection, file, embeddingGenerator);
                     processedFiles++;
                     WeakReferenceMessenger.Default.Send(new ToastMessage($"处理进度: {processedFiles}/{totalFiles}"));
                 }
                 catch (Exception ex)
                 {
-                    Logger?.LogError(ex, "处理DOCX文件时出错: {docxFile}", docxFile);
+                    Logger?.LogError(ex, "处理PDF文件时出错: {file}", file);
                 }
             }
 

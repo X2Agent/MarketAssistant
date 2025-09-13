@@ -254,7 +254,7 @@
                         <CollectionView ItemsSource="{Binding NewsEventData}" SelectionMode="None" EmptyView="暂无新闻事件">
                             <CollectionView.ItemTemplate>
                                 <DataTemplate x:DataType="models:AnalysisDataItem">
-                                    <Border BackgroundColor="#ffffff" Stroke="#e9ecef" StrokeShape="RoundRectangle 4" Padding="8" Margin="0,4">
+                                    <Border BackgroundColor="{StaticResource GradientWhite}" Stroke="{StaticResource GradientMediumGray}" StrokeShape="RoundRectangle 4" Padding="8" Margin="0,4">
                                         <VerticalStackLayout Spacing="{StaticResource TinySpacing}">
                                             <Label Text="{Binding Name}" FontAttributes="Bold" TextColor="{AppThemeBinding Light={StaticResource TextPrimaryLight}, Dark={StaticResource TextPrimaryDark}}" FontSize="13" />
                                             <Label Text="{Binding Value}" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" LineBreakMode="WordWrap" FontSize="12" />
@@ -278,7 +278,7 @@
                                         <VerticalStackLayout Grid.Column="0">
                                             <Label Text="{Binding Name}" FontSize="13" FontAttributes="Bold" />
                                             <Label Text="{Binding DataType}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-                                            <Label Text="{Binding Strategy}" FontSize="11" TextColor="#495057" IsVisible="{Binding Strategy, Converter={StaticResource IsStringNullOrEmptyConverter}, ConverterParameter=Invert}" />
+                                            <Label Text="{Binding Strategy}" FontSize="11" TextColor="{StaticResource MediumDarkGray}" IsVisible="{Binding Strategy, Converter={StaticResource IsStringNullOrEmptyConverter}, ConverterParameter=Invert}" />
                                         </VerticalStackLayout>
                                         <Label Grid.Column="1" Text="{Binding Value}" FontSize="13" FontAttributes="Bold" VerticalOptions="Center" />
                                         <Label Grid.Column="2" Text="{Binding Unit}" FontSize="11" TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" VerticalOptions="Center" IsVisible="{Binding Unit, Converter={StaticResource IsStringNullOrEmptyConverter}, ConverterParameter=Invert}" />
@@ -294,18 +294,18 @@
         
         <!-- 数据解析加载指示器覆盖层 -->
         <Grid IsVisible="{Binding IsBusy}" 
-              BackgroundColor="#80FFFFFF" 
+              BackgroundColor="{StaticResource SemiTransparentWhite}" 
               ZIndex="1000">
             <VerticalStackLayout HorizontalOptions="Center" 
                                VerticalOptions="Center" 
                                Spacing="16">
                 <ActivityIndicator IsRunning="{Binding IsBusy}" 
-                                 Color="{AppThemeBinding Light=#512BD4, Dark=#AC99EA}" 
+                                 Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" 
                                  WidthRequest="40" 
                                  HeightRequest="40" />
                 <Label Text="正在解析分析数据..." 
                        FontSize="16" 
-                       TextColor="{AppThemeBinding Light=#212529, Dark=#FFFFFF}" 
+                       TextColor="{AppThemeBinding Light={StaticResource DarkText}, Dark={StaticResource White}}" 
                        HorizontalOptions="Center" />
             </VerticalStackLayout>
         </Grid>

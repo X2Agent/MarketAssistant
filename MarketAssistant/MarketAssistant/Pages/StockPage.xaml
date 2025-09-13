@@ -14,20 +14,11 @@
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
             
             <!-- 页面特有资源 -->
-            <!-- 渐变色定义 - 页面特有 -->
-            <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="#ffffff" Offset="0" />
-                <GradientStop Color="#f8f9fa" Offset="1" />
-            </LinearGradientBrush>
-            
-            <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="#007bff" Offset="0" />
-                <GradientStop Color="#4dabf7" Offset="1" />
-            </LinearGradientBrush>
+            <!-- 使用全局渐变资源，移除重复定义 -->
 
             <!-- 页面特有样式 -->
             <Style x:Key="StockCompactCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="Background" Value="{StaticResource CardGradientBrush}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
                 <Setter Property="Stroke" Value="Transparent" />
                 <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
@@ -43,7 +34,7 @@
             </Style>
 
             <Style x:Key="StockChartCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="Background" Value="{StaticResource CardGradientBrush}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 12" />
                 <Setter Property="Stroke" Value="Transparent" />
                 <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
@@ -58,11 +49,11 @@
             </Style>
 
             <Style x:Key="StockActiveButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource PrimaryGradient}" />
+                <Setter Property="Background" Value="{StaticResource PrimaryGradientBrush}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="BorderWidth" Value="0" />
                 <Setter Property="CornerRadius" Value="6" />
-                <Setter Property="Padding" Value="{StaticResource SmallCardPadding},{StaticResource SmallSpacing}" />
+                <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
                 <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
@@ -78,10 +69,7 @@
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
 
-            <Style x:Key="StockSmallLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="11" />
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-            </Style>
+            <!-- 使用全局TinyLabelStyle替代StockSmallLabelStyle -->
 
             <Style x:Key="StockDataLabelStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="13" />
@@ -94,8 +82,8 @@
     <!-- 现代化渐变背景 -->
     <ContentPage.Background>
         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#f8f9fa" Offset="0" />
-            <GradientStop Color="#e9ecef" Offset="1" />
+            <GradientStop Color="{StaticResource GradientLightGray}" Offset="0" />
+            <GradientStop Color="{StaticResource GradientMediumGray}" Offset="1" />
         </LinearGradientBrush>
     </ContentPage.Background>
 
@@ -103,7 +91,7 @@
         
         <!-- 股票基本信息卡片 - 水平布局版 -->
         <Border Grid.Row="0" Style="{StaticResource StockCompactCardStyle}">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="{StaticResource ItemPadding}">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto" ColumnSpacing="{StaticResource TinySpacing}">
                 
                 <!-- 股票名称 -->
                 <Label Grid.Column="0"
@@ -115,7 +103,7 @@
                 <Border Grid.Column="1"
                         BackgroundColor="{StaticResource Info}" 
                         StrokeShape="RoundRectangle 4" 
-                        Padding="{StaticResource SmallSpacing},{StaticResource TinySpacing}"
+                        Padding="{StaticResource SmallHorizontalTinyVerticalPadding}"
                         VerticalOptions="Center">
                     <Label Text="{Binding StockCode}" 
                            FontSize="11" 
@@ -155,20 +143,20 @@
                 <Button Grid.Column="5"
                         Text="🤖 AI分析" 
                         Command="{Binding NavigateToAnalysisCommand}" 
-                        Style="{StaticResource ActiveButtonStyle}"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         VerticalOptions="Center" />
                 
                 <!-- 刷新按钮 -->
                 <Button Grid.Column="6"
                         Text="🔄 刷新" 
                         Command="{Binding RefreshDataCommand}" 
-                        Style="{StaticResource ActiveButtonStyle}"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         VerticalOptions="Center" />
             </Grid>
         </Border>
 
         <!-- K线图表区域 - 只在数据加载成功时显示 -->
-        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand"
+        <Border Grid.Row="1" Style="{StaticResource PrimaryCardStyle}" VerticalOptions="FillAndExpand"
                 IsVisible="{Binding HasError, Converter={StaticResource InvertedBoolConverter}}">
             <StackLayout VerticalOptions="FillAndExpand" Spacing="10">
 
@@ -200,7 +188,7 @@
                                 FontSize="12"
                                 FontAttributes="Bold"
                                 CornerRadius="6"
-                                Padding="10,6"
+                                Padding="{StaticResource SmallButtonPadding}"
                                 BorderWidth="1"
                                 BorderColor="{StaticResource PrimaryColor}"
                                 BackgroundColor="{Binding IsMinuteSelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
@@ -212,7 +200,7 @@
                                 FontSize="12"
                                 FontAttributes="Bold"
                                 CornerRadius="6"
-                                Padding="10,6"
+                                Padding="{StaticResource SmallButtonPadding}"
                                 BorderWidth="1"
                                 BorderColor="{StaticResource PrimaryColor}"
                                 BackgroundColor="{Binding IsDailySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
@@ -224,7 +212,7 @@
                                 FontSize="12"
                                 FontAttributes="Bold"
                                 CornerRadius="6"
-                                Padding="10,6"
+                                Padding="{StaticResource SmallButtonPadding}"
                                 BorderWidth="1"
                                 BorderColor="{StaticResource PrimaryColor}"
                                 BackgroundColor="{Binding IsWeeklySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
@@ -236,7 +224,7 @@
                                 FontSize="12"
                                 FontAttributes="Bold"
                                 CornerRadius="6"
-                                Padding="10,6"
+                                Padding="{StaticResource SmallButtonPadding}"
                                 BorderWidth="1"
                                 BorderColor="{StaticResource PrimaryColor}"
                                 BackgroundColor="{Binding IsMonthlySelected, Converter={StaticResource BoolToColorConverter}, ConverterParameter='#007bff,Transparent'}"
@@ -254,11 +242,11 @@
         </Border>
         
         <!-- 错误状态显示区域 -->
-        <Border Grid.Row="1" Style="{StaticResource ChartCardStyle}" VerticalOptions="FillAndExpand"
+        <Border Grid.Row="1" Style="{StaticResource PrimaryCardStyle}" VerticalOptions="FillAndExpand"
                 IsVisible="{Binding HasError}">
             <VerticalStackLayout HorizontalOptions="Center" 
                                VerticalOptions="Center" 
-                               Spacing="{StaticResource ItemPadding}">
+                               Spacing="{StaticResource TinySpacing}">
                 <Label Text="⚠️" FontSize="48" HorizontalOptions="Center" />
                 <Label Text="数据加载失败" 
                        FontSize="18"
@@ -273,7 +261,7 @@
                        MaxLines="3" />
                 <Button Text="🔄 重新加载" 
                         Command="{Binding RefreshDataCommand}" 
-                        Style="{StaticResource ActiveButtonStyle}"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         Margin="0,16,0,0" />
             </VerticalStackLayout>
         </Border>

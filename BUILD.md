@@ -74,7 +74,7 @@
 dotnet workload install maui
 
 # 还原依赖项
-dotnet restore MarketAssistant.sln
+dotnet restore MarketAssistant.slnx
 
 # 构建 Windows 版本
 dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj \
@@ -94,7 +94,7 @@ dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.cspro
 dotnet workload install maui
 
 # 还原依赖项
-dotnet restore MarketAssistant.sln
+dotnet restore MarketAssistant.slnx
 
 # 构建 macOS 版本
 dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj \
@@ -137,8 +137,8 @@ hdiutil create -volname "MarketAssistant" \
 
 2. **构建失败 - 缺少依赖项**
    ```bash
-   dotnet restore MarketAssistant.sln
-   dotnet clean MarketAssistant.sln
+   dotnet restore MarketAssistant.slnx
+   dotnet clean MarketAssistant.slnx
    ```
 
 3. **macOS 构建失败**

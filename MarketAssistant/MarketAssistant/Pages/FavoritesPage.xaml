@@ -20,7 +20,7 @@
             <controls:CardView.Header>
                 <Grid ColumnDefinitions="*,Auto">
                     <Label Grid.Column="0" Text="我的收藏" FontSize="20" FontAttributes="Bold" 
-           TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}" />
+           TextColor="{AppThemeBinding Light={StaticResource DarkText}, Dark={StaticResource TextPrimaryDark}}" />
                     <Image Grid.Column="1" Source="tab_favorites_on.png" HeightRequest="24" WidthRequest="24" 
            VerticalOptions="Center" />
                 </Grid>
@@ -45,7 +45,7 @@
                     <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="{StaticResource SmallSpacing}">
                         <Image Source="tab_favorites.png" HeightRequest="48" WidthRequest="48" />
                         <Label Text="暂无收藏股票" HorizontalOptions="Center" 
-                   TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" />
+                   TextColor="{AppThemeBinding Light={StaticResource MediumGray}, Dark={StaticResource TextSecondaryDark}}" />
                         <Label Text="在股票详情页点击收藏按钮添加" HorizontalOptions="Center" 
                    TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" FontSize="12" />
                     </VerticalStackLayout>
@@ -55,7 +55,7 @@
                         <Border Padding="{StaticResource CardPadding}" Margin="{StaticResource TinyMargin}" 
                                 StrokeShape="RoundRectangle 6" 
                                 Stroke="Transparent" 
-                                BackgroundColor="{AppThemeBinding Light=White, Dark=#3c3c3c}">
+                                BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource ItemBackgroundDark}}">
                             <Grid ColumnDefinitions="*,Auto">
                                 <!-- 股票信息区域 -->
                                 <VerticalStackLayout Grid.Column="0" Spacing="{StaticResource TinySpacing}">
@@ -63,24 +63,24 @@
                                     <HorizontalStackLayout Spacing="{StaticResource TinySpacing}">
                                         <Label Text="{Binding Market}" 
                                                FontSize="12" 
-                                               TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" />
+                                               TextColor="{AppThemeBinding Light={StaticResource MediumGray}, Dark={StaticResource TextSecondaryDark}}" />
                                         <Label Text="{Binding Code}" 
                                                FontSize="12" 
-                                               TextColor="{AppThemeBinding Light=#6c757d, Dark=#a0a0a0}" />
+                                               TextColor="{AppThemeBinding Light={StaticResource MediumGray}, Dark={StaticResource TextSecondaryDark}}" />
                                     </HorizontalStackLayout>
                                     
                                     <!-- 股票名称 -->
                                     <Label Text="{Binding Name}" 
                                            FontSize="14" 
                                            FontAttributes="Bold" 
-                                           TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}" />
+                                           TextColor="{AppThemeBinding Light={StaticResource DarkText}, Dark={StaticResource TextPrimaryDark}}" />
                                     
                                     <!-- 价格和涨跌幅 -->
                                     <HorizontalStackLayout Spacing="{StaticResource SmallSpacing}">
                                         <Label Text="{Binding CurrentPrice}" 
                                                FontSize="16" 
                                                FontAttributes="Bold" 
-                                               TextColor="{AppThemeBinding Light=#212529, Dark=#e0e0e0}" />
+                                               TextColor="{AppThemeBinding Light={StaticResource DarkText}, Dark={StaticResource TextPrimaryDark}}" />
                                         <Label Text="{Binding ChangePercentage}" 
                                                FontSize="14" 
                                                TextColor="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}" />
@@ -95,11 +95,11 @@
                                       VerticalOptions="Start"
                                       IsVisible="False" 
                                       x:Name="DeleteButton">
-                                    <Ellipse Fill="{AppThemeBinding Light=#f8f9fa, Dark=#404040}" 
+                                    <Ellipse Fill="{AppThemeBinding Light={StaticResource GradientLightGray}, Dark={StaticResource Gray600}}" 
                                              WidthRequest="32" 
                                              HeightRequest="32" />
                                     <Path Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
-                                          Fill="{AppThemeBinding Light=#dc3545, Dark=#ff6b6b}"
+                                          Fill="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource Error}}"
                                           WidthRequest="18" 
                                           HeightRequest="18"
                                           HorizontalOptions="Center" 
@@ -123,7 +123,7 @@
                                     <VisualState Name="PointerOver">
                                         <VisualState.Setters>
                                             <Setter Property="BackgroundColor" 
-                                                    Value="{AppThemeBinding Light=#f8f9fa, Dark=#404040}" />
+                                                    Value="{AppThemeBinding Light={StaticResource GradientLightGray}, Dark={StaticResource Gray600}}" />
                                             <Setter TargetName="DeleteButton" 
                                                     Property="IsVisible" 
                                                     Value="True" />

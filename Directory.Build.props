@@ -8,6 +8,10 @@
     
     <!-- 排除 Windows 项目的构建 -->
     <DefaultItemExcludes Condition="'$(OS)' != 'Windows_NT'">$(DefaultItemExcludes);**/*WinUI*/**</DefaultItemExcludes>
+
+    <!-- 限制发布/输出的卫星资源语种，避免生成大量无用语言目录 -->
+    <!-- 如需调整，使用分号分隔：例如 zh-Hans;en-US;ja -->
+    <SatelliteResourceLanguages>zh-Hans;en-us</SatelliteResourceLanguages>
   </PropertyGroup>
   
   <!-- 条件性排除 Windows 项目引用 -->
