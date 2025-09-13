@@ -14,17 +14,7 @@
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
             <converters:DoubleConverter x:Key="DoubleConverter" />
             
-            <!-- 页面特有资源 - FAB按钮样式 -->
-            <Style x:Key="FabButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource InfoBlue}" />
-                <Setter Property="TextColor" Value="White" />
-                <Setter Property="FontSize" Value="22" />
-                <Setter Property="CornerRadius" Value="28" />
-                <Setter Property="WidthRequest" Value="56" />
-                <Setter Property="HeightRequest" Value="56" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="Margin" Value="{StaticResource LargeMargin}" />
-            </Style>
+            <!-- 使用全局FAB按钮样式 -->
         </ResourceDictionary>
     </ContentPage.Resources>
 

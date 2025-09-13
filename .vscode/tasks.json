@@ -4,7 +4,7 @@
 		{
 			"label": "Build solution",
 			"type": "shell",
-			"command": "dotnet build .\\MarketAssistant.sln -c Debug --nologo",
+			"command": "dotnet build .\\MarketAssistant.slnx -c Debug --nologo",
 			"isBackground": false,
 			"problemMatcher": [
 				"$msCompile"

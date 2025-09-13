@@ -21,12 +21,6 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
-		
-		<!-- Embedded Templates -->
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Remove="config\models.yaml" />
 	</ItemGroup>
 
 	<ItemGroup>

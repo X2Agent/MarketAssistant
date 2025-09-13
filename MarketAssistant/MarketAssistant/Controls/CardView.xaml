@@ -8,12 +8,7 @@
 
     <ContentView.Resources>
         <ResourceDictionary>
-            <Color x:Key="TextPrimaryLight">#212529</Color>
-            <Color x:Key="TextPrimaryDark">#e0e0e0</Color>
-            <Color x:Key="DividerLight">#e9ecef</Color>
-            <Color x:Key="DividerDark">#404040</Color>
-            <Color x:Key="CardBackgroundLight">#f8f9fa</Color>
-            <Color x:Key="CardBackgroundDark">#2c2c2c</Color>
+            <!-- 使用全局颜色资源，移除重复定义 -->
             <Style x:Key="CardTitleStyle"
                    TargetType="Label">
                 <Setter Property="FontSize"
@@ -29,7 +24,7 @@
             <Style x:Key="CardStyle"
        TargetType="Border">
                 <Setter Property="Padding"
-            Value="16"/>
+            Value="{StaticResource CardPadding}"/>
                 <Setter Property="StrokeShape"
             Value="RoundRectangle 8"/>
                 <Setter Property="Stroke"

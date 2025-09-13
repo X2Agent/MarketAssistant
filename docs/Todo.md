@@ -1,5 +1,8 @@
 ## TODO
  
+- 管理windows下图片平铺到根目录的问题
+- 发布裁剪
+
 - 选定目录文档(Pdf,Docx)向量化搜索
    pandoc.net 文档转换
    Mammoth.NET - DOCX 到 HTML

@@ -97,7 +97,7 @@
                                                 <DataTemplate x:DataType="x:String">
                                                     <Border Padding="{StaticResource ItemPadding}"
                                                                 Margin="{StaticResource TinyMargin}"
-                                                                Stroke="Gray"
+                                                                Stroke="{AppThemeBinding Light={StaticResource BorderLight}, Dark={StaticResource BorderDark}}"
                                                                 StrokeThickness="0.5">
                                                         <Label Text="{Binding .}"
                                                                    FontSize="12"
@@ -134,8 +134,8 @@
            Style="{StaticResource SectionTitleStyle}"/>
                         <Image Grid.Column="1"
            Source="trending_icon.png"
-           HeightRequest="20"
-           WidthRequest="20"
+           HeightRequest="{StaticResource SmallIconSize}"
+           WidthRequest="{StaticResource SmallIconSize}"
            VerticalOptions="Center"/>
                     </Grid>
                 </controls:CardView.Header>

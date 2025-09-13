@@ -3,6 +3,7 @@ using MarketAssistant.Plugins;
 using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Plugins.Web;
 
 namespace MarketAssistant.Infrastructure;
 
@@ -36,6 +37,7 @@ public class KernelPluginConfig : IKernelPluginConfig
         var k = kernel.Clone();
         switch (analysisAgent)
         {
+            //DocumentPlugin
             case AnalysisAgents.FundamentalAnalystAgent:
                 k.Plugins.AddFromObject(_stockBasicPlugin);
                 break;
@@ -44,6 +46,10 @@ public class KernelPluginConfig : IKernelPluginConfig
                 break;
             case AnalysisAgents.FinancialAnalystAgent:
                 k.Plugins.AddFromObject(_stockFinancialPlugin);
+                break;
+            case AnalysisAgents.MarketSentimentAnalystAgent:
+                //k.Plugins.AddFromType<WebSearchEnginePlugin>();
+                k.Plugins.AddFromType<SearchUrlPlugin>();
                 break;
             case AnalysisAgents.NewsEventAnalystAgent:
                 k.Plugins.AddFromObject(_stockNewsPlugin);

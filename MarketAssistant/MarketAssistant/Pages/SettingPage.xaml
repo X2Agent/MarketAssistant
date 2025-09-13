@@ -61,8 +61,8 @@
                                 BackgroundColor="{StaticResource PrimaryButtonColor}"
                                 TextColor="White"
                                 Margin="8,0,0,0"
-                                WidthRequest="100"
-                                HeightRequest="40"/>
+                                WidthRequest="{StaticResource StandardButtonWidth}"
+                                HeightRequest="{StaticResource StandardButtonHeight}"/>
                     </Grid>
                 </Grid>
             </controls:CardView>
@@ -85,8 +85,8 @@
                                     BackgroundColor="{StaticResource PrimaryBlue}"
                                     TextColor="White"
                                     Margin="8,0,0,0"
-                                    WidthRequest="100"
-                                    HeightRequest="40"/>
+                                    WidthRequest="{StaticResource StandardButtonWidth}"
+                                    HeightRequest="{StaticResource StandardButtonHeight}"/>
                         </Grid>
                     </VerticalStackLayout>
                 </VerticalStackLayout>
@@ -301,7 +301,7 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <Label Text="浏览器路径"
                             FontSize="14"
-                            TextColor="#6c757d"/>
+                            TextColor="{StaticResource MediumGray}"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <Entry Grid.Column="0"
                                 Text="{Binding UserSetting.BrowserPath}"
@@ -316,7 +316,7 @@
                     </Grid>
                     <Label Text="注意：如果留空，系统将自动使用默认浏览器"
                             FontSize="12"
-                            TextColor="#6c757d"/>
+                            TextColor="{StaticResource MediumGray}"/>
                 </VerticalStackLayout>
             </controls:CardView>
 
@@ -325,7 +325,7 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <Label Text="日志文件路径"
                             FontSize="14"
-                            TextColor="#6c757d"/>
+                            TextColor="{StaticResource MediumGray}"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <Entry Grid.Column="0"
                                 Text="{Binding UserSetting.LogPath}"
@@ -390,10 +390,10 @@
                 <VerticalStackLayout Spacing="{StaticResource StackSpacing}">
                     <Label Text="配置MCP服务器，用于连接外部服务"
                             FontSize="14"
-                            TextColor="#6c757d"/>
+                            TextColor="{StaticResource MediumGray}"/>
                     <Button Text="MCP服务器配置"
                             Command="{Binding NavigateToMCPConfigCommand}"
-                            BackgroundColor="#007bff"
+                            BackgroundColor="{StaticResource PrimaryBlue}"
                             TextColor="White"
                             HorizontalOptions="Start"/>
                 </VerticalStackLayout>
@@ -405,7 +405,7 @@
                     Margin="0,16,0,0">
                 <Button Text="重置"
                         Command="{Binding ResetCommand}"
-                        BackgroundColor="#6c757d"
+                        BackgroundColor="{StaticResource MediumGray}"
                         TextColor="White"
                         WidthRequest="{StaticResource ButtonWidth}"/>
                 <Button Text="保存"

@@ -55,6 +55,16 @@
     <!-- 字体大小定义 -->
     <x:Double x:Key="LabelFontSize">14</x:Double>
     
+    <!-- 常用按钮尺寸定义 -->
+    <x:Double x:Key="StandardButtonWidth">100</x:Double>
+    <x:Double x:Key="StandardButtonHeight">40</x:Double>
+    <x:Double x:Key="FabButtonSize">56</x:Double>
+    
+    <!-- 常用图标尺寸定义 -->
+    <x:Double x:Key="SmallIconSize">20</x:Double>
+    <x:Double x:Key="MediumIconSize">24</x:Double>
+    <x:Double x:Key="LargeIconSize">32</x:Double>
+    
     <!-- 常用渐变画刷定义 -->
     <LinearGradientBrush x:Key="CardGradientBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource GradientWhite}" Offset="0" />
@@ -629,6 +639,18 @@
         <Setter Property="Padding" Value="16,8"/>
         <Setter Property="CornerRadius" Value="6"/>
         <Setter Property="BorderWidth" Value="0"/>
+    </Style>
+    
+    <!-- 浮动操作按钮样式 -->
+    <Style x:Key="FabButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{StaticResource InfoBlue}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="CornerRadius" Value="28" />
+        <Setter Property="WidthRequest" Value="{StaticResource FabButtonSize}" />
+        <Setter Property="HeightRequest" Value="{StaticResource FabButtonSize}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="{StaticResource LargeMargin}" />
     </Style>
 
 </ResourceDictionary>

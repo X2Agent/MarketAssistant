@@ -30,5 +30,12 @@
     </array>
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/AppIcon.appiconset</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en-us</string>
+        <string>zh-Hans</string>
+    </array>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en-us</string>
 </dict>
 </plist> 

@@ -14,20 +14,11 @@
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
             
             <!-- 页面特有资源 -->
-            <!-- 渐变色定义 - 页面特有 -->
-            <LinearGradientBrush x:Key="CardGradient" StartPoint="0,0" EndPoint="0,1">
-                <GradientStop Color="{StaticResource GradientWhite}" Offset="0" />
-                <GradientStop Color="{StaticResource GradientLightGray}" Offset="1" />
-            </LinearGradientBrush>
-            
-            <LinearGradientBrush x:Key="PrimaryGradient" StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Color="{StaticResource PrimaryBlue}" Offset="0" />
-                <GradientStop Color="{StaticResource PrimaryBlueLight}" Offset="1" />
-            </LinearGradientBrush>
+            <!-- 使用全局渐变资源，移除重复定义 -->
 
             <!-- 页面特有样式 -->
             <Style x:Key="StockCompactCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="Background" Value="{StaticResource CardGradientBrush}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
                 <Setter Property="Stroke" Value="Transparent" />
                 <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
@@ -43,7 +34,7 @@
             </Style>
 
             <Style x:Key="StockChartCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardGradient}" />
+                <Setter Property="Background" Value="{StaticResource CardGradientBrush}" />
                 <Setter Property="StrokeShape" Value="RoundRectangle 12" />
                 <Setter Property="Stroke" Value="Transparent" />
                 <Setter Property="Padding" Value="{StaticResource SmallCardPadding}" />
@@ -58,7 +49,7 @@
             </Style>
 
             <Style x:Key="StockActiveButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource PrimaryGradient}" />
+                <Setter Property="Background" Value="{StaticResource PrimaryGradientBrush}" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="BorderWidth" Value="0" />
                 <Setter Property="CornerRadius" Value="6" />
@@ -78,10 +69,7 @@
                 <Setter Property="FontAttributes" Value="Bold" />
             </Style>
 
-            <Style x:Key="StockSmallLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="11" />
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
-            </Style>
+            <!-- 使用全局TinyLabelStyle替代StockSmallLabelStyle -->
 
             <Style x:Key="StockDataLabelStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="13" />
