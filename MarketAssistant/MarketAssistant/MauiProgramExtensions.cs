@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
@@ -10,6 +11,7 @@ using MarketAssistant.Vectors.Extensions;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Serilog;
@@ -34,6 +36,12 @@ namespace MarketAssistant
 
             // 注册HttpClient服务
             builder.Services.AddHttpClient();
+
+            // 注册内存缓存服务
+            builder.Services.AddMemoryCache(options =>
+            {
+                options.SizeLimit = 50 * 1024 * 1024; // 50MB 限制
+            });
 
             // 注册用户设置服务为单例
             builder.Services.AddSingleton<IUserSettingService, UserSettingService>();
@@ -63,6 +71,9 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
             builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
             builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
+            // Prompt semantic cache (read) and write-back filter
+            builder.Services.AddSingleton<IPromptRenderFilter, PromptCacheFilter>();
+            builder.Services.AddSingleton<IFunctionInvocationFilter, PromptCacheWriteFilter>();
             // 注册用户 Kernel 服务（可失效重建）
             builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
             // 注册嵌入服务
@@ -91,7 +102,23 @@ namespace MarketAssistant
             builder.Services.AddSingleton<TelegramService>();
             builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
-            builder.Services.AddSingleton<MarketAnalysisAgent>();
+
+            // 注册分析缓存服务
+            builder.Services.AddSingleton<IAnalysisCacheService>(serviceProvider =>
+            {
+                var logger = serviceProvider.GetRequiredService<ILogger<AnalysisCacheService>>();
+                var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
+                return new AnalysisCacheService(logger, memoryCache, TimeSpan.FromHours(2));
+            });
+
+            builder.Services.AddSingleton<MarketAnalysisAgent>(serviceProvider =>
+            {
+                var logger = serviceProvider.GetRequiredService<ILogger<MarketAnalysisAgent>>();
+                var analystManager = serviceProvider.GetRequiredService<AnalystManager>();
+                var cacheService = serviceProvider.GetRequiredService<IAnalysisCacheService>();
+
+                return new MarketAnalysisAgent(logger, analystManager, cacheService);
+            });
             builder.Services.AddSingleton<StockService>();
             builder.Services.AddSingleton<StockKLineService>();
             builder.Services.AddSingleton<StockSearchHistory>();

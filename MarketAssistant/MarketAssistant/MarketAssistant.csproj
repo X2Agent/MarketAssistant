@@ -31,6 +31,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="DotLiquid" Version="2.3.197" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="9.0.100" />
 		<PackageReference Include="CommunityToolkit.Maui" Version="12.1.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />

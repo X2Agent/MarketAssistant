@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Applications.Cache;
 
 namespace MarketAssistant.Agents;
 
@@ -27,6 +28,7 @@ public class MarketAnalysisAgent
 
     private readonly AnalystManager _analystManager;
     private readonly ILogger<MarketAnalysisAgent> _logger;
+    private readonly IAnalysisCacheService? _cacheService;
     private readonly string _copilot = "Copilot";
 
     // 当前进度信息
@@ -36,10 +38,14 @@ public class MarketAnalysisAgent
 
     #region 构造函数
 
-    public MarketAnalysisAgent(ILogger<MarketAnalysisAgent> logger, AnalystManager analystManager)
+    public MarketAnalysisAgent(
+        ILogger<MarketAnalysisAgent> logger, 
+        AnalystManager analystManager,
+        IAnalysisCacheService? cacheService = null)
     {
         _logger = logger;
         _analystManager = analystManager;
+        _cacheService = cacheService;
     }
 
     #endregion
@@ -50,19 +56,49 @@ public class MarketAnalysisAgent
     /// 执行股票分析
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
+    /// <param name="forceRefresh">是否强制刷新，忽略缓存</param>
     /// <returns>分析消息列表</returns>
-    public async Task<ChatHistory> AnalysisAsync(string stockSymbol)
+    public async Task<ChatHistory> AnalysisAsync(string stockSymbol, bool forceRefresh = false)
     {
         try
         {
             // 初始化分析环境
             InitializeAnalysisEnvironment();
 
+            // 检查缓存（如果不强制刷新）
+            if (!forceRefresh && _cacheService != null)
+            {
+                UpdateProgress("缓存检查", "检查是否有缓存的分析结果");
+                
+                var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
+                if (cachedResult != null)
+                {
+                    _logger.LogInformation("使用缓存的分析结果: {StockSymbol}", stockSymbol);
+                    UpdateProgress("缓存命中", "使用缓存的分析结果", false);
+                    
+                    // 将缓存结果复制到当前历史
+                    _analystManager.History.Clear();
+                    foreach (var message in cachedResult)
+                    {
+                        _analystManager.History.Add(message);
+                    }
+                    
+                    // 触发分析完成事件
+                    var lastMessage = cachedResult.LastOrDefault();
+                    if (lastMessage != null)
+                    {
+                        AnalysisCompleted?.Invoke(this, lastMessage);
+                    }
+                    
+                    return _analystManager.History;
+                }
+            }
+
             // 构建分析提示词
             string prompt = BuildAnalysisPrompt(stockSymbol);
 
             // 执行分析过程
-            await ExecuteAnalysisProcessAsync(prompt);
+            await ExecuteAnalysisProcessAsync(prompt, stockSymbol);
         }
         catch (Exception ex)
         {
@@ -112,7 +148,7 @@ public class MarketAnalysisAgent
     /// <summary>
     /// 执行分析过程
     /// </summary>
-    private async Task ExecuteAnalysisProcessAsync(string prompt)
+    private async Task ExecuteAnalysisProcessAsync(string prompt, string stockSymbol)
     {
         UpdateProgress("分析师团队", "分析师分析中");
 
@@ -123,6 +159,21 @@ public class MarketAnalysisAgent
         var coordinatorResult = await _analystManager.ExecuteCoordinatorAnalysisAsync(analystResults);
 
         UpdateProgress("系统", "CoordinatorAnalystAgent总结完成");
+
+        // 缓存分析结果
+        if (_cacheService != null)
+        {
+            try
+            {
+                UpdateProgress("缓存保存", "保存分析结果到缓存");
+                await _cacheService.CacheAnalysisAsync(stockSymbol, _analystManager.History);
+                _logger.LogInformation("分析结果已缓存: {StockSymbol}", stockSymbol);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "缓存分析结果失败: {StockSymbol}", stockSymbol);
+            }
+        }
 
         // 触发分析完成事件
         AnalysisCompleted?.Invoke(this, coordinatorResult);
