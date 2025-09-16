@@ -47,38 +47,21 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public ObservableCollection<AnalysisDataItem> AnalysisData { get; } = new();
 
     // 数据过滤属性
-    public ObservableCollection<AnalysisDataItem> TechnicalIndicators =>
-        new(AnalysisData.Where(x =>
-            x.DataType.Contains("Technical", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("技术", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Indicator", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("指标", StringComparison.OrdinalIgnoreCase)));
+    // 缓存的分类数据集合 - 使用[ObservableProperty]管理
+    [ObservableProperty]
+    private ObservableCollection<AnalysisDataItem> _technicalIndicators = new();
 
-    public ObservableCollection<AnalysisDataItem> FundamentalIndicators =>
-        new(AnalysisData.Where(x =>
-            x.DataType.Contains("Fundamental", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("基本面", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("基础", StringComparison.OrdinalIgnoreCase)));
+    [ObservableProperty]
+    private ObservableCollection<AnalysisDataItem> _fundamentalIndicators = new();
 
-    public ObservableCollection<AnalysisDataItem> FinancialData =>
-        new(AnalysisData.Where(x =>
-            x.DataType.Contains("Financial", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("财务", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Finance", StringComparison.OrdinalIgnoreCase)));
+    [ObservableProperty]
+    private ObservableCollection<AnalysisDataItem> _financialData = new();
 
-    public ObservableCollection<AnalysisDataItem> MarketSentimentData =>
-        new(AnalysisData.Where(x =>
-            x.DataType.Contains("Sentiment", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("情绪", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Market", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("市场", StringComparison.OrdinalIgnoreCase)));
+    [ObservableProperty]
+    private ObservableCollection<AnalysisDataItem> _marketSentimentData = new();
 
-    public ObservableCollection<AnalysisDataItem> NewsEventData =>
-        new(AnalysisData.Where(x =>
-            x.DataType.Contains("News", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Event", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("新闻", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("事件", StringComparison.OrdinalIgnoreCase)));
+    [ObservableProperty]
+    private ObservableCollection<AnalysisDataItem> _newsEventData = new();
 
     // 其他集合
     public ObservableCollection<string> InvestmentHighlights { get; } = new();
@@ -86,11 +69,18 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public ObservableCollection<string> OperationSuggestions { get; } = new();
     public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
 
-    // 辅助属性
-    public bool HasConsensusInfo => !string.IsNullOrEmpty(ConsensusInfo);
-    public bool HasDisagreementInfo => !string.IsNullOrEmpty(DisagreementInfo);
-    public bool HasConsensusOrDisagreement => HasConsensusInfo || HasDisagreementInfo;
-    public string ScorePercentage => $"{OverallScore}/10";
+    // 辅助属性 - 使用[ObservableProperty]统一管理
+    [ObservableProperty]
+    private bool _hasConsensusInfo;
+
+    [ObservableProperty]
+    private bool _hasDisagreementInfo;
+
+    [ObservableProperty]
+    private bool _hasConsensusOrDisagreement;
+
+    [ObservableProperty]
+    private string _scorePercentage = "0/10";
 
     public AnalysisReportViewModel(IAnalystDataParser analystDataParser,
          IAnalysisCacheService analysisCacheService,
@@ -103,19 +93,96 @@ public partial class AnalysisReportViewModel : ViewModelBase
 
     partial void OnConsensusInfoChanged(string value)
     {
-        OnPropertyChanged(nameof(HasConsensusInfo));
-        OnPropertyChanged(nameof(HasConsensusOrDisagreement));
+        HasConsensusInfo = !string.IsNullOrEmpty(value);
+        UpdateConsensusOrDisagreement();
     }
 
     partial void OnDisagreementInfoChanged(string value)
     {
-        OnPropertyChanged(nameof(HasDisagreementInfo));
-        OnPropertyChanged(nameof(HasConsensusOrDisagreement));
+        HasDisagreementInfo = !string.IsNullOrEmpty(value);
+        UpdateConsensusOrDisagreement();
     }
 
     partial void OnOverallScoreChanged(float value)
     {
-        OnPropertyChanged(nameof(ScorePercentage));
+        ScorePercentage = $"{value}/10";
+    }
+
+    /// <summary>
+    /// 更新组合状态
+    /// </summary>
+    private void UpdateConsensusOrDisagreement()
+    {
+        HasConsensusOrDisagreement = HasConsensusInfo || HasDisagreementInfo;
+    }
+
+    /// <summary>
+    /// 更新分类数据集合的缓存
+    /// </summary>
+    private void UpdateFilteredCollections()
+    {
+        // 技术指标数据
+        var technicalItems = AnalysisData.Where(x =>
+            x.DataType.Contains("Technical", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("技术", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("Indicator", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("指标", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        TechnicalIndicators.Clear();
+        foreach (var item in technicalItems)
+        {
+            TechnicalIndicators.Add(item);
+        }
+
+        // 基本面指标数据
+        var fundamentalItems = AnalysisData.Where(x =>
+            x.DataType.Contains("Fundamental", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("基本面", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("基础", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        FundamentalIndicators.Clear();
+        foreach (var item in fundamentalItems)
+        {
+            FundamentalIndicators.Add(item);
+        }
+
+        // 财务数据
+        var financialItems = AnalysisData.Where(x =>
+            x.DataType.Contains("Financial", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("财务", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("Finance", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        FinancialData.Clear();
+        foreach (var item in financialItems)
+        {
+            FinancialData.Add(item);
+        }
+
+        // 市场情绪数据
+        var sentimentItems = AnalysisData.Where(x =>
+            x.DataType.Contains("Sentiment", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("情绪", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("Market", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("市场", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        MarketSentimentData.Clear();
+        foreach (var item in sentimentItems)
+        {
+            MarketSentimentData.Add(item);
+        }
+
+        // 新闻事件数据
+        var newsItems = AnalysisData.Where(x =>
+            x.DataType.Contains("News", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("Event", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("新闻", StringComparison.OrdinalIgnoreCase) ||
+            x.DataType.Contains("事件", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        NewsEventData.Clear();
+        foreach (var item in newsItems)
+        {
+            NewsEventData.Add(item);
+        }
     }
 
     public void ProcessAnalysisMessage(AnalysisMessage message)
@@ -217,14 +284,24 @@ public partial class AnalysisReportViewModel : ViewModelBase
         AnalysisData.Clear();
         ConsensusInfo = string.Empty;
         DisagreementInfo = string.Empty;
+        
+        // 重置计算属性
+        HasConsensusInfo = false;
+        HasDisagreementInfo = false;
+        HasConsensusOrDisagreement = false;
+        ScorePercentage = "0/10";
+        
+        // 清空分类数据缓存
+        TechnicalIndicators.Clear();
+        FundamentalIndicators.Clear();
+        FinancialData.Clear();
+        MarketSentimentData.Clear();
+        NewsEventData.Clear();
     }
 
     private void NotifyFilteredCollectionsChanged()
     {
-        OnPropertyChanged(nameof(TechnicalIndicators));
-        OnPropertyChanged(nameof(FundamentalIndicators));
-        OnPropertyChanged(nameof(FinancialData));
-        OnPropertyChanged(nameof(MarketSentimentData));
-        OnPropertyChanged(nameof(NewsEventData));
+        // 更新缓存的分类数据集合
+        UpdateFilteredCollections();
     }
 }

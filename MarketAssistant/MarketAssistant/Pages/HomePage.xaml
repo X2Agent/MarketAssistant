@@ -32,7 +32,7 @@
             </Border.Shadow>
             <SearchBar x:Name="searchBar"
                            Placeholder="输入股票代码或名称"
-                           SearchCommand="{Binding SearchCommand}"
+                           SearchCommand="{Binding Search.SearchCommand}"
                            SearchCommandParameter="{Binding Text, Source={x:Reference searchBar}}"
                            BackgroundColor="Transparent"
                            CancelButtonColor="{StaticResource Primary}"
@@ -52,7 +52,7 @@
                     <Grid ColumnDefinitions="*,Auto">
                         <Label Text="7*24小时快讯" Style="{StaticResource SectionTitleStyle}"/>
                         <Label Grid.Column="1"
-                                   Text="{Binding TelegraphRefreshCountdown}"
+                                   Text="{Binding News.TelegraphRefreshCountdown}"
                                    FontSize="12"
                                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}"
                                    VerticalOptions="Center"
@@ -60,7 +60,7 @@
                     </Grid>
                 </controls:CardView.Header>
                 <!--新闻快讯列表-->
-                <CollectionView ItemsSource="{Binding Telegraphs}"
+                <CollectionView ItemsSource="{Binding News.Telegraphs}"
                                     SelectionMode="None"
                                     HorizontalOptions="Fill"
                                     VerticalScrollBarVisibility="Always">
@@ -115,7 +115,7 @@
                                                Margin="{StaticResource LeftSmallMargin}"/>
                                 </Grid>
                                 <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenNewsCommand}"
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.News.OpenNewsCommand}"
                                                               CommandParameter="{Binding .}"/>
                                 </Border.GestureRecognizers>
                             </Border>
@@ -141,7 +141,7 @@
                 </controls:CardView.Header>
 
                 <!-- 热门股票列表 -->
-                <CollectionView ItemsSource="{Binding HotStocks}"
+                <CollectionView ItemsSource="{Binding HotStocks.HotStocks}"
                 SelectionMode="None"
                 HorizontalOptions="Fill">
                     <CollectionView.ItemsLayout>
@@ -209,7 +209,7 @@
                                                      Source="tab_favorites.png"
                                                      Scale="0.6"
                                                      HorizontalOptions="Center"
-                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddToFavoriteCommand}"
+                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.HotStocks.AddToFavoriteCommand}"
                                                      CommandParameter="{Binding .}"
                                                      x:Name="favoriteButton"
                                                      Opacity="0" />
@@ -217,7 +217,7 @@
                                 </Grid>
 
                                 <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectHotStockCommand}"
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.HotStocks.SelectHotStockCommand}"
                                               CommandParameter="{Binding .}"/>
                                 </Border.GestureRecognizers>
 
@@ -246,7 +246,7 @@
             <controls:CardView Grid.Column="2" 
                                    Header="最近查看">
                 <!-- 最近查看的股票数据列表 -->
-                <CollectionView ItemsSource="{Binding RecentStocks}"
+                <CollectionView ItemsSource="{Binding RecentStocks.RecentStocks}"
                                         SelectionMode="None"
                                         HorizontalOptions="Fill">
                     <CollectionView.EmptyView>
@@ -290,13 +290,13 @@
                                                          Scale="0.6"
                                                          BackgroundColor="Transparent"
                                                          VerticalOptions="Center"
-                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.AddToFavoriteCommand}"
+                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RecentStocks.AddToFavoriteCommand}"
                                                          CommandParameter="{Binding .}"
                                                          x:Name="recentFavoriteButton"
                                                          Opacity="0"/>
                                 </Grid>
                                 <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectRecentStockCommand}"
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RecentStocks.SelectRecentStockCommand}"
                                                                   CommandParameter="{Binding .}"/>
                                 </Border.GestureRecognizers>
 

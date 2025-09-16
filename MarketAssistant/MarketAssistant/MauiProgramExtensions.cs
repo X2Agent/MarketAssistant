@@ -112,6 +112,10 @@ namespace MarketAssistant
             builder.Services.AddSingleton<StockFavoriteService>();
             builder.Services.AddSingleton<PlaywrightService>();
 
+            // 注册新的主页相关服务
+            builder.Services.AddSingleton<IHomeStockService, HomeStockService>();
+            builder.Services.AddSingleton<INewsUpdateService, NewsUpdateService>();
+
             // 注册AI选股相关服务
             builder.Services.AddSingleton<StockSelectionManager>();
             builder.Services.AddSingleton<StockSelectionService>();
@@ -126,6 +130,13 @@ namespace MarketAssistant
 
             // Register view models.
             builder.Services.AddTransient<HomeViewModel>();
+            
+            // Register home sub-viewmodels
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.HomeSearchViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.HotStocksViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.RecentStocksViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.TelegraphNewsViewModel>();
+            
             builder.Services.AddTransient<AgentAnalysisViewModel>();
             builder.Services.AddTransient<SettingViewModel>();
             builder.Services.AddTransient<StockViewModel>();

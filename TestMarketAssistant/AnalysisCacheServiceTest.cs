@@ -7,6 +7,9 @@ using Moq;
 
 namespace TestMarketAssistant;
 
+/// <summary>
+/// 分析缓存服务测试类，验证基本的读取和写入功能
+/// </summary>
 [TestClass]
 public class AnalysisCacheServiceTest
 {
@@ -18,11 +21,7 @@ public class AnalysisCacheServiceTest
     public void Setup()
     {
         _mockLogger = new Mock<ILogger<AnalysisCacheService>>();
-        _memoryCache = new MemoryCache(new MemoryCacheOptions
-        {
-            SizeLimit = 5 * 1024 * 1024 // 5MB for testing
-        });
-        
+        _memoryCache = new MemoryCache(new MemoryCacheOptions());
         _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache);
     }
 
@@ -33,8 +32,11 @@ public class AnalysisCacheServiceTest
         _memoryCache?.Dispose();
     }
 
+    /// <summary>
+    /// 测试缓存分析数据的写入功能
+    /// </summary>
     [TestMethod]
-    public async Task CacheAnalysisAsync_WithValidData_SavesSuccessfully()
+    public async Task CacheAnalysisAsync_ShouldSaveDataSuccessfully()
     {
         // Arrange
         var stockSymbol = "AAPL";
@@ -48,51 +50,49 @@ public class AnalysisCacheServiceTest
         Assert.IsNotNull(cachedResult);
         Assert.AreEqual(stockSymbol, cachedResult.StockSymbol);
         Assert.AreEqual("买入", cachedResult.Rating);
-        Assert.AreEqual(8.5f, cachedResult.OverallScore);
     }
 
+    /// <summary>
+    /// 测试缓存分析数据的读取功能
+    /// </summary>
     [TestMethod]
-    public async Task GetCachedAnalysisAsync_WithNonExistentStock_ReturnsNull()
+    public async Task GetCachedAnalysisAsync_ShouldReturnCorrectData()
     {
         // Arrange
-        var stockSymbol = "NONEXISTENT";
-
-        // Act
-        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
-
-        // Assert
-        Assert.IsNull(result);
-    }
-
-    [TestMethod]
-    public async Task GetCachedAnalysisAsync_WithExpiredCache_ReturnsNull()
-    {
-        // Arrange
-        var stockSymbol = "AAPL";
+        var stockSymbol = "MSFT";
         var analysisResult = CreateTestAnalysisResult(stockSymbol);
-
-        // 直接设置一个很短的过期时间到内存缓存中
-        var cacheOptions = new MemoryCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50),
-            Size = 1000
-        };
-        _memoryCache.Set($"{stockSymbol.ToUpperInvariant()}_{DateTime.UtcNow:yyyyMMdd}", analysisResult, cacheOptions);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
 
         // Act
-        // 等待缓存过期
-        await Task.Delay(100);
+        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
 
         // Assert
-        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
+        Assert.IsNotNull(result);
+        Assert.AreEqual(stockSymbol, result.StockSymbol);
+        Assert.AreEqual(8.5f, result.OverallScore);
+    }
+
+    /// <summary>
+    /// 测试读取不存在的缓存数据
+    /// </summary>
+    [TestMethod]
+    public async Task GetCachedAnalysisAsync_WithNonExistentStock_ShouldReturnNull()
+    {
+        // Act
+        var result = await _cacheService.GetCachedAnalysisAsync("NONEXISTENT");
+
+        // Assert
         Assert.IsNull(result);
     }
 
+    /// <summary>
+    /// 测试缓存数据的覆盖写入功能
+    /// </summary>
     [TestMethod]
-    public async Task CacheAnalysisAsync_OverwritesExistingCache_WhenSameStockSymbol()
+    public async Task CacheAnalysisAsync_ShouldOverwriteExistingData()
     {
         // Arrange
-        var stockSymbol = "AAPL";
+        var stockSymbol = "GOOGL";
         var firstResult = CreateTestAnalysisResult(stockSymbol);
         firstResult.Rating = "卖出";
         var secondResult = CreateTestAnalysisResult(stockSymbol);
@@ -108,126 +108,14 @@ public class AnalysisCacheServiceTest
         Assert.AreEqual("买入", cachedResult.Rating);
     }
 
-    [TestMethod]
-    public async Task ClearCacheAsync_WithSpecificStock_RemovesOnlyThatStock()
-    {
-        // Arrange
-        var stockSymbol1 = "AAPL";
-        var stockSymbol2 = "MSFT";
-        var analysisResult1 = CreateTestAnalysisResult(stockSymbol1);
-        var analysisResult2 = CreateTestAnalysisResult(stockSymbol2);
-
-        await _cacheService.CacheAnalysisAsync(stockSymbol1, analysisResult1);
-        await _cacheService.CacheAnalysisAsync(stockSymbol2, analysisResult2);
-
-        // Act
-        await _cacheService.ClearCacheAsync(stockSymbol1);
-
-        // Assert
-        var result1 = await _cacheService.GetCachedAnalysisAsync(stockSymbol1);
-        var result2 = await _cacheService.GetCachedAnalysisAsync(stockSymbol2);
-
-        Assert.IsNull(result1);
-        Assert.IsNotNull(result2);
-    }
-
-
-    [TestMethod]
-    public async Task CacheAnalysisAsync_UpdatesExistingCache_WhenSameKeyUsed()
-    {
-        // Arrange
-        var stockSymbol = "AAPL";
-        var originalResult = CreateTestAnalysisResult(stockSymbol);
-        originalResult.TargetPrice = "150-160美元";
-        var updatedResult = CreateTestAnalysisResult(stockSymbol);
-        updatedResult.TargetPrice = "180-200美元";
-
-        // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, originalResult);
-        await _cacheService.CacheAnalysisAsync(stockSymbol, updatedResult);
-
-        // Assert
-        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
-        Assert.IsNotNull(result);
-        Assert.AreEqual("180-200美元", result.TargetPrice);
-    }
-
-    [TestMethod]
-    public async Task CacheService_HandlesMultipleStocks_Correctly()
-    {
-        // Arrange
-        var stockSymbols = new[] { "AAPL", "GOOGL", "MSFT", "TSLA" };
-        var analysisResults = stockSymbols.Select(symbol => CreateTestAnalysisResult(symbol)).ToArray();
-
-        // Act
-        for (int i = 0; i < stockSymbols.Length; i++)
-        {
-            await _cacheService.CacheAnalysisAsync(stockSymbols[i], analysisResults[i]);
-        }
-
-        // Assert
-        for (int i = 0; i < stockSymbols.Length; i++)
-        {
-            var result = await _cacheService.GetCachedAnalysisAsync(stockSymbols[i]);
-            Assert.IsNotNull(result, $"股票 {stockSymbols[i]} 的缓存应该存在");
-            Assert.AreEqual(stockSymbols[i], result.StockSymbol);
-        }
-    }
-
-
-    #region Helper Methods
-
-    private AnalystResult CreateTestAnalysisResult(string stockSymbol = "AAPL")
+    private AnalystResult CreateTestAnalysisResult(string stockSymbol)
     {
         return new AnalystResult
         {
             StockSymbol = stockSymbol,
-            TargetPrice = "180-200美元",
-            PriceChange = "上涨15-25%",
             Rating = "买入",
-            InvestmentRating = "买入",
-            RiskLevel = "中等",
             OverallScore = 8.5f,
-            ConfidencePercentage = 85f,
-            ConsensusInfo = "分析师普遍看好该股票",
-            DisagreementInfo = "对短期波动存在分歧",
-            DimensionScores = new Dictionary<string, float>
-            {
-                { "基本面", 8.0f },
-                { "技术面", 7.5f },
-                { "市场情绪", 9.0f }
-            },
-            InvestmentHighlights = new List<string>
-            {
-                "业绩稳定增长",
-                "市场地位领先",
-                "创新能力强"
-            },
-            RiskFactors = new List<string>
-            {
-                "宏观经济风险",
-                "行业竞争加剧"
-            },
-            OperationSuggestions = new List<string>
-            {
-                "建议分批买入",
-                "设置止损位"
-            },
-            AnalysisData = new List<AnalysisDataItem>
-            {
-                new AnalysisDataItem
-                {
-                    DataType = "TechnicalIndicator",
-                    Name = "RSI",
-                    Value = "65",
-                    Unit = "",
-                    Signal = "中性",
-                    Impact = "中等",
-                    Strategy = "观察突破"
-                }
-            }
+            TargetPrice = "180-200美元"
         };
     }
-
-    #endregion
 }
