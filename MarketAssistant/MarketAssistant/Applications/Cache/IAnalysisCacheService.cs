@@ -1,4 +1,4 @@
-using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Views.Models;
 
 namespace MarketAssistant.Applications.Cache;
 
@@ -11,15 +11,15 @@ public interface IAnalysisCacheService : IDisposable
     /// 获取缓存的分析结果
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
-    /// <returns>缓存的聊天历史，如果没有缓存则返回null</returns>
-    Task<ChatHistory?> GetCachedAnalysisAsync(string stockSymbol);
+    /// <returns>缓存的分析结果，如果没有缓存则返回null</returns>
+    Task<AnalystResult?> GetCachedAnalysisAsync(string stockSymbol);
 
     /// <summary>
     /// 缓存分析结果
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
-    /// <param name="chatHistory">聊天历史</param>
-    Task CacheAnalysisAsync(string stockSymbol, ChatHistory chatHistory);
+    /// <param name="analysisResult">分析结果</param>
+    Task CacheAnalysisAsync(string stockSymbol, AnalystResult analysisResult);
 
     /// <summary>
     /// 清除指定股票的缓存

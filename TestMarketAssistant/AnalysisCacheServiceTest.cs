@@ -1,7 +1,7 @@
 using MarketAssistant.Applications.Cache;
+using MarketAssistant.Views.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
@@ -23,7 +23,7 @@ public class AnalysisCacheServiceTest
             SizeLimit = 5 * 1024 * 1024 // 5MB for testing
         });
         
-        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache, TimeSpan.FromMinutes(30));
+        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache);
     }
 
     [TestCleanup]
@@ -38,16 +38,17 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "AAPL";
-        var chatHistory = CreateTestChatHistory();
+        var analysisResult = CreateTestAnalysisResult(stockSymbol);
 
         // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, chatHistory);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
 
         // Assert
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
-        Assert.AreEqual(2, cachedResult.Count);
-        Assert.AreEqual("分析AAPL股票", cachedResult.First().Content);
+        Assert.AreEqual(stockSymbol, cachedResult.StockSymbol);
+        Assert.AreEqual("买入", cachedResult.Rating);
+        Assert.AreEqual(8.5f, cachedResult.OverallScore);
     }
 
     [TestMethod]
@@ -68,21 +69,22 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "AAPL";
-        var chatHistory = CreateTestChatHistory();
-        
-        // 使用很短的过期时间
-        using var shortMemoryCache = new MemoryCache(new MemoryCacheOptions());
-        using var shortCacheService = new AnalysisCacheService(_mockLogger.Object, shortMemoryCache, TimeSpan.FromMilliseconds(100));
+        var analysisResult = CreateTestAnalysisResult(stockSymbol);
+
+        // 直接设置一个很短的过期时间到内存缓存中
+        var cacheOptions = new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromMilliseconds(50),
+            Size = 1000
+        };
+        _memoryCache.Set($"{stockSymbol.ToUpperInvariant()}_{DateTime.UtcNow:yyyyMMdd}", analysisResult, cacheOptions);
 
         // Act
-        await shortCacheService.CacheAnalysisAsync(stockSymbol, chatHistory);
-        
         // 等待缓存过期
-        await Task.Delay(200);
-        
-        var result = await shortCacheService.GetCachedAnalysisAsync(stockSymbol);
+        await Task.Delay(100);
 
         // Assert
+        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNull(result);
     }
 
@@ -91,17 +93,19 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "AAPL";
-        var firstHistory = CreateTestChatHistory("第一次分析");
-        var secondHistory = CreateTestChatHistory("第二次分析");
+        var firstResult = CreateTestAnalysisResult(stockSymbol);
+        firstResult.Rating = "卖出";
+        var secondResult = CreateTestAnalysisResult(stockSymbol);
+        secondResult.Rating = "买入";
 
         // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, firstHistory);
-        await _cacheService.CacheAnalysisAsync(stockSymbol, secondHistory);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, firstResult);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, secondResult);
 
         // Assert
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
-        Assert.AreEqual("第二次分析", cachedResult.First().Content);
+        Assert.AreEqual("买入", cachedResult.Rating);
     }
 
     [TestMethod]
@@ -110,11 +114,11 @@ public class AnalysisCacheServiceTest
         // Arrange
         var stockSymbol1 = "AAPL";
         var stockSymbol2 = "MSFT";
-        var chatHistory1 = CreateTestChatHistory("AAPL分析");
-        var chatHistory2 = CreateTestChatHistory("MSFT分析");
+        var analysisResult1 = CreateTestAnalysisResult(stockSymbol1);
+        var analysisResult2 = CreateTestAnalysisResult(stockSymbol2);
 
-        await _cacheService.CacheAnalysisAsync(stockSymbol1, chatHistory1);
-        await _cacheService.CacheAnalysisAsync(stockSymbol2, chatHistory2);
+        await _cacheService.CacheAnalysisAsync(stockSymbol1, analysisResult1);
+        await _cacheService.CacheAnalysisAsync(stockSymbol2, analysisResult2);
 
         // Act
         await _cacheService.ClearCacheAsync(stockSymbol1);
@@ -133,17 +137,19 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "AAPL";
-        var originalHistory = CreateTestChatHistory("原始分析");
-        var updatedHistory = CreateTestChatHistory("更新分析");
+        var originalResult = CreateTestAnalysisResult(stockSymbol);
+        originalResult.TargetPrice = "150-160美元";
+        var updatedResult = CreateTestAnalysisResult(stockSymbol);
+        updatedResult.TargetPrice = "180-200美元";
 
         // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, originalHistory);
-        await _cacheService.CacheAnalysisAsync(stockSymbol, updatedHistory);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, originalResult);
+        await _cacheService.CacheAnalysisAsync(stockSymbol, updatedResult);
 
         // Assert
         var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(result);
-        Assert.AreEqual("更新分析", result.First().Content);
+        Assert.AreEqual("180-200美元", result.TargetPrice);
     }
 
     [TestMethod]
@@ -151,12 +157,12 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbols = new[] { "AAPL", "GOOGL", "MSFT", "TSLA" };
-        var histories = stockSymbols.Select(symbol => CreateTestChatHistory($"{symbol}分析")).ToArray();
+        var analysisResults = stockSymbols.Select(symbol => CreateTestAnalysisResult(symbol)).ToArray();
 
         // Act
         for (int i = 0; i < stockSymbols.Length; i++)
         {
-            await _cacheService.CacheAnalysisAsync(stockSymbols[i], histories[i]);
+            await _cacheService.CacheAnalysisAsync(stockSymbols[i], analysisResults[i]);
         }
 
         // Assert
@@ -164,19 +170,63 @@ public class AnalysisCacheServiceTest
         {
             var result = await _cacheService.GetCachedAnalysisAsync(stockSymbols[i]);
             Assert.IsNotNull(result, $"股票 {stockSymbols[i]} 的缓存应该存在");
-            Assert.AreEqual($"{stockSymbols[i]}分析", result.First().Content);
+            Assert.AreEqual(stockSymbols[i], result.StockSymbol);
         }
     }
 
 
     #region Helper Methods
 
-    private ChatHistory CreateTestChatHistory(string content = "分析AAPL股票")
+    private AnalystResult CreateTestAnalysisResult(string stockSymbol = "AAPL")
     {
-        var chatHistory = new ChatHistory();
-        chatHistory.AddUserMessage(content);
-        chatHistory.AddAssistantMessage("根据分析，AAPL是一只优质股票，建议买入。");
-        return chatHistory;
+        return new AnalystResult
+        {
+            StockSymbol = stockSymbol,
+            TargetPrice = "180-200美元",
+            PriceChange = "上涨15-25%",
+            Rating = "买入",
+            InvestmentRating = "买入",
+            RiskLevel = "中等",
+            OverallScore = 8.5f,
+            ConfidencePercentage = 85f,
+            ConsensusInfo = "分析师普遍看好该股票",
+            DisagreementInfo = "对短期波动存在分歧",
+            DimensionScores = new Dictionary<string, float>
+            {
+                { "基本面", 8.0f },
+                { "技术面", 7.5f },
+                { "市场情绪", 9.0f }
+            },
+            InvestmentHighlights = new List<string>
+            {
+                "业绩稳定增长",
+                "市场地位领先",
+                "创新能力强"
+            },
+            RiskFactors = new List<string>
+            {
+                "宏观经济风险",
+                "行业竞争加剧"
+            },
+            OperationSuggestions = new List<string>
+            {
+                "建议分批买入",
+                "设置止损位"
+            },
+            AnalysisData = new List<AnalysisDataItem>
+            {
+                new AnalysisDataItem
+                {
+                    DataType = "TechnicalIndicator",
+                    Name = "RSI",
+                    Value = "65",
+                    Unit = "",
+                    Signal = "中性",
+                    Impact = "中等",
+                    Strategy = "观察突破"
+                }
+            }
+        };
     }
 
     #endregion

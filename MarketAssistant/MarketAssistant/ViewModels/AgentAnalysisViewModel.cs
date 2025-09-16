@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.Cache;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -12,6 +13,7 @@ namespace MarketAssistant.ViewModels;
 public partial class AgentAnalysisViewModel : ViewModelBase
 {
     private readonly MarketAnalysisAgent _marketAnalysisAgent;
+    private readonly IAnalysisCacheService _analysisCacheService;
 
     private string _stockCode = "";
     public string StockCode
@@ -67,10 +69,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     public AgentAnalysisViewModel(
         MarketAnalysisAgent marketAnalysisAgent,
         AnalysisReportViewModel analysisReportViewModel,
+        IAnalysisCacheService analysisCacheService,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _marketAnalysisAgent = marketAnalysisAgent;
         _analysisReportViewModel = analysisReportViewModel;
+        _analysisCacheService = analysisCacheService;
 
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
@@ -101,7 +105,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
     private void OnAnalysisCompleted(object sender, ChatMessageContent e)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
+        MainThread.BeginInvokeOnMainThread(async () =>
         {
             var message = new AnalysisMessage
             {
@@ -114,8 +118,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             };
 
             AnalysisMessages.Add(message);
-            AnalysisReportViewModel.ProcessAnalysisMessage(message);
-            AnalysisReportViewModel.IsReportVisible = true;
+            await AnalysisReportViewModel.ProcessAnalysisMessageAsync(message);
         });
     }
 
@@ -131,9 +134,22 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
         await SafeExecuteAsync(async () =>
         {
+            // 首先尝试从缓存获取分析结果
+            var cachedResult = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
+            if (cachedResult != null)
+            {
+                Logger?.LogInformation("从缓存加载分析结果: {StockCode}", StockCode);
+
+                // 使用缓存结果更新UI
+                AnalysisReportViewModel.UpdateWithResult(cachedResult);
+                return;
+            }
+
+            // 缓存中没有结果，执行新的分析
+            Logger?.LogInformation("缓存中没有结果，开始新的分析: {StockCode}", StockCode);
             AnalysisMessages.Clear();
-            AnalysisReportViewModel.ProcessAnalysisMessage(new AnalysisMessage());
             var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
+
             foreach (var message in history)
             {
                 if (message.Role != AuthorRole.Assistant)

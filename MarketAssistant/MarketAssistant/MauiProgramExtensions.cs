@@ -11,7 +11,6 @@ using MarketAssistant.Vectors.Extensions;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Serilog;
@@ -102,23 +101,11 @@ namespace MarketAssistant
             builder.Services.AddSingleton<TelegramService>();
             builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
+            builder.Services.AddSingleton<MarketAnalysisAgent>();
 
             // 注册分析缓存服务
-            builder.Services.AddSingleton<IAnalysisCacheService>(serviceProvider =>
-            {
-                var logger = serviceProvider.GetRequiredService<ILogger<AnalysisCacheService>>();
-                var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
-                return new AnalysisCacheService(logger, memoryCache, TimeSpan.FromHours(2));
-            });
+            builder.Services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
 
-            builder.Services.AddSingleton<MarketAnalysisAgent>(serviceProvider =>
-            {
-                var logger = serviceProvider.GetRequiredService<ILogger<MarketAnalysisAgent>>();
-                var analystManager = serviceProvider.GetRequiredService<AnalystManager>();
-                var cacheService = serviceProvider.GetRequiredService<IAnalysisCacheService>();
-
-                return new MarketAnalysisAgent(logger, analystManager, cacheService);
-            });
             builder.Services.AddSingleton<StockService>();
             builder.Services.AddSingleton<StockKLineService>();
             builder.Services.AddSingleton<StockSearchHistory>();

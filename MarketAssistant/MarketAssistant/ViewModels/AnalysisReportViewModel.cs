@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Views.Models;
 using MarketAssistant.Views.Parsers;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,7 @@ namespace MarketAssistant.ViewModels;
 public partial class AnalysisReportViewModel : ViewModelBase
 {
     private readonly IAnalystDataParser _analystDataParser;
+    private readonly IAnalysisCacheService _analysisCacheService;
 
     [ObservableProperty]
     private bool _isReportVisible;
@@ -90,10 +92,13 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public bool HasConsensusOrDisagreement => HasConsensusInfo || HasDisagreementInfo;
     public string ScorePercentage => $"{OverallScore}/10";
 
-    public AnalysisReportViewModel(IAnalystDataParser analystDataParser, ILogger<AnalysisReportViewModel> logger)
+    public AnalysisReportViewModel(IAnalystDataParser analystDataParser,
+         IAnalysisCacheService analysisCacheService,
+        ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
         _analystDataParser = analystDataParser;
+        _analysisCacheService = analysisCacheService;
     }
 
     partial void OnConsensusInfoChanged(string value)
@@ -121,6 +126,17 @@ public partial class AnalysisReportViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 异步处理分析消息
+    /// </summary>
+    public async Task ProcessAnalysisMessageAsync(AnalysisMessage message)
+    {
+        if (message?.Sender == nameof(AnalysisAgents.CoordinatorAnalystAgent))
+        {
+            await ParseAnalystOpinionAsync(message.Content);
+        }
+    }
+
     private async Task ParseAnalystOpinionAsync(string opinion)
     {
         if (string.IsNullOrEmpty(opinion))
@@ -138,11 +154,12 @@ public partial class AnalysisReportViewModel : ViewModelBase
             if (result != null)
             {
                 UpdateWithResult(result);
+                await _analysisCacheService.CacheAnalysisAsync(StockSymbol, result);
             }
         }, "解析分析师意见");
     }
 
-    private void UpdateWithResult(AnalystResult result)
+    public void UpdateWithResult(AnalystResult result)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
@@ -181,6 +198,8 @@ public partial class AnalysisReportViewModel : ViewModelBase
             // 添加统一的分析数据
             foreach (var dataItem in result.AnalysisData)
                 AnalysisData.Add(dataItem);
+
+            IsReportVisible = true;
 
             // 通知UI更新分析数据的分类视图
             NotifyFilteredCollectionsChanged();
