@@ -2,16 +2,12 @@
  
 - 管理windows下图片平铺到根目录的问题
 - 发布裁剪
-- 分析结果缓存：避免短时间内重复分析同一股票
 - 会话内Token管理：当单次会话过长时进行压缩
 - 缺少分析质量的自我评估和改进机制
-- 分析结果缓存：避免短时间内重复分析同一股票
-- 会话内Token管理：当单次会话过长时进行压缩
+- xml prompt
 
 - 选定目录文档(Pdf,Docx)向量化搜索
    pandoc.net 文档转换
-
-- SK Web Search 支持
 - MCP Client 支持
    问题：所有 MCP 工具被合并在一个 mcp 命名空间下，模型可自动调用，但“无法限制/引导只调用某个 MCP 或某类 MCP 工具”，特别是用户可添加任意 MCP 时，缺少选择性暴露与强约束。
    1.注册分组与最小暴露 每个 MCP 服务器的工具注册为独立插件名，例如 mcp.<serverName>，或按业务域归类，例如 mcp.search.<serverName>、mcp.finance.<serverName>

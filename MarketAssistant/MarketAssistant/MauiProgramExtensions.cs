@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
@@ -35,6 +36,12 @@ namespace MarketAssistant
             // 注册HttpClient服务
             builder.Services.AddHttpClient();
 
+            // 注册内存缓存服务
+            builder.Services.AddMemoryCache(options =>
+            {
+                options.SizeLimit = 50 * 1024 * 1024; // 50MB 限制
+            });
+
             // 注册用户设置服务为单例
             builder.Services.AddSingleton<IUserSettingService, UserSettingService>();
 
@@ -63,6 +70,9 @@ namespace MarketAssistant
             builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
             builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
             builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
+            // Prompt semantic cache (read) and write-back filter
+            builder.Services.AddSingleton<IPromptRenderFilter, PromptCacheFilter>();
+            builder.Services.AddSingleton<IFunctionInvocationFilter, PromptCacheWriteFilter>();
             // 注册用户 Kernel 服务（可失效重建）
             builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
             // 注册嵌入服务
@@ -92,11 +102,19 @@ namespace MarketAssistant
             builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
             builder.Services.AddSingleton<MarketAnalysisAgent>();
+
+            // 注册分析缓存服务
+            builder.Services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
+
             builder.Services.AddSingleton<StockService>();
             builder.Services.AddSingleton<StockKLineService>();
             builder.Services.AddSingleton<StockSearchHistory>();
             builder.Services.AddSingleton<StockFavoriteService>();
             builder.Services.AddSingleton<PlaywrightService>();
+
+            // 注册新的主页相关服务
+            builder.Services.AddSingleton<IHomeStockService, HomeStockService>();
+            builder.Services.AddSingleton<INewsUpdateService, NewsUpdateService>();
 
             // 注册AI选股相关服务
             builder.Services.AddSingleton<StockSelectionManager>();
@@ -112,6 +130,13 @@ namespace MarketAssistant
 
             // Register view models.
             builder.Services.AddTransient<HomeViewModel>();
+            
+            // Register home sub-viewmodels
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.HomeSearchViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.HotStocksViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.RecentStocksViewModel>();
+            builder.Services.AddTransient<MarketAssistant.ViewModels.Home.TelegraphNewsViewModel>();
+            
             builder.Services.AddTransient<AgentAnalysisViewModel>();
             builder.Services.AddTransient<SettingViewModel>();
             builder.Services.AddTransient<StockViewModel>();

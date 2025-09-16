@@ -95,7 +95,7 @@ public class AboutViewModel : ViewModelBase
         catch (Exception ex)
         {
             UpdateStatus = "检查更新失败";
-            Debug.WriteLine($"检查更新失败: {ex.Message}");
+            Logger?.LogError(ex, "检查更新失败");
         }
         finally
         {
@@ -121,7 +121,7 @@ public class AboutViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"下载更新失败: {ex.Message}");
+            Logger?.LogError(ex, "下载更新失败");
         }
     }
 

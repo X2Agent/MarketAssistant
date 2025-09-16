@@ -294,7 +294,7 @@ public class MCPServerConfigViewModel : ViewModelBase
 
     private async Task TestConnectionAsync()
     {
-        try
+        await SafeExecuteAsync(async () =>
         {
             if (_editingConfig == null)
             {
@@ -310,11 +310,7 @@ public class MCPServerConfigViewModel : ViewModelBase
             }
 
             WeakReferenceMessenger.Default.Send(new ToastMessage($"连接成功，发现 {count} 个工具"));
-        }
-        catch (Exception ex)
-        {
-            WeakReferenceMessenger.Default.Send(new ToastMessage($"连接失败：{ex.Message}"));
-        }
+        }, "测试MCP连接");
     }
 
     // 取消编辑

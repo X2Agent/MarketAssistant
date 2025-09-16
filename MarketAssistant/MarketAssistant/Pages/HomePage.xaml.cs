@@ -19,15 +19,15 @@ public partial class HomePage : ContentPage
         BindingContext = _viewModel;
 
         // 订阅搜索结果变化事件
-        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        _viewModel.Search.PropertyChanged += SearchViewModel_PropertyChanged;
 
         // 设置SearchBar的TextChanged事件
         searchBar.TextChanged += SearchBar_TextChanged;
     }
 
-    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private void SearchViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(HomeViewModel.IsSearchResultVisible) && _viewModel.IsSearchResultVisible)
+        if (e.PropertyName == nameof(_viewModel.Search.IsSearchResultVisible) && _viewModel.Search.IsSearchResultVisible)
         {
             ShowSearchPopup();
         }
@@ -38,7 +38,7 @@ public partial class HomePage : ContentPage
         // 当文本为空时，确保关闭弹窗
         if (string.IsNullOrWhiteSpace(e.NewTextValue))
         {
-            _viewModel.IsSearchResultVisible = false;
+            _viewModel.Search.ClearSearchResults();
         }
     }
 
@@ -49,7 +49,7 @@ public partial class HomePage : ContentPage
         _isPopupShowing = true;
 
         // 创建搜索结果弹窗
-        _searchPopup = new StockSearchPopup(_viewModel.StockResults, _viewModel.SelectStockCommand as Command<StockItem>);
+        _searchPopup = new StockSearchPopup(_viewModel.Search.SearchResults, new Command<StockItem>(item => _viewModel.Search.SelectStockCommand.Execute(item)));
 
         // 配置弹窗选项
         var popupOptions = new PopupOptions
@@ -66,7 +66,7 @@ public partial class HomePage : ContentPage
         {
             // 弹窗关闭后的处理
             _isPopupShowing = false;
-            _viewModel.IsSearchResultVisible = false;
+            _viewModel.Search.ClearSearchResults();
         }
     }
 
@@ -86,7 +86,7 @@ public partial class HomePage : ContentPage
         _viewModel.StopTimer();
 
         // 取消事件订阅，防止内存泄漏
-        _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _viewModel.Search.PropertyChanged -= SearchViewModel_PropertyChanged;
         searchBar.TextChanged -= SearchBar_TextChanged;
     }
 }

@@ -194,14 +194,16 @@
                         <!-- 右列第1行：基本面分析师 -->
                         <HorizontalStackLayout Grid.Column="1"
                                 Grid.Row="0">
-                            <CheckBox IsChecked="{Binding EnableFinancialAnalyst}"
-                                    Color="{StaticResource CheckBoxColor}"/>
+                            <!-- 只读计算属性，使用 OneWay 绑定 -->
+                            <CheckBox IsChecked="{Binding EnableFundamentalAnalyst, Mode=OneWay}"
+                                Color="{StaticResource CheckBoxColor}"
+                                IsEnabled="False"/>
                             <VerticalStackLayout>
                                 <Label Text="基本面分析师"
                                         FontSize="14"
                                         TextColor="{StaticResource PrimaryTextColor}"
                                         VerticalOptions="Center"/>
-                                <Label Text="整合了策略分析师和股票研究分析师的功能"
+                                <Label Text="整合了策略分析师和股票研究分析师的功能（必选）"
                                         FontSize="12"
                                         TextColor="{StaticResource SecondaryTextColor}"
                                         VerticalOptions="Center"/>
@@ -211,10 +213,8 @@
                         <!-- 左列第2行：财务分析师 -->
                         <HorizontalStackLayout Grid.Column="0"
                                 Grid.Row="1">
-                            <!-- 只读计算属性，使用 OneWay 绑定 -->
-                            <CheckBox IsChecked="{Binding EnableFundamentalAnalyst, Mode=OneWay}"
-                                    Color="{StaticResource CheckBoxColor}"
-                                    IsEnabled="False"/>
+                            <CheckBox IsChecked="{Binding EnableFinancialAnalyst}"
+                                Color="{StaticResource CheckBoxColor}"/>
                             <VerticalStackLayout>
                                 <Label Text="财务分析师"
                                         FontSize="14"

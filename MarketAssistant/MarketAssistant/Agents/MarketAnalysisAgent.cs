@@ -36,7 +36,9 @@ public class MarketAnalysisAgent
 
     #region 构造函数
 
-    public MarketAnalysisAgent(ILogger<MarketAnalysisAgent> logger, AnalystManager analystManager)
+    public MarketAnalysisAgent(
+        ILogger<MarketAnalysisAgent> logger,
+        AnalystManager analystManager)
     {
         _logger = logger;
         _analystManager = analystManager;
@@ -50,6 +52,7 @@ public class MarketAnalysisAgent
     /// 执行股票分析
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
+    /// <param name="forceRefresh">是否强制刷新，忽略缓存</param>
     /// <returns>分析消息列表</returns>
     public async Task<ChatHistory> AnalysisAsync(string stockSymbol)
     {
@@ -62,7 +65,7 @@ public class MarketAnalysisAgent
             string prompt = BuildAnalysisPrompt(stockSymbol);
 
             // 执行分析过程
-            await ExecuteAnalysisProcessAsync(prompt);
+            await ExecuteAnalysisProcessAsync(prompt, stockSymbol);
         }
         catch (Exception ex)
         {
@@ -112,7 +115,7 @@ public class MarketAnalysisAgent
     /// <summary>
     /// 执行分析过程
     /// </summary>
-    private async Task ExecuteAnalysisProcessAsync(string prompt)
+    private async Task ExecuteAnalysisProcessAsync(string prompt, string stockSymbol)
     {
         UpdateProgress("分析师团队", "分析师分析中");
 

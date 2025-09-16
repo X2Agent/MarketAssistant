@@ -1,4 +1,5 @@
 using CommunityToolkit.Maui.Storage;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications;
@@ -37,23 +38,15 @@ public partial class SettingViewModel : ViewModelBase
     }
 
     // 模型列表 - ViewModel特有属性
+    [ObservableProperty]
     private ObservableCollection<string> _models = [];
-    public ObservableCollection<string> Models
-    {
-        get => _models;
-        set => SetProperty(ref _models, value);
-    }
 
     // 判断知识库目录是否有效 - 计算属性
     public bool IsKnowledgeDirectoryValid => !string.IsNullOrEmpty(UserSetting.KnowledgeFileDirectory) && Directory.Exists(UserSetting.KnowledgeFileDirectory);
 
     // 是否正在向量化
+    [ObservableProperty]
     private bool _isVectorizing;
-    public bool IsVectorizing
-    {
-        get => _isVectorizing;
-        set => SetProperty(ref _isVectorizing, value);
-    }
 
     // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
@@ -261,10 +254,8 @@ public partial class SettingViewModel : ViewModelBase
 
     private void SaveSettings()
     {
-        try
+        SafeExecute(() =>
         {
-            IsBusy = true;
-
             // 获取当前保存的LogPath用于比较
             var currentLogPath = _userSettingService.CurrentSetting.LogPath;
 
@@ -282,17 +273,7 @@ public partial class SettingViewModel : ViewModelBase
             {
                 WeakReferenceMessenger.Default.Send(new ToastMessage("操作成功！"));
             }
-        }
-        catch (Exception ex)
-        {
-            // 处理异常
-            Logger?.LogError(ex, "保存设置时出错");
-            WeakReferenceMessenger.Default.Send(new ToastMessage("保存设置失败！"));
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "保存设置");
     }
 
     /// <summary>
@@ -300,10 +281,8 @@ public partial class SettingViewModel : ViewModelBase
     /// </summary>
     private async Task LoadModelsAsync()
     {
-        try
+        await SafeExecuteAsync(async () =>
         {
-            IsBusy = true;
-
             // 清空当前模型列表
             Models.Clear();
 
@@ -314,15 +293,7 @@ public partial class SettingViewModel : ViewModelBase
             {
                 Models.Add(model);
             }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "加载模型列表时出错");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "加载模型列表");
     }
 
     /// <summary>
@@ -330,16 +301,14 @@ public partial class SettingViewModel : ViewModelBase
     /// </summary>
     private async Task<List<string>> LoadModelsFromYamlAsync()
     {
-        var models = new List<string>();
-        // 获取yaml文件路径
-        string yamlContent;
-
-        try
+        return await SafeExecuteAsync(async () =>
         {
+            var models = new List<string>();
+            
             // 尝试从应用包中读取
             using var stream = await FileSystem.Current.OpenAppPackageFileAsync("config/models.yaml");
             using var reader = new StreamReader(stream);
-            yamlContent = await reader.ReadToEndAsync();
+            var yamlContent = await reader.ReadToEndAsync();
 
             // 解析yaml内容
             var deserializer = new DeserializerBuilder().Build();
@@ -350,21 +319,15 @@ public partial class SettingViewModel : ViewModelBase
             {
                 models = yamlData["models"];
             }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "读取yaml文件时出错");
-        }
 
-        return models;
+            return models;
+        }, "读取yaml文件") ?? new List<string>();
     }
 
     private void LoadSettings()
     {
-        try
+        SafeExecute(() =>
         {
-            IsBusy = true;
-
             // 直接使用UserSetting对象
             UserSetting = _userSettingService.CurrentSetting;
 
@@ -376,16 +339,7 @@ public partial class SettingViewModel : ViewModelBase
             OnPropertyChanged(nameof(EnableTechnicalAnalyst));
             OnPropertyChanged(nameof(EnableNewsEventAnalyst));
             OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
-        }
-        catch (Exception ex)
-        {
-            // 处理异常
-            Logger?.LogError(ex, "加载设置时出错");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        }, "加载设置");
     }
 
     private void ResetSettings()
