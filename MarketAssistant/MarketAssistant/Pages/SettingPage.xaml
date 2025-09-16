@@ -203,7 +203,7 @@
                                         FontSize="14"
                                         TextColor="{StaticResource PrimaryTextColor}"
                                         VerticalOptions="Center"/>
-                                <Label Text="整合了策略分析师和股票研究分析师的功能"
+                                <Label Text="整合了策略分析师和股票研究分析师的功能（必选）"
                                         FontSize="12"
                                         TextColor="{StaticResource SecondaryTextColor}"
                                         VerticalOptions="Center"/>
