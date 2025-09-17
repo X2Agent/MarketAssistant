@@ -4,11 +4,20 @@ namespace MarketAssistant.Pages;
 
 public partial class AgentAnalysisPage : ContentPage
 {
-    public AgentAnalysisPage(AgentAnalysisViewModel viewModel)
+    private readonly ChatSidebarViewModel _chatSidebarViewModel;
+
+    public AgentAnalysisPage(AgentAnalysisViewModel viewModel, ChatSidebarViewModel chatSidebarViewModel)
     {
         InitializeComponent();
 
         BindingContext = viewModel;
+        _chatSidebarViewModel = chatSidebarViewModel;
+
+        // 设置聊天侧边栏的 BindingContext
+        ChatSidebarView.BindingContext = _chatSidebarViewModel;
+
+        // 建立 ViewModel 之间的连接
+        viewModel.ChatSidebarViewModel = _chatSidebarViewModel;
 
         // 页面加载完成后加载数据
         Loaded += OnPageLoaded;

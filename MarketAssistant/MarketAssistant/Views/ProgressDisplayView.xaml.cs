@@ -16,9 +16,6 @@ public partial class ProgressDisplayView : ContentView
     public static readonly BindableProperty AnalysisStageProperty =
         BindableProperty.Create(nameof(AnalysisStage), typeof(string), typeof(ProgressDisplayView), string.Empty, propertyChanged: OnAnalysisStageChanged);
 
-    // 显示详情命令
-    public static readonly BindableProperty ShowDetailsCommandProperty =
-        BindableProperty.Create(nameof(ShowDetailsCommand), typeof(ICommand), typeof(ProgressDisplayView), null, propertyChanged: OnShowDetailsCommandChanged);
 
     public bool IsProgressVisible
     {
@@ -38,11 +35,6 @@ public partial class ProgressDisplayView : ContentView
         set => SetValue(AnalysisStageProperty, value);
     }
 
-    public ICommand ShowDetailsCommand
-    {
-        get => (ICommand)GetValue(ShowDetailsCommandProperty);
-        set => SetValue(ShowDetailsCommandProperty, value);
-    }
 
     public ProgressDisplayView()
     {
@@ -83,9 +75,4 @@ public partial class ProgressDisplayView : ContentView
         control.StageLabel.Text = (string)newValue;
     }
 
-    private static void OnShowDetailsCommandChanged(BindableObject bindable, object oldValue, object newValue)
-    {
-        var control = (ProgressDisplayView)bindable;
-        control.ShowDetailsButton.Command = (ICommand)newValue;
-    }
 }

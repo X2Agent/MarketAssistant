@@ -138,6 +138,7 @@ namespace MarketAssistant
             builder.Services.AddTransient<MarketAssistant.ViewModels.Home.TelegraphNewsViewModel>();
             
             builder.Services.AddTransient<AgentAnalysisViewModel>();
+            builder.Services.AddTransient<ChatSidebarViewModel>();
             builder.Services.AddTransient<SettingViewModel>();
             builder.Services.AddTransient<StockViewModel>();
             builder.Services.AddTransient<MCPServerConfigViewModel>();

@@ -6,6 +6,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -64,7 +65,21 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     }
 
     public ICommand ToggleViewCommand { get; private set; }
-    public ICommand ShowAnalysisDetailsCommand { get; private set; }
+    
+    // 聊天侧边栏控制
+    private bool _isChatSidebarVisible;
+    public bool IsChatSidebarVisible
+    {
+        get => _isChatSidebarVisible;
+        set => SetProperty(ref _isChatSidebarVisible, value);
+    }
+    
+    public ICommand ToggleChatSidebarCommand { get; private set; }
+    
+    /// <summary>
+    /// 聊天侧边栏 ViewModel 引用（用于数据同步）
+    /// </summary>
+    public ChatSidebarViewModel? ChatSidebarViewModel { get; set; }
 
     public AgentAnalysisViewModel(
         MarketAnalysisAgent marketAnalysisAgent,
@@ -78,7 +93,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
-        ShowAnalysisDetailsCommand = new RelayCommand(ShowAnalysisDetails);
+        ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
     }
 
     private void SubscribeToEvents()
@@ -122,10 +137,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         });
     }
 
-    private async void ShowAnalysisDetails()
-    {
-        await Shell.Current.DisplayAlert("功能提示", "查看分析详情功能正在开发中，敬请期待！", "确定");
-    }
 
     public async Task LoadAnalysisDataAsync()
     {
@@ -172,4 +183,23 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             }
         }, "股票分析");
     }
+
+    /// <summary>
+    /// 切换聊天侧边栏显示状态
+    /// </summary>
+    private void ToggleChatSidebar()
+    {
+        IsChatSidebarVisible = !IsChatSidebarVisible;
+        
+        // 当打开聊天侧边栏时，更新聊天上下文
+        if (IsChatSidebarVisible && ChatSidebarViewModel != null)
+        {
+            ChatSidebarViewModel.UpdateAnalysisContext(StockCode, AnalysisMessages);
+        }
+    }
+
+
+
+
+
 }

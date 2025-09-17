@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="MarketAssistant.Views.ChatSidebarView"
+             x:DataType="viewmodels:ChatSidebarViewModel"
+             x:Name="Root">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- 用户消息样式 - 参考 agent-ui 设计 -->
+            <Style x:Key="UserMessageStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="StrokeThickness" Value="0" />
+                <Setter Property="Padding" Value="12,8" />
+                <Setter Property="Margin" Value="16,4,8,4" />
+            </Style>
+            
+            <!-- AI消息样式 - 参考 agent-ui 设计 -->
+            <Style x:Key="AiMessageStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray900}}" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="Padding" Value="12,8" />
+                <Setter Property="Margin" Value="8,4,16,4" />
+            </Style>
+            
+            <!-- 系统消息样式 - 新增，用于显示工具调用等 -->
+            <Style x:Key="SystemMessageStyle" TargetType="Border">
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Warning}, Dark={StaticResource Warning}}" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="StrokeThickness" Value="0" />
+                <Setter Property="Padding" Value="8,4" />
+                <Setter Property="Margin" Value="12,2,12,2" />
+                <Setter Property="Opacity" Value="0.9" />
+            </Style>
+            
+            <!-- 消息文本样式 -->
+            <Style x:Key="MessageTextStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="LineBreakMode" Value="WordWrap" />
+                <Setter Property="LineHeight" Value="1.4" />
+            </Style>
+            
+            <!-- 用户消息文本样式 -->
+            <Style x:Key="UserMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource White}}" />
+            </Style>
+            
+            <!-- AI消息文本样式 -->
+            <Style x:Key="AiMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}" />
+            </Style>
+            
+            <!-- 系统消息文本样式 -->
+            <Style x:Key="SystemMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource White}}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontAttributes" Value="Italic" />
+            </Style>
+            
+            <!-- 消息头部样式 -->
+            <Style x:Key="MessageHeaderStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="Opacity" Value="0.7" />
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}">
+        
+        <!-- 标题栏 -->
+        <Border Grid.Row="0" 
+                BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray950}}"
+                Padding="{StaticResource CardPadding}">
+            <Grid ColumnDefinitions="*,Auto">
+                <Label Grid.Column="0" 
+                       Text="智能对话" 
+                       FontSize="16" 
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                       VerticalOptions="Center" />
+                
+                <Button Grid.Column="1"
+                        Text="✕"
+                        FontSize="16"
+                        BackgroundColor="Transparent"
+                        TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
+                        Command="{Binding CloseCommand, Source={x:Reference Root}}"
+                        Padding="8,4"
+                        WidthRequest="32"
+                        HeightRequest="32" />
+            </Grid>
+        </Border>
+
+        <!-- 对话消息列表 - 参考 agent-ui 的消息展示 -->
+        <ScrollView Grid.Row="1" x:Name="ChatScrollView" Padding="8,0">
+            <CollectionView ItemsSource="{Binding ChatMessages}" 
+                            BackgroundColor="Transparent"
+                            SelectionMode="None"
+                            ItemSizingStrategy="MeasureAllItems">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewmodels:ChatMessage">
+                        <Grid Padding="0,2" RowDefinitions="Auto,Auto">
+                            
+                            <!-- 消息时间戳 - 居中显示 -->
+                            <Label Grid.Row="0" 
+                                   Text="{Binding FormattedTime}" 
+                                   FontSize="10" 
+                                   TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
+                                   HorizontalOptions="Center"
+                                   Margin="0,4,0,2"
+                                   IsVisible="True" />
+                            
+                            <Grid Grid.Row="1">
+                                <!-- 用户消息 -->
+                                <Border IsVisible="{Binding IsUser}" 
+                                        Style="{StaticResource UserMessageStyle}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="16,4,16,16" />
+                                    </Border.StrokeShape>
+                                    <StackLayout Spacing="2">
+                                        <Label Text="您" 
+                                               Style="{StaticResource MessageHeaderStyle}"
+                                               TextColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource White}}"
+                                               HorizontalOptions="End" />
+                                        <Label Text="{Binding Content}" 
+                                               Style="{StaticResource UserMessageTextStyle}" />
+                                        <!-- 消息状态指示器 -->
+                                        <Grid HorizontalOptions="End" ColumnDefinitions="Auto,Auto" ColumnSpacing="4">
+                                            <Label Grid.Column="0" 
+                                                   Text="●" 
+                                                   FontSize="8" 
+                                                   TextColor="LightGreen"
+                                                   IsVisible="{Binding Status, Converter={toolkit:CompareConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Sent}}"
+                                                   VerticalOptions="Center" />
+                                            <Label Grid.Column="0" 
+                                                   Text="●" 
+                                                   FontSize="8" 
+                                                   TextColor="Orange"
+                                                   IsVisible="{Binding Status, Converter={toolkit:CompareConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Sending}}"
+                                                   VerticalOptions="Center" />
+                                            <Label Grid.Column="0" 
+                                                   Text="●" 
+                                                   FontSize="8" 
+                                                   TextColor="Red"
+                                                   IsVisible="{Binding Status, Converter={toolkit:CompareConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Failed}}"
+                                                   VerticalOptions="Center" />
+                                        </Grid>
+                                    </StackLayout>
+                                </Border>
+                                
+                                <!-- AI消息 -->
+                                <Border IsVisible="{Binding IsUser, Converter={toolkit:InvertedBoolConverter}}" 
+                                        Style="{StaticResource AiMessageStyle}">
+                                    <Border.StrokeShape>
+                                        <RoundRectangle CornerRadius="4,16,16,16" />
+                                    </Border.StrokeShape>
+                                    <StackLayout Spacing="4">
+                                        <!-- AI 标识和名称 -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                            <Ellipse Grid.Column="0" 
+                                                     Fill="{StaticResource Primary}" 
+                                                     WidthRequest="16" 
+                                                     HeightRequest="16"
+                                                     VerticalOptions="Center" />
+                                            <Label Grid.Column="1" 
+                                                   Text="{Binding Sender}" 
+                                                   Style="{StaticResource MessageHeaderStyle}"
+                                                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
+                                                   IsVisible="{Binding Sender, Converter={toolkit:IsStringNotNullOrEmptyConverter}}"
+                                                   VerticalOptions="Center" />
+                                        </Grid>
+                                        
+                                        <!-- 消息内容 -->
+                                        <Label Text="{Binding Content}" 
+                                               Style="{StaticResource AiMessageTextStyle}" />
+                                        
+                                        <!-- 工具调用指示器（预留） -->
+                                        <Border IsVisible="False"
+                                                Style="{StaticResource SystemMessageStyle}">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="8" />
+                                            </Border.StrokeShape>
+                                            <Label Text="🔧 调用工具: 股票分析" 
+                                                   Style="{StaticResource SystemMessageTextStyle}" />
+                                        </Border>
+                                    </StackLayout>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </ScrollView>
+
+        <!-- 输入区域 - 参考 agent-ui 的现代化输入设计 -->
+        <Border Grid.Row="2" 
+                BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                StrokeThickness="1"
+                Padding="12">
+            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                
+                <!-- 输入框区域 -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Border Grid.Column="0" 
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray800}}"
+                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                            StrokeThickness="1"
+                            Padding="12,10">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="12" />
+                        </Border.StrokeShape>
+                        <Entry x:Name="MessageEntry"
+                               Text="{Binding UserInput}"
+                               Placeholder="询问关于股票分析的问题..."
+                               BackgroundColor="Transparent"
+                               FontSize="14"
+                               ReturnType="Send"
+                               ReturnCommand="{Binding SendMessageCommand}"
+                               PlaceholderColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                    </Border>
+                    
+                    <!-- 发送按钮 -->
+                    <Border Grid.Column="1"
+                            BackgroundColor="{StaticResource Primary}"
+                            WidthRequest="40"
+                            HeightRequest="40">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="20" />
+                        </Border.StrokeShape>
+                        <Button Text="➤"
+                                Command="{Binding SendMessageCommand}"
+                                BackgroundColor="Transparent"
+                                TextColor="White"
+                                FontSize="16"
+                                FontAttributes="Bold"
+                                IsEnabled="{Binding UserInput, Converter={toolkit:IsStringNotNullOrEmptyConverter}}" />
+                    </Border>
+                </Grid>
+                
+                <!-- 功能按钮区域 - 参考 agent-ui 的工具栏 -->
+                <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                    
+                    <!-- 清空对话按钮 -->
+                    <Button Grid.Column="0"
+                            Text="🗑️"
+                            FontSize="14"
+                            BackgroundColor="Transparent"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
+                            Command="{Binding ClearChatCommand}"
+                            ToolTipProperties.Text="清空对话"
+                            Padding="8,4"
+                            CornerRadius="6" />
+                    
+                    <!-- 导出对话按钮 -->
+                    <Button Grid.Column="1"
+                            Text="📋"
+                            FontSize="14"
+                            BackgroundColor="Transparent"
+                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
+                            Command="{Binding ExportChatCommand}"
+                            ToolTipProperties.Text="导出对话"
+                            Padding="8,4"
+                            CornerRadius="6" />
+                    
+                    <!-- 占位空间 -->
+                    <BoxView Grid.Column="2" />
+                    
+                    <!-- 连接状态指示器 -->
+                    <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="4">
+                        <Ellipse Grid.Column="0"
+                                 Fill="LightGreen"
+                                 WidthRequest="8"
+                                 HeightRequest="8"
+                                 VerticalOptions="Center" />
+                        <Label Grid.Column="1"
+                               Text="在线"
+                               FontSize="10"
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
+                               VerticalOptions="Center" />
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</ContentView>
