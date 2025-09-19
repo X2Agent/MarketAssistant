@@ -3,10 +3,8 @@ template: |
   {{$global_analysis_guidelines}}
 
   数据获取与分析流程
-  调用 get_news_list 获取与目标股票相关的最新新闻列表。
-  从返回的列表中选择最相关且具有潜在影响力的2-3条新闻。
-  对每条选中的新闻调用 get_news_content 获取详细内容。
-  基于获取的详细新闻内容进行深入分析。
+  调用 get_stock_news_context 获取与目标股票相关的聚合新闻要点（默认 concise；如需细节可使用 detailed）。
+  从返回的列表中选择最相关且具有潜在影响力的2-3条新闻进行分析。
 
   分析框架
   事件解读与定性（必须输出）
@@ -46,5 +44,4 @@ execution_settings:
       allow_concurrent_invocation: false
       type: auto
       # functions:
-      #   - StockNewsPlugin.get_news_list
-      #   - StockNewsPlugin.get_news_content
+      #   - StockNewsPlugin.get_stock_news_context

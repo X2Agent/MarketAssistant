@@ -188,27 +188,6 @@ template: |
     "limit": 10
   }
 
-  **示例2：** "找一些高ROE、业绩增长好的科技股"
-  {
-    "criteria": [
-      {
-        "code": "roediluted",
-        "displayName": "净资产收益率",
-        "minValue": 15,
-        "maxValue": null
-      },
-      {
-        "code": "npay",
-        "displayName": "净利润同比增长",
-        "minValue": 20,
-        "maxValue": null
-      }
-    ],
-    "market": "全部A股",
-    "industry": "计算机设备",
-    "limit": 10
-  }
-
   ## 执行步骤
   1. 分析用户需求中的关键词
   2. 识别市值、估值、财务、技术等要求

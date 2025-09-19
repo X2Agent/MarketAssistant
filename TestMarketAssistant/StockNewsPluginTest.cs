@@ -29,18 +29,19 @@ namespace TestMarketAssistant
         }
 
         [TestMethod]
-        public async Task TestGetNewsListAsync()
+        public async Task TestGetStockNewsContext_Concise()
         {
-            var result = await _stockNewsPlugin.GetNewsListAsync("sz002594");
+            var result = await _stockNewsPlugin.GetStockNewsContextAsync("sz002594", topK: 3, responseFormat: "concise");
             Assert.IsNotNull(result);
+            // concise 模式不强制要求 Summary
         }
 
         [TestMethod]
-        public async Task TestGetNewsContentAsync()
+        public async Task TestGetStockNewsContext_Detailed()
         {
-            var testUrl = "https://www.cls.cn/detail/1234567";
-            var result = await _stockNewsPlugin.GetNewsContentAsync(testUrl);
+            var result = await _stockNewsPlugin.GetStockNewsContextAsync("sz002594", topK: 2, responseFormat: "detailed");
             Assert.IsNotNull(result);
+            // detailed 模式尽量包含 Summary（但考虑网络/解析失败，不强制）
         }
     }
 }
