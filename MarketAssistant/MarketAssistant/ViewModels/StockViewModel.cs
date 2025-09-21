@@ -195,7 +195,6 @@ namespace MarketAssistant.ViewModels
 
                 KLineDataSet = kLineDataSet;
                 KLineData = new ObservableCollection<StockKLineData>(kLineDataSet.Data);
-                StockName = kLineDataSet.Name;
 
                 if (kLineDataSet.Data.Count > 0)
                 {

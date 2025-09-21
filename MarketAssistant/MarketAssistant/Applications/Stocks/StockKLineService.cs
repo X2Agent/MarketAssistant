@@ -221,7 +221,6 @@ public class StockKLineService
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = formattedSymbol,
                 Interval = "daily",
                 Data = new List<StockKLineData>()
             };
@@ -266,7 +265,6 @@ public class StockKLineService
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = formattedSymbol,
                 Interval = "weekly",
                 Data = new List<StockKLineData>()
             };
@@ -311,7 +309,6 @@ public class StockKLineService
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = formattedSymbol,
                 Interval = "monthly",
                 Data = new List<StockKLineData>()
             };
@@ -408,7 +405,6 @@ public class StockKLineService
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = formattedSymbol,
                 Interval = $"{interval}min",
                 Data = new List<StockKLineData>()
             };
@@ -464,7 +460,6 @@ public class StockKLineService
             var klineDataSet = new StockKLineDataSet
             {
                 Symbol = symbol,
-                Name = formattedSymbol,
                 Interval = "yearly",
                 Data = new List<StockKLineData>()
             };

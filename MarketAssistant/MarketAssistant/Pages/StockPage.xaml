@@ -13,9 +13,6 @@
             <!-- 转换器 -->
             <toolkit:InvertedBoolConverter x:Key="InvertedBoolConverter" />
             
-            <!-- 页面特有资源 -->
-            <!-- 使用全局渐变资源，移除重复定义 -->
-
             <!-- 页面特有样式 -->
             <Style x:Key="StockCompactCardStyle" TargetType="Border">
                 <Setter Property="Background" Value="{StaticResource CardGradientBrush}" />

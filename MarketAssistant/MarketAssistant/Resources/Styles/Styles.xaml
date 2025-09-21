@@ -650,7 +650,7 @@
         <Setter Property="WidthRequest" Value="{StaticResource FabButtonSize}" />
         <Setter Property="HeightRequest" Value="{StaticResource FabButtonSize}" />
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="{StaticResource LargeMargin}" />
+        <Setter Property="Margin" Value="{StaticResource DefaultMargin}" />
     </Style>
 
 </ResourceDictionary>

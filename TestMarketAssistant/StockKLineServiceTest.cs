@@ -44,7 +44,6 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("daily", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -62,7 +61,6 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("weekly", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -80,7 +78,6 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("monthly", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }
@@ -99,7 +96,6 @@ public class StockKLineServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual(expectedFormattedSymbol, result.Name);
         Assert.AreEqual("5min", result.Interval);
         Assert.IsTrue(result.Data.Count > 0);
     }

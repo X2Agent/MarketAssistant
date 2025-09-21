@@ -79,11 +79,6 @@ public class StockKLineDataSet
     public string Symbol { get; set; } = string.Empty;
 
     /// <summary>
-    /// 股票名称
-    /// </summary>
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
     /// 时间周期（日K、周K、月K等）
     /// </summary>
     public string Interval { get; set; } = string.Empty;

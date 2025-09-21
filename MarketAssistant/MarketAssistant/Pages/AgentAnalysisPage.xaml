@@ -60,7 +60,7 @@
                     <Button 
                         Style="{StaticResource FabButtonStyle}"
                         Text="💬" 
-                        FontSize="20"
+                        FontSize="24"
                         Command="{Binding ToggleChatSidebarCommand}"
                         ToolTipProperties.Text="智能对话" />
                     

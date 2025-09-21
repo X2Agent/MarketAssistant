@@ -47,8 +47,6 @@ public partial class ChatSidebarViewModel : ViewModelBase
     #region 命令
 
     public ICommand SendMessageCommand { get; }
-    public ICommand ClearChatCommand { get; }
-    public ICommand ExportChatCommand { get; }
 
     #endregion
 
@@ -58,8 +56,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
         : base(logger)
     {
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
-        ClearChatCommand = new RelayCommand(ClearChat);
-        ExportChatCommand = new RelayCommand(ExportChat);
+        
+        // 添加初始欢迎消息
+        AddWelcomeMessage();
     }
 
     #endregion
@@ -134,45 +133,6 @@ public partial class ChatSidebarViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// 清空聊天记录
-    /// </summary>
-    private async void ClearChat()
-    {
-        var result = await Shell.Current.DisplayAlert("确认", "确定要清空所有对话记录吗？", "确定", "取消");
-        if (result)
-        {
-            ChatMessages.Clear();
-        }
-    }
-
-    /// <summary>
-    /// 导出聊天记录
-    /// </summary>
-    private async void ExportChat()
-    {
-        try
-        {
-            if (!ChatMessages.Any())
-            {
-                await Shell.Current.DisplayAlert("提示", "暂无对话记录可导出", "确定");
-                return;
-            }
-
-            var chatContent = string.Join("\n\n", ChatMessages.Select(m => 
-                $"[{m.FormattedTime}] {m.Sender}: {m.Content}"));
-
-            var fileName = $"聊天记录_{StockCode}_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
-            
-            // 这里应该实现文件保存逻辑
-            await Shell.Current.DisplayAlert("导出成功", $"聊天记录已保存为 {fileName}", "确定");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "导出聊天记录失败");
-            await Shell.Current.DisplayAlert("错误", "导出失败，请稍后重试", "确定");
-        }
-    }
 
     #endregion
 
@@ -192,6 +152,84 @@ public partial class ChatSidebarViewModel : ViewModelBase
         return $"感谢您的提问。关于{StockCode}的详细分析，您可以查看完整的分析报告，或者提出更具体的问题，我会尽力为您解答。";
     }
 
+    /// <summary>
+    /// 将分析历史加载为聊天消息
+    /// </summary>
+    private void LoadAnalysisHistoryAsChat()
+    {
+        // 清空现有聊天消息
+        ChatMessages.Clear();
+        
+        if (AnalysisMessages == null || !AnalysisMessages.Any())
+        {
+            // 如果没有分析历史，添加欢迎消息
+            AddWelcomeMessage();
+            return;
+        }
+        
+        // 添加分析开始的系统消息
+        var startMessage = new ChatMessage
+        {
+            Content = $"开始分析股票 {StockCode}，以下是各位分析师的观点：",
+            IsUser = false,
+            Sender = "系统",
+            Timestamp = AnalysisMessages.First().Timestamp,
+            Status = MessageStatus.Sent
+        };
+        ChatMessages.Add(startMessage);
+        
+        // 将每个分析消息转换为聊天消息
+        foreach (var analysisMessage in AnalysisMessages)
+        {
+            if (string.IsNullOrWhiteSpace(analysisMessage.Content))
+                continue;
+                
+            var chatMessage = new ChatMessage
+            {
+                Content = analysisMessage.Content,
+                IsUser = false,
+                Sender = analysisMessage.Sender,
+                Timestamp = analysisMessage.Timestamp,
+                Status = MessageStatus.Sent
+            };
+            
+            ChatMessages.Add(chatMessage);
+        }
+        
+        // 添加分析完成的系统消息
+        if (AnalysisMessages.Any())
+        {
+            var endMessage = new ChatMessage
+            {
+                Content = "分析完成！您可以针对以上分析内容提出问题。",
+                IsUser = false,
+                Sender = "系统",
+                Timestamp = AnalysisMessages.Last().Timestamp.AddSeconds(1),
+                Status = MessageStatus.Sent
+            };
+            ChatMessages.Add(endMessage);
+        }
+    }
+    
+    /// <summary>
+    /// 添加欢迎消息
+    /// </summary>
+    private void AddWelcomeMessage()
+    {
+        var welcomeMessage = new ChatMessage
+        {
+            Content = string.IsNullOrEmpty(StockCode) 
+                ? "欢迎使用智能对话功能！请先选择要分析的股票。" 
+                : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。",
+            IsUser = false,
+            Sender = "市场分析助手",
+            Timestamp = DateTime.Now,
+            Status = MessageStatus.Sent
+        };
+        
+        ChatMessages.Add(welcomeMessage);
+    }
+
     #endregion
 
     #region 公共方法
@@ -203,6 +241,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
     {
         StockCode = stockCode;
         AnalysisMessages = analysisMessages;
+        
+        // 将分析历史转换为聊天消息并显示
+        LoadAnalysisHistoryAsChat();
     }
 
     /// <summary>

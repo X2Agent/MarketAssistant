@@ -20,8 +20,8 @@
             
             <!-- AI消息样式 - 参考 agent-ui 设计 -->
             <Style x:Key="AiMessageStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray900}}" />
-                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray900}}" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
                 <Setter Property="StrokeThickness" Value="1" />
                 <Setter Property="Padding" Value="12,8" />
                 <Setter Property="Margin" Value="8,4,16,4" />
@@ -74,7 +74,7 @@
         
         <!-- 标题栏 -->
         <Border Grid.Row="0" 
-                BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray950}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray950}}"
                 Padding="{StaticResource CardPadding}">
             <Grid ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" 
@@ -203,12 +203,12 @@
                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                 StrokeThickness="1"
                 Padding="12">
-            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+            <Grid RowDefinitions="Auto" RowSpacing="8">
                 
                 <!-- 输入框区域 -->
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Border Grid.Column="0" 
-                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray50}, Dark={StaticResource Gray800}}"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}"
                             Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
                             StrokeThickness="1"
                             Padding="12,10">
@@ -224,7 +224,7 @@
                                ReturnCommand="{Binding SendMessageCommand}"
                                PlaceholderColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
                     </Border>
-                    
+
                     <!-- 发送按钮 -->
                     <Border Grid.Column="1"
                             BackgroundColor="{StaticResource Primary}"
@@ -241,49 +241,6 @@
                                 FontAttributes="Bold"
                                 IsEnabled="{Binding UserInput, Converter={toolkit:IsStringNotNullOrEmptyConverter}}" />
                     </Border>
-                </Grid>
-                
-                <!-- 功能按钮区域 - 参考 agent-ui 的工具栏 -->
-                <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-                    
-                    <!-- 清空对话按钮 -->
-                    <Button Grid.Column="0"
-                            Text="🗑️"
-                            FontSize="14"
-                            BackgroundColor="Transparent"
-                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
-                            Command="{Binding ClearChatCommand}"
-                            ToolTipProperties.Text="清空对话"
-                            Padding="8,4"
-                            CornerRadius="6" />
-                    
-                    <!-- 导出对话按钮 -->
-                    <Button Grid.Column="1"
-                            Text="📋"
-                            FontSize="14"
-                            BackgroundColor="Transparent"
-                            TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
-                            Command="{Binding ExportChatCommand}"
-                            ToolTipProperties.Text="导出对话"
-                            Padding="8,4"
-                            CornerRadius="6" />
-                    
-                    <!-- 占位空间 -->
-                    <BoxView Grid.Column="2" />
-                    
-                    <!-- 连接状态指示器 -->
-                    <Grid Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="4">
-                        <Ellipse Grid.Column="0"
-                                 Fill="LightGreen"
-                                 WidthRequest="8"
-                                 HeightRequest="8"
-                                 VerticalOptions="Center" />
-                        <Label Grid.Column="1"
-                               Text="在线"
-                               FontSize="10"
-                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                               VerticalOptions="Center" />
-                    </Grid>
                 </Grid>
             </Grid>
         </Border>
