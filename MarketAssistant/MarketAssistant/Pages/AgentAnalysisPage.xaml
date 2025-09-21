@@ -83,7 +83,8 @@
                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                 StrokeThickness="1">
             <views:ChatSidebarView x:Name="ChatSidebarView" 
-                                   CloseCommand="{Binding ToggleChatSidebarCommand}" />
+                                   BindingContext="{Binding ChatSidebarViewModel}"
+                                   CloseCommand="{Binding Source={x:Reference ParentPage}, Path=BindingContext.ToggleChatSidebarCommand}" />
         </Border>
     </Grid>
 </ContentPage>

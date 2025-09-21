@@ -3,6 +3,8 @@ using CommunityToolkit.Mvvm.Input;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace MarketAssistant.ViewModels;
 
@@ -16,7 +18,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// <summary>
     /// 聊天消息集合
     /// </summary>
-    public ObservableCollection<ChatMessage> ChatMessages { get; } = new ObservableCollection<ChatMessage>();
+    public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = new ObservableCollection<ChatMessageAdapter>();
 
     /// <summary>
     /// 用户输入内容
@@ -81,14 +83,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(UserInput))
             return;
 
-        var userMessage = new ChatMessage
-        {
-            Content = UserInput.Trim(),
-            IsUser = true,
-            Sender = "用户",
-            Timestamp = DateTime.Now,
-            Status = MessageStatus.Sent
-        };
+        var userMessage = new ChatMessageAdapter(UserInput.Trim(), true, "用户");
 
         ChatMessages.Add(userMessage);
         var currentInput = UserInput;
@@ -97,12 +92,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
         try
         {
             // 显示AI正在思考的消息
-            var thinkingMessage = new ChatMessage
+            var thinkingMessage = new ChatMessageAdapter("正在分析中...", false, "市场分析助手")
             {
-                Content = "正在分析中...",
-                IsUser = false,
-                Sender = "市场分析助手",
-                Timestamp = DateTime.Now,
                 Status = MessageStatus.Sending
             };
 
@@ -120,12 +111,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
             Logger.LogError(ex, "发送消息失败");
             
             // 显示错误消息
-            var errorMessage = new ChatMessage
+            var errorMessage = new ChatMessageAdapter("抱歉，消息发送失败，请稍后重试。", false, "系统")
             {
-                Content = "抱歉，消息发送失败，请稍后重试。",
-                IsUser = false,
-                Sender = "系统",
-                Timestamp = DateTime.Now,
                 Status = MessageStatus.Failed
             };
 
@@ -168,13 +155,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
         }
         
         // 添加分析开始的系统消息
-        var startMessage = new ChatMessage
+        var startMessage = new ChatMessageAdapter($"开始分析股票 {StockCode}，以下是各位分析师的观点：", false, "系统")
         {
-            Content = $"开始分析股票 {StockCode}，以下是各位分析师的观点：",
-            IsUser = false,
-            Sender = "系统",
-            Timestamp = AnalysisMessages.First().Timestamp,
-            Status = MessageStatus.Sent
+            Timestamp = AnalysisMessages.First().Timestamp
         };
         ChatMessages.Add(startMessage);
         
@@ -184,13 +167,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
             if (string.IsNullOrWhiteSpace(analysisMessage.Content))
                 continue;
                 
-            var chatMessage = new ChatMessage
+            var chatMessage = new ChatMessageAdapter(analysisMessage.Content, false, analysisMessage.Sender)
             {
-                Content = analysisMessage.Content,
-                IsUser = false,
-                Sender = analysisMessage.Sender,
-                Timestamp = analysisMessage.Timestamp,
-                Status = MessageStatus.Sent
+                Timestamp = analysisMessage.Timestamp
             };
             
             ChatMessages.Add(chatMessage);
@@ -199,13 +178,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
         // 添加分析完成的系统消息
         if (AnalysisMessages.Any())
         {
-            var endMessage = new ChatMessage
+            var endMessage = new ChatMessageAdapter("分析完成！您可以针对以上分析内容提出问题。", false, "系统")
             {
-                Content = "分析完成！您可以针对以上分析内容提出问题。",
-                IsUser = false,
-                Sender = "系统",
-                Timestamp = AnalysisMessages.Last().Timestamp.AddSeconds(1),
-                Status = MessageStatus.Sent
+                Timestamp = AnalysisMessages.Last().Timestamp.AddSeconds(1)
             };
             ChatMessages.Add(endMessage);
         }
@@ -216,18 +191,16 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     private void AddWelcomeMessage()
     {
-        var welcomeMessage = new ChatMessage
-        {
-            Content = string.IsNullOrEmpty(StockCode) 
-                ? "欢迎使用智能对话功能！请先选择要分析的股票。" 
-                : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。",
-            IsUser = false,
-            Sender = "市场分析助手",
-            Timestamp = DateTime.Now,
-            Status = MessageStatus.Sent
-        };
-        
+        var content = string.IsNullOrEmpty(StockCode) 
+            ? "欢迎使用智能对话功能！请先选择要分析的股票。" 
+            : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。";
+            
+        var welcomeMessage = new ChatMessageAdapter(content, false, "市场分析助手");
         ChatMessages.Add(welcomeMessage);
+        
+        // 临时调试输出
+        Logger?.LogInformation("已添加欢迎消息，当前消息数量: {Count}, 内容: {Content}", 
+            ChatMessages.Count, content);
     }
 
     #endregion
@@ -251,16 +224,50 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     public void AddSystemMessage(string content)
     {
-        var systemMessage = new ChatMessage
-        {
-            Content = content,
-            IsUser = false,
-            Sender = "系统",
-            Timestamp = DateTime.Now,
-            Status = MessageStatus.Sent
-        };
-
+        var systemMessage = new ChatMessageAdapter(content, false, "系统");
         ChatMessages.Add(systemMessage);
+    }
+
+    /// <summary>
+    /// 从ChatHistory加载聊天消息
+    /// </summary>
+    public void LoadFromChatHistory(ChatHistory history)
+    {
+        ChatMessages.Clear();
+        
+        foreach (var message in history)
+        {
+            if (string.IsNullOrWhiteSpace(message.Content))
+                continue;
+                
+            var chatMessage = new ChatMessageAdapter(message);
+            ChatMessages.Add(chatMessage);
+        }
+        
+        // 如果没有消息，添加欢迎消息
+        if (!ChatMessages.Any())
+        {
+            AddWelcomeMessage();
+        }
+    }
+
+    /// <summary>
+    /// 转换为ChatHistory
+    /// </summary>
+    public ChatHistory ToChatHistory()
+    {
+        var history = new ChatHistory();
+        
+        foreach (var message in ChatMessages)
+        {
+            // 跳过系统消息和欢迎消息
+            if (message.Sender == "系统" || message.Sender == "市场分析助手")
+                continue;
+                
+            history.Add(message.ToChatMessageContent());
+        }
+        
+        return history;
     }
 
     #endregion

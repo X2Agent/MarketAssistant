@@ -35,7 +35,11 @@ public partial class ChatSidebarView : ContentView
         MainThread.BeginInvokeOnMainThread(async () =>
         {
             await Task.Delay(100); // 等待UI更新
-            await ChatScrollView.ScrollToAsync(0, double.MaxValue, true);
+            var chatMessages = BindingContext as ChatSidebarViewModel;
+            if (chatMessages?.ChatMessages?.Count > 0)
+            {
+                ChatCollectionView.ScrollTo(chatMessages.ChatMessages.Last(), position: ScrollToPosition.End, animate: true);
+            }
         });
     }
 }

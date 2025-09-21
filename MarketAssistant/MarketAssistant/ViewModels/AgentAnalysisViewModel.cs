@@ -107,8 +107,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     }
 
     // 聊天功能的代理属性，直接转发到 ChatSidebarViewModel
-    private readonly ObservableCollection<ChatMessage> _emptyChatMessages = new();
-    public ObservableCollection<ChatMessage> ChatMessages => ChatSidebarViewModel?.ChatMessages ?? _emptyChatMessages;
+    private readonly ObservableCollection<ChatMessageAdapter> _emptyChatMessages = new();
+    public ObservableCollection<ChatMessageAdapter> ChatMessages => ChatSidebarViewModel?.ChatMessages ?? _emptyChatMessages;
     public string UserInput
     {
         get => ChatSidebarViewModel?.UserInput ?? string.Empty;
@@ -138,14 +138,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
         
         // 临时调试：添加测试消息到空集合
-        _emptyChatMessages.Add(new ChatMessage
-        {
-            Content = "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null",
-            IsUser = false,
-            Sender = "调试系统",
-            Timestamp = DateTime.Now,
-            Status = MessageStatus.Sent
-        });
+        _emptyChatMessages.Add(new ChatMessageAdapter(
+            "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null", 
+            false, 
+            "调试系统"));
     }
 
     private void SubscribeToEvents()
@@ -250,6 +246,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                     TotalTokenCount = 0
                 });
             }
+            //更新聊天侧边栏，将分析历史转换为聊天消息
+            ChatSidebarViewModel?.LoadFromChatHistory(history);
         }, "股票分析");
     }
 
