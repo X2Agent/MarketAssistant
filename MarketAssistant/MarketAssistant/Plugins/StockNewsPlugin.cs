@@ -55,8 +55,13 @@ public class StockNewsPlugin
         }
     }
 
-    [KernelFunction("get_news_content"), Description("根据新闻Url获取新闻详情")]
-    public async Task<string> GetNewsContentAsync(string url)
+    /// <summary>
+    /// 根据新闻Url获取新闻详情
+    /// </summary>
+    /// <param name="url"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    private async Task<string> GetNewsContentAsync(string url)
     {
         try
         {
@@ -82,9 +87,13 @@ public class StockNewsPlugin
         }
     }
 
-    [KernelFunction("get_news_list"), Description("获取指定股票新闻列表")]
-    [return: Description("返回一个元组集合，每个元组包含新闻标题(string)和对应的URL链接(string)，用于分析股票相关的最新新闻动态")]
-    public async Task<IEnumerable<NewsItem>> GetNewsListAsync(string stockSymbol)
+    /// <summary>
+    /// 获取指定股票新闻列表（标题/来源/链接）
+    /// </summary>
+    /// <param name="stockSymbol"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    private async Task<IEnumerable<NewsItem>> GetNewsListAsync(string stockSymbol)
     {
         try
         {
@@ -137,6 +146,53 @@ public class StockNewsPlugin
         catch (Exception ex)
         {
             throw new Exception($"处理新闻列表时发生错误: {ex.Message}", ex);
+        }
+    }
+
+    [KernelFunction("get_stock_news_context"), Description("获取指定股票的聚合新闻上下文，一次返回最近且相关的新闻要点。默认返回精简要点，可通过 response_format 控制详细程度。")]
+    [return: Description("返回高信号的新闻上下文条目列表（Title/Source/Url/Summary）。concise 模式仅返回必要要点；detailed 模式包含更长摘要片段。")]
+    public async Task<IEnumerable<NewsItem>> GetStockNewsContextAsync(
+        [Description("股票代码，支持含前缀或仅数字")] string stockSymbol,
+        [Description("返回的新闻条数上限，默认 5，建议 1-10")] int topK = 5,
+        [Description("响应格式：concise | detailed。默认 concise 更省 token")] string responseFormat = "concise")
+    {
+        try
+        {
+            topK = Math.Clamp(topK, 1, 10);
+
+            var list = await GetNewsListAsync(stockSymbol);
+            var results = list.Take(topK).ToList();
+
+            bool isDetailed = string.Equals(responseFormat, "detailed", StringComparison.OrdinalIgnoreCase);
+
+            if (isDetailed)
+            {
+                foreach (var item in results)
+                {
+                    try
+                    {
+                        var content = await GetNewsContentAsync(item.Url);
+
+                        // 简单截断作为摘要片段，避免长文本占用上下文
+                        if (!string.IsNullOrWhiteSpace(content))
+                        {
+                            var normalized = content.Trim();
+                            item.Summary = normalized.Length <= 500 ? normalized : normalized.Substring(0, 500);
+                        }
+                    }
+                    catch
+                    {
+                        // 单条失败不影响整体，保持 Summary 为空
+                    }
+                }
+            }
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            // 以可读错误提示帮助代理调整调用策略
+            throw new Exception($"获取聚合新闻上下文失败: {ex.Message}. 可尝试：降低 topK、将 response_format 设为 'concise' 或缩小时间范围。", ex);
         }
     }
 }
