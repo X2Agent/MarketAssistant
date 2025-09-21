@@ -76,10 +76,52 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     
     public ICommand ToggleChatSidebarCommand { get; private set; }
     
+    private ChatSidebarViewModel? _chatSidebarViewModel;
     /// <summary>
     /// 聊天侧边栏 ViewModel 引用（用于数据同步）
     /// </summary>
-    public ChatSidebarViewModel? ChatSidebarViewModel { get; set; }
+    public ChatSidebarViewModel? ChatSidebarViewModel 
+    { 
+        get => _chatSidebarViewModel;
+        set 
+        {
+            if (_chatSidebarViewModel != null)
+            {
+                // 取消订阅旧的 ViewModel
+                _chatSidebarViewModel.PropertyChanged -= OnChatSidebarPropertyChanged;
+            }
+            
+            SetProperty(ref _chatSidebarViewModel, value);
+            
+            if (_chatSidebarViewModel != null)
+            {
+                // 订阅新的 ViewModel 的属性变更
+                _chatSidebarViewModel.PropertyChanged += OnChatSidebarPropertyChanged;
+            }
+            
+            // 通知代理属性已更改
+            OnPropertyChanged(nameof(ChatMessages));
+            OnPropertyChanged(nameof(UserInput));
+            OnPropertyChanged(nameof(SendMessageCommand));
+        }
+    }
+
+    // 聊天功能的代理属性，直接转发到 ChatSidebarViewModel
+    private readonly ObservableCollection<ChatMessage> _emptyChatMessages = new();
+    public ObservableCollection<ChatMessage> ChatMessages => ChatSidebarViewModel?.ChatMessages ?? _emptyChatMessages;
+    public string UserInput
+    {
+        get => ChatSidebarViewModel?.UserInput ?? string.Empty;
+        set
+        {
+            if (ChatSidebarViewModel != null)
+            {
+                ChatSidebarViewModel.UserInput = value;
+                OnPropertyChanged(); // 通知UI属性已更改
+            }
+        }
+    }
+    public ICommand SendMessageCommand => ChatSidebarViewModel?.SendMessageCommand ?? new RelayCommand(() => { });
 
     public AgentAnalysisViewModel(
         MarketAnalysisAgent marketAnalysisAgent,
@@ -94,12 +136,39 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
+        
+        // 临时调试：添加测试消息到空集合
+        _emptyChatMessages.Add(new ChatMessage
+        {
+            Content = "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null",
+            IsUser = false,
+            Sender = "调试系统",
+            Timestamp = DateTime.Now,
+            Status = MessageStatus.Sent
+        });
     }
 
     private void SubscribeToEvents()
     {
         _marketAnalysisAgent.ProgressChanged += OnAnalysisProgressChanged;
         _marketAnalysisAgent.AnalysisCompleted += OnAnalysisCompleted;
+    }
+    
+    /// <summary>
+    /// 处理 ChatSidebarViewModel 的属性变更
+    /// </summary>
+    private void OnChatSidebarPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // 当 ChatSidebarViewModel 的属性变更时，通知对应的代理属性
+        switch (e.PropertyName)
+        {
+            case nameof(ChatSidebarViewModel.UserInput):
+                OnPropertyChanged(nameof(UserInput));
+                break;
+            case nameof(ChatSidebarViewModel.ChatMessages):
+                OnPropertyChanged(nameof(ChatMessages));
+                break;
+        }
     }
 
     private void ToggleView()

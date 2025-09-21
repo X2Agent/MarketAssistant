@@ -4,7 +4,6 @@
              xmlns:viewmodels="clr-namespace:MarketAssistant.ViewModels"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="MarketAssistant.Views.ChatSidebarView"
-             x:DataType="viewmodels:ChatSidebarViewModel"
              x:Name="Root">
 
     <ContentView.Resources>
@@ -74,25 +73,27 @@
         
         <!-- 标题栏 -->
         <Border Grid.Row="0" 
-                BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray950}}"
-                Padding="{StaticResource CardPadding}">
+                BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
+                StrokeThickness="1"
+                Padding="16,12">
             <Grid ColumnDefinitions="*,Auto">
                 <Label Grid.Column="0" 
                        Text="智能对话" 
-                       FontSize="16" 
-                       FontAttributes="Bold"
-                       TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                       Style="{StaticResource LargeLabelStyle}"
                        VerticalOptions="Center" />
                 
                 <Button Grid.Column="1"
                         Text="✕"
-                        FontSize="16"
+                        FontSize="18"
                         BackgroundColor="Transparent"
                         TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
-                        Command="{Binding CloseCommand, Source={x:Reference Root}}"
-                        Padding="8,4"
-                        WidthRequest="32"
-                        HeightRequest="32" />
+                        Command="{Binding Source={x:Reference Root}, Path=CloseCommand}"
+                        Padding="8"
+                        WidthRequest="36"
+                        HeightRequest="36"
+                        CornerRadius="18"
+                        BorderWidth="0" />
             </Grid>
         </Border>
 
@@ -102,8 +103,27 @@
                             BackgroundColor="Transparent"
                             SelectionMode="None"
                             ItemSizingStrategy="MeasureAllItems">
+                <CollectionView.EmptyView>
+                    <StackLayout Padding="16" VerticalOptions="Center">
+                        <Label Text="🔍" 
+                               FontSize="48" 
+                               HorizontalOptions="Center" 
+                               Margin="0,0,0,16" />
+                        <Label Text="调试信息：集合为空" 
+                               FontSize="16" 
+                               TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
+                               HorizontalOptions="Center" 
+                               HorizontalTextAlignment="Center" />
+                        <Label Text="ChatSidebarViewModel 可能未正确初始化" 
+                               FontSize="14" 
+                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray500}}"
+                               HorizontalOptions="Center" 
+                               HorizontalTextAlignment="Center"
+                               Margin="0,8,0,0" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="viewmodels:ChatMessage">
+                    <DataTemplate>
                         <Grid Padding="0,2" RowDefinitions="Auto,Auto">
                             
                             <!-- 消息时间戳 - 居中显示 -->
@@ -197,51 +217,43 @@
             </CollectionView>
         </ScrollView>
 
-        <!-- 输入区域 - 参考 agent-ui 的现代化输入设计 -->
+        <!-- 输入区域 - 现代化设计 -->
         <Border Grid.Row="2" 
-                BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Gray950}}"
-                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
                 StrokeThickness="1"
-                Padding="12">
-            <Grid RowDefinitions="Auto" RowSpacing="8">
-                
-                <!-- 输入框区域 -->
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <Border Grid.Column="0" 
-                            BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray600}}"
-                            Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
-                            StrokeThickness="1"
-                            Padding="12,10">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="12" />
-                        </Border.StrokeShape>
-                        <Entry x:Name="MessageEntry"
-                               Text="{Binding UserInput}"
-                               Placeholder="询问关于股票分析的问题..."
-                               BackgroundColor="Transparent"
-                               FontSize="14"
-                               ReturnType="Send"
-                               ReturnCommand="{Binding SendMessageCommand}"
-                               PlaceholderColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
-                    </Border>
+                Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <!-- 输入框 -->
+                <Border Grid.Column="0" 
+                        BackgroundColor="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray700}}"
+                        Stroke="{AppThemeBinding Light={StaticResource Gray300}, Dark={StaticResource Gray600}}"
+                        StrokeThickness="1"
+                        Padding="16,12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="12" />
+                    </Border.StrokeShape>
+                    <Entry x:Name="MessageEntry"
+                           Text="{Binding UserInput}"
+                           Placeholder="询问关于股票分析的问题..."
+                           BackgroundColor="Transparent"
+                           FontSize="14"
+                           ReturnType="Send"
+                           ReturnCommand="{Binding SendMessageCommand}"
+                           PlaceholderColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}" />
+                </Border>
 
-                    <!-- 发送按钮 -->
-                    <Border Grid.Column="1"
-                            BackgroundColor="{StaticResource Primary}"
-                            WidthRequest="40"
-                            HeightRequest="40">
-                        <Border.StrokeShape>
-                            <RoundRectangle CornerRadius="20" />
-                        </Border.StrokeShape>
-                        <Button Text="➤"
-                                Command="{Binding SendMessageCommand}"
-                                BackgroundColor="Transparent"
-                                TextColor="White"
-                                FontSize="16"
-                                FontAttributes="Bold"
-                                IsEnabled="{Binding UserInput, Converter={toolkit:IsStringNotNullOrEmptyConverter}}" />
-                    </Border>
-                </Grid>
+                <!-- 发送按钮 -->
+                <Button Grid.Column="1"
+                        Text="➤"
+                        Command="{Binding SendMessageCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        FontSize="18"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        CornerRadius="22"
+                        Padding="0"
+                        IsEnabled="{Binding UserInput, Converter={toolkit:IsStringNotNullOrEmptyConverter}}" />
             </Grid>
         </Border>
     </Grid>

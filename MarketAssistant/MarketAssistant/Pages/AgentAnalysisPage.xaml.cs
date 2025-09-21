@@ -8,16 +8,13 @@ public partial class AgentAnalysisPage : ContentPage
 
     public AgentAnalysisPage(AgentAnalysisViewModel viewModel, ChatSidebarViewModel chatSidebarViewModel)
     {
-        InitializeComponent();
-
-        BindingContext = viewModel;
         _chatSidebarViewModel = chatSidebarViewModel;
-
-        // 设置聊天侧边栏的 BindingContext
-        ChatSidebarView.BindingContext = _chatSidebarViewModel;
-
-        // 建立 ViewModel 之间的连接
+        
+        // 建立 ViewModel 连接
         viewModel.ChatSidebarViewModel = _chatSidebarViewModel;
+        
+        BindingContext = viewModel;
+        InitializeComponent();
 
         // 页面加载完成后加载数据
         Loaded += OnPageLoaded;
