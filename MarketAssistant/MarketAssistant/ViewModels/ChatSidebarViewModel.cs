@@ -5,6 +5,7 @@ using System.Windows.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Agents;
 
 namespace MarketAssistant.ViewModels;
 
@@ -13,6 +14,12 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class ChatSidebarViewModel : ViewModelBase
 {
+    #region 私有字段
+
+    private readonly MarketChatAgent _chatAgent;
+
+    #endregion
+
     #region 属性
 
     /// <summary>
@@ -54,9 +61,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     #region 构造函数
 
-    public ChatSidebarViewModel(Microsoft.Extensions.Logging.ILogger<ChatSidebarViewModel> logger) 
+    public ChatSidebarViewModel(
+        Microsoft.Extensions.Logging.ILogger<ChatSidebarViewModel> logger,
+        MarketChatAgent chatAgent) 
         : base(logger)
     {
+        _chatAgent = chatAgent;
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
         
         // 添加初始欢迎消息
@@ -99,24 +109,24 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
             ChatMessages.Add(thinkingMessage);
 
-            // 模拟AI回复（这里应该集成真实的AI服务）
-            await Task.Delay(2000);
+            // 调用真实的AI服务
+            var aiResponse = await _chatAgent.SendMessageAsync(currentInput);
 
             // 更新AI消息
-            thinkingMessage.Content = GenerateAIResponse(currentInput);
+            thinkingMessage.Content = aiResponse.Content ?? "抱歉，无法生成回复";
             thinkingMessage.Status = MessageStatus.Sent;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "发送消息失败");
             
-            // 显示错误消息
-            var errorMessage = new ChatMessageAdapter("抱歉，消息发送失败，请稍后重试。", false, "系统")
+            // 更新思考消息为失败状态
+            var thinkingMessage = ChatMessages.LastOrDefault(m => m.Status == MessageStatus.Sending);
+            if (thinkingMessage != null)
             {
-                Status = MessageStatus.Failed
-            };
-
-            ChatMessages.Add(errorMessage);
+                thinkingMessage.Content = "抱歉，消息发送失败，请稍后重试。";
+                thinkingMessage.Status = MessageStatus.Failed;
+            }
         }
     }
 
@@ -125,66 +135,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     #region 私有方法
 
-    /// <summary>
-    /// 生成AI回复（临时实现）
-    /// </summary>
-    private string GenerateAIResponse(string userInput)
-    {
-        // 这里应该集成真实的AI服务
-        if (string.IsNullOrEmpty(StockCode))
-        {
-            return "请先选择要分析的股票，然后我可以为您提供更精准的分析和建议。";
-        }
 
-        return $"感谢您的提问。关于{StockCode}的详细分析，您可以查看完整的分析报告，或者提出更具体的问题，我会尽力为您解答。";
-    }
-
-    /// <summary>
-    /// 将分析历史加载为聊天消息
-    /// </summary>
-    private void LoadAnalysisHistoryAsChat()
-    {
-        // 清空现有聊天消息
-        ChatMessages.Clear();
-        
-        if (AnalysisMessages == null || !AnalysisMessages.Any())
-        {
-            // 如果没有分析历史，添加欢迎消息
-            AddWelcomeMessage();
-            return;
-        }
-        
-        // 添加分析开始的系统消息
-        var startMessage = new ChatMessageAdapter($"开始分析股票 {StockCode}，以下是各位分析师的观点：", false, "系统")
-        {
-            Timestamp = AnalysisMessages.First().Timestamp
-        };
-        ChatMessages.Add(startMessage);
-        
-        // 将每个分析消息转换为聊天消息
-        foreach (var analysisMessage in AnalysisMessages)
-        {
-            if (string.IsNullOrWhiteSpace(analysisMessage.Content))
-                continue;
-                
-            var chatMessage = new ChatMessageAdapter(analysisMessage.Content, false, analysisMessage.Sender)
-            {
-                Timestamp = analysisMessage.Timestamp
-            };
-            
-            ChatMessages.Add(chatMessage);
-        }
-        
-        // 添加分析完成的系统消息
-        if (AnalysisMessages.Any())
-        {
-            var endMessage = new ChatMessageAdapter("分析完成！您可以针对以上分析内容提出问题。", false, "系统")
-            {
-                Timestamp = AnalysisMessages.Last().Timestamp.AddSeconds(1)
-            };
-            ChatMessages.Add(endMessage);
-        }
-    }
     
     /// <summary>
     /// 添加欢迎消息
@@ -208,15 +159,31 @@ public partial class ChatSidebarViewModel : ViewModelBase
     #region 公共方法
 
     /// <summary>
-    /// 更新分析上下文
+    /// 初始化分析历史记录
     /// </summary>
-    public void UpdateAnalysisContext(string stockCode, ObservableCollection<AnalysisMessage> analysisMessages)
+    public async Task InitializeWithAnalysisHistory(string stockCode, ChatHistory analysisHistory)
     {
         StockCode = stockCode;
-        AnalysisMessages = analysisMessages;
         
-        // 将分析历史转换为聊天消息并显示
-        LoadAnalysisHistoryAsChat();
+        // 更新ChatAgent的股票上下文
+        await _chatAgent.UpdateStockContextAsync(stockCode);
+        
+        // 添加分析历史作为上下文
+        foreach (var message in analysisHistory)
+        {
+            if (message.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(message.Content))
+            {
+                _chatAgent.AddSystemMessage($"分析师观点：{message.Content}");
+            }
+        }
+        
+        // 从ChatAgent的历史记录加载聊天消息
+        var history = new ChatHistory();
+        foreach (var message in _chatAgent.ConversationHistory)
+        {
+            history.Add(message);
+        }
+        LoadFromChatHistory(history);
     }
 
     /// <summary>
@@ -226,6 +193,19 @@ public partial class ChatSidebarViewModel : ViewModelBase
     {
         var systemMessage = new ChatMessageAdapter(content, false, "系统");
         ChatMessages.Add(systemMessage);
+        
+        // 同时添加到ChatAgent的历史中
+        _chatAgent.AddSystemMessage(content);
+    }
+
+    /// <summary>
+    /// 清空聊天历史
+    /// </summary>
+    public void ClearChatHistory()
+    {
+        ChatMessages.Clear();
+        _chatAgent.ClearHistory();
+        AddWelcomeMessage();
     }
 
     /// <summary>

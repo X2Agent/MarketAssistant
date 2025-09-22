@@ -102,6 +102,7 @@ namespace MarketAssistant
             builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
             builder.Services.AddSingleton<MarketAnalysisAgent>();
+            builder.Services.AddTransient<MarketChatAgent>();
 
             // 注册分析缓存服务
             builder.Services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();

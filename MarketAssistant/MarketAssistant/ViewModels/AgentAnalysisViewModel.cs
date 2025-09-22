@@ -6,7 +6,6 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -65,7 +64,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     }
 
     public ICommand ToggleViewCommand { get; private set; }
-    
+
     // 聊天侧边栏控制
     private bool _isChatSidebarVisible;
     public bool IsChatSidebarVisible
@@ -73,32 +72,32 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         get => _isChatSidebarVisible;
         set => SetProperty(ref _isChatSidebarVisible, value);
     }
-    
+
     public ICommand ToggleChatSidebarCommand { get; private set; }
-    
+
     private ChatSidebarViewModel? _chatSidebarViewModel;
     /// <summary>
     /// 聊天侧边栏 ViewModel 引用（用于数据同步）
     /// </summary>
-    public ChatSidebarViewModel? ChatSidebarViewModel 
-    { 
+    public ChatSidebarViewModel? ChatSidebarViewModel
+    {
         get => _chatSidebarViewModel;
-        set 
+        set
         {
             if (_chatSidebarViewModel != null)
             {
                 // 取消订阅旧的 ViewModel
                 _chatSidebarViewModel.PropertyChanged -= OnChatSidebarPropertyChanged;
             }
-            
+
             SetProperty(ref _chatSidebarViewModel, value);
-            
+
             if (_chatSidebarViewModel != null)
             {
                 // 订阅新的 ViewModel 的属性变更
                 _chatSidebarViewModel.PropertyChanged += OnChatSidebarPropertyChanged;
             }
-            
+
             // 通知代理属性已更改
             OnPropertyChanged(nameof(ChatMessages));
             OnPropertyChanged(nameof(UserInput));
@@ -136,11 +135,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         SubscribeToEvents();
         ToggleViewCommand = new RelayCommand(ToggleView);
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
-        
+
         // 临时调试：添加测试消息到空集合
         _emptyChatMessages.Add(new ChatMessageAdapter(
-            "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null", 
-            false, 
+            "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null",
+            false,
             "调试系统"));
     }
 
@@ -149,7 +148,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         _marketAnalysisAgent.ProgressChanged += OnAnalysisProgressChanged;
         _marketAnalysisAgent.AnalysisCompleted += OnAnalysisCompleted;
     }
-    
+
     /// <summary>
     /// 处理 ChatSidebarViewModel 的属性变更
     /// </summary>
@@ -246,8 +245,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                     TotalTokenCount = 0
                 });
             }
-            //更新聊天侧边栏，将分析历史转换为聊天消息
-            ChatSidebarViewModel?.LoadFromChatHistory(history);
+            //更新聊天侧边栏，初始化分析历史记录
+            ChatSidebarViewModel?.InitializeWithAnalysisHistory(StockCode, history);
         }, "股票分析");
     }
 
@@ -257,16 +256,5 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     private void ToggleChatSidebar()
     {
         IsChatSidebarVisible = !IsChatSidebarVisible;
-        
-        // 当打开聊天侧边栏时，更新聊天上下文
-        if (IsChatSidebarVisible && ChatSidebarViewModel != null)
-        {
-            ChatSidebarViewModel.UpdateAnalysisContext(StockCode, AnalysisMessages);
-        }
     }
-
-
-
-
-
 }
