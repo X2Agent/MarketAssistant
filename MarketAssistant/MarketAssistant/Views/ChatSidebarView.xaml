@@ -186,7 +186,7 @@
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="18,18,18,4" />
                                 </Border.StrokeShape>
-                                <Grid RowDefinitions="Auto,Auto">
+                                <Grid RowDefinitions="Auto,Auto,Auto">
                                     <!-- 发送者 -->
                                     <Label Grid.Row="0" 
                                            Text="{Binding Sender}" 
@@ -194,12 +194,38 @@
                                            FontAttributes="Bold"
                                            TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
                                            Margin="0,0,0,2" />
+                                    
+                                    <!-- 状态指示器 -->
+                                    <StackLayout Grid.Row="1" 
+                                                 Orientation="Horizontal" 
+                                                 IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Sending}}"
+                                                 Margin="0,0,0,4">
+                                        <ActivityIndicator IsRunning="True"
+                                                         Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
+                                                         WidthRequest="12"
+                                                         HeightRequest="12" />
+                                        <Label Text="正在思考..."
+                                               FontSize="10"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
+                                               Margin="4,0,0,0" />
+                                    </StackLayout>
+                                    
                                     <!-- 内容 -->
-                                    <Label Grid.Row="1" 
-                                           Text="{Binding Content}" 
-                                           FontSize="14" 
-                                           TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                           LineBreakMode="WordWrap" />
+                                    <StackLayout Grid.Row="2" Orientation="Horizontal">
+                                        <Label Text="{Binding Content}" 
+                                               FontSize="14" 
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
+                                               LineBreakMode="WordWrap"
+                                               HorizontalOptions="FillAndExpand" />
+                                        
+                                        <!-- 失败状态图标 -->
+                                        <Label Text="⚠️"
+                                               FontSize="12"
+                                               TextColor="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource Error}}"
+                                               IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Failed}}"
+                                               VerticalOptions="Start"
+                                               Margin="4,0,0,0" />
+                                    </StackLayout>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -228,10 +254,11 @@
                    VerticalOptions="Center"
                    HorizontalOptions="FillAndExpand"
                    HeightRequest="48"
-                   Margin="16,0,16,0" />
+                   Margin="16,0,16,0"
+                   IsEnabled="{Binding IsProcessing, Converter={toolkit:InvertedBoolConverter}}" />
 
-            <!-- 发送按钮 -->
-            <Button Text="➤"
+            <!-- 发送/取消按钮 -->
+            <Button Text="{Binding SendButtonText}"
                     Command="{Binding SendMessageCommand}"
                     BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
                     TextColor="White"
@@ -242,7 +269,7 @@
                     CornerRadius="24"
                     BorderWidth="0"
                     VerticalOptions="Center"
-                    IsEnabled="{Binding UserInput, Converter={toolkit:IsStringNotNullOrEmptyConverter}}" />
+                    IsEnabled="True" />
         </StackLayout>
     </Grid>
 </ContentView>

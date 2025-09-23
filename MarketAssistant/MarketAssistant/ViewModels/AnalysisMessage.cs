@@ -26,37 +26,17 @@ public class AnalysisMessage
     public string FormattedTime => Timestamp.ToString("HH:mm:ss");
     
     /// <summary>
-    /// 输入Token数量
+    /// 消息Token数量（如果是AI生成的消息，表示该消息的Token数量）
     /// </summary>
-    public int InputTokenCount { get; set; }
-    
-    /// <summary>
-    /// 输出Token数量
-    /// </summary>
-    public int OutputTokenCount { get; set; }
-    
-    /// <summary>
-    /// Token总数
-    /// </summary>
-    public int TotalTokenCount { get; set; }
+    public int TokenCount { get; set; }
     
     /// <summary>
     /// 是否包含Token使用信息
     /// </summary>
-    public bool HasTokenUsage => InputTokenCount > 0 || OutputTokenCount > 0 || TotalTokenCount > 0;
+    public bool HasTokenUsage => TokenCount > 0;
     
     /// <summary>
-    /// 格式化的输入Token数量
+    /// 格式化的Token数量
     /// </summary>
-    public string FormattedInputTokens => $"{InputTokenCount:#,##0}";
-    
-    /// <summary>
-    /// 格式化的输出Token数量
-    /// </summary>
-    public string FormattedOutputTokens => $"{OutputTokenCount:#,##0}";
-    
-    /// <summary>
-    /// 格式化的总Token数量
-    /// </summary>
-    public string FormattedTotalTokens => $"{TotalTokenCount:#,##0}";
+    public string FormattedTokenCount => $"{TokenCount:#,##0}";
 }

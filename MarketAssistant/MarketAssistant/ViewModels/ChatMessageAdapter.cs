@@ -100,6 +100,18 @@ public partial class ChatMessageAdapter : ObservableObject
     }
 
     /// <summary>
+    /// 从AnalysisMessage创建适配器
+    /// </summary>
+    public ChatMessageAdapter(AnalysisMessage analysisMessage)
+    {
+        Content = analysisMessage.Content;
+        IsUser = false; // 分析消息都是来自助手/分析师
+        Sender = analysisMessage.Sender;
+        Timestamp = analysisMessage.Timestamp;
+        Status = MessageStatus.Sent;
+    }
+
+    /// <summary>
     /// 创建系统消息适配器
     /// </summary>
     public static ChatMessageAdapter CreateSystemMessage(string content, string? sender = null)

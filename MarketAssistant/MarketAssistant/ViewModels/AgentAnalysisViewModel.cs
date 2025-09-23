@@ -3,7 +3,6 @@ using MarketAssistant.Agents;
 using MarketAssistant.Applications.Cache;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -191,9 +190,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                 Sender = e.AuthorName ?? string.Empty,
                 Content = e.Content ?? string.Empty,
                 Timestamp = DateTime.Now,
-                InputTokenCount = 0,
-                OutputTokenCount = 0,
-                TotalTokenCount = 0
+                TokenCount = 0
             };
 
             AnalysisMessages.Add(message);
@@ -223,30 +220,113 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             // 缓存中没有结果，执行新的分析
             Logger?.LogInformation("缓存中没有结果，开始新的分析: {StockCode}", StockCode);
             AnalysisMessages.Clear();
-            var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
-
-            foreach (var message in history)
+            // 模拟分析数据（避免调试时浪费Token）
+            var mockAnalysisMessages = new List<AnalysisMessage>
             {
-                if (message.Role != AuthorRole.Assistant)
+                new AnalysisMessage
                 {
-                    continue; // 只处理助手的消息
+                    Sender = "技术分析师",
+                    Content = $"【技术面分析】{StockCode} 当前技术指标显示：\n\n" +
+                             "• MA5 和 MA10 呈现金叉形态，短期趋势向好\n" +
+                             "• RSI 指标为 65，处于相对强势区间\n" +
+                             "• MACD 柱状图由负转正，动能开始增强\n" +
+                             "• 成交量较前期放大约 20%，资金关注度提升\n\n" +
+                             "**技术面评级：看多** 📈",
+                    Timestamp = DateTime.Now.AddMinutes(-5),
+                    TokenCount = 156
+                },
+                new AnalysisMessage
+                {
+                    Sender = "基本面分析师",
+                    Content = $"【基本面分析】{StockCode} 财务状况评估：\n\n" +
+                             "• 最新季度营收同比增长 12.3%，盈利能力稳定\n" +
+                             "• 毛利率维持在 35% 左右，成本控制良好\n" +
+                             "• 资产负债率 45%，财务结构健康\n" +
+                             "• ROE 为 15.2%，股东回报率较为理想\n" +
+                             "• 现金流充裕，经营活动现金流为正\n\n" +
+                             "**基本面评级：中性偏多** 📊",
+                    Timestamp = DateTime.Now.AddMinutes(-4),
+                    TokenCount = 189
+                },
+                new AnalysisMessage
+                {
+                    Sender = "市场情绪分析师",
+                    Content = $"【市场情绪分析】{StockCode} 市场表现：\n\n" +
+                             "• 近5日资金净流入 2.3亿元，主力资金积极布局\n" +
+                             "• 机构持仓比例上升至 68%，长线资金看好\n" +
+                             "• 市场关注度指数 85/100，热度较高\n" +
+                             "• 分析师一致预期目标价上调 8%\n" +
+                             "• 社交媒体情绪指数 72，整体偏乐观\n\n" +
+                             "**市场情绪：积极** 🚀",
+                    Timestamp = DateTime.Now.AddMinutes(-3),
+                    TokenCount = 142
+                },
+                new AnalysisMessage
+                {
+                    Sender = "风险控制分析师",
+                    Content = $"【风险评估】{StockCode} 风险因子分析：\n\n" +
+                             "• 行业景气度：当前处于周期上行阶段\n" +
+                             "• 政策风险：相关政策环境相对稳定\n" +
+                             "• 估值风险：PE 22倍，略高于行业平均\n" +
+                             "• 流动性风险：日均成交额充足，流动性良好\n" +
+                             "• 系统性风险：需关注宏观经济波动\n\n" +
+                             "**风险等级：中等** ⚠️\n" +
+                             "**建议仓位：建议控制在组合的 5-8% 以内**",
+                    Timestamp = DateTime.Now.AddMinutes(-2),
+                    TokenCount = 168
+                },
+                new AnalysisMessage
+                {
+                    Sender = "综合策略分析师",
+                    Content = $"【投资建议】{StockCode} 综合评估报告：\n\n" +
+                             "**综合评级：买入** 🎯\n\n" +
+                             "**核心逻辑：**\n" +
+                             "1. 技术面多头排列，短期趋势明确向上\n" +
+                             "2. 基本面稳健，盈利能力持续改善\n" +
+                             "3. 资金面积极，机构资金持续流入\n" +
+                             "4. 估值合理，仍有上升空间\n\n" +
+                             "**操作建议：**\n" +
+                             "• 目标价位：当前价格+15% 作为第一目标\n" +
+                             "• 止损位：跌破 MA20 考虑减仓\n" +
+                             "• 持有周期：建议 3-6 个月\n\n" +
+                             "**风险提示：** 请注意控制仓位，做好风险管理 📋",
+                    Timestamp = DateTime.Now.AddMinutes(-1),
+                    TokenCount = 225
                 }
-                if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
-                {
-                    continue;
-                }
-                AnalysisMessages.Add(new AnalysisMessage()
-                {
-                    Sender = message.AuthorName ?? string.Empty,
-                    Content = message.Content ?? string.Empty,
-                    Timestamp = DateTime.Now,
-                    InputTokenCount = 0,
-                    OutputTokenCount = 0,
-                    TotalTokenCount = 0
-                });
+            };
+
+            foreach (var mockMessage in mockAnalysisMessages)
+            {
+                AnalysisMessages.Add(mockMessage);
+                // 模拟分析过程的延迟
+                await Task.Delay(200);
             }
+
+            // 实际分析代码（调试时注释）
+            //var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
+            //foreach (var message in history)
+            //{
+            //    if (message.Role != AuthorRole.Assistant)
+            //    {
+            //        continue; // 只处理助手的消息
+            //    }
+            //    if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
+            //    {
+            //        continue;
+            //    }
+            //    AnalysisMessages.Add(new AnalysisMessage()
+            //    {
+            //        Sender = message.AuthorName ?? string.Empty,
+            //        Content = message.Content ?? string.Empty,
+            //        Timestamp = DateTime.Now,
+            //        TokenCount = 0
+            //    });
+            //}
             //更新聊天侧边栏，初始化分析历史记录
-            ChatSidebarViewModel?.InitializeWithAnalysisHistory(StockCode, history);
+            if (ChatSidebarViewModel != null)
+            {
+                await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, AnalysisMessages);
+            }
         }, "股票分析");
     }
 

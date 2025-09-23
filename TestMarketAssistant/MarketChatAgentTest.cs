@@ -20,10 +20,9 @@ public class MarketChatAgentTest : BaseKernelTest
         var analystManagerLogger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<AnalystManager>();
         var kernelPluginConfig = _kernel.Services.GetRequiredService<IKernelPluginConfig>();
         var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, kernelPluginConfig);
-        var chatService = _kernel.GetRequiredService<IChatCompletionService>();
 
         _analysisAgent = new MarketAnalysisAgent(analysisLogger, analystManager);
-        _chatAgent = new MarketChatAgent(chatService, logger, _kernel, _analysisAgent);
+        _chatAgent = new MarketChatAgent(logger, _kernel, _analysisAgent);
     }
 
     [TestMethod]
