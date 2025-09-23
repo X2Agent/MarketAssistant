@@ -110,7 +110,7 @@
                         ItemsSource="{Binding ChatMessages}" 
                         BackgroundColor="Transparent"
                         SelectionMode="None"
-                        ItemSizingStrategy="MeasureFirstItem"
+                        ItemSizingStrategy="MeasureAllItems"
                         Margin="8,0"
                         VerticalOptions="FillAndExpand"
                         VerticalScrollBarVisibility="Default">
@@ -268,8 +268,7 @@
                     HeightRequest="48"
                     CornerRadius="24"
                     BorderWidth="0"
-                    VerticalOptions="Center"
-                    IsEnabled="True" />
+                    VerticalOptions="Center" />
         </StackLayout>
     </Grid>
 </ContentView>

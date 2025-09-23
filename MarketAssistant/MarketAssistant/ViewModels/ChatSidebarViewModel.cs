@@ -31,13 +31,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// 用户输入内容
     /// </summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
     private string userInput = string.Empty;
 
-    /// <summary>
-    /// 是否连接到AI服务
-    /// </summary>
-    [ObservableProperty]
-    private bool isConnected = true;
 
     /// <summary>
     /// 当前股票代码（用于上下文）
@@ -55,6 +51,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// 是否正在处理请求
     /// </summary>
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
     private bool isProcessing = false;
 
     /// <summary>
@@ -72,7 +69,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     #region 命令
 
-    public ICommand SendMessageCommand { get; }
+    public IRelayCommand SendMessageCommand { get; }
 
     #endregion
 
@@ -88,14 +85,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
     #region 构造函数
 
     public ChatSidebarViewModel(
-        Microsoft.Extensions.Logging.ILogger<ChatSidebarViewModel> logger,
+        ILogger<ChatSidebarViewModel> logger,
         MarketChatAgent chatAgent) 
         : base(logger)
     {
         _chatAgent = chatAgent;
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
-        
-        // 不在构造函数中添加欢迎消息，等待初始化完成后再决定
     }
 
     #endregion
@@ -107,7 +102,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     private bool CanSendMessage()
     {
-        return (!string.IsNullOrWhiteSpace(UserInput) && IsConnected) || IsProcessing;
+        return !string.IsNullOrWhiteSpace(UserInput) || IsProcessing;
     }
 
     /// <summary>
@@ -128,6 +123,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
         var userMessage = new ChatMessageAdapter(UserInput.Trim(), true, "用户");
         ChatMessages.Add(userMessage);
         
+        // 立即滚动到用户消息
+        ScrollToBottom?.Invoke();
+        
         var currentInput = UserInput;
         UserInput = string.Empty;
         
@@ -141,6 +139,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
             Status = MessageStatus.Sending
         };
         ChatMessages.Add(aiMessage);
+        
+        // 滚动到AI消息（显示"正在思考"状态）
+        ScrollToBottom?.Invoke();
 
         try
         {
@@ -148,6 +149,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
             var contentBuilder = new System.Text.StringBuilder();
             
             // 使用流式API
+            bool firstChunk = true;
             await foreach (var chunk in _chatAgent.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
                 if (!string.IsNullOrEmpty(chunk.Content))
@@ -158,6 +160,13 @@ public partial class ChatSidebarViewModel : ViewModelBase
                     MainThread.BeginInvokeOnMainThread(() =>
                     {
                         aiMessage.Content = contentBuilder.ToString();
+                        
+                        // 第一个内容块时触发滚动，确保用户能看到AI开始回复
+                        if (firstChunk)
+                        {
+                            ScrollToBottom?.Invoke();
+                            firstChunk = false;
+                        }
                     });
                 }
             }
@@ -186,7 +195,6 @@ public partial class ChatSidebarViewModel : ViewModelBase
             _currentCancellationTokenSource = null;
         }
     }
-
 
     #endregion
 
@@ -258,6 +266,13 @@ public partial class ChatSidebarViewModel : ViewModelBase
                 "系统");
             ChatMessages.Add(contextMessage);
         }
+        
+        // 初始化完成后滚动到底部（延迟确保UI渲染完成）
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(300);
+            ScrollToBottom?.Invoke();
+        });
     }
 
     /// <summary>
@@ -279,6 +294,13 @@ public partial class ChatSidebarViewModel : ViewModelBase
     {
         ChatMessages.Clear();
         AddWelcomeMessage();
+        
+        // 初始化完成后滚动到底部（延迟确保UI渲染完成）
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(300);
+            ScrollToBottom?.Invoke();
+        });
     }
 
     /// <summary>
@@ -289,6 +311,13 @@ public partial class ChatSidebarViewModel : ViewModelBase
         ChatMessages.Clear();
         _chatAgent.ClearHistory();
         AddWelcomeMessage();
+        
+        // 清空后滚动到底部（延迟确保UI渲染完成）
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(300);
+            ScrollToBottom?.Invoke();
+        });
     }
 
     /// <summary>
@@ -320,6 +349,13 @@ public partial class ChatSidebarViewModel : ViewModelBase
         {
             AddWelcomeMessage();
         }
+        
+        // 加载完成后滚动到底部（延迟确保UI渲染完成）
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(300);
+            ScrollToBottom?.Invoke();
+        });
     }
 
     /// <summary>
