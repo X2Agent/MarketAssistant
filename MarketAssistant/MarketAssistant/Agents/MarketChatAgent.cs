@@ -1,3 +1,4 @@
+using MarketAssistant.Plugins;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -65,6 +66,9 @@ public class MarketChatAgent
 
         // 初始化系统消息
         InitializeSystemContext();
+
+        // 初始化MCP服务
+        InitializeMcpServices();
     }
 
     #endregion
@@ -324,8 +328,6 @@ public class MarketChatAgent
         _conversationHistory.Add(systemMessage);
     }
 
-
-
     #endregion
 
     #region 私有方法
@@ -337,6 +339,35 @@ public class MarketChatAgent
     {
         var systemPrompt = BuildSystemPrompt(_currentStockCode);
         _conversationHistory.AddSystemMessage(systemPrompt);
+    }
+
+    /// <summary>
+    /// 初始化并加载所有配置的MCP服务
+    /// </summary>
+    private void InitializeMcpServices()
+    {
+        try
+        {
+            _logger.LogInformation("开始初始化MCP服务");
+            
+            var mcpFunctions = McpPlugin.GetKernelFunctionsAsync().GetAwaiter().GetResult();
+            var functionCount = mcpFunctions.Count();
+            
+            if (functionCount > 0)
+            {
+                _kernel.Plugins.AddFromFunctions("mcp", mcpFunctions);
+                _logger.LogInformation("成功加载 {Count} 个MCP函数", functionCount);
+            }
+            else
+            {
+                _logger.LogWarning("未发现任何可用的MCP函数");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "加载MCP插件失败");
+            System.Diagnostics.Debug.WriteLine($"加载 MCP 插件失败: {ex.Message}");
+        }
     }
 
     /// <summary>

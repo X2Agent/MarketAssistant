@@ -9,69 +9,25 @@
 
     <ContentView.Resources>
         <ResourceDictionary>
-            <!-- 用户消息样式 - 参考 agent-ui 设计 -->
-            <Style x:Key="UserMessageStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}" />
-                <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="StrokeThickness" Value="0" />
-                <Setter Property="Padding" Value="12,8" />
-                <Setter Property="Margin" Value="16,4,8,4" />
-            </Style>
-            
-            <!-- AI消息样式 - 参考 agent-ui 设计 -->
-            <Style x:Key="AiMessageStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F8F9FA, Dark=#374151}" />
-                <Setter Property="Stroke" Value="{AppThemeBinding Light=#E5E7EB, Dark=#4B5563}" />
-                <Setter Property="StrokeThickness" Value="1" />
-                <Setter Property="Padding" Value="12,8" />
-                <Setter Property="Margin" Value="8,4,16,4" />
-            </Style>
-            
-            <!-- 系统消息样式 - 新增，用于显示工具调用等 -->
-            <Style x:Key="SystemMessageStyle" TargetType="Border">
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Warning}, Dark={StaticResource Warning}}" />
-                <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="StrokeThickness" Value="0" />
-                <Setter Property="Padding" Value="8,4" />
-                <Setter Property="Margin" Value="12,2,12,2" />
-                <Setter Property="Opacity" Value="0.9" />
-            </Style>
-            
-            <!-- 消息文本样式 -->
+            <!-- 消息文本基础样式 -->
             <Style x:Key="MessageTextStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="LineBreakMode" Value="WordWrap" />
                 <Setter Property="LineHeight" Value="1.4" />
             </Style>
             
-            <!-- 用户消息文本样式 -->
-            <Style x:Key="UserMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource White}}" />
-            </Style>
-            
-            <!-- AI消息文本样式 -->
-            <Style x:Key="AiMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}" />
-            </Style>
-            
-            <!-- 系统消息文本样式 -->
-            <Style x:Key="SystemMessageTextStyle" TargetType="Label" BasedOn="{StaticResource MessageTextStyle}">
-                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource White}}" />
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="FontAttributes" Value="Italic" />
-            </Style>
-            
-            <!-- 消息头部样式 -->
-            <Style x:Key="MessageHeaderStyle" TargetType="Label">
+            <!-- 消息发送者样式 -->
+            <Style x:Key="MessageSenderStyle" TargetType="Label">
                 <Setter Property="FontSize" Value="11" />
                 <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="Opacity" Value="0.7" />
+                <Setter Property="Margin" Value="0" />
             </Style>
             
-            <!-- 圆角Entry样式 -->
-            <Style x:Key="RoundedEntryStyle" TargetType="Entry">
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F9FAFB, Dark=#374151}" />
-                <Setter Property="Visual" Value="Material" />
+            <!-- 状态指示器样式 -->
+            <Style x:Key="StatusIndicatorStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="10" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}" />
+                <Setter Property="VerticalOptions" Value="Center" />
             </Style>
         </ResourceDictionary>
     </ContentView.Resources>
@@ -79,30 +35,27 @@
     <Grid RowDefinitions="Auto,*,Auto" BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}">
         
         <!-- 标题栏 -->
-        <Border Grid.Row="0" 
-                BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
-                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
-                StrokeThickness="1"
-                Padding="16,12">
-            <Grid ColumnDefinitions="*,Auto">
-                <Label Grid.Column="0" 
-                       Text="智能对话" 
-                       Style="{StaticResource LargeLabelStyle}"
-                       VerticalOptions="Center" />
-                
-                <Button Grid.Column="1"
-                        Text="✕"
-                        FontSize="18"
-                        BackgroundColor="Transparent"
-                        TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
-                        Command="{Binding Source={x:Reference Root}, Path=CloseCommand}"
-                        Padding="8"
-                        WidthRequest="36"
-                        HeightRequest="36"
-                        CornerRadius="18"
-                        BorderWidth="0" />
-            </Grid>
-        </Border>
+        <Grid Grid.Row="0" 
+              ColumnDefinitions="*,Auto"
+              BackgroundColor="{AppThemeBinding Light={StaticResource CardBackgroundLight}, Dark={StaticResource CardBackgroundDark}}"
+              Padding="16,12">
+            <Label Grid.Column="0" 
+                   Text="智能对话" 
+                   Style="{StaticResource LargeLabelStyle}"
+                   VerticalOptions="Center" />
+            
+            <Button Grid.Column="1"
+                    Text="✕"
+                    FontSize="18"
+                    BackgroundColor="Transparent"
+                    TextColor="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource Gray400}}"
+                    Command="{Binding Source={x:Reference Root}, Path=CloseCommand}"
+                    Padding="8"
+                    WidthRequest="36"
+                    HeightRequest="36"
+                    CornerRadius="18"
+                    BorderWidth="0" />
+        </Grid>
 
         <!-- 对话消息列表 - 参考 agent-ui 的消息展示 -->
         <CollectionView Grid.Row="1" 
@@ -136,138 +89,111 @@
                 </CollectionView.EmptyView>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewmodels:ChatMessageAdapter">
-                        <!-- 智能对齐的消息模板 -->
-                        <Grid Padding="8,4" Margin="4,2" RowDefinitions="Auto,Auto">
+                        <!-- 简化的消息模板 -->
+                        <StackLayout Padding="12,4" Margin="0,2" Spacing="4">
                             <!-- 时间戳 -->
-                            <Label Grid.Row="0" 
-                                   Text="{Binding FormattedTime}" 
+                            <Label Text="{Binding FormattedTime}" 
                                    FontSize="10" 
                                    TextColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
-                                   HorizontalOptions="Center"
-                                   Margin="0,0,0,4" />
+                                   HorizontalOptions="Center" />
                             
-                            <!-- 用户消息 - 右对齐 -->
-                            <Border Grid.Row="1" 
-                                    Padding="12,8"
+                            <!-- 用户消息 -->
+                            <Border Padding="12,8"
                                     BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
-                                    Stroke="Transparent"
-                                    StrokeThickness="0"
                                     HorizontalOptions="End"
-                                    MaximumWidthRequest="280"
+                                    WidthRequest="360"
                                     IsVisible="{Binding IsUser}">
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="18,18,4,18" />
                                 </Border.StrokeShape>
-                                <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
-                                    <!-- 发送者 -->
-                                    <Label Grid.Row="0" 
-                                           Text="{Binding Sender}" 
-                                           FontSize="11" 
-                                           FontAttributes="Bold"
-                                           TextColor="White"
-                                           Margin="0" />
-                                    <!-- 内容 -->
-                                    <Label Grid.Row="1" 
-                                           Text="{Binding Content}" 
-                                           FontSize="14" 
-                                           TextColor="White"
-                                           LineBreakMode="WordWrap" />
-                                </Grid>
+                                <StackLayout Spacing="2">
+                                    <Label Text="{Binding Sender}" 
+                                           Style="{StaticResource MessageSenderStyle}"
+                                           TextColor="White" />
+                                    <Label Text="{Binding Content}" 
+                                           Style="{StaticResource MessageTextStyle}"
+                                           TextColor="White" />
+                                </StackLayout>
                             </Border>
                             
-                            <!-- 系统/AI消息 - 左对齐 -->
-                            <Border Grid.Row="1" 
-                                    Padding="12,8"
+                            <!-- AI/系统消息 -->
+                            <Border Padding="12,8"
                                     BackgroundColor="{AppThemeBinding Light=#F8F9FA, Dark=#374151}"
                                     Stroke="{AppThemeBinding Light=#E5E7EB, Dark=#4B5563}"
                                     StrokeThickness="1"
                                     HorizontalOptions="Start"
-                                    MaximumWidthRequest="280"
+                                    WidthRequest="360"
                                     IsVisible="{Binding IsUser, Converter={toolkit:InvertedBoolConverter}}">
                                 <Border.StrokeShape>
                                     <RoundRectangle CornerRadius="18,18,18,4" />
                                 </Border.StrokeShape>
                                 <StackLayout Spacing="4">
-                                    <!-- 发送者 -->
                                     <Label Text="{Binding Sender}" 
-                                           FontSize="11" 
-                                           FontAttributes="Bold"
-                                           TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
-                                           Margin="0" />
+                                           Style="{StaticResource MessageSenderStyle}"
+                                           TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}" />
                                     
-                                    <!-- 正在思考状态指示器 -->
-                                    <StackLayout Orientation="Horizontal"
-                                                 IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Sending}}"
-                                                 Spacing="4"
-                                                 Margin="0">
-                                        <ActivityIndicator IsRunning="True"
+                                    <!-- 状态指示器 -->
+                                    <Grid ColumnDefinitions="Auto,*" 
+                                          ColumnSpacing="4"
+                                          IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Sending}}">
+                                        <ActivityIndicator Grid.Column="0" 
+                                                         IsRunning="True"
                                                          Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
-                                                         WidthRequest="12"
-                                                         HeightRequest="12" />
-                                        <Label Text="正在思考..."
-                                               FontSize="10"
-                                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                                               VerticalOptions="Center" />
-                                    </StackLayout>
+                                                         WidthRequest="12" HeightRequest="12" />
+                                        <Label Grid.Column="1" Text="正在思考..." Style="{StaticResource StatusIndicatorStyle}" />
+                                    </Grid>
                                     
-                                    <!-- 流式接收状态指示器 -->
-                                    <StackLayout Orientation="Horizontal"
-                                                 IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Streaming}}"
-                                                 Spacing="4"
-                                                 Margin="0">
-                                        <ActivityIndicator IsRunning="True"
+                                    <Grid ColumnDefinitions="Auto,*" 
+                                          ColumnSpacing="4"
+                                          IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Streaming}}">
+                                        <ActivityIndicator Grid.Column="0" 
+                                                         IsRunning="True"
                                                          Color="{AppThemeBinding Light={StaticResource Success}, Dark={StaticResource Success}}"
-                                                         WidthRequest="12"
-                                                         HeightRequest="12" />
-                                        <Label Text="正在回复..."
-                                               FontSize="10"
-                                               TextColor="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray400}}"
-                                               VerticalOptions="Center" />
-                                    </StackLayout>
+                                                         WidthRequest="12" HeightRequest="12" />
+                                        <Label Grid.Column="1" Text="正在回复..." Style="{StaticResource StatusIndicatorStyle}" />
+                                    </Grid>
                                     
-                                    <!-- 内容 -->
-                                    <StackLayout Orientation="Horizontal"
-                                                 IsVisible="{Binding Content, Converter={toolkit:IsStringNotNullOrEmptyConverter}}"
-                                                 Spacing="0">
-                                        <Label Text="{Binding Content}" 
-                                               FontSize="14" 
-                                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
-                                               LineBreakMode="WordWrap"
-                                               HorizontalOptions="FillAndExpand" />
+                                    <!-- 内容区域 -->
+                                    <Grid ColumnDefinitions="*,Auto" 
+                                          IsVisible="{Binding Content, Converter={toolkit:IsStringNotNullOrEmptyConverter}}">
+                                        <Label Grid.Column="0" 
+                                               Text="{Binding Content}" 
+                                               Style="{StaticResource MessageTextStyle}"
+                                               TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}" />
                                         
-                                        <!-- 流式接收指示器 -->
-                                        <Label Text="▋"
+                                        <Label Grid.Column="1" 
+                                               Text="▋"
                                                FontSize="14"
                                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
                                                IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Streaming}}"
                                                VerticalOptions="End"
                                                Margin="2,0,0,0" />
                                         
-                                        <!-- 失败状态图标 -->
-                                        <Label Text="⚠️"
+                                        <Label Grid.Column="1" 
+                                               Text="⚠️"
                                                FontSize="12"
                                                TextColor="{AppThemeBinding Light={StaticResource Error}, Dark={StaticResource Error}}"
                                                IsVisible="{Binding Status, Converter={toolkit:EnumToBoolConverter}, ConverterParameter={x:Static viewmodels:MessageStatus.Failed}}"
                                                VerticalOptions="Start"
                                                Margin="4,0,0,0" />
-                                    </StackLayout>
+                                    </Grid>
                                 </StackLayout>
                             </Border>
-                        </Grid>
+                        </StackLayout>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <!-- 输入区域 - 重新设计的布局 -->
-        <StackLayout Grid.Row="2" 
-                     Orientation="Horizontal" 
-                     Padding="16,12,16,16"
-                     BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1F2937}"
-                     Spacing="12"
-                     VerticalOptions="End">
+        <!-- 输入区域 -->
+        <Grid Grid.Row="2" 
+              ColumnDefinitions="*,Auto"
+              Padding="16,12,16,16"
+              BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1F2937}"
+              ColumnSpacing="12">
             
-            <!-- 输入框 - 纯Entry实现 -->
-            <Entry x:Name="MessageEntry"
+            <!-- 输入框 -->
+            <Entry Grid.Column="0"
+                   x:Name="MessageEntry"
                    Text="{Binding UserInput}"
                    Placeholder="询问关于股票分析的问题..."
                    BackgroundColor="{AppThemeBinding Light=#F9FAFB, Dark=#374151}"
@@ -277,13 +203,12 @@
                    PlaceholderColor="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray500}}"
                    TextColor="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}"
                    VerticalOptions="Center"
-                   HorizontalOptions="FillAndExpand"
                    HeightRequest="48"
-                   Margin="16,0,16,0"
                    IsEnabled="{Binding IsProcessing, Converter={toolkit:InvertedBoolConverter}}" />
 
-            <!-- 发送/取消按钮 -->
-            <Button Text="{Binding SendButtonText}"
+            <!-- 发送按钮 -->
+            <Button Grid.Column="1"
+                    Text="{Binding SendButtonText}"
                     Command="{Binding SendMessageCommand}"
                     BackgroundColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource Primary}}"
                     TextColor="White"
@@ -294,8 +219,7 @@
                     CornerRadius="26"
                     BorderWidth="0"
                     VerticalOptions="Center"
-                    HorizontalOptions="Center"
                     Padding="0" />
-        </StackLayout>
+        </Grid>
     </Grid>
 </ContentView>
