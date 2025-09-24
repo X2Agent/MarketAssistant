@@ -10,9 +10,14 @@ namespace MarketAssistant.ViewModels;
 public enum MessageStatus
 {
     /// <summary>
-    /// 发送中
+    /// 发送中（正在思考）
     /// </summary>
     Sending,
+    
+    /// <summary>
+    /// 正在接收流式内容
+    /// </summary>
+    Streaming,
     
     /// <summary>
     /// 已发送

@@ -78,7 +78,7 @@
         <!-- 聊天侧边栏 -->
         <Border Grid.Column="1" 
                 IsVisible="{Binding IsChatSidebarVisible}"
-                WidthRequest="420"
+                WidthRequest="480"
                 BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}"
                 Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
                 StrokeThickness="1">

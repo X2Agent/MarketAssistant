@@ -1,4 +1,7 @@
 using MarketAssistant.ViewModels;
+using Microsoft.Extensions.Logging;
+using System.Collections;
+using System.Collections.Specialized;
 using System.Windows.Input;
 
 namespace MarketAssistant.Views;
@@ -8,6 +11,10 @@ namespace MarketAssistant.Views;
 /// </summary>
 public partial class ChatSidebarView : ContentView
 {
+    private readonly ILogger<ChatSidebarView>? _logger;
+    private ChatSidebarViewModel? _viewModel;
+    private bool _isCollectionViewLoaded = false;
+
     public static readonly BindableProperty CloseCommandProperty =
         BindableProperty.Create(nameof(CloseCommand), typeof(ICommand), typeof(ChatSidebarView), null);
 
@@ -22,102 +29,107 @@ public partial class ChatSidebarView : ContentView
         InitializeComponent();
     }
 
-    public ChatSidebarView(ChatSidebarViewModel viewModel) : this()
+    public ChatSidebarView(ChatSidebarViewModel viewModel, ILogger<ChatSidebarView> logger) : this()
     {
+        _logger = logger;
         BindingContext = viewModel;
-        
-        // 订阅ViewModel的滚动事件
-        viewModel.ScrollToBottom += ScrollToBottom;
-        
-        // 监听消息集合变化
-        viewModel.ChatMessages.CollectionChanged += OnChatMessagesChanged;
-        
-        // 如果已有消息，则在UI加载完成后滚动到底部
-        if (viewModel.ChatMessages.Count > 0)
+        AttachToViewModel(viewModel);
+    }
+
+    protected override void OnBindingContextChanged()
+    {
+        base.OnBindingContextChanged();
+
+        if (BindingContext is ChatSidebarViewModel newViewModel)
         {
-            Loaded += OnViewLoaded;
+            AttachToViewModel(newViewModel);
         }
-        
-        // 监听CollectionView的SizeChanged事件，确保在布局完成后滚动
-        ChatCollectionView.SizeChanged += OnCollectionViewSizeChanged;
-    }
-
-    private bool _initialScrollPending = false;
-
-    /// <summary>
-    /// 视图加载完成后的处理
-    /// </summary>
-    private async void OnViewLoaded(object? sender, EventArgs e)
-    {
-        Loaded -= OnViewLoaded;
-        
-        // 标记需要初始滚动
-        _initialScrollPending = true;
-        
-        // 等待UI完全渲染完成
-        await Task.Delay(200);
-        ScrollToBottom();
-    }
-
-    /// <summary>
-    /// CollectionView大小变化时的处理（确保布局完成后滚动）
-    /// </summary>
-    private void OnCollectionViewSizeChanged(object? sender, EventArgs e)
-    {
-        if (_initialScrollPending && BindingContext is ChatSidebarViewModel viewModel && viewModel.ChatMessages.Count > 0)
+        else
         {
-            _initialScrollPending = false;
-            ChatCollectionView.SizeChanged -= OnCollectionViewSizeChanged;
-            
-            // 延迟一点确保所有项都渲染完成
-            MainThread.BeginInvokeOnMainThread(async () =>
+            DetachFromViewModel();
+        }
+    }
+
+    private void AttachToViewModel(ChatSidebarViewModel viewModel)
+    {
+        if (ReferenceEquals(_viewModel, viewModel))
+        {
+            return;
+        }
+
+        DetachFromViewModel();
+
+        _viewModel = viewModel;
+        _viewModel.ChatMessages.CollectionChanged += OnChatMessagesChanged;
+
+        // 如果已经有消息且CollectionView已加载，延迟滚动到底部
+        if (_viewModel.ChatMessages.Count > 0 && _isCollectionViewLoaded)
+        {
+            _ = ScrollToBottomAsync();
+        }
+    }
+
+    private void DetachFromViewModel()
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        _viewModel.ChatMessages.CollectionChanged -= OnChatMessagesChanged;
+        _viewModel = null;
+    }
+
+    /// <summary>
+    /// 聊天消息集合变化时自动滚动到底部
+    /// </summary>
+    private void OnChatMessagesChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // 只在添加、替换或重置消息时滚动到底部
+        if (e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset)
+        {
+            _ = ScrollToBottomAsync();
+        }
+    }
+
+    /// <summary>
+    /// CollectionView 初始化完成后触发
+    /// </summary>
+    private void OnChatCollectionViewLoaded(object? sender, EventArgs e)
+    {
+        _isCollectionViewLoaded = true;
+        // 初始化完成后延迟滚动到底部
+        _ = ScrollToBottomAsync();
+    }
+
+    /// <summary>
+    /// 异步滚动到底部，确保CollectionView完全初始化
+    /// </summary>
+    private async Task ScrollToBottomAsync()
+    {
+        if (!_isCollectionViewLoaded)
+        {
+            return;
+        }
+
+        try
+        {
+            // 等待一小段时间确保UI完全渲染
+            await Task.Delay(100);
+
+            await Dispatcher.DispatchAsync(() =>
             {
-                await Task.Delay(100);
-                ScrollToBottom();
+                if (!IsVisible || ChatCollectionView.ItemsSource is not IList items || items.Count == 0)
+                {
+                    return;
+                }
+
+                ChatCollectionView.ScrollTo(items[^1], position: ScrollToPosition.End, animate: true);
             });
         }
-    }
-
-    /// <summary>
-    /// 处理消息集合变化
-    /// </summary>
-    private void OnChatMessagesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-    {
-        if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+        catch (Exception ex)
         {
-            ScrollToBottom();
+            _logger?.LogWarning(ex, "滚动到底部失败");
         }
-    }
-
-    /// <summary>
-    /// 滚动到底部显示最新消息
-    /// </summary>
-    public void ScrollToBottom()
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            try
-            {
-                if (BindingContext is ChatSidebarViewModel viewModel && 
-                    viewModel.ChatMessages?.Count > 0)
-                {
-                    // 等待UI更新完成
-                    await Task.Delay(100);
-                    
-                    var lastMessage = viewModel.ChatMessages.Last();
-                    
-                    // 使用更可靠的滚动方式
-                    ChatCollectionView.ScrollTo(lastMessage, ScrollToPosition.End, animate: false);
-                    
-                    // 再次确保滚动到最底部
-                    await Task.Delay(50);
-                    ChatCollectionView.ScrollTo(lastMessage, ScrollToPosition.End, animate: true);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"滚动到底部失败: {ex.Message}");
-            }
-        });
     }
 }

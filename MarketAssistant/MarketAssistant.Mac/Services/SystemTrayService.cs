@@ -2,6 +2,7 @@ using AppKit;
 using Foundation;
 using MarketAssistant.Services;
 using Microsoft.Extensions.Logging;
+using CoreGraphics;
 
 namespace MarketAssistant.Mac.Services
 {
@@ -109,13 +110,13 @@ namespace MarketAssistant.Mac.Services
                         case NSImage imageObj:
                             imageObj.Size = new CoreGraphics.CGSize(18, 18);
                             _statusItem.Button.Image = imageObj;
-                            _statusItem.Button.Title = ""; // 清除文字标题
+						_statusItem.Button.Title = string.Empty; // 清除文字标题
                             break;
                         case string iconPath when File.Exists(iconPath):
                             var image = new NSImage(iconPath);
                             image.Size = new CoreGraphics.CGSize(18, 18);
                             _statusItem.Button.Image = image;
-                            _statusItem.Button.Title = ""; // 清除文字标题
+						_statusItem.Button.Title = string.Empty; // 清除文字标题
                             break;
                         case string iconPath:
                             _logger.LogWarning($"托盘图标文件不存在: {iconPath}");
@@ -129,7 +130,14 @@ namespace MarketAssistant.Mac.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"设置托盘图标失败: {iconPath}");
+				var iconDescription = icon switch
+				{
+					NSImage => nameof(NSImage),
+					string path => path,
+					_ => icon?.GetType().Name ?? "未知类型"
+				};
+
+				_logger.LogError(ex, $"设置托盘图标失败: {iconDescription}");
                     SetDefaultIcon();
                 }
             });

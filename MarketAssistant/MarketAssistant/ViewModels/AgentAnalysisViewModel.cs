@@ -190,7 +190,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                 Sender = e.AuthorName ?? string.Empty,
                 Content = e.Content ?? string.Empty,
                 Timestamp = DateTime.Now,
-                TokenCount = 0
             };
 
             AnalysisMessages.Add(message);
@@ -220,6 +219,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             // 缓存中没有结果，执行新的分析
             Logger?.LogInformation("缓存中没有结果，开始新的分析: {StockCode}", StockCode);
             AnalysisMessages.Clear();
+
+#if DEBUG
             // 模拟分析数据（避免调试时浪费Token）
             var mockAnalysisMessages = new List<AnalysisMessage>
             {
@@ -233,7 +234,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                              "• 成交量较前期放大约 20%，资金关注度提升\n\n" +
                              "**技术面评级：看多** 📈",
                     Timestamp = DateTime.Now.AddMinutes(-5),
-                    TokenCount = 156
+                    InputTokenCount = 156
                 },
                 new AnalysisMessage
                 {
@@ -246,34 +247,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                              "• 现金流充裕，经营活动现金流为正\n\n" +
                              "**基本面评级：中性偏多** 📊",
                     Timestamp = DateTime.Now.AddMinutes(-4),
-                    TokenCount = 189
-                },
-                new AnalysisMessage
-                {
-                    Sender = "市场情绪分析师",
-                    Content = $"【市场情绪分析】{StockCode} 市场表现：\n\n" +
-                             "• 近5日资金净流入 2.3亿元，主力资金积极布局\n" +
-                             "• 机构持仓比例上升至 68%，长线资金看好\n" +
-                             "• 市场关注度指数 85/100，热度较高\n" +
-                             "• 分析师一致预期目标价上调 8%\n" +
-                             "• 社交媒体情绪指数 72，整体偏乐观\n\n" +
-                             "**市场情绪：积极** 🚀",
-                    Timestamp = DateTime.Now.AddMinutes(-3),
-                    TokenCount = 142
-                },
-                new AnalysisMessage
-                {
-                    Sender = "风险控制分析师",
-                    Content = $"【风险评估】{StockCode} 风险因子分析：\n\n" +
-                             "• 行业景气度：当前处于周期上行阶段\n" +
-                             "• 政策风险：相关政策环境相对稳定\n" +
-                             "• 估值风险：PE 22倍，略高于行业平均\n" +
-                             "• 流动性风险：日均成交额充足，流动性良好\n" +
-                             "• 系统性风险：需关注宏观经济波动\n\n" +
-                             "**风险等级：中等** ⚠️\n" +
-                             "**建议仓位：建议控制在组合的 5-8% 以内**",
-                    Timestamp = DateTime.Now.AddMinutes(-2),
-                    TokenCount = 168
+                    InputTokenCount = 189
                 },
                 new AnalysisMessage
                 {
@@ -291,7 +265,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                              "• 持有周期：建议 3-6 个月\n\n" +
                              "**风险提示：** 请注意控制仓位，做好风险管理 📋",
                     Timestamp = DateTime.Now.AddMinutes(-1),
-                    TokenCount = 225
+                    InputTokenCount = 225
                 }
             };
 
@@ -301,27 +275,36 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                 // 模拟分析过程的延迟
                 await Task.Delay(200);
             }
+#else
+            var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
+            foreach (var message in history)
+            {
+                if (message.Role != Microsoft.SemanticKernel.ChatCompletion.AuthorRole.Assistant)
+                {
+                    continue; // 只处理助手的消息
+                }
+                if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
+                {
+                    continue;
+                }
+                var analysisMessage = new AnalysisMessage
+                {
+                    Sender = message.AuthorName ?? string.Empty,
+                    Content = message.Content ?? string.Empty,
+                    Timestamp = DateTime.Now,
+                };
+                if (message.Metadata.TryGetValue("Usage", out var usageObject))
+                {
+                    if (usageObject is OpenAI.Chat.ChatTokenUsage openAIUsage)
+                    {
+                        analysisMessage.InputTokenCount = openAIUsage.InputTokenCount;
+                        analysisMessage.OutputTokenCount = openAIUsage.OutputTokenCount;
+                    }
+                }
 
-            // 实际分析代码（调试时注释）
-            //var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
-            //foreach (var message in history)
-            //{
-            //    if (message.Role != AuthorRole.Assistant)
-            //    {
-            //        continue; // 只处理助手的消息
-            //    }
-            //    if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
-            //    {
-            //        continue;
-            //    }
-            //    AnalysisMessages.Add(new AnalysisMessage()
-            //    {
-            //        Sender = message.AuthorName ?? string.Empty,
-            //        Content = message.Content ?? string.Empty,
-            //        Timestamp = DateTime.Now,
-            //        TokenCount = 0
-            //    });
-            //}
+                AnalysisMessages.Add(analysisMessage);
+            }
+#endif
             //更新聊天侧边栏，初始化分析历史记录
             if (ChatSidebarViewModel != null)
             {

@@ -32,7 +32,6 @@ public class MarketChatAgent
     #region 私有字段
 
     private readonly IChatCompletionService _chatCompletionService;
-    private readonly MarketAnalysisAgent? _analysisAgent;
     private readonly ILogger<MarketChatAgent> _logger;
     private readonly Kernel _kernel;
 
@@ -46,10 +45,6 @@ public class MarketChatAgent
     /// </summary>
     private string _currentStockCode = string.Empty;
 
-    /// <summary>
-    /// 系统消息缓存，避免重复生成相同内容
-    /// </summary>
-    private readonly Dictionary<string, ChatMessageContent> _systemMessageCache = new();
 
     /// <summary>
     /// 取消令牌源
@@ -62,11 +57,9 @@ public class MarketChatAgent
 
     public MarketChatAgent(
         ILogger<MarketChatAgent> logger,
-        Kernel kernel,
-        MarketAnalysisAgent? analysisAgent = null)
+        Kernel kernel)
     {
         _chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
-        _analysisAgent = analysisAgent;
         _logger = logger;
         _kernel = kernel;
 
@@ -83,10 +76,6 @@ public class MarketChatAgent
     /// </summary>
     public event EventHandler<StreamingResponseEventArgs>? StreamingResponse;
 
-    /// <summary>
-    /// 上下文压缩事件
-    /// </summary>
-    public event EventHandler<ContextCompressionEventArgs>? ContextCompressed;
 
 
     #endregion
@@ -132,8 +121,6 @@ public class MarketChatAgent
 
             // 检查并管理上下文窗口
             await ManageContextWindowAsync();
-
-            // 不再进行硬编码的动态上下文注入
 
             // 创建取消令牌源
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -253,17 +240,21 @@ public class MarketChatAgent
             // 将完整响应添加到历史
             if (completeResponse.Length > 0)
             {
-                var fullResponse = new ChatMessageContent(AuthorRole.Assistant, completeResponse.ToString())
+                var cleanedContent = completeResponse.ToString().Trim();
+                if (!string.IsNullOrEmpty(cleanedContent))
                 {
-                    AuthorName = "市场分析助手"
-                };
-                _conversationHistory.Add(fullResponse);
+                    var fullResponse = new ChatMessageContent(AuthorRole.Assistant, cleanedContent)
+                    {
+                        AuthorName = "市场分析助手"
+                    };
+                    _conversationHistory.Add(fullResponse);
+                }
             }
 
             // 触发完成事件
             StreamingResponse?.Invoke(this, new StreamingResponseEventArgs
             {
-                Content = completeResponse.ToString(),
+                Content = completeResponse.ToString().Trim(),
                 IsComplete = true
             });
 
@@ -298,25 +289,15 @@ public class MarketChatAgent
 
         // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
         var hasUserMessages = _conversationHistory.Any(m => m.Role == AuthorRole.User);
-        
+
         if (hasUserMessages && !string.IsNullOrEmpty(stockCode))
         {
-            var switchKey = "stock_switch_notification";
-            var switchMessage = string.IsNullOrEmpty(previousStockCode) 
+            var switchMessage = string.IsNullOrEmpty(previousStockCode)
                 ? $"开始分析股票: {stockCode}"
                 : $"分析焦点已从 {previousStockCode} 切换到 {stockCode}";
-            
-            // 移除之前的切换通知
-            RemoveSystemMessageByKey(switchKey);
-            
-            // 添加新的切换通知
-            var contextMessage = new ChatMessageContent(AuthorRole.System, switchMessage)
-            {
-                AuthorName = "系统"
-            };
-            
-            _systemMessageCache[switchKey] = contextMessage;
-            _conversationHistory.Add(contextMessage);
+
+            // 添加切换通知
+            _conversationHistory.AddSystemMessage(switchMessage);
         }
     }
 
@@ -326,9 +307,8 @@ public class MarketChatAgent
     public void ClearHistory()
     {
         _conversationHistory.Clear();
-        _systemMessageCache.Clear();
         InitializeSystemContext();
-        _logger.LogInformation("已清空对话历史和系统消息缓存");
+        _logger.LogInformation("已清空对话历史");
     }
 
     /// <summary>
@@ -345,25 +325,6 @@ public class MarketChatAgent
     }
 
 
-    /// <summary>
-    /// 获取上下文统计信息
-    /// </summary>
-    /// <returns>上下文统计</returns>
-    public ContextStatistics GetContextStatistics()
-    {
-        var messageCount = _conversationHistory.Count;
-        var userMessageCount = _conversationHistory.Count(m => m.Role == AuthorRole.User);
-        var assistantMessageCount = _conversationHistory.Count(m => m.Role == AuthorRole.Assistant);
-
-        return new ContextStatistics
-        {
-            TotalMessages = messageCount,
-            UserMessages = userMessageCount,
-            AssistantMessages = assistantMessageCount,
-            MessageUtilization = (double)messageCount / MaxContextMessages, // 基于消息数量的利用率
-            CurrentStockCode = _currentStockCode
-        };
-    }
 
     #endregion
 
@@ -383,54 +344,17 @@ public class MarketChatAgent
     /// </summary>
     private async Task UpdateSystemContextAsync()
     {
-        // 生成新的股票上下文消息键
-        var contextKey = $"stock_context_{_currentStockCode}";
-        
         if (!string.IsNullOrEmpty(_currentStockCode))
         {
             var analysisContext = await GetAnalysisContextAsync(_conversationHistory, _currentStockCode);
             if (!string.IsNullOrEmpty(analysisContext))
             {
-                var newContextContent = $"当前股票分析上下文：\n{analysisContext}";
-                
-                // 检查是否需要更新（内容是否有变化）
-                if (!_systemMessageCache.ContainsKey(contextKey) || 
-                    _systemMessageCache[contextKey].Content != newContextContent)
-                {
-                    // 移除旧的股票上下文消息
-                    RemoveSystemMessageByKey(contextKey);
-                    
-                    // 创建并缓存新的上下文消息
-                    var contextMessage = new ChatMessageContent(AuthorRole.System, newContextContent)
-                    {
-                        AuthorName = "系统"
-                    };
-                    
-                    _systemMessageCache[contextKey] = contextMessage;
-                    _conversationHistory.Add(contextMessage);
-                }
+                var contextContent = $"当前股票分析上下文：\n{analysisContext}";
+                _conversationHistory.AddSystemMessage(contextContent);
             }
-        }
-        else
-        {
-            // 如果没有股票代码，移除相关的上下文消息
-            RemoveSystemMessageByKey(contextKey);
         }
     }
 
-    /// <summary>
-    /// 移除指定键的系统消息
-    /// </summary>
-    /// <param name="key">消息键</param>
-    private void RemoveSystemMessageByKey(string key)
-    {
-        if (_systemMessageCache.ContainsKey(key))
-        {
-            var messageToRemove = _systemMessageCache[key];
-            _conversationHistory.Remove(messageToRemove);
-            _systemMessageCache.Remove(key);
-        }
-    }
 
 
     /// <summary>
@@ -497,7 +421,7 @@ public class MarketChatAgent
         var orderedSelectedMessages = selectedMessages
             .OrderBy(m => nonSystemMessages.IndexOf(m))
             .ToList();
-        
+
         foreach (var message in orderedSelectedMessages)
         {
             _conversationHistory.Add(message);
@@ -507,14 +431,6 @@ public class MarketChatAgent
 
         _logger.LogInformation("上下文压缩完成，消息数: {OriginalCount} -> {NewCount}，保留重要消息: {RetainedCount}",
             originalCount, newCount, selectedMessages.Count);
-
-        // 触发压缩事件
-        ContextCompressed?.Invoke(this, new ContextCompressionEventArgs
-        {
-            OriginalMessageCount = originalCount,
-            NewMessageCount = newCount,
-            CompressionRatio = (double)newCount / originalCount
-        });
     }
 
     /// <summary>
@@ -596,7 +512,7 @@ public class MarketChatAgent
         // 问句和分析结论加分
         if (content.Contains("?") || content.Contains("？"))
             score += 1.0;
-        
+
         if (content.Contains("结论") || content.Contains("建议") || content.Contains("总结"))
             score += 2.0;
 
@@ -639,12 +555,12 @@ public class MarketChatAgent
                                    $"3. 重要的投资建议或风险提示\n" +
                                    $"4. 用户关心的核心问题\n" +
                                    $"请用3-5句话概括，保持专业性：";
-            
+
             compressionHistory.AddSystemMessage(compressionPrompt);
             compressionHistory.AddUserMessage(combinedText);
 
             var summary = await _chatCompletionService.GetChatMessageContentAsync(compressionHistory);
-            return summary.Content ?? string.Empty;
+            return summary.Content?.Trim() ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -661,52 +577,36 @@ public class MarketChatAgent
     /// <returns>系统提示词</returns>
     private static string BuildSystemPrompt(string stockCode)
     {
-        var prompt = new StringBuilder();
-        prompt.AppendLine("你是一个专业的股票市场分析助手，具备以下能力：");
-        prompt.AppendLine("1. 提供专业的股票分析和投资建议");
-        prompt.AppendLine("2. 解答用户关于股票市场的各种问题");
-        prompt.AppendLine("3. 基于技术分析、基本面分析等多维度提供见解");
-        prompt.AppendLine("4. 主动使用可用的分析工具获取实时数据");
-        prompt.AppendLine("5. 保持客观、专业的态度，提醒投资风险");
-        prompt.AppendLine();
-        
-        prompt.AppendLine("工具使用指导：");
-        prompt.AppendLine("- 当需要股票基本信息时，优先使用股票基础信息插件");
-        prompt.AppendLine("- 当需要财务数据时，使用财务分析插件获取准确数据");
-        prompt.AppendLine("- 当需要技术指标时，使用技术分析插件计算指标");
-        prompt.AppendLine("- 当需要最新新闻时，使用新闻搜索插件获取资讯");
-        prompt.AppendLine("- 当需要筛选股票时，使用股票筛选插件");
-        prompt.AppendLine();
-        
-        prompt.AppendLine("回复格式要求：");
-        prompt.AppendLine("- 使用结构化格式：【核心观点】、【数据支撑】、【技术分析】、【风险提示】");
-        prompt.AppendLine("- 语言简洁明了，避免过于技术化的术语");
-        prompt.AppendLine("- 提供具体的数据和分析依据");
-        prompt.AppendLine("- 重要数据用**粗体**标注");
-        prompt.AppendLine("- 始终在结尾提醒投资风险");
+        var basePrompt = """
+            你是一个专业的股票市场分析助手，具备以下能力：
+            1. 提供专业的股票分析和投资建议
+            2. 解答用户关于股票市场的各种问题
+            3. 基于技术分析、基本面分析等多维度提供见解
+            4. 主动使用可用的分析工具获取实时数据
+            5. 保持客观、专业的态度，提醒投资风险
 
-        if (!string.IsNullOrEmpty(stockCode))
-        {
-            prompt.AppendLine();
-            prompt.AppendLine($"**当前分析焦点：{stockCode}**");
-            prompt.AppendLine();
-            prompt.AppendLine("重要约束：");
-            prompt.AppendLine($"- 你的专业领域是股票 {stockCode} 的分析，请将所有回复都围绕这只股票展开");
-            prompt.AppendLine("- 如果用户询问与该股票无关的问题（如天气、娱乐、其他股票等），请礼貌地引导用户回到股票分析主题");
-            prompt.AppendLine($"- 引导示例：\"我专注于为您分析 {stockCode}，让我们聊聊这只股票的[技术面/基本面/市场表现]如何？\"");
-            prompt.AppendLine("- 根据用户问题的类型，自动调整分析角度：");
-            prompt.AppendLine("  * 技术分析问题 → 重点分析图表形态、技术指标、价格趋势");
-            prompt.AppendLine("  * 基本面问题 → 重点分析财务数据、业务模式、行业地位");
-            prompt.AppendLine("  * 风险相关问题 → 特别强调风险提示和风险管理建议");
-        }
-        else
-        {
-            prompt.AppendLine();
-            prompt.AppendLine("- 当用户指定具体股票时，请专注分析该股票");
-            prompt.AppendLine("- 根据问题类型智能调整分析视角和重点");
-        }
+            工具使用指导：
+            - 当需要股票基本信息时，优先使用股票基础信息插件
+            - 当需要财务数据时，使用财务分析插件获取准确数据
+            - 当需要技术指标时，使用技术分析插件计算指标
+            - 当需要最新新闻时，使用新闻搜索插件获取资讯
+            - 当需要筛选股票时，使用股票筛选插件
 
-        return prompt.ToString();
+            回复格式要求：
+            - 使用结构化格式：【核心观点】、【数据支撑】、【技术分析】、【风险提示】
+            - 语言简洁明了，避免过于技术化的术语
+            - 提供具体的数据和分析依据
+            - 重要数据用**粗体**标注
+            - 始终在结尾提醒投资风险
+            - 根据用户问题的类型，自动调整分析角度：
+              * 技术分析问题 → 重点分析图表形态、技术指标、价格趋势
+              * 基本面问题 → 重点分析财务数据、业务模式、行业地位
+              * 风险相关问题 → 特别强调风险提示和风险管理建议
+            """;
+
+        return string.IsNullOrEmpty(stockCode)
+            ? basePrompt
+            : $"{basePrompt}\n\n**当前分析焦点：{stockCode}**";
     }
 
     /// <summary>
@@ -743,8 +643,8 @@ public class MarketChatAgent
     private string ExtractAnalysisContext(ChatHistory analysisHistory, string stockCode)
     {
         var contextBuilder = new StringBuilder();
-        contextBuilder.AppendLine($"当前分析股票：{stockCode}");
-        contextBuilder.AppendLine("最近的分析观点摘要：");
+        contextBuilder.Append($"当前分析股票：{stockCode}\n");
+        contextBuilder.Append("最近的分析观点摘要：\n");
 
         // 获取最近的分析师观点（限制长度避免上下文过长）
         var recentMessages = analysisHistory
@@ -759,10 +659,10 @@ public class MarketChatAgent
                 ? message.Content.Substring(0, 200) + "..."
                 : message.Content;
 
-            contextBuilder.AppendLine($"- {authorName}: {content}");
+            contextBuilder.Append($"- {authorName}: {content}\n");
         }
 
-        return contextBuilder.ToString();
+        return contextBuilder.ToString().Trim();
     }
 
     #endregion
@@ -784,55 +684,4 @@ public class StreamingResponseEventArgs : EventArgs
     public bool IsComplete { get; set; }
 }
 
-/// <summary>
-/// 上下文压缩事件参数
-/// </summary>
-public class ContextCompressionEventArgs : EventArgs
-{
-    /// <summary>
-    /// 原始消息数量
-    /// </summary>
-    public int OriginalMessageCount { get; set; }
 
-    /// <summary>
-    /// 压缩后消息数量
-    /// </summary>
-    public int NewMessageCount { get; set; }
-
-    /// <summary>
-    /// 压缩比率（基于消息数量）
-    /// </summary>
-    public double CompressionRatio { get; set; }
-}
-
-
-/// <summary>
-/// 上下文统计信息
-/// </summary>
-public class ContextStatistics
-{
-    /// <summary>
-    /// 总消息数
-    /// </summary>
-    public int TotalMessages { get; set; }
-
-    /// <summary>
-    /// 用户消息数
-    /// </summary>
-    public int UserMessages { get; set; }
-
-    /// <summary>
-    /// 助手消息数
-    /// </summary>
-    public int AssistantMessages { get; set; }
-
-    /// <summary>
-    /// 消息利用率（基于最大消息数量）
-    /// </summary>
-    public double MessageUtilization { get; set; }
-
-    /// <summary>
-    /// 当前股票代码
-    /// </summary>
-    public string CurrentStockCode { get; set; } = string.Empty;
-}

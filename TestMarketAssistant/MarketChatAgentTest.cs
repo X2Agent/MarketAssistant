@@ -8,7 +8,6 @@ namespace TestMarketAssistant;
 public class MarketChatAgentTest : BaseKernelTest
 {
     private MarketChatAgent _chatAgent;
-    private MarketAnalysisAgent _analysisAgent;
 
     [TestInitialize]
     public void Initialize()
@@ -16,13 +15,7 @@ public class MarketChatAgentTest : BaseKernelTest
         BaseInitialize();
 
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketChatAgent>();
-        var analysisLogger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketAnalysisAgent>();
-        var analystManagerLogger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<AnalystManager>();
-        var kernelPluginConfig = _kernel.Services.GetRequiredService<IKernelPluginConfig>();
-        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, kernelPluginConfig);
-
-        _analysisAgent = new MarketAnalysisAgent(analysisLogger, analystManager);
-        _chatAgent = new MarketChatAgent(logger, _kernel, _analysisAgent);
+        _chatAgent = new MarketChatAgent(logger, _kernel);
     }
 
     [TestMethod]
@@ -101,12 +94,11 @@ public class MarketChatAgentTest : BaseKernelTest
             await _chatAgent.SendMessageAsync($"这是第{i}条测试消息，关于sz002594的股票分析。");
         }
 
-        // 检查上下文统计
-        var stats = _chatAgent.GetContextStatistics();
-        Assert.IsTrue(stats.TotalMessages > 0);
-        Assert.AreEqual("sz002594", stats.CurrentStockCode);
+        // 检查对话历史是否有内容
+        Assert.IsTrue(_chatAgent.ConversationHistory.Count > 0);
+        Assert.AreEqual("sz002594", _chatAgent.CurrentStockCode);
 
-        Console.WriteLine($"消息数: {stats.TotalMessages}, 利用率: {stats.MessageUtilization:P2}");
+        Console.WriteLine($"消息数: {_chatAgent.ConversationHistory.Count}");
     }
 
     [TestMethod]
