@@ -4,11 +4,21 @@ namespace MarketAssistant.Pages;
 
 public partial class AgentAnalysisPage : ContentPage
 {
-    public AgentAnalysisPage(AgentAnalysisViewModel viewModel)
-    {
-        InitializeComponent();
+    private readonly ChatSidebarViewModel _chatSidebarViewModel;
 
+    public AgentAnalysisPage(AgentAnalysisViewModel viewModel, ChatSidebarViewModel chatSidebarViewModel)
+    {
+        _chatSidebarViewModel = chatSidebarViewModel;
+        
+        // 建立 ViewModel 连接
+        viewModel.ChatSidebarViewModel = _chatSidebarViewModel;
+        
+        // 初始化 ChatSidebarViewModel 为空白状态（显示欢迎消息）
+        // 这样在分析数据加载之前用户就能看到合适的初始状态
+        _chatSidebarViewModel.InitializeEmpty();
+        
         BindingContext = viewModel;
+        InitializeComponent();
 
         // 页面加载完成后加载数据
         Loaded += OnPageLoaded;

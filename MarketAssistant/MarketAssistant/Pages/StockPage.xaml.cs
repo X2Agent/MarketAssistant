@@ -44,7 +44,7 @@ public partial class StockPage : ContentPage
             try
             {
                 // 更新WebView图表
-                await WebChartView.SetTitleAsync(_viewModel.StockName);
+                await WebChartView.SetTitleAsync(_viewModel.StockCode);
                 await WebChartView.UpdateChartAsync(_viewModel.KLineData);
             }
             catch (Exception ex)

@@ -93,16 +93,6 @@ public class KernelFactory : IKernelFactory
 
         builder.Plugins.AddFromPromptDirectory(Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml"));
 
-        try
-        {
-            var mcpFunctions = McpPlugin.GetKernelFunctionsAsync().GetAwaiter().GetResult();
-            builder.Plugins.AddFromFunctions("mcp", mcpFunctions);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"加载 MCP 插件失败: {ex.Message}");
-        }
-
         return builder.Build();
     }
 }

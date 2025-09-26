@@ -18,17 +18,18 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid>
-        <!-- 进度显示区域 - 仅在分析时显示 -->
-        <views:ProgressDisplayView 
-            IsVisible="{Binding IsBusy}"
-            IsProgressVisible="{Binding IsBusy}"
-            IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
-            AnalysisStage="{Binding AnalysisStage}"
-            ShowDetailsCommand="{Binding ShowAnalysisDetailsCommand}"/>
+    <Grid ColumnDefinitions="*,Auto">
+        <!-- 主内容区域 -->
+        <Grid Grid.Column="0">
+            <!-- 进度显示区域 - 仅在分析时显示 -->
+            <views:ProgressDisplayView 
+                IsVisible="{Binding IsBusy}"
+                IsProgressVisible="{Binding IsBusy}"
+                IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
+                AnalysisStage="{Binding AnalysisStage}"/>
 
-        <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
-        <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
+            <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
+            <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}">
             <!-- 智能分析报告区域 -->
             <ContentView BindingContext="{Binding AnalysisReportViewModel}"
                          IsVisible="{Binding Source={x:Reference ParentPage}, Path=BindingContext.IsRawDataViewVisible, Converter={StaticResource InvertedBoolConverter}}">
@@ -52,17 +53,38 @@
                 InputTransparent="True" 
                 ZIndex="999" />
             
-            <!-- 浮动操作按钮(FAB) -->
-            <StackLayout HorizontalOptions="End" VerticalOptions="End" 
-                         ZIndex="1000" Margin="{StaticResource BottomRightLargeMargin}">
-                <!-- 切换视图按钮 -->
-                <Button 
-                    Style="{StaticResource FabButtonStyle}"
-                    Text="⇄" 
-                    FontSize="24"
-                    Command="{Binding ToggleViewCommand}"
-                    ToolTipProperties.Text="切换视图" />                
-            </StackLayout>
+                <!-- 浮动操作按钮(FAB) -->
+                <StackLayout HorizontalOptions="End" VerticalOptions="End" 
+                             ZIndex="1000" Margin="{StaticResource BottomRightLargeMargin}" Spacing="8">
+                    <!-- 聊天按钮 -->
+                    <Button 
+                        Style="{StaticResource FabButtonStyle}"
+                        Text="💬" 
+                        FontSize="24"
+                        Command="{Binding ToggleChatSidebarCommand}"
+                        ToolTipProperties.Text="智能对话" />
+                    
+                    <!-- 切换视图按钮 -->
+                    <Button 
+                        Style="{StaticResource FabButtonStyle}"
+                        Text="⇄" 
+                        FontSize="24"
+                        Command="{Binding ToggleViewCommand}"
+                        ToolTipProperties.Text="切换视图" />                
+                </StackLayout>
+            </Grid>
         </Grid>
+
+        <!-- 聊天侧边栏 -->
+        <Border Grid.Column="1" 
+                IsVisible="{Binding IsChatSidebarVisible}"
+                WidthRequest="480"
+                BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}"
+                Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray700}}"
+                StrokeThickness="1">
+            <views:ChatSidebarView x:Name="ChatSidebarView" 
+                                   BindingContext="{Binding ChatSidebarViewModel}"
+                                   CloseCommand="{Binding Source={x:Reference ParentPage}, Path=BindingContext.ToggleChatSidebarCommand}" />
+        </Border>
     </Grid>
 </ContentPage>

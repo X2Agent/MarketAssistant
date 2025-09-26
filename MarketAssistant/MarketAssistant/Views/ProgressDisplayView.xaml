@@ -41,10 +41,6 @@
             <Label x:Name="StageLabel" FontSize="14" HorizontalOptions="Center" 
                    TextColor="{AppThemeBinding Light={StaticResource TextSecondaryLight}, Dark={StaticResource TextSecondaryDark}}" />
 
-            <Button x:Name="ShowDetailsButton" Text="查看分析过程" 
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Command="{Binding ShowDetailsCommand, Source={x:Reference Root}}" />
-
         </VerticalStackLayout>
     </Border>
 </ContentView>

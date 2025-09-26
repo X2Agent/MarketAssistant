@@ -1,227 +1,207 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
-namespace MarketAssistant.ViewModels
+namespace MarketAssistant.ViewModels;
+
+[QueryProperty(nameof(StockCode), "code")]
+public partial class StockViewModel : ViewModelBase
 {
-    [QueryProperty(nameof(StockCode), "code")]
-    public class StockViewModel : ViewModelBase
+    private readonly StockKLineService _stockKLineService;
+    private CancellationTokenSource? _loadingCancellationTokenSource;
+
+    [ObservableProperty]
+    private KLineType _currentKLineType = KLineType.Daily;
+
+    [ObservableProperty]
+    private string _stockCode = "";
+
+    [ObservableProperty]
+    private string _stockName = string.Empty;
+
+    [ObservableProperty]
+    private bool _isLoading;
+
+    [ObservableProperty]
+    private string _errorMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasError;
+
+    [ObservableProperty]
+    private StockKLineDataSet? _kLineDataSet;
+
+    [ObservableProperty]
+    private ObservableCollection<StockKLineData> _kLineData = new();
+
+    [ObservableProperty]
+    private decimal _currentPrice;
+
+    [ObservableProperty]
+    private decimal _priceChangePercent;
+
+    [ObservableProperty]
+    private decimal _priceChange;
+
+    // 计算属性用于UI绑定
+    public bool IsMinuteSelected => CurrentKLineType == KLineType.Minute15;
+    public bool IsDailySelected => CurrentKLineType == KLineType.Daily;
+    public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
+    public bool IsMonthlySelected => CurrentKLineType == KLineType.Monthly;
+
+    public IRelayCommand RefreshDataCommand { get; private set; }
+    public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
+    public IRelayCommand NavigateToAnalysisCommand { get; private set; }
+
+    public StockViewModel(
+        ILogger<StockViewModel> logger,
+        StockKLineService stockKLineService) : base(logger)
     {
-        private readonly StockKLineService _stockKLineService;
+        _stockKLineService = stockKLineService;
 
-        public enum KLineType
+        RefreshDataCommand = new RelayCommand(RefreshDataAsync);
+        ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
+        NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
+    }
+
+    /// <summary>
+    /// 当股票代码变化时自动加载数据
+    /// </summary>
+    partial void OnStockCodeChanged(string value)
+    {
+        if (!string.IsNullOrEmpty(value))
         {
-            Minute5,
-            Minute15,
-            Daily,
-            Weekly,
-            Monthly
+            _ = LoadStockDataAsync(value);
         }
+    }
 
-        private KLineType _currentKLineType = KLineType.Daily;
-        public KLineType CurrentKLineType
+    /// <summary>
+    /// 当K线类型变化时通知相关UI属性
+    /// </summary>
+    partial void OnCurrentKLineTypeChanged(KLineType value)
+    {
+        OnPropertyChanged(nameof(IsMinuteSelected));
+        OnPropertyChanged(nameof(IsDailySelected));
+        OnPropertyChanged(nameof(IsWeeklySelected));
+        OnPropertyChanged(nameof(IsMonthlySelected));
+        
+        if (!string.IsNullOrEmpty(StockCode))
         {
-            get => _currentKLineType;
-            set => SetProperty(ref _currentKLineType, value);
+            _ = LoadStockDataAsync(StockCode);
         }
+    }
 
-        public bool IsMinuteSelected => CurrentKLineType == KLineType.Minute15;
-        public bool IsDailySelected => CurrentKLineType == KLineType.Daily;
-        public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
-        public bool IsMonthlySelected => CurrentKLineType == KLineType.Monthly;
-
-        private string _stockCode = "";
-        public string StockCode
+    /// <summary>
+    /// 刷新股票数据
+    /// </summary>
+    private async void RefreshDataAsync()
+    {
+        if (!string.IsNullOrEmpty(StockCode))
         {
-            get => _stockCode;
-            set
+            await LoadStockDataAsync(StockCode);
+        }
+    }
+
+    /// <summary>
+    /// 导航到股票分析页面
+    /// </summary>
+    private async void NavigateToAnalysisAsync()
+    {
+        if (string.IsNullOrEmpty(StockCode))
+            return;
+
+        await SafeExecuteAsync(async () =>
+        {
+            await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
             {
-                if (SetProperty(ref _stockCode, value))
-                {
-                    _ = LoadStockDataAsync(value);
-                }
-            }
-        }
+                { "code", StockCode }
+            });
+        }, "导航到股票分析页");
+    }
 
-        private string _stockName = string.Empty;
-        public string StockName
+    /// <summary>
+    /// 改变K线类型
+    /// </summary>
+    private void ChangeKLineTypeAsync(string? type)
+    {
+        if (string.IsNullOrEmpty(type))
+            return;
+
+        var newKLineType = type.ToLower() switch
         {
-            get => _stockName;
-            set => SetProperty(ref _stockName, value);
-        }
+            "minute" => KLineType.Minute15,
+            "daily" => KLineType.Daily,
+            "weekly" => KLineType.Weekly,
+            "monthly" => KLineType.Monthly,
+            _ => CurrentKLineType
+        };
 
-        private bool _isLoading;
-        public bool IsLoading
+        if (newKLineType != CurrentKLineType)
         {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
+            CurrentKLineType = newKLineType;
         }
+    }
 
-        private string _errorMessage;
-        public string ErrorMessage
+    /// <summary>
+    /// 加载股票K线数据
+    /// </summary>
+    private async Task LoadStockDataAsync(string stockCode)
+    {
+        if (string.IsNullOrEmpty(stockCode))
+            return;
+
+        // 取消之前的加载操作
+        _loadingCancellationTokenSource?.Cancel();
+        _loadingCancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = _loadingCancellationTokenSource.Token;
+
+        await SafeExecuteAsync(async () =>
         {
-            get => _errorMessage;
-            set => SetProperty(ref _errorMessage, value);
-        }
-
-        private bool _hasError;
-        public bool HasError
-        {
-            get => _hasError;
-            set => SetProperty(ref _hasError, value);
-        }
-
-        private StockKLineDataSet _kLineDataSet;
-        public StockKLineDataSet KLineDataSet
-        {
-            get => _kLineDataSet;
-            set => SetProperty(ref _kLineDataSet, value);
-        }
-
-        private ObservableCollection<StockKLineData> _kLineData = new ObservableCollection<StockKLineData>();
-        public ObservableCollection<StockKLineData> KLineData
-        {
-            get => _kLineData;
-            set => SetProperty(ref _kLineData, value);
-        }
-
-        private decimal _currentPrice;
-        public decimal CurrentPrice
-        {
-            get => _currentPrice;
-            set => SetProperty(ref _currentPrice, value);
-        }
-
-        private decimal _priceChangePercent;
-        public decimal PriceChangePercent
-        {
-            get => _priceChangePercent;
-            set => SetProperty(ref _priceChangePercent, value);
-        }
-
-        private decimal _priceChange;
-        public decimal PriceChange
-        {
-            get => _priceChange;
-            set => SetProperty(ref _priceChange, value);
-        }
-
-        public IRelayCommand RefreshDataCommand { get; private set; }
-        public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
-        public IRelayCommand NavigateToAnalysisCommand { get; private set; }
-
-        public StockViewModel(
-            ILogger<StockViewModel> logger,
-            StockKLineService stockKLineService) : base(logger)
-        {
-            _stockKLineService = stockKLineService;
-            _kLineDataSet = new StockKLineDataSet();
-
-            RefreshDataCommand = new RelayCommand(async () => await LoadStockDataAsync(StockCode));
-            ChangeKLineTypeCommand = new RelayCommand<string>(async (type) => await ChangeKLineTypeAsync(type));
-            NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysis);
-        }
-
-        private async void NavigateToAnalysis()
-        {
-            if (string.IsNullOrEmpty(StockCode))
-                return;
-
-            await SafeExecuteAsync(async () =>
+            var kLineDataSet = CurrentKLineType switch
             {
-                await Shell.Current.GoToAsync("analysis", new Dictionary<string, object>
-                {
-                    { "code", StockCode }
-                });
-            }, "导航到股票分析页");
-        }
+                KLineType.Minute15 => await _stockKLineService.GetMinuteKLineDataAsync(stockCode, "15"),
+                KLineType.Weekly => await _stockKLineService.GetWeeklyKLineDataAsync(stockCode),
+                KLineType.Monthly => await _stockKLineService.GetMonthlyKLineDataAsync(stockCode),
+                _ => await _stockKLineService.GetDailyKLineDataAsync(stockCode)
+            };
 
-        private async Task ChangeKLineTypeAsync(string? type)
+            // 检查是否已被取消
+            cancellationToken.ThrowIfCancellationRequested();
+
+            KLineDataSet = kLineDataSet;
+            KLineData = new ObservableCollection<StockKLineData>(kLineDataSet.Data);
+
+            // 计算价格信息
+            CalculatePriceInfo(kLineDataSet.Data);
+
+        }, $"加载股票 {stockCode} 的K线数据");
+    }
+
+    /// <summary>
+    /// 计算价格相关信息
+    /// </summary>
+    private void CalculatePriceInfo(List<StockKLineData> data)
+    {
+        if (data.Count == 0)
+            return;
+
+        var latestData = data.Last();
+        CurrentPrice = latestData.Close;
+
+        if (data.Count > 1)
         {
-            if (string.IsNullOrEmpty(type) || string.IsNullOrEmpty(StockCode))
-                return;
-
-            KLineType previousType = CurrentKLineType;
-
-            switch (type.ToLower())
-            {
-                case "minute":
-                    CurrentKLineType = KLineType.Minute15;
-                    break;
-                case "daily":
-                    CurrentKLineType = KLineType.Daily;
-                    break;
-                case "weekly":
-                    CurrentKLineType = KLineType.Weekly;
-                    break;
-                case "monthly":
-                    CurrentKLineType = KLineType.Monthly;
-                    break;
-                default:
-                    return;
-            }
-
-            if (previousType != CurrentKLineType)
-            {
-                OnPropertyChanged(nameof(CurrentKLineType));
-                OnPropertyChanged(nameof(IsMinuteSelected));
-                OnPropertyChanged(nameof(IsDailySelected));
-                OnPropertyChanged(nameof(IsWeeklySelected));
-                OnPropertyChanged(nameof(IsMonthlySelected));
-                await LoadStockDataAsync(StockCode);
-            }
+            var previousData = data[data.Count - 2];
+            PriceChange = latestData.Close - previousData.Close;
+            PriceChangePercent = previousData.Close != 0 ?
+                Math.Round((latestData.Close - previousData.Close) / previousData.Close * 100, 2) : 0;
         }
-
-        private async Task LoadStockDataAsync(string stockCode)
+        else
         {
-            if (string.IsNullOrEmpty(stockCode))
-                return;
-
-            try
-            {
-                IsLoading = true;
-                HasError = false;
-                ErrorMessage = string.Empty;
-
-                var kLineDataSet = CurrentKLineType switch
-                {
-                    KLineType.Minute15 => await _stockKLineService.GetMinuteKLineDataAsync(stockCode, "15"),
-                    KLineType.Weekly => await _stockKLineService.GetWeeklyKLineDataAsync(stockCode),
-                    KLineType.Monthly => await _stockKLineService.GetMonthlyKLineDataAsync(stockCode),
-                    _ => await _stockKLineService.GetDailyKLineDataAsync(stockCode)
-                };
-
-                KLineDataSet = kLineDataSet;
-                KLineData = new ObservableCollection<StockKLineData>(kLineDataSet.Data);
-                StockName = kLineDataSet.Name;
-
-                if (kLineDataSet.Data.Count > 0)
-                {
-                    var latestData = kLineDataSet.Data.Last();
-                    var previousData = kLineDataSet.Data.Count > 1 ? kLineDataSet.Data[kLineDataSet.Data.Count - 2] : null;
-
-                    CurrentPrice = latestData.Close;
-
-                    if (previousData != null)
-                    {
-                        PriceChange = latestData.Close - previousData.Close;
-                        PriceChangePercent = previousData.Close != 0 ?
-                            Math.Round((latestData.Close - previousData.Close) / previousData.Close * 100, 2) : 0;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                HasError = true;
-                ErrorMessage = $"加载K线数据失败: {ex.Message}";
-                Logger?.LogError(ex, "加载K线数据异常");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
+            PriceChange = 0;
+            PriceChangePercent = 0;
         }
     }
 }

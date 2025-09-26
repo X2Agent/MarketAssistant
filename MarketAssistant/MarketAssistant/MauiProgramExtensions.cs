@@ -102,6 +102,7 @@ namespace MarketAssistant
             builder.Services.AddSingleton<GroundingSearchPlugin>();
             builder.Services.AddSingleton<AnalystManager>();
             builder.Services.AddSingleton<MarketAnalysisAgent>();
+            builder.Services.AddTransient<MarketChatAgent>();
 
             // 注册分析缓存服务
             builder.Services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -138,6 +139,7 @@ namespace MarketAssistant
             builder.Services.AddTransient<MarketAssistant.ViewModels.Home.TelegraphNewsViewModel>();
             
             builder.Services.AddTransient<AgentAnalysisViewModel>();
+            builder.Services.AddTransient<ChatSidebarViewModel>();
             builder.Services.AddTransient<SettingViewModel>();
             builder.Services.AddTransient<StockViewModel>();
             builder.Services.AddTransient<MCPServerConfigViewModel>();

@@ -94,6 +94,7 @@ public class BaseKernelTest
         });
 
         builder.Services.AddRagServices();
+        builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
         builder.Services.AddKernel().AddOpenAIChatCompletion(
                 modelId,
