@@ -1,0 +1,55 @@
+name: analyst_data_parser
+template: |
+  你是一个专业的金融分析师数据解析专家。请从以下分析师返回的文本内容中提取结构化数据。
+
+  分析内容：
+  {{$content}}
+
+  请提取以下信息并以JSON格式返回：
+  {
+    "stockSymbol": "", // 股票代码，如"AAPL"、"sz002594"
+    "consensusInfo": "", // 一致性信息
+    "disagreementInfo": "", // 分歧信息
+    "dimensionScores": {}, // 维度评分字典，如 {"趋势强度": 7.5, "可靠性": 8.0}
+    "overallScore": 0.0, // 综合评分(1-10分，浮点数)
+    "confidencePercentage": 0.0, // 置信度百分比(0-100，浮点数)
+    "investmentRating": "", // 投资评级：买入/卖出/持有等
+    "targetPrice": "", // 目标价格区间
+    "riskLevel": "", // 风险等级：低/中/高
+    "investmentHighlights": [], // 投资亮点数组
+    "riskFactors": [], // 风险因素数组
+    "operationSuggestions": [], // 操作建议数组
+    "analysisData": [ // 分析数据项数组
+      {
+        "dataType": "TechnicalIndicator", // 数据类型
+        "name": "", // 指标名称
+        "value": "", // 指标值
+        "unit": "", // 数据单位
+        "signal": "", // 信号类型
+        "impact": "", // 影响评估
+        "strategy": "", // 策略建议
+      }
+    ]
+  }
+
+  解析规则：
+  1. 提取股票代码、评分([7/10]格式转浮点数)、**粗体**关键信息
+  2. 将技术指标、财务数据等归类到analysisData数组
+  3. 数值字段必须为浮点数，缺失字段用默认值
+  4. 返回完整JSON，严格符合AnalystResult结构
+
+  请仅返回纯JSON数据，不要包含任何markdown代码块标识（如```json或```），不要包含其他解释性文本。
+template_format: semantic-kernel
+description: 从分析师返回的文本内容中提取结构化的分析数据，支持所有类型的分析师。
+input_variables:
+  - name: content
+    description: 需要解析的分析师返回文本内容。
+    is_required: true
+output_variable:
+  description: 包含所有解析字段的JSON对象，符合AnalystResult数据结构。
+execution_settings:
+  default:
+    top_p: 0
+    top_k: 1
+    temperature: 0.1
+    max_token: 1024

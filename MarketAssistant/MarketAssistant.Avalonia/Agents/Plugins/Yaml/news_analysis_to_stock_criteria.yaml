@@ -1,0 +1,144 @@
+name: NewsAnalysisToStockCriteria
+description: 分析新闻内容并转换为股票筛选条件
+
+template: |
+  <role>
+  你是专业的财经新闻分析师，负责将新闻内容转换为精确的股票筛选条件。
+  </role>
+
+  <task>
+  分析新闻内容，识别相关行业，判断情感倾向，并生成对应的股票筛选条件。
+  </task>
+
+  <input>
+  <news_content>{{$news_content}}</news_content>
+  <limit>{{$limit}}</limit>
+  </input>
+
+  <instructions>
+
+    <step1>
+    <title>新闻类型识别与行业映射</title>
+    <description>
+    根据新闻内容关键词，选择相关性最高的单个行业（必须使用以下精确名称）：
+    **科技类新闻**（AI、芯片、云计算、5G、大数据、软件）→ **计算机设备** 或 **软件开发**  
+    **半导体新闻**（芯片制造、集成电路、存储器）→ **半导体**  
+    **新能源类新闻**（电动车电池、光伏、风电、储能）→ **电池** 或 **光伏设备** 或 **风电设备**  
+    **医药类新闻**（新药研发、疫苗、生物技术）→ **化学制药** 或 **生物制品** 或 **医疗器械**  
+    **消费类新闻**（白酒、饮料、食品）→ **白酒** 或 **饮料乳品** 或 **食品加工**  
+    **银行类新闻**（银行业务、金融政策）→ **股份制银行** 或 **国有大型银行**  
+    **房地产新闻**（地产政策、房价调控）→ **房地产开发**  
+    **汽车新闻**（传统汽车、新能源车）→ **乘用车** 或 **汽车零部件**  
+    **通信新闻**（5G、通信设备、运营商）→ **通信设备** 或 **通信服务**  
+    **电力新闻**（电网、发电、新能源）→ **电力**  
+    **化工新闻**（化学原料、精细化工）→ **化学原料** 或 **化学制品**  
+    **机械新闻**（工程机械、专用设备）→ **工程机械** 或 **专用设备**  
+    **家电新闻**（空调、冰箱、小家电）→ **白色家电** 或 **小家电**  
+    </description>
+    </step1>
+
+    <step2>
+      <title>指标说明</title>
+      <basic_indicators>
+        mc: 总市值（元，如100亿=10000000000）  
+        npay: 净利润同比增长率（%）  
+        roediluted: 净资产收益率（%）  
+        pb: 市净率  
+        pettm: 市盈率TTM  
+        dy_l: 股息收益率（%）  
+      </basic_indicators>
+      <market_indicators>
+        amount: 成交额（元，如1亿=100000000）  
+        tr: 换手率（%）  
+        pct20: 近20日涨跌幅（%）  
+        pct60: 近60日涨跌幅（%）  
+      </market_indicators>
+    </step2>
+
+    <step3>
+      <title>情感判断与筛选策略</title>
+      <strategy_rules>
+        **积极新闻 → 成长股策略**  
+        - npay > 15  
+        - roediluted > 12  
+        - pct20 > -5  
+
+        **政策利好 → 龙头股策略**  
+        - mc > 10000000000  
+        - roediluted > 10  
+        - pettm < 30  
+
+        **技术突破 → 创新股策略**  
+        - amount > 200000000  
+        - tr > 2  
+        - pct60 > 0  
+
+        **业绩利好 → 价值股策略**  
+        - npay > 20  
+        - pb < 3  
+        - roediluted > 15  
+
+        **中性/消极新闻 → 防御股策略**  
+        - dy_l > 2  
+        - pb < 2  
+        - roediluted > 8  
+      </strategy_rules>
+      </step3>
+    </instructions>
+
+    <output_format>
+    严格要求：只能输出JSON对象，不能有任何其他文字、说明或解释！
+    <json_format>
+    {
+      "criteria": [
+        {
+          "code": "指标代码",
+          "displayName": "指标中文名",
+          "minValue": 最小值或null,
+          "maxValue": 最大值或null
+        }
+      ],
+      "market": "全部A股",
+      "industry": "单个行业名称",
+      "limit": {{$limit}}
+    }
+    </json_format>
+    </output_format>
+
+    <forbidden>
+    不要在JSON前后添加任何文字说明  
+    不要添加代码块标记  
+    不要输出解释文字  
+    必须输出完整JSON对象  
+    </forbidden>
+
+    <example>
+    新闻：AI芯片技术取得重大突破，相关企业有望受益  
+    输出：
+    {
+      "criteria": [
+        {"code": "amount","displayName": "成交额","minValue": 200000000,"maxValue": null},
+        {"code": "tr","displayName": "换手率","minValue": 2,"maxValue": null},
+        {"code": "pct60","displayName": "近60日涨跌幅","minValue": 0,"maxValue": null}
+      ],
+      "market": "全部A股",
+      "industry": "半导体",
+      "limit": 10
+    }
+    </example>
+
+template_format: semantic-kernel
+input_variables:
+  - name: news_content
+    description: 需要分析的新闻内容文本
+    is_required: true
+  - name: limit
+    description: 推荐的股票数量限制，默认为5
+    is_required: true
+output_variable:
+  description: 包含筛选条件的JSON格式字符串
+execution_settings:
+  default:
+    temperature: 0.1
+    max_tokens: 3500
+    response_format: json_object
