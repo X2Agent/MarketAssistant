@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Avalonia.Threading;
 
 namespace MarketAssistant.Infrastructure;
 
@@ -62,7 +63,7 @@ public class GlobalExceptionHandler
             _logger.LogCritical(exception, "发生未处理的异常: {Message}", exception.Message);
 
             // 在主线程上显示错误信息
-            MainThread.BeginInvokeOnMainThread(async () =>
+            Dispatcher.UIThread.Post(async () =>
             {
                 await ShowErrorToUserAsync("应用程序遇到严重错误", exception.Message);
             });
@@ -80,7 +81,7 @@ public class GlobalExceptionHandler
         e.SetObserved();
 
         // 在主线程上显示错误信息
-        MainThread.BeginInvokeOnMainThread(async () =>
+        Dispatcher.UIThread.Post(async () =>
         {
             await ShowErrorToUserAsync("后台任务执行失败", e.Exception.GetBaseException().Message);
         });
@@ -117,8 +118,8 @@ public class GlobalExceptionHandler
     {
         try
         {
-            // 使用MAUI的跨平台对话框
-            await Shell.Current?.DisplayAlert(title, message, "确定");
+            // 使用Avalonia的跨平台对话框
+            await Shell.DisplayAlert(title, message, "确定");
         }
         catch (Exception ex)
         {
@@ -147,7 +148,7 @@ public class GlobalExceptionHandler
         // 在主线程上显示错误信息
         if (_instance != null)
         {
-            await MainThread.InvokeOnMainThreadAsync(async () =>
+            await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 await _instance.ShowErrorToUserAsync("操作失败", exception.Message);
             });

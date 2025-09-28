@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure;
 using System.Text.Json;
 
 namespace MarketAssistant.Infrastructure;
@@ -23,7 +24,7 @@ public class MCPServerConfigService
     public List<MCPServerConfig> ServerConfigs => _serverConfigs;
 
     // 配置文件路径
-    private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, "mcpservers.json");
+    private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName);
 
     private MCPServerConfigService()
     {

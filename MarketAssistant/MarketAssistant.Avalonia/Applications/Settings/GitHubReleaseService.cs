@@ -2,13 +2,13 @@ using System.Linq;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Infrastructure;
+namespace MarketAssistant.Applications.Settings;
 
 public class GitHubReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private const string GITHUB_API_BASE_URL = "https://api.github.com/repos/X2Agent/MarketAssistant/releases";
-    private const string GITHUB_API_LATEST_URL = "https://api.github.com/repos/X2Agent/MarketAssistant/releases/latest";
+    private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
+    private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
 
     public GitHubReleaseService(IHttpClientFactory httpClientFactory)
     {
@@ -24,9 +24,9 @@ public class GitHubReleaseService
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
             
-            var response = await httpClient.GetFromJsonAsync<List<ReleaseInfo>>(GITHUB_API_BASE_URL);
+            var response = await httpClient.GetFromJsonAsync<List<ReleaseInfo>>(_githubApiBaseUrl);
             return response;
         }
         catch (Exception ex)
@@ -46,8 +46,8 @@ public class GitHubReleaseService
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
-            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(GITHUB_API_LATEST_URL);
+            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
+            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(_githubApiLatestUrl);
             return response;
         }
         catch (Exception ex)
@@ -122,7 +122,7 @@ public class GitHubReleaseService
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", "MarketAssistant");
+            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
             var response = await httpClient.GetAsync(downloadUrl);
             response.EnsureSuccessStatusCode();
 

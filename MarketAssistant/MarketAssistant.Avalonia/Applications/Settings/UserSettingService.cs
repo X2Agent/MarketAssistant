@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure;
 using System.Text.Json;
 
 namespace MarketAssistant.Infrastructure;
@@ -46,7 +47,7 @@ public class UserSettingService : IUserSettingService
             // 如果日志路径为空，设置为默认日志目录（与启动阶段保持一致）
             if (string.IsNullOrWhiteSpace(_currentSetting.LogPath))
             {
-                _currentSetting.LogPath = Path.Combine(FileSystem.Current.AppDataDirectory, "logs");
+                _currentSetting.LogPath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.LogsDirectoryName);
             }
 
             // 如果浏览器路径为空，则使用IBrowserService自动检测
