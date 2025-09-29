@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="MarketAssistant.Avalonia.Views.SettingsPageView"
+             x:DataType="vm:SettingsPageViewModel">
+
+    <Design.DataContext>
+        <vm:SettingsPageViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="16" Spacing="16">
+            <!-- 标题 -->
+            <TextBlock Text="{Binding Title}" 
+                       FontSize="24" 
+                       FontWeight="Bold"/>
+
+            <!-- 通知设置 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="通知设置" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <CheckBox IsChecked="{Binding EnableNotifications}" 
+                              Content="启用通知"/>
+                    
+                    <CheckBox IsChecked="{Binding EnableAutoRefresh}" 
+                              Content="自动刷新数据"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 刷新设置 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="刷新设置" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Column="0" 
+                                   Text="刷新间隔:" 
+                                   VerticalAlignment="Center"/>
+                        
+                        <Slider Grid.Column="1" 
+                                Minimum="10" 
+                                Maximum="300" 
+                                Value="{Binding RefreshInterval}"
+                                Margin="12,0"/>
+                        
+                        <TextBlock Grid.Column="2" 
+                                   Text="{Binding RefreshInterval, StringFormat={}{0}秒}" 
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 主题设置 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="外观设置" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" 
+                                   Text="主题:" 
+                                   VerticalAlignment="Center"/>
+                        
+                        <ComboBox Grid.Column="1" 
+                                  ItemsSource="{Binding AvailableThemes}"
+                                  SelectedItem="{Binding SelectedTheme}"
+                                  Margin="12,0,0,0"
+                                  MinWidth="120"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,13 +1,22 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="MarketAssistant.Avalonia.App"
-             xmlns:local="using:MarketAssistant.Avalonia"
+             xmlns:infra="using:MarketAssistant.Avalonia.Infrastructure"
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
-        <local:ViewLocator/>
+        <infra:ViewLocator/>
     </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="/Resources/Styles/Colors.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Styles.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
   
     <Application.Styles>
         <FluentTheme />

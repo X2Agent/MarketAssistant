@@ -1,0 +1,105 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 主色调定义 -->
+    <Color x:Key="Primary">#512BD4</Color>
+    <Color x:Key="PrimaryDark">#ac99ea</Color>
+    <Color x:Key="PrimaryDarkText">#242424</Color>
+    <Color x:Key="Secondary">#DFD8F7</Color>
+    <Color x:Key="SecondaryDarkText">#9880e5</Color>
+    <Color x:Key="Tertiary">#2B0B98</Color>
+
+    <!-- 基础颜色 -->
+    <Color x:Key="White">White</Color>
+    <Color x:Key="Black">Black</Color>
+    <Color x:Key="Magenta">#D600AA</Color>
+    <Color x:Key="MidnightBlue">#190649</Color>
+    <Color x:Key="OffBlack">#1f1f1f</Color>
+
+    <!-- 灰度色阶 -->
+    <Color x:Key="Gray100">#E1E1E1</Color>
+    <Color x:Key="Gray200">#C8C8C8</Color>
+    <Color x:Key="Gray300">#ACACAC</Color>
+    <Color x:Key="Gray400">#919191</Color>
+    <Color x:Key="Gray500">#6E6E6E</Color>
+    <Color x:Key="Gray600">#404040</Color>
+    <Color x:Key="Gray700">#374151</Color>
+    <Color x:Key="Gray800">#1F2937</Color>
+    <Color x:Key="Gray900">#212121</Color>
+    <Color x:Key="Gray950">#141414</Color>
+
+    <!-- 功能性颜色 -->
+    <Color x:Key="Success">#28a745</Color>
+    <Color x:Key="Warning">#ffc107</Color>
+    <Color x:Key="Info">#17a2b8</Color>
+    <Color x:Key="Error">#dc3545</Color>
+    <Color x:Key="UpColor">#dc3545</Color>
+    <Color x:Key="DownColor">#28a745</Color>
+
+    <!-- 主题变体颜色 - 支持亮色/暗色主题 -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key='Light'>
+            <!-- 卡片和背景色 -->
+            <SolidColorBrush x:Key='CardBackgroundBrush'>#f8f9fa</SolidColorBrush>
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>White</SolidColorBrush>
+            <SolidColorBrush x:Key='SurfaceVariantBrush'>#f1f3f4</SolidColorBrush>
+            
+            <!-- 文本颜色 -->
+            <SolidColorBrush x:Key='TextPrimaryBrush'>#212529</SolidColorBrush>
+            <SolidColorBrush x:Key='TextSecondaryBrush'>#6c757d</SolidColorBrush>
+            
+            <!-- 边框和分割线 -->
+            <SolidColorBrush x:Key='BorderBrush'>#e9ecef</SolidColorBrush>
+            <SolidColorBrush x:Key='DividerBrush'>#e9ecef</SolidColorBrush>
+            
+            <!-- 阴影颜色 -->
+            <SolidColorBrush x:Key='ShadowBrush'>#77000000</SolidColorBrush>
+        </ResourceDictionary>
+        
+        <ResourceDictionary x:Key='Dark'>
+            <!-- 卡片和背景色 -->
+            <SolidColorBrush x:Key='CardBackgroundBrush'>#2c2c2c</SolidColorBrush>
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#3c3c3c</SolidColorBrush>
+            <SolidColorBrush x:Key='SurfaceVariantBrush'>#3c3c3c</SolidColorBrush>
+            
+            <!-- 文本颜色 -->
+            <SolidColorBrush x:Key='TextPrimaryBrush'>#e0e0e0</SolidColorBrush>
+            <SolidColorBrush x:Key='TextSecondaryBrush'>#a0a0a0</SolidColorBrush>
+            
+            <!-- 边框和分割线 -->
+            <SolidColorBrush x:Key='BorderBrush'>#404040</SolidColorBrush>
+            <SolidColorBrush x:Key='DividerBrush'>#404040</SolidColorBrush>
+            
+            <!-- 阴影颜色 -->
+            <SolidColorBrush x:Key='ShadowBrush'>#00000010</SolidColorBrush>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- 固定颜色画刷 -->
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
+    <SolidColorBrush x:Key="TertiaryBrush" Color="{StaticResource Tertiary}"/>
+    <SolidColorBrush x:Key="WhiteBrush" Color="{StaticResource White}"/>
+    <SolidColorBrush x:Key="BlackBrush" Color="{StaticResource Black}"/>
+
+    <!-- 灰度画刷 -->
+    <SolidColorBrush x:Key="Gray100Brush" Color="{StaticResource Gray100}"/>
+    <SolidColorBrush x:Key="Gray200Brush" Color="{StaticResource Gray200}"/>
+    <SolidColorBrush x:Key="Gray300Brush" Color="{StaticResource Gray300}"/>
+    <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
+    <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
+    <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
+    <SolidColorBrush x:Key="Gray700Brush" Color="{StaticResource Gray700}"/>
+    <SolidColorBrush x:Key="Gray800Brush" Color="{StaticResource Gray800}"/>
+    <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
+    <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+
+    <!-- 功能性画刷 -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}"/>
+    <SolidColorBrush x:Key="UpColorBrush" Color="{StaticResource UpColor}"/>
+    <SolidColorBrush x:Key="DownColorBrush" Color="{StaticResource DownColor}"/>
+
+</ResourceDictionary>

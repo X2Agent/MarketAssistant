@@ -48,45 +48,26 @@
 	<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
 	<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 	<PackageReference Include="SmartReader" Version="0.10.2" />
+	<PackageReference Include="Svg.Skia" Version="3.2.1" />
 	<PackageReference Include="System.Linq.Async" Version="6.0.3" />
 	<!-- Added for CLIP ONNX embedding support -->
-	<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.0-rc.1" />
+	<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.0" />
 	<PackageReference Include="System.Numerics.Tensors" Version="9.0.9" />
 	<!-- 添加用于Preferences和FileSystem替代的包 -->
 	<PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.9" />
 	<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.9" />
 	<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.9" />
+	<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
+	<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
+	<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
+	<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.9" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Agents\Plugins\Yaml\analyst_data_parser.yaml">
+    <None Update="Agents\Plugins\Yaml\*.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Agents\Plugins\Yaml\extract_article_content.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Plugins\Yaml\news_analysis_to_stock_criteria.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Plugins\Yaml\user_requirement_to_stock_criteria.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\CoordinatorAnalystAgent.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\FinancialAnalystAgent.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\FundamentalAnalystAgent.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\MarketSentimentAnalystAgent.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\NewsEventAnalystAgent.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Agents\Yaml\TechnicalAnalystAgent.yaml">
+    <None Update="Agents\Yaml\*.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="MarketAssistant.Avalonia.Views.HomePageView"
+             x:DataType="vm:HomePageViewModel">
+
+    <Design.DataContext>
+        <vm:HomePageViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="16" Spacing="16">
+            <!-- 标题 -->
+            <TextBlock Text="{Binding Title}" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Left"/>
+
+            <!-- 欢迎消息 -->
+            <Border Background="{DynamicResource SystemAccentColorLight3}" 
+                    CornerRadius="8" 
+                    Padding="16">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{Binding WelcomeMessage}" 
+                               FontSize="18" 
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="这里是您的股票市场分析工作台" 
+                               FontSize="14" 
+                               Opacity="0.8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 功能卡片 -->
+            <Grid ColumnDefinitions="*,*" RowDefinitions="*,*" Margin="0,16,0,0">
+                <Grid.Styles>
+                    <Style Selector="Border.feature-card">
+                        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
+                        <Setter Property="CornerRadius" Value="8"/>
+                        <Setter Property="Padding" Value="16"/>
+                        <Setter Property="Margin" Value="4"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                </Grid.Styles>
+
+                <!-- 市场概览 -->
+                <Border Classes="feature-card" Grid.Row="0" Grid.Column="0">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="📊 市场概览" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="查看实时市场数据和趋势" FontSize="12" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 股票搜索 -->
+                <Border Classes="feature-card" Grid.Row="0" Grid.Column="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="🔍 股票搜索" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="快速搜索和分析股票信息" FontSize="12" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 智能分析 -->
+                <Border Classes="feature-card" Grid.Row="1" Grid.Column="0">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="🤖 智能分析" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="AI驱动的股票分析和建议" FontSize="12" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 投资组合 -->
+                <Border Classes="feature-card" Grid.Row="1" Grid.Column="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="💼 投资组合" FontSize="16" FontWeight="SemiBold"/>
+                        <TextBlock Text="管理和跟踪您的投资" FontSize="12" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

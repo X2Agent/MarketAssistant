@@ -1,5 +1,7 @@
-using Microsoft.Extensions.Logging;
 using Avalonia.Threading;
+using MarketAssistant.Avalonia.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure;
 
@@ -9,14 +11,19 @@ namespace MarketAssistant.Infrastructure;
 public class GlobalExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IDialogService _dialogService;
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
 
-    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IServiceProvider serviceProvider)
+    /// <summary>
+    /// 获取全局异常处理器实例
+    /// </summary>
+    public static GlobalExceptionHandler? Instance => _instance;
+
+    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         _logger = logger;
-        _serviceProvider = serviceProvider;
+        _dialogService = dialogService;
     }
 
     /// <summary>
@@ -31,7 +38,8 @@ public class GlobalExceptionHandler
             if (_instance != null) return;
 
             var logger = serviceProvider.GetRequiredService<ILogger<GlobalExceptionHandler>>();
-            _instance = new GlobalExceptionHandler(logger, serviceProvider);
+            var dialogService = serviceProvider.GetRequiredService<IDialogService>();
+            _instance = new GlobalExceptionHandler(logger, dialogService);
             _instance.SetupExceptionHandlers();
         }
     }
@@ -118,8 +126,8 @@ public class GlobalExceptionHandler
     {
         try
         {
-            // 使用Avalonia的跨平台对话框
-            await Shell.DisplayAlert(title, message, "确定");
+            // 使用依赖注入的DialogService
+            await _dialogService.ShowAlertAsync(title, message, "确定");
         }
         catch (Exception ex)
         {
@@ -129,9 +137,9 @@ public class GlobalExceptionHandler
     }
 
     /// <summary>
-    /// 处理ViewModel中的异常
+    /// 处理ViewModel中的异常（实例方法）
     /// </summary>
-    public static async Task HandleViewModelExceptionAsync(Exception exception, string operation, ILogger? logger = null)
+    public async Task HandleViewModelExceptionInstanceAsync(Exception exception, string operation, ILogger? logger = null)
     {
         var message = $"执行操作 '{operation}' 时发生错误: {exception.Message}";
 
@@ -142,16 +150,24 @@ public class GlobalExceptionHandler
         }
         else
         {
-            _instance?._logger.LogError(exception, message);
+            _logger.LogError(exception, message);
         }
 
         // 在主线程上显示错误信息
+        await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await ShowErrorToUserAsync("操作失败", exception.Message);
+        });
+    }
+
+    /// <summary>
+    /// 处理ViewModel中的异常（静态方法，用于向后兼容）
+    /// </summary>
+    public static async Task HandleViewModelExceptionAsync(Exception exception, string operation, ILogger? logger = null)
+    {
         if (_instance != null)
         {
-            await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                await _instance.ShowErrorToUserAsync("操作失败", exception.Message);
-            });
+            await _instance.HandleViewModelExceptionInstanceAsync(exception, operation, logger);
         }
     }
 

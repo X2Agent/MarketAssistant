@@ -1,0 +1,164 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 统一间距定义 - 使用4的倍数，最大值16 -->
+    <Thickness x:Key="PagePadding">16</Thickness>
+    <Thickness x:Key="CardPadding">16</Thickness>
+    <Thickness x:Key="SmallCardPadding">12</Thickness>
+    <Thickness x:Key="CompactCardPadding">8</Thickness>
+    <Thickness x:Key="ItemPadding">4</Thickness>
+    
+    <!-- 专用Margin定义 -->
+    <Thickness x:Key="LargeMargin">16</Thickness>
+    <Thickness x:Key="DefaultMargin">12</Thickness>
+    <Thickness x:Key="SmallMargin">8</Thickness>
+    <Thickness x:Key="TinyMargin">4</Thickness>
+    
+    <!-- 单向Margin定义 -->
+    <Thickness x:Key="TopLargeMargin">0,16,0,0</Thickness>
+    <Thickness x:Key="TopSmallMargin">0,8,0,0</Thickness>
+    <Thickness x:Key="TopTinyMargin">0,4,0,0</Thickness>
+    <Thickness x:Key="BottomLargeMargin">0,0,0,16</Thickness>
+    <Thickness x:Key="BottomSmallMargin">0,0,0,8</Thickness>
+    <Thickness x:Key="BottomTinyMargin">0,0,0,4</Thickness>
+    <Thickness x:Key="LeftLargeMargin">16,0,0,0</Thickness>
+    <Thickness x:Key="LeftSmallMargin">8,0,0,0</Thickness>
+    <Thickness x:Key="LeftTinyMargin">4,0,0,0</Thickness>
+    <Thickness x:Key="RightLargeMargin">0,0,16,0</Thickness>
+    <Thickness x:Key="RightSmallMargin">0,0,8,0</Thickness>
+    <Thickness x:Key="RightTinyMargin">0,0,4,0</Thickness>
+    
+    <!-- 双向Margin定义 -->
+    <Thickness x:Key="TopBottomSmallMargin">0,8,0,8</Thickness>
+    <Thickness x:Key="TopBottomTinyMargin">0,4,0,4</Thickness>
+    <Thickness x:Key="LeftRightLargeMargin">16,0,16,0</Thickness>
+    <Thickness x:Key="LeftRightSmallMargin">8,0,8,0</Thickness>
+    
+    <!-- 特殊组合Margin定义 -->
+    <Thickness x:Key="BottomRightLargeMargin">0,0,16,16</Thickness>
+    
+    <!-- 特殊Padding定义 -->
+    <Thickness x:Key="SmallHorizontalTinyVerticalPadding">8,4</Thickness>
+    <Thickness x:Key="ButtonPadding">12,8</Thickness>
+    <Thickness x:Key="SmallButtonPadding">8,4</Thickness>
+    
+    <!-- 字体大小定义 -->
+    <x:Double x:Key="LabelFontSize">14</x:Double>
+    <x:Double x:Key="TitleFontSize">24</x:Double>
+    <x:Double x:Key="SectionTitleFontSize">16</x:Double>
+    <x:Double x:Key="ItemTitleFontSize">14</x:Double>
+    <x:Double x:Key="DescriptionFontSize">12</x:Double>
+    <x:Double x:Key="SmallLabelFontSize">12</x:Double>
+    
+    <!-- 常用按钮尺寸定义 -->
+    <x:Double x:Key="StandardButtonWidth">100</x:Double>
+    <x:Double x:Key="StandardButtonHeight">40</x:Double>
+    <x:Double x:Key="FabButtonSize">56</x:Double>
+    
+    <!-- 常用图标尺寸定义 -->
+    <x:Double x:Key="SmallIconSize">20</x:Double>
+    <x:Double x:Key="MediumIconSize">24</x:Double>
+    <x:Double x:Key="LargeIconSize">32</x:Double>
+
+    <!-- 通用卡片样式 -->
+    <Style x:Key="PrimaryCardStyle" Selector="Border">
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    </Style>
+    
+    <Style x:Key="SmallCardStyle" Selector="Border">
+        <Setter Property="Padding" Value="{StaticResource SmallCardPadding}"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    </Style>
+    
+    <Style x:Key="CompactCardStyle" Selector="Border">
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    </Style>
+    
+    <!-- 通用按钮样式 -->
+    <Style x:Key="PrimaryButtonStyle" Selector="Button">
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    
+    <Style x:Key="SecondaryButtonStyle" Selector="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    
+    <Style x:Key="SuccessButtonStyle" Selector="Button">
+        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    
+    <!-- 通用标题样式 -->
+    <Style x:Key="PageTitleStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource TitleFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+    
+    <Style x:Key="SectionTitleStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource SectionTitleFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    
+    <Style x:Key="ItemTitleStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource ItemTitleFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    
+    <Style x:Key="DescriptionStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource DescriptionFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    
+    <Style x:Key="SmallLabelStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource SmallLabelFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- 扩展文本样式 -->
+    <Style x:Key="TinyLabelStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    
+    <Style x:Key="MediumLabelStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    
+    <Style x:Key="LargeLabelStyle" Selector="TextBlock">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+</ResourceDictionary>

@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="MarketAssistant.Avalonia.Views.AboutPageView"
+             x:DataType="vm:AboutPageViewModel">
+
+    <Design.DataContext>
+        <vm:AboutPageViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer>
+        <StackPanel Margin="16" Spacing="16" HorizontalAlignment="Center" MaxWidth="600">
+            <!-- 标题 -->
+            <TextBlock Text="{Binding Title}" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Center"/>
+
+            <!-- 应用图标和名称 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="32"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    HorizontalAlignment="Center">
+                <StackPanel Spacing="16" HorizontalAlignment="Center">
+                    <!-- 应用图标占位 -->
+                    <Border Width="64" 
+                            Height="64" 
+                            Background="{DynamicResource SystemAccentColorLight2}"
+                            CornerRadius="32"
+                            HorizontalAlignment="Center">
+                        <TextBlock Text="📈" 
+                                   FontSize="32" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <TextBlock Text="{Binding ApplicationName}" 
+                               FontSize="20" 
+                               FontWeight="SemiBold" 
+                               HorizontalAlignment="Center"/>
+
+                    <TextBlock Text="{Binding Description}" 
+                               FontSize="14" 
+                               Opacity="0.8" 
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 版本信息 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="版本信息" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                        <TextBlock Grid.Row="0" Grid.Column="0" 
+                                   Text="版本:" 
+                                   FontWeight="SemiBold" 
+                                   Margin="0,0,12,4"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" 
+                                   Text="{Binding Version}" 
+                                   Margin="0,0,0,4"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" 
+                                   Text="版权:" 
+                                   FontWeight="SemiBold" 
+                                   Margin="0,0,12,0"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" 
+                                   Text="{Binding Copyright}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 功能特性 -->
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8"
+                    Padding="16"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="主要功能" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="• 实时股票数据查询和分析" FontSize="14"/>
+                        <TextBlock Text="• AI驱动的智能投资建议" FontSize="14"/>
+                        <TextBlock Text="• 个性化股票收藏和跟踪" FontSize="14"/>
+                        <TextBlock Text="• 多维度技术指标分析" FontSize="14"/>
+                        <TextBlock Text="• 市场新闻和资讯聚合" FontSize="14"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

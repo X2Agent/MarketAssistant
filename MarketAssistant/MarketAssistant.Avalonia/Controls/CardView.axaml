@@ -1,0 +1,48 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Avalonia.Controls">
+
+    <!-- CardView 默认样式 -->
+    <Style Selector="controls|CardView">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16"
+                        BoxShadow="0 2 4 0 #19000000">
+                    
+                    <Grid RowDefinitions="Auto,Auto,Auto,*">
+                        <!-- 字符串标题 -->
+                        <TextBlock x:Name="PART_StringHeaderLabel"
+                                   Grid.Row="0"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                   IsVisible="False"/>
+
+                        <!-- 视图标题 -->
+                        <ContentPresenter x:Name="PART_ViewHeaderContentPresenter"
+                                          Grid.Row="1"
+                                          IsVisible="False"/>
+
+                        <!-- 分隔线 -->
+                        <Border x:Name="PART_Divider"
+                                Grid.Row="2"
+                                Height="1"
+                                Margin="0,12,0,12"
+                                Background="{DynamicResource DividerStrokeColorDefaultBrush}"
+                                IsVisible="False"/>
+
+                        <!-- 主要内容 -->
+                        <ContentPresenter Grid.Row="3"
+                                          Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"/>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+</Styles>
