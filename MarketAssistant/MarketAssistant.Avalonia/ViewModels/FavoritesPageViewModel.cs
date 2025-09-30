@@ -1,43 +1,102 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications.Stocks;
+using MarketAssistant.Applications.Stocks.Models;
 using System.Collections.ObjectModel;
 
-namespace MarketAssistant.Avalonia.ViewModels
+namespace MarketAssistant.Avalonia.ViewModels;
+
+/// <summary>
+/// 收藏页ViewModel - 对应 FavoritesViewModel
+/// </summary>
+public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFavoritesChanged>
 {
-    /// <summary>
-    /// 收藏页ViewModel
-    /// </summary>
-    public partial class FavoritesPageViewModel : ViewModelBase
+    private readonly StockFavoriteService? _favoriteService;
+
+    [ObservableProperty]
+    private bool _isLoading;
+
+    public ObservableCollection<StockInfo> Stocks { get; set; } = new ObservableCollection<StockInfo>();
+
+    public FavoritesPageViewModel()
     {
-        [ObservableProperty]
-        private string _title = "收藏";
+        // 无参构造函数用于设计时
+    }
 
-        public ObservableCollection<FavoriteItemViewModel> FavoriteItems { get; }
+    public FavoritesPageViewModel(StockFavoriteService favoriteService)
+    {
+        _favoriteService = favoriteService;
+        LoadFavoriteStocksAsync();
+        WeakReferenceMessenger.Default.Register(this);
+    }
 
-        public FavoritesPageViewModel()
+    /// <summary>
+    /// 加载收藏股票列表
+    /// </summary>
+    private async void LoadFavoriteStocksAsync()
+    {
+        if (_favoriteService == null) return;
+
+        IsLoading = true;
+        try
         {
-            FavoriteItems = new ObservableCollection<FavoriteItemViewModel>();
-            LoadFavorites();
+            var favorites = await _favoriteService.GetFavoritesWithLatestDataAsync(CancellationToken.None);
+
+            Stocks.Clear();
+            foreach (var stock in favorites)
+            {
+                Stocks.Add(stock);
+            }
         }
-
-        private void LoadFavorites()
+        catch (Exception)
         {
-            // 示例数据，实际应该从服务加载
-            FavoriteItems.Add(new FavoriteItemViewModel("000001", "平安银行", "SZ"));
-            FavoriteItems.Add(new FavoriteItemViewModel("600036", "招商银行", "SH"));
+            // 忽略加载错误
+        }
+        finally
+        {
+            IsLoading = false;
         }
     }
 
-    public class FavoriteItemViewModel : ViewModelBase
+    /// <summary>
+    /// 选择收藏股票
+    /// </summary>
+    [RelayCommand]
+    private void SelectFavoriteStock(StockInfo? stock)
     {
-        public string Code { get; }
-        public string Name { get; }
-        public string Market { get; }
+        if (stock == null) return;
 
-        public FavoriteItemViewModel(string code, string name, string market)
+        // TODO: Avalonia 导航到股票详情页
+        // 需要实现导航逻辑
+    }
+
+    /// <summary>
+    /// 移除收藏股票
+    /// </summary>
+    [RelayCommand]
+    private async Task RemoveFavorite(StockInfo? stock)
+    {
+        if (stock == null || _favoriteService == null) return;
+
+        try
         {
-            Code = code;
-            Name = name;
-            Market = market;
+            // TODO: Avalonia 显示确认对话框
+            // 暂时直接删除
+            _favoriteService.RemoveFavorite(stock.Code, stock.Market);
+            Stocks.Remove(stock);
         }
+        catch (Exception)
+        {
+            // 忽略删除错误
+        }
+    }
+
+    /// <summary>
+    /// 接收收藏变更消息
+    /// </summary>
+    public void Receive(StockFavoritesChanged message)
+    {
+        LoadFavoriteStocksAsync();
     }
 }

@@ -1,13 +1,14 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
-using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Avalonia.ViewModels;
 
 namespace MarketAssistant.Avalonia.Views;
 
-public partial class HomePageView : UserControl
+/// <summary>
+/// 股票详情页视图
+/// </summary>
+public partial class StockPageView : UserControl
 {
-    public HomePageView()
+    public StockPageView()
     {
         InitializeComponent();
     }

@@ -3,62 +3,166 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             xmlns:converts="using:MarketAssistant.Avalonia.Converts"
+             xmlns:stocks="using:MarketAssistant.Applications.Stocks.Models"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Avalonia.Views.FavoritesPageView"
              x:DataType="vm:FavoritesPageViewModel">
+
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+    </UserControl.Resources>
 
     <Design.DataContext>
         <vm:FavoritesPageViewModel/>
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,*" Margin="16">
-        <!-- 标题 -->
-        <TextBlock Grid.Row="0" 
-                   Text="{Binding Title}" 
-                   FontSize="24" 
-                   FontWeight="Bold" 
-                   Margin="0,0,0,16"/>
+    <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
+        <controls:CardView Margin="16">
+            <controls:CardView.Header>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" 
+                               Text="我的收藏" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <svg:Svg Grid.Column="1" 
+                             Path="/Assets/Images/tab_favorites_on.svg" 
+                             Width="24" 
+                             Height="24" 
+                             VerticalAlignment="Center" />
+                </Grid>
+            </controls:CardView.Header>
 
-        <!-- 收藏列表 -->
-        <ScrollViewer Grid.Row="1">
-            <ItemsControl ItemsSource="{Binding FavoriteItems}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FavoriteItemViewModel">
-                        <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
-                                CornerRadius="8"
-                                Padding="16"
-                                Margin="0,0,0,8"
-                                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                                BorderThickness="1">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                                <!-- 股票代码 -->
-                                <TextBlock Grid.Column="0" 
-                                           Text="{Binding Code}" 
-                                           FontWeight="SemiBold" 
-                                           FontSize="16"
-                                           VerticalAlignment="Center"/>
+            <!-- 主内容区域 -->
+            <Grid>
+                <!-- 加载指示器 -->
+                <Panel IsVisible="{Binding IsLoading}"
+                       HorizontalAlignment="Center" 
+                       VerticalAlignment="Center">
+                    <PathIcon Data="{StaticResource LoadingIcon}"
+                              Width="48" 
+                              Height="48"
+                              Foreground="{StaticResource PrimaryBrush}"/>
+                </Panel>
 
-                                <!-- 股票名称 -->
-                                <TextBlock Grid.Column="1" 
-                                           Text="{Binding Name}" 
-                                           FontSize="14" 
-                                           Margin="12,0,0,0"
-                                           VerticalAlignment="Center"/>
+                <!-- 收藏股票列表 -->
+                <Panel IsVisible="{Binding !IsLoading}">
+                    <!-- 空视图 -->
+                    <StackPanel IsVisible="{Binding !Stocks.Count}"
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center" 
+                                Spacing="12">
+                        <svg:Svg Path="/Assets/Images/tab_favorites.svg" 
+                                 Width="48" 
+                                 Height="48" 
+                                 HorizontalAlignment="Center"/>
+                        <TextBlock Text="暂无收藏股票" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="在股票详情页点击收藏按钮添加" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" 
+                                   FontSize="12" />
+                    </StackPanel>
 
-                                <!-- 市场标识 -->
-                                <Border Grid.Column="2" 
-                                        Background="{DynamicResource SystemAccentColorLight2}"
-                                        CornerRadius="4"
-                                        Padding="8,4">
-                                    <TextBlock Text="{Binding Market}" 
-                                               FontSize="12" 
-                                               FontWeight="SemiBold"/>
+                    <!-- 股票网格 -->
+                    <ItemsControl ItemsSource="{Binding Stocks}" 
+                                  IsVisible="{Binding Stocks.Count}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel HorizontalAlignment="Stretch" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stocks:StockInfo">
+                                <Border Background="{DynamicResource CardBackgroundBrush}"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12"
+                                        Margin="4"
+                                        MinWidth="220"
+                                        MaxWidth="250"
+                                        Cursor="Hand"
+                                        Tapped="OnStockItemTapped"
+                                        Tag="{Binding .}">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                        </Style>
+                                        <Style Selector="Border:pointerover > Grid > Panel#DeleteButton">
+                                            <Setter Property="IsVisible" Value="True"/>
+                                        </Style>
+                                    </Border.Styles>
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <!-- 股票信息区域 -->
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <!-- 市场和代码 -->
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <TextBlock Text="{Binding Market}" 
+                                                           FontSize="12" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                <TextBlock Text="{Binding Code}" 
+                                                           FontSize="12" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            </StackPanel>
+                                            
+                                            <!-- 股票名称 -->
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontSize="14" 
+                                                       FontWeight="Bold" 
+                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                                            
+                                            <!-- 价格和涨跌幅 -->
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding CurrentPrice}" 
+                                                           FontSize="16" 
+                                                           FontWeight="Bold" 
+                                                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                                                <TextBlock Text="{Binding ChangePercentage}" 
+                                                           FontSize="14" 
+                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        
+                                        <!-- 删除按钮 -->
+                                        <Button Grid.Column="1" 
+                                                x:Name="DeleteButton"
+                                                Width="32" 
+                                                Height="32" 
+                                                HorizontalAlignment="Right" 
+                                                VerticalAlignment="Top"
+                                                IsVisible="False"
+                                                Cursor="Hand"
+                                                Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                                BorderThickness="0"
+                                                CornerRadius="16"
+                                                Padding="0"
+                                                Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
+                                                CommandParameter="{Binding .}">
+                                            <PathIcon Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
+                                                      Width="18" 
+                                                      Height="18"
+                                                      Foreground="{StaticResource ErrorBrush}" />
+                                        </Button>
+                                    </Grid>
+                                    
+                                    <Border.Styles>
+                                        <Style Selector="Border[Cursor=Hand]:pressed">
+                                            <Setter Property="Opacity" Value="0.8"/>
+                                        </Style>
+                                    </Border.Styles>
                                 </Border>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Panel>
+            </Grid>
+        </controls:CardView>
+    </ScrollViewer>
 </UserControl>

@@ -1,3 +1,4 @@
+using MarketAssistant.Avalonia.Infrastructure.Kernel;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;

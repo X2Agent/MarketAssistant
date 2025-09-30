@@ -20,5 +20,6 @@
   
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="/Controls/CardView.axaml"/>
     </Application.Styles>
 </Application>

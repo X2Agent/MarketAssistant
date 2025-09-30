@@ -8,16 +8,10 @@ namespace MarketAssistant.Avalonia.Controls;
 /// <summary>
 /// 卡片视图控件，支持标题和阴影效果
 /// </summary>
-public partial class CardView : TemplatedControl
+public partial class CardView : ContentControl
 {
     public static readonly StyledProperty<object?> HeaderProperty =
         AvaloniaProperty.Register<CardView, object?>(nameof(Header), null);
-
-    public static readonly StyledProperty<double> ShadowOpacityProperty =
-        AvaloniaProperty.Register<CardView, double>(nameof(ShadowOpacity), 0.6);
-
-    public static readonly StyledProperty<object?> ContentProperty =
-        ContentControl.ContentProperty.AddOwner<CardView>();
 
     /// <summary>
     /// 卡片标题，可以是字符串或视图
@@ -28,36 +22,32 @@ public partial class CardView : TemplatedControl
         set => SetValue(HeaderProperty, value);
     }
 
-    /// <summary>
-    /// 阴影透明度
-    /// </summary>
-    public double ShadowOpacity
-    {
-        get => GetValue(ShadowOpacityProperty);
-        set => SetValue(ShadowOpacityProperty, value);
-    }
-
-    /// <summary>
-    /// 卡片内容
-    /// </summary>
-    public object? Content
-    {
-        get => GetValue(ContentProperty);
-        set => SetValue(ContentProperty, value);
-    }
-
     private TextBlock? _stringHeaderLabel;
     private ContentPresenter? _viewHeaderPresenter;
     private Border? _divider;
+
+    static CardView()
+    {
+        HeaderProperty.Changed.AddClassHandler<CardView>((x, e) => 
+        {
+            System.Diagnostics.Debug.WriteLine($"CardView: HeaderProperty changed, new value = {e.NewValue?.GetType().Name ?? "null"}");
+            x.UpdateHeader();
+        });
+    }
 
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
 
+        System.Diagnostics.Debug.WriteLine($"CardView.OnApplyTemplate called");
+
         // 获取模板元素 (使用 PART_ 命名约定)
         _stringHeaderLabel = e.NameScope.Find<TextBlock>("PART_StringHeaderLabel");
         _viewHeaderPresenter = e.NameScope.Find<ContentPresenter>("PART_ViewHeaderContentPresenter");
         _divider = e.NameScope.Find<Border>("PART_Divider");
+
+        System.Diagnostics.Debug.WriteLine($"CardView: Found parts - StringLabel: {_stringHeaderLabel != null}, ViewPresenter: {_viewHeaderPresenter != null}, Divider: {_divider != null}");
+        System.Diagnostics.Debug.WriteLine($"CardView: Current Header value = {Header?.GetType().Name ?? "null"}");
 
         // 初始化状态
         if (_stringHeaderLabel != null) _stringHeaderLabel.IsVisible = false;
@@ -72,15 +62,6 @@ public partial class CardView : TemplatedControl
         UpdateHeader();
     }
 
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        
-        if (change.Property == HeaderProperty)
-        {
-            UpdateHeader();
-        }
-    }
 
     /// <summary>
     /// 更新标题显示
@@ -89,33 +70,38 @@ public partial class CardView : TemplatedControl
     {
         if (_stringHeaderLabel == null || _viewHeaderPresenter == null || _divider == null)
         {
+            System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader: Parts not ready");
             return;
         }
 
         try
         {
             var header = Header;
+            System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader: Header type = {header?.GetType().Name ?? "null"}");
 
             if (header is string headerText && !string.IsNullOrEmpty(headerText))
             {
                 // 显示文本标题
+                System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader: String header = {headerText}");
                 _stringHeaderLabel.Text = headerText;
                 _stringHeaderLabel.IsVisible = true;
                 _viewHeaderPresenter.IsVisible = false;
                 _viewHeaderPresenter.Content = null;
                 _divider.IsVisible = true;
             }
-            else if (header is Control headerView)
+            else if (header != null)
             {
-                // 显示视图标题
-                _viewHeaderPresenter.Content = headerView;
-                _stringHeaderLabel.IsVisible = false;
+                // 显示视图标题（任何非null对象）
+                System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader: Object header");
+                _viewHeaderPresenter.Content = header;
                 _viewHeaderPresenter.IsVisible = true;
+                _stringHeaderLabel.IsVisible = false;
                 _divider.IsVisible = true;
             }
             else
             {
                 // 隐藏所有标题元素
+                System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader: No header");
                 _stringHeaderLabel.IsVisible = false;
                 _viewHeaderPresenter.IsVisible = false;
                 _divider.IsVisible = false;

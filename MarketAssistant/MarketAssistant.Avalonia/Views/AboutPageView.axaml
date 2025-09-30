@@ -14,43 +14,65 @@
         <ResourceDictionary>
             <!-- 转换器 -->
             <converts:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
-            
-            <!-- 页面特有样式 -->
-            <Style x:Key="FeatureItemStyle" Selector="Border">
-                <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-                <Setter Property="Padding" Value="12"/>
-                <Setter Property="Margin" Value="0,0,0,8"/>
-                <Setter Property="CornerRadius" Value="8"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-                <Setter Property="BorderThickness" Value="1"/>
-            </Style>
-
-            <Style x:Key="FeatureIconStyle" Selector="Border">
-                <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-                <Setter Property="CornerRadius" Value="8"/>
-                <Setter Property="Padding" Value="8"/>
-                <Setter Property="BorderThickness" Value="0"/>
-            </Style>
-
-            <Style x:Key="FeatureTitleStyle" Selector="TextBlock">
-                <Setter Property="FontSize" Value="16"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                <Setter Property="VerticalAlignment" Value="Center"/>
-            </Style>
-
-            <Style x:Key="FeatureButtonStyle" Selector="Button">
-                <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-                <Setter Property="Foreground" Value="White"/>
-                <Setter Property="FontSize" Value="12"/>
-                <Setter Property="FontWeight" Value="Bold"/>
-                <Setter Property="Height" Value="32"/>
-                <Setter Property="Padding" Value="8,0"/>
-                <Setter Property="CornerRadius" Value="6"/>
-                <Setter Property="BorderThickness" Value="0"/>
-            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
+    
+    <UserControl.Styles>
+        <!-- 页面特有样式 -->
+        <Style Selector="Border.featureItem">
+            <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style Selector="Border.featureIcon">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <Style Selector="TextBlock.featureTitle">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.featureButton">
+            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <!-- 成功按钮样式 (绿色) -->
+        <Style Selector="Button.success">
+            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <!-- 警告按钮样式 (黄色) -->
+        <Style Selector="Button.warning">
+            <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
 
     <Design.DataContext>
         <vm:AboutPageViewModel/>
@@ -60,14 +82,9 @@
         <StackPanel Spacing="16" Margin="16">
             
             <!-- 顶部应用信息区域 -->
-            <Border Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="16">
-                <StackPanel>
-                    <!-- 卡片头部 -->
-                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <controls:CardView>
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
                                    Text="关于我们"
                                    FontSize="18"
@@ -91,147 +108,132 @@
                             </Button>
                         </Border>
                     </Grid>
-                    
-                    <!-- Logo和应用信息 -->
-                    <Grid ColumnDefinitions="Auto, *, Auto"
-                          RowDefinitions="Auto"
-                          Margin="16"
-                          Background="{DynamicResource ItemBackgroundBrush}">
-                        <!-- Logo -->
-                        <Border Grid.Column="0"
-                                Background="{DynamicResource CardBackgroundBrush}"
-                                CornerRadius="12"
-                                Padding="12"
-                                BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1">
-                            <Image Source="avares://MarketAssistant.Avalonia/Assets/Images/logo.jpg"
-                                   Width="80"
-                                   Height="80"
-                                   Stretch="UniformToFill"/>
-                        </Border>
+                </controls:CardView.Header>
+                <!-- Logo和应用信息 -->
+                <Panel Margin="-16">
+                    <Panel.Background>
+                        <SolidColorBrush Color="{DynamicResource ItemBackground}"/>
+                    </Panel.Background>
+                <Grid ColumnDefinitions="Auto, *, Auto"
+                      RowDefinitions="Auto"
+                      Margin="16">
+                    <!-- Logo -->
+                    <Border Grid.Column="0"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            CornerRadius="12"
+                            Padding="12"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1">
+                        <Image Source="avares://MarketAssistant.Avalonia/Assets/Images/logo.jpg"
+                               Width="80"
+                               Height="80"
+                               Stretch="UniformToFill"/>
+                    </Border>
 
-                        <!-- 应用信息 -->
-                        <StackPanel Grid.Column="1"
-                                    VerticalAlignment="Center"
-                                    Spacing="8"
-                                    Margin="16,0">
-                            <TextBlock Text="{Binding AppName}"
-                                       FontSize="24"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="{Binding Description}"
-                                       FontSize="14"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextWrapping="Wrap"/>
-                            <Border Background="{StaticResource InfoBrush}"
-                                    CornerRadius="12"
-                                    Padding="8"
-                                    BorderThickness="0"
-                                    HorizontalAlignment="Left">
-                                <TextBlock Text="{Binding Version}"
-                                           FontSize="12"
-                                           Foreground="White"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- 更新按钮区域 -->
-                        <StackPanel Grid.Column="2"
-                                    VerticalAlignment="Center"
-                                    Spacing="8"
-                                    Margin="16,0">
-                            <!-- 更新状态显示 -->
-                            <TextBlock Text="{Binding UpdateStatus}"
+                    <!-- 应用信息 -->
+                    <StackPanel Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                Margin="16,0">
+                        <TextBlock Text="{Binding AppName}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="{Binding Description}"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"/>
+                        <Border Background="{StaticResource InfoBrush}"
+                                CornerRadius="4"
+                                Padding="8,4"
+                                BorderThickness="0"
+                                HorizontalAlignment="Left">
+                            <TextBlock Text="{Binding Version}"
                                        FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Foreground="White"
+                                       FontWeight="Bold"
                                        HorizontalAlignment="Center"
-                                       Width="100"
-                                       TextAlignment="Center"/>
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
 
-                            <!-- 检查更新按钮 -->
-                            <Button Content="检查更新"
-                                    Background="{StaticResource SuccessBrush}"
-                                    Foreground="White"
-                                    FontSize="12"
-                                    FontWeight="Bold"
-                                    Height="36"
-                                    Width="100"
-                                    CornerRadius="8"
-                                    Command="{Binding CheckUpdateCommand}"
-                                    IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"/>
+                    <!-- 更新按钮区域 -->
+                    <StackPanel Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                Margin="16,0">
+                        <!-- 更新状态显示 -->
+                        <TextBlock Text="{Binding UpdateStatus}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Width="100"
+                                   TextAlignment="Center"/>
 
-                            <!-- 下载更新按钮 -->
-                            <Button Content="下载更新"
-                                    Background="{StaticResource WarningBrush}"
-                                    Foreground="White"
-                                    CornerRadius="8"
-                                    FontSize="12"
-                                    FontWeight="Bold"
-                                    Height="36"
-                                    Width="100"
-                                    Command="{Binding DownloadUpdateCommand}"
-                                    IsVisible="{Binding HasNewVersion}"/>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
-            </Border>
+                        <!-- 检查更新按钮 -->
+                        <Button Content="检查更新"
+                                Classes="success"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Height="36"
+                                Width="100"
+                                Command="{Binding CheckUpdateCommand}"
+                                IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"/>
+
+                        <!-- 下载更新按钮 -->
+                        <Button Content="下载更新"
+                                Classes="warning"
+                                FontSize="12"
+                                FontWeight="Bold"
+                                Height="36"
+                                Width="100"
+                                Command="{Binding DownloadUpdateCommand}"
+                                IsVisible="{Binding HasNewVersion}"/>
+                    </StackPanel>
+                </Grid>
+                </Panel>
+            </controls:CardView>
 
             <!-- 功能选项列表 -->
-            <Border Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="16">
-                <StackPanel>
-                    <TextBlock Text="功能与支持"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"
-                               VerticalAlignment="Center"
-                               Margin="0,0,0,16"/>
-                    
-                    <ItemsControl ItemsSource="{Binding FeatureItems}"
-                                  Background="{DynamicResource CardBackgroundBrush}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:FeatureItem">
-                                <Border Classes="FeatureItemStyle"
-                                        Margin="0,0,0,8">
-                                    <Grid ColumnDefinitions="Auto, *, Auto">
-                                        <!-- 图标容器 -->
-                                        <Border Grid.Column="0"
-                                                Classes="FeatureIconStyle">
-											<Svg Path="{Binding IconSource}"
-                                                     Width="20"
-                                                     Height="20"/>
-                                        </Border>
+            <controls:CardView Header="功能与支持">
+                <ItemsControl ItemsSource="{Binding FeatureItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FeatureItem">
+                            <Border Classes="FeatureItemStyle"
+                                    Margin="0,0,0,8">
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <!-- 图标容器 -->
+                                    <Border Grid.Column="0"
+                                            Classes="FeatureIconStyle">
+										<Svg Path="{Binding IconSource}"
+                                                 Width="20"
+                                                 Height="20"/>
+                                    </Border>
 
-                                        <!-- 标题和描述 -->
-                                        <StackPanel Grid.Column="1"
-                                                    VerticalAlignment="Center"
-                                                    Spacing="4"
-                                                    Margin="16,0">
-                                            <TextBlock Text="{Binding Title}"
-                                                       Classes="FeatureTitleStyle"/>
-                                            <TextBlock Text="{Binding Title, StringFormat='查看{0}相关信息'}"
-                                                       FontSize="12"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        </StackPanel>
+                                    <!-- 标题和描述 -->
+                                    <StackPanel Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Spacing="4"
+                                                Margin="16,0">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Classes="FeatureTitleStyle"/>
+                                        <TextBlock Text="{Binding Title, StringFormat='查看{0}相关信息'}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
 
-                                        <!-- 操作按钮 -->
-                                        <Button Grid.Column="2"
-                                                Content="{Binding ButtonText}"
-                                                Classes="FeatureButtonStyle"
-                                                Command="{Binding Command}"/>
+                                    <!-- 操作按钮 -->
+                                    <Button Grid.Column="2"
+                                            Content="{Binding ButtonText}"
+                                            Classes="FeatureButtonStyle"
+                                            Command="{Binding Command}"/>
 
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
-            </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </controls:CardView>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

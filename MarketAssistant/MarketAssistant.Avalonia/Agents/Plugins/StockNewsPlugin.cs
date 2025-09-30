@@ -1,3 +1,4 @@
+using MarketAssistant.Avalonia.Infrastructure.Kernel;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins.Models;
 using Microsoft.Playwright;
