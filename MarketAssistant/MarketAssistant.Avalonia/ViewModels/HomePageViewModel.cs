@@ -1,4 +1,6 @@
+using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.ViewModels.Home;
 using Microsoft.Extensions.Logging;
 
@@ -30,19 +32,7 @@ public class HomePageViewModel : ViewModelBase, IDisposable
     public TelegraphNewsViewModel News { get; }
 
     /// <summary>
-    /// 临时构造：暂不使用DI，手动创建依赖。后续需要重构为使用DI容器
-    /// </summary>
-    public HomePageViewModel() : base(null)
-    {
-        // TODO: 这里应该通过DI注入，暂时简化处理
-        // 由于缺少服务实例，这些子ViewModels暂时无法正常工作
-        // 需要在Program.cs中配置DI容器后重构此代码
-        
-        Logger?.LogWarning("HomePageViewModel: 使用临时构造，部分功能可能不可用");
-    }
-    
-    /// <summary>
-    /// 完整构造函数（待DI容器配置后使用）
+    /// 构造函数（使用依赖注入）
     /// </summary>
     public HomePageViewModel(
         HomeSearchViewModel searchViewModel,
@@ -104,7 +94,10 @@ public class HomePageViewModel : ViewModelBase, IDisposable
             // 清除搜索结果
             Search.ClearSearchResults();
 
-            // TODO: 实现Avalonia的导航逻辑
+            // 发送导航消息到股票详情页
+            WeakReferenceMessenger.Default.Send(
+                new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stockCode } }));
+                    
             Logger?.LogInformation($"导航到股票详情页: {stockCode}");
         }, "导航到股票详情页");
     }

@@ -1,4 +1,4 @@
-﻿namespace MarketAssistant.Plugins.Models;
+namespace MarketAssistant.Plugins.Models;
 
 /// <summary>
 /// 股票筛选条件

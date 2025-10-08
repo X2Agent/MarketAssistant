@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure;
+using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.Avalonia.ViewModels;
@@ -49,12 +50,13 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     private MCPServerConfig? _editingConfig;
 
-    public MCPConfigPageViewModel()
+    public MCPConfigPageViewModel() : this(null, null)
     {
         // 设计时构造函数
     }
 
-    public MCPConfigPageViewModel(MCPServerConfigService configService)
+    public MCPConfigPageViewModel(MCPServerConfigService? configService, ILogger<MCPConfigPageViewModel>? logger) 
+        : base(logger)
     {
         _configService = configService;
         LoadServerConfigs();

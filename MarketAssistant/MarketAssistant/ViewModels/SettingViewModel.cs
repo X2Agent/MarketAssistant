@@ -228,8 +228,8 @@ public partial class SettingViewModel : ViewModelBase
                 // 如果用户取消选择，尝试自动检测浏览器路径
                 if (_browserService != null)
                 {
-                    var (browserPath, found) = _browserService.CheckBrowser();
-                    if (found)
+                    var browserPath = _browserService.CheckBrowser();
+                    if (!string.IsNullOrEmpty(browserPath))
                     {
                         UserSetting.BrowserPath = browserPath;
                     }

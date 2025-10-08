@@ -13,6 +13,10 @@
         <vm:StockPageViewModel/>
     </Design.DataContext>
 
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+    </UserControl.Resources>
+
     <UserControl.Styles>
         <!-- 时间周期按钮样式 -->
         <Style Selector="Button.period-button">
@@ -72,13 +76,9 @@
                            FontSize="28"
                            FontWeight="Bold"
                            VerticalAlignment="Center"
-                           Margin="16,0,0,0">
-                    <TextBlock.Foreground>
-                        <MultiBinding Converter="{StaticResource PriceChangeColorConverter}">
-                            <Binding Path="PriceChange"/>
-                        </MultiBinding>
-                    </TextBlock.Foreground>
-                </TextBlock>
+                           Margin="16,0,0,0"
+                           Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
+                
                 
                 <!-- 涨跌信息 -->
                 <StackPanel Grid.Column="3" 
@@ -88,27 +88,13 @@
                             Margin="12,0,0,0">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <TextBlock FontSize="14" 
-                                   FontWeight="Bold">
-                            <TextBlock.Text>
-                                <Binding Path="PriceChange" StringFormat="{}{0:F2}"/>
-                            </TextBlock.Text>
-                            <TextBlock.Foreground>
-                                <MultiBinding Converter="{StaticResource PriceChangeColorConverter}">
-                                    <Binding Path="PriceChange"/>
-                                </MultiBinding>
-                            </TextBlock.Foreground>
-                        </TextBlock>
+                                   FontWeight="Bold"
+                                   Text="{Binding PriceChange, StringFormat={}{0:F2}}"
+                                   Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
                         <TextBlock FontSize="14" 
-                                   FontWeight="Bold">
-                            <TextBlock.Text>
-                                <Binding Path="PriceChangePercent" StringFormat="{}({0:F2}%)"/>
-                            </TextBlock.Text>
-                            <TextBlock.Foreground>
-                                <MultiBinding Converter="{StaticResource PriceChangeColorConverter}">
-                                    <Binding Path="PriceChange"/>
-                                </MultiBinding>
-                            </TextBlock.Foreground>
-                        </TextBlock>
+                                   FontWeight="Bold"
+                                   Text="{Binding PriceChangePercent, StringFormat={}({0:F2}%)}"
+                                   Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
                     </StackPanel>
                     <TextBlock Text="较昨收" 
                                FontSize="12" 

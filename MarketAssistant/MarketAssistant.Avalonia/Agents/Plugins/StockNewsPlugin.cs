@@ -1,9 +1,19 @@
-using MarketAssistant.Avalonia.Infrastructure.Kernel;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Plugins.Models;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Playwright;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Factories;
 using System.ComponentModel;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Avalonia.Services.Browser;
 
 namespace MarketAssistant.Plugins;
 

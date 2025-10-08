@@ -1,7 +1,11 @@
 using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
+using MarketAssistant.Infrastructure.Configuration;
 using System.Text.Json;
+using MarketAssistant.Infrastructure.Configuration;
 
 namespace MarketAssistant.Applications.Stocks;
 

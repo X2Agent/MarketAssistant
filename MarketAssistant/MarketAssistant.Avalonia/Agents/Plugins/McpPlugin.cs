@@ -1,4 +1,5 @@
-﻿using MarketAssistant.Applications.Settings;
+using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.Infrastructure;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;

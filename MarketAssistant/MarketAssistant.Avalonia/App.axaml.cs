@@ -5,12 +5,16 @@ using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using MarketAssistant.Avalonia.ViewModels;
 using MarketAssistant.Avalonia.Views;
+using Microsoft.Extensions.DependencyInjection;
+using System;
 using System.Linq;
 
 namespace MarketAssistant.Avalonia
 {
     public partial class App : Application
     {
+        public static IServiceProvider? ServiceProvider { get; private set; }
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -18,14 +22,20 @@ namespace MarketAssistant.Avalonia
 
         public override void OnFrameworkInitializationCompleted()
         {
+            // 配置依赖注入
+            ServiceProvider = Program.ConfigureServices();
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
                 // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
                 DisableAvaloniaDataAnnotationValidation();
+                
+                // 使用DI容器创建MainWindowViewModel
+                var mainWindowViewModel = ServiceProvider.GetRequiredService<MainWindowViewModel>();
                 desktop.MainWindow = new MainWindow
                 {
-                    DataContext = new MainWindowViewModel(),
+                    DataContext = mainWindowViewModel,
                 };
             }
 

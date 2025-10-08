@@ -1,19 +1,39 @@
 using Avalonia.Platform.Storage;
+using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Avalonia.Infrastructure;
+using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.Notification;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Notification;
+using MarketAssistant.Avalonia.Services;
+using MarketAssistant.Services.Notification;
+using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Notification;
+using MarketAssistant.Vectors.Interfaces;
+using MarketAssistant.Services.Notification;
+using Microsoft.Extensions.Logging;
+using MarketAssistant.Services.Notification;
 using System.Collections.ObjectModel;
+using MarketAssistant.Services.Notification;
 using YamlDotNet.Serialization;
+using MarketAssistant.Services.Notification;
 
 namespace MarketAssistant.Avalonia.ViewModels;
 
 /// <summary>
-/// 设置页ViewModel - 完全基于 SettingViewModel
+/// 设置页ViewModel
 /// </summary>
 public partial class SettingsPageViewModel : ViewModelBase
 {
+    private readonly IRagIngestionService _ragIngestionService;
+    private readonly INotificationService _notificationService;
+    private readonly IUserSettingService _userSettingService;
     private IStorageProvider? _storageProvider;
 
     // UserSetting对象，包含所有用户设置
@@ -100,9 +120,18 @@ public partial class SettingsPageViewModel : ViewModelBase
         }
     }
 
-    public SettingsPageViewModel()
+    /// <summary>
+    /// 构造函数（使用依赖注入）
+    /// </summary>
+    public SettingsPageViewModel(
+        IRagIngestionService ragIngestionService,
+        INotificationService notificationService,
+        IUserSettingService userSettingService,
+        ILogger<SettingsPageViewModel> logger) : base(logger)
     {
-        // 使用异步初始化方法
+        _ragIngestionService = ragIngestionService;
+        _notificationService = notificationService;
+        _userSettingService = userSettingService;
         _ = InitializeAsync();
     }
 
@@ -118,7 +147,8 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         // 先加载模型列表
         await LoadModelsAsync();
-        // TODO: 加载设置（需要依赖注入 IUserSettingService）
+        // 加载用户设置
+        UserSetting = _userSettingService.CurrentSetting;
     }
 
     /// <summary>
@@ -225,13 +255,32 @@ public partial class SettingsPageViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 向量化文档方法
+    /// 向量化文档
     /// </summary>
     [RelayCommand]
     private async Task VectorizeDocuments()
     {
-        // TODO: 实现向量化逻辑（需要依赖注入相关服务）
-        await Task.CompletedTask;
+        if (!IsKnowledgeDirectoryValid)
+        {
+            Logger?.LogWarning("知识库目录无效，无法进行向量化");
+            return;
+        }
+
+        await SafeExecuteAsync(async () =>
+        {
+            IsVectorizing = true;
+            try
+            {
+                // TODO: 实现完整的向量化逻辑
+                // 需要遍历知识库目录中的文件并调用 _ragIngestionService.IngestDocumentAsync
+                Logger?.LogInformation($"开始向量化知识库目录: {UserSetting.KnowledgeFileDirectory}");
+                await Task.CompletedTask;
+            }
+            finally
+            {
+                IsVectorizing = false;
+            }
+        }, "向量化文档");
     }
 
     /// <summary>
@@ -240,16 +289,28 @@ public partial class SettingsPageViewModel : ViewModelBase
     [RelayCommand]
     private void Save()
     {
-        // TODO: 实现保存逻辑（需要依赖注入 IUserSettingService）
+        SafeExecute(() =>
+        {
+            _userSettingService.UpdateSettings(UserSetting);
+            _notificationService.ShowSuccess("设置已保存");
+            Logger?.LogInformation("保存设置");
+        }, "保存设置");
     }
 
     /// <summary>
-    /// 重置设置
+    /// 重置设置为默认值
     /// </summary>
     [RelayCommand]
     private void Reset()
     {
-        // TODO: 实现重置逻辑（需要依赖注入 IUserSettingService）
+        SafeExecute(() =>
+        {
+            _userSettingService.ResetSettings();
+            UserSetting = _userSettingService.CurrentSetting;
+            OnPropertyChanged(nameof(UserSetting));
+            _notificationService.ShowSuccess("设置已重置为默认值");
+            Logger?.LogInformation("重置设置为默认值");
+        }, "重置设置");
     }
 
     /// <summary>

@@ -100,16 +100,20 @@ public class HomeStockService : IHomeStockService
     {
         try
         {
+            string stockName = "";
+            string code = "";
+            string market = "";
+
             if (stockParameter is HotStock hotStock)
             {
-                _favoriteService.AddFavorite(hotStock.Code, hotStock.Market);
-                await Shell.Current.DisplayAlert("收藏成功", $"已将 {hotStock.Name} 添加到收藏列表", "确定");
-                return true;
+                stockName = hotStock.Name;
+                code = hotStock.Code;
+                market = hotStock.Market;
             }
             else if (stockParameter is StockItem stockItem)
             {
-                string market = "";
-                string code = stockItem.Code;
+                stockName = stockItem.Name;
+                code = stockItem.Code;
 
                 // 尝试从股票代码中提取市场代码
                 if (code.StartsWith("sh") || code.StartsWith("sz"))
@@ -117,9 +121,23 @@ public class HomeStockService : IHomeStockService
                     market = code.Substring(0, 2).ToUpper();
                     code = code.Substring(2);
                 }
+            }
+            else
+            {
+                return false;
+            }
 
+            // 显示确认对话框
+            bool confirmed = await Shell.Current.DisplayAlert(
+                "添加收藏", 
+                $"确定要将 {stockName} 添加到收藏列表吗？", 
+                "确认", 
+                "取消");
+
+            if (confirmed)
+            {
                 _favoriteService.AddFavorite(code, market);
-                await Shell.Current.DisplayAlert("收藏成功", $"已将 {stockItem.Name} 添加到收藏列表", "确定");
+                await Shell.Current.DisplayAlert("收藏成功", $"已将 {stockName} 添加到收藏列表", "确定");
                 return true;
             }
 

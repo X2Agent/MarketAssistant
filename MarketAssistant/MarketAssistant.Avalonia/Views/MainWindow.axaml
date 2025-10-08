@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
-        xmlns:infra="using:MarketAssistant.Avalonia.Infrastructure"
+        xmlns:infra="using:MarketAssistant.Infrastructure.Core"
         xmlns:converts="using:MarketAssistant.Avalonia.Converts"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -25,7 +25,7 @@
 
     <Grid ColumnDefinitions="72,*">
         <!-- 左侧图标导航栏 -->
-        <Border Grid.Column="0" 
+        <Border Grid.Column="0"
                 Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0,0,1,0">
@@ -34,14 +34,14 @@
                 <Border Margin="0,0,0,24" 
                         Width="48"
                         Height="48"
-                        Background="{DynamicResource SystemAccentColor}"
                         CornerRadius="12"
                         HorizontalAlignment="Center"
-                        ToolTip.Tip="MarketAssistant">
-                    <TextBlock Text="📈" 
-                               FontSize="28" 
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
+                        ToolTip.Tip="MarketAssistant"
+                        ClipToBounds="True">
+                    <Image Source="/Assets/logo.png"
+                           Stretch="UniformToFill"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
                 </Border>
 
                 <!-- 导航菜单 -->
@@ -73,18 +73,14 @@
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:NavigationItemViewModel">
-                            <Svg Width="24" 
-                                 Height="24"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Center"
-                                 ToolTip.Tip="{Binding Title}">
-                                <Svg.Path>
-                                    <MultiBinding Converter="{StaticResource NavigationIconConverter}">
-                                        <Binding Path="."/>
-                                        <Binding Path="IsSelected" RelativeSource="{RelativeSource AncestorType=ListBoxItem}"/>
-                                    </MultiBinding>
-                                </Svg.Path>
-                            </Svg>
+                            <Panel Width="24" 
+                                   Height="24"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding Title}">
+                                <svg:Svg Width="24" Height="24" Path="{Binding IconPath}"/>
+                                <svg:Svg Width="24" Height="24" Path="{Binding SelectedIconPath}" IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                            </Panel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -92,7 +88,7 @@
         </Border>
 
         <!-- 右侧内容区域 -->
-        <ContentControl Grid.Column="1" 
+        <ContentControl Grid.Column="1"
                         Content="{Binding CurrentPage}"
                         ContentTemplate="{StaticResource ViewLocator}"/>
     </Grid>

@@ -1,10 +1,17 @@
 using Avalonia.Threading;
+using MarketAssistant.Applications.StockSelection;
 using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Applications.StockSelection;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Applications.StockSelection;
 using Microsoft.Extensions.Logging;
+using MarketAssistant.Applications.StockSelection;
 using System.Collections.ObjectModel;
+using MarketAssistant.Applications.StockSelection;
 
 namespace MarketAssistant.Avalonia.ViewModels;
 
@@ -44,7 +51,7 @@ public enum SelectionModeType
 /// </summary>
 public partial class StockSelectionPageViewModel : ViewModelBase
 {
-    private readonly StockSelectionService? _stockSelectionService;
+    private readonly StockSelectionService _stockSelectionService;
 
     [ObservableProperty]
     private string _userRequirements = string.Empty;
@@ -123,17 +130,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
         SelectionResult?.RiskWarnings != null && SelectionResult.RiskWarnings.Count > 0;
 
     /// <summary>
-    /// 临时无参构造函数
-    /// </summary>
-    public StockSelectionPageViewModel() : base(null)
-    {
-        // TODO: 配置DI后使用完整构造函数
-        Logger?.LogWarning("StockSelectionPageViewModel: 使用临时构造，部分功能不可用");
-        _ = LoadSelectionModesAsync();
-    }
-
-    /// <summary>
-    /// 完整构造函数
+    /// 构造函数（使用依赖注入）
     /// </summary>
     public StockSelectionPageViewModel(
         ILogger<StockSelectionPageViewModel> logger,
@@ -166,7 +163,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     [RelayCommand]
     private async Task ExecuteAnalysisAsync()
     {
-        if (SelectedMode == null || _stockSelectionService == null)
+        if (SelectedMode == null)
             return;
 
         switch (SelectedMode.ModeType)
@@ -211,7 +208,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     [RelayCommand]
     private async Task ExecuteQuickSelectionAsync(QuickSelectionStrategyInfo? strategy)
     {
-        if (strategy == null || _stockSelectionService == null)
+        if (strategy == null)
             return;
 
         await SafeExecuteAsync(async () =>
@@ -235,7 +232,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
 
     private async Task ExecuteSelectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(UserRequirements) || _stockSelectionService == null)
+        if (string.IsNullOrWhiteSpace(UserRequirements))
             return;
 
         await SafeExecuteAsync(async () =>
@@ -255,7 +252,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
 
     private async Task ExecuteNewsSelectionAsync()
     {
-        if (string.IsNullOrWhiteSpace(NewsContent) || _stockSelectionService == null)
+        if (string.IsNullOrWhiteSpace(NewsContent))
             return;
 
         await SafeExecuteAsync(async () =>
@@ -284,8 +281,6 @@ public partial class StockSelectionPageViewModel : ViewModelBase
 
     private async Task LoadQuickStrategiesAsync()
     {
-        if (_stockSelectionService == null) return;
-
         await SafeExecuteAsync(() =>
         {
             var strategies = _stockSelectionService.GetQuickSelectionStrategies();

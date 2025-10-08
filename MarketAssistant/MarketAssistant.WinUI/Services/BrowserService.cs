@@ -8,31 +8,29 @@ internal class BrowserService : IBrowserService
     /// <summary>
     /// 检查Windows系统上安装的浏览器
     /// </summary>
-    /// <returns>浏览器路径和是否找到浏览器</returns>
-    public (string Path, bool Found) CheckBrowser()
+    public string CheckBrowser()
     {
         // 首先检查Edge浏览器
-        var (edgePath, edgeFound) = CheckEdge();
-        if (edgeFound)
+        var edgePath = CheckEdge();
+        if (!string.IsNullOrEmpty(edgePath))
         {
-            return (edgePath, true);
+            return edgePath;
         }
 
         // 然后检查Chrome浏览器
-        var (chromePath, chromeFound) = CheckChrome();
-        if (chromeFound)
+        var chromePath = CheckChrome();
+        if (!string.IsNullOrEmpty(chromePath))
         {
-            return (chromePath, true);
+            return chromePath;
         }
 
-        return (string.Empty, false);
+        return string.Empty;
     }
 
     /// <summary>
     /// 检查Windows系统上安装的Edge浏览器
     /// </summary>
-    /// <returns>Edge路径和是否找到Edge</returns>
-    private static (string Path, bool Found) CheckEdge()
+    private static string CheckEdge()
     {
         try
         {
@@ -43,7 +41,11 @@ internal class BrowserService : IBrowserService
                 var path = key.GetValue("Path") as string;
                 if (!string.IsNullOrEmpty(path))
                 {
-                    return (Path.Combine(path, "msedge.exe"), true);
+                    var edgePath = Path.Combine(path, "msedge.exe");
+                    if (File.Exists(edgePath))
+                    {
+                        return edgePath;
+                    }
                 }
             }
 
@@ -54,7 +56,11 @@ internal class BrowserService : IBrowserService
                 var path = keyWow.GetValue("Path") as string;
                 if (!string.IsNullOrEmpty(path))
                 {
-                    return (Path.Combine(path, "msedge.exe"), true);
+                    var edgePath = Path.Combine(path, "msedge.exe");
+                    if (File.Exists(edgePath))
+                    {
+                        return edgePath;
+                    }
                 }
             }
 
@@ -63,7 +69,7 @@ internal class BrowserService : IBrowserService
                 "Microsoft", "Edge", "Application", "msedge.exe");
             if (File.Exists(userEdgePath))
             {
-                return (userEdgePath, true);
+                return userEdgePath;
             }
         }
         catch
@@ -71,14 +77,13 @@ internal class BrowserService : IBrowserService
             // 忽略注册表访问错误
         }
 
-        return (string.Empty, false);
+        return string.Empty;
     }
 
     /// <summary>
     /// 检查Windows系统上安装的Chrome浏览器
     /// </summary>
-    /// <returns>Chrome路径和是否找到Chrome</returns>
-    private static (string Path, bool Found) CheckChrome()
+    private static string CheckChrome()
     {
         try
         {
@@ -89,7 +94,7 @@ internal class BrowserService : IBrowserService
                 var path = key.GetValue(null) as string;
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
                 {
-                    return (path, true);
+                    return path;
                 }
             }
 
@@ -100,7 +105,7 @@ internal class BrowserService : IBrowserService
                 var path = keyWow.GetValue(null) as string;
                 if (!string.IsNullOrEmpty(path) && File.Exists(path))
                 {
-                    return (path, true);
+                    return path;
                 }
             }
 
@@ -109,7 +114,7 @@ internal class BrowserService : IBrowserService
                 "Google", "Chrome", "Application", "chrome.exe");
             if (File.Exists(userChromePath))
             {
-                return (userChromePath, true);
+                return userChromePath;
             }
         }
         catch
@@ -117,6 +122,6 @@ internal class BrowserService : IBrowserService
             // 忽略注册表访问错误
         }
 
-        return (string.Empty, false);
+        return string.Empty;
     }
 }

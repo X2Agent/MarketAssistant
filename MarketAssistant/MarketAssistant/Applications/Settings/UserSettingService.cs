@@ -52,8 +52,8 @@ public class UserSettingService : IUserSettingService
             // 如果浏览器路径为空，则使用IBrowserService自动检测
             if (string.IsNullOrEmpty(_currentSetting.BrowserPath) && _browserService != null)
             {
-                var (browserPath, found) = _browserService.CheckBrowser();
-                if (found)
+                var browserPath = _browserService.CheckBrowser();
+                if (!string.IsNullOrEmpty(browserPath))
                 {
                     _currentSetting.BrowserPath = browserPath;
                 }

@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
-using MarketAssistant.Avalonia.Infrastructure;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -71,13 +71,14 @@ public partial class StockPageViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 设置股票代码并加载数据
+    /// 设置股票代码（异步加载数据，避免阻塞UI）
     /// </summary>
     public void SetStockCode(string code)
     {
         StockCode = code;
         if (!string.IsNullOrEmpty(code))
         {
+            // 直接异步加载数据，不需要额外延迟（外部已处理）
             _ = LoadStockDataAsync(code);
         }
     }

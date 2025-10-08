@@ -1,4 +1,4 @@
-﻿namespace MarketAssistant.Plugins.Models;
+namespace MarketAssistant.Plugins.Models;
 
 /// <summary>
 /// 雪球网股票筛选结果实体

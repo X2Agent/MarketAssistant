@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
+             xmlns:models="using:MarketAssistant.Avalonia.Views.Models"
+             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
+             x:Class="MarketAssistant.Avalonia.Views.AnalysisReportView"
+             x:DataType="vm:AnalysisReportViewModel">
+
+    <Grid>
+        <!-- 主要内容区域 -->
+        <ScrollViewer x:Name="ReportScrollView" IsVisible="{Binding IsReportVisible}">
+            <StackPanel Margin="8" Spacing="8">
+                <!-- 股票信息卡片 -->
+                <controls:CardView>
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <TextBlock Text="股票代码" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding StockSymbol}" FontSize="16" FontWeight="Bold" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="目标价格" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding TargetPrice}" FontSize="16" FontWeight="Bold" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Spacing="4">
+                            <TextBlock Text="价格变化预期" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding PriceChange}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </controls:CardView>
+
+                <!-- 顶部关键指标 -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <!-- 投资建议卡片 -->
+                    <controls:CardView Grid.Column="0">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="投资建议" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding Recommendation}" FontSize="18" FontWeight="Bold" />
+                            <TextBlock Text="{Binding ConfidenceLevel}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 风险等级卡片 -->
+                    <controls:CardView Grid.Column="1">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="风险等级" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding RiskLevel}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource ErrorBrush}" />
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 综合评分卡片 -->
+                    <controls:CardView Grid.Column="2">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="综合评分" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding OverallScore}" FontSize="18" FontWeight="Bold" Foreground="{DynamicResource PrimaryBrush}" />
+                            <TextBlock Text="{Binding ScorePercentage}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </controls:CardView>
+                </Grid>
+
+                <!-- 投资亮点与风险因素 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <!-- 投资亮点 -->
+                    <controls:CardView Grid.Column="0">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="投资亮点" FontSize="15" FontWeight="SemiBold" />
+
+                            <ItemsControl ItemsSource="{Binding InvestmentHighlights}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
+                                            <Ellipse Grid.Column="0" 
+                                                     Width="8" Height="8" 
+                                                     Fill="{DynamicResource SuccessBrush}" 
+                                                     VerticalAlignment="Center" 
+                                                     Margin="0,0,8,0" />
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="{Binding .}" 
+                                                       TextWrapping="Wrap" 
+                                                       FontSize="13" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 风险因素 -->
+                    <controls:CardView Grid.Column="1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="风险因素" FontSize="15" FontWeight="SemiBold" />
+
+                            <ItemsControl ItemsSource="{Binding RiskFactors}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
+                                            <Ellipse Grid.Column="0" 
+                                                     Width="8" Height="8" 
+                                                     Fill="{DynamicResource ErrorBrush}" 
+                                                     VerticalAlignment="Center" 
+                                                     Margin="0,0,8,0" />
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="{Binding .}" 
+                                                       TextWrapping="Wrap" 
+                                                       FontSize="13" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </controls:CardView>
+                </Grid>
+
+                <!-- 操作建议与维度评分 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <!-- 操作建议 -->
+                    <controls:CardView Grid.Column="0">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="操作建议" FontSize="15" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding OperationSuggestions}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding .}" 
+                                                   TextWrapping="Wrap" 
+                                                   Margin="0,4" 
+                                                   FontSize="13" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 维度评分 -->
+                    <controls:CardView Grid.Column="1">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="维度评分" FontSize="15" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding DimensionScores}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ScoreItem">
+                                        <Grid ColumnDefinitions="*,Auto,60" Margin="0,4" ColumnSpacing="8">
+                                            <TextBlock Grid.Column="0" 
+                                                       Text="{Binding Name}" 
+                                                       VerticalAlignment="Center" 
+                                                       FontSize="13" />
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="{Binding FormattedScore}" 
+                                                       FontWeight="Bold" 
+                                                       VerticalAlignment="Center" 
+                                                       FontSize="13" />
+                                            <ProgressBar Grid.Column="2" 
+                                                         Value="{Binding ScorePercentage}" 
+                                                         Height="8" 
+                                                         VerticalAlignment="Center" 
+                                                         Minimum="0" 
+                                                         Maximum="1"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </controls:CardView>
+                </Grid>
+
+                <!-- 分析师共识与分歧 -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8" IsVisible="{Binding HasConsensusOrDisagreement}">
+                    <!-- 核心共识 -->
+                    <controls:CardView Grid.Column="0" IsVisible="{Binding HasConsensusInfo}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="核心共识" FontSize="15" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding ConsensusInfo}" 
+                                       TextWrapping="Wrap" 
+                                       FontSize="13" />
+                        </StackPanel>
+                    </controls:CardView>
+
+                    <!-- 主要分歧 -->
+                    <controls:CardView Grid.Column="1" IsVisible="{Binding HasDisagreementInfo}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="主要分歧" FontSize="15" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding DisagreementInfo}" 
+                                       TextWrapping="Wrap" 
+                                       FontSize="13" />
+                        </StackPanel>
+                    </controls:CardView>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- 数据解析加载指示器覆盖层 -->
+        <Grid IsVisible="{Binding IsBusy}" 
+              Background="#80FFFFFF"
+              ZIndex="1000">
+            <StackPanel HorizontalAlignment="Center" 
+                        VerticalAlignment="Center" 
+                        Spacing="16">
+                <ProgressBar IsIndeterminate="{Binding IsBusy}" 
+                             Width="40" 
+                             Height="40" />
+                <TextBlock Text="正在解析分析数据..." 
+                           FontSize="16" 
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
+

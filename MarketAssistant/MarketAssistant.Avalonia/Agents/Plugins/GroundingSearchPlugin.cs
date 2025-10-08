@@ -1,5 +1,7 @@
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Vectors.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;

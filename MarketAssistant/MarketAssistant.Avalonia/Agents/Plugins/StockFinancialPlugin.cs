@@ -1,5 +1,6 @@
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins.Models;
+using MarketAssistant.Services.Settings;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
 using System.Text.Json;

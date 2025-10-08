@@ -19,20 +19,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.6" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.6" />
+    <PackageReference Include="Avalonia" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.7" />
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.6">
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.7">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-	<PackageReference Include="DotLiquid" Version="2.3.197" />
+    <PackageReference Include="Markdig" Version="0.42.0" />
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
 	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 	<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
-	<PackageReference Include="Microsoft.Maui.Graphics.Text.Markdig" Version="9.0.100" />
 	<PackageReference Include="Microsoft.Playwright" Version="1.55.0" />
 	<PackageReference Include="Microsoft.SemanticKernel" Version="1.65.0" />
 	<PackageReference Include="Microsoft.SemanticKernel.Agents.Core" Version="1.65.0" />
@@ -63,6 +62,7 @@
 	<PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
 	<PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.9" />
 	<PackageReference Include="WebViewControl-Avalonia" Version="3.120.10" />
+	<PackageReference Include="Markdown.Avalonia" Version="11.0.3-a1" />
   </ItemGroup>
 
   <ItemGroup>

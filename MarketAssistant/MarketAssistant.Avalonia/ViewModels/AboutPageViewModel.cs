@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications.Settings;
+using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
@@ -19,9 +21,9 @@ namespace MarketAssistant.Avalonia.ViewModels
         [ObservableProperty]
         private bool _hasNewVersion;
 
-        public string AppName => "Market Assistant";
-        public string Version => "v 1.0.0";
-        public string Description => "AI大模型构建的股票分析助手";
+        public string AppName => AppInfo.ProductName;
+        public string Version => $"v {AppInfo.Version}";
+        public string Description => AppInfo.Description;
 
         public ObservableCollection<FeatureItem> FeatureItems { get; } = new ObservableCollection<FeatureItem>();
 
@@ -29,7 +31,10 @@ namespace MarketAssistant.Avalonia.ViewModels
         public IAsyncRelayCommand DownloadUpdateCommand { get; }
         public IAsyncRelayCommand OpenGitHubCommand { get; }
 
-        public AboutPageViewModel()
+    /// <summary>
+    /// 构造函数（使用依赖注入）
+    /// </summary>
+    public AboutPageViewModel(ILogger<AboutPageViewModel> logger) : base(logger)
         {
             CheckUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
             DownloadUpdateCommand = new AsyncRelayCommand(DownloadUpdateAsync);
@@ -81,8 +86,7 @@ namespace MarketAssistant.Avalonia.ViewModels
         {
             try
             {
-                var url = "https://github.com/yourusername/MarketAssistant";
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(AppInfo.GitHubRepoUrl) { UseShellExecute = true });
             }
             catch (Exception)
             {
@@ -109,7 +113,7 @@ namespace MarketAssistant.Avalonia.ViewModels
                 IconSource = "/Assets/Images/refresh.svg",
                 Title = "更新日志",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync("https://github.com/yourusername/MarketAssistant/releases"))
+                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.ChangelogUrl))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -117,7 +121,7 @@ namespace MarketAssistant.Avalonia.ViewModels
                 IconSource = "/Assets/Images/globe.svg",
                 Title = "官方网站",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync("https://github.com/yourusername/MarketAssistant"))
+                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.OfficialWebsite))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -125,7 +129,7 @@ namespace MarketAssistant.Avalonia.ViewModels
                 IconSource = "/Assets/Images/feedback.svg",
                 Title = "意见反馈",
                 ButtonText = "反馈",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync("https://github.com/yourusername/MarketAssistant/issues"))
+                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.FeedbackUrl))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -133,7 +137,7 @@ namespace MarketAssistant.Avalonia.ViewModels
                 IconSource = "/Assets/Images/license.svg",
                 Title = "许可证",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync("https://github.com/yourusername/MarketAssistant/blob/main/LICENSE"))
+                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.LicenseUrl))
             });
         }
     }

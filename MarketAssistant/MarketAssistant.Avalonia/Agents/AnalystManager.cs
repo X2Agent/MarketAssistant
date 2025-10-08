@@ -1,11 +1,17 @@
-using MarketAssistant.Avalonia.Infrastructure.Kernel;
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Settings;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.SemanticKernel;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.SemanticKernel.Agents;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.SemanticKernel.Agents.Orchestration.Concurrent;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.SemanticKernel.Agents.Runtime.InProcess;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Infrastructure.Configuration;
 
 namespace MarketAssistant.Agents;
 

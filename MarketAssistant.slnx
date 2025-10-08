@@ -5,9 +5,6 @@
     <File Path="README.md" />
   </Folder>
   <Project Path="MarketAssistant/MarketAssistant.Avalonia/MarketAssistant.Avalonia.csproj" Id="52707ff8-ba3b-4745-b451-c52632180670" />
-  <Project Path="MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj">
-    <Deploy />
-  </Project>
   <Project Path="MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj">
     <Platform Project="x64" />
   </Project>

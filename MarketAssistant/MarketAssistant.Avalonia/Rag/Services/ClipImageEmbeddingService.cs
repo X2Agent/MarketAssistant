@@ -11,82 +11,82 @@ using System.Security.Cryptography;
 namespace MarketAssistant.Vectors.Services;
 
 /// <summary>
-/// CLIPÍ¼ÏñÇ¶Èë·þÎñ£¨¶àÄ£Ì¬RAGµÄºËÐÄ×é¼þ£©
+/// CLIPÍ¼ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ñ£¨¶ï¿½Ä£Ì¬RAGï¿½Äºï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 /// 
-/// ¡¾Ñ§Ï°Òªµã¡¿£º
-/// 1. ¶àÄ£Ì¬AI£º½áºÏÍ¼ÏñÀí½âºÍÎÄ±¾Àí½âµÄAIÄ£ÐÍ
-/// 2. CLIPÄ£ÐÍ£ºOpenAI¿ª·¢µÄ¿çÄ£Ì¬Ä£ÐÍ£¬¿ÉÒÔ½«Í¼ÏñºÍÎÄ±¾Ó³Éäµ½Í¬Ò»ÓïÒå¿Õ¼ä
-/// 3. ½µ¼¶»úÖÆ£ºÉú²ú»·¾³µÄ¿É¿¿ÐÔ±£ÕÏ£¬Ö÷·½°¸Ê§°ÜÊ±×Ô¶¯ÇÐ»»µ½±¸ÓÃ·½°¸
-/// 4. ONNXÔËÐÐÊ±£º¿çÆ½Ì¨µÄ»úÆ÷Ñ§Ï°ÍÆÀíÒýÇæ£¬ÓÃÓÚ²¿ÊðÉî¶ÈÑ§Ï°Ä£ÐÍ
+/// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+/// 1. ï¿½ï¿½Ä£Ì¬AIï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½AIÄ£ï¿½ï¿½
+/// 2. CLIPÄ£ï¿½Í£ï¿½OpenAIï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½Ä£Ì¬Ä£ï¿½Í£ï¿½ï¿½ï¿½ï¿½Ô½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Ó³ï¿½äµ½Í¬Ò»ï¿½ï¿½ï¿½ï¿½Õ¼ï¿½
+/// 3. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿É¿ï¿½ï¿½Ô±ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½Ê±ï¿½Ô¶ï¿½ï¿½Ð»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã·ï¿½ï¿½ï¿½
+/// 4. ONNXï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Æ½Ì¨ï¿½Ä»ï¿½ï¿½ï¿½Ñ§Ï°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ£¬ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§Ï°Ä£ï¿½ï¿½
 /// 
-/// ¡¾¼Ü¹¹Éè¼Æ¡¿£º
-/// - Ë«¹¦ÄÜÉè¼Æ£ºÍ¼ÏñÇ¶ÈëÏòÁ¿Éú³É + Í¼ÏñÃèÊöÎÄ×ÖÉú³É£¨Caption£©
-/// - ·Ö²ã½µ¼¶£ºCLIPÄ£ÐÍ ¡ú ¹þÏ£ÏòÁ¿£¬¶àÄ£Ì¬ÁÄÌì ¡ú Õ¼Î»·ûÎÄ×Ö
-/// - ×ÊÔ´¹ÜÀí£ºÊµÏÖIDisposable×Ô¶¯ÊÍ·ÅONNX»á»°×ÊÔ´
-/// - ÑÓ³Ù³õÊ¼»¯£ºÊ×´Îµ÷ÓÃÊ±²Å¼ÓÔØÄ£ÐÍ£¬ÌáÉýÆô¶¯ÐÔÄÜ
+/// ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½Æ¡ï¿½ï¿½ï¿½
+/// - Ë«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½Í¼ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ + Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½Captionï¿½ï¿½
+/// - ï¿½Ö²ã½µï¿½ï¿½ï¿½ï¿½CLIPÄ£ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Õ¼Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+/// - ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½IDisposableï¿½Ô¶ï¿½ï¿½Í·ï¿½ONNXï¿½á»°ï¿½ï¿½Ô´
+/// - ï¿½Ó³Ù³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½×´Îµï¿½ï¿½ï¿½Ê±ï¿½Å¼ï¿½ï¿½ï¿½Ä£ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 /// 
-/// ¡¾¼¼ÊõÕ»¡¿£º
-/// - Microsoft.ML.OnnxRuntime£ºONNXÄ£ÐÍÍÆÀí
-/// - SkiaSharp£º¿çÆ½Ì¨Í¼Ïñ´¦Àí¿â
-/// - Microsoft.SemanticKernel£º¶àÄ£Ì¬ÁÄÌìÄÜÁ¦
-/// - Microsoft.Extensions.AI£ºÏòÁ¿Ç¶Èë±ê×¼½Ó¿Ú
+/// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Õ»ï¿½ï¿½ï¿½ï¿½
+/// - Microsoft.ML.OnnxRuntimeï¿½ï¿½ONNXÄ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+/// - SkiaSharpï¿½ï¿½ï¿½ï¿½Æ½Ì¨Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+/// - Microsoft.SemanticKernelï¿½ï¿½ï¿½ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+/// - Microsoft.Extensions.AIï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½×¼ï¿½Ó¿ï¿½
 /// </summary>
 public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 {
-    // ¡¾ÅäÖÃ³£Á¿¡¿Ä¿±êÇ¶ÈëÏòÁ¿Î¬¶È£¬ÓëÎÄ±¾Ç¶Èë±£³ÖÒ»ÖÂÒÔ±ã»ìºÏ¼ìË÷
+    // ï¿½ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½È£ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Ç¶ï¿½ë±£ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ô±ï¿½ï¿½Ï¼ï¿½ï¿½ï¿½
     private const int TargetDim = 1024;
 
-    // ¡¾ÒÀÀµ×¢Èë¡¿ºËÐÄ·þÎñ×é¼þ
-    private readonly ILogger<ClipImageEmbeddingService> _logger;          // ½á¹¹»¯ÈÕÖ¾¼ÇÂ¼
-    private readonly IChatCompletionService? _chat;                       // ¶àÄ£Ì¬ÁÄÌì·þÎñ£¨¿ÉÑ¡£©
-    private readonly string? _modelPath;                                  // CLIP ONNXÄ£ÐÍÎÄ¼þÂ·¾¶
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ë¡¿ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    private readonly ILogger<ClipImageEmbeddingService> _logger;          // ï¿½á¹¹ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½Â¼
+    private readonly IChatCompletionService? _chat;                       // ï¿½ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ñ£¨¿ï¿½Ñ¡ï¿½ï¿½
+    private readonly string? _modelPath;                                  // CLIP ONNXÄ£ï¿½ï¿½ï¿½Ä¼ï¿½Â·ï¿½ï¿½
 
-    // ¡¾×´Ì¬¹ÜÀí¡¿ONNXÍÆÀí»á»°ºÍ³õÊ¼»¯±êÖ¾
-    private InferenceSession? _session;                                   // ONNXÔËÐÐÊ±ÍÆÀí»á»°
-    private bool _initAttempted;                                          // ±ÜÃâÖØ¸´³õÊ¼»¯µÄ±êÖ¾
+    // ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ONNXï¿½ï¿½ï¿½ï¿½ï¿½á»°ï¿½Í³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ö¾
+    private InferenceSession? _session;                                   // ONNXï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½á»°
+    private bool _initAttempted;                                          // ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½Ä±ï¿½Ö¾
 
     /// <summary>
-    /// ¹¹Ôìº¯Êý£ºÊ¹ÓÃÒÀÀµ×¢Èë»ñÈ¡·þÎñ£¬Ö§³Ö»·¾³±äÁ¿ÅäÖÃÄ£ÐÍÂ·¾¶
+    /// ï¿½ï¿½ï¿½ìº¯ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½Ö§ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Â·ï¿½ï¿½
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ÒÀÀµ×¢ÈëÄ£Ê½£ºÍ¨¹ýIServiceProvider»ñÈ¡¿ÉÑ¡·þÎñ£¬×ñÑ­µ¥Ò»Ö°ÔðÔ­Ôò
-    /// - ÅäÖÃÓÅÏÈ¼¶£º»·¾³±äÁ¿ > Ä¬ÈÏÂ·¾¶£¬±ãÓÚ²»Í¬»·¾³²¿Êð
-    /// - ÑÓ³Ù¼ÓÔØ£º¹¹ÔìÊ±²»¼ÓÔØÄ£ÐÍ£¬Ê×´ÎÊ¹ÓÃÊ±²Å³õÊ¼»¯
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½Ä£Ê½ï¿½ï¿½Í¨ï¿½ï¿½IServiceProviderï¿½ï¿½È¡ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½Ò»Ö°ï¿½ï¿½Ô­ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ > Ä¬ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½Ó³Ù¼ï¿½ï¿½Ø£ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í£ï¿½ï¿½×´ï¿½Ê¹ï¿½ï¿½Ê±ï¿½Å³ï¿½Ê¼ï¿½ï¿½
     /// </summary>
     public ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IServiceProvider sp)
     {
         _logger = logger;
-        // ³¢ÊÔ»ñÈ¡ÁÄÌì·þÎñ£¨¶àÄ£Ì¬Caption¹¦ÄÜ£¬¿ÉÑ¡£©
+        // ï¿½ï¿½ï¿½Ô»ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ñ£¨¶ï¿½Ä£Ì¬Captionï¿½ï¿½ï¿½Ü£ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½
         _chat = sp.GetService<IChatCompletionService>();
 
-        // Ä£ÐÍÂ·¾¶ÅäÖÃ£ºÓÅÏÈ»·¾³±äÁ¿£¬ºó±¸Ä¬ÈÏÂ·¾¶
+        // Ä£ï¿½ï¿½Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¬ï¿½ï¿½Â·ï¿½ï¿½
         _modelPath = Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")
                      ?? Path.Combine(AppContext.BaseDirectory, "models", "clip-image.onnx");
     }
 
     /// <summary>
-    /// Éú³ÉÍ¼ÏñµÄÇ¶ÈëÏòÁ¿£¨RAGÏµÍ³µÄºËÐÄ¹¦ÄÜ£©
+    /// ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½RAGÏµÍ³ï¿½Äºï¿½ï¿½Ä¹ï¿½ï¿½Ü£ï¿½
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ¶à²ã½µ¼¶²ßÂÔ£ºCLIPÄ£ÐÍÍÆÀí ¡ú ¹þÏ£ÏòÁ¿£¬È·±£ÏµÍ³ÎÈ¶¨ÐÔ
-    /// - Òì³£´¦Àí£º²¶»ñËùÓÐÒì³£²¢½µ¼¶£¬±ÜÃâÓ°ÏìÕûÌåÁ÷³Ì
-    /// - ÏòÁ¿±ê×¼»¯£ºÈ·±£ËùÓÐÏòÁ¿¶¼ÊÇµ¥Î»ÏòÁ¿£¬±ãÓÚÓàÏÒÏàËÆ¶È¼ÆËã
-    /// - Î¬¶ÈÍ³Ò»£ºËùÓÐÏòÁ¿Í³Ò»µ½TargetDimÎ¬¶È£¬Ö§³Ö»ìºÏ¼ìË÷
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½ã½µï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½CLIPÄ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ÏµÍ³ï¿½È¶ï¿½ï¿½ï¿½
+    /// - ï¿½ì³£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Çµï¿½Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶È¼ï¿½ï¿½ï¿½
+    /// - Î¬ï¿½ï¿½Í³Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í³Ò»ï¿½ï¿½TargetDimÎ¬ï¿½È£ï¿½Ö§ï¿½Ö»ï¿½Ï¼ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾¼¼ÊõÏ¸½Ú¡¿£º
-    /// - ONNXÍÆÀí£ºÊ¹ÓÃÔ¤ÑµÁ·CLIPÄ£ÐÍ½øÐÐÍ¼Ïñ±àÂë
-    /// - ÕÅÁ¿²Ù×÷£ºÍ¼ÏñÔ¤´¦ÀíÎª±ê×¼ÊäÈë¸ñÊ½
-    /// - ÄÚ´æ¹ÜÀí£ºusingÓï¾äÈ·±£×ÊÔ´¼°Ê±ÊÍ·Å
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½Ú¡ï¿½ï¿½ï¿½
+    /// - ONNXï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½Ô¤Ñµï¿½ï¿½CLIPÄ£ï¿½Í½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½Îªï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½ï¿½Ê½
+    /// - ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½usingï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½Ê±ï¿½Í·ï¿½
     /// </summary>
     public async Task<Embedding<float>> GenerateAsync(byte[] imageBytes, CancellationToken ct = default)
     {
         try
         {
-            // ¡¾²½Öè1¡¿È·±£ONNX»á»°ÒÑ³õÊ¼»¯
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½È·ï¿½ï¿½ONNXï¿½á»°ï¿½Ñ³ï¿½Ê¼ï¿½ï¿½
             EnsureSession();
             if (_session is not null)
             {
-                // ¡¾²½Öè2¡¿½âÎöÄ£ÐÍµÄÊäÈëÊä³ö½á¹¹
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½á¹¹
                 var (imageInput, imageOutput) = ResolveVisionIO();
                 if (imageInput == null || imageOutput == null)
                 {
@@ -94,22 +94,22 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                     return new Embedding<float>(HashToVector(imageBytes, TargetDim));
                 }
 
-                // ¡¾²½Öè3~6¡¿ÔÚºóÌ¨Ïß³ÌÖ´ÐÐÔ¤´¦Àí + ÍÆÀí + ºó´¦Àí£¬Ö§³ÖÈ¡Ïû
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½3~6ï¿½ï¿½ï¿½Úºï¿½Ì¨ï¿½ß³ï¿½Ö´ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½ + ï¿½ï¿½ï¿½ï¿½ + ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½È¡ï¿½ï¿½
                 var vec = await Task.Run(() =>
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    // Í¼ÏñÔ¤´¦Àí£º×Ö½ÚÊý×é ¡ú ±ê×¼»¯ÕÅÁ¿
+                    // Í¼ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     var tensor = PreprocessToTensor(imageBytes);
 
-                    // ¹¹½¨Ä£ÐÍËùÐèµÄËùÓÐÊäÈë
+                    // ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     var inputs = CreateModelInputs(imageInput, tensor);
 
-                    // Ö´ÐÐONNXÍÆÀí²¢»ñÈ¡ÌØÕ÷ÏòÁ¿
+                    // Ö´ï¿½ï¿½ONNXï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     using var results = _session.Run(inputs, new[] { imageOutput });
                     var output = results.First().AsEnumerable<float>().ToArray();
 
-                    // ÏòÁ¿ºó´¦Àí£º±ê×¼»¯²¢µ÷ÕûÎ¬¶È
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½ï¿½
                     return NormalizeAndResize(output, TargetDim);
                 }, ct).ConfigureAwait(false);
 
@@ -122,21 +122,21 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         }
         catch (Exception ex)
         {
-            // ¡¾½µ¼¶´¦Àí¡¿CLIPÍÆÀíÊ§°ÜÊ±¼ÇÂ¼ÈÕÖ¾²¢½µ¼¶
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½CLIPï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½Ê±ï¿½ï¿½Â¼ï¿½ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             _logger.LogDebug(ex, "CLIP embedding failed, fallback to hash vector");
         }
 
-        // ¡¾½µ¼¶²ßÂÔ¡¿Éú³É»ùÓÚ¹þÏ£µÄÎ±ÏòÁ¿
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½ï¿½ï¿½É»ï¿½ï¿½Ú¹ï¿½Ï£ï¿½ï¿½Î±ï¿½ï¿½ï¿½ï¿½
         return new Embedding<float>(HashToVector(imageBytes, TargetDim));
     }
 
     /// <summary>
-    /// ½âÎöONNXÄ£ÐÍµÄÊäÈëÊä³ö½ÚµãÃû³Æ
+    /// ï¿½ï¿½ï¿½ï¿½ONNXÄ£ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾×÷ÓÃ¡¿£º×Ô¶¯¼ì²âÄ£ÐÍµÄÍ¼ÏñÊäÈëºÍÊä³ö½ÚµãÃû³Æ
-    /// ¡¾·µ»ØÖµ¡¿£º
-    /// - imageInput: Í¼ÏñÊäÈë½ÚµãÃû£¨Èç "pixel_values", "image"£©  
-    /// - imageOutput: Í¼ÏñÌØÕ÷Êä³ö½ÚµãÃû£¨Èç "image_embeds", "pooler_output"£©
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ã¡ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Íµï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½
+    /// - imageInput: Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ "pixel_values", "image"ï¿½ï¿½  
+    /// - imageOutput: Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ "image_embeds", "pooler_output"ï¿½ï¿½
     /// </summary>
     private (string? imageInput, string? imageOutput) ResolveVisionIO()
     {
@@ -144,16 +144,16 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
         try
         {
-            // ³£¼ûµÄÊäÈëÊä³ö½ÚµãÃû³Æ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½
             var inputCandidates = new[] { "pixel_values", "image", "input", "images" };
             var outputCandidates = new[] { "image_embeds", "pooler_output", "last_hidden_state", "embeddings", "output" };
 
-            // ²éÕÒÆ¥ÅäµÄ½ÚµãÃû³Æ
+            // ï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½Ä½Úµï¿½ï¿½ï¿½ï¿½ï¿½
             var imageInput = inputCandidates.FirstOrDefault(name => _session.InputMetadata.ContainsKey(name))
-                           ?? _session.InputMetadata.Keys.FirstOrDefault(); // ½µ¼¶£ºÊ¹ÓÃµÚÒ»¸öÊäÈë
+                           ?? _session.InputMetadata.Keys.FirstOrDefault(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ãµï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
             var imageOutput = outputCandidates.FirstOrDefault(name => _session.OutputMetadata.ContainsKey(name))
-                            ?? _session.OutputMetadata.Keys.FirstOrDefault(); // ½µ¼¶£ºÊ¹ÓÃµÚÒ»¸öÊä³ö
+                            ?? _session.OutputMetadata.Keys.FirstOrDefault(); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ãµï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½
 
             _logger.LogDebug("Resolved model IO: input={Input}, output={Output}", imageInput, imageOutput);
             return (imageInput, imageOutput);
@@ -166,37 +166,37 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// ´´½¨Ä£ÐÍËùÐèµÄËùÓÐÊäÈë£¨´¦Àí¶àÊäÈëÄ£ÐÍ£©
+    /// ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë£¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í£ï¿½
     /// 
-    /// ¡¾Éè¼ÆÔ­Òò¡¿£º
-    /// Ä³Ð©CLIPÄ£ÐÍ¿ÉÄÜÐèÒª¶à¸öÊäÈë£¨ÈçÎÄ±¾+Í¼ÏñµÄÁªºÏÄ£ÐÍ£©
-    /// ´Ë·½·¨È·±£Ìá¹©ËùÓÐ±ØÐèµÄÊäÈë£¬¶ÔÓÚ²»ÐèÒªµÄÊäÈëÌá¹©ºÏÊÊµÄÄ¬ÈÏÖµ
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ô­ï¿½ò¡¿£ï¿½
+    /// Ä³Ð©CLIPÄ£ï¿½Í¿ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë£¨ï¿½ï¿½ï¿½Ä±ï¿½+Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í£ï¿½
+    /// ï¿½Ë·ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½á¹©ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë£¬ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½ï¿½Êµï¿½Ä¬ï¿½ï¿½Öµ
     /// </summary>
     private List<NamedOnnxValue> CreateModelInputs(string imageInputName, DenseTensor<float> imageTensor)
     {
         var inputs = new List<NamedOnnxValue>();
 
-        // ¡¾Ìí¼ÓÍ¼ÏñÊäÈë¡¿
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ë¡¿
         inputs.Add(NamedOnnxValue.CreateFromTensor(imageInputName, imageTensor));
 
-        // ¡¾´¦Àí¿ÉÄÜÐèÒªµÄÆäËûÊäÈë¡¿
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë¡¿
         foreach (var inputMeta in _session!.InputMetadata)
         {
-            if (inputMeta.Key == imageInputName) continue; // ÒÑÌí¼ÓÍ¼ÏñÊäÈë
+            if (inputMeta.Key == imageInputName) continue; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-            // ¡¾³£¼ûµÄÎÄ±¾ÊäÈë´¦Àí¡¿
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ë´¦ï¿½ï¿½ï¿½ï¿½
             if (inputMeta.Key.Contains("input_ids") || inputMeta.Key.Contains("text"))
             {
-                // ´´½¨¿ÕÎÄ±¾ÊäÈë£¨±íÊ¾Ö»´¦ÀíÍ¼Ïñ£©
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ë£¨ï¿½ï¿½Ê¾Ö»ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½
                 var textShape = inputMeta.Value.Dimensions.ToArray();
-                if (textShape.Any(d => d <= 0)) textShape = new[] { 1, 1 }; // Ä¬ÈÏÐÎ×´
+                if (textShape.Any(d => d <= 0)) textShape = new[] { 1, 1 }; // Ä¬ï¿½ï¿½ï¿½ï¿½×´
 
                 var emptyTextTensor = new DenseTensor<long>(new long[textShape.Aggregate(1, (a, b) => a * b)], textShape);
                 inputs.Add(NamedOnnxValue.CreateFromTensor(inputMeta.Key, emptyTextTensor));
                 _logger.LogDebug("Added empty text input: {InputName} with shape [{Shape}]",
                     inputMeta.Key, string.Join(", ", textShape));
             }
-            // ¡¾attention_mask´¦Àí¡¿
+            // ï¿½ï¿½attention_maskï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             else if (inputMeta.Key.Contains("attention_mask"))
             {
                 var maskShape = inputMeta.Value.Dimensions.ToArray();
@@ -213,106 +213,106 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// Éú³ÉÍ¼ÏñÃèÊöÎÄ×Ö£¨¶àÄ£Ì¬Àí½âµÄÖØÒª²¹³ä£©
+    /// ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö£ï¿½ï¿½ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ä£©
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ¶àÄ£Ì¬ÌáÊ¾£º½áºÏÎÄ±¾Ö¸ÁîºÍÍ¼ÏñÄÚÈÝµÄ¸´ºÏÊäÈë
-    /// - ÄÚÈÝ°²È«£ºÏÞÖÆÃèÊö³¤¶ÈºÍ¿Í¹ÛÐÔ£¬±ÜÃâÄ£ÐÍ»Ã¾õ
-    /// - ÓÅÑÅ½µ¼¶£ºLLM²»¿ÉÓÃÊ±Ìá¹©Õ¼Î»·û¶ø·ÇÊ§°Ü
-    /// - Òì²½´¦Àí£ºÖ§³ÖÈ¡ÏûÁîÅÆ£¬±ÜÃâ³¤Ê±¼ä×èÈû
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½Ä£Ì¬ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Ö¸ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ÝµÄ¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½Ý°ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÈºÍ¿Í¹ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½Í»Ã¾ï¿½
+    /// - ï¿½ï¿½ï¿½Å½ï¿½ï¿½ï¿½ï¿½ï¿½LLMï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½á¹©Õ¼Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
+    /// - ï¿½ì²½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½â³¤Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾ÒµÎñ¼ÛÖµ¡¿£º
-    /// - ¿ÉËÑË÷ÐÔ£ºÎªÍ¼ÏñÌá¹©ÎÄ±¾ÃèÊö£¬Ö§³ÖÎÄ±¾¼ìË÷
-    /// - ¿É½âÊÍÐÔ£ºÓÃ»§¿ÉÒÔÀí½âÍ¼ÏñÄÚÈÝ¶ø·ÇÖ»¿´ÏòÁ¿
-    /// - »ìºÏ¼ìË÷£ºÎÄ±¾ÃèÊö¿ÉÓëÍ¼ÏñÏòÁ¿½áºÏÌáÉý¼ìË÷×¼È·ÐÔ
+    /// ï¿½ï¿½Òµï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ÎªÍ¼ï¿½ï¿½ï¿½á¹©ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö§ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½É½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½Ý¶ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½Ï¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¼È·ï¿½ï¿½
     /// </summary>
     public async Task<string> CaptionAsync(byte[] imageBytes, CancellationToken ct = default)
     {
-        // ¡¾Ö÷²ßÂÔ¡¿Ê¹ÓÃ¶àÄ£Ì¬ÁÄÌìÄ£ÐÍÉú³ÉÃèÊö
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½Ê¹ï¿½Ã¶ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (_chat is not null)
         {
             try
             {
-                // ¡¾¹¹½¨¶àÄ£Ì¬¶Ô»°¡¿°üº¬ÎÄ±¾Ö¸ÁîºÍÍ¼ÏñÄÚÈÝ
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ì¬ï¿½Ô»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Ö¸ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                 var history = new ChatHistory("Your job is describing images.");
                 history.AddUserMessage(
                 [
-                    // ¡¾ÎÄ±¾Ö¸Áî¡¿Òýµ¼Ä£ÐÍÉú³É¿Í¹Û¡¢¼ò½àµÄÃèÊö
-                    new Microsoft.SemanticKernel.TextContent("ÓÃ²»³¬¹ý20×Ö¿Í¹ÛÃèÊöÕâÕÅÍ¼£¨²»µÃÒÜ²âÎ´³öÏÖµÄÊý×Ö/ÎÄ×Ö£©"),
-                    // ¡¾Í¼ÏñÄÚÈÝ¡¿×÷ÎªÄ£ÐÍÊäÈëµÄÍ¼ÏñÊý¾Ý
+                    // ï¿½ï¿½ï¿½Ä±ï¿½Ö¸ï¿½î¡¿ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½É¿Í¹Û¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+                    new Microsoft.SemanticKernel.TextContent("ï¿½Ã²ï¿½ï¿½ï¿½ï¿½ï¿½20ï¿½Ö¿Í¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü²ï¿½Î´ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½Ö£ï¿½"),
+                    // ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½Ý¡ï¿½ï¿½ï¿½ÎªÄ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     new ImageContent(imageBytes, "image/png"),
                 ]);
 
-                // ¡¾Ä£ÐÍÍÆÀí¡¿µ÷ÓÃ¶àÄ£Ì¬LLMÉú³ÉÃèÊö
+                // ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½Ä£Ì¬LLMï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                 var resp = await _chat.GetChatMessageContentAsync(history, cancellationToken: ct);
                 var text = resp?.Content?.Trim();
 
-                // ¡¾ºó´¦Àí¡¿ÑéÖ¤ºÍ½Ø¶ÏÃèÊöÎÄ×Ö
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½Í½Ø¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                 if (!string.IsNullOrWhiteSpace(text))
                 {
-                    // ÏÞÖÆ×î´ó³¤¶È£¬±ÜÃâ¹ý³¤ÃèÊö
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó³¤¶È£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                     if (text.Length > 60) text = text[..60];
                     return text!;
                 }
             }
             catch (Exception ex)
             {
-                // ¡¾½µ¼¶´¦Àí¡¿¶àÄ£Ì¬ÍÆÀíÊ§°ÜÊ±¼ÇÂ¼²¢½µ¼¶
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ì¬ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½Ê±ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
                 _logger.LogDebug(ex, "Multimodal caption generation failed, fallback placeholder");
             }
         }
 
-        // ¡¾½µ¼¶²ßÂÔ¡¿·µ»ØÕ¼Î»·û¶ø·ÇÊ§°Ü
-        return "(Í¼ÏñÄÚÈÝ´ý½âÎö)";
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¡ï¿½ï¿½ï¿½ï¿½ï¿½Õ¼Î»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
+        return "(Í¼ï¿½ï¿½ï¿½ï¿½ï¿½Ý´ï¿½ï¿½ï¿½ï¿½ï¿½)";
     }
 
     /// <summary>
-    /// ÑÓ³Ù³õÊ¼»¯ONNXÍÆÀí»á»°£¨ÐÔÄÜÓÅ»¯µÄÖØÒªÄ£Ê½£©
+    /// ï¿½Ó³Ù³ï¿½Ê¼ï¿½ï¿½ONNXï¿½ï¿½ï¿½ï¿½ï¿½á»°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å»ï¿½ï¿½ï¿½ï¿½ï¿½ÒªÄ£Ê½ï¿½ï¿½
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ÑÓ³Ù¼ÓÔØ£º±ÜÃâÆô¶¯Ê±¼ÓÔØ´óÐÍÄ£ÐÍÓ°ÏìÐÔÄÜ
-    /// - µ¥´Î³õÊ¼»¯£ºÊ¹ÓÃ±êÖ¾Î»È·±£Ö»³¢ÊÔÒ»´Î£¬±ÜÃâÖØ¸´Ê§°Ü
-    /// - ×ÊÔ´¼ì²é£ºÑéÖ¤Ä£ÐÍÎÄ¼þ´æÔÚÐÔ£¬Ìá¹©ÇåÎúµÄ´íÎóÐÅÏ¢
-    /// - Òì³£¸ôÀë£º³õÊ¼»¯Ê§°Ü²»Ó°Ïì½µ¼¶¹¦ÄÜµÄÕý³£¹¤×÷
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½Ó³Ù¼ï¿½ï¿½Ø£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ø´ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Ó°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½Î³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã±ï¿½Ö¾Î»È·ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½Ò»ï¿½Î£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½Ê§ï¿½ï¿½
+    /// - ï¿½ï¿½Ô´ï¿½ï¿½é£ºï¿½ï¿½Ö¤Ä£ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
+    /// - ï¿½ì³£ï¿½ï¿½ï¿½ë£ºï¿½ï¿½Ê¼ï¿½ï¿½Ê§ï¿½Ü²ï¿½Ó°ï¿½ì½µï¿½ï¿½ï¿½ï¿½ï¿½Üµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾Éè¼ÆÄ£Ê½¡¿£º
-    /// - ·À»¤Ä£Ê½£ºÍ¨¹ý±êÖ¾Î»±ÜÃâÖØ¸´°º¹ó²Ù×÷
-    /// - ×ÊÔ´¹ÜÀí£ºONNX»á»°½«ÔÚDisposeÊ±ÕýÈ·ÊÍ·Å
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½Ä£Ê½ï¿½ï¿½Í¨ï¿½ï¿½ï¿½ï¿½Ö¾Î»ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ONNXï¿½á»°ï¿½ï¿½ï¿½ï¿½DisposeÊ±ï¿½ï¿½È·ï¿½Í·ï¿½
     /// </summary>
     private void EnsureSession()
     {
-        // ¡¾·À»¤Ìõ¼þ¡¿±ÜÃâÖØ¸´³õÊ¼»¯³¢ÊÔ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (_initAttempted) return;
         _initAttempted = true;
 
         try
         {
-            // ¡¾×ÊÔ´¼ì²é¡¿ÑéÖ¤Ä£ÐÍÎÄ¼þ¿ÉÓÃÐÔ
+            // ï¿½ï¿½ï¿½ï¿½Ô´ï¿½ï¿½é¡¿ï¿½ï¿½Ö¤Ä£ï¿½ï¿½ï¿½Ä¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             if (!string.IsNullOrWhiteSpace(_modelPath) && File.Exists(_modelPath))
             {
-                // ¡¾ONNX³õÊ¼»¯¡¿´´½¨ÍÆÀí»á»°
+                // ï¿½ï¿½ONNXï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½á»°
                 _session = new InferenceSession(_modelPath);
 
-                // ¡¾Ä£ÐÍÐÅÏ¢¼ì²é¡¿¼ÇÂ¼Ä£ÐÍµÄÊäÈëÊä³öÐÅÏ¢£¬±ãÓÚµ÷ÊÔ
+                // ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½é¡¿ï¿½ï¿½Â¼Ä£ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½
                 LogModelInfo();
 
                 _logger.LogInformation("Loaded CLIP image ONNX model: {Path}", _modelPath);
             }
             else
             {
-                // ¡¾ÅäÖÃ¾¯¸æ¡¿Ä£ÐÍ²»´æÔÚÊ±µÄÓÑºÃÌáÊ¾
+                // ï¿½ï¿½ï¿½ï¿½ï¿½Ã¾ï¿½ï¿½æ¡¿Ä£ï¿½Í²ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Ñºï¿½ï¿½ï¿½Ê¾
                 _logger.LogWarning("CLIP model not found at {Path}, using hash fallback", _modelPath);
             }
         }
         catch (Exception ex)
         {
-            // ¡¾³õÊ¼»¯Ê§°Ü¡¿¼ÇÂ¼´íÎóµ«²»Å×³öÒì³££¬±£Ö¤½µ¼¶¹¦ÄÜ¿ÉÓÃ
+            // ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½ï¿½Ê§ï¿½Ü¡ï¿½ï¿½ï¿½Â¼ï¿½ï¿½ï¿½óµ«²ï¿½ï¿½×³ï¿½ï¿½ì³£ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ü¿ï¿½ï¿½ï¿½
             _logger.LogWarning(ex, "Failed to init CLIP model session; fallback to hash embedding");
         }
     }
 
     /// <summary>
-    /// ¼ÇÂ¼ONNXÄ£ÐÍµÄÊäÈëÊä³öÐÅÏ¢£¬±ãÓÚµ÷ÊÔºÍÑéÖ¤
+    /// ï¿½ï¿½Â¼ONNXÄ£ï¿½Íµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½Ôºï¿½ï¿½ï¿½Ö¤
     /// </summary>
     private void LogModelInfo()
     {
@@ -322,7 +322,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         {
             _logger.LogInformation("ONNX Model Information:");
 
-            // ÊäÈë½ÚµãÐÅÏ¢
+            // ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½Ï¢
             _logger.LogInformation("Inputs:");
             foreach (var input in _session.InputMetadata)
             {
@@ -330,7 +330,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                 _logger.LogInformation("  - {Name}: {Type} [{Shape}]", input.Key, input.Value.ElementType, shape);
             }
 
-            // Êä³ö½ÚµãÐÅÏ¢
+            // ï¿½ï¿½ï¿½ï¿½Úµï¿½ï¿½ï¿½Ï¢
             _logger.LogInformation("Outputs:");
             foreach (var output in _session.OutputMetadata)
             {
@@ -345,10 +345,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// Í¼ÏñÔ¤´¦Àí£º½«Ô­Ê¼×Ö½Ú×ª»»ÎªCLIPÄ£ÐÍËùÐèµÄ±ê×¼»¯ÕÅÁ¿£¨¼ò»¯°æ±¾£©
+    /// Í¼ï¿½ï¿½Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô­Ê¼ï¿½Ö½ï¿½×ªï¿½ï¿½ÎªCLIPÄ£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò»¯°æ±¾ï¿½ï¿½
     /// 
-    /// ¡¾×÷ÓÃ¡¿£ºÍ¼Ïñ½âÂë ¡ú Ëõ·Åµ½224¡Á224 ¡ú ×ª»»ÎªCHWÕÅÁ¿¸ñÊ½
-    /// ¡¾¼ò»¯¡¿£ºÒÆ³ý¸´ÔÓµÄImageNet±ê×¼»¯£¬ÈÃÄ£ÐÍ×ÔÐÐ´¦Àí»òÊ¹ÓÃ¸ü¼òµ¥µÄ¹éÒ»»¯
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ã¡ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Åµï¿½224ï¿½ï¿½224 ï¿½ï¿½ ×ªï¿½ï¿½ÎªCHWï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½
+    /// ï¿½ï¿½ï¿½ò»¯¡ï¿½ï¿½ï¿½ï¿½Æ³ï¿½ï¿½ï¿½ï¿½Óµï¿½ImageNetï¿½ï¿½×¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ï¿½Ð´ï¿½ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½Ã¸ï¿½ï¿½òµ¥µÄ¹ï¿½Ò»ï¿½ï¿½
     /// </summary>
     private static DenseTensor<float> PreprocessToTensor(byte[] bytes)
     {
@@ -363,11 +363,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
             using var resized = new SKBitmap(size, size);
             original.ScalePixels(resized, SKFilterQuality.Medium);
 
-            // ÐÞ¸´£ºÕýÈ·µÄÊý×é´óÐ¡£¬°üº¬batchÎ¬¶È
+            // ï¿½Þ¸ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½batchÎ¬ï¿½ï¿½
             var tensorData = new float[1 * channels * size * size];
             var pixels = resized.Pixels;
 
-            // CHW¸ñÊ½´¦Àí£ºChannel-Height-Width
+            // CHWï¿½ï¿½Ê½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Channel-Height-Width
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -378,10 +378,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                     var b = pixel.Blue / 255f;
 
                     var baseIndex = y * size + x;
-                    // CHW¸ñÊ½£º[batch, channel, height, width]
-                    tensorData[0 * size * size + baseIndex] = r;  // RÍ¨µÀ
-                    tensorData[1 * size * size + baseIndex] = g;  // GÍ¨µÀ  
-                    tensorData[2 * size * size + baseIndex] = b;  // BÍ¨µÀ
+                    // CHWï¿½ï¿½Ê½ï¿½ï¿½[batch, channel, height, width]
+                    tensorData[0 * size * size + baseIndex] = r;  // RÍ¨ï¿½ï¿½
+                    tensorData[1 * size * size + baseIndex] = g;  // GÍ¨ï¿½ï¿½  
+                    tensorData[2 * size * size + baseIndex] = b;  // BÍ¨ï¿½ï¿½
                 }
             }
 
@@ -389,101 +389,101 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         }
         catch (Exception)
         {
-            // ´íÎó»Ö¸´£º·µ»ØÁãÕÅÁ¿£¬±£³ÖÕýÈ·µÄÎ¬¶È
+            // ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½Î¬ï¿½ï¿½
             return new DenseTensor<float>(new float[1 * channels * size * size], new[] { 1, channels, size, size });
         }
     }
 
     /// <summary>
-    /// ÏòÁ¿¹éÒ»»¯ºÍÎ¬¶Èµ÷Õû£¨È·±£ÏòÁ¿¼ìË÷µÄÊýÑ§ÕýÈ·ÐÔ£©
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Î¬ï¿½Èµï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½È·ï¿½Ô£ï¿½
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ÏòÁ¿¹éÒ»»¯£ºL2·¶Êý¹éÒ»»¯È·±£ÓàÏÒÏàËÆ¶È¼ÆËãÕýÈ·
-    /// - Î¬¶È¶ÔÆë£º²»Í¬Ä£ÐÍÊä³öÎ¬¶È¿ÉÄÜ²»Í¬£¬ÐèÒªÍ³Ò»
-    /// - ÁãÏòÁ¿´¦Àí£º±ÜÃâ³ýÁã´íÎó£¬±£Ö¤ÊýÖµÎÈ¶¨ÐÔ
-    /// - Ñ­»·Ìî³ä£º¼òµ¥ÓÐÐ§µÄÎ¬¶ÈÀ©Õ¹²ßÂÔ
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½L2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶È¼ï¿½ï¿½ï¿½ï¿½ï¿½È·
+    /// - Î¬ï¿½È¶ï¿½ï¿½ë£ºï¿½ï¿½Í¬Ä£ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½È¿ï¿½ï¿½Ü²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ÒªÍ³Ò»
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó£¬±ï¿½Ö¤ï¿½ï¿½Öµï¿½È¶ï¿½ï¿½ï¿½
+    /// - Ñ­ï¿½ï¿½ï¿½ï¿½ä£ºï¿½ï¿½ï¿½ï¿½Ð§ï¿½ï¿½Î¬ï¿½ï¿½ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾ÊýÑ§Ô­Àí¡¿£º
-    /// - L2·¶Êý£º||v|| = sqrt(v1? + v2? + ... + vn?)
-    /// - ¹éÒ»»¯£ºv_norm = v / ||v||£¬Ê¹µÃ ||v_norm|| = 1
-    /// - ÓàÏÒÏàËÆ¶È£ºcos(¦È) = (a¡¤b) / (||a|| ¡Á ||b||)£¬¹éÒ»»¯ºó¼ò»¯Îª a¡¤b
+    /// ï¿½ï¿½ï¿½ï¿½Ñ§Ô­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - L2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½||v|| = sqrt(v1? + v2? + ... + vn?)
+    /// - ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½v_norm = v / ||v||ï¿½ï¿½Ê¹ï¿½ï¿½ ||v_norm|| = 1
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¶È£ï¿½cos(ï¿½ï¿½) = (aï¿½ï¿½b) / (||a|| ï¿½ï¿½ ||b||)ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Îª aï¿½ï¿½b
     /// </summary>
-    /// <param name="src">Ô­Ê¼ÏòÁ¿Êý¾Ý</param>
-    /// <param name="dim">Ä¿±êÎ¬¶È</param>
-    /// <returns>¹éÒ»»¯²¢µ÷ÕûÎ¬¶ÈµÄÏòÁ¿</returns>
+    /// <param name="src">Ô­Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</param>
+    /// <param name="dim">Ä¿ï¿½ï¿½Î¬ï¿½ï¿½</param>
+    /// <returns>ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½Èµï¿½ï¿½ï¿½ï¿½ï¿½</returns>
     private static float[] NormalizeAndResize(float[] src, int dim)
     {
-        // ¡¾±ß½ç¼ì²é¡¿´¦Àí¿ÕÏòÁ¿Çé¿ö
+        // ï¿½ï¿½ï¿½ß½ï¿½ï¿½é¡¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (src.Length == 0) return new float[dim];
 
-        // ¡¾L2·¶Êý¼ÆËã¡¿¼ÆËãÏòÁ¿µÄÅ·¼¸ÀïµÃ³¤¶È
+        // ï¿½ï¿½L2ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ã¡¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å·ï¿½ï¿½ï¿½ï¿½Ã³ï¿½ï¿½ï¿½
         double norm = Math.Sqrt(src.Sum(v => v * v));
-        if (norm == 0) norm = 1;  // ¡¾ÁãÏòÁ¿±£»¤¡¿±ÜÃâ³ýÁã´íÎó
+        if (norm == 0) norm = 1;  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-        // ¡¾ÏòÁ¿¹éÒ»»¯¡¿Ã¿¸ö·ÖÁ¿³ýÒÔÏòÁ¿³¤¶È
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         var normalized = src.Select(v => (float)(v / norm)).ToArray();
 
-        // ¡¾Î¬¶ÈÆ¥Åä¡¿Èç¹ûÎ¬¶ÈÒÑ¾­ÕýÈ·£¬Ö±½Ó·µ»Ø
+        // ï¿½ï¿½Î¬ï¿½ï¿½Æ¥ï¿½ä¡¿ï¿½ï¿½ï¿½Î¬ï¿½ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½È·ï¿½ï¿½Ö±ï¿½Ó·ï¿½ï¿½ï¿½
         if (normalized.Length == dim) return normalized;
 
-        // ¡¾Î¬¶Èµ÷Õû¡¿Ñ­»·Ìî³äµ½Ä¿±êÎ¬¶È
+        // ï¿½ï¿½Î¬ï¿½Èµï¿½ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½äµ½Ä¿ï¿½ï¿½Î¬ï¿½ï¿½
         var dst = new float[dim];
         for (int i = 0; i < dim; i++)
-            dst[i] = normalized[i % normalized.Length];  // ¡¾Ñ­»·Ë÷Òý¡¿ÖØ¸´Ê¹ÓÃÔ­ÏòÁ¿ÔªËØ
+            dst[i] = normalized[i % normalized.Length];  // ï¿½ï¿½Ñ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½Ê¹ï¿½ï¿½Ô­ï¿½ï¿½ï¿½ï¿½Ôªï¿½ï¿½
 
         return dst;
     }
 
     /// <summary>
-    /// ¹þÏ£½µ¼¶ÏòÁ¿Éú³É£¨×îºóµÄ¶µµ×·½°¸£©
+    /// ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É£ï¿½ï¿½ï¿½ï¿½Ä¶ï¿½ï¿½×·ï¿½ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ½µ¼¶²ßÂÔ£ºµ±AIÄ£ÐÍ²»¿ÉÓÃÊ±µÄ¿É¿¿±¸Ñ¡·½°¸
-    /// - ¹þÏ£Ëã·¨£ºSHA256Ìá¹©Á¼ºÃµÄÊý¾Ý·Ö²¼ÌØÐÔ
-    /// - Î±Ëæ»úÐÔ£º¹þÏ£Êä³ö¾ßÓÐÁ¼ºÃµÄÍ³¼ÆÌØÐÔ£¬ÊÊºÏ×÷ÎªÏòÁ¿
-    /// - ¶µµ×»úÖÆ£ºÈ·±£ÏµÍ³ÔÚÈÎºÎÇé¿öÏÂ¶¼ÄÜÌá¹©»ù±¾¹¦ÄÜ
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½AIÄ£ï¿½Í²ï¿½ï¿½ï¿½ï¿½ï¿½Ê±ï¿½Ä¿É¿ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½Ï£ï¿½ã·¨ï¿½ï¿½SHA256ï¿½á¹©ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½Ý·Ö²ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - Î±ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ãµï¿½Í³ï¿½ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½Êºï¿½ï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½×»ï¿½ï¿½Æ£ï¿½È·ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½Îºï¿½ï¿½ï¿½ï¿½ï¿½Â¶ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// 
-    /// ¡¾Éè¼ÆË¼Â·¡¿£º
-    /// - È·¶¨ÐÔ£ºÏàÍ¬ÊäÈëÊ¼ÖÕ²úÉúÏàÍ¬ÏòÁ¿£¬±£Ö¤¼ìË÷Ò»ÖÂÐÔ
-    /// - ·Ö²¼¾ùÔÈ£ºSHA256È·±£ÏòÁ¿·ÖÁ¿ÔÚ[0,1]·¶Î§ÄÚ¾ùÔÈ·Ö²¼
-    /// - ¼òµ¥¿É¿¿£º²»ÒÀÀµÍâ²¿Ä£ÐÍ£¬ÓÀÔ¶²»»áÊ§°Ü
-    /// - ÓïÒåÎÞ¹Ø£º´¿´â»ùÓÚÄÚÈÝ¹þÏ££¬ÎÞÓïÒåÀí½âÄÜÁ¦
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ë¼Â·ï¿½ï¿½ï¿½ï¿½
+    /// - È·ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½Ê¼ï¿½Õ²ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¤ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½Ö²ï¿½ï¿½ï¿½ï¿½È£ï¿½SHA256È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½[0,1]ï¿½ï¿½Î§ï¿½Ú¾ï¿½ï¿½È·Ö²ï¿½
+    /// - ï¿½òµ¥¿É¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â²¿Ä£ï¿½Í£ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½Þ¹Ø£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¹ï¿½Ï£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
-    /// <param name="bytes">Ô­Ê¼Í¼Ïñ×Ö½ÚÊý¾Ý</param>
-    /// <param name="dim">Ä¿±êÏòÁ¿Î¬¶È</param>
-    /// <returns>»ùÓÚ¹þÏ£µÄÎ±Ëæ»úÏòÁ¿</returns>
+    /// <param name="bytes">Ô­Ê¼Í¼ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½ï¿½ï¿½</param>
+    /// <param name="dim">Ä¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î¬ï¿½ï¿½</param>
+    /// <returns>ï¿½ï¿½ï¿½Ú¹ï¿½Ï£ï¿½ï¿½Î±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½</returns>
     private static float[] HashToVector(byte[] bytes, int dim)
     {
-        // ¡¾¹þÏ£¼ÆËã¡¿Ê¹ÓÃSHA256Ëã·¨¼ÆËãÄÚÈÝ¹þÏ£
+        // ï¿½ï¿½ï¿½ï¿½Ï£ï¿½ï¿½ï¿½ã¡¿Ê¹ï¿½ï¿½SHA256ï¿½ã·¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ý¹ï¿½Ï£
         using var sha = SHA256.Create();
         var h = sha.ComputeHash(bytes);
 
-        // ¡¾ÏòÁ¿¹¹Ôì¡¿½«¹þÏ£×Ö½Ú×ª»»Îª¸¡µãÏòÁ¿
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì¡¿ï¿½ï¿½ï¿½ï¿½Ï£ï¿½Ö½ï¿½×ªï¿½ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         var vec = new float[dim];
         for (int i = 0; i < dim; i++)
-            vec[i] = h[i % h.Length] / 255f;  // ¡¾¹éÒ»»¯¡¿×Ö½ÚÖµ[0,255]×ª»»Îª[0,1]
+            vec[i] = h[i % h.Length] / 255f;  // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Ö½ï¿½Öµ[0,255]×ªï¿½ï¿½Îª[0,1]
 
         return vec;
     }
 
     /// <summary>
-    /// ×ÊÔ´ÇåÀí£ºÕýÈ·ÊÍ·ÅONNXÍÆÀí»á»°
+    /// ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È·ï¿½Í·ï¿½ONNXï¿½ï¿½ï¿½ï¿½ï¿½á»°
     /// 
-    /// ¡¾Ñ§Ï°Òªµã¡¿£º
-    /// - ×ÊÔ´¹ÜÀí£ºONNX»á»°³ÖÓÐ·ÇÍÐ¹Ü×ÊÔ´£¬±ØÐëÏÔÊ½ÊÍ·Å
-    /// - IDisposableÄ£Ê½£º.NET×ÊÔ´¹ÜÀíµÄ±ê×¼·½Ê½
-    /// - ÄÚ´æÐ¹Â©Ô¤·À£º»úÆ÷Ñ§Ï°Ä£ÐÍÍ¨³£Õ¼ÓÃ´óÁ¿ÄÚ´æ
-    /// - ÉúÃüÖÜÆÚ¹ÜÀí£º·þÎñÈÝÆ÷»áÔÚÊÊµ±Ê±»úµ÷ÓÃDispose
+    /// ï¿½ï¿½Ñ§Ï°Òªï¿½ã¡¿ï¿½ï¿½
+    /// - ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ONNXï¿½á»°ï¿½ï¿½ï¿½Ð·ï¿½ï¿½Ð¹ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½ï¿½Í·ï¿½
+    /// - IDisposableÄ£Ê½ï¿½ï¿½.NETï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½×¼ï¿½ï¿½Ê½
+    /// - ï¿½Ú´ï¿½Ð¹Â©Ô¤ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ§Ï°Ä£ï¿½ï¿½Í¨ï¿½ï¿½Õ¼ï¿½Ã´ï¿½ï¿½ï¿½ï¿½Ú´ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Dispose
     /// 
-    /// ¡¾×î¼ÑÊµ¼ù¡¿£º
-    /// - ¼°Ê±ÊÍ·Å£º±ÜÃâ³¤ÆÚÕ¼ÓÃGPU/CPUÄÚ´æ
-    /// - ·À»¤ÐÔ±à³Ì£º¼ì²énull±ÜÃâÖØ¸´ÊÍ·Å´íÎó
-    /// - ÍÐ¹Ü×ÊÔ´£ºÈÃ.NETÀ¬»ø»ØÊÕÆ÷´¦ÀíÍÐ¹Ü¶ÔÏó
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+    /// - ï¿½ï¿½Ê±ï¿½Í·Å£ï¿½ï¿½ï¿½ï¿½â³¤ï¿½ï¿½Õ¼ï¿½ï¿½GPU/CPUï¿½Ú´ï¿½
+    /// - ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ï¿½Ì£ï¿½ï¿½ï¿½ï¿½nullï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½Í·Å´ï¿½ï¿½ï¿½
+    /// - ï¿½Ð¹ï¿½ï¿½ï¿½Ô´ï¿½ï¿½ï¿½ï¿½.NETï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¹Ü¶ï¿½ï¿½ï¿½
     /// </summary>
     public void Dispose()
     {
-        // ¡¾×ÊÔ´ÊÍ·Å¡¿ÊÍ·ÅONNXÍÆÀí»á»°µÄ·ÇÍÐ¹Ü×ÊÔ´
+        // ï¿½ï¿½ï¿½ï¿½Ô´ï¿½Í·Å¡ï¿½ï¿½Í·ï¿½ONNXï¿½ï¿½ï¿½ï¿½ï¿½á»°ï¿½Ä·ï¿½ï¿½Ð¹ï¿½ï¿½ï¿½Ô´
         _session?.Dispose();
-        // ×¢Òâ£ºÆäËû×Ö¶Î£¨_logger, _chatCompletionµÈ£©ÊÇÍÐ¹Ü×ÊÔ´£¬GC»á×Ô¶¯´¦Àí
+        // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï¿½ï¿½Ö¶Î£ï¿½_logger, _chatCompletionï¿½È£ï¿½ï¿½ï¿½ï¿½Ð¹ï¿½ï¿½ï¿½Ô´ï¿½ï¿½GCï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½
     }
 }

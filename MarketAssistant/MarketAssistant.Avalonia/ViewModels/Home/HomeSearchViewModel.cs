@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Applications.Stocks;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Services;
@@ -20,6 +21,9 @@ public partial class HomeSearchViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isSearchResultVisible;
+
+    [ObservableProperty]
+    private StockItem? _selectedStock;
 
     /// <summary>
     /// 搜索结果集合
@@ -48,6 +52,27 @@ public partial class HomeSearchViewModel : ViewModelBase
         
         SearchCommand = new AsyncRelayCommand<string>(OnSearchAsync);
         SelectStockCommand = new RelayCommand<StockItem>(OnSelectStock);
+    }
+
+    /// <summary>
+    /// 当 SearchQuery 变化时自动触发搜索
+    /// </summary>
+    partial void OnSearchQueryChanged(string value)
+    {
+        _ = OnSearchAsync(value);
+    }
+
+    /// <summary>
+    /// 当选中股票变化时触发选择
+    /// </summary>
+    partial void OnSelectedStockChanged(StockItem? value)
+    {
+        if (value != null)
+        {
+            OnSelectStock(value);
+            // 清除选中项，以便下次可以再次选择同一项
+            SelectedStock = null;
+        }
     }
 
     /// <summary>

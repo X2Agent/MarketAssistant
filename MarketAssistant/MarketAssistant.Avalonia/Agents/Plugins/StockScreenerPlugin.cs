@@ -5,6 +5,7 @@ using Microsoft.Playwright;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
+using MarketAssistant.Avalonia.Services.Browser;
 
 namespace MarketAssistant.Plugins;
 

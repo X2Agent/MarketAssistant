@@ -1,6 +1,9 @@
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Vectors.Interfaces;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Vectors.Services;
+using MarketAssistant.Infrastructure.Factories;
 
 namespace MarketAssistant.Vectors.Extensions;
 

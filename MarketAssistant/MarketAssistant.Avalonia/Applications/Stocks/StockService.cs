@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Avalonia.Services.Browser;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;

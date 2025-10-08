@@ -1,6 +1,9 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Avalonia.ViewModels;
 

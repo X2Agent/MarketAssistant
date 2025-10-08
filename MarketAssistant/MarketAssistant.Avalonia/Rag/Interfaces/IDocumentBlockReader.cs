@@ -1,7 +1,7 @@
 namespace MarketAssistant.Vectors.Interfaces;
 
 /// <summary>
-/// Ö§³ÖÍ¬Ê±¶ÁÈ¡ÎÄ±¾¡¢Í¼Æ¬¡¢±í¸ñ¿éµÄÎÄµµ¶ÁÈ¡Æ÷¡£
+/// Ö§ï¿½ï¿½Í¬Ê±ï¿½ï¿½È¡ï¿½Ä±ï¿½ï¿½ï¿½Í¼Æ¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public interface IDocumentBlockReader
 {
@@ -12,33 +12,33 @@ public interface IDocumentBlockReader
 public enum DocumentBlockType
 {
     /// <summary>
-    /// ÆÕÍ¨ÎÄ±¾¶ÎÂä
+    /// ï¿½ï¿½Í¨ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     Text,
 
     /// <summary>
-    /// ±êÌâ£¨²»Í¬¼¶±ðµÄ±êÌâÓÐ²»Í¬µÄÓïÒåÖØÒªÐÔ£©
+    /// ï¿½ï¿½ï¿½â£¨ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½Ð²ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ô£ï¿½
     /// </summary>
     Heading,
 
     /// <summary>
-    /// ÁÐ±íÏî£¨ÓÐÐò/ÎÞÐòÁÐ±í£©
+    /// ï¿½Ð±ï¿½ï¿½î£¨ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½
     /// </summary>
     List,
 
     /// <summary>
-    /// ±í¸ñÊý¾Ý
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     Table,
 
     /// <summary>
-    /// Í¼Æ¬/Í¼±í
+    /// Í¼Æ¬/Í¼ï¿½ï¿½
     /// </summary>
     Image
 }
 
 /// <summary>
-/// ÎÄµµ¿é»ùÀà
+/// ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public abstract class DocumentBlock
 {
@@ -48,7 +48,7 @@ public abstract class DocumentBlock
 }
 
 /// <summary>
-/// ÎÄ±¾¿é
+/// ï¿½Ä±ï¿½ï¿½ï¿½
 /// </summary>
 public sealed class TextBlock : DocumentBlock
 {
@@ -61,12 +61,12 @@ public sealed class TextBlock : DocumentBlock
 }
 
 /// <summary>
-/// ±êÌâ¿é
+/// ï¿½ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public sealed class HeadingBlock : DocumentBlock
 {
     public required string Text { get; init; }
-    public required int Level { get; init; } // 1-6£¬¶ÔÓ¦H1-H6
+    public required int Level { get; init; } // 1-6ï¿½ï¿½ï¿½ï¿½Ó¦H1-H6
 
     public HeadingBlock()
     {
@@ -75,7 +75,7 @@ public sealed class HeadingBlock : DocumentBlock
 }
 
 /// <summary>
-/// ÁÐ±í¿é
+/// ï¿½Ð±ï¿½ï¿½ï¿½
 /// </summary>
 public sealed class ListBlock : DocumentBlock
 {
@@ -88,14 +88,14 @@ public sealed class ListBlock : DocumentBlock
     }
 
     /// <summary>
-    /// ÁÐ±íµÄÎÄ±¾±íÊ¾£¨ÓÃÓÚÏòÁ¿»¯£©
+    /// ï¿½Ð±ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     public string Text => string.Join("\n", Items.Select((item, index) =>
         ListType == ListType.Ordered ? $"{index + 1}. {item}" : $"- {item}"));
 }
 
 /// <summary>
-/// ±í¸ñ¿é
+/// ï¿½ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public sealed class TableBlock : DocumentBlock
 {
@@ -110,19 +110,19 @@ public sealed class TableBlock : DocumentBlock
     }
 
     /// <summary>
-    /// ±í¸ñµÄÎÄ±¾±íÊ¾£¨ÓÃÓÚÏòÁ¿»¯£©
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     public string Text => (TableCaption != null ? TableCaption + "\n" : string.Empty) + Markdown;
 }
 
 /// <summary>
-/// Í¼Æ¬¿é
+/// Í¼Æ¬ï¿½ï¿½
 /// </summary>
 public sealed class ImageBlock : DocumentBlock
 {
     public required byte[] ImageBytes { get; init; }
-    public string? Description { get; init; } // AIÉú³ÉµÄÍ¼Æ¬ÃèÊö
-    public string? ImagePath { get; init; } // Í¼Æ¬µÄÓÐÐ§Â·¾¶£¨ÒÑ½âÎö£©
+    public string? Description { get; init; } // AIï¿½ï¿½ï¿½Éµï¿½Í¼Æ¬ï¿½ï¿½ï¿½ï¿½
+    public string? ImagePath { get; init; } // Í¼Æ¬ï¿½ï¿½ï¿½ï¿½Ð§Â·ï¿½ï¿½ï¿½ï¿½ï¿½Ñ½ï¿½ï¿½ï¿½ï¿½ï¿½
 
     public ImageBlock()
     {
@@ -130,34 +130,34 @@ public sealed class ImageBlock : DocumentBlock
     }
 
     /// <summary>
-    /// Í¼Æ¬µÄÎÄ±¾±íÊ¾£¨ÓÃÓÚÏòÁ¿»¯£©
+    /// Í¼Æ¬ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     public string Text => Description ?? Caption ?? "[Í¼Æ¬]";
 }
 
 /// <summary>
-/// ÁÐ±íÀàÐÍ
+/// ï¿½Ð±ï¿½ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public enum ListType
 {
     /// <summary>
-    /// ÎÞÐòÁÐ±í£¨bullet points£©
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½bullet pointsï¿½ï¿½
     /// </summary>
     Unordered,
 
     /// <summary>
-    /// ÓÐÐòÁÐ±í£¨numbered£©
+    /// ï¿½ï¿½ï¿½ï¿½ï¿½Ð±ï¿½ï¿½ï¿½numberedï¿½ï¿½
     /// </summary>
     Ordered
 }
 
 /// <summary>
-/// DocumentBlock À©Õ¹·½·¨
+/// DocumentBlock ï¿½ï¿½Õ¹ï¿½ï¿½ï¿½ï¿½
 /// </summary>
 public static class DocumentBlockExtensions
 {
     /// <summary>
-    /// »ñÈ¡ÈÎÒâÎÄµµ¿éµÄÎÄ±¾±íÊ¾£¨ÓÃÓÚÏòÁ¿»¯£©
+    /// ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½Äµï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     public static string GetText(this DocumentBlock block)
     {
@@ -173,7 +173,7 @@ public static class DocumentBlockExtensions
     }
 
     /// <summary>
-    /// ÅÐ¶Ï¿éÊÇ·ñ°üº¬ÓÐÐ§ÎÄ±¾ÄÚÈÝ
+    /// ï¿½Ð¶Ï¿ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð§ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     public static bool HasTextContent(this DocumentBlock block)
     {

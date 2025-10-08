@@ -5,12 +5,12 @@ namespace MarketAssistant.Vectors.Interfaces;
 public interface IImageEmbeddingService
 {
     /// <summary>
-    /// Éú³ÉÍ¼ÏñÏòÁ¿£¨ÓëÎÄ±¾Î¬¶È¶ÔÆë»ò¿ÉÏßÐÔÓ³Éä£©¡£
+    /// ï¿½ï¿½ï¿½ï¿½Í¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½Î¬ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó³ï¿½ä£©ï¿½ï¿½
     /// </summary>
     Task<Embedding<float>> GenerateAsync(byte[] imageBytes, CancellationToken ct = default);
 
     /// <summary>
-    /// Éú³É¼òµ¥Õ¼Î» Caption£¨¿ÉÁô¿Õ×Ö·û´®£©¡£
+    /// ï¿½ï¿½ï¿½É¼ï¿½Õ¼Î» Captionï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     /// </summary>
     Task<string> CaptionAsync(byte[] imageBytes, CancellationToken ct = default);
 }

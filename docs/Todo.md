@@ -3,8 +3,6 @@
 - 更新打包脚本
 - 更新readme.md及agetns.md
 
-- 管理windows下图片平铺到根目录的问题
-- 发布裁剪
 - 会话内Token管理：当单次会话过长时进行压缩
 - 缺少分析质量的自我评估和改进机制
 - xml prompt

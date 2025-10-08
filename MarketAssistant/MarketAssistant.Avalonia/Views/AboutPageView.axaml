@@ -124,7 +124,7 @@
                             Padding="12"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1">
-                        <Image Source="avares://MarketAssistant.Avalonia/Assets/Images/logo.jpg"
+                        <Image Source="avares://MarketAssistant.Avalonia/Assets/logo.png"
                                Width="80"
                                Height="80"
                                Stretch="UniformToFill"/>
@@ -199,13 +199,13 @@
                 <ItemsControl ItemsSource="{Binding FeatureItems}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:FeatureItem">
-                            <Border Classes="FeatureItemStyle"
+                            <Border Classes="featureItem"
                                     Margin="0,0,0,8">
                                 <Grid ColumnDefinitions="Auto, *, Auto">
                                     <!-- 图标容器 -->
                                     <Border Grid.Column="0"
-                                            Classes="FeatureIconStyle">
-										<Svg Path="{Binding IconSource}"
+                                            Classes="featureIcon">
+										<svg:Svg Path="{Binding IconSource}"
                                                  Width="20"
                                                  Height="20"/>
                                     </Border>
@@ -216,7 +216,7 @@
                                                 Spacing="4"
                                                 Margin="16,0">
                                         <TextBlock Text="{Binding Title}"
-                                                   Classes="FeatureTitleStyle"/>
+                                                   Classes="featureTitle"/>
                                         <TextBlock Text="{Binding Title, StringFormat='查看{0}相关信息'}"
                                                    FontSize="12"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -225,7 +225,7 @@
                                     <!-- 操作按钮 -->
                                     <Button Grid.Column="2"
                                             Content="{Binding ButtonText}"
-                                            Classes="FeatureButtonStyle"
+                                            Classes="featureButton"
                                             Command="{Binding Command}"/>
 
                                 </Grid>

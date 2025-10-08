@@ -2,6 +2,7 @@ using MarketAssistant.Infrastructure;
 using MarketAssistant.Plugins.Models;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
+using MarketAssistant.Services.Settings;
 
 namespace MarketAssistant.Plugins;
 

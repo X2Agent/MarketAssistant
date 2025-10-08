@@ -15,6 +15,31 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <!-- 股票卡片悬停效果 -->
+        <Style Selector="Border.stock-card:pointerover">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        </Style>
+        <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
+            <Setter Property="Opacity" Value="0.8"/>
+        </Style>
+        
+        <!-- 删除按钮样式 -->
+        <Style Selector="Button.delete-button">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.stock-card:pointerover Button.delete-button">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+    </UserControl.Styles>
+
     <Design.DataContext>
         <vm:FavoritesPageViewModel/>
     </Design.DataContext>
@@ -39,17 +64,16 @@
             <!-- 主内容区域 -->
             <Grid>
                 <!-- 加载指示器 -->
-                <Panel IsVisible="{Binding IsLoading}"
-                       HorizontalAlignment="Center" 
-                       VerticalAlignment="Center">
-                    <PathIcon Data="{StaticResource LoadingIcon}"
-                              Width="48" 
-                              Height="48"
-                              Foreground="{StaticResource PrimaryBrush}"/>
-                </Panel>
+                <PathIcon Data="{StaticResource LoadingIcon}"
+                          IsVisible="{Binding IsLoading}"
+                          Width="48" 
+                          Height="48"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Foreground="{StaticResource PrimaryBrush}"/>
 
-                <!-- 收藏股票列表 -->
-                <Panel IsVisible="{Binding !IsLoading}">
+                <!-- 内容区域（非加载状态） -->
+                <Grid IsVisible="{Binding !IsLoading}">
                     <!-- 空视图 -->
                     <StackPanel IsVisible="{Binding !Stocks.Count}"
                                 HorizontalAlignment="Center" 
@@ -73,95 +97,80 @@
                                   IsVisible="{Binding Stocks.Count}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel HorizontalAlignment="Stretch" />
+                                <UniformGrid Columns="4" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
-                        
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stocks:StockInfo">
-                                <Border Background="{DynamicResource CardBackgroundBrush}"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="12"
-                                        Margin="4"
-                                        MinWidth="220"
-                                        MaxWidth="250"
-                                        Cursor="Hand"
-                                        Tapped="OnStockItemTapped"
-                                        Tag="{Binding .}">
-                                    <Border.Styles>
-                                        <Style Selector="Border:pointerover">
-                                            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-                                        </Style>
-                                        <Style Selector="Border:pointerover > Grid > Panel#DeleteButton">
-                                            <Setter Property="IsVisible" Value="True"/>
-                                        </Style>
-                                    </Border.Styles>
-
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <!-- 股票信息区域 -->
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <!-- 市场和代码 -->
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <TextBlock Text="{Binding Market}" 
-                                                           FontSize="12" 
-                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                                                <TextBlock Text="{Binding Code}" 
-                                                           FontSize="12" 
-                                                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                                            </StackPanel>
-                                            
-                                            <!-- 股票名称 -->
-                                            <TextBlock Text="{Binding Name}" 
-                                                       FontSize="14" 
-                                                       FontWeight="Bold" 
-                                                       Foreground="{DynamicResource TextPrimaryBrush}" />
-                                            
-                                            <!-- 价格和涨跌幅 -->
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding CurrentPrice}" 
-                                                           FontSize="16" 
-                                                           FontWeight="Bold" 
-                                                           Foreground="{DynamicResource TextPrimaryBrush}" />
-                                                <TextBlock Text="{Binding ChangePercentage}" 
-                                                           FontSize="14" 
-                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                        
-                                        <!-- 删除按钮 -->
-                                        <Button Grid.Column="1" 
-                                                x:Name="DeleteButton"
-                                                Width="32" 
-                                                Height="32" 
-                                                HorizontalAlignment="Right" 
-                                                VerticalAlignment="Top"
-                                                IsVisible="False"
-                                                Cursor="Hand"
-                                                Background="{DynamicResource SubtleFillColorSecondaryBrush}"
-                                                BorderThickness="0"
-                                                CornerRadius="16"
-                                                Padding="0"
-                                                Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
-                                                CommandParameter="{Binding .}">
-                                            <PathIcon Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
-                                                      Width="18" 
-                                                      Height="18"
-                                                      Foreground="{StaticResource ErrorBrush}" />
-                                        </Button>
-                                    </Grid>
+                    
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="stocks:StockInfo">
+                            <Border Classes="stock-card"
+                                    Background="{DynamicResource ItemBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="10"
+                                    Margin="4,3"
+                                    Cursor="Hand"
+                                    Tapped="OnStockItemTapped"
+                                    Tag="{Binding .}"
+                                    VerticalAlignment="Top">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                    <!-- 市场和代码 -->
+                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                                               FontSize="11" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}">
+                                        <Run Text="{Binding Market}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding Code}"/>
+                                    </TextBlock>
                                     
-                                    <Border.Styles>
-                                        <Style Selector="Border[Cursor=Hand]:pressed">
-                                            <Setter Property="Opacity" Value="0.8"/>
-                                        </Style>
-                                    </Border.Styles>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </Panel>
+                                    <!-- 股票名称 -->
+                                    <TextBlock Grid.Row="1" Grid.Column="0"
+                                               Text="{Binding Name}" 
+                                               FontSize="13" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,3,0,0" />
+                                    
+                                    <!-- 价格和涨跌幅 -->
+                                    <TextBlock Grid.Row="2" Grid.Column="0"
+                                               FontSize="15" 
+                                               FontWeight="Bold" 
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,3,0,0">
+                                        <Run Text="{Binding CurrentPrice}"/>
+                                        <Run Text=" " FontSize="13" FontWeight="Normal"/>
+                                        <Run Text="{Binding ChangePercentage}" 
+                                             FontSize="13" 
+                                             FontWeight="Normal"
+                                             Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                    </TextBlock>
+                                    
+                                    <!-- 删除按钮 -->
+                                    <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
+                                            Classes="delete-button"
+                                            Width="28" 
+                                            Height="28" 
+                                            Cursor="Hand"
+                                            Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                            BorderThickness="0"
+                                            CornerRadius="14"
+                                            Padding="0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
+                                            CommandParameter="{Binding .}">
+                                        <PathIcon Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
+                                                  Width="16" 
+                                                  Height="16"
+                                                  Foreground="{StaticResource ErrorBrush}" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                </Grid>
             </Grid>
         </controls:CardView>
     </ScrollViewer>

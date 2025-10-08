@@ -54,7 +54,7 @@
 		<PackageReference Include="SmartReader" Version="0.10.2" />
 		<PackageReference Include="System.Linq.Async" Version="6.0.3" />
 		<!-- Added for CLIP ONNX embedding support -->
-		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.0-rc.1" />
+		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.0" />
 		<PackageReference Include="System.Numerics.Tensors" Version="9.0.9" />
 		<!-- Added for image processing -->
 		<PackageReference Include="SkiaSharp" Version="3.119.0" />
