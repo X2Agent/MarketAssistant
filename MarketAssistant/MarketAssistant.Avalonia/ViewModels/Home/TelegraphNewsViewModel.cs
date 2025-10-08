@@ -1,21 +1,11 @@
-using Avalonia.Threading;
-using MarketAssistant.Applications.News;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Applications.News;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Applications.News;
-using MarketAssistant.Services;
-using MarketAssistant.Applications.News;
-using Microsoft.Extensions.Logging;
-using MarketAssistant.Applications.News;
-using System.Collections.ObjectModel;
-using MarketAssistant.Applications.News;
-using System.Diagnostics;
-using MarketAssistant.Applications.News;
 using MarketAssistant.Avalonia.ViewModels;
-using MarketAssistant.Applications.News;
+using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace MarketAssistant.ViewModels.Home;
 

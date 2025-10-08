@@ -1,16 +1,11 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Services.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Plugins;
-using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.Logging;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel.Plugins.Web;
-using MarketAssistant.Infrastructure.Factories;
 
 namespace MarketAssistant.Infrastructure.Configuration;
 

@@ -1,28 +1,14 @@
 using Avalonia.Platform.Storage;
-using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Services.Notification;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Services.Notification;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.Notification;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Notification;
-using MarketAssistant.Avalonia.Services;
-using MarketAssistant.Services.Notification;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Services.Notification;
 using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Services.Notification;
 using Microsoft.Extensions.Logging;
-using MarketAssistant.Services.Notification;
 using System.Collections.ObjectModel;
-using MarketAssistant.Services.Notification;
 using YamlDotNet.Serialization;
-using MarketAssistant.Services.Notification;
 
 namespace MarketAssistant.Avalonia.ViewModels;
 

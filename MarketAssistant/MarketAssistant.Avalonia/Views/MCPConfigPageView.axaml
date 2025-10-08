@@ -112,7 +112,7 @@
                 <StackPanel IsVisible="{Binding IsEditing}" Spacing="16">
                     <!-- 基本信息 -->
                     <controls:CardView Header="基本信息">
-                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                             <!-- 服务器名称标签 -->
                             <TextBlock Grid.Row="0"
                                        FontSize="14" 
@@ -239,33 +239,32 @@
                                      IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
                                      Margin="0,8,0,0"/>
                             <!-- 参数提示 (仅stdio) -->
-                            <TextBlock Grid.Row="10"
+                            <TextBlock Grid.Row="11"
                                        Text="提示：多个参数请用空格分隔" 
                                        FontSize="12" 
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
-                                       Margin="0,108,0,0"/>
+                                       Margin="0,4,0,0"/>
 
                             <!-- 环境变量标签 (仅stdio) -->
-                            <TextBlock Grid.Row="11"
+                            <TextBlock Grid.Row="12"
                                        Text="环境变量" 
                                        FontSize="14" 
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
                                        Margin="0,16,0,0"/>
                             <!-- 环境变量输入 (仅stdio) -->
-                            <Grid Grid.Row="11"
-                                  RowDefinitions="Auto,Auto,Auto"
+                            <Grid Grid.Row="13"
+                                  RowDefinitions="Auto,Auto"
                                   IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
-                                  Margin="0,16,0,0">
-                                <TextBox Grid.Row="1"
+                                  Margin="0,8,0,0">
+                                <TextBox Grid.Row="0"
                                          Text="{Binding EnvironmentVariablesText}"
                                          Watermark="KEY1=value1&#10;KEY2=value2"
                                          Height="150"
                                          AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         Margin="0,8,0,0"/>
-                                <TextBlock Grid.Row="2"
+                                         TextWrapping="Wrap"/>
+                                <TextBlock Grid.Row="1"
                                            Text="每行一个环境变量，格式为KEY=value" 
                                            FontSize="12" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"
@@ -273,7 +272,7 @@
                             </Grid>
 
                             <!-- 是否启用 -->
-                            <StackPanel Grid.Row="11"
+                            <StackPanel Grid.Row="14"
                                         Orientation="Horizontal"
                                         Spacing="8"
                                         Margin="0,16,0,0">

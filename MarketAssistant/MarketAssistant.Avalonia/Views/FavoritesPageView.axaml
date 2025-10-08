@@ -15,31 +15,6 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
-    <UserControl.Styles>
-        <!-- 股票卡片悬停效果 -->
-        <Style Selector="Border.stock-card:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-        </Style>
-        <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
-            <Setter Property="Opacity" Value="0.8"/>
-        </Style>
-        
-        <!-- 删除按钮样式 -->
-        <Style Selector="Button.delete-button">
-            <Setter Property="Opacity" Value="0"/>
-            <Setter Property="IsHitTestVisible" Value="False"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-                </Transitions>
-            </Setter>
-        </Style>
-        <Style Selector="Border.stock-card:pointerover Button.delete-button">
-            <Setter Property="Opacity" Value="1"/>
-            <Setter Property="IsHitTestVisible" Value="True"/>
-        </Style>
-    </UserControl.Styles>
-
     <Design.DataContext>
         <vm:FavoritesPageViewModel/>
     </Design.DataContext>

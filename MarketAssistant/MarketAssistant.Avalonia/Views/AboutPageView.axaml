@@ -17,63 +17,6 @@
         </ResourceDictionary>
     </UserControl.Resources>
     
-    <UserControl.Styles>
-        <!-- 页面特有样式 -->
-        <Style Selector="Border.featureItem">
-            <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-            <Setter Property="Padding" Value="12"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-
-        <Style Selector="Border.featureIcon">
-            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Padding" Value="8"/>
-            <Setter Property="BorderThickness" Value="0"/>
-        </Style>
-
-        <Style Selector="TextBlock.featureTitle">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <Style Selector="Button.featureButton">
-            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="Padding" Value="8,0"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="BorderThickness" Value="0"/>
-        </Style>
-
-        <!-- 成功按钮样式 (绿色) -->
-        <Style Selector="Button.success">
-            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-
-        <!-- 警告按钮样式 (黄色) -->
-        <Style Selector="Button.warning">
-            <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-    </UserControl.Styles>
-
     <Design.DataContext>
         <vm:AboutPageViewModel/>
     </Design.DataContext>

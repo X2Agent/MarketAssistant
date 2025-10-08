@@ -1,0 +1,13 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 搜索结果列表样式 -->
+    <Style Selector="ListBoxItem">
+        <Setter Property="Padding" Value="12"/>
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+    </Style>
+
+</Styles>
+

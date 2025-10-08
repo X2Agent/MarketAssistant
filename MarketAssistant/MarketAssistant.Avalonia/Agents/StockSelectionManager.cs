@@ -1,18 +1,11 @@
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Avalonia.Services.Browser;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Plugins;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.Logging;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel.Agents;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel.ChatCompletion;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Avalonia.Services.Browser;
 
 namespace MarketAssistant.Agents;
 

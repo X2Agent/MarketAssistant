@@ -1,17 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Services.Dialog;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Services.Dialog;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Dialog;
-using Microsoft.Extensions.DependencyInjection;
-using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
-using MarketAssistant.Services.Dialog;
-using System;
-using MarketAssistant.Services.Dialog;
 using System.Collections.ObjectModel;
-using MarketAssistant.Services.Dialog;
+using Avalonia.Threading;
 
 namespace MarketAssistant.Avalonia.ViewModels
 {
@@ -94,28 +85,41 @@ namespace MarketAssistant.Avalonia.ViewModels
                 CurrentPage = stockViewModel;
                 SelectedNavigationItem = null; // 清除左侧导航选择
                 
-                // 然后异步加载股票数据，不阻塞UI
+                // 立即在UI线程异步加载股票数据
                 if (message.Parameter is Dictionary<string, object> parameters && 
                     parameters.TryGetValue("code", out var code))
                 {
-                    _ = Task.Run(async () =>
-                    {
-                        // 短暂延迟，确保页面已完成切换和初始渲染
-                        await Task.Delay(100);
-                        stockViewModel.SetStockCode(code?.ToString() ?? string.Empty);
-                    });
+                    var stockCode = code?.ToString() ?? string.Empty;
+                    // 使用 Dispatcher 在UI线程的下一个空闲时刻执行，确保页面已渲染
+                    Dispatcher.UIThread.Post(() => 
+                        stockViewModel.SetStockCode(stockCode), 
+                        DispatcherPriority.Background);
                 }
                 break;
                 
             case "Analysis":
-                // AI 分析页面正在开发中，先显示提示消息
-                var dialogService = _serviceProvider.GetRequiredService<IDialogService>();
-                _ = dialogService.ShowMessageAsync(
-                    "功能开发中", 
-                    "AI 股票分析功能正在从 MAUI 平台迁移到 Avalonia，敬请期待！\n\n" +
-                    "您可以在 MAUI 版本中体验完整功能。"
-                );
-                Logger?.LogInformation("AI 分析页面功能待实现");
+                var analysisViewModel = _serviceProvider.GetRequiredService<AgentAnalysisViewModel>();
+                // 先切换页面，让UI立即响应
+                CurrentPage = analysisViewModel;
+                SelectedNavigationItem = null; // 清除左侧导航选择
+                
+                // 立即在UI线程异步加载分析数据
+                if (message.Parameter is Dictionary<string, object> analysisParameters && 
+                    analysisParameters.TryGetValue("code", out var analysisCode))
+                {
+                    var stockCode = analysisCode?.ToString() ?? string.Empty;
+                    Logger?.LogInformation("导航到 AI 股票分析页面，股票代码: {Code}", stockCode);
+                    // 使用 Dispatcher 在UI线程的下一个空闲时刻执行
+                    Dispatcher.UIThread.Post(async () =>
+                    {
+                        analysisViewModel.StockCode = stockCode;
+                        await analysisViewModel.LoadAnalysisDataAsync();
+                    }, DispatcherPriority.Background);
+                }
+                else
+                {
+                    Logger?.LogInformation("导航到 AI 股票分析页面，但未提供股票代码");
+                }
                 break;
         }
     }

@@ -139,6 +139,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<RecentStocksViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
 
+        // 注册 AI 分析相关 ViewModels
+        services.AddTransient<AgentAnalysisViewModel>();
+        services.AddTransient<AnalysisReportViewModel>();
+        services.AddTransient<ChatSidebarViewModel>();
+
         return services;
     }
 

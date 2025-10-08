@@ -1,17 +1,9 @@
-using Avalonia.Threading;
-using MarketAssistant.Applications.StockSelection;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Applications.StockSelection;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Agents;
 using MarketAssistant.Applications.StockSelection;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Applications.StockSelection;
 using Microsoft.Extensions.Logging;
-using MarketAssistant.Applications.StockSelection;
 using System.Collections.ObjectModel;
-using MarketAssistant.Applications.StockSelection;
 
 namespace MarketAssistant.Avalonia.ViewModels;
 

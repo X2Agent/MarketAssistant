@@ -17,33 +17,6 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
-    <UserControl.Styles>
-        <!-- 时间周期按钮样式 -->
-        <Style Selector="Button.period-button">
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="CornerRadius" Value="6"/>
-            <Setter Property="Padding" Value="12,6"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
-        </Style>
-
-        <Style Selector="Button.period-button.selected">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
-            <Setter Property="Foreground" Value="White"/>
-        </Style>
-
-        <Style Selector="Button.period-button:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-        </Style>
-
-        <Style Selector="Button.period-button.selected:pointerover">
-            <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}"/>
-        </Style>
-    </UserControl.Styles>
-
     <Grid Margin="16" RowDefinitions="Auto,*">
         
         <!-- 股票基本信息卡片 -->
@@ -236,13 +209,6 @@
                            TextAlignment="Center"
                            MaxWidth="400"
                            TextWrapping="Wrap" />
-                <Button Content="🔄 重新加载" 
-                        Command="{Binding RefreshDataCommand}" 
-                        Background="{DynamicResource SystemAccentColor}"
-                        Foreground="White"
-                        CornerRadius="6"
-                        Padding="16,8"
-                        Margin="0,16,0,0" />
             </StackPanel>
         </controls:CardView>
     </Grid>

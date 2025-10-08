@@ -1,11 +1,88 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     
-    <!-- 全局按钮默认样式 - 确保内容居中 -->
+    <!-- 全局按钮默认样式 -->
     <Style Selector="Button">
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
-</Styles>
+    <!-- 时间周期按钮样式 -->
+    <Style Selector="Button.period-button">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
+    </Style>
+    <Style Selector="Button.period-button.selected">
+        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.period-button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+    </Style>
+    <Style Selector="Button.period-button.selected:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}"/>
+    </Style>
 
+    <!-- 功能按钮样式 -->
+    <Style Selector="Button.featureButton">
+        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Padding" Value="8,0"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- 成功按钮样式 -->
+    <Style Selector="Button.success">
+        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- 警告按钮样式 -->
+    <Style Selector="Button.warning">
+        <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- 删除按钮样式（悬停显示） -->
+    <Style Selector="Button.delete-button">
+        <Setter Property="Opacity" Value="0"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <!-- 收藏按钮样式（悬停显示） -->
+    <Style Selector="Button.favorite-button">
+        <Setter Property="Opacity" Value="0"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+</Styles>

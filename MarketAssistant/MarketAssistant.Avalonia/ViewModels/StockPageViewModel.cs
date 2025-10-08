@@ -78,7 +78,7 @@ public partial class StockPageViewModel : ViewModelBase
         StockCode = code;
         if (!string.IsNullOrEmpty(code))
         {
-            // 直接异步加载数据，不需要额外延迟（外部已处理）
+            // 立即开始异步加载数据
             _ = LoadStockDataAsync(code);
         }
     }
@@ -161,11 +161,12 @@ public partial class StockPageViewModel : ViewModelBase
         _loadingCancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = _loadingCancellationTokenSource.Token;
 
-        await SafeExecuteAsync(async () =>
-        {
-            HasError = false;
-            ErrorMessage = string.Empty;
+        IsBusy = true;
+        HasError = false;
+        ErrorMessage = string.Empty;
 
+        try
+        {
             var kLineDataSet = CurrentKLineType switch
             {
                 KLineType.Minute15 => await _stockKLineService.GetMinuteKLineDataAsync(stockCode, "15"),
@@ -188,8 +189,23 @@ public partial class StockPageViewModel : ViewModelBase
 
             // 计算价格信息
             CalculatePriceInfo(kLineDataSet.Data);
-
-        }, $"加载股票 {stockCode} 的K线数据");
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消操作，不显示错误
+            Logger?.LogInformation("股票 {StockCode} 的K线数据加载已取消", stockCode);
+        }
+        catch (Exception ex)
+        {
+            // 设置错误状态
+            HasError = true;
+            ErrorMessage = ex.Message ?? "加载K线数据失败，请稍后重试";
+            Logger?.LogError(ex, "加载股票 {StockCode} 的K线数据时发生错误", stockCode);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     /// <summary>

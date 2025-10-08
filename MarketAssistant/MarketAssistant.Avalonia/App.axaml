@@ -21,6 +21,9 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="/Resources/Styles/ButtonStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/CardStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
         <StyleInclude Source="/Controls/CardView.axaml"/>
     </Application.Styles>
 </Application>

@@ -81,7 +81,7 @@ public class WatermarkView : Control
     /// <summary>
     /// 水印字体大小
     /// </summary>
-    public new double FontSize
+    public double FontSize
     {
         get => GetValue(WatermarkFontSizeProperty);
         set => SetValue(WatermarkFontSizeProperty, value);

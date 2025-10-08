@@ -83,23 +83,20 @@ public class HomePageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void NavigateToStock(string stockCode, StockItem? stockItem = null)
     {
-        SafeExecute(() =>
-        {
-            // 添加到最近查看（如果有股票信息）
-            if (stockItem != null)
-            {
-                RecentStocks.AddToRecentStocks(stockItem);
-            }
-
-            // 清除搜索结果
-            Search.ClearSearchResults();
-
-            // 发送导航消息到股票详情页
-            WeakReferenceMessenger.Default.Send(
-                new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stockCode } }));
+        // 立即发送导航消息，不阻塞UI
+        WeakReferenceMessenger.Default.Send(
+            new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stockCode } }));
                     
-            Logger?.LogInformation($"导航到股票详情页: {stockCode}");
-        }, "导航到股票详情页");
+        Logger?.LogInformation($"导航到股票详情页: {stockCode}");
+
+        // 异步添加到最近查看，不阻塞导航
+        if (stockItem != null)
+        {
+            _ = Task.Run(() => RecentStocks.AddToRecentStocks(stockItem));
+        }
+
+        // 清除搜索结果
+        Search.ClearSearchResults();
     }
 
     /// <summary>
