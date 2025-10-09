@@ -52,9 +52,6 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     private string _newsContent = string.Empty;
 
     [ObservableProperty]
-    private string _inputContent = string.Empty;
-
-    [ObservableProperty]
     private ObservableCollection<SelectionModeItem> _selectionModes = new();
 
     [ObservableProperty]
@@ -68,6 +65,47 @@ public partial class StockSelectionPageViewModel : ViewModelBase
 
     [ObservableProperty]
     private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = new();
+
+    [ObservableProperty]
+    private string _validationMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasValidationMessage;
+
+    /// <summary>
+    /// 根据当前选择的模式，动态返回对应的输入内容
+    /// </summary>
+    public string CurrentInputContent
+    {
+        get => SelectedMode?.ModeType switch
+        {
+            SelectionModeType.UserRequirement => UserRequirements,
+            SelectionModeType.NewsAnalysis => NewsContent,
+            _ => string.Empty
+        };
+        set
+        {
+            if (SelectedMode != null)
+            {
+                switch (SelectedMode.ModeType)
+                {
+                    case SelectionModeType.UserRequirement:
+                        UserRequirements = value;
+                        break;
+                    case SelectionModeType.NewsAnalysis:
+                        NewsContent = value;
+                        break;
+                }
+            }
+            
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                ClearValidationMessage();
+            }
+            
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>
     /// 输入区域是否可见（非快速策略模式时显示）
@@ -137,7 +175,7 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     {
         if (value != null)
         {
-            UpdateCurrentMode();
+            OnPropertyChanged(nameof(CurrentInputContent));
             OnPropertyChanged(nameof(CurrentPlaceholder));
             OnPropertyChanged(nameof(CurrentButtonText));
             OnPropertyChanged(nameof(IsInputAreaVisible));
@@ -161,11 +199,9 @@ public partial class StockSelectionPageViewModel : ViewModelBase
         switch (SelectedMode.ModeType)
         {
             case SelectionModeType.UserRequirement:
-                UserRequirements = InputContent;
                 await ExecuteSelectionAsync();
                 break;
             case SelectionModeType.NewsAnalysis:
-                NewsContent = InputContent;
                 await ExecuteNewsSelectionAsync();
                 break;
             case SelectionModeType.QuickStrategy:
@@ -218,15 +254,19 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     [RelayCommand]
     private void ClearContent()
     {
-        InputContent = string.Empty;
+        CurrentInputContent = string.Empty;
         ClearResult();
     }
 
     private async Task ExecuteSelectionAsync()
     {
         if (string.IsNullOrWhiteSpace(UserRequirements))
+        {
+            ShowValidationMessage("请输入您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍的价值股");
             return;
+        }
 
+        ClearValidationMessage();
         await SafeExecuteAsync(async () =>
         {
             var request = new StockRecommendationRequest
@@ -245,8 +285,12 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     private async Task ExecuteNewsSelectionAsync()
     {
         if (string.IsNullOrWhiteSpace(NewsContent))
+        {
+            ShowValidationMessage("请输入新闻内容或热点信息，例如：央行降准利好银行股，新能源汽车销量创新高等");
             return;
+        }
 
+        ClearValidationMessage();
         await SafeExecuteAsync(async () =>
         {
             var request = new NewsBasedSelectionRequest
@@ -269,6 +313,19 @@ public partial class StockSelectionPageViewModel : ViewModelBase
         HasResult = false;
         UserRequirements = string.Empty;
         NewsContent = string.Empty;
+        ClearValidationMessage();
+    }
+
+    private void ShowValidationMessage(string message)
+    {
+        ValidationMessage = message;
+        HasValidationMessage = true;
+    }
+
+    private void ClearValidationMessage()
+    {
+        ValidationMessage = string.Empty;
+        HasValidationMessage = false;
     }
 
     private async Task LoadQuickStrategiesAsync()
@@ -310,21 +367,5 @@ public partial class StockSelectionPageViewModel : ViewModelBase
             });
             return Task.CompletedTask;
         }, "加载选股模式");
-    }
-
-    private void UpdateCurrentMode()
-    {
-        if (SelectedMode != null)
-        {
-            switch (SelectedMode.ModeType)
-            {
-                case SelectionModeType.UserRequirement:
-                    InputContent = UserRequirements;
-                    break;
-                case SelectionModeType.NewsAnalysis:
-                    InputContent = NewsContent;
-                    break;
-            }
-        }
     }
 }

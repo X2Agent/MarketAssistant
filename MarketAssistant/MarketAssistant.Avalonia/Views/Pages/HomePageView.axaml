@@ -82,8 +82,7 @@
                             <DataTemplate x:DataType="telegrams:Telegram">
                                 <Border Classes="news-card"
                                         Tapped="NewsCard_Tapped"
-                                        Tag="{Binding .}"
-										Background="Transparent">
+                                        Tag="{Binding .}">
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
                                         <TextBlock Grid.Row="0" Grid.Column="0"
                                                    Text="{Binding Title}"
@@ -164,8 +163,7 @@
                                 <Border Classes="hot-stock-card" 
                                         Margin="4,2" 
                                         Tapped="HotStockCard_Tapped"
-                                        Tag="{Binding .}"
-										Background="Transparent">
+                                        Tag="{Binding .}">
                                     <Grid ColumnDefinitions="Auto,4,Auto,*,Auto,Auto,Auto"
                                           RowDefinitions="Auto,Auto,Auto"
                                           Cursor="Hand">
@@ -247,8 +245,7 @@
                                 <DataTemplate x:DataType="stocks:StockItem">
                                     <Border Classes="recent-stock-card" 
                                             Tapped="RecentStockCard_Tapped"
-                                            Tag="{Binding .}"
-                                            Background="Transparent">
+                                            Tag="{Binding .}">
                                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0"
                                                        Text="{Binding Name}"

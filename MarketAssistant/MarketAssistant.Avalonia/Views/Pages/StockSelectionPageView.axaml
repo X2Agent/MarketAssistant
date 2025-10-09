@@ -13,56 +13,153 @@
         <vm:StockSelectionPageViewModel/>
     </Design.DataContext>
 
-    <ScrollViewer>
-        <StackPanel Margin="16" Spacing="12">
-            
-            <!-- 页面标题 -->
-            <TextBlock Text="AI智能选股" 
-                       FontSize="20"
-                       FontWeight="Bold"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,8"/>
+    <Grid RowDefinitions="Auto,*">
+        <!-- 加载指示器（优化后的覆盖层） -->
+        <Border Grid.Row="0" Grid.RowSpan="2"
+                Background="#E0FFFFFF"
+                IsVisible="{Binding IsBusy}"
+                ZIndex="1000">
+            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="16"
+                    Padding="32,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="320"
+                    MaxWidth="400"
+                    BoxShadow="0 8 32 0 #30000000">
+                <StackPanel Spacing="16">
+                    <!-- 加载动画区域 - 三点脉冲动画 -->
+                    <StackPanel Orientation="Horizontal" 
+                                Spacing="8"
+                                HorizontalAlignment="Center">
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                        
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite" Delay="0:0:0.2">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                        
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite" Delay="0:0:0.4">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                    </StackPanel>
+                    
+                    <!-- 文本信息 -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="正在分析中" 
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="AI 正在为您精选优质股票，请稍候..."
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="280"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
 
-            <!-- 加载指示器 -->
-            <controls:CardView IsVisible="{Binding IsBusy}">
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="16">
-                    <TextBlock Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
-                               Text="⏳" 
-                               FontSize="20"
-                               Width="24"
-                               Height="24"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"
-                               Margin="0,0,16,0"/>
-                    <TextBlock Grid.Row="0" Grid.Column="1"
-                               Text="正在分析中..."
-                               FontSize="16"
-                               FontWeight="Bold"/>
-                    <TextBlock Grid.Row="1" Grid.Column="1"
-                               Text="AI正在为您精选优质股票，请稍候"
-                               FontSize="12"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="0,4,0,0"/>
-                </Grid>
-            </controls:CardView>
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="16" Spacing="16">
+                
+                <!-- 页面标题 -->
+                <TextBlock Text="AI智能选股" 
+                           FontSize="24"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,4"/>
 
             <!-- 智能选股输入区域 -->
             <controls:CardView>
                 <StackPanel Spacing="12">
                     <!-- 选股模式选择器 -->
                     <TextBlock Text="选股模式" 
-                               FontSize="14" 
+                               FontSize="16" 
                                FontWeight="Bold"/>
+                    
+                    <!-- 验证提示消息 -->
+                    <Border Background="#FEF3C7"
+                            BorderBrush="#F59E0B"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            IsVisible="{Binding HasValidationMessage}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="ℹ️" 
+                                       FontSize="16"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ValidationMessage}"
+                                       FontSize="14"
+                                       Foreground="#92400E"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
                     
                     <ItemsControl ItemsSource="{Binding SelectionModes}" Height="80">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="12"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SelectionModeItem">
-                                <Border Classes.mode-card="True"
+								<Border Classes.mode-card="True"
                                         Classes.selected="{Binding IsSelected}"
                                         MinWidth="120">
                                     <Grid RowDefinitions="Auto,Auto">
@@ -84,7 +181,7 @@
                     </ItemsControl>
                     
                     <!-- 统一输入框 -->
-                    <TextBox Text="{Binding InputContent}"
+                    <TextBox Text="{Binding CurrentInputContent}"
                              Watermark="{Binding CurrentPlaceholder}"
                              Height="120"
                              AcceptsReturn="True"
@@ -93,7 +190,7 @@
                     
                     <!-- 操作按钮 -->
                     <StackPanel Orientation="Horizontal" 
-                                Spacing="12"
+                                Spacing="8"
                                 IsVisible="{Binding IsInputAreaVisible}">
                         <Button Content="{Binding CurrentButtonText}"
                                 Command="{Binding ExecuteAnalysisCommand}"
@@ -101,9 +198,11 @@
                                 Background="{DynamicResource SystemAccentColor}"
                                 Foreground="White"
                                 HorizontalAlignment="Stretch"
+                                Padding="16,8"
                                 MinWidth="120"/>
                         <Button Content="清除"
                                 Command="{Binding ClearContentCommand}"
+                                Padding="16,8"
                                 MinWidth="80"/>
                     </StackPanel>
                 </StackPanel>
@@ -267,6 +366,7 @@
                 </StackPanel>
             </controls:CardView>
 
-        </StackPanel>
-    </ScrollViewer>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

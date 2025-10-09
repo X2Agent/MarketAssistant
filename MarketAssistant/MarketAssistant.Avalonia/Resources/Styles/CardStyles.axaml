@@ -10,9 +10,6 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
-    <Style Selector="Border.mode-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-    </Style>
     <Style Selector="Border.mode-card.selected">
         <Setter Property="BorderThickness" Value="2"/>
         <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
@@ -33,9 +30,6 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
-    <Style Selector="Border.strategy-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
-    </Style>
 
     <!-- 股票卡片样式 -->
     <Style Selector="Border.stock-card">
@@ -45,9 +39,6 @@
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="12"/>
         <Setter Property="Cursor" Value="Hand"/>
-    </Style>
-    <Style Selector="Border.stock-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
     </Style>
     <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
         <Setter Property="Opacity" Value="0.8"/>
@@ -66,9 +57,6 @@
         <Setter Property="Padding" Value="8,6"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
-    <Style Selector="Border.hot-stock-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
-    </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
         <Setter Property="IsHitTestVisible" Value="True"/>
@@ -83,9 +71,6 @@
         <Setter Property="Padding" Value="12"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
-    <Style Selector="Border.recent-stock-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
-    </Style>
     <Style Selector="Border.recent-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
         <Setter Property="IsHitTestVisible" Value="True"/>
@@ -97,9 +82,6 @@
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="12"/>
         <Setter Property="Cursor" Value="Hand"/>
-    </Style>
-    <Style Selector="Border.news-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
         <Setter Property="Cursor" Value="Hand"/>
