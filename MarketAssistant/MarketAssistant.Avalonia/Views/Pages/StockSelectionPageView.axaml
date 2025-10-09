@@ -3,7 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
-             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls"
              xmlns:agents="using:MarketAssistant.Agents"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Avalonia.Views.StockSelectionPageView"

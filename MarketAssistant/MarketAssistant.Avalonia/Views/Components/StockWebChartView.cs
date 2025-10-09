@@ -1,15 +1,11 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Presenters;
 using Avalonia.Layout;
-using Avalonia.Media;
-using Avalonia.Threading;
+using Avalonia.Platform;
 using MarketAssistant.Applications.Stocks.Models;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using WebViewControl;
 
-namespace MarketAssistant.Avalonia.Controls;
+namespace MarketAssistant.Avalonia.Views.Components;
 
 /// <summary>
 /// 股票Web图表视图组件 (Avalonia版本)
@@ -20,11 +16,8 @@ public class StockWebChartView : UserControl
     private bool _isInitialized = false;
     private readonly ILogger<StockWebChartView>? _logger;
     private WebView? _webView;
-
-    // 控件引用
     private StackPanel? _loadingPanel;
     private StackPanel? _errorPanel;
-    private TextBlock? _statusText;
     private TextBlock? _errorText;
     private Button? _retryButton;
 
@@ -35,18 +28,7 @@ public class StockWebChartView : UserControl
 
     private void InitializeComponent()
     {
-        // 创建主要布局
-        var border = new Border
-        {
-            Background = Brushes.White,
-            CornerRadius = new CornerRadius(8),
-            BorderBrush = Brushes.LightGray,
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(8)
-        };
-
         var grid = new Grid();
-        border.Child = grid;
 
         // 创建 WebView
         _webView = new WebView
@@ -56,10 +38,6 @@ public class StockWebChartView : UserControl
             VerticalAlignment = VerticalAlignment.Stretch
         };
 
-        // 监听 WebView 事件 (简化版本)
-        // _webView.NavigationCompleted += OnWebViewNavigationCompleted;
-        // _webView.NavigationStarting += OnWebViewNavigationStarting;
-
         // 加载状态面板
         _loadingPanel = new StackPanel
         {
@@ -67,67 +45,39 @@ public class StockWebChartView : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             IsVisible = true
         };
-
-        _loadingPanel.Children.Add(new TextBlock 
-        { 
-            Text = "📈", 
-            FontSize = 48, 
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 16)
+        _loadingPanel.Children.Add(new TextBlock
+        {
+            Text = "正在加载图表...",
+            FontSize = 14,
+            HorizontalAlignment = HorizontalAlignment.Center
         });
-
-        _loadingPanel.Children.Add(new TextBlock 
-        { 
-            Text = "正在加载图表...", 
-            FontSize = 16, 
-            HorizontalAlignment = HorizontalAlignment.Center 
-        });
-
-        _statusText = new TextBlock 
-        { 
-            FontSize = 12, 
-            Opacity = 0.7, 
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 8, 0, 0)
-        };
-        _loadingPanel.Children.Add(_statusText);
 
         // 错误状态面板
         _errorPanel = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            IsVisible = false
+            IsVisible = false,
+            Spacing = 12
         };
-
-        _errorPanel.Children.Add(new TextBlock 
-        { 
-            Text = "❌", 
-            FontSize = 48, 
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 16)
+        _errorPanel.Children.Add(new TextBlock
+        {
+            Text = "图表加载失败",
+            FontSize = 14,
+            HorizontalAlignment = HorizontalAlignment.Center
         });
 
-        _errorPanel.Children.Add(new TextBlock 
-        { 
-            Text = "图表加载失败", 
-            FontSize = 16, 
-            HorizontalAlignment = HorizontalAlignment.Center 
-        });
-
-        _errorText = new TextBlock 
-        { 
-            FontSize = 12, 
-            Opacity = 0.7, 
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 8, 0, 0)
+        _errorText = new TextBlock
+        {
+            FontSize = 12,
+            Opacity = 0.7,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
         _errorPanel.Children.Add(_errorText);
 
-        _retryButton = new Button 
-        { 
-            Content = "重试", 
-            Margin = new Thickness(0, 16, 0, 0),
+        _retryButton = new Button
+        {
+            Content = "重试",
             HorizontalAlignment = HorizontalAlignment.Center
         };
         _retryButton.Click += (s, e) => _ = InitializeChartAsync();
@@ -138,26 +88,22 @@ public class StockWebChartView : UserControl
         grid.Children.Add(_loadingPanel);
         grid.Children.Add(_errorPanel);
 
-        Content = border;
+        Content = grid;
 
         // 初始化图表
         _ = InitializeChartAsync();
     }
 
     /// <summary>
-    /// 模拟 WebView 导航完成
+    /// WebView 导航完成事件处理器
     /// </summary>
-    private async void SimulateNavigationCompleted()
+    private void OnWebViewNavigated(string url, string? title)
     {
-        // 延迟模拟加载时间
-        await Task.Delay(2000);
-        
         Dispatcher.UIThread.Post(() =>
         {
             _isInitialized = true;
-            SetStatus("图表页面加载完成");
             HideLoading();
-            _logger?.LogInformation("WebView 模拟导航完成，图表已初始化");
+            _logger?.LogInformation("WebView 导航完成，图表已初始化");
         });
     }
 
@@ -168,7 +114,6 @@ public class StockWebChartView : UserControl
     {
         try
         {
-            SetStatus("正在初始化图表...");
             ShowLoading();
 
             if (_webView == null)
@@ -179,20 +124,20 @@ public class StockWebChartView : UserControl
 
             // 加载 HTML 图表文件
             string htmlContent = await LoadHtmlContentAsync("kline_chart.html");
-            
+
             if (string.IsNullOrEmpty(htmlContent))
             {
                 ShowError("无法加载图表 HTML 文件");
                 return;
             }
 
-            // TODO: 使用正确的 WebView API 加载 HTML 内容
-            // _webView.NavigateToString(htmlContent);
-            
-            // 模拟导航完成事件 (待 WebView API 确认后替换)
-            SimulateNavigationCompleted();
-            
-            _logger?.LogInformation("开始加载图表 HTML 内容");
+            _logger?.LogInformation("开始加载图表 HTML，长度: {Length}", htmlContent.Length);
+
+            // 监听 WebView 加载完成事件（必须在 LoadHtml 之前注册）
+            _webView.Navigated += OnWebViewNavigated;
+
+            // 使用 WebView 的 LoadHtml 方法加载 HTML 内容
+            _webView.LoadHtml(htmlContent);
         }
         catch (Exception ex)
         {
@@ -208,32 +153,33 @@ public class StockWebChartView : UserControl
     {
         try
         {
-            // 尝试从应用包中加载HTML文件
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            var resourceName = $"MarketAssistant.Avalonia.Assets.{htmlFileName}";
-            
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream != null)
+            // 方法1：使用 Avalonia 原生的 AssetLoader（推荐）
+            // 资源 URI 格式：avares://AssemblyName/Path/To/File
+            var assetUri = new Uri($"avares://MarketAssistant.Avalonia/Assets/Raw/{htmlFileName}");
+
+            if (AssetLoader.Exists(assetUri))
             {
+                using var stream = AssetLoader.Open(assetUri);
                 using var reader = new StreamReader(stream);
                 return await reader.ReadToEndAsync();
             }
 
-            // 如果从资源加载失败，尝试从文件系统加载
+            // 备用方案 - 从文件系统加载（用于开发调试）
             var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            var htmlPath = Path.Combine(appDirectory, htmlFileName);
-            
+            var htmlPath = Path.Combine(appDirectory, "Assets", "Raw", htmlFileName);
+
             if (File.Exists(htmlPath))
             {
                 return await File.ReadAllTextAsync(htmlPath);
             }
 
-            // 如果文件不存在，返回默认的图表HTML
+            // 如果都失败，返回默认HTML
+            _logger?.LogWarning("无法找到HTML文件: {FileName}，使用默认HTML", htmlFileName);
             return GetDefaultChartHtml();
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, $"加载HTML文件失败: {ex.Message}");
+            _logger?.LogError(ex, "加载HTML文件失败");
             return GetDefaultChartHtml();
         }
     }
@@ -374,44 +320,6 @@ public class StockWebChartView : UserControl
     }
 
     /// <summary>
-    /// 设置状态文本
-    /// </summary>
-    private void SetStatus(string status)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (_statusText != null) _statusText.Text = status;
-        });
-    }
-
-    /// <summary>
-    /// 设置图表标题
-    /// </summary>
-    public async Task SetTitleAsync(string title)
-    {
-        if (string.IsNullOrEmpty(title) || _webView == null)
-            return;
-
-        try
-        {
-            await WaitForInitializationAsync();
-            
-            string escapedTitle = title.Replace("\"", "\\\"");
-            string script = $"if (window.stockChartInterface && window.stockChartInterface.chart) {{ " +
-                          $"window.stockChartInterface.chart.setOption({{ title: {{ text: \"{escapedTitle}\" }} }}); }}";
-            
-            // TODO: 使用正确的 WebView API 执行 JavaScript
-            // await _webView.ExecuteScriptAsync(script);
-            _logger?.LogInformation($"JavaScript 调用: {script}");
-            _logger?.LogInformation($"图表标题已设置: {title}");
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "设置图表标题失败");
-        }
-    }
-
-    /// <summary>
     /// 使用K线数据更新图表
     /// </summary>
     public async Task UpdateChartAsync(IEnumerable<StockKLineData> kLineData)
@@ -422,53 +330,42 @@ public class StockWebChartView : UserControl
         try
         {
             await WaitForInitializationAsync();
-            
-            SetStatus("正在更新图表数据...");
 
-            // 设置加载状态
-            // TODO: 使用正确的 WebView API 执行 JavaScript
-            // await _webView.ExecuteScriptAsync("window.stockChartInterface.setLoading(true);");
-            _logger?.LogInformation("JavaScript 调用: window.stockChartInterface.setLoading(true);");
-
-            // 序列化数据
-            var options = new JsonSerializerOptions
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            };
-            string jsonData = JsonSerializer.Serialize(kLineData, options);
+                try
+                {
+                    // 设置加载状态
+                    _webView.ExecuteScript("window.stockChartInterface.setLoading(true);");
 
-            // 调用JavaScript更新图表数据
-            string script = $"window.stockChartInterface.loadData({jsonData});";
-            // TODO: 使用正确的 WebView API 执行 JavaScript
-            // await _webView.ExecuteScriptAsync(script);
-            _logger?.LogInformation($"JavaScript 调用: {script}");
+                    // 序列化数据
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                        WriteIndented = false
+                    };
+                    string jsonData = JsonSerializer.Serialize(kLineData, options);
 
-            // 取消加载状态
-            // TODO: 使用正确的 WebView API 执行 JavaScript
-            // await _webView.ExecuteScriptAsync("window.stockChartInterface.setLoading(false);");
-            _logger?.LogInformation("JavaScript 调用: window.stockChartInterface.setLoading(false);");
+                    // 调用JavaScript更新图表数据
+                    string script = $"window.stockChartInterface.loadData({jsonData});";
+                    _webView.ExecuteScript(script);
 
-            _logger?.LogInformation($"图表数据已更新，数据点数量: {kLineData.Count()}");
-            SetStatus($"图表更新完成 ({kLineData.Count()} 个数据点)");
+                    // 取消加载状态
+                    _webView.ExecuteScript("window.stockChartInterface.setLoading(false);");
+
+                    _logger?.LogInformation("图表数据已更新，数据点: {Count}", kLineData.Count());
+                }
+                catch (Exception jsEx)
+                {
+                    _logger?.LogError(jsEx, "执行JavaScript失败");
+                    ShowError($"更新图表失败: {jsEx.Message}");
+                }
+            });
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "更新图表失败");
-            
-            // 显示JavaScript错误
-            string errorMessage = ex.Message.Replace("\"", "\\\"");
-            try
-            {
-                // TODO: 使用正确的 WebView API 执行 JavaScript
-                // await _webView.ExecuteScriptAsync($"window.stockChartInterface.setError(true, \"{errorMessage}\");");
-                _logger?.LogWarning($"JavaScript 错误处理: {errorMessage}");
-            }
-            catch
-            {
-                // 如果JavaScript调用也失败，显示本地错误
-                ShowError($"更新失败: {ex.Message}");
-            }
+            ShowError($"更新失败: {ex.Message}");
         }
     }
 

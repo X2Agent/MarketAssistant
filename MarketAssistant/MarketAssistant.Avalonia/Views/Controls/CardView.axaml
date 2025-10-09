@@ -1,6 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:controls="using:MarketAssistant.Avalonia.Controls">
+        xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls">
 
     <!-- CardView 默认样式 -->
     <Style Selector="controls|CardView">

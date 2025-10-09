@@ -150,7 +150,7 @@ public class StockWebChartView : ContentView
         
         // 监听事件
         _webView.Navigated += (sender, e) => _isInitialized = true;
-    }
+    } 
     
     public async Task UpdateChartAsync(IEnumerable<StockKLineData> kLineData)
     {

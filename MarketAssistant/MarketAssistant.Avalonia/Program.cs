@@ -1,10 +1,8 @@
 using Avalonia;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using MarketAssistant.Avalonia.Services;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.Vectors.Extensions;
-using System;
+using Microsoft.Extensions.Hosting;
 
 namespace MarketAssistant.Avalonia
 {
@@ -31,12 +29,17 @@ namespace MarketAssistant.Avalonia
         {
             var services = new ServiceCollection();
 
-            // 配置日志
-            services.AddLogging(builder =>
+            // 注册用户设置服务为单例（需要先注册以便获取日志路径）
+            services.AddSingleton<IUserSettingService, UserSettingService>();
+
+            // 构建一个临时 ServiceProvider 以便在配置日志之前获取用户设置
+            using (var tempProvider = services.BuildServiceProvider())
             {
-                builder.AddConsole();
-                builder.SetMinimumLevel(LogLevel.Information);
-            });
+                var userSettingService = tempProvider.GetRequiredService<IUserSettingService>();
+
+                // 配置日志
+                services.AddLogging(builder => builder.ConfigureLogging(userSettingService));
+            }
 
             // 注册基础服务（RAG、向量化等）
             services.AddRagServices();

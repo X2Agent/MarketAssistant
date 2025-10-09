@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using MarketAssistant.Avalonia.ViewModels;
 using MarketAssistant.Avalonia.Views;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 
 namespace MarketAssistant.Infrastructure.Core
@@ -41,6 +40,7 @@ namespace MarketAssistant.Infrastructure.Core
                 AboutPageViewModel => new AboutPageView { DataContext = data },
                 MCPConfigPageViewModel => new MCPConfigPageView { DataContext = data },
                 StockPageViewModel => new StockPageView { DataContext = data },
+                AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
                 _ => new TextBlock { Text = $"未找到视图: {viewModelType.Name}" }
             };
         }

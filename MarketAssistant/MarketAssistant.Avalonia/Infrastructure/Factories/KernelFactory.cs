@@ -1,4 +1,3 @@
-using MarketAssistant.Plugins;
 using MarketAssistant.Services.Settings;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
@@ -92,7 +91,7 @@ public class KernelFactory : IKernelFactory
             .AddFromType<ConversationSummaryPlugin>()
             .AddFromType<TextPlugin>();
 
-        builder.Plugins.AddFromPromptDirectory(Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml"));
+        builder.Plugins.AddFromPromptDirectory(Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Plugins", "Yaml"));
 
         return builder.Build();
     }

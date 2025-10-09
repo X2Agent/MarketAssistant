@@ -1,6 +1,4 @@
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using MarketAssistant.Avalonia.ViewModels;
 
 namespace MarketAssistant.Avalonia.Views;
@@ -10,23 +8,9 @@ namespace MarketAssistant.Avalonia.Views;
 /// </summary>
 public partial class AgentAnalysisPageView : UserControl
 {
-    private readonly ChatSidebarViewModel _chatSidebarViewModel;
-
     public AgentAnalysisPageView()
     {
         InitializeComponent();
-    }
-
-    public AgentAnalysisPageView(AgentAnalysisViewModel viewModel, ChatSidebarViewModel chatSidebarViewModel) : this()
-    {
-        _chatSidebarViewModel = chatSidebarViewModel;
-        
-        viewModel.ChatSidebarViewModel = _chatSidebarViewModel;
-        
-        _chatSidebarViewModel.InitializeEmpty();
-        
-        DataContext = viewModel;
-
         Loaded += OnPageLoaded;
     }
 
@@ -36,11 +20,6 @@ public partial class AgentAnalysisPageView : UserControl
         {
             await viewModel.LoadAnalysisDataAsync();
         }
-    }
-
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
     }
 }
 

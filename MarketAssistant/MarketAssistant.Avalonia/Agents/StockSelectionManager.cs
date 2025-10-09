@@ -356,7 +356,7 @@ public class StockSelectionManager : IDisposable
         if (!TryEnsureKernel(out var ensureError))
             throw new InvalidOperationException($"Kernel 未初始化：{ensureError}");
 
-        string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", yamlFileName);
+        string yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Plugins", "Yaml", yamlFileName);
         if (!File.Exists(yamlPath))
         {
             _logger.LogWarning("YAML 文件不存在: {YamlPath}", yamlPath);

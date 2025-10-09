@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 
-namespace MarketAssistant.Avalonia.Controls;
+namespace MarketAssistant.Avalonia.Views.Controls;
 
 /// <summary>
 /// 卡片视图控件，支持标题和阴影效果
@@ -107,7 +107,7 @@ public partial class CardView : ContentControl
                 _divider.IsVisible = false;
             }
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"CardView.UpdateHeader error: {ex.Message}");
         }

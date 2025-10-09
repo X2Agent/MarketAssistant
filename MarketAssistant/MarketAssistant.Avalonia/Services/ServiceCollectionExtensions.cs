@@ -1,28 +1,25 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
-using Microsoft.Extensions.AI;
-using Serilog;
-using MarketAssistant.Avalonia.ViewModels;
-using MarketAssistant.ViewModels.Home;
-using MarketAssistant.Services.Cache;
-using MarketAssistant.Services.Settings;
-using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Applications.News;
-using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Agents;
+using MarketAssistant.Applications.News;
+using MarketAssistant.Applications.Stocks;
+using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Applications.Telegrams;
+using MarketAssistant.Avalonia.Services.Browser;
+using MarketAssistant.Avalonia.ViewModels;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Infrastructure.Configuration;
-using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Parsers;
 using MarketAssistant.Plugins;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.Vectors.Extensions;
-using MarketAssistant.Parsers;
-using MarketAssistant.Avalonia.Services.Browser;
+using MarketAssistant.ViewModels.Home;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
+using Serilog;
 
 namespace MarketAssistant.Avalonia.Services;
 
@@ -148,7 +145,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// 配置日志服务
+    /// 配置 Serilog 日志服务
     /// </summary>
     public static ILoggingBuilder ConfigureLogging(this ILoggingBuilder logging, IUserSettingService userSettingService)
     {
@@ -166,6 +163,9 @@ public static class ServiceCollectionExtensions
 
         logging.ClearProviders();
         logging.AddSerilog(Log.Logger);
+
+        logging.AddConsole();
+        logging.SetMinimumLevel(LogLevel.Information);
 
         return logging;
     }

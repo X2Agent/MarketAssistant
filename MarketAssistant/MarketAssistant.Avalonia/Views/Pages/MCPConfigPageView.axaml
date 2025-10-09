@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
              xmlns:settings="using:MarketAssistant.Applications.Settings"
-             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls"
              xmlns:converts="using:MarketAssistant.Avalonia.Converts"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Avalonia.Views.MCPConfigPageView"

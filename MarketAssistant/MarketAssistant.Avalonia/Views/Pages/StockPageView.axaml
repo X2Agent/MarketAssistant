@@ -3,7 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
-             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls"
+			 xmlns:components="using:MarketAssistant.Avalonia.Views.Components"
              xmlns:converts="using:MarketAssistant.Avalonia.Converts"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Avalonia.Views.StockPageView"
@@ -109,7 +110,7 @@
 
                 <!-- 图表控制区域 -->
                 <Grid Grid.Row="0" 
-                      Margin="16"
+                      Margin="16,8,16,12"
                       ColumnDefinitions="Auto,*,Auto">
                     
                     <!-- 图例 -->
@@ -181,7 +182,7 @@
                     </StackPanel>
 
                     <!-- K线图表 -->
-                    <controls:StockWebChartView x:Name="WebChartView" 
+					<components:StockWebChartView x:Name="WebChartView" 
                                                IsVisible="{Binding !IsBusy}" />
                 </Grid>
             </Grid>

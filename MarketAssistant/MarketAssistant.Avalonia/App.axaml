@@ -13,7 +13,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/Styles/Colors.axaml"/>
-                <ResourceInclude Source="/Resources/Styles/Styles.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Spacing.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
@@ -24,6 +24,6 @@
         <StyleInclude Source="/Resources/Styles/CardStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
-        <StyleInclude Source="/Controls/CardView.axaml"/>
+        <StyleInclude Source="/Views/Controls/CardView.axaml"/>
     </Application.Styles>
 </Application>

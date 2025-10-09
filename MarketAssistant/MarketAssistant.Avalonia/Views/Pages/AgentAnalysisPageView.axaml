@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
              xmlns:views="using:MarketAssistant.Avalonia.Views"
-             xmlns:controls="using:MarketAssistant.Avalonia.Controls"
+             xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls"
              xmlns:converts="using:MarketAssistant.Avalonia.Converts"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Avalonia.Views.AgentAnalysisPageView"
@@ -17,7 +17,7 @@
 
     <Grid ColumnDefinitions="*,Auto">
         <!-- 主内容区域 -->
-        <Grid Grid.Column="0">
+        <Grid Grid.Column="0" ClipToBounds="True">
             <!-- 进度显示区域 - 仅在分析时显示 -->
             <views:ProgressDisplayView 
                 IsVisible="{Binding IsBusy}"

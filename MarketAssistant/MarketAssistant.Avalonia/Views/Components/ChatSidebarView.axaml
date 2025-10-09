@@ -1,0 +1,193 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.Avalonia.ViewModels"
+             xmlns:converts="using:MarketAssistant.Avalonia.Converts"
+             xmlns:controls="using:MarketAssistant.Avalonia.Views.Controls"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="800"
+             x:Class="MarketAssistant.Avalonia.Views.ChatSidebarView"
+             x:DataType="vm:ChatSidebarViewModel"
+             x:Name="Root">
+
+    <UserControl.Resources>
+        <converts:InvertBoolConverter x:Key="InvertBoolConverter"/>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Background="{DynamicResource BackgroundBrush}">
+        
+        <!-- 标题栏 -->
+        <Grid Grid.Row="0" 
+              ColumnDefinitions="*,Auto"
+              Background="{DynamicResource CardBackgroundBrush}"
+              Height="56">
+            <TextBlock Grid.Column="0" 
+                       Text="智能对话" 
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center"
+                       Margin="16,0" />
+            
+            <Button Grid.Column="1"
+                    Content="✕"
+                    FontSize="18"
+                    Background="Transparent"
+                    Width="36"
+                    Height="36"
+                    CornerRadius="18"
+                    Margin="8"
+                    Command="{Binding #Root.CloseCommand}"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"/>
+        </Grid>
+        
+        <!-- 标题栏分割线 -->
+        <Border Grid.Row="1"
+                Height="1"
+                Background="{DynamicResource BorderBrush}" />
+
+        <!-- 对话消息列表 -->
+        <ScrollViewer Grid.Row="2" 
+                      x:Name="ChatScrollViewer"
+                      Margin="8,8,8,0">
+            <ItemsControl ItemsSource="{Binding ChatMessages}"
+                          Background="Transparent">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChatMessageAdapter">
+                        <Border Padding="12,4" Margin="0,2">
+                            <StackPanel Spacing="4">
+                                <!-- 时间戳 -->
+                                <TextBlock Text="{Binding FormattedTime}" 
+                                           FontSize="10" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           HorizontalAlignment="Center" />
+                                
+                                <!-- 用户消息 -->
+                                <Border Padding="12,8"
+                                        Background="{DynamicResource PrimaryBrush}"
+                                        HorizontalAlignment="Right"
+                                        MaxWidth="360"
+                                        CornerRadius="18,18,4,18"
+                                        IsVisible="{Binding IsUser}">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Sender}" 
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   Foreground="White" />
+                                        <TextBlock Text="{Binding Content}" 
+                                                  FontSize="14"
+                                                  TextWrapping="Wrap"
+                                                  Foreground="White" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <!-- AI/系统消息 -->
+                                <Border Padding="12,8"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        HorizontalAlignment="Left"
+                                        MaxWidth="360"
+                                        CornerRadius="18,18,18,4"
+                                        IsVisible="{Binding IsUser, Converter={StaticResource InvertBoolConverter}}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding Sender}" 
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource PrimaryBrush}" />
+                                        
+                                        <!-- 状态指示器 -->
+                                        <Grid ColumnDefinitions="Auto,*" 
+                                              ColumnSpacing="4"
+                                              IsVisible="{Binding Status, Converter={StaticResource InvertBoolConverter}}">
+                                            <ProgressBar Grid.Column="0" 
+                                                        IsIndeterminate="True"
+                                                        Width="12" Height="12" />
+                                            <TextBlock Grid.Column="1" 
+                                                       Text="正在思考..." 
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                        
+                                        <!-- 内容区域 -->
+                                        <controls:RichTextBlock Text="{Binding Content}" 
+                                                               IsVisible="{Binding Content, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- 输入区域 -->
+        <Border Grid.Row="3" 
+                Margin="16,12,16,16"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                BoxShadow="0 2 8 0 #10000000">
+            
+            <Grid ColumnDefinitions="*,Auto" 
+                  Margin="16,8">
+                
+                <!-- 输入框 -->
+                <TextBox Grid.Column="0"
+                         x:Name="MessageEntry"
+                         Text="{Binding UserInput}"
+                         Watermark="询问关于股票分析的问题..."
+                         FontSize="14"
+                         MinHeight="40"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="4,8"
+                         IsEnabled="{Binding IsProcessing, Converter={StaticResource InvertBoolConverter}}"
+                         VerticalContentAlignment="Center"
+                         TextWrapping="Wrap"
+                         MaxHeight="120"
+                         AcceptsReturn="True">
+                    <TextBox.Styles>
+                        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                        </Style>
+                    </TextBox.Styles>
+                </TextBox>
+
+                <!-- 发送按钮 -->
+                <Button Grid.Column="1"
+                        Command="{Binding SendMessageCommand}"
+                        Background="{DynamicResource PrimaryBrush}"
+                        Width="44"
+                        Height="44"
+                        CornerRadius="22"
+                        Margin="8,0,0,0"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Padding="0">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+                            <Setter Property="Opacity" Value="0.9"/>
+                        </Style>
+                        <Style Selector="Button:pressed /template/ ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Style>
+                    </Button.Styles>
+                    
+                    <!-- 发送图标 -->
+                    <Viewbox Width="20" Height="20">
+                        <Canvas Width="24" Height="24">
+                            <Path Fill="White" 
+                                  Data="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

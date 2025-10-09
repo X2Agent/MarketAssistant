@@ -8,7 +8,7 @@ using System;
 using System.Text.RegularExpressions;
 using WebViewControl;
 
-namespace MarketAssistant.Avalonia.Controls;
+namespace MarketAssistant.Avalonia.Views.Controls;
 
 /// <summary>
 /// 内容格式类型
@@ -75,7 +75,7 @@ public class RichTextBlock : UserControl
             VerticalAlignment = VerticalAlignment.Stretch
         };
         
-        base.Content = _contentContainer;
+        Content = _contentContainer;
     }
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace MarketAssistant.Avalonia.Controls;
+namespace MarketAssistant.Avalonia.Views.Controls;
 
 /// <summary>
 /// 水印视图组件 - 基础自绘控件

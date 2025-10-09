@@ -115,19 +115,19 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         MarketAnalysisAgent marketAnalysisAgent,
         AnalysisReportViewModel analysisReportViewModel,
         IAnalysisCacheService analysisCacheService,
+        ChatSidebarViewModel chatSidebarViewModel,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _marketAnalysisAgent = marketAnalysisAgent;
         _analysisReportViewModel = analysisReportViewModel;
         _analysisCacheService = analysisCacheService;
 
+        // 通过构造函数注入 ChatSidebarViewModel
+        ChatSidebarViewModel = chatSidebarViewModel;
+        ChatSidebarViewModel.InitializeEmpty();
+
         SubscribeToEvents();
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
-
-        _emptyChatMessages.Add(new ChatMessageAdapter(
-            "🔧 调试消息：如果你看到这条消息，说明绑定工作正常，但 ChatSidebarViewModel 为 null",
-            false,
-            "调试系统"));
     }
 
     private void SubscribeToEvents()
@@ -246,6 +246,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase
                 AnalysisMessages.Add(mockMessage);
                 await Task.Delay(200);
             }
+            
+            // 加载模拟的分析报告数据
+            AnalysisReportViewModel.LoadMockData(StockCode);
 #else
             var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
             foreach (var message in history)

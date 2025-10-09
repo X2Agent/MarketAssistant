@@ -10,16 +10,12 @@
         padding: 0;
         font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu,
           Cantarell, 'Open Sans',  sans-serif;
-        background-color: #f5f5f5;
-        color: #333;
       }
       #chart-container {
         width: 100%;
         height: 100%;
         position: relative;
-        border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         background-color: #ffffff;
       }
       html, body {
@@ -74,30 +70,12 @@
         border-left-color: #3498db;
         animation: spin 1s linear infinite;
       }
-      .chart-legend {
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        display: flex;
-        gap: 15px;
-        z-index: 5;
-        font-size: 12px;
-      }
       @keyframes spin {
         0% {
           transform: rotate(0deg);
         }
         100% {
           transform: rotate(360deg);
-        }
-      }
-      @media (max-width: 768px) {
-        #chart-container {
-          height: 100%;
-        }
-        .chart-legend {
-          font-size: 10px;
-          gap: 10px;
         }
       }
     </style>
@@ -378,41 +356,6 @@
         size: 2,
         precision: 2,
       });
-
-      // 格式化日期
-      function formatDate(timestamp) {
-        const date = new Date(timestamp);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      }
-
-      // 格式化时间
-      function formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        return `${hours}:${minutes}`;
-      }
-
-      // 格式化数字
-      function formatNumber(num, precision = 2) {
-        if (num === null || num === undefined) return '-';
-        return parseFloat(num).toFixed(precision);
-      }
-
-      // 格式化成交量
-      function formatVolume(volume) {
-        if (volume === null || volume === undefined) return '-';
-        if (volume >= 100000000) {
-          return (volume / 100000000).toFixed(2) + '亿';
-        } else if (volume >= 10000) {
-          return (volume / 10000).toFixed(2) + '万';
-        } else {
-          return volume.toString();
-        }
-      }
 
       // 定义与C#交互的接口
       window.stockChartInterface = {

@@ -1,7 +1,6 @@
 using MarketAssistant.Avalonia.Views.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Parsers;
@@ -23,7 +22,7 @@ public class AIAnalystDataParser : IAnalystDataParser
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
 
         // 加载AI解析插件
-        var yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "analyst_data_parser.yaml");
+        var yamlPath = Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Plugins", "Yaml", "analyst_data_parser.yaml");
         if (!File.Exists(yamlPath))
         {
             throw new FileNotFoundException($"AI解析插件配置文件未找到: {yamlPath}");

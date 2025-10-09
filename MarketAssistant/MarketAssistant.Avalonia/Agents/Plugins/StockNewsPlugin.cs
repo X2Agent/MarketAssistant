@@ -76,7 +76,7 @@ public class StockNewsPlugin
             }
 
             // 使用YAML插件进行内容识别
-            string promptYaml = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Plugins", "Yaml", "extract_article_content.yaml"));
+            string promptYaml = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Plugins", "Yaml", "extract_article_content.yaml"));
             var kernel = GetKernel();
             KernelFunction extractContentFunc = kernel.CreateFunctionFromPromptYaml(promptYaml);
             var result = await extractContentFunc.InvokeAsync(kernel, new() { ["html_content"] = article.Content });
