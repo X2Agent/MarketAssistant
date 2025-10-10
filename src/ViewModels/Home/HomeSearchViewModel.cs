@@ -57,7 +57,18 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
-        _ = OnSearchAsync(value);
+        // 使用 Task.Run 避免异常被吞掉，同时记录日志
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await OnSearchAsync(value);
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, "搜索股票时发生错误，查询：{Query}", value);
+            }
+        });
     }
 
     /// <summary>
@@ -82,21 +93,47 @@ public partial class HomeSearchViewModel : ViewModelBase
         {
             IsSearchResultVisible = false;
             SearchResults.Clear();
+            Logger?.LogDebug("搜索查询为空，清空结果");
             return;
         }
 
-        await SafeExecuteAsync(async () =>
+        Logger?.LogInformation("开始搜索股票，查询：{Query}", query);
+
+        try
         {
             var results = await _homeStockService.SearchStockAsync(query, CancellationToken.None);
 
-            SearchResults.Clear();
-            foreach (var stock in results)
-            {
-                SearchResults.Add(stock);
-            }
+            Logger?.LogInformation("搜索完成，找到 {Count} 个结果", results.Count);
 
-            IsSearchResultVisible = true;
-        }, "搜索股票");
+            // 确保在 UI 线程上更新集合
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SearchResults.Clear();
+                foreach (var stock in results)
+                {
+                    SearchResults.Add(stock);
+                    Logger?.LogDebug("添加搜索结果：{Name} ({Code})", stock.Name, stock.Code);
+                }
+
+                IsSearchResultVisible = SearchResults.Count > 0;
+            });
+            
+            if (results.Count == 0)
+            {
+                Logger?.LogWarning("未找到匹配的股票，查询：{Query}", query);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "搜索股票失败，查询：{Query}", query);
+            
+            // 确保在异常时也清空结果
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SearchResults.Clear();
+                IsSearchResultVisible = false;
+            });
+        }
     }
 
     /// <summary>

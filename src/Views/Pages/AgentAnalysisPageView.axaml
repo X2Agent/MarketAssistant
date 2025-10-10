@@ -11,10 +11,6 @@
              x:DataType="vm:AgentAnalysisViewModel"
              x:Name="ParentPage">
 
-    <UserControl.Resources>
-        <converts:InvertBoolConverter x:Key="InvertBoolConverter"/>
-    </UserControl.Resources>
-
     <Grid ColumnDefinitions="*,Auto">
         <!-- 主内容区域 -->
         <Grid Grid.Column="0" ClipToBounds="True">
@@ -26,7 +22,7 @@
                 AnalysisStage="{Binding AnalysisStage}"/>
 
             <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
-            <Grid IsVisible="{Binding IsBusy, Converter={StaticResource InvertBoolConverter}}">
+            <Grid IsVisible="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}">
                 <!-- 智能分析报告区域 -->
                 <ContentControl Content="{Binding AnalysisReportViewModel}">
                     <ContentControl.ContentTemplate>

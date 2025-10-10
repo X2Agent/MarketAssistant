@@ -38,7 +38,7 @@ public class MCPServerConfig
     /// <summary>
     /// 环境变量，用于stdio类型
     /// </summary>
-    public Dictionary<string, string?> EnvironmentVariables { get; set; } = new();
+    public Dictionary<string, string> EnvironmentVariables { get; set; } = new();
 
     /// <summary>
     /// 是否启用

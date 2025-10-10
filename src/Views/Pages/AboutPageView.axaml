@@ -10,12 +10,6 @@
              x:Class="MarketAssistant.Views.Pages.AboutPageView"
              x:DataType="vm:AboutPageViewModel">
 
-    <UserControl.Resources>
-        <ResourceDictionary>
-            <!-- 转换器 -->
-            <converts:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
-        </ResourceDictionary>
-    </UserControl.Resources>
     
     <Design.DataContext>
         <vm:AboutPageViewModel/>
@@ -121,7 +115,7 @@
                                 Height="36"
                                 Width="100"
                                 Command="{Binding CheckUpdateCommand}"
-                                IsEnabled="{Binding IsCheckingUpdate, Converter={StaticResource InvertedBoolConverter}}"/>
+                                IsEnabled="{Binding IsCheckingUpdate, Converter={x:Static BoolConverters.Not}}"/>
 
                         <!-- 下载更新按钮 -->
                         <Button Content="下载更新"

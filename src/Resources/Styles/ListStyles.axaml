@@ -3,10 +3,7 @@
 
     <!-- 搜索结果列表样式 -->
     <Style Selector="ListBoxItem">
-        <Setter Property="Padding" Value="12"/>
-    </Style>
-    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}"/>
+        <Setter Property="Padding" Value="8"/>
     </Style>
 
 </Styles>

@@ -10,10 +10,6 @@
              x:DataType="vm:ChatSidebarViewModel"
              x:Name="Root">
 
-    <UserControl.Resources>
-        <converts:InvertBoolConverter x:Key="InvertBoolConverter"/>
-    </UserControl.Resources>
-
     <Grid RowDefinitions="Auto,Auto,*,Auto" Background="{DynamicResource BackgroundBrush}">
         
         <!-- 标题栏 -->
@@ -89,7 +85,7 @@
                                         HorizontalAlignment="Left"
                                         MaxWidth="360"
                                         CornerRadius="18,18,18,4"
-                                        IsVisible="{Binding IsUser, Converter={StaticResource InvertBoolConverter}}">
+                                        IsVisible="{Binding IsUser, Converter={x:Static BoolConverters.Not}}">
                                     <StackPanel Spacing="4">
                                         <TextBlock Text="{Binding Sender}" 
                                                    FontSize="11"
@@ -99,7 +95,7 @@
                                         <!-- 状态指示器 -->
                                         <Grid ColumnDefinitions="Auto,*" 
                                               ColumnSpacing="4"
-                                              IsVisible="{Binding Status, Converter={StaticResource InvertBoolConverter}}">
+                                              IsVisible="{Binding Status, Converter={x:Static BoolConverters.Not}}">
                                             <ProgressBar Grid.Column="0" 
                                                         IsIndeterminate="True"
                                                         Width="12" Height="12" />
@@ -144,7 +140,7 @@
                          Background="Transparent"
                          BorderThickness="0"
                          Padding="4,8"
-                         IsEnabled="{Binding IsProcessing, Converter={StaticResource InvertBoolConverter}}"
+                         IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}"
                          VerticalContentAlignment="Center"
                          TextWrapping="Wrap"
                          MaxHeight="120"

@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Notification;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -11,7 +13,8 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class MCPConfigPageViewModel : ViewModelBase
 {
-    private readonly MCPServerConfigService? _configService;
+    private readonly MCPServerConfigService _configService;
+    private readonly INotificationService? _notificationService;
 
     [ObservableProperty]
     private ObservableCollection<MCPServerConfig> _serverConfigs = new();
@@ -24,6 +27,12 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _showDeleteConfirmation;
+
+    [ObservableProperty]
+    private bool _isTesting;
+
+    [ObservableProperty]
+    private string _testStatus = string.Empty;
 
     // 编辑中的属性
     [ObservableProperty]
@@ -54,10 +63,13 @@ public partial class MCPConfigPageViewModel : ViewModelBase
         // 设计时构造函数
     }
 
-    public MCPConfigPageViewModel(MCPServerConfigService? configService, ILogger<MCPConfigPageViewModel>? logger)
+    public MCPConfigPageViewModel(
+        INotificationService? notificationService,
+        ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
-        _configService = configService;
+        _configService = MCPServerConfigService.Instance;
+        _notificationService = notificationService;
         LoadServerConfigs();
     }
 
@@ -66,7 +78,20 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     /// </summary>
     private void LoadServerConfigs()
     {
-        // TODO: 暂时跳过，等待服务实现
+        try
+        {
+            _configService.LoadConfigs();
+            ServerConfigs.Clear();
+            foreach (var config in _configService.ServerConfigs)
+            {
+                ServerConfigs.Add(config);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "加载MCP服务器配置失败");
+            _notificationService?.ShowError($"加载配置失败: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -75,6 +100,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     [RelayCommand]
     private void AddServer()
     {
+        // 清空选中项，避免与编辑状态冲突
+        SelectedConfig = null;
+        
         _editingConfig = new MCPServerConfig
         {
             Id = Guid.NewGuid().ToString(),
@@ -118,18 +146,42 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     [RelayCommand]
     private void SaveServer()
     {
-        if (_editingConfig == null || _configService == null) return;
+        if (_editingConfig == null) return;
 
-        // 更新配置对象
-        SaveUIToConfig(_editingConfig);
+        // 验证必填字段
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            _notificationService?.ShowWarning("请输入服务器名称");
+            return;
+        }
 
-        // 保存到服务
-        _configService.AddOrUpdateConfig(_editingConfig);
+        if (string.IsNullOrWhiteSpace(Command))
+        {
+            _notificationService?.ShowWarning("请输入命令或URL");
+            return;
+        }
 
-        // 刷新列表
-        LoadServerConfigs();
-        IsEditing = false;
-        _editingConfig = null;
+        try
+        {
+            // 更新配置对象
+            SaveUIToConfig(_editingConfig);
+
+            // 保存到服务
+            _configService.AddOrUpdateConfig(_editingConfig);
+
+            // 刷新列表
+            LoadServerConfigs();
+            IsEditing = false;
+            _editingConfig = null;
+
+            _notificationService?.ShowSuccess("保存成功");
+            Logger?.LogInformation("MCP服务器配置已保存: {Name}", Name);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "保存MCP服务器配置失败");
+            _notificationService?.ShowError($"保存失败: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -138,6 +190,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     [RelayCommand]
     private void CancelEdit()
     {
+        SelectedConfig = null;
         IsEditing = false;
         _editingConfig = null;
     }
@@ -148,8 +201,92 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     [RelayCommand]
     private async Task TestConnection()
     {
-        // TODO: 实现测试连接逻辑
-        await Task.CompletedTask;
+        if (_editingConfig == null) return;
+
+        // 验证必填字段
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            _notificationService?.ShowWarning("请输入服务器名称");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Command))
+        {
+            _notificationService?.ShowWarning("请输入命令或URL");
+            return;
+        }
+
+        IsTesting = true;
+        TestStatus = "正在连接...";
+
+        try
+        {
+            // 创建临时配置用于测试
+            var testConfig = new MCPServerConfig
+            {
+                Id = _editingConfig.Id,
+                Name = Name,
+                Description = Description,
+                TransportType = TransportType,
+                Command = Command,
+                Arguments = Arguments,
+                IsEnabled = true
+            };
+
+            // 解析环境变量
+            if (!string.IsNullOrWhiteSpace(EnvironmentVariablesText))
+            {
+                testConfig.EnvironmentVariables = new Dictionary<string, string?>();
+                var lines = EnvironmentVariablesText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                {
+                    var parts = line.Split('=', 2);
+                    if (parts.Length == 2)
+                    {
+                        testConfig.EnvironmentVariables[parts[0].Trim()] = parts[1].Trim();
+                    }
+                }
+            }
+
+            // 设置超时
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+            // 尝试连接并获取工具列表
+            var functions = await McpPlugin.GetKernelFunctionsAsync(testConfig);
+            var functionCount = functions.Count();
+
+            if (functionCount > 0)
+            {
+                TestStatus = $"连接成功！发现 {functionCount} 个工具";
+                _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {functionCount} 个工具");
+                Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, functionCount);
+            }
+            else
+            {
+                TestStatus = "连接成功，但未发现可用工具";
+                _notificationService?.ShowWarning("连接成功，但未发现可用工具");
+                Logger?.LogWarning("MCP服务器连接成功但无工具: {Name}", Name);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            TestStatus = "连接超时";
+            _notificationService?.ShowError("连接超时，请检查服务器配置");
+            Logger?.LogWarning("MCP服务器连接超时: {Name}", Name);
+        }
+        catch (Exception ex)
+        {
+            TestStatus = $"连接失败: {ex.Message}";
+            _notificationService?.ShowError($"连接失败: {ex.Message}");
+            Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
+        }
+        finally
+        {
+            IsTesting = false;
+            
+            // 3秒后清除状态信息
+            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+        }
     }
 
     /// <summary>
@@ -167,7 +304,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     [RelayCommand]
     private void ConfirmDelete()
     {
-        if (SelectedConfig == null || _configService == null) return;
+        if (SelectedConfig == null) return;
 
         _configService.DeleteConfig(SelectedConfig.Id);
         LoadServerConfigs();
@@ -238,7 +375,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     partial void OnSelectedConfigChanged(MCPServerConfig? value)
     {
-        if (value != null && !IsEditing)
+        if (value != null)
         {
             EditServer();
         }

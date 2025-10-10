@@ -27,7 +27,10 @@ public class MCPServerConfigService
     // 配置文件路径
     private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName);
 
-    private MCPServerConfigService()
+    /// <summary>
+    /// 构造函数（支持依赖注入，也支持单例模式）
+    /// </summary>
+    public MCPServerConfigService()
     {
         // 从存储中加载设置
         LoadConfigs();
