@@ -1,163 +1,177 @@
-# MarketAssistant Build Script v2.0
-# Build optimized Windows and macOS versions locally
-# Features: Single-file builds, size optimization, automatic cleanup
+# MarketAssistant Build Script - Avalonia
+# 跨平台构建脚本：Windows, macOS, Linux
 
 param(
-    [string]$Platform = "All",  # All, Windows, macOS
+    [string]$Platform = "Windows",  # Windows, macOS, Linux, All
     [string]$Configuration = "Release"
 )
 
-Write-Host "🚀 MarketAssistant Build Script v2.0" -ForegroundColor Green
-Write-Host "Platform: $Platform | Configuration: $Configuration" -ForegroundColor Cyan
+$startTime = Get-Date
 
-# Check .NET and MAUI workload
-Write-Host "🔍 Checking prerequisites..." -ForegroundColor Yellow
+Write-Host "🚀 Building MarketAssistant - Platform: $Platform" -ForegroundColor Green
+
+# 检查 .NET SDK
 try {
-    $dotnetVersion = dotnet --version
-    Write-Host "✓ .NET version: $dotnetVersion" -ForegroundColor Green
+    $version = dotnet --version
+    Write-Host "✓ .NET $version" -ForegroundColor Green
 } catch {
     Write-Host "✗ .NET SDK not found" -ForegroundColor Red
     exit 1
 }
 
-# Install MAUI workload (Windows and macOS only)
-Write-Host "Installing MAUI workload for Windows and macOS..." -ForegroundColor Yellow
-dotnet workload install maui-windows maui-maccatalyst
+# 还原依赖
+Write-Host "📦 Restoring dependencies..." -ForegroundColor Yellow
+dotnet restore MarketAssistant.slnx --verbosity quiet
+if ($LASTEXITCODE -ne 0) { exit 1 }
 
-# Restore dependencies
-Write-Host "Restoring project dependencies..." -ForegroundColor Yellow
-dotnet restore MarketAssistant.slnx
-
-# Create output directory
+# 准备输出目录
 $outputDir = "./Release"
-if (Test-Path $outputDir) {
-    Remove-Item $outputDir -Recurse -Force
-}
+if (Test-Path $outputDir) { Remove-Item $outputDir -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
-# Build Windows version
-if ($Platform -eq "All" -or $Platform -eq "Windows") {
-    Write-Host "Building Windows version..." -ForegroundColor Yellow
+# 构建统计
+$buildStats = @()
+
+# 构建函数
+function Build-Package {
+    param([string]$Name, [string]$Runtime)
     
-    try {
-        # 使用框架依赖部署（推荐用于 WinUI 3 应用）
-        dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
-             -c $Configuration `
-             -f net9.0-windows10.0.19041.0 `
-             -p:Platform=x64 `
-             -p:SelfContained=false `
-             -p:PublishReadyToRun=true `
-             -o "$outputDir/Windows"
-            
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "✓ Windows build successful" -ForegroundColor Green
-            
-            # 📊 显示构建前的大小
-            $buildSize = (Get-ChildItem -Path "$outputDir/Windows" -Recurse | Measure-Object -Property Length -Sum).Sum
-            Write-Host "🔍 Build size before optimization: $([math]::Round($buildSize/1MB, 2)) MB" -ForegroundColor Yellow
-            
-            # 🗑️ 清理不必要的文件来减少大小
-            Write-Host "🧹 Optimizing single-file build..." -ForegroundColor Yellow
-            $removedItems = 0
-            $savedSize = 0
-            
-            # 删除调试文件
-            $debugFiles = @("*.pdb", "*.xml", "*.deps.json")
-            foreach ($pattern in $debugFiles) {
-                $files = Get-ChildItem -Path "$outputDir/Windows" -Filter $pattern -Recurse
-                foreach ($file in $files) {
-                    $savedSize += $file.Length
-                    Remove-Item $file.FullName -Force
-                    $removedItems++
-                }
-            }
-            
-            # 检查是否有单个可执行文件
-            $exeFile = Get-ChildItem -Path "$outputDir/Windows" -Filter "*.exe" | Select-Object -First 1
-            if ($exeFile) {
-                Write-Host "   ✓ Single executable: $($exeFile.Name) ($([math]::Round($exeFile.Length/1MB, 2)) MB)" -ForegroundColor Green
-            }
-            
-            # Create ZIP package
-            Write-Host "📦 Creating ZIP package..." -ForegroundColor Yellow
-            $zipPath = "$outputDir/MarketAssistant-Windows-x64.zip"
-            Compress-Archive -Path "$outputDir/Windows/*" -DestinationPath $zipPath -Force
-            $zipSize = (Get-Item $zipPath).Length
-            Write-Host "✓ Windows ZIP created: ./Release/MarketAssistant-Windows-x64.zip" -ForegroundColor Green
-            Write-Host "   ZIP size: $([math]::Round($zipSize/1MB, 2)) MB" -ForegroundColor Green
-        } else {
-            Write-Host "✗ Windows build failed" -ForegroundColor Red
-        }
-    } catch {
-        Write-Host "✗ Windows build error: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
-
-# Build macOS version (macOS only)
-if ($Platform -eq "All" -or $Platform -eq "macOS") {
-    if ($IsMacOS) {
-        Write-Host "Building macOS version..." -ForegroundColor Yellow
+    Write-Host "`n🔨 Building $Name..." -ForegroundColor Cyan
+    
+    $publishDir = "$outputDir/$Name"
+    $buildStart = Get-Date
+    
+    dotnet publish src/MarketAssistant.csproj `
+        -c $Configuration `
+        -r $Runtime `
+        --self-contained `
+        -p:PublishReadyToRun=true `
+        -p:DebugType=None `
+        -p:DebugSymbols=false `
+        --verbosity quiet `
+        -o $publishDir
         
-        try {
-            dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj `
-                -c $Configuration `
-                -f net9.0-maccatalyst `
-                -p:CreatePackage=true `
-                -o "$outputDir/macOS"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "✗ Build failed" -ForegroundColor Red
+        return $null
+    }
+    
+    $buildTime = ((Get-Date) - $buildStart).TotalSeconds
+    
+    # 统计构建前大小
+    $beforeSize = (Get-ChildItem -Path $publishDir -Recurse | Measure-Object -Property Length -Sum).Sum
+    
+    # 清理调试文件
+    $debugFiles = Get-ChildItem -Path $publishDir -Include "*.pdb", "*.xml" -Recurse
+    $cleanedSize = 0
+    foreach ($file in $debugFiles) {
+        $cleanedSize += $file.Length
+        Remove-Item $file.FullName -Force
+    }
+    
+    $afterSize = $beforeSize - $cleanedSize
+    
+    # 打包
+    $zipPath = "$outputDir/MarketAssistant-$Name.zip"
+    Compress-Archive -Path "$publishDir/*" -DestinationPath $zipPath -CompressionLevel Optimal -Force
+    
+    $zipSize = (Get-Item $zipPath).Length
+    
+    Write-Host "   Build size: $([math]::Round($beforeSize/1MB, 2)) MB" -ForegroundColor Gray
+    Write-Host "   Cleaned: $([math]::Round($cleanedSize/1MB, 2)) MB (debug files)" -ForegroundColor Gray
+    Write-Host "   Final size: $([math]::Round($afterSize/1MB, 2)) MB" -ForegroundColor Gray
+    Write-Host "   ZIP size: $([math]::Round($zipSize/1MB, 2)) MB" -ForegroundColor Yellow
+    Write-Host "   Build time: $([math]::Round($buildTime, 1))s" -ForegroundColor Gray
+    Write-Host "✓ $Name completed" -ForegroundColor Green
+    
+    return @{
+        Name = $Name
+        ZipPath = $zipPath
+        ZipSize = $zipSize
+        BuildSize = $afterSize
+        BuildTime = $buildTime
+    }
+}
+
+# 执行构建
+$results = @()
+
+if ($Platform -eq "All" -or $Platform -eq "Windows") {
+    $result = Build-Package "Windows-x64" "win-x64"
+    if ($result) { $results += $result }
+}
+
+if ($Platform -eq "All" -or $Platform -eq "macOS") {
+    if ($IsMacOS -or $Platform -eq "All") {
+        $result = Build-Package "macOS-x64" "osx-x64"
+        if ($result) {
+            $results += $result
+            
+            # 在 macOS 上创建 DMG
+            if ($IsMacOS) {
+                Write-Host "`n📀 Creating DMG package..." -ForegroundColor Cyan
+                $appDir = "$outputDir/temp/MarketAssistant.app/Contents/MacOS"
+                New-Item -ItemType Directory -Force -Path $appDir | Out-Null
+                Copy-Item -Path "$outputDir/macOS-x64/*" -Destination $appDir -Recurse
                 
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "✓ macOS build successful" -ForegroundColor Green
+                hdiutil create -volname "MarketAssistant" `
+                    -srcfolder "$outputDir/temp/MarketAssistant.app" `
+                    -ov -format UDZO `
+                    "$outputDir/MarketAssistant-macOS.dmg" 2>&1 | Out-Null
                 
-                # Find .app file and create DMG
-                $appPath = Get-ChildItem -Path "$outputDir/macOS" -Filter "*.app" -Directory | Select-Object -First 1
-                
-                if ($appPath) {
-                    Write-Host "Found app bundle: $($appPath.FullName)" -ForegroundColor Green
-                    
-                    # Create DMG (requires macOS)
-                    $dmgPath = "$outputDir/MarketAssistant-macOS.dmg"
-                    hdiutil create -volname "MarketAssistant" -srcfolder $appPath.FullName -ov -format UDZO $dmgPath
-                    
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Host "✓ macOS DMG created: $dmgPath" -ForegroundColor Green
-                    }
-                } else {
-                    Write-Host "App bundle not found, creating ZIP..." -ForegroundColor Yellow
-                    $zipPath = "$outputDir/MarketAssistant-macOS.zip"
-                    Compress-Archive -Path "$outputDir/macOS/*" -DestinationPath $zipPath -Force
-                    Write-Host "✓ macOS ZIP created: $zipPath" -ForegroundColor Green
+                if ($LASTEXITCODE -eq 0) {
+                    $dmgSize = (Get-Item "$outputDir/MarketAssistant-macOS.dmg").Length
+                    Write-Host "✓ DMG created: $([math]::Round($dmgSize/1MB, 2)) MB" -ForegroundColor Green
+                    Remove-Item "$outputDir/temp" -Recurse -Force
                 }
-            } else {
-                Write-Host "✗ macOS build failed" -ForegroundColor Red
             }
-        } catch {
-            Write-Host "✗ macOS build error: $($_.Exception.Message)" -ForegroundColor Red
         }
-    } else {
-        Write-Host "⚠ macOS version can only be built on macOS" -ForegroundColor Yellow
     }
 }
 
-Write-Host "🎉 Build process completed!" -ForegroundColor Green
-Write-Host "📁 Output directory: $outputDir" -ForegroundColor Cyan
-
-# 📊 显示最终文件统计
-if (Test-Path "$outputDir") {
-    Write-Host "📋 Generated files:" -ForegroundColor Cyan
-    $allFiles = Get-ChildItem -Path "$outputDir" -File -Recurse
-    $totalSize = 0
-    foreach ($file in $allFiles) {
-        if ($file.Extension -eq ".zip" -or $file.Extension -eq ".exe" -or $file.Extension -eq ".dmg") {
-            Write-Host "   📦 $($file.Name) ($([math]::Round($file.Length/1MB, 2)) MB)" -ForegroundColor Yellow
-            $totalSize += $file.Length
-        }
-    }
-    Write-Host "📊 Total output size: $([math]::Round($totalSize/1MB, 2)) MB" -ForegroundColor Green
+if ($Platform -eq "All" -or $Platform -eq "Linux") {
+    $result = Build-Package "Linux-x64" "linux-x64"
+    if ($result) { $results += $result }
 }
 
-Write-Host "`n📈 Build Summary:" -ForegroundColor Cyan
-Write-Host "   Platform: $Platform" -ForegroundColor White
-Write-Host "   Configuration: $Configuration" -ForegroundColor White
-Write-Host "   Build Time: $(Get-Date -Format 'MM/dd/yyyy HH:mm:ss')" -ForegroundColor White
+$totalTime = ((Get-Date) - $startTime).TotalSeconds
 
-Write-Host "`nUsage:" -ForegroundColor Cyan
+# 构建汇总
+Write-Host "`n" + "="*60 -ForegroundColor Cyan
+Write-Host "📊 Build Summary" -ForegroundColor Cyan
+Write-Host "="*60 -ForegroundColor Cyan
+
+if ($results.Count -gt 0) {
+    Write-Host "`n📦 Generated Packages:" -ForegroundColor Yellow
+    $totalZipSize = 0
+    foreach ($result in $results) {
+        Write-Host "   • $($result.Name).zip - $([math]::Round($result.ZipSize/1MB, 2)) MB" -ForegroundColor White
+        $totalZipSize += $result.ZipSize
+    }
+    
+    # 如果有 DMG 文件
+    $dmgFile = Get-ChildItem -Path "$outputDir" -Filter "*.dmg" -ErrorAction SilentlyContinue
+    if ($dmgFile) {
+        Write-Host "   • macOS.dmg - $([math]::Round($dmgFile.Length/1MB, 2)) MB" -ForegroundColor White
+        $totalZipSize += $dmgFile.Length
+    }
+    
+    Write-Host "`n📈 Statistics:" -ForegroundColor Yellow
+    Write-Host "   Platforms built: $($results.Count)" -ForegroundColor White
+    Write-Host "   Total package size: $([math]::Round($totalZipSize/1MB, 2)) MB" -ForegroundColor White
+    Write-Host "   Total build time: $([math]::Round($totalTime, 1))s" -ForegroundColor White
+    Write-Host "   Output directory: $outputDir" -ForegroundColor White
+    
+    Write-Host "`n✅ Build completed successfully!" -ForegroundColor Green
+} else {
+    Write-Host "`n❌ No packages were built" -ForegroundColor Red
+}
+
+Write-Host "`n" + "="*60 -ForegroundColor Cyan
+Write-Host "📖 Usage Examples" -ForegroundColor Cyan
+Write-Host "="*60 -ForegroundColor Cyan
+Write-Host "   .\build-release.ps1                     # Build Windows (default)" -ForegroundColor White
+Write-Host "   .\build-release.ps1 -Platform macOS     # Build macOS" -ForegroundColor White
+Write-Host "   .\build-release.ps1 -Platform Linux     # Build Linux" -ForegroundColor White
+Write-Host "   .\build-release.ps1 -Platform All       # Build all platforms" -ForegroundColor White
+Write-Host ""

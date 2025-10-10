@@ -1,12 +1,12 @@
 # MarketAssistant 构建和发布指南
 
-本文档介绍如何为 MarketAssistant 项目构建和发布 Windows exe 和 macOS dmg 文件。
+本文档介绍如何为 MarketAssistant 项目构建和发布跨平台版本。本项目基于 Avalonia UI 开发，支持 Windows、macOS 和 Linux。
 
 ## 项目结构
 
-- `MarketAssistant/MarketAssistant/` - 核心 MAUI 项目
-- `MarketAssistant/MarketAssistant.WinUI/` - Windows 特定项目
-- `MarketAssistant/MarketAssistant.Mac/` - macOS 特定项目
+- `src/` - Avalonia 主项目
+- `tests/` - 单元测试项目
+- `MarketAssistant.slnx` - 解决方案文件
 
 ## 自动化发布 (GitHub Actions)
 
@@ -42,27 +42,20 @@
 
 - `MarketAssistant-Windows-x64.zip` - Windows 版本 (包含 exe 和依赖文件)
 - `MarketAssistant-macOS.dmg` - macOS 磁盘映像文件
-- `MarketAssistant-macOS.zip` - macOS 备用 ZIP 文件
+- `MarketAssistant-Linux-x64.zip` - Linux 版本
 
 ## 本地构建
 
 ### 前置要求
 
 - .NET 9.0 SDK
-- Visual Studio 2022 (Windows) 或 Visual Studio for Mac (macOS)
-- MAUI 工作负载
+- 无需额外工作负载（Avalonia 通过 NuGet 包提供所有依赖）
 
 ### 使用 PowerShell 脚本 (推荐)
 
 ```powershell
-# 构建所有平台
+# Windows 一键发布
 .\build-release.ps1
-
-# 仅构建 Windows 版本
-.\build-release.ps1 -Platform Windows
-
-# 仅构建 macOS 版本 (需要在 macOS 上运行)
-.\build-release.ps1 -Platform macOS
 ```
 
 ### 手动构建
@@ -70,85 +63,88 @@
 #### Windows 版本
 
 ```bash
-# 安装 MAUI 工作负载
-dotnet workload install maui
-
 # 还原依赖项
-dotnet restore MarketAssistant.slnx
+dotnet restore src/MarketAssistant.csproj
 
-# 构建 Windows 版本
-dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj \
+# 构建并发布 Windows 版本
+dotnet publish src/MarketAssistant.csproj \
   -c Release \
-  -f net9.0-windows10.0.19041.0 \
-  -p:Platform=x64 \
-  -p:PublishSingleFile=true \
-  -p:SelfContained=true \
-  -p:RuntimeIdentifier=win-x64 \
+  -r win-x64 \
+  --self-contained \
   -o ./publish/windows
 ```
 
-#### macOS 版本 (仅在 macOS 上)
+#### macOS 版本
 
 ```bash
-# 安装 MAUI 工作负载
-dotnet workload install maui
-
 # 还原依赖项
-dotnet restore MarketAssistant.slnx
+dotnet restore src/MarketAssistant.csproj
 
-# 构建 macOS 版本
-dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj \
+# 构建并发布 macOS 版本
+dotnet publish src/MarketAssistant.csproj \
   -c Release \
-  -f net9.0-maccatalyst \
-  -p:CreatePackage=true \
+  -r osx-x64 \
+  --self-contained \
   -o ./publish/macos
+```
 
-# 创建 DMG (可选)
-hdiutil create -volname "MarketAssistant" \
-  -srcfolder ./publish/macos/MarketAssistant.app \
-  -ov -format UDZO \
-  ./MarketAssistant-macOS.dmg
+#### Linux 版本
+
+```bash
+# 还原依赖项
+dotnet restore src/MarketAssistant.csproj
+
+# 构建并发布 Linux 版本
+dotnet publish src/MarketAssistant.csproj \
+  -c Release \
+  -r linux-x64 \
+  --self-contained \
+  -o ./publish/linux
 ```
 
 ## 发布配置说明
 
-### Windows 配置
+### 通用配置
 
-- **目标框架**: `net9.0-windows10.0.19041.0`
-- **平台**: x64
-- **发布模式**: 单文件 + 自包含
-- **运行时**: win-x64
+- **目标框架**: `net9.0`
+- **UI 框架**: Avalonia UI 11.3.7
+- **发布模式**: 自包含 (self-contained)
 
-### macOS 配置
+### 平台特定配置
 
-- **目标框架**: `net9.0-maccatalyst`
-- **最低支持版本**: macOS 15.0
-- **输出**: .app 应用包
-- **分发**: DMG 磁盘映像
+#### Windows
+- **运行时标识符**: win-x64
+- **输出**: 可执行文件 (.exe)
+
+#### macOS
+- **运行时标识符**: osx-x64
+- **输出**: 可执行文件
+
+#### Linux
+- **运行时标识符**: linux-x64
+- **输出**: 可执行文件
 
 ## 故障排除
 
 ### 常见问题
 
-1. **MAUI 工作负载未安装**
-   ```bash
-   dotnet workload install maui
-   ```
-
-2. **构建失败 - 缺少依赖项**
+1. **构建失败 - 缺少依赖项**
    ```bash
    dotnet restore MarketAssistant.slnx
    dotnet clean MarketAssistant.slnx
+   dotnet restore src/MarketAssistant.csproj
    ```
 
-3. **macOS 构建失败**
-   - 确保在 macOS 系统上构建
-   - 检查 Xcode 是否已安装
-   - 验证开发者证书配置
+2. **Playwright 浏览器未安装**
+   ```bash
+   dotnet tool update --global Microsoft.Playwright.CLI
+   playwright install
+   ```
 
-4. **Windows 构建失败**
-   - 确保安装了 Windows SDK
-   - 检查 Visual Studio 工作负载
+3. **跨平台构建注意事项**
+   - Windows/Linux 版本可以在任何平台上构建
+   - macOS 版本建议在 macOS 上构建以获得最佳兼容性
+   - 发布时使用 `--self-contained` 以包含所有运行时依赖
 
 ### 日志和调试
 
@@ -186,4 +182,8 @@ hdiutil create -volname "MarketAssistant" \
 
 ---
 
-有关更多信息，请参考 [.NET MAUI 官方文档](https://docs.microsoft.com/dotnet/maui/)。
+## 相关文档
+
+- [Avalonia UI 官方文档](https://docs.avaloniaui.net/)
+- [.NET 9.0 发布指南](https://docs.microsoft.com/dotnet/core/deploying/)
+- [MAUI 到 Avalonia 迁移指南](MAUI到Avalonia迁移指南.md)

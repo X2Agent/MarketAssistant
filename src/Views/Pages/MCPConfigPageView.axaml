@@ -1,0 +1,374 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:settings="using:MarketAssistant.Applications.Settings"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converts="using:MarketAssistant.Converts"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.MCPConfigPageView"
+             x:DataType="vm:MCPConfigPageViewModel">
+
+    <UserControl.Resources>
+        <converts:RadioButtonEqualityConverter x:Key="RadioButtonEqualityConverter"/>
+        <converts:InvertedBoolConverter x:Key="InvertedBoolConverter"/>
+    </UserControl.Resources>
+
+    <Design.DataContext>
+        <vm:MCPConfigPageViewModel/>
+    </Design.DataContext>
+
+    <Grid ColumnDefinitions="300,*">
+        <!-- 左侧服务器列表 -->
+        <Border Grid.Column="0" 
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16">
+            <Grid RowDefinitions="Auto,*">
+                <!-- 添加服务器按钮 -->
+                <Button Grid.Row="0" 
+                        Content="添加服务器" 
+                        Command="{Binding AddServerCommand}" 
+                        Background="{StaticResource SuccessBrush}"
+                        Foreground="White"
+                        HorizontalAlignment="Stretch"
+                        Margin="0,0,0,12" />
+
+                <!-- 服务器列表 -->
+                <ScrollViewer Grid.Row="1">
+                    <ItemsControl ItemsSource="{Binding ServerConfigs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="settings:MCPServerConfig">
+                                <Border Background="{DynamicResource ItemBackgroundBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="12"
+                                        Margin="0,0,0,8"
+                                        Cursor="Hand"
+                                        Tapped="OnServerItemTapped"
+                                        Tag="{Binding .}">
+                                    <Border.Styles>
+                                        <Style Selector="Border:pointerover">
+                                            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                        </Style>
+                                    </Border.Styles>
+
+                                    <Grid RowDefinitions="Auto,Auto,Auto">
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Name}" 
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Description}" 
+                                                   FontSize="12" 
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,4,0,0"/>
+                                        <StackPanel Grid.Row="2"
+                                                    Orientation="Horizontal"
+                                                    Spacing="8"
+                                                    Margin="0,4,0,0">
+                                            <TextBlock Text="{Binding TransportType}" 
+                                                       FontSize="10" 
+                                                       Foreground="{StaticResource PrimaryBrush}"/>
+                                            <TextBlock Text="{Binding IsEnabled, StringFormat={}{0}启用}" 
+                                                       FontSize="10" 
+                                                       Foreground="{StaticResource SuccessBrush}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- 空视图 -->
+                <Grid Grid.Row="1"
+                      RowDefinitions="Auto,Auto"
+                      IsVisible="{Binding !ServerConfigs.Count}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+                    <TextBlock Grid.Row="0"
+                               Text="暂无服务器配置" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Grid.Row="1"
+                               Text="点击上方按钮添加" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 右侧配置详情 -->
+        <ScrollViewer Grid.Column="1" 
+                      Padding="16">
+            <Grid>
+                <!-- 编辑表单 -->
+                <StackPanel IsVisible="{Binding IsEditing}" Spacing="16">
+                    <!-- 基本信息 -->
+                    <controls:CardView Header="基本信息">
+                        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                            <!-- 服务器名称标签 -->
+                            <TextBlock Grid.Row="0"
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                <Run Text="*" Foreground="#dc3545"/>
+                                <Run Text="名称"/>
+                            </TextBlock>
+                            <!-- 服务器名称输入 -->
+                            <TextBox Grid.Row="1"
+                                     Text="{Binding Name}" 
+                                     Watermark="请输入服务器名称"
+                                     Margin="0,8,0,0"/>
+
+                            <!-- 服务器描述标签 -->
+                            <TextBlock Grid.Row="2"
+                                       Text="描述" 
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,16,0,0"/>
+                            <!-- 服务器描述输入 -->
+                            <TextBox Grid.Row="3"
+                                     Text="{Binding Description}" 
+                                     Watermark="请输入服务器描述"
+                                     Height="100"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     Margin="0,8,0,0"/>
+
+                            <!-- 服务器类型标签 -->
+                            <TextBlock Grid.Row="4"
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,16,0,0">
+                                <Run Text="*" Foreground="#dc3545"/>
+                                <Run Text="类型"/>
+                            </TextBlock>
+                            <!-- 服务器类型选择 -->
+                            <StackPanel Grid.Row="5"
+                                        Orientation="Horizontal"
+                                        Spacing="16"
+                                        Margin="0,8,0,0">
+                                <RadioButton GroupName="transportType" 
+                                             Content="标准输入/输出(stdio)"
+                                             IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"/>
+                                <RadioButton GroupName="transportType" 
+                                             Content="服务器发送事件(sse)"
+                                             IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}"/>
+                                <RadioButton GroupName="transportType" 
+                                             Content="可流式传输的HTTP(streamableHttp)"
+                                             IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}"/>
+                            </StackPanel>
+
+                            <!-- 命令或URL标签 - stdio -->
+                            <TextBlock Grid.Row="6"
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                       Margin="0,16,0,0">
+                                <Run Text="*" Foreground="#dc3545"/>
+                                <Run Text="命令"/>
+                            </TextBlock>
+                            <!-- 命令或URL标签 - sse -->
+                            <TextBlock Grid.Row="6"
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}"
+                                       Margin="0,16,0,0">
+                                <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                                <Run Text="URL"/>
+                            </TextBlock>
+                            <!-- 命令或URL标签 - streamableHttp -->
+                            <TextBlock Grid.Row="6"
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}"
+                                       Margin="0,16,0,0">
+                                <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                                <Run Text="URL"/>
+                            </TextBlock>
+                            
+                            <!-- 命令或URL输入 -->
+                            <TextBox Grid.Row="7"
+                                     Text="{Binding Command}"
+                                     Margin="0,8,0,0">
+                                <TextBox.Styles>
+                                    <Style Selector="TextBox">
+                                        <Setter Property="Watermark" Value="请输入命令，如npx"/>
+                                    </Style>
+                                    <Style Selector="TextBox[IsVisible=true]">
+                                        <Setter Property="Watermark" Value="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio, Mode=OneWay}"/>
+                                    </Style>
+                                </TextBox.Styles>
+                            </TextBox>
+                            
+                            <!-- 提示文本 - sse -->
+                            <TextBlock Grid.Row="8"
+                                       Text="提示：URL示例 http://localhost:3000/sse" 
+                                       FontSize="12" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}"
+                                       Margin="0,8,0,0"/>
+                            <!-- 提示文本 - streamableHttp -->
+                            <TextBlock Grid.Row="8"
+                                       Text="提示：URL示例 http://localhost:3000/mcp" 
+                                       FontSize="12" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}"
+                                       Margin="0,8,0,0"/>
+
+                            <!-- 参数标签 (仅stdio) -->
+                            <TextBlock Grid.Row="9"
+                                       Text="参数" 
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                       Margin="0,16,0,0"/>
+                            <!-- 参数输入 (仅stdio) -->
+                            <TextBox Grid.Row="10"
+                                     Text="{Binding Arguments}" 
+                                     Watermark="请输入命令参数，如-y @modelcontextprotocol/server-github"
+                                     Height="100"
+                                     AcceptsReturn="True"
+                                     TextWrapping="Wrap"
+                                     IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                     Margin="0,8,0,0"/>
+                            <!-- 参数提示 (仅stdio) -->
+                            <TextBlock Grid.Row="11"
+                                       Text="提示：多个参数请用空格分隔" 
+                                       FontSize="12" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                       Margin="0,4,0,0"/>
+
+                            <!-- 环境变量标签 (仅stdio) -->
+                            <TextBlock Grid.Row="12"
+                                       Text="环境变量" 
+                                       FontSize="14" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                       Margin="0,16,0,0"/>
+                            <!-- 环境变量输入 (仅stdio) -->
+                            <Grid Grid.Row="13"
+                                  RowDefinitions="Auto,Auto"
+                                  IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"
+                                  Margin="0,8,0,0">
+                                <TextBox Grid.Row="0"
+                                         Text="{Binding EnvironmentVariablesText}"
+                                         Watermark="KEY1=value1&#10;KEY2=value2"
+                                         Height="150"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"/>
+                                <TextBlock Grid.Row="1"
+                                           Text="每行一个环境变量，格式为KEY=value" 
+                                           FontSize="12" 
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,8,0,0"/>
+                            </Grid>
+
+                            <!-- 是否启用 -->
+                            <StackPanel Grid.Row="14"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Margin="0,16,0,0">
+                                <CheckBox IsChecked="{Binding IsEnabled}"/>
+                                <TextBlock Text="启用" 
+                                           FontSize="14" 
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </controls:CardView>
+
+                    <!-- 操作按钮区域 -->
+                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="0,16,0,0"
+                            Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal" 
+                                    HorizontalAlignment="Right" 
+                                    Spacing="12">
+                            <Button Content="取消" 
+                                    Command="{Binding CancelEditCommand}"
+                                    MinWidth="100"
+                                    Padding="16,8"/>
+                            <Button Content="测试连接" 
+                                    Command="{Binding TestConnectionCommand}" 
+                                    Background="{StaticResource InfoBrush}"
+                                    Foreground="White"
+                                    MinWidth="100"
+                                    Padding="16,8"/>
+                            <Button Content="保存" 
+                                    Command="{Binding SaveServerCommand}" 
+                                    Background="{StaticResource PrimaryBrush}"
+                                    Foreground="White"
+                                    MinWidth="100"
+                                    Padding="16,8"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- 删除确认对话框 -->
+                <Border IsVisible="{Binding ShowDeleteConfirmation}"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Width="400"
+                        Height="200"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        BoxShadow="0 4 16 0 #33000000"
+                        Padding="16">
+                    <Grid RowDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
+                        <TextBlock Grid.Row="0"
+                                   Text="确认删除" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" 
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Grid.Row="1"
+                                   Text="确定要删除此服务器配置吗？此操作无法撤销。" 
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,16,0,0"/>
+                        <StackPanel Grid.Row="2"
+                                    Orientation="Horizontal" 
+                                    HorizontalAlignment="Center" 
+                                    Spacing="16"
+                                    Margin="0,16,0,0">
+                            <Button Content="取消" 
+                                    Command="{Binding CancelDeleteCommand}" 
+                                    Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                    Foreground="{DynamicResource TextPrimaryBrush}"
+                                    Width="120"/>
+                            <Button Content="删除" 
+                                    Command="{Binding ConfirmDeleteCommand}" 
+                                    Background="#dc3545"
+                                    Foreground="White"
+                                    Width="120"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 未选择服务器时的提示 -->
+                <StackPanel IsVisible="{Binding IsEditing, Converter={StaticResource InvertedBoolConverter}}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="16">
+                    <TextBlock Text="请选择或添加MCP服务器" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="18"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

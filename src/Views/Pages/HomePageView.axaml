@@ -1,0 +1,305 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             xmlns:telegrams="using:MarketAssistant.Applications.Telegrams"
+             xmlns:stocks="using:MarketAssistant.Applications.Stocks.Models"
+             xmlns:converts="using:MarketAssistant.Converts"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.HomePageView"
+             x:DataType="vm:HomePageViewModel">
+
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="16" RowDefinitions="Auto,*">
+        
+        <!-- 顶部搜索区域 -->
+        <controls:CardView Grid.Row="0" Margin="0,0,0,12">
+            <AutoCompleteBox x:Name="StockSearchBox"
+                             Watermark="输入股票代码或名称"
+                             MinimumPrefixLength="1"
+                             ItemsSource="{Binding Search.SearchResults}"
+                             SelectedItem="{Binding Search.SelectedStock}"
+                             FilterMode="None"
+                             Text="{Binding Search.SearchQuery, Mode=TwoWay}"
+                             Background="Transparent"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             FontSize="16"
+                             Padding="12,8"
+                             KeyDown="StockSearchBox_KeyDown">
+                <AutoCompleteBox.ItemTemplate>
+                    <DataTemplate x:DataType="stocks:StockItem">
+                        <Grid ColumnDefinitions="*,Auto" Margin="4" RowDefinitions="Auto,Auto">
+                            <TextBlock Grid.Row="0" 
+                                       Text="{Binding Name}" 
+                                       FontWeight="SemiBold"
+                                       FontSize="14"/>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding Code}" 
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,2,0,0"/>
+                        </Grid>
+                    </DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+            </AutoCompleteBox>
+        </controls:CardView>
+
+        <!-- 三列布局 -->
+        <Grid Grid.Row="1" 
+              ColumnDefinitions="2*,3*,1*">
+            
+            <!-- 左侧：7*24小时新闻快讯 -->
+            <controls:CardView Grid.Column="0" Margin="0,0,8,0">
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" 
+                                   Text="7*24小时快讯" 
+                                   FontSize="16" 
+                               FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding News.TelegraphRefreshCountdown}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0"/>
+                    </Grid>
+                </controls:CardView.Header>
+                
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding News.Telegraphs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="telegrams:Telegram">
+                                <Border Classes="news-card"
+                                        Tapped="NewsCard_Tapped"
+                                        Tag="{Binding .}">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   Text="{Binding Title}"
+                                                   FontSize="14" 
+                                                   FontWeight="SemiBold"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding Content}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   MaxLines="3"
+                                                   Margin="0,4,0,0"/>
+                                        
+                                        <!-- 关联股票标签 -->
+                                        <ItemsControl Grid.Row="2" Grid.Column="0"
+                                                      ItemsSource="{Binding Stocks}" 
+                                                      Margin="0,4,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="4"
+                                                            Padding="4,2"
+                                                            Margin="0,0,4,4">
+                                                        <TextBlock Text="{Binding .}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
+                                                   Text="{Binding Time}"
+                                                   FontSize="14"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8,0,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </controls:CardView>
+            
+            <!-- 中间：热门推荐 -->
+            <controls:CardView Grid.Column="1" Margin="0,0,8,0">
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="热门推荐"
+                                   FontSize="16" 
+                                   FontWeight="SemiBold"/>
+                        <svg:Svg Grid.Column="1"
+                                 Path="/Assets/Images/trending_icon.svg"
+                                 Width="20"
+                                 Height="20"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                </controls:CardView.Header>
+                
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding HotStocks.HotStocks}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="stocks:HotStock">
+                                <Border Classes="hot-stock-card" 
+                                        Margin="4,2" 
+                                        Tapped="HotStockCard_Tapped"
+                                        Tag="{Binding .}">
+                                    <Grid ColumnDefinitions="Auto,4,Auto,*,Auto,Auto,Auto"
+                                          RowDefinitions="Auto,Auto,Auto"
+                                          Cursor="Hand">
+                                        <!-- 左侧信息 -->
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   Text="{Binding Market}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="2"
+                                                   Text="{Binding Code}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                                                   Text="{Binding Name}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Margin="0,2,0,0"/>
+                                        
+                                        <TextBlock Grid.Row="2" Grid.Column="0"
+                                                   Text="{Binding CurrentPrice}"
+                                                   FontSize="15"
+                                                   FontWeight="Bold"
+                                                   Margin="0,2,0,0"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="2"
+                                                   Text="{Binding ChangePercentage}"
+                                                   FontSize="13"
+                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                                   Margin="0,2,0,0"/>
+                                        
+                                        <!-- 右侧热度与收藏 -->
+                                        <TextBlock Grid.Row="0" Grid.Column="4"
+                                                   Text="热度"
+                                                   FontSize="10"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="4"
+                                                   Text="{Binding HeatIndex}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryBrush}"
+                                                   Margin="0,2,0,0"/>
+                                        
+                                        <Button Grid.Row="2" Grid.Column="4"
+                                                Classes="favorite-button"
+                                                Background="Transparent"
+                                                Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotStocks.AddToFavoriteCommand}"
+                                                CommandParameter="{Binding .}"
+                                                Width="20"
+                                                Height="20"
+                                                Padding="0"
+                                                Margin="0,4,0,0"
+                                                HorizontalAlignment="Center">
+                                            <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                                                     Width="14"
+                                                     Height="14"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </controls:CardView>
+            
+            <!-- 右侧：最近查看 -->
+            <controls:CardView Grid.Column="2" Header="最近查看">
+                <ScrollViewer>
+                    <Panel>
+                        <ItemsControl ItemsSource="{Binding RecentStocks.RecentStocks}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="8"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="stocks:StockItem">
+                                    <Border Classes="recent-stock-card" 
+                                            Tapped="RecentStockCard_Tapped"
+                                            Tag="{Binding .}">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                                       Text="{Binding Name}"
+                                                       FontSize="14"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                                       Text="{Binding Code}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Margin="0,4,0,0"/>
+
+                                            <!-- 收藏按钮 -->
+                                            <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                                                    Classes="favorite-button"
+                                                    Background="Transparent"
+                                                    Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentStocks.AddToFavoriteCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    Width="24"
+                                                    Height="24"
+                                                    Padding="0"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                                                         Width="16"
+                                                         Height="16"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        
+                        <!-- 空视图提示 -->
+                        <StackPanel IsVisible="{Binding !RecentStocks.RecentStocks.Count}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="12">
+                            <svg:Svg Path="/Assets/Images/empty_data.svg"
+                                     Width="64"
+                                     Height="64"
+                                     Opacity="0.6"/>
+                            <TextBlock Text="暂无查看记录"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="搜索或浏览热门股票以添加记录"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </controls:CardView>
+        </Grid>
+            </Grid>
+</UserControl>

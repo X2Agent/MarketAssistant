@@ -1,0 +1,436 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="MarketAssistant.Views.Pages.SettingsPageView"
+             x:DataType="vm:SettingsPageViewModel">
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <x:Double x:Key="ButtonWidth">120</x:Double>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <Design.DataContext>
+        <vm:SettingsPageViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
+        <StackPanel Spacing="12" Margin="12">
+
+            <!-- 模型设置区域 -->
+            <controls:CardView Header="模型设置(硅基流动)">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto">
+                    <!-- 模型选择 -->
+                    <ComboBox Grid.Row="0"
+                              ItemsSource="{Binding Models}"
+                              SelectedItem="{Binding UserSetting.ModelId}"
+                              PlaceholderText="模型选择"
+                              HorizontalAlignment="Stretch"
+                              IsEnabled="{Binding Models.Count}"/>
+
+                    <!-- API密钥标签 -->
+                    <TextBlock Grid.Row="1"
+                               Text="API密钥"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,16,0,0"/>
+                    
+                    <!-- API密钥输入和按钮 -->
+                    <Grid Grid.Row="2"
+                          ColumnDefinitions="*,Auto"
+                          Margin="0,8,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding UserSetting.ApiKey}"
+                                 Watermark="请输入API密钥"
+                                 PasswordChar="●"/>
+                        <Button Grid.Column="1"
+                                Content="获取密钥"
+                                Command="{Binding OpenModelApiWebsiteCommand}"
+                                Background="{StaticResource PrimaryBrush}"
+                                Foreground="White"
+                                Margin="8,0,0,0"
+                                Width="100"
+                                Height="40"/>
+                    </Grid>
+                </Grid>
+            </controls:CardView>
+
+            <!-- API令牌设置区域 -->
+            <controls:CardView Header="API令牌设置">
+                <Grid RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Row="0"
+                               Text="ZhiTu API令牌"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="*,Auto"
+                          Margin="0,8,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding UserSetting.ZhiTuApiToken}"
+                                 Watermark="请输入ZhiTu API令牌"/>
+                        <Button Grid.Column="1"
+                                Content="获取令牌"
+                                Command="{Binding OpenZhiTuApiWebsiteCommand}"
+                                Background="{StaticResource InfoBrush}"
+                                Foreground="White"
+                                Margin="8,0,0,0"
+                                Width="100"
+                                Height="40"/>
+                    </Grid>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 知识库设置区域 -->
+            <controls:CardView Header="知识库设置">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                    <!-- 是否加载知识库 -->
+                    <CheckBox Grid.Row="0"
+                              IsChecked="{Binding UserSetting.LoadKnowledge}"
+                              Content="加载知识库"/>
+
+                    <!-- 知识文件目录标签 -->
+                    <TextBlock Grid.Row="1"
+                               Text="知识文件目录"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               IsEnabled="{Binding UserSetting.LoadKnowledge}"
+                               Margin="0,16,0,0"/>
+                    
+                    <!-- 知识文件目录输入 -->
+                    <Grid Grid.Row="2"
+                          ColumnDefinitions="*,Auto"
+                          IsEnabled="{Binding UserSetting.LoadKnowledge}"
+                          Margin="0,8,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding UserSetting.KnowledgeFileDirectory}"
+                                 Watermark="请选择知识库目录"
+                                 IsReadOnly="True"/>
+                        <Button Grid.Column="1"
+                                Content="浏览"
+                                Command="{Binding SelectKnowledgeDirectoryCommand}"
+                                Background="{StaticResource PrimaryBrush}"
+                                Foreground="White"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+
+                    <!-- 知识库向量化标签 -->
+                    <TextBlock Grid.Row="3"
+                               Text="知识库向量化"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               IsEnabled="{Binding UserSetting.LoadKnowledge}"
+                               Margin="0,16,0,0"/>
+                    
+                    <!-- 向量化按钮和加载指示器 -->
+                    <StackPanel Grid.Row="4"
+                                Orientation="Horizontal"
+                                Spacing="12"
+                                IsEnabled="{Binding UserSetting.LoadKnowledge}"
+                                Margin="0,8,0,0">
+                        <Button Content="向量化文档"
+                                Command="{Binding VectorizeDocumentsCommand}"
+                                Background="{StaticResource SuccessBrush}"
+                                Foreground="White"
+                                IsEnabled="{Binding IsKnowledgeDirectoryValid}"/>
+                        <PathIcon Data="{StaticResource LoadingIcon}"
+                                  Width="24"
+                                  Height="24"
+                                  Foreground="{StaticResource PrimaryBrush}"
+                                  IsVisible="{Binding IsVectorizing}"/>
+                    </StackPanel>
+                    
+                    <!-- 提示文本 -->
+                    <TextBlock Grid.Row="5"
+                               Text="将读取知识文件夹中的PDF和DOCX文件并进行向量化存储"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               IsEnabled="{Binding UserSetting.LoadKnowledge}"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 市场分析师角色设置区域 -->
+            <controls:CardView Header="市场分析师角色设置">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="选择参与分析讨论的角色"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="注意：启用的角色越多，消耗的Token越多"
+                               FontSize="12"
+                               Foreground="{StaticResource ErrorBrush}"/>
+
+                    <!-- 两列Grid布局 -->
+                    <Grid ColumnDefinitions="*,*"
+                          RowDefinitions="Auto,Auto,Auto"
+                          ColumnSpacing="16"
+                          RowSpacing="16">
+                        <!-- 左列第1行：协调分析师（必选） -->
+                        <Grid Grid.Column="0" Grid.Row="0"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableAnalysisSynthesizer, Mode=OneWay}"
+                                      IsEnabled="False"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="协调分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="负责引导讨论和总结（必选）"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+
+                        <!-- 右列第1行：基本面分析师 -->
+                        <Grid Grid.Column="1" Grid.Row="0"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableFundamentalAnalyst, Mode=OneWay}"
+                                      IsEnabled="False"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="基本面分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="整合了策略分析师和股票研究分析师的功能（必选）"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+
+                        <!-- 左列第2行：财务分析师 -->
+                        <Grid Grid.Column="0" Grid.Row="1"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableFinancialAnalyst}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="财务分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="专注于财务报表和财务健康分析"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+
+                        <!-- 右列第2行：技术分析师 -->
+                        <Grid Grid.Column="1" Grid.Row="1"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableTechnicalAnalyst}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="技术分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="专注于图表模式和技术指标分析"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+
+                        <!-- 左列第3行：市场情绪分析师 -->
+                        <Grid Grid.Column="0" Grid.Row="2"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableMarketSentimentAnalyst}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="市场情绪分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="整合了行为金融分析师和市场分析师的功能"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+
+                        <!-- 右列第3行：新闻事件分析师 -->
+                        <Grid Grid.Column="1" Grid.Row="2"
+                              ColumnDefinitions="Auto,*"
+                              RowDefinitions="Auto,Auto">
+                            <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                      IsChecked="{Binding EnableNewsEventAnalyst}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                       Text="新闻事件分析师"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       Text="专注于新闻事件对股票的影响分析"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,4,0,0"/>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </controls:CardView>
+
+            <!-- 通知设置区域 -->
+            <controls:CardView Header="通知设置">
+                <CheckBox IsChecked="{Binding UserSetting.Notification}"
+                          Content="开启通知"/>
+            </controls:CardView>
+
+            <!-- 浏览器设置区域 -->
+            <controls:CardView Header="浏览器设置">
+                <Grid RowDefinitions="Auto,Auto,Auto">
+                    <TextBlock Grid.Row="0"
+                               Text="浏览器路径"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="*,Auto"
+                          Margin="0,8,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding UserSetting.BrowserPath}"
+                                 Watermark="请选择浏览器路径（留空则自动检测）"
+                                 IsReadOnly="True"/>
+                        <Button Grid.Column="1"
+                                Content="浏览"
+                                Command="{Binding SelectBrowserPathCommand}"
+                                Background="{StaticResource InfoBrush}"
+                                Foreground="White"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+                    <TextBlock Grid.Row="2"
+                               Text="注意：如果留空，系统将自动使用默认浏览器"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 日志设置区域 -->
+            <controls:CardView Header="日志设置">
+                <Grid RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Row="0"
+                               Text="日志文件路径"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="*,Auto"
+                          Margin="0,8,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding UserSetting.LogPath}"
+                                 Watermark="请输入日志文件路径"/>
+                        <Button Grid.Column="1"
+                                Content="浏览"
+                                Command="{Binding SelectLogPathCommand}"
+                                Background="{StaticResource InfoBrush}"
+                                Foreground="White"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+                </Grid>
+            </controls:CardView>
+
+            <!-- Web Search设置区域 -->
+            <controls:CardView Header="Web Search设置">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                    <!-- 是否启用Web Search -->
+                    <CheckBox Grid.Row="0"
+                              IsChecked="{Binding UserSetting.EnableWebSearch}"
+                              Content="启用Web Search功能"/>
+
+                    <!-- Web Search 服务商选择和API Key -->
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="Auto,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto"
+                          ColumnSpacing="16"
+                          IsEnabled="{Binding UserSetting.EnableWebSearch}"
+                          Margin="0,16,0,0">
+                        <!-- 搜索平台选择标签 -->
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="搜索平台选择"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <!-- 搜索平台选择控件 -->
+                        <ComboBox Grid.Row="1" Grid.Column="0"
+                                  ItemsSource="{Binding WebSearchProviders}"
+                                  SelectedItem="{Binding UserSetting.WebSearchProvider}"
+                                  Width="150"
+                                  Margin="0,8,0,0"/>
+
+                        <!-- API Key标签 -->
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="Web Search API Key"
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <!-- API Key输入框 -->
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 Text="{Binding UserSetting.WebSearchApiKey}"
+                                 Watermark="请输入Web Search API Key"
+                                 Margin="0,8,0,0"/>
+                    </Grid>
+                    
+                    <!-- 提示文本 -->
+                    <TextBlock Grid.Row="2"
+                               Text="注意：启用Web Search功能需要配置有效的API Key"
+                               FontSize="12"
+                               Foreground="{StaticResource ErrorBrush}"
+                               Margin="0,16,0,0"/>
+                </Grid>
+            </controls:CardView>
+
+            <!-- MCP服务器配置区域 -->
+            <controls:CardView Header="MCP服务器配置">
+                <Grid RowDefinitions="Auto,Auto">
+                    <TextBlock Grid.Row="0"
+                               Text="配置MCP服务器，用于连接外部服务"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Button Grid.Row="1"
+                            Content="MCP服务器配置"
+                            Command="{Binding NavigateToMCPConfigCommand}"
+                            Background="{StaticResource InfoBrush}"
+                            Foreground="White"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"/>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 操作按钮区域 -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Spacing="12"
+                        Margin="0,16,0,0">
+                <Button Content="重置"
+                        Command="{Binding ResetCommand}"
+                        Background="{DynamicResource TextSecondaryBrush}"
+                        Foreground="White"
+                        Width="{StaticResource ButtonWidth}"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"/>
+                <Button Content="保存"
+                        Command="{Binding SaveCommand}"
+                        Background="#007bff"
+                        Foreground="White"
+                        Width="{StaticResource ButtonWidth}"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
