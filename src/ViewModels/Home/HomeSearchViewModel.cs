@@ -21,7 +21,7 @@ public partial class HomeSearchViewModel : ViewModelBase
     private bool _isSearchResultVisible;
 
     [ObservableProperty]
-    private StockItem? _selectedStock;
+    private bool _isSearching;
 
     /// <summary>
     /// 搜索结果集合
@@ -57,7 +57,7 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
-        // 使用 Task.Run 避免异常被吞掉，同时记录日志
+        // 触发搜索（空字符串会在 OnSearchAsync 中自动处理）
         _ = Task.Run(async () =>
         {
             try
@@ -72,25 +72,13 @@ public partial class HomeSearchViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 当选中股票变化时触发选择
-    /// </summary>
-    partial void OnSelectedStockChanged(StockItem? value)
-    {
-        if (value != null)
-        {
-            OnSelectStock(value);
-            // 清除选中项，以便下次可以再次选择同一项
-            SelectedStock = null;
-        }
-    }
-
-    /// <summary>
     /// 执行搜索
     /// </summary>
     private async Task OnSearchAsync(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
+            IsSearching = false;
             IsSearchResultVisible = false;
             SearchResults.Clear();
             Logger?.LogDebug("搜索查询为空，清空结果");
@@ -98,6 +86,7 @@ public partial class HomeSearchViewModel : ViewModelBase
         }
 
         Logger?.LogInformation("开始搜索股票，查询：{Query}", query);
+        IsSearching = true;
 
         try
         {
@@ -134,6 +123,10 @@ public partial class HomeSearchViewModel : ViewModelBase
                 IsSearchResultVisible = false;
             });
         }
+        finally
+        {
+            IsSearching = false;
+        }
     }
 
     /// <summary>
@@ -151,12 +144,13 @@ public partial class HomeSearchViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 清除搜索结果
+    /// 清空搜索（包括文本和结果）
     /// </summary>
-    public void ClearSearchResults()
+    public void ClearSearch()
     {
+        SearchQuery = string.Empty;
         SearchResults.Clear();
         IsSearchResultVisible = false;
-        SearchQuery = string.Empty;
+        IsSearching = false;
     }
 }

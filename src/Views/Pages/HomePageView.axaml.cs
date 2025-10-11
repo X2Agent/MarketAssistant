@@ -9,9 +9,42 @@ namespace MarketAssistant.Views.Pages;
 
 public partial class HomePageView : UserControl
 {
+    private bool _isHandlingSelection = false;
+
     public HomePageView()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// 搜索框选择变更处理
+    /// </summary>
+    private void StockSearchBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        // 防止重入
+        if (_isHandlingSelection)
+            return;
+
+        if (e.AddedItems.Count > 0 && 
+            e.AddedItems[0] is StockItem selectedStock && 
+            DataContext is HomePageViewModel viewModel)
+        {
+            _isHandlingSelection = true;
+            
+            // 清除选中项和下拉框
+            StockSearchBox.SelectedItem = null;
+            StockSearchBox.IsDropDownOpen = false;
+            
+            // 执行导航
+            viewModel.Search.SelectStockCommand.Execute(selectedStock);
+            
+            // 延迟清空搜索框，避免在事件处理中修改集合
+            Dispatcher.UIThread.Post(() =>
+            {
+                viewModel.Search.ClearSearch();
+                _isHandlingSelection = false;
+            }, Avalonia.Threading.DispatcherPriority.Background);
+        }
     }
 
     /// <summary>
@@ -25,6 +58,7 @@ public partial class HomePageView : UserControl
             if (StockSearchBox.SelectedItem is StockItem selectedStock)
             {
                 viewModel.Search.SelectStockCommand.Execute(selectedStock);
+                StockSearchBox.SelectedItem = null;
                 e.Handled = true;
                 return;
             }

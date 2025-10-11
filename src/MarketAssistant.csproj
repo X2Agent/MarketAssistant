@@ -6,6 +6,32 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    
+    <!-- 跨平台构建配置 -->
+    <RuntimeIdentifiers>win-x64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
+    <UseAppHost>true</UseAppHost>
+    
+    <!-- 应用程序信息 -->
+    <AssemblyName>MarketAssistant</AssemblyName>
+    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Company>MarketAssistant</Company>
+    <Product>Market Assistant</Product>
+    <Copyright>Copyright © 2025</Copyright>
+    <Description>AI-powered market analysis assistant</Description>
+    
+    <!-- macOS 特定配置 -->
+    <CFBundleName>MarketAssistant</CFBundleName>
+    <CFBundleDisplayName>Market Assistant</CFBundleDisplayName>
+    <CFBundleIdentifier>com.marketassistant.app</CFBundleIdentifier>
+    <CFBundleVersion>1.0.0</CFBundleVersion>
+    <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
+    <CFBundlePackageType>APPL</CFBundlePackageType>
+    <CFBundleSignature>MKAS</CFBundleSignature>
+    <CFBundleExecutable>MarketAssistant</CFBundleExecutable>
+    <CFBundleIconFile>MarketAssistant.icns</CFBundleIconFile>
+    <NSHighResolutionCapable>true</NSHighResolutionCapable>
+    <NSPrincipalClass>NSApplication</NSPrincipalClass>
   </PropertyGroup>
 
   <ItemGroup>

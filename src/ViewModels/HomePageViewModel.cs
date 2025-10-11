@@ -93,9 +93,6 @@ public class HomePageViewModel : ViewModelBase, IDisposable
         {
             _ = Task.Run(() => RecentStocks.AddToRecentStocks(stockItem));
         }
-
-        // 清除搜索结果
-        Search.ClearSearchResults();
     }
 
     /// <summary>

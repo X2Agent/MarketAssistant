@@ -20,34 +20,124 @@
         
         <!-- 顶部搜索区域 -->
         <controls:CardView Grid.Row="0" Margin="0,0,0,12">
-            <AutoCompleteBox x:Name="StockSearchBox"
-                             Watermark="输入股票代码或名称"
-                             MinimumPrefixLength="1"
-                             ItemsSource="{Binding Search.SearchResults}"
-                             SelectedItem="{Binding Search.SelectedStock}"
-                             FilterMode="None"
-                             Text="{Binding Search.SearchQuery, Mode=TwoWay}"
-                             Background="Transparent"
-                             Foreground="{DynamicResource TextPrimaryBrush}"
-                             FontSize="16"
-                             Padding="12,8"
-                             KeyDown="StockSearchBox_KeyDown">
-                <AutoCompleteBox.ItemTemplate>
-                    <DataTemplate x:DataType="stocks:StockItem">
-                        <Grid ColumnDefinitions="*,Auto" Margin="4" RowDefinitions="Auto,Auto">
-                            <TextBlock Grid.Row="0" 
-                                       Text="{Binding Name}" 
-                                       FontWeight="SemiBold"
-                                       FontSize="14"/>
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding Code}" 
-                                       FontSize="12"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,2,0,0"/>
-                        </Grid>
-                    </DataTemplate>
-                </AutoCompleteBox.ItemTemplate>
-            </AutoCompleteBox>
+            <Grid ColumnDefinitions="*,Auto">
+                <AutoCompleteBox x:Name="StockSearchBox"
+                                 Grid.Column="0"
+                                 Watermark="输入股票代码或名称"
+                                 MinimumPrefixLength="1"
+                                 ItemsSource="{Binding Search.SearchResults}"
+                                 FilterMode="None"
+                                 Text="{Binding Search.SearchQuery, Mode=TwoWay}"
+                                 IsDropDownOpen="{Binding Search.IsSearchResultVisible}"
+                                 MaxDropDownHeight="400"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 FontSize="16"
+                                 Padding="12,8"
+                                 SelectionChanged="StockSearchBox_SelectionChanged"
+                                 KeyDown="StockSearchBox_KeyDown">
+                    <AutoCompleteBox.ItemTemplate>
+                        <DataTemplate x:DataType="stocks:StockItem">
+                            <Grid ColumnDefinitions="*,Auto" Margin="4" RowDefinitions="Auto,Auto">
+                                <TextBlock Grid.Row="0" 
+                                           Text="{Binding Name}" 
+                                           FontWeight="SemiBold"
+                                           FontSize="14"/>
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding Code}" 
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,2,0,0"/>
+                            </Grid>
+                        </DataTemplate>
+                    </AutoCompleteBox.ItemTemplate>
+                </AutoCompleteBox>
+                
+                <!-- 搜索加载指示器 -->
+                <Border Grid.Column="1"
+                       IsVisible="{Binding Search.IsSearching}"
+                       Background="{DynamicResource CardBackgroundBrush}"
+                       CornerRadius="12"
+                       Padding="12,6"
+                       VerticalAlignment="Center"
+                       Margin="8,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- 搜索图标 (SVG 搜索图标) -->
+                        <svg:Svg Path="/Assets/Images/search_icon.svg"
+                                Width="16"
+                                Height="16"
+                                VerticalAlignment="Center"/>
+                        
+                        <!-- 搜索文字 -->
+                        <TextBlock Text="搜索中"
+                                  FontSize="13"
+                                  Foreground="{DynamicResource PrimaryBrush}"
+                                  FontWeight="Medium"
+                                  VerticalAlignment="Center"/>
+                        
+                        <!-- 脉冲圆点 -->
+                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Ellipse Width="4" Height="4" Fill="{DynamicResource PrimaryBrush}" Opacity="0.3">
+                                <Ellipse.Styles>
+                                    <Style Selector="Ellipse">
+                                        <Style.Animations>
+                                            <Animation Duration="0:0:1.2" IterationCount="Infinite">
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="50%">
+                                                    <Setter Property="Opacity" Value="1"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                    </Style>
+                                </Ellipse.Styles>
+                            </Ellipse>
+                            <Ellipse Width="4" Height="4" Fill="{DynamicResource PrimaryBrush}" Opacity="0.3">
+                                <Ellipse.Styles>
+                                    <Style Selector="Ellipse">
+                                        <Style.Animations>
+                                            <Animation Duration="0:0:1.2" IterationCount="Infinite" Delay="0:0:0.4">
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="50%">
+                                                    <Setter Property="Opacity" Value="1"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                    </Style>
+                                </Ellipse.Styles>
+                            </Ellipse>
+                            <Ellipse Width="4" Height="4" Fill="{DynamicResource PrimaryBrush}" Opacity="0.3">
+                                <Ellipse.Styles>
+                                    <Style Selector="Ellipse">
+                                        <Style.Animations>
+                                            <Animation Duration="0:0:1.2" IterationCount="Infinite" Delay="0:0:0.8">
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="50%">
+                                                    <Setter Property="Opacity" Value="1"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                    </Style>
+                                </Ellipse.Styles>
+                            </Ellipse>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </controls:CardView>
 
         <!-- 三列布局 -->
