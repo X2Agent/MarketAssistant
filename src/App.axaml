@@ -14,6 +14,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="/Resources/Styles/Colors.axaml"/>
                 <ResourceInclude Source="/Resources/Styles/Spacing.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Geometries.axaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

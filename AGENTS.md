@@ -10,7 +10,6 @@
 - 主项目（Avalonia 应用）：`src/`
 - 单元测试工程：`tests/`
 - 构建脚本：根目录 `build-release.ps1`，构建说明见根目录 `BUILD.md`
-- 迁移文档：根目录 `MAUI到Avalonia迁移指南.md`
 
 主要功能模块：
 

@@ -154,7 +154,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         if (_storageProvider == null) return;
 
-        try
+        await SafeExecuteAsync(async () =>
         {
             var folders = await _storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
@@ -168,12 +168,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                 OnPropertyChanged(nameof(UserSetting));
                 OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
             }
-        }
-        catch (Exception ex)
-        {
-            // 忽略错误或记录日志
-            System.Diagnostics.Debug.WriteLine($"选择知识库目录失败: {ex.Message}");
-        }
+        }, "选择知识库目录");
     }
 
     /// <summary>
@@ -184,7 +179,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         if (_storageProvider == null) return;
 
-        try
+        await SafeExecuteAsync(async () =>
         {
             // 定义可执行文件类型
             var executableFileType = new FilePickerFileType("可执行文件")
@@ -205,11 +200,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                 UserSetting.BrowserPath = files[0].Path.LocalPath;
                 OnPropertyChanged(nameof(UserSetting));
             }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"选择浏览器路径失败: {ex.Message}");
-        }
+        }, "选择浏览器路径");
     }
 
     /// <summary>
@@ -220,7 +211,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         if (_storageProvider == null) return;
 
-        try
+        await SafeExecuteAsync(async () =>
         {
             var folders = await _storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
@@ -233,11 +224,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                 UserSetting.LogPath = Path.Combine(folders[0].Path.LocalPath, "logs");
                 OnPropertyChanged(nameof(UserSetting));
             }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"选择日志路径失败: {ex.Message}");
-        }
+        }, "选择日志路径");
     }
 
     /// <summary>
@@ -373,7 +360,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     /// </summary>
     private async Task OpenUrlAsync(string url)
     {
-        try
+        await SafeExecuteAsync(async () =>
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
@@ -381,11 +368,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                 UseShellExecute = true
             };
             System.Diagnostics.Process.Start(psi);
-        }
-        catch
-        {
-            // 忽略打开错误
-        }
-        await Task.CompletedTask;
+            await Task.CompletedTask;
+        }, "打开链接");
     }
 }

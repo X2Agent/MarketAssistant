@@ -6,21 +6,16 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Infrastructure.Core;
 
 /// <summary>
-/// 全局异常处理器，提供跨平台的异常处理功能
+/// 全局异常处理器，提供应用级异常捕获和处理
 /// </summary>
-public class GlobalExceptionHandler
+public sealed class GlobalExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger;
     private readonly IDialogService _dialogService;
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
 
-    /// <summary>
-    /// 获取全局异常处理器实例
-    /// </summary>
-    public static GlobalExceptionHandler? Instance => _instance;
-
-    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
+    private GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         _logger = logger;
         _dialogService = dialogService;
@@ -40,22 +35,18 @@ public class GlobalExceptionHandler
             var logger = serviceProvider.GetRequiredService<ILogger<GlobalExceptionHandler>>();
             var dialogService = serviceProvider.GetRequiredService<IDialogService>();
             _instance = new GlobalExceptionHandler(logger, dialogService);
-            _instance.SetupExceptionHandlers();
+            _instance.RegisterHandlers();
         }
     }
 
     /// <summary>
-    /// 设置异常处理器
+    /// 注册全局异常处理器
     /// </summary>
-    private void SetupExceptionHandlers()
+    private void RegisterHandlers()
     {
-        // 处理未捕获的异常
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-
-        // 处理任务异常
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-        // 处理线程异常（仅在调试模式下）
 #if DEBUG
         AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
 #endif
@@ -66,14 +57,20 @@ public class GlobalExceptionHandler
     /// </summary>
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        if (e.ExceptionObject is Exception exception)
-        {
-            _logger.LogCritical(exception, "发生未处理的异常: {Message}", exception.Message);
+        if (e.ExceptionObject is not Exception exception) return;
 
-            // 在主线程上显示错误信息
+        _logger.LogCritical(exception, "发生未处理的异常 (IsTerminating: {IsTerminating})", e.IsTerminating);
+
+        if (e.IsTerminating)
+        {
+            WriteCrashLog(exception);
+        }
+        else
+        {
             Dispatcher.UIThread.Post(async () =>
             {
-                await ShowErrorToUserAsync("应用程序遇到严重错误", exception.Message);
+                var message = ErrorMessageMapper.GetUserFriendlyMessage(exception, exception.Message);
+                await ShowErrorAsync("应用程序遇到严重错误", message);
             });
         }
     }
@@ -83,15 +80,13 @@ public class GlobalExceptionHandler
     /// </summary>
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        _logger.LogError(e.Exception, "发生未观察到的任务异常: {Message}", e.Exception.Message);
-
-        // 标记异常已处理，防止应用程序崩溃
+        _logger.LogError(e.Exception, "发生未观察到的任务异常");
         e.SetObserved();
 
-        // 在主线程上显示错误信息
         Dispatcher.UIThread.Post(async () =>
         {
-            await ShowErrorToUserAsync("后台任务执行失败", e.Exception.GetBaseException().Message);
+            var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception.GetBaseException());
+            await ShowErrorAsync("后台任务执行失败", message);
         });
     }
 
@@ -100,82 +95,79 @@ public class GlobalExceptionHandler
     /// </summary>
     private void OnFirstChanceException(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
     {
-        // 只记录非常见的异常，避免日志过多
-        if (ShouldLogFirstChanceException(e.Exception))
+        if (e.Exception is not (OperationCanceledException or TaskCanceledException))
         {
             _logger.LogDebug(e.Exception, "第一次机会异常: {Message}", e.Exception.Message);
         }
     }
 
     /// <summary>
-    /// 判断是否应该记录第一次机会异常
+    /// 写入崩溃日志
     /// </summary>
-    private static bool ShouldLogFirstChanceException(Exception exception)
+    private void WriteCrashLog(Exception exception)
     {
-        // 过滤掉一些常见的、不需要记录的异常
-        return exception is not (
-            OperationCanceledException or
-            TaskCanceledException
-        );
+        try
+        {
+            var crashLogDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MarketAssistant");
+            Directory.CreateDirectory(crashLogDir);
+
+            var crashLogPath = Path.Combine(crashLogDir, "crash.log");
+            var crashInfo = $"""
+                ========================================
+                崩溃时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                ========================================
+                异常类型: {exception.GetType().FullName}
+                异常消息: {exception.Message}
+                堆栈跟踪:
+                {exception.StackTrace}
+                
+                内部异常:
+                {exception.InnerException}
+                ========================================
+                
+                
+                """;
+
+            File.AppendAllText(crashLogPath, crashInfo);
+            _logger.LogInformation("崩溃日志已写入: {CrashLogPath}", crashLogPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "写入崩溃日志失败");
+        }
     }
 
     /// <summary>
     /// 向用户显示错误信息
     /// </summary>
-    private async Task ShowErrorToUserAsync(string title, string message)
+    private async Task ShowErrorAsync(string title, string message)
     {
         try
         {
-            // 使用依赖注入的DialogService
             await _dialogService.ShowAlertAsync(title, message, "确定");
         }
         catch (Exception ex)
         {
-            // 如果显示对话框失败，至少记录到日志
-            _logger.LogError(ex, "显示错误对话框失败: {Message}", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// 处理ViewModel中的异常（实例方法）
-    /// </summary>
-    public async Task HandleViewModelExceptionInstanceAsync(Exception exception, string operation, ILogger? logger = null)
-    {
-        var message = $"执行操作 '{operation}' 时发生错误: {exception.Message}";
-
-        // 记录异常
-        if (logger != null)
-        {
-            logger.LogError(exception, message);
-        }
-        else
-        {
-            _logger.LogError(exception, message);
-        }
-
-        // 在主线程上显示错误信息
-        await Dispatcher.UIThread.InvokeAsync(async () =>
-        {
-            await ShowErrorToUserAsync("操作失败", exception.Message);
-        });
-    }
-
-    /// <summary>
-    /// 处理ViewModel中的异常（静态方法，用于向后兼容）
-    /// </summary>
-    public static async Task HandleViewModelExceptionAsync(Exception exception, string operation, ILogger? logger = null)
-    {
-        if (_instance != null)
-        {
-            await _instance.HandleViewModelExceptionInstanceAsync(exception, operation, logger);
+            _logger.LogError(ex, "显示错误对话框失败");
         }
     }
 
     /// <summary>
     /// 安全执行异步操作，自动处理异常和IsBusy状态
     /// </summary>
-    public static async Task SafeExecuteAsync(Func<Task> operation, Action<bool>? setBusy = null, string? operationName = null, ILogger? logger = null)
+    public static async Task SafeExecuteAsync(
+        Func<Task> operation,
+        Action<bool>? setBusy = null,
+        string? operationName = null,
+        ILogger? logger = null)
     {
+        if (_instance == null)
+        {
+            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
+        }
+
         setBusy?.Invoke(true);
 
         try
@@ -184,50 +176,13 @@ public class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            await HandleViewModelExceptionAsync(ex, operationName ?? "未知操作", logger);
-        }
-        finally
-        {
-            setBusy?.Invoke(false);
-        }
-    }
+            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
 
-    /// <summary>
-    /// 安全执行同步操作，自动处理异常和IsBusy状态
-    /// </summary>
-    public static void SafeExecute(Action operation, Action<bool>? setBusy = null, string? operationName = null, ILogger? logger = null)
-    {
-        setBusy?.Invoke(true);
-
-        try
-        {
-            operation();
-        }
-        catch (Exception ex)
-        {
-            Task.Run(async () => await HandleViewModelExceptionAsync(ex, operationName ?? "未知操作", logger));
-        }
-        finally
-        {
-            setBusy?.Invoke(false);
-        }
-    }
-
-    /// <summary>
-    /// 安全执行带返回值的同步操作
-    /// </summary>
-    public static T? SafeExecute<T>(Func<T> operation, Action<bool>? setBusy = null, string? operationName = null, ILogger? logger = null)
-    {
-        setBusy?.Invoke(true);
-
-        try
-        {
-            return operation();
-        }
-        catch (Exception ex)
-        {
-            Task.Run(async () => await HandleViewModelExceptionAsync(ex, operationName ?? "未知操作", logger));
-            return default;
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await _instance.ShowErrorAsync("操作失败", message);
+            });
         }
         finally
         {
@@ -238,8 +193,17 @@ public class GlobalExceptionHandler
     /// <summary>
     /// 安全执行带返回值的异步操作
     /// </summary>
-    public static async Task<T?> SafeExecuteAsync<T>(Func<Task<T>> operation, Action<bool>? setBusy = null, string? operationName = null, ILogger? logger = null)
+    public static async Task<T?> SafeExecuteAsync<T>(
+        Func<Task<T>> operation,
+        Action<bool>? setBusy = null,
+        string? operationName = null,
+        ILogger? logger = null)
     {
+        if (_instance == null)
+        {
+            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
+        }
+
         setBusy?.Invoke(true);
 
         try
@@ -248,8 +212,52 @@ public class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            await HandleViewModelExceptionAsync(ex, operationName ?? "未知操作", logger);
+            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
+
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await _instance.ShowErrorAsync("操作失败", message);
+            });
+
             return default;
+        }
+        finally
+        {
+            setBusy?.Invoke(false);
+        }
+    }
+
+    /// <summary>
+    /// 安全执行同步操作，自动处理异常和IsBusy状态
+    /// </summary>
+    public static void SafeExecute(
+        Action operation,
+        Action<bool>? setBusy = null,
+        string? operationName = null,
+        ILogger? logger = null)
+    {
+        if (_instance == null)
+        {
+            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
+        }
+
+        setBusy?.Invoke(true);
+
+        try
+        {
+            operation();
+        }
+        catch (Exception ex)
+        {
+            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
+
+            // 使用 Post 而不是 InvokeAsync，避免阻塞当前线程
+            Dispatcher.UIThread.Post(async () =>
+            {
+                await _instance.ShowErrorAsync("操作失败", message);
+            });
         }
         finally
         {
@@ -279,4 +287,3 @@ public class GlobalExceptionHandler
         }
     }
 }
-

@@ -99,9 +99,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StockSelectionManager>();
         services.AddSingleton<StockSelectionService>();
 
-        // 注册应用程序服务
-        services.AddSingleton<GlobalExceptionHandler>();
-
         // 注册 Avalonia 平台特定服务
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<INotificationService, NotificationService>();

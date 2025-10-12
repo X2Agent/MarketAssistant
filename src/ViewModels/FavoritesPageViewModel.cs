@@ -19,13 +19,10 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     private readonly StockInfoCache _stockInfoCache;
     private readonly IDialogService _dialogService;
 
-    [ObservableProperty]
-    private bool _isLoading;
-
     public ObservableCollection<StockInfo> Stocks { get; set; } = new ObservableCollection<StockInfo>();
 
     /// <summary>
-    /// 构造函数（使用依赖注入）
+    /// 构造函数
     /// </summary>
     public FavoritesPageViewModel(
         StockFavoriteService favoriteService, 
@@ -39,48 +36,29 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
         _stockService = stockService;
         _stockInfoCache = stockInfoCache;
         _dialogService = dialogService;
-        LoadFavoriteStocksAsync();
+        _ = LoadFavoriteStocksAsync();
         WeakReferenceMessenger.Default.Register(this);
     }
 
     /// <summary>
-    /// 加载收藏股票列表（渐进式加载策略）
+    /// 加载收藏股票列表
     /// </summary>
-    private async void LoadFavoriteStocksAsync()
+    private async Task LoadFavoriteStocksAsync()
     {
-        IsLoading = true;
-        try
+        await SafeExecuteAsync(async () =>
         {
-            // 第一步：快速显示收藏列表（仅基本信息）
+            // 获取收藏列表
             var favoritesCodes = _favoriteService.GetFavoritesCodes();
             
             Stocks.Clear();
-            foreach (var favorite in favoritesCodes)
-            {
-                Stocks.Add(new StockInfo 
-                { 
-                    Code = favorite.Code, 
-                    Market = favorite.Market, 
-                    Name = $"{favorite.Market}.{favorite.Code}",
-                    CurrentPrice = string.Empty,
-                    ChangePercentage = string.Empty
-                });
-            }
-            
-            IsLoading = false;
 
-            // 第二步：在后台逐个更新实时数据（限制并发数）
+            // 使用并发加载所有股票数据
             await UpdateStockDataProgressivelyAsync(favoritesCodes);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "加载收藏股票列表时出错");
-            IsLoading = false;
-        }
+        }, "加载收藏列表");
     }
 
     /// <summary>
-    /// 渐进式更新股票实时数据（限制并发数，避免同时打开过多浏览器页面）
+    /// 渐进式加载股票实时数据（限制并发数，避免同时打开过多浏览器页面）
     /// </summary>
     private async Task UpdateStockDataProgressivelyAsync(List<FavoriteStock> favorites)
     {
@@ -106,17 +84,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
                         _stockInfoCache.Set(stockInfo);
                     }
                     
-                    // 在UI线程更新对应的股票信息
-                    var existingStock = Stocks.FirstOrDefault(s => s.Code == favorite.Code && s.Market == favorite.Market);
-                    if (existingStock != null)
-                    {
-                        var index = Stocks.IndexOf(existingStock);
-                        Stocks[index] = stockInfo;
-                    }
+                    // 添加到列表中
+                    Stocks.Add(stockInfo);
                 }
                 catch (Exception ex)
                 {
-                    Logger?.LogError(ex, $"更新股票 {favorite.Code} 数据时出错");
+                    Logger?.LogError(ex, $"加载股票 {favorite.Code} 数据时出错");
                 }
                 finally
                 {
@@ -150,28 +123,24 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     {
         if (stock == null) return;
 
-        try
-        {
-            // 显示确认对话框
-            var confirmed = await _dialogService.ShowConfirmationAsync(
-                "取消收藏",
-                $"确定要取消收藏 {stock.Name}({stock.Code}) 吗？",
-                "确定",
-                "取消"
-            );
+        // 显示确认对话框
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "取消收藏",
+            $"确定要取消收藏 {stock.Name}({stock.Code}) 吗？",
+            "确定",
+            "取消"
+        );
 
-            // 用户确认后才执行删除
-            if (confirmed)
+        // 用户确认后才执行删除
+        if (confirmed)
+        {
+            await SafeExecuteAsync(async () =>
             {
                 _favoriteService.RemoveFavorite(stock.Code, stock.Market);
                 Stocks.Remove(stock);
                 Logger?.LogInformation($"已取消收藏股票: {stock.Name}({stock.Code})");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, $"取消收藏股票 {stock.Code} 时出错");
-            await _dialogService.ShowMessageAsync("错误", "取消收藏失败，请稍后重试");
+                await Task.CompletedTask;
+            }, "取消收藏");
         }
     }
 
@@ -180,6 +149,6 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     /// </summary>
     public void Receive(StockFavoritesChanged message)
     {
-        LoadFavoriteStocksAsync();
+        _ = LoadFavoriteStocksAsync();
     }
 }

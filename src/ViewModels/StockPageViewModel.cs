@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -198,7 +199,7 @@ public partial class StockPageViewModel : ViewModelBase
         {
             // 设置错误状态
             HasError = true;
-            ErrorMessage = ex.Message ?? "加载K线数据失败，请稍后重试";
+            ErrorMessage = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "加载K线数据");
             Logger?.LogError(ex, "加载股票 {StockCode} 的K线数据时发生错误", stockCode);
         }
         finally

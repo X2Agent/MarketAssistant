@@ -9,75 +9,28 @@ namespace MarketAssistant.Views.Pages;
 
 public partial class HomePageView : UserControl
 {
-    private bool _isHandlingSelection = false;
-
     public HomePageView()
     {
         InitializeComponent();
     }
 
     /// <summary>
-    /// 搜索框选择变更处理
+    /// 搜索结果项点击处理
     /// </summary>
-    private void StockSearchBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private void SearchResultItem_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // 防止重入
-        if (_isHandlingSelection)
-            return;
-
-        if (e.AddedItems.Count > 0 && 
-            e.AddedItems[0] is StockItem selectedStock && 
+        if (sender is Border border &&
+            border.Tag is StockItem selectedStock &&
             DataContext is HomePageViewModel viewModel)
         {
-            _isHandlingSelection = true;
+            // 标记事件已处理，防止AutoCompleteBox处理
+            e.Handled = true;
             
-            // 清除选中项和下拉框
-            StockSearchBox.SelectedItem = null;
-            StockSearchBox.IsDropDownOpen = false;
+            // 关闭下拉框
+            viewModel.Search.IsSearchResultVisible = false;
             
             // 执行导航
             viewModel.Search.SelectStockCommand.Execute(selectedStock);
-            
-            // 延迟清空搜索框，避免在事件处理中修改集合
-            Dispatcher.UIThread.Post(() =>
-            {
-                viewModel.Search.ClearSearch();
-                _isHandlingSelection = false;
-            }, Avalonia.Threading.DispatcherPriority.Background);
-        }
-    }
-
-    /// <summary>
-    /// 搜索框按键处理（回车搜索）
-    /// </summary>
-    private void StockSearchBox_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && DataContext is HomePageViewModel viewModel)
-        {
-            // 如果有选中的项目，直接选择
-            if (StockSearchBox.SelectedItem is StockItem selectedStock)
-            {
-                viewModel.Search.SelectStockCommand.Execute(selectedStock);
-                StockSearchBox.SelectedItem = null;
-                e.Handled = true;
-                return;
-            }
-
-            // 如果没有选中项但有搜索结果，选择第一个结果
-            if (viewModel.Search.SearchResults.Count > 0)
-            {
-                var firstStock = viewModel.Search.SearchResults[0];
-                viewModel.Search.SelectStockCommand.Execute(firstStock);
-                e.Handled = true;
-                return;
-            }
-
-            // 如果有输入但没有结果，可以提示用户
-            if (!string.IsNullOrWhiteSpace(viewModel.Search.SearchQuery))
-            {
-                // 可以在这里添加提示逻辑
-                e.Handled = true;
-            }
         }
     }
 

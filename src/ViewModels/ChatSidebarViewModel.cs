@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
@@ -134,7 +135,16 @@ public partial class ChatSidebarViewModel : ViewModelBase
         catch (Exception ex)
         {
             Logger.LogError(ex, "发送消息失败");
-            aiMessage.Content = "抱歉，消息发送失败，请稍后重试。";
+            
+            // 根据异常类型提供更友好的提示
+            aiMessage.Content = ex switch
+            {
+                HttpRequestException => "网络连接失败，请检查网络后重试",
+                UnauthorizedAccessException => "API密钥无效，请在设置中检查配置",
+                TaskCanceledException => "请求超时，请稍后重试",
+                _ => ErrorMessageMapper.GetUserFriendlyMessage(ex, "抱歉，消息发送失败，请稍后重试")
+            };
+            
             aiMessage.Status = MessageStatus.Failed;
         }
         finally

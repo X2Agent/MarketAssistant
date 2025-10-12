@@ -13,6 +13,8 @@ namespace MarketAssistant.ViewModels.Home;
 public partial class HomeSearchViewModel : ViewModelBase
 {
     private readonly IHomeStockService _homeStockService;
+    private CancellationTokenSource? _debounceCts;
+    private const int DebounceDelayMs = 200;
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -43,7 +45,9 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// </summary>
     public event EventHandler<StockItem>? StockSelected;
 
-    public HomeSearchViewModel(IHomeStockService homeStockService, ILogger<HomeSearchViewModel> logger)
+    public HomeSearchViewModel(
+        IHomeStockService homeStockService,
+        ILogger<HomeSearchViewModel> logger)
         : base(logger)
     {
         _homeStockService = homeStockService;
@@ -53,22 +57,51 @@ public partial class HomeSearchViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 当 SearchQuery 变化时自动触发搜索
+    /// 当 SearchQuery 变化时自动触发搜索（带500毫秒防抖）
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
-        // 触发搜索（空字符串会在 OnSearchAsync 中自动处理）
+        // 取消之前的防抖任务
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = new CancellationTokenSource();
+
+        var cancellationToken = _debounceCts.Token;
+
+        // 空字符串立即清空，不需要防抖
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            IsSearching = false;
+            IsSearchResultVisible = false;
+            SearchResults.Clear();
+            Logger?.LogDebug("搜索查询为空，清空结果");
+            return;
+        }
+
+        // 触发防抖搜索
         _ = Task.Run(async () =>
         {
             try
             {
-                await OnSearchAsync(value);
+                // 等待200毫秒
+                await Task.Delay(DebounceDelayMs, cancellationToken);
+
+                // 如果没有被取消，执行搜索
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    await OnSearchAsync(value);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                // 防抖被取消，正常情况，不记录日志
+                Logger?.LogDebug("搜索防抖被取消，查询：{Query}", value);
             }
             catch (Exception ex)
             {
                 Logger?.LogError(ex, "搜索股票时发生错误，查询：{Query}", value);
             }
-        });
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -88,7 +121,7 @@ public partial class HomeSearchViewModel : ViewModelBase
         Logger?.LogInformation("开始搜索股票，查询：{Query}", query);
         IsSearching = true;
 
-        try
+        await SafeExecuteAsync(async () =>
         {
             var results = await _homeStockService.SearchStockAsync(query, CancellationToken.None);
 
@@ -111,22 +144,9 @@ public partial class HomeSearchViewModel : ViewModelBase
             {
                 Logger?.LogWarning("未找到匹配的股票，查询：{Query}", query);
             }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "搜索股票失败，查询：{Query}", query);
-            
-            // 确保在异常时也清空结果
-            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                SearchResults.Clear();
-                IsSearchResultVisible = false;
-            });
-        }
-        finally
-        {
-            IsSearching = false;
-        }
+        }, "搜索股票");
+
+        IsSearching = false;
     }
 
     /// <summary>
@@ -148,6 +168,11 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// </summary>
     public void ClearSearch()
     {
+        // 取消防抖任务
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = null;
+
         SearchQuery = string.Empty;
         SearchResults.Clear();
         IsSearchResultVisible = false;

@@ -5,6 +5,7 @@ using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Windows;
+using Serilog;
 
 namespace MarketAssistant;
 
@@ -23,6 +24,9 @@ public partial class App : Application
         // 配置依赖注入
         ServiceProvider = Program.ConfigureServices();
 
+        // 初始化全局异常处理器
+        Infrastructure.Core.GlobalExceptionHandler.Initialize(ServiceProvider);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
@@ -39,9 +43,32 @@ public partial class App : Application
 
             // 配置关闭行为：最小化到托盘而不是退出
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+            // 订阅应用退出事件，进行资源清理
+            desktop.Exit += OnApplicationExit;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// 应用退出事件处理
+    /// </summary>
+    private void OnApplicationExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
+    {
+        try
+        {
+            // 清理全局异常处理器
+            GlobalExceptionHandler.Cleanup();
+            
+            // 刷新并关闭日志
+            Log.CloseAndFlush();
+        }
+        catch (Exception ex)
+        {
+            // 尽最大努力记录退出时的错误
+            Console.Error.WriteLine($"应用退出清理时发生错误: {ex}");
+        }
     }
 
     /// <summary>
