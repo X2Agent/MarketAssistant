@@ -156,8 +156,8 @@ namespace MarketAssistant.ViewModels
                     {
                         var stockCode = analysisCode?.ToString() ?? string.Empty;
                         Logger?.LogInformation("导航到 AI 股票分析页面，股票代码: {Code}", stockCode);
-                        // 使用 Dispatcher 在UI线程的下一个空闲时刻执行
-                        Dispatcher.UIThread.Post(async () =>
+                        // 使用 InvokeAsync 而非 Post，避免 async void 陷阱
+                        _ = Dispatcher.UIThread.InvokeAsync(async () =>
                         {
                             analysisViewModel.StockCode = stockCode;
                             await analysisViewModel.LoadAnalysisDataAsync();

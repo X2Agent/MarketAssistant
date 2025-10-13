@@ -46,6 +46,12 @@ public sealed class GlobalExceptionHandler
     {
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        
+        // 注册 Avalonia 的 UI 线程异常处理
+        if (Dispatcher.UIThread != null)
+        {
+            Dispatcher.UIThread.UnhandledException += OnDispatcherUnhandledException;
+        }
 
 #if DEBUG
         AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
@@ -69,7 +75,7 @@ public sealed class GlobalExceptionHandler
         {
             Dispatcher.UIThread.Post(async () =>
             {
-                var message = ErrorMessageMapper.GetUserFriendlyMessage(exception, exception.Message);
+                var message = ErrorMessageMapper.GetUserFriendlyMessage(exception);
                 await ShowErrorAsync("应用程序遇到严重错误", message);
             });
         }
@@ -87,6 +93,25 @@ public sealed class GlobalExceptionHandler
         {
             var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception.GetBaseException());
             await ShowErrorAsync("后台任务执行失败", message);
+        });
+    }
+
+    /// <summary>
+    /// 处理 Avalonia Dispatcher 的未捕获异常
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, Avalonia.Threading.DispatcherUnhandledExceptionEventArgs e)
+    {
+        _logger.LogError(e.Exception, "UI 线程发生未处理的异常");
+        
+        var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception);
+        
+        // 标记异常已处理，防止应用崩溃
+        e.Handled = true;
+        
+        // 显示错误对话框
+        Dispatcher.UIThread.Post(async () =>
+        {
+            await ShowErrorAsync("操作失败", message);
         });
     }
 
@@ -146,7 +171,7 @@ public sealed class GlobalExceptionHandler
     {
         try
         {
-            await _dialogService.ShowAlertAsync(title, message, "确定");
+            await _dialogService.ShowMessageAsync(title, message, "知道了");
         }
         catch (Exception ex)
         {
@@ -278,6 +303,11 @@ public sealed class GlobalExceptionHandler
 
             AppDomain.CurrentDomain.UnhandledException -= _instance.OnUnhandledException;
             TaskScheduler.UnobservedTaskException -= _instance.OnUnobservedTaskException;
+            
+            if (Dispatcher.UIThread != null)
+            {
+                Dispatcher.UIThread.UnhandledException -= _instance.OnDispatcherUnhandledException;
+            }
 
 #if DEBUG
             AppDomain.CurrentDomain.FirstChanceException -= _instance.OnFirstChanceException;

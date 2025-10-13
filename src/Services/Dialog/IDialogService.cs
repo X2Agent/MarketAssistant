@@ -6,17 +6,12 @@ namespace MarketAssistant.Services.Dialog;
 public interface IDialogService
 {
     /// <summary>
-    /// 显示简单的消息对话框
-    /// </summary>
-    Task<bool> ShowAlertAsync(string title, string message, string cancel = "取消");
-
-    /// <summary>
     /// 显示简单的信息对话框（只有一个按钮）
     /// </summary>
     Task ShowMessageAsync(string title, string message, string button = "确定");
 
     /// <summary>
-    /// 显示确认对话框
+    /// 显示确认对话框（两个按钮，可自定义文本）
     /// </summary>
     Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消");
 

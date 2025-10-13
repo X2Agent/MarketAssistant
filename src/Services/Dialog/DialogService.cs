@@ -8,25 +8,12 @@ using Avalonia.Media;
 namespace MarketAssistant.Services.Dialog;
 
 /// <summary>
-/// Avalonia平台的对话框服务，提供与MAUI Shell.DisplayAlert类似的功能
+/// Avalonia平台的对话框服务
 /// </summary>
 public class DialogService : IDialogService
 {
     /// <summary>
-    /// 显示简单的消息对话框（类似Shell.DisplayAlert）
-    /// </summary>
-    /// <param name="title">标题</param>
-    /// <param name="message">消息内容</param>
-    /// <param name="cancel">取消按钮文本（可选）</param>
-    /// <returns>如果用户点击确定返回true，点击取消返回false</returns>
-    public async Task<bool> ShowAlertAsync(string title, string message, string cancel = "取消")
-    {
-        var result = await ShowCustomDialogAsync(title, message, new[] { "确定", cancel });
-        return result == "确定";
-    }
-
-    /// <summary>
-    /// 显示简单的信息对话框（只有一个确定按钮）
+    /// 显示简单的信息对话框（只有一个按钮）
     /// </summary>
     /// <param name="title">标题</param>
     /// <param name="message">消息内容</param>
@@ -37,12 +24,12 @@ public class DialogService : IDialogService
     }
 
     /// <summary>
-    /// 显示确认对话框（类似Shell.DisplayAlert的确认版本）
+    /// 显示确认对话框（两个按钮，都可自定义）
     /// </summary>
     /// <param name="title">标题</param>
     /// <param name="message">消息内容</param>
-    /// <param name="accept">确认按钮文本</param>
-    /// <param name="cancel">取消按钮文本</param>
+    /// <param name="accept">确认按钮文本（默认"确认"）</param>
+    /// <param name="cancel">取消按钮文本（默认"取消"）</param>
     /// <returns>如果用户点击确认返回true，点击取消返回false</returns>
     public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消")
     {

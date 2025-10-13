@@ -10,10 +10,13 @@ public static class ErrorMessageMapper
     /// <summary>
     /// 获取用户友好的错误消息
     /// </summary>
-    public static string GetUserFriendlyMessage(Exception exception, string? defaultMessage = null)
+    public static string GetUserFriendlyMessage(Exception exception)
     {
         return exception switch
         {
+            // 友好异常直接返回消息
+            FriendlyException => exception.Message,
+            
             // 取消相关异常
             TaskCanceledException => "请求超时，请稍后重试",
             OperationCanceledException => "操作已取消",
@@ -57,7 +60,7 @@ public static class ErrorMessageMapper
             InvalidCastException => "数据类型转换失败",
             NullReferenceException => "数据访问错误，请刷新后重试",
             
-            _ => defaultMessage ?? "操作失败，请稍后重试"
+            _ => "操作失败，请稍后重试"
         };
     }
 

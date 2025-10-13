@@ -140,7 +140,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
                 HttpRequestException => "网络连接失败，请检查网络后重试",
                 UnauthorizedAccessException => "API密钥无效，请在设置中检查配置",
                 TaskCanceledException => "请求超时，请稍后重试",
-                _ => ErrorMessageMapper.GetUserFriendlyMessage(ex, "抱歉，消息发送失败，请稍后重试")
+                _ => ErrorMessageMapper.GetUserFriendlyMessage(ex)
             };
 
             aiMessage.Status = MessageStatus.Failed;
