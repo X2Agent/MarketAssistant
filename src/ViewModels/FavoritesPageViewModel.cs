@@ -1,11 +1,14 @@
+using Avalonia.Animation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace MarketAssistant.ViewModels;
 
@@ -64,7 +67,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     {
         const int maxConcurrency = 3; // 最多同时请求3个股票数据
         var semaphore = new SemaphoreSlim(maxConcurrency);
-        var tasks = new List<Task>();
+        var tasks = new List<Task<StockInfo?>>();
 
         foreach (var favorite in favorites)
         {
@@ -76,7 +79,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
                     // 先尝试从缓存获取
                     var stockInfo = _stockInfoCache.Get(favorite.Code, favorite.Market);
                     
-                    // 如果缓存中没有，则从网络获取
+                    // 如果缓存中没有,则从网络获取
                     if (stockInfo == null)
                     {
                         stockInfo = await _stockService.GetStockInfoAsync(favorite.Code, favorite.Market);
@@ -84,12 +87,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
                         _stockInfoCache.Set(stockInfo);
                     }
                     
-                    // 添加到列表中
-                    Stocks.Add(stockInfo);
+                    return stockInfo;
                 }
                 catch (Exception ex)
                 {
                     Logger?.LogError(ex, $"加载股票 {favorite.Code} 数据时出错");
+                    return null;
                 }
                 finally
                 {
@@ -100,7 +103,16 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
             tasks.Add(task);
         }
 
-        await Task.WhenAll(tasks);
+        var results = await Task.WhenAll(tasks);
+        
+        // 在UI线程上批量添加结果
+        foreach (var stockInfo in results)
+        {
+            if (stockInfo != null)
+            {
+                Stocks.Add(stockInfo);
+            }
+        }
     }
 
     /// <summary>
@@ -111,8 +123,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     {
         if (stock == null) return;
 
-        // TODO: Avalonia 导航到股票详情页
-        // 需要实现导航逻辑
+        WeakReferenceMessenger.Default.Send(
+            new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stock.FullCode } }));
     }
 
     /// <summary>
@@ -136,8 +148,16 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
         {
             await SafeExecuteAsync(async () =>
             {
+                // 先从UI集合中移除（避免因消息触发重新加载导致的竞态条件）
+                var stockToRemove = Stocks.FirstOrDefault(s => s.Code == stock.Code && s.Market == stock.Market);
+                if (stockToRemove != null)
+                {
+                    Stocks.Remove(stockToRemove);
+                }
+                
+                // 再从持久化存储中移除
                 _favoriteService.RemoveFavorite(stock.Code, stock.Market);
-                Stocks.Remove(stock);
+                
                 Logger?.LogInformation($"已取消收藏股票: {stock.Name}({stock.Code})");
                 await Task.CompletedTask;
             }, "取消收藏");

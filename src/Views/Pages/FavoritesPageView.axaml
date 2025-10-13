@@ -71,11 +71,11 @@
                     </StackPanel>
 
                     <!-- 股票网格 -->
-                    <ItemsControl ItemsSource="{Binding Stocks}" 
+                    <ItemsControl ItemsSource="{Binding Stocks}"
                                   IsVisible="{Binding Stocks.Count}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="4" />
+                                <UniformGrid Columns="4" VerticalAlignment="Top"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     
