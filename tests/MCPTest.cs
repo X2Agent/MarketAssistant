@@ -1,4 +1,4 @@
-﻿using MarketAssistant.Plugins;
+﻿using MarketAssistant.Agents.Plugins;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 

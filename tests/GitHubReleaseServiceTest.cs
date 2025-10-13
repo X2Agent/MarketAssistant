@@ -1,4 +1,4 @@
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Applications.Settings;
 using Moq;
 using Moq.Protected;
 using System.Net;

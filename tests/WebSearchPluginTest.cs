@@ -1,4 +1,5 @@
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Data;

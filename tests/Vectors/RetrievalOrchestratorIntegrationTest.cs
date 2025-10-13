@@ -1,11 +1,8 @@
-using MarketAssistant.Vectors;
-using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Vectors.Services;
+using MarketAssistant.Rag;
+using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel.Data;
-using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace TestMarketAssistant.Vectors;
 

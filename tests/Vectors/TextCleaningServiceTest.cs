@@ -1,5 +1,5 @@
-using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Vectors.Services;
+using MarketAssistant.Rag.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant.Vectors;
 

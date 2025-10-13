@@ -1,7 +1,6 @@
-using MarketAssistant.Vectors;
-using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Vectors.Services;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Rag.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant.Vectors;
 
@@ -16,7 +15,7 @@ public class DocumentBlockMapperTest : BaseKernelTest
     public void Setup()
     {
         base.BaseInitialize();
-        
+
         _cleaningService = _kernel.Services.GetRequiredService<ITextCleaningService>();
         _chunkingService = _kernel.Services.GetRequiredService<ITextChunkingService>();
         _mapper = new DocumentBlockMapper(_cleaningService, _chunkingService);
@@ -39,14 +38,14 @@ public class DocumentBlockMapperTest : BaseKernelTest
         // Assert
         var paragraphList = paragraphs.ToList();
         Assert.IsTrue(paragraphList.Count > 0, "应该生成至少一个段落");
-        
+
         // 验证第一个段落的基本属性
         var firstParagraph = paragraphList[0];
         Assert.IsTrue(firstParagraph.ParagraphId.StartsWith("txt_"), "文本块的ParagraphId应该以txt_开头");
         Assert.AreEqual(10, firstParagraph.Order);
         Assert.AreEqual<int?>(0, firstParagraph.BlockKind); // Text
         Assert.AreEqual("第一章", firstParagraph.Section);
-        
+
         // 验证下一个序号正确递增
         Assert.IsTrue(nextOrder > 10, "下一个序号应该大于起始序号");
         Assert.AreEqual("第一章", updatedSection); // 章节保持不变

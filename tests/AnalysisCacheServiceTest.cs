@@ -1,8 +1,7 @@
-using MarketAssistant.Applications.Cache;
-using MarketAssistant.Views.Models;
+using MarketAssistant.Models;
+using MarketAssistant.Services.Cache;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Moq;
 
 namespace TestMarketAssistant;

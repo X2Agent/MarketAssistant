@@ -1,6 +1,6 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

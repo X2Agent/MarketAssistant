@@ -1,6 +1,7 @@
+using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Plugins;
+using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 
 namespace TestMarketAssistant

@@ -1,6 +1,4 @@
-using MarketAssistant.Vectors.Services;
-using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
+using MarketAssistant.Rag.Services;
 
 namespace TestMarketAssistant;
 
@@ -93,7 +91,7 @@ public class LocalImageStorageServiceTest
         Assert.AreEqual(result1, result2); // Should be the same path (overwritten)
         Assert.IsTrue(File.Exists(result1));
         Assert.IsTrue(File.Exists(result2));
-        
+
         // Verify the file content matches the second save (overwritten)
         var savedBytes = await File.ReadAllBytesAsync(result2);
         CollectionAssert.AreEqual(imageBytes2, savedBytes);
@@ -227,7 +225,7 @@ public class LocalImageStorageServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(File.Exists(result));
-        
+
         // 验证目录结构
         var imageDir = Path.GetDirectoryName(result);
         Assert.IsNotNull(imageDir);

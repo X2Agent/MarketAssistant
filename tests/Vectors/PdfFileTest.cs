@@ -1,5 +1,6 @@
-using MarketAssistant.Vectors.Services;
-using MarketAssistant.Vectors.Interfaces;
+using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Rag.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant.Vectors;
 
@@ -16,7 +17,7 @@ public class PdfFileTest : BaseKernelTest
     public void Setup()
     {
         base.BaseInitialize();
-        
+
         // 从 DI 容器获取工厂
         _converterFactory = _kernel.Services.GetRequiredService<MarkdownConverterFactory>();
         _readerFactory = _kernel.Services.GetRequiredService<DocumentBlockReaderFactory>();

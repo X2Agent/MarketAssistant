@@ -1,8 +1,9 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Infrastructure.Factories;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Microsoft.SemanticKernel;
 
 namespace TestMarketAssistant;
 

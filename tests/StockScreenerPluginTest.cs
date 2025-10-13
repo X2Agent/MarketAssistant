@@ -1,6 +1,6 @@
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Plugins;
-using MarketAssistant.Plugins.Models;
+using MarketAssistant.Agents.Plugins;
+using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.Logging;
 using Moq;
 

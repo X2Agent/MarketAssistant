@@ -1,5 +1,5 @@
+using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Plugins;
 
 namespace TestMarketAssistant;
 

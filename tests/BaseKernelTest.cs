@@ -1,9 +1,13 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Filtering;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Plugins;
-using MarketAssistant.Vectors.Extensions;
+using MarketAssistant.Infrastructure.Configuration;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Rag.Extensions;
+using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;

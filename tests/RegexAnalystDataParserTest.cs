@@ -1,4 +1,4 @@
-using MarketAssistant.Views.Parsers;
+using MarketAssistant.Parsers;
 
 namespace TestMarketAssistant;
 

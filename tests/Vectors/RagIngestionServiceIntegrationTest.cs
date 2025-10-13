@@ -1,8 +1,7 @@
-using MarketAssistant.Vectors;
-using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Vectors.Services;
+using MarketAssistant.Rag;
+using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.VectorData;
 
 namespace TestMarketAssistant.Vectors;
@@ -24,7 +23,7 @@ public class RagIngestionServiceIntegrationTest : BaseKernelTest
         // 获取服务
         _embeddingGenerator = _kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
         _vectorStore = _kernel.Services.GetRequiredService<VectorStore>();
-        
+
         // 从 DI 容器获取 RagIngestionService
         _ragIngestionService = _kernel.Services.GetRequiredService<IRagIngestionService>();
 

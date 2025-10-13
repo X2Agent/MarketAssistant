@@ -1,6 +1,5 @@
-using MarketAssistant.Vectors.Interfaces;
-using MarketAssistant.Vectors.Services;
-using Microsoft.Extensions.Logging;
+using MarketAssistant.Rag.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant.Vectors;
 
@@ -33,7 +32,7 @@ public class ClipImageEmbeddingServiceTest : BaseKernelTest
     public void Setup()
     {
         base.BaseInitialize();
-        
+
         // 清理模型环境变量，默认走哈希降级（真实路径存在时会自动加载）
         Environment.SetEnvironmentVariable("CLIP_IMAGE_ONNX", null);
 

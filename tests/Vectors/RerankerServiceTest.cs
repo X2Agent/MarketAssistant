@@ -1,6 +1,6 @@
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+using MarketAssistant.Rag.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.Data;
-using MarketAssistant.Vectors.Interfaces;
 
 namespace TestMarketAssistant.Vectors;
 
@@ -81,7 +81,7 @@ public class RerankerServiceTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(3, result.Count);
-        
+
         // The AI-related item should be ranked higher
         Console.WriteLine($"Reranked order:");
         for (int i = 0; i < result.Count; i++)
@@ -109,7 +109,7 @@ public class RerankerServiceTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(4, result.Count);
-        
+
         // Should prioritize new energy vehicle related content
         Console.WriteLine($"Reranked results for '{query}':");
         for (int i = 0; i < result.Count; i++)
@@ -124,12 +124,12 @@ public class RerankerServiceTest : BaseKernelTest
         // Arrange
         var query = "芯片半导体";
         var items = new List<TextSearchResult>();
-        
+
         // Create 15 test items
         for (int i = 1; i <= 15; i++)
         {
             var isRelevant = i % 3 == 0; // Every 3rd item is relevant
-            var content = isRelevant 
+            var content = isRelevant
                 ? $"芯片半导体技术发展报告第{i}部分"
                 : $"一般性市场分析报告第{i}部分";
             items.Add(CreateTextSearchResult($"result{i}", content, $"https://example.com/{i}"));
@@ -141,7 +141,7 @@ public class RerankerServiceTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(15, result.Count);
-        
+
         Console.WriteLine($"Reranked large dataset for '{query}':");
         for (int i = 0; i < Math.Min(5, result.Count); i++) // Show top 5
         {
@@ -160,7 +160,7 @@ public class RerankerServiceTest : BaseKernelTest
 
         // Act & Assert - Should not throw
         var result = _rerankerService.Rerank(null!, items);
-        
+
         Assert.IsNotNull(result);
         Assert.AreEqual(1, result.Count);
     }
@@ -190,7 +190,7 @@ public class RerankerServiceTest : BaseKernelTest
         var query = "市场分析";
         var originalCount = 10;
         var items = new List<TextSearchResult>();
-        
+
         for (int i = 1; i <= originalCount; i++)
         {
             items.Add(CreateTextSearchResult($"result{i}", $"内容{i}", $"https://example.com/{i}"));
@@ -202,11 +202,11 @@ public class RerankerServiceTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(originalCount, result.Count);
-        
+
         // All items should be preserved
         var originalNames = items.Select(i => i.Name).OrderBy(n => n).ToArray();
         var resultNames = result.Select(r => r.Name).OrderBy(n => n).ToArray();
-        
+
         CollectionAssert.AreEquivalent(originalNames, resultNames);
     }
 

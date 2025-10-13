@@ -1,6 +1,7 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.VectorData;
 
 namespace TestMarketAssistant;

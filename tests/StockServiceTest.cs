@@ -1,5 +1,5 @@
 using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.Logging;
 using Moq;
 

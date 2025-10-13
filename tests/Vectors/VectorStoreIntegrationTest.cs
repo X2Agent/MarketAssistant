@@ -1,5 +1,6 @@
-using MarketAssistant.Vectors;
+using MarketAssistant.Rag;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.VectorData;
 
 namespace TestMarketAssistant.Vectors;

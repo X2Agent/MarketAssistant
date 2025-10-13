@@ -1,9 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.ChatCompletion;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels;
@@ -110,7 +108,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
                 if (!string.IsNullOrEmpty(chunk.Content))
                 {
                     contentBuilder.Append(chunk.Content);
-                    
+
                     if (!hasReceivedContent)
                     {
                         hasReceivedContent = true;
@@ -130,12 +128,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
         {
             aiMessage.Content = "对话已取消";
             aiMessage.Status = MessageStatus.Failed;
-            Logger.LogInformation("用户取消了对话请求");
+            Logger?.LogInformation("用户取消了对话请求");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "发送消息失败");
-            
+            Logger?.LogError(ex, "发送消息失败");
+
             // 根据异常类型提供更友好的提示
             aiMessage.Content = ex switch
             {
@@ -144,7 +142,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
                 TaskCanceledException => "请求超时，请稍后重试",
                 _ => ErrorMessageMapper.GetUserFriendlyMessage(ex, "抱歉，消息发送失败，请稍后重试")
             };
-            
+
             aiMessage.Status = MessageStatus.Failed;
         }
         finally

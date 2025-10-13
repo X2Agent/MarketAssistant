@@ -1,5 +1,6 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Plugins.Models;
+using MarketAssistant.Agents.Plugins.Models;
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 
 namespace TestMarketAssistant;
