@@ -1,148 +1,409 @@
-using System.Linq;
+using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.Settings;
 
-public class GitHubReleaseService
+/// <summary>
+/// GitHub Release 服务实现
+/// </summary>
+public class GitHubReleaseService : IReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<GitHubReleaseService> _logger;
     private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
     private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
 
-    public GitHubReleaseService(IHttpClientFactory httpClientFactory)
+    private CachedData<List<ReleaseInfo>>? _cachedReleases;
+    private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
+    private RateLimitInfo? _rateLimitInfo;
+
+    public GitHubReleaseService(IHttpClientFactory httpClientFactory, ILogger<GitHubReleaseService> logger)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
-
-    /// <summary>
-    /// 获取所有发布版本信息（包含正式版和预览版）
-    /// </summary>
-    /// <returns>所有发布版本信息列表</returns>
-    public async Task<List<ReleaseInfo>?> GetAllReleasesAsync()
-    {
-        try
-        {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
-            
-            var response = await httpClient.GetFromJsonAsync<List<ReleaseInfo>>(_githubApiBaseUrl);
-            return response;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"获取所有发布版本信息失败: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"异常详情: {ex}");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// 获取最新正式版本信息
-    /// </summary>
-    /// <returns>最新正式版本信息</returns>
-    public async Task<ReleaseInfo?> GetLatestReleaseAsync()
-    {
-        try
-        {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
-            var response = await httpClient.GetFromJsonAsync<ReleaseInfo>(_githubApiLatestUrl);
-            return response;
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"获取最新版本信息失败: {ex.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// 获取所有正式版本（非预览版）
-    /// </summary>
-    /// <returns>所有正式版本信息列表</returns>
-    public async Task<List<ReleaseInfo>?> GetStableReleasesAsync()
-    {
-        var allReleases = await GetAllReleasesAsync();
-        return allReleases?.Where(r => !r.Prerelease && !r.Draft).ToList();
-    }
-
-    /// <summary>
-    /// 获取所有预览版本
-    /// </summary>
-    /// <returns>所有预览版本信息列表</returns>
-    public async Task<List<ReleaseInfo>?> GetPrereleaseVersionsAsync()
-    {
-        var allReleases = await GetAllReleasesAsync();
-        return allReleases?.Where(r => r.Prerelease && !r.Draft).ToList();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
     /// 检查是否有新版本
     /// </summary>
-    /// <param name="currentVersion">当前版本</param>
-    /// <param name="includePrerelease">是否包含预览版</param>
-    /// <returns>是否有新版本</returns>
-    public async Task<(bool HasNewVersion, ReleaseInfo? ReleaseInfo)> CheckForUpdateAsync(string currentVersion, bool includePrerelease = true)
+    public async Task<UpdateCheckResult> CheckForUpdateAsync(string currentVersion, bool includePrerelease = true)
     {
-        ReleaseInfo? releaseInfo;
-
-        if (includePrerelease)
+        try
         {
-            var allReleases = await GetAllReleasesAsync();
-            releaseInfo = allReleases?.Where(r => !r.Draft).OrderByDescending(r => r.PublishedAt).FirstOrDefault();
+            _logger.LogInformation("开始检查更新：当前版本 {CurrentVersion}，包含预览版：{IncludePrerelease}",
+                currentVersion, includePrerelease);
+
+            if (string.IsNullOrWhiteSpace(currentVersion))
+            {
+                throw new FriendlyException("当前版本号不能为空");
+            }
+
+            // 检查速率限制
+            if (!CheckRateLimit())
+            {
+                var waitTime = _rateLimitInfo!.ResetTime - DateTime.UtcNow;
+                throw new FriendlyException($"GitHub API 速率限制已达上限，请等待 {waitTime.TotalMinutes:F0} 分钟后重试");
+            }
+
+            // 获取最新版本
+            ReleaseInfo? latestRelease;
+            if (includePrerelease)
+            {
+                var allReleases = await GetAllReleasesInternalAsync();
+                latestRelease = allReleases
+                    .Where(r => !r.Draft)
+                    .OrderByDescending(r => r.PublishedAt)
+                    .FirstOrDefault();
+            }
+            else
+            {
+                latestRelease = await GetLatestReleaseInternalAsync();
+            }
+
+            if (latestRelease == null)
+            {
+                throw new FriendlyException("未找到可用的发布版本");
+            }
+
+            // 比较版本号
+            var latestVersion = latestRelease.TagName.TrimStart('v');
+            var current = currentVersion.TrimStart('v');
+
+            var comparison = CompareVersions(latestVersion, current);
+            var hasNewVersion = comparison > 0;
+
+            var result = new UpdateCheckResult
+            {
+                HasNewVersion = hasNewVersion,
+                LatestRelease = latestRelease,
+                CurrentVersion = currentVersion
+            };
+
+            if (hasNewVersion)
+            {
+                _logger.LogInformation("发现新版本：{LatestVersion}（当前：{CurrentVersion}）",
+                    latestVersion, current);
+            }
+            else
+            {
+                _logger.LogInformation("当前已是最新版本：{CurrentVersion}", current);
+            }
+
+            return result;
         }
-        else
+        catch (FriendlyException)
         {
-            releaseInfo = await GetLatestReleaseAsync();
+            throw;
         }
-
-        if (releaseInfo == null)
+        catch (Exception ex)
         {
-            return (false, null);
+            _logger.LogError(ex, "检查更新失败");
+            throw new FriendlyException($"检查更新失败：{ex.Message}", ex);
         }
-
-        // 移除版本号前的'v'字符
-        var latestVersion = releaseInfo.TagName.StartsWith("v") ? releaseInfo.TagName.Substring(1) : releaseInfo.TagName;
-        var current = currentVersion.StartsWith("v") ? currentVersion.Substring(1) : currentVersion;
-
-        // 比较版本号
-        var hasNewVersion = CompareVersions(latestVersion, current) > 0;
-        return (hasNewVersion, releaseInfo);
     }
 
     /// <summary>
     /// 下载更新文件
     /// </summary>
-    /// <param name="downloadUrl">下载地址</param>
-    /// <param name="savePath">保存路径</param>
-    /// <returns>下载结果</returns>
-    public async Task<bool> DownloadUpdateAsync(string downloadUrl, string savePath)
+    public async Task<string> DownloadUpdateAsync(
+        string downloadUrl,
+        string savePath,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(downloadUrl))
+            {
+                throw new FriendlyException("下载地址不能为空");
+            }
+
+            if (string.IsNullOrWhiteSpace(savePath))
+            {
+                throw new FriendlyException("保存路径不能为空");
+            }
+
+            _logger.LogInformation("开始下载更新文件：{Url} -> {SavePath}", downloadUrl, savePath);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
+            httpClient.Timeout = TimeSpan.FromMinutes(10);
+
+            var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new FriendlyException($"下载失败：HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+            }
+
+            var totalBytes = response.Content.Headers.ContentLength ?? 0;
+            var totalMb = totalBytes / 1024.0 / 1024.0;
+            _logger.LogInformation("文件大小：{Size:F2} MB", totalMb);
+
+            // 确保目录存在
+            var directory = Path.GetDirectoryName(savePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+            var buffer = new byte[8192];
+            long totalRead = 0;
+            int bytesRead;
+            var lastProgressReport = DateTime.UtcNow;
+
+            while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
+            {
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+                totalRead += bytesRead;
+
+                // 报告进度（每100ms报告一次，避免过于频繁）
+                if (progress != null && DateTime.UtcNow - lastProgressReport > TimeSpan.FromMilliseconds(100))
+                {
+                    if (totalBytes > 0)
+                    {
+                        var percentage = (double)totalRead / totalBytes;
+                        progress.Report(percentage);
+                    }
+                    lastProgressReport = DateTime.UtcNow;
+                }
+            }
+
+            // 确保报告100%
+            progress?.Report(1.0);
+
+            _logger.LogInformation("更新文件下载完成：{SavePath}（{Size:F2} MB）", savePath, totalRead / 1024.0 / 1024.0);
+            return savePath;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "下载更新失败：HTTP 请求异常");
+            throw new FriendlyException($"下载失败：{ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("下载已取消");
+            throw new OperationCanceledException("下载已取消", ex, cancellationToken);
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "下载更新失败：文件 IO 异常");
+            throw new FriendlyException($"文件保存失败：{ex.Message}", ex);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "下载更新失败：无权限访问文件");
+            throw new FriendlyException($"无权限保存文件：{ex.Message}", ex);
+        }
+        catch (FriendlyException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "下载更新失败：未知异常");
+            throw new FriendlyException($"下载失败：{ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 清除缓存的版本信息
+    /// </summary>
+    public void ClearCache()
+    {
+        _cachedReleases = null;
+        _logger.LogInformation("已清除版本信息缓存");
+    }
+
+    /// <summary>
+    /// 获取所有发布版本（内部方法）
+    /// </summary>
+    private async Task<List<ReleaseInfo>> GetAllReleasesInternalAsync()
+    {
+        // 检查缓存
+        if (_cachedReleases != null && !_cachedReleases.IsExpired(_cacheExpiration))
+        {
+            _logger.LogDebug("从缓存返回所有版本信息");
+            return _cachedReleases.Data;
+        }
+
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+            var response = await httpClient.GetAsync(_githubApiBaseUrl);
+            UpdateRateLimitInfo(response);
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("GitHub API 速率限制已达上限");
+                // 如果有缓存数据，返回缓存
+                if (_cachedReleases != null)
+                {
+                    return _cachedReleases.Data;
+                }
+                throw new FriendlyException("GitHub API 速率限制已达上限");
+            }
+
+            response.EnsureSuccessStatusCode();
+            var releases = await response.Content.ReadFromJsonAsync<List<ReleaseInfo>>();
+
+            if (releases == null)
+            {
+                throw new FriendlyException("获取版本信息失败：响应数据为空");
+            }
+
+            _cachedReleases = new CachedData<List<ReleaseInfo>>(releases);
+            _logger.LogInformation("成功获取 {Count} 个版本信息", releases.Count);
+            return releases;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "获取版本信息失败：HTTP 请求异常");
+            // 如果有缓存，返回缓存数据作为降级方案
+            if (_cachedReleases != null)
+            {
+                _logger.LogInformation("返回缓存的版本信息作为降级方案");
+                return _cachedReleases.Data;
+            }
+            throw new FriendlyException($"网络请求失败：{ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "获取版本信息失败：请求超时");
+            if (_cachedReleases != null)
+            {
+                return _cachedReleases.Data;
+            }
+            throw new FriendlyException("请求超时", ex);
+        }
+        catch (FriendlyException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取版本信息失败：未知异常");
+            if (_cachedReleases != null)
+            {
+                return _cachedReleases.Data;
+            }
+            throw new FriendlyException($"获取版本信息失败：{ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 获取最新正式版本（内部方法）
+    /// </summary>
+    private async Task<ReleaseInfo> GetLatestReleaseInternalAsync()
     {
         try
         {
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
-            var response = await httpClient.GetAsync(downloadUrl);
-            response.EnsureSuccessStatusCode();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
 
-            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await response.Content.CopyToAsync(fileStream);
-            return true;
+            var response = await httpClient.GetAsync(_githubApiLatestUrl);
+            UpdateRateLimitInfo(response);
+
+            if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("GitHub API 速率限制已达上限");
+                throw new FriendlyException("GitHub API 速率限制已达上限");
+            }
+
+            response.EnsureSuccessStatusCode();
+            var release = await response.Content.ReadFromJsonAsync<ReleaseInfo>();
+
+            if (release == null)
+            {
+                throw new FriendlyException("获取版本信息失败：响应数据为空");
+            }
+
+            _logger.LogInformation("成功获取最新版本信息：{Version}", release.TagName);
+            return release;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "获取最新版本信息失败：HTTP 请求异常");
+            throw new FriendlyException($"网络请求失败：{ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogError(ex, "获取最新版本信息失败：请求超时");
+            throw new FriendlyException("请求超时", ex);
+        }
+        catch (FriendlyException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"下载更新失败: {ex.Message}");
-            return false;
+            _logger.LogError(ex, "获取最新版本信息失败：未知异常");
+            throw new FriendlyException($"获取版本信息失败：{ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 检查 GitHub API 速率限制
+    /// </summary>
+    private bool CheckRateLimit()
+    {
+        if (_rateLimitInfo == null || _rateLimitInfo.IsExpired())
+        {
+            return true;
+        }
+
+        if (_rateLimitInfo.Remaining <= 0)
+        {
+            var waitTime = _rateLimitInfo.ResetTime - DateTime.UtcNow;
+            if (waitTime > TimeSpan.Zero)
+            {
+                _logger.LogWarning("GitHub API 速率限制已达上限，需等待 {WaitTime} 后重试", waitTime);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 从响应头更新速率限制信息
+    /// </summary>
+    private void UpdateRateLimitInfo(HttpResponseMessage response)
+    {
+        try
+        {
+            if (response.Headers.TryGetValues("X-RateLimit-Limit", out var limitValues) &&
+                response.Headers.TryGetValues("X-RateLimit-Remaining", out var remainingValues) &&
+                response.Headers.TryGetValues("X-RateLimit-Reset", out var resetValues))
+            {
+                var limit = int.Parse(limitValues.First());
+                var remaining = int.Parse(remainingValues.First());
+                var resetTimestamp = long.Parse(resetValues.First());
+                var resetTime = DateTimeOffset.FromUnixTimeSeconds(resetTimestamp).UtcDateTime;
+
+                _rateLimitInfo = new RateLimitInfo(limit, remaining, resetTime);
+
+                _logger.LogDebug("GitHub API 速率限制：{Remaining}/{Limit}，重置时间：{ResetTime}",
+                    remaining, limit, resetTime);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析 GitHub API 速率限制信息失败");
         }
     }
 
     /// <summary>
     /// 比较版本号（支持三位数和四位数版本号格式）
     /// </summary>
-    /// <param name="version1">版本1</param>
-    /// <param name="version2">版本2</param>
-    /// <returns>比较结果：1表示version1>version2，-1表示version1<version2，0表示相等</returns>
     private int CompareVersions(string version1, string version2)
     {
         try
@@ -150,13 +411,10 @@ public class GitHubReleaseService
             var v1 = ParseVersionInfo(version1);
             var v2 = ParseVersionInfo(version2);
 
-            // 使用 System.Version 进行版本号比较
             var result = v1.Version.CompareTo(v2.Version);
             if (result != 0)
                 return result;
 
-            // 如果主版本号相同，比较预发布版本
-            // 根据 SemVer 规范：正式版本 > 预发布版本
             if (string.IsNullOrEmpty(v1.Prerelease) && !string.IsNullOrEmpty(v2.Prerelease))
                 return 1;
             if (!string.IsNullOrEmpty(v1.Prerelease) && string.IsNullOrEmpty(v2.Prerelease))
@@ -168,8 +426,7 @@ public class GitHubReleaseService
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"版本号比较失败: {ex.Message}");
-            // 如果解析失败，回退到字符串比较
+            _logger.LogWarning(ex, "版本号比较失败：{Version1} vs {Version2}", version1, version2);
             return string.Compare(version1, version2, StringComparison.OrdinalIgnoreCase);
         }
     }
@@ -177,34 +434,26 @@ public class GitHubReleaseService
     /// <summary>
     /// 解析版本号字符串（支持三位数和四位数版本号）
     /// </summary>
-    /// <param name="version">版本号字符串</param>
-    /// <returns>解析后的版本信息</returns>
     private (Version Version, string Prerelease) ParseVersionInfo(string version)
     {
         if (string.IsNullOrWhiteSpace(version))
             throw new ArgumentException("版本号不能为空", nameof(version));
 
-        // 分离主版本号和预发布标识符
         var parts = version.Split('-', 2);
         var mainVersion = parts[0];
         var prerelease = parts.Length > 1 ? parts[1] : string.Empty;
 
-        // 验证版本号格式
         if (!IsValidVersionFormat(mainVersion))
             throw new FormatException($"无效的版本号格式: {mainVersion}");
 
-        // 使用 System.Version 解析版本号
-        // System.Version 支持 Major.Minor、Major.Minor.Build、Major.Minor.Build.Revision 格式
         if (Version.TryParse(mainVersion, out var parsedVersion))
         {
             return (parsedVersion, prerelease);
         }
 
-        // 如果解析失败，尝试补全版本号格式
         var versionParts = mainVersion.Split('.');
         if (versionParts.Length >= 2)
         {
-            // 确保至少有 Major.Minor 格式
             var normalizedVersion = string.Join(".", versionParts.Take(4));
             if (Version.TryParse(normalizedVersion, out var normalizedParsedVersion))
             {
@@ -218,8 +467,6 @@ public class GitHubReleaseService
     /// <summary>
     /// 验证版本号格式是否有效
     /// </summary>
-    /// <param name="version">版本号字符串</param>
-    /// <returns>是否为有效格式</returns>
     private bool IsValidVersionFormat(string version)
     {
         if (string.IsNullOrWhiteSpace(version))
@@ -235,9 +482,6 @@ public class GitHubReleaseService
     /// <summary>
     /// 比较预发布版本标识符
     /// </summary>
-    /// <param name="prerelease1">预发布版本1</param>
-    /// <param name="prerelease2">预发布版本2</param>
-    /// <returns>比较结果</returns>
     private int ComparePrerelease(string prerelease1, string prerelease2)
     {
         var parts1 = prerelease1.Split('.');
@@ -248,13 +492,11 @@ public class GitHubReleaseService
             var part1 = i < parts1.Length ? parts1[i] : string.Empty;
             var part2 = i < parts2.Length ? parts2[i] : string.Empty;
 
-            // 如果一个部分为空，另一个不为空，空的部分较小
             if (string.IsNullOrEmpty(part1) && !string.IsNullOrEmpty(part2))
                 return -1;
             if (!string.IsNullOrEmpty(part1) && string.IsNullOrEmpty(part2))
                 return 1;
 
-            // 尝试按数字比较
             if (int.TryParse(part1, out var num1) && int.TryParse(part2, out var num2))
             {
                 if (num1 != num2)
@@ -262,7 +504,6 @@ public class GitHubReleaseService
             }
             else
             {
-                // 按字符串比较
                 var result = string.Compare(part1, part2, StringComparison.OrdinalIgnoreCase);
                 if (result != 0)
                     return result;
@@ -273,71 +514,44 @@ public class GitHubReleaseService
     }
 }
 
-public class ReleaseInfo
+/// <summary>
+/// 缓存数据包装类
+/// </summary>
+internal class CachedData<T>
 {
-    [JsonPropertyName("id")]
-    public long Id { get; set; }
+    public T Data { get; }
+    public DateTime Timestamp { get; }
 
-    [JsonPropertyName("url")]
-    public string Url { get; set; } = string.Empty;
+    public CachedData(T data)
+    {
+        Data = data;
+        Timestamp = DateTime.UtcNow;
+    }
 
-    [JsonPropertyName("assets_url")]
-    public string AssetsUrl { get; set; } = string.Empty;
-
-    [JsonPropertyName("upload_url")]
-    public string UploadUrl { get; set; } = string.Empty;
-
-    [JsonPropertyName("html_url")]
-    public string HtmlUrl { get; set; } = string.Empty;
-
-    [JsonPropertyName("node_id")]
-    public string NodeId { get; set; } = string.Empty;
-
-    [JsonPropertyName("tag_name")]
-    public string TagName { get; set; } = string.Empty;
-
-    [JsonPropertyName("target_commitish")]
-    public string TargetCommitish { get; set; } = string.Empty;
-
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
-
-    [JsonPropertyName("draft")]
-    public bool Draft { get; set; }
-
-    [JsonPropertyName("prerelease")]
-    public bool Prerelease { get; set; }
-
-    [JsonPropertyName("created_at")]
-    public DateTime CreatedAt { get; set; }
-
-    [JsonPropertyName("published_at")]
-    public DateTime PublishedAt { get; set; }
-
-    [JsonPropertyName("assets")]
-    public List<ReleaseAsset> Assets { get; set; } = new List<ReleaseAsset>();
-
-    [JsonPropertyName("tarball_url")]
-    public string TarballUrl { get; set; } = string.Empty;
-
-    [JsonPropertyName("zipball_url")]
-    public string ZipballUrl { get; set; } = string.Empty;
-
-    [JsonPropertyName("body")]
-    public string Body { get; set; } = string.Empty;
+    public bool IsExpired(TimeSpan expiration)
+    {
+        return DateTime.UtcNow - Timestamp > expiration;
+    }
 }
 
-public class ReleaseAsset
+/// <summary>
+/// GitHub API 速率限制信息
+/// </summary>
+internal class RateLimitInfo
 {
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
+    public int Limit { get; }
+    public int Remaining { get; }
+    public DateTime ResetTime { get; }
 
-    [JsonPropertyName("browser_download_url")]
-    public string DownloadUrl { get; set; } = string.Empty;
+    public RateLimitInfo(int limit, int remaining, DateTime resetTime)
+    {
+        Limit = limit;
+        Remaining = remaining;
+        ResetTime = resetTime;
+    }
 
-    [JsonPropertyName("size")]
-    public long Size { get; set; }
-
-    [JsonPropertyName("content_type")]
-    public string ContentType { get; set; } = string.Empty;
+    public bool IsExpired()
+    {
+        return DateTime.UtcNow >= ResetTime;
+    }
 }

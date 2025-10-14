@@ -15,7 +15,7 @@ public partial class StockPageView : UserControl
     public StockPageView()
     {
         InitializeComponent();
-
+        
         DataContextChanged += OnDataContextChanged;
         Loaded += OnLoaded;
     }
@@ -51,11 +51,7 @@ public partial class StockPageView : UserControl
         // 当页面加载时（包括从导航返回），重新更新图表
         if (_viewModel?.KLineData != null && _viewModel.KLineData.Any())
         {
-            // 延迟一小段时间以确保 WebView 完全初始化
-            _ = Task.Delay(500).ContinueWith(_ =>
-            {
-                Dispatcher.UIThread.Post(() => UpdateCharts(), DispatcherPriority.Background);
-            });
+            UpdateCharts();
         }
     }
 

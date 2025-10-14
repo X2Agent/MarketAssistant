@@ -4,17 +4,34 @@
 
 ## 📁 工作流文件
 
-### build.yml - 持续集成
+### build.yml - 构建验证
 **触发条件：**
 - Push to: `main`, `develop`, `feat/*`
 - Pull Request to: `main`, `develop`
 
 **任务：**
-- ✅ 运行单元测试
 - ✅ 在三个平台验证构建（Windows, macOS, Linux）
-- ✅ 不创建安装包（快速反馈）
+- ✅ 不运行单元测试（不依赖环境变量）
+- ✅ 快速反馈构建问题
 
-**用途：** 开发过程中及早发现问题
+**用途：** 开发过程中验证代码编译通过
+
+### test.yml - 单元测试
+**触发条件：**
+- 手动触发（workflow_dispatch）
+- 可配置自动触发（默认关闭）
+
+**任务：**
+- ✅ 运行完整单元测试套件
+- ✅ 需要配置 GitHub Secrets（API Keys）
+- ✅ 生成测试报告
+
+**用途：** 在配置好环境变量后运行完整测试
+
+**所需 Secrets：**
+- `OPENAI_API_KEY` - OpenAI API 密钥
+- `ZHITU_API_TOKEN` - 知图 API Token
+- `WEB_SEARCH_API_KEY` - 网络搜索 API 密钥
 
 ### release.yml - 发布构建
 **触发条件：**
@@ -108,8 +125,8 @@ act push -W .github/workflows/build.yml
 # 只测试 Windows 构建
 .\scripts\test-workflows.ps1 -Workflow build -Job build-windows
 
-# 只测试测试任务
-.\scripts\test-workflows.ps1 -Workflow build -Job test
+# 只测试 macOS 构建
+.\scripts\test-workflows.ps1 -Workflow build -Job build-macos
 ```
 
 或使用 act:
@@ -118,7 +135,14 @@ act push -W .github/workflows/build.yml
 act push -W .github/workflows/build.yml -j build-windows
 ```
 
-#### 4. 测试 release.yml
+#### 4. 测试单元测试工作流
+
+```powershell
+# 测试 test.yml（需要配置环境变量）
+.\scripts\test-workflows.ps1 -Workflow test
+```
+
+#### 5. 测试 release.yml
 
 ```powershell
 # ⚠️ 警告：release 工作流会执行完整构建，耗时较长
@@ -168,10 +192,21 @@ on:
 ```
 
 **Jobs:**
+1. **build-windows** - 验证 Windows 构建
+2. **build-macos** - 验证 macOS 构建
+3. **build-linux** - 验证 Linux 构建
+
+### test.yml 配置
+
+```yaml
+on:
+  workflow_dispatch:  # 手动触发
+```
+
+**Jobs:**
 1. **test** - 运行单元测试（Ubuntu）
-2. **build-windows** - 验证 Windows 构建
-3. **build-macos** - 验证 macOS 构建
-4. **build-linux** - 验证 Linux 构建
+
+**注意：** 需要在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置所需的 API 密钥
 
 ### release.yml 配置
 
@@ -197,10 +232,15 @@ on:
 ### build.yml 验证
 
 - [ ] 语法正确（`act -l` 能列出）
-- [ ] 单元测试运行成功
 - [ ] Windows 构建通过
 - [ ] macOS 构建通过（带 -r osx-x64）
 - [ ] Linux 构建通过（带 -r linux-x64）
+
+### test.yml 验证
+
+- [ ] 语法正确
+- [ ] GitHub Secrets 已配置
+- [ ] 单元测试运行成功
 
 ### release.yml 验证
 
@@ -220,11 +260,11 @@ act -l
 # 2. Dry run build.yml
 act push -W .github/workflows/build.yml -n
 
-# 3. 测试单元测试 job
-act push -W .github/workflows/build.yml -j test
-
-# 4. 测试 Windows 构建
+# 3. 测试 Windows 构建
 act push -W .github/workflows/build.yml -j build-windows
+
+# 4. 测试 test.yml（需要配置环境变量）
+act workflow_dispatch -W .github/workflows/test.yml
 ```
 
 ---
@@ -279,6 +319,21 @@ git push origin develop
 # 创建 PR
 gh pr create --base main
 ```
+
+### 触发 test.yml
+
+在 GitHub UI：
+1. Actions → Run Tests
+2. Run workflow → 选择分支
+3. 点击 Run workflow
+
+或使用 CLI:
+
+```bash
+gh workflow run test.yml
+```
+
+**注意：** 确保已在仓库 Settings → Secrets and variables → Actions 中配置所需的 API 密钥。
 
 ### 触发 release.yml
 

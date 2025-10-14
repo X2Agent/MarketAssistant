@@ -86,7 +86,7 @@
 
             <!-- 知识库设置区域 -->
             <controls:CardView Header="知识库设置">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                     <!-- 是否加载知识库 -->
                     <CheckBox Grid.Row="0"
                               IsChecked="{Binding UserSetting.LoadKnowledge}"
@@ -143,9 +143,26 @@
                                   IsVisible="{Binding IsVectorizing}"/>
                     </StackPanel>
                     
+                    <!-- 向量化进度条 -->
+                    <ProgressBar Grid.Row="5"
+                                 Value="{Binding VectorizingProgress}"
+                                 Maximum="100"
+                                 Height="8"
+                                 IsVisible="{Binding IsVectorizing}"
+                                 Margin="0,12,0,0"/>
+                    
+                    <!-- 向量化进度文本 -->
+                    <TextBlock Grid.Row="6"
+                               Text="{Binding VectorizingProgressText}"
+                               FontSize="13"
+                               Foreground="{StaticResource PrimaryBrush}"
+                               FontWeight="Medium"
+                               IsVisible="{Binding IsVectorizing}"
+                               Margin="0,8,0,0"/>
+                    
                     <!-- 提示文本 -->
-                    <TextBlock Grid.Row="5"
-                               Text="将读取知识文件夹中的PDF和DOCX文件并进行向量化存储"
+                    <TextBlock Grid.Row="7"
+                               Text="将读取知识文件夹中的PDF、DOCX和Markdown文件并进行向量化存储"
                                FontSize="12"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                TextWrapping="Wrap"

@@ -1,6 +1,7 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.News;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Applications.Telegrams;
@@ -98,6 +99,9 @@ public static class ServiceCollectionExtensions
         // 注册AI选股相关服务
         services.AddSingleton<StockSelectionManager>();
         services.AddSingleton<StockSelectionService>();
+
+        // 注册版本更新服务
+        services.AddSingleton<IReleaseService, GitHubReleaseService>();
 
         // 注册 Avalonia 平台特定服务
         services.AddSingleton<IDialogService, DialogService>();

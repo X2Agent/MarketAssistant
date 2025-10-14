@@ -10,7 +10,6 @@
              x:Class="MarketAssistant.Views.Pages.AboutPageView"
              x:DataType="vm:AboutPageViewModel">
 
-    
     <Design.DataContext>
         <vm:AboutPageViewModel/>
     </Design.DataContext>
@@ -125,10 +124,57 @@
                                 Height="36"
                                 Width="100"
                                 Command="{Binding DownloadUpdateCommand}"
-                                IsVisible="{Binding HasNewVersion}"/>
+                                IsVisible="{Binding HasNewVersion}"
+                                IsEnabled="{Binding IsDownloading, Converter={x:Static BoolConverters.Not}}"/>
+
+                        <!-- 下载进度条 -->
+                        <ProgressBar Value="{Binding DownloadProgress}"
+                                     Maximum="100"
+                                     Height="4"
+                                     Width="100"
+                                     IsVisible="{Binding IsDownloading}"/>
                     </StackPanel>
                 </Grid>
                 </Panel>
+            </controls:CardView>
+
+            <!-- 版本更新信息 -->
+            <controls:CardView Header="版本更新信息"
+                               IsVisible="{Binding HasNewVersion}">
+                <StackPanel Spacing="8">
+                    <!-- 最新版本 -->
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0"
+                                   Text="最新版本："
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding LatestVersion}"
+                                   FontSize="14"
+                                   Foreground="{StaticResource SuccessBrush}"
+                                   FontWeight="Bold"
+                                   Margin="4,0,0,0"/>
+                    </Grid>
+
+                    <!-- 更新说明 -->
+                    <TextBlock Text="更新说明："
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Margin="0,8,0,0"/>
+                    <Border Background="{DynamicResource ItemBackground}"
+                            CornerRadius="8"
+                            Padding="12"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1">
+                        <TextBlock Text="{Binding ReleaseNotes}"
+                                   FontSize="13"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   MaxHeight="200"/>
+                    </Border>
+                </StackPanel>
             </controls:CardView>
 
             <!-- 功能选项列表 -->

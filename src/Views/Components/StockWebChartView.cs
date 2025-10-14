@@ -90,8 +90,8 @@ public class StockWebChartView : UserControl
 
         Content = grid;
 
-        // 初始化图表
-        _ = InitializeChartAsync();
+        // 延迟初始化：不在构造时立即初始化，等待数据加载完成后再初始化
+        // 这样可以让页面更快地打开
     }
 
     /// <summary>
@@ -329,6 +329,13 @@ public class StockWebChartView : UserControl
 
         try
         {
+            // 首次调用时才初始化图表（延迟初始化）
+            if (!_isInitialized)
+            {
+                _logger?.LogInformation("首次加载图表数据，开始初始化 WebView");
+                await InitializeChartAsync();
+            }
+
             await WaitForInitializationAsync();
 
             await Dispatcher.UIThread.InvokeAsync(() =>

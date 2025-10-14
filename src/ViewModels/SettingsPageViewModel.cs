@@ -3,10 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
 using YamlDotNet.Serialization;
 
@@ -20,6 +23,8 @@ public partial class SettingsPageViewModel : ViewModelBase
     private readonly IRagIngestionService _ragIngestionService;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly VectorStore _vectorStore;
     private IStorageProvider? _storageProvider;
 
     // UserSetting对象，包含所有用户设置
@@ -36,6 +41,14 @@ public partial class SettingsPageViewModel : ViewModelBase
     // 是否正在向量化
     [ObservableProperty]
     private bool _isVectorizing;
+
+    // 向量化进度（0-100）
+    [ObservableProperty]
+    private int _vectorizingProgress;
+
+    // 向量化进度文本
+    [ObservableProperty]
+    private string _vectorizingProgressText = "";
 
     // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
@@ -113,11 +126,15 @@ public partial class SettingsPageViewModel : ViewModelBase
         IRagIngestionService ragIngestionService,
         INotificationService notificationService,
         IUserSettingService userSettingService,
+        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        VectorStore vectorStore,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
         _ragIngestionService = ragIngestionService;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
+        _embeddingGenerator = embeddingGenerator;
+        _vectorStore = vectorStore;
         _ = InitializeAsync();
     }
 
@@ -235,6 +252,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         if (!IsKnowledgeDirectoryValid)
         {
+            _notificationService.ShowWarning("知识库目录无效，请先选择有效的目录");
             Logger?.LogWarning("知识库目录无效，无法进行向量化");
             return;
         }
@@ -242,12 +260,105 @@ public partial class SettingsPageViewModel : ViewModelBase
         await SafeExecuteAsync(async () =>
         {
             IsVectorizing = true;
+            VectorizingProgress = 0;
+            VectorizingProgressText = "准备中...";
+
             try
             {
-                // TODO: 实现完整的向量化逻辑
-                // 需要遍历知识库目录中的文件并调用 _ragIngestionService.IngestDocumentAsync
-                Logger?.LogInformation($"开始向量化知识库目录: {UserSetting.KnowledgeFileDirectory}");
-                await Task.CompletedTask;
+                Logger?.LogInformation("开始向量化知识库目录: {Directory}", UserSetting.KnowledgeFileDirectory);
+
+                // 使用 UserSetting 中定义的集合名称
+                var collectionName = UserSetting.VectorCollectionName;
+                var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
+                await collection.EnsureCollectionExistsAsync();
+                Logger?.LogInformation("使用向量集合: {CollectionName}", collectionName);
+
+                // 支持的文件扩展名：PDF、DOCX、Markdown
+                var supportedExtensions = new[] { ".pdf", ".docx", ".md" };
+
+                // 扫描目录获取所有支持的文件
+                var files = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.*", SearchOption.AllDirectories)
+                    .Where(f => supportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                    .ToList();
+
+                if (files.Count == 0)
+                {
+                    _notificationService.ShowWarning($"未找到支持的文档（支持：{string.Join(", ", supportedExtensions)}）");
+                    Logger?.LogWarning("知识库目录中没有找到支持的文档");
+                    return;
+                }
+
+                var totalFiles = files.Count;
+                Logger?.LogInformation("找到 {Count} 个文档需要向量化", totalFiles);
+                _notificationService.ShowInfo($"开始向量化 {totalFiles} 个文档...");
+
+                var successCount = 0;
+                var failedCount = 0;
+                var failedFiles = new List<string>();
+
+                // 逐个处理文件
+                for (int i = 0; i < totalFiles; i++)
+                {
+                    var file = files[i];
+                    var fileName = Path.GetFileName(file);
+                    var fileExtension = Path.GetExtension(file).ToUpperInvariant();
+
+                    try
+                    {
+                        // 更新进度
+                        var currentIndex = i + 1;
+                        VectorizingProgress = (int)((double)currentIndex / totalFiles * 100);
+                        VectorizingProgressText = $"正在处理 {currentIndex}/{totalFiles}: {fileName}";
+
+                        Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]", 
+                            currentIndex, totalFiles, fileName, fileExtension);
+
+                        // 执行向量化
+                        await _ragIngestionService.IngestFileAsync(collection, file, _embeddingGenerator);
+
+                        successCount++;
+                        Logger?.LogInformation("✓ 成功向量化: {FileName}", fileName);
+                    }
+                    catch (Exception ex)
+                    {
+                        failedCount++;
+                        failedFiles.Add(fileName);
+                        Logger?.LogError(ex, "✗ 向量化失败: {FileName} - {ErrorMessage}", fileName, ex.Message);
+                        
+                        // 单个文件失败不中断整体流程，继续处理下一个
+                    }
+                }
+
+                // 显示完成消息
+                VectorizingProgress = 100;
+                if (failedCount == 0)
+                {
+                    VectorizingProgressText = $"✅ 全部完成！共 {successCount} 个文件";
+                    _notificationService.ShowSuccess($"✅ 所有文档向量化完成！\n成功处理 {successCount} 个文件");
+                    Logger?.LogInformation("向量化完成：成功 {Success}/{Total} 个", successCount, totalFiles);
+                }
+                else
+                {
+                    VectorizingProgressText = $"⚠️ 完成（部分失败）: {successCount} 成功, {failedCount} 失败";
+                    var failedList = string.Join("\n- ", failedFiles.Take(5));
+                    if (failedFiles.Count > 5)
+                    {
+                        failedList += $"\n... 还有 {failedFiles.Count - 5} 个";
+                    }
+                    
+                    _notificationService.ShowWarning(
+                        $"向量化完成：\n✓ 成功 {successCount} 个\n✗ 失败 {failedCount} 个\n\n失败文件：\n- {failedList}");
+                    
+                    Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个", 
+                        successCount, failedCount, totalFiles);
+                }
+            }
+            catch (Exception ex)
+            {
+                VectorizingProgressText = "向量化失败";
+                Logger?.LogError(ex, "向量化过程发生严重错误");
+                _notificationService.ShowError($"向量化失败：{ex.Message}");
+                throw;
             }
             finally
             {
