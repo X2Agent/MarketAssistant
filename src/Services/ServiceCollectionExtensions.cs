@@ -62,13 +62,6 @@ public static class ServiceCollectionExtensions
             return svc.CreateKernel();
         });
 
-        services.AddSingleton(serviceProvider =>
-        {
-            var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
-            var embeddingGenerator = embeddingFactory.Create();
-            return embeddingGenerator;
-        });
-
         // 注册向量存储
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
         services.AddSqliteVectorStore(_ => $"Data Source={store}");

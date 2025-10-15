@@ -70,26 +70,15 @@
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:NavigationItemViewModel">
-                            <Grid>
-                                <!-- 左侧选中指示竖线 -->
-                                <Border Width="3" 
-                                        Height="32"
-                                        Background="{DynamicResource SystemAccentColor}"
-                                        CornerRadius="0,2,2,0"
-                                        HorizontalAlignment="Left"
-                                        IsVisible="{Binding $parent[ListBoxItem].IsSelected}"
-                                        Margin="-8,0,0,0"/>
-                                
-                                <!-- 图标 -->
-                                <Panel Width="24" 
-                                       Height="24"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       ToolTip.Tip="{Binding Title}">
-                                    <svg:Svg Width="24" Height="24" Path="{Binding IconPath}"/>
-                                    <svg:Svg Width="24" Height="24" Path="{Binding SelectedIconPath}" IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
-                                </Panel>
-                            </Grid>
+                            <!-- 图标 -->
+                            <Panel Width="24" 
+                                   Height="24"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding Title}">
+                                <svg:Svg Width="24" Height="24" Path="{Binding IconPath}"/>
+                                <svg:Svg Width="24" Height="24" Path="{Binding SelectedIconPath}" IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                            </Panel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

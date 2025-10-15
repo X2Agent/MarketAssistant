@@ -9,5 +9,10 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
+    <!-- TextBox 全局样式 - 垂直居中对齐 -->
+    <Style Selector="TextBox">
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
 </Styles>
 
