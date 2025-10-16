@@ -1,0 +1,83 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="80" d:DesignHeight="24"
+             x:Class="MarketAssistant.Views.Controls.LoadingDots"
+             x:Name="Root">
+    
+    <StackPanel Orientation="Horizontal" 
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="{Binding #Root.DotSpacing}">
+        <Ellipse x:Name="Dot1"
+                 Fill="{Binding #Root.DotColor}"
+                 Width="{Binding #Root.DotSize}"
+                 Height="{Binding #Root.DotSize}">
+            <Ellipse.Styles>
+                <Style Selector="Ellipse">
+                    <Style.Animations>
+                        <Animation Duration="0:0:1.2" IterationCount="Infinite">
+                            <KeyFrame Cue="0%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="33%">
+                                <Setter Property="Opacity" Value="1"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="66%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+            </Ellipse.Styles>
+        </Ellipse>
+        
+        <Ellipse x:Name="Dot2"
+                 Fill="{Binding #Root.DotColor}"
+                 Width="{Binding #Root.DotSize}"
+                 Height="{Binding #Root.DotSize}">
+            <Ellipse.Styles>
+                <Style Selector="Ellipse">
+                    <Style.Animations>
+                        <Animation Duration="0:0:1.2" IterationCount="Infinite" Delay="0:0:0.2">
+                            <KeyFrame Cue="0%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="33%">
+                                <Setter Property="Opacity" Value="1"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="66%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+            </Ellipse.Styles>
+        </Ellipse>
+        
+        <Ellipse x:Name="Dot3"
+                 Fill="{Binding #Root.DotColor}"
+                 Width="{Binding #Root.DotSize}"
+                 Height="{Binding #Root.DotSize}">
+            <Ellipse.Styles>
+                <Style Selector="Ellipse">
+                    <Style.Animations>
+                        <Animation Duration="0:0:1.2" IterationCount="Infinite" Delay="0:0:0.4">
+                            <KeyFrame Cue="0%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="33%">
+                                <Setter Property="Opacity" Value="1"/>
+                            </KeyFrame>
+                            <KeyFrame Cue="66%">
+                                <Setter Property="Opacity" Value="0.3"/>
+                            </KeyFrame>
+                        </Animation>
+                    </Style.Animations>
+                </Style>
+            </Ellipse.Styles>
+        </Ellipse>
+    </StackPanel>
+</UserControl>
+

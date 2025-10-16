@@ -1,6 +1,6 @@
 ## ✨ 简介
 
-本项目基于.NET MAUI开发，结合AI大模型构建的股票分析工具。目前已支持A股，未来计划加入港股、美股、虚拟币等支持。
+本项目基于 Avalonia UI 开发，结合 AI 大模型构建的跨平台股票分析工具。目前已支持 A 股，未来计划加入港股、美股、虚拟币等支持。
 
 基于实时数据，旨在做出明智的决策，主要专注于金融市场。它利用分析大量数据，提供股票等的动态实时洞察。快速汇集相关信息，全面审核整个情况，旨在为投资者、交易员和顾问提供最佳结果
 
@@ -120,13 +120,16 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
   
 ## 🖥️ 平台支持
 
-- Windows (WinUI)
-- MacOS
+- Windows
+- macOS
+- Linux
 
 ## 🛠️ 技术栈
 
-- .NET MAUI
+- Avalonia UI 11.3.7
+- .NET 9.0
 - Semantic Kernel
+- CommunityToolkit.Mvvm
   
 ## 🙏 鸣谢
 

@@ -1,0 +1,45 @@
+name: Run Tests
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  # 取消注释下面的行以在特定分支自动运行测试
+  # push:
+  #   branches: [ main ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore MarketAssistant.slnx
+    
+    - name: Build solution
+      run: dotnet build MarketAssistant.slnx -c Debug --no-restore
+    
+    - name: Run tests
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ZHITU_API_TOKEN: ${{ secrets.ZHITU_API_TOKEN }}
+        WEB_SEARCH_API_KEY: ${{ secrets.WEB_SEARCH_API_KEY }}
+      run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build --logger "trx;LogFileName=test-results.trx"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: '**/test-results.trx'
+

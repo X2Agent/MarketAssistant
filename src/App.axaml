@@ -1,0 +1,47 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MarketAssistant.App"
+             xmlns:infra="using:MarketAssistant.Infrastructure.Core"
+             RequestedThemeVariant="Default">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.DataTemplates>
+        <infra:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="/Resources/Styles/Colors.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Spacing.axaml"/>
+                <ResourceInclude Source="/Resources/Styles/Geometries.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+  
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="/Resources/Styles/ButtonStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/CardStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
+        <StyleInclude Source="/Views/Controls/CardView.axaml"/>
+    </Application.Styles>
+
+    <!-- 系统托盘图标 -->
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/trans_bg.ico" 
+                      ToolTipText="MarketAssistant - 智能股票分析助手"
+                      Clicked="TrayIcon_Clicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="显示主窗口" Click="ShowMainWindow_Click"/>
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="退出" Click="Exit_Click"/>
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+</Application>

@@ -1,363 +1,209 @@
 name: Build and Release
-# 优化后的发布脚本 - 提高构建速度
-permissions:
-  contents: write
-
-env:
-  DOTNET_VERSION: "9.0.x"
-  BUILD_CONFIGURATION: "Release"
 
 on:
+  push:
+    tags:
+      - 'v*'
   release:
-    types: [published]
+    types: [created]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: false
+        default: '1.0.0'
 
+env:
+  DOTNET_VERSION: '9.0.x'
+  APP_NAME: MarketAssistant
+  
 jobs:
+  # Windows 构建
   build-windows:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        platform: [x64]
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # 优化缓存策略 - 修复Windows路径
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~\.nuget\packages
-            ~\.nuget\global-packages
-            ~\.nuget\tools
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      # 缓存MAUI workload - 修复Windows路径
-      - name: Cache MAUI workload
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~\.dotnet\tools
-            ~\.dotnet\workloads
-          key: ${{ runner.os }}-maui-workload-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-maui-workload-
-
-      # 安装MAUI workload
-      - name: Install MAUI workload
-        run: dotnet workload install maui-windows
-
-      # 恢复依赖
-      - name: Restore dependencies
-        run: dotnet restore MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj --runtime win-x64 --verbosity minimal
-
-      # 优化构建配置
-      - name: Build Windows app
-        env:
-          DOTNET_CLI_TELEMETRY_OPTOUT: 1
-          NUGET_XMLDOC_MODE: skip
-        run: |
-          dotnet publish MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj `
-            -c ${{ env.BUILD_CONFIGURATION }} `
-            -f net9.0-windows10.0.19041.0 `
-            -r win-x64 `
-            -p:Platform=x64 `
-            -p:SelfContained=false `
-            -p:PublishReadyToRun=false `
-            -p:PublishTrimmed=false `
-            -p:EnableCompressionInSingleFile=false `
-            -p:DebugType=None `
-            -p:DebugSymbols=false `
-            --verbosity minimal `
-            --no-restore `
-            -o ./publish/windows
-
-      # 优化打包过程
-      - name: Create Windows package
-        run: |
-          # 创建安装包目录
-          New-Item -ItemType Directory -Force -Path "./installer/windows"
-
-          # 复制文件
-          Copy-Item -Path "./publish/windows/*" -Destination "./installer/windows/" -Recurse
-
-          # 创建安装脚本
-          @'
-          @echo off
-          echo Installing MarketAssistant...
-          if not exist "%ProgramFiles%\MarketAssistant" mkdir "%ProgramFiles%\MarketAssistant"
-          xcopy /E /I /Y "%~dp0*" "%ProgramFiles%\MarketAssistant\"
-          echo Installation completed!
-          pause
-          '@ | Out-File -FilePath "./installer/windows/install.bat" -Encoding ASCII
-
-          # 使用更快的压缩方式
-          Compress-Archive -Path "./installer/windows/*" -DestinationPath "./MarketAssistant-Windows-x64.zip" -CompressionLevel Optimal
-
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-release-${{ matrix.platform }}
-          path: ./MarketAssistant-Windows-x64.zip
-          retention-days: 7
-
-  # 并行构建macOS版本
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore MarketAssistant.slnx
+    
+    - name: Build Windows x64
+      run: |
+        dotnet publish src/MarketAssistant.csproj `
+          -c Release `
+          -r win-x64 `
+          --self-contained `
+          -p:PublishReadyToRun=true `
+          -p:PublishSingleFile=false `
+          -p:UseAppHost=true `
+          -p:DebugType=None `
+          -p:DebugSymbols=false `
+          -o ./publish/windows
+    
+    - name: Clean debug files
+      run: |
+        Get-ChildItem -Path ./publish/windows -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
+      shell: pwsh
+    
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path ./publish/windows/* `
+          -DestinationPath ./${{ env.APP_NAME }}-Windows-x64.zip `
+          -CompressionLevel Optimal
+      shell: pwsh
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-x64
+        path: ${{ env.APP_NAME }}-Windows-x64.zip
+  
+  # macOS 构建
   build-macos:
-    runs-on: macos-14
-
-    strategy:
-      matrix:
-        platform: [x64]
-
+    runs-on: macos-latest
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # 优化缓存 - macOS路径
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.nuget/packages
-            ~/.nuget/global-packages
-            ~/.nuget/tools
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '**/*.targets') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Cache MAUI workload
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.dotnet/tools
-            ~/.dotnet/workloads
-          key: ${{ runner.os }}-maui-workload-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-maui-workload-
-
-      - name: Install MAUI workload
-        env:
-          DOTNET_CLI_TELEMETRY_OPTOUT: 1
-          NUGET_XMLDOC_MODE: skip
-          EnableWindowsTargeting: false
-        run: dotnet workload install maui-maccatalyst
-
-      - name: Restore dependencies
-        env:
-          EnableWindowsTargeting: false
-        run: dotnet restore MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj --runtime maccatalyst-x64 --verbosity minimal
-
-      - name: Build macOS app
-        env:
-          DOTNET_CLI_TELEMETRY_OPTOUT: 1
-          NUGET_XMLDOC_MODE: skip
-          EnableWindowsTargeting: false
-        run: |
-          # 显示项目信息
-          echo "Building macOS app..."
-          dotnet --info
-
-          # 执行构建
-          dotnet publish MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj \
-            -c ${{ env.BUILD_CONFIGURATION }} \
-            -f net9.0-maccatalyst \
-            -r maccatalyst-x64 \
-            -p:CreatePackage=true \
-            -p:EnableWindowsTargeting=false \
-            -p:TargetPlatformIdentifier=maccatalyst \
-            -p:SupportedOSPlatformVersion=15.0 \
-            -p:DebugType=None \
-            -p:DebugSymbols=false \
-            -p:SelfContained=false \
-            --no-restore \
-            --verbosity normal \
-            -o ./publish/macos
-            
-          # 显示构建结果
-          echo "Build completed. Contents of publish directory:"
-          ls -la ./publish/macos
-
-      - name: Create macOS package
-        run: |
-          # 查找生成的 .app 文件
-          APP_PATH=$(find ./publish/macos -name "*.app" -type d | head -1)
-
-          if [ -n "$APP_PATH" ]; then
-            echo "Found app at: $APP_PATH"
-            
-            # 创建临时目录用于DMG内容
-            mkdir -p ./dmg-contents
-            cp -R "$APP_PATH" ./dmg-contents/
-            
-            # 创建DMG
-            hdiutil create -volname "MarketAssistant" \
-              -srcfolder ./dmg-contents \
-              -ov -format UDZO \
-              ./MarketAssistant-macOS.dmg
-          else
-            echo "No .app bundle found, creating zip instead"
-            cd ./publish/macos
-            zip -r ../../MarketAssistant-macOS.zip . -q
-            cd ../..
-          fi
-
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-release-${{ matrix.platform }}
-          path: |
-            ./MarketAssistant-macOS.dmg
-            ./MarketAssistant-macOS.zip
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # 发布步骤 - 允许部分平台失败
-  release:
-    # 修改依赖关系：总是运行，但需要至少一个构建job完成
-    needs: [build-windows, build-macos]
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore MarketAssistant.slnx
+    
+    # 如果需要代码签名，可以在这里配置 keychain
+    # - name: Setup Keychain
+    #   if: ${{ secrets.MACOS_CERTIFICATE }}
+    #   run: |
+    #     security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+    #     security default-keychain -s build.keychain
+    #     security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+    #     echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
+    #     security import certificate.p12 -k build.keychain -P "${{ secrets.MACOS_CERTIFICATE_PWD }}" -T /usr/bin/codesign
+    #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+    #     xcrun notarytool store-credentials "AC_PASSWORD" --apple-id "${{ secrets.APPLE_ID }}" --team-id ${{ secrets.TEAM_ID }} --password "${{ secrets.NOTARY_TOOL_PASSWORD }}"
+    
+    - name: Make build script executable
+      run: chmod +x ./scripts/macos/build-app-bundle.sh
+    
+    - name: Build macOS app
+      run: ./scripts/macos/build-app-bundle.sh
+      env:
+        # 如果配置了签名，取消注释以下行
+        # SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        # NOTARYTOOL_PROFILE: "AC_PASSWORD"
+        SIGNING_IDENTITY: ""
+    
+    - name: Upload app bundle
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-app
+        path: Release/macOS/*.app
+        if-no-files-found: ignore
+    
+    - name: Upload DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-dmg
+        path: Release/macOS/*.dmg
+  
+  # Linux 构建
+  build-linux:
     runs-on: ubuntu-latest
-    if: (success() || failure()) && (github.event_name == 'release' || github.event_name == 'workflow_dispatch')
-
+    
     steps:
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-release-x64
-          path: ./windows-artifacts
-        continue-on-error: true
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-release-x64
-          path: ./macos-artifacts
-        continue-on-error: true
-
-      - name: Debug - List all artifacts
-        run: |
-          echo "=== Debugging artifact download ==="
-          echo "Current directory contents:"
-          ls -la ./
-
-          echo "Windows artifacts directory:"
-          if [ -d "./windows-artifacts" ]; then
-            ls -la ./windows-artifacts/
-          else
-            echo "Windows artifacts directory not found"
-          fi
-
-          echo "macOS artifacts directory:"
-          if [ -d "./macos-artifacts" ]; then
-            ls -la ./macos-artifacts/
-          else
-            echo "macOS artifacts directory not found"
-          fi
-
-      - name: Prepare release assets
-        run: |
-          echo "Preparing release assets..."
-
-          # 创建发布目录
-          mkdir -p ./release-assets
-
-          # 检查Windows构建结果
-          WINDOWS_SUCCESS=false
-          if [ -d "./windows-artifacts" ] && [ -f "./windows-artifacts/MarketAssistant-Windows-x64.zip" ]; then
-            cp ./windows-artifacts/MarketAssistant-Windows-x64.zip ./release-assets/
-            echo "✅ Windows artifact prepared"
-            WINDOWS_SUCCESS=true
-          else
-            echo "❌ Windows build artifact not found"
-          fi
-
-          # 检查macOS构建结果
-          MACOS_SUCCESS=false
-          if [ -d "./macos-artifacts" ]; then
-            if [ -f "./macos-artifacts/MarketAssistant-macOS.dmg" ]; then
-              cp ./macos-artifacts/MarketAssistant-macOS.dmg ./release-assets/
-              echo "✅ macOS DMG prepared"
-              MACOS_SUCCESS=true
-            fi
-            if [ -f "./macos-artifacts/MarketAssistant-macOS.zip" ]; then
-              cp ./macos-artifacts/MarketAssistant-macOS.zip ./release-assets/
-              echo "✅ macOS ZIP prepared"
-              MACOS_SUCCESS=true
-            fi
-          fi
-
-          if [ "$MACOS_SUCCESS" = false ]; then
-            echo "⚠️ macOS build artifact not found - will proceed with available platforms"
-          fi
-
-          # 至少需要一个平台成功
-          if [ "$WINDOWS_SUCCESS" = false ] && [ "$MACOS_SUCCESS" = false ]; then
-            echo "❌ No build artifacts found - release cannot proceed"
-            exit 1
-          fi
-
-          echo "📦 Release will proceed with available platforms:"
-          [ "$WINDOWS_SUCCESS" = true ] && echo "  - Windows ✅"
-          [ "$MACOS_SUCCESS" = true ] && echo "  - macOS ✅"
-
-          # 列出实际可用的文件
-          echo "📋 Available release files:"
-          ls -la ./release-assets/
-
-      - name: Upload release assets
-        run: |
-          echo "=== Preparing files for release ==="
-
-          # 检查文件是否存在
-          if [ -d "./release-assets" ]; then
-            echo "Release assets directory contents:"
-            ls -la ./release-assets/
-            
-            # 收集所有文件到一个数组
-            FILES=""
-            for file in ./release-assets/*; do
-              if [ -f "$file" ]; then
-                FILES="$FILES$file\n"
-                echo "Found file: $file"
-              fi
-            done
-            
-            if [ -n "$FILES" ]; then
-              echo "Files ready for upload:"
-              echo -e "$FILES"
-            else
-              echo "No files found in release-assets directory"
-              exit 1
-            fi
-          else
-            echo "Release assets directory not found"
-            exit 1
-          fi
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ./release-assets/*
-          fail_on_unmatched_files: false
-          draft: ${{ github.event_name == 'workflow_dispatch' }}
-          prerelease: false
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', github.run_number) || github.ref_name }}
-          name: ${{ github.event_name == 'workflow_dispatch' && format('Release v{0}', github.run_number) || github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y rpm
+    
+    - name: Restore dependencies
+      run: dotnet restore MarketAssistant.slnx
+    
+    - name: Make build scripts executable
+      run: |
+        chmod +x ./scripts/linux/build-deb.sh
+        chmod +x ./scripts/linux/build-rpm.sh
+    
+    - name: Build Debian package
+      run: ./scripts/linux/build-deb.sh
+    
+    - name: Build RPM package
+      run: ./scripts/linux/build-rpm.sh
+      continue-on-error: true
+    
+    - name: Upload .deb package
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-deb
+        path: Release/Linux/*.deb
+    
+    - name: Upload .rpm package
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-rpm
+        path: Release/Linux/*.rpm
+        if-no-files-found: ignore
+    
+    - name: Upload ZIP archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-x64
+        path: Release/Linux/*.zip
+  
+  # 发布 Release
+  create-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+    
+    - name: List artifacts
+      run: ls -R ./artifacts
+    
+    - name: Get release version
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" == "release" ]; then
+          echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./artifacts/**/*.zip
+          ./artifacts/**/*.dmg
+          ./artifacts/**/*.deb
+          ./artifacts/**/*.rpm
+        tag_name: ${{ steps.get_version.outputs.version }}
+        name: Release ${{ steps.get_version.outputs.version }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

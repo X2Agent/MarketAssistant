@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <!-- 背景圆形 -->
+  <circle cx="32" cy="32" r="28" fill="#F5F5F5" stroke="#E0E0E0" stroke-width="2"/>
+  
+  <!-- 文档图标 -->
+  <rect x="20" y="16" width="24" height="32" rx="2" fill="#FFFFFF" stroke="#D0D0D0" stroke-width="1.5"/>
+  
+  <!-- 文档内容线条 -->
+  <line x1="24" y1="24" x2="40" y2="24" stroke="#C0C0C0" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="24" y1="28" x2="36" y2="28" stroke="#C0C0C0" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="24" y1="32" x2="38" y2="32" stroke="#C0C0C0" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="24" y1="36" x2="34" y2="36" stroke="#C0C0C0" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- 空状态指示器 -->
+  <circle cx="32" cy="42" r="3" fill="#FFB74D" opacity="0.6"/>
+  <text x="32" y="45" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#FFFFFF">?</text>
+</svg>

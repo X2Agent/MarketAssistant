@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        x:Class="MarketAssistant.Views.Windows.NotificationWindow"
+        Width="320"
+        Height="72"
+        CanResize="False"
+        ShowInTaskbar="False"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        WindowStartupLocation="Manual">
+    
+    <Border Name="NotificationBorder"
+            Background="#2D2D30"
+            BorderBrush="#3F3F46"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12"
+            Margin="8"
+            BoxShadow="0 4 16 0 #60000000">
+        
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            
+            <!-- 图标区域 -->
+            <Border Grid.Column="0"
+                    Width="32"
+                    Height="32"
+                    CornerRadius="16"
+                    Background="#4CAF50"
+                    VerticalAlignment="Center"
+                    Margin="0,0,12,0">
+                <TextBlock Text="✓"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+            
+            <!-- 消息内容 -->
+            <StackPanel Grid.Column="1"
+                        VerticalAlignment="Center">
+                <TextBlock Name="MessageText"
+                           Text="操作成功"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="#FFFFFF"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+            
+            <!-- 关闭按钮 -->
+            <Button Grid.Column="2"
+                    Name="CloseButton"
+                    Content="✕"
+                    Width="24"
+                    Height="24"
+                    FontSize="16"
+                    Foreground="#8F8F8F"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    VerticalAlignment="Center"
+                    Margin="8,0,0,0"
+                    Padding="0"
+                    CornerRadius="12"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="#3F3F46"/>
+                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Background" Value="#4F4F56"/>
+                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+        </Grid>
+    </Border>
+</Window>
+

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Market Assistant
+Comment=AI-powered market analysis assistant
+Exec=/opt/MarketAssistant/MarketAssistant
+Icon=marketassistant
+Terminal=false
+Categories=Office;Finance;
+StartupWMClass=MarketAssistant
+

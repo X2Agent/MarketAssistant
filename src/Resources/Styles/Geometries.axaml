@@ -1,0 +1,12 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================ -->
+    <!-- 几何图形资源定义 -->
+    <!-- ============================================ -->
+
+    <!-- 加载图标 - 旋转圆弧 -->
+    <StreamGeometry x:Key="LoadingIcon">M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z</StreamGeometry>
+
+</ResourceDictionary>
+

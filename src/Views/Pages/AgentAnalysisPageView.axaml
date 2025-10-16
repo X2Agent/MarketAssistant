@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:views="using:MarketAssistant.Views.Components"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converts="using:MarketAssistant.Converts"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.AgentAnalysisPageView"
+             x:DataType="vm:AgentAnalysisViewModel"
+             x:Name="ParentPage">
+
+    <Grid ColumnDefinitions="*,Auto">
+        <!-- 主内容区域 -->
+        <Grid Grid.Column="0" ClipToBounds="True">
+            <!-- 进度显示区域 - 仅在分析时显示 -->
+            <views:ProgressDisplayView 
+                IsVisible="{Binding IsBusy}"
+                IsProgressVisible="{Binding IsBusy}"
+                IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
+                AnalysisStage="{Binding AnalysisStage}"/>
+
+            <!-- 分析完成后的内容区域（包含浮动操作按钮） -->
+            <Grid IsVisible="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}">
+                <!-- 智能分析报告区域 -->
+                <ContentControl Content="{Binding AnalysisReportViewModel}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate x:DataType="vm:AnalysisReportViewModel">
+                            <views:AnalysisReportView DataContext="{Binding}"/>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            
+                <!-- 水印控件 -->
+                <controls:WatermarkView 
+                    Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！" 
+                    OpacityValue="0.4" 
+                    Angle="-30" 
+                    FontSize="28" 
+                    HorizontalRepeatCount="2" 
+                    VerticalRepeatCount="4" 
+                    ZIndex="999" />
+            
+                <!-- 浮动操作按钮(FAB) -->
+                <StackPanel HorizontalAlignment="Right" 
+                            VerticalAlignment="Bottom" 
+                            ZIndex="1000" 
+                            Margin="0,0,16,16" 
+                            Spacing="8">
+                    <!-- 聊天按钮 -->
+                    <Button Content="💬" 
+                            FontSize="24"
+                            Width="56"
+                            Height="56"
+                            CornerRadius="28"
+                            Background="{DynamicResource PrimaryBrush}"
+                            Command="{Binding ToggleChatSidebarCommand}"
+                            ToolTip.Tip="智能对话"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"/>                
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <!-- 聊天侧边栏 -->
+        <Border Grid.Column="1" 
+                IsVisible="{Binding IsChatSidebarVisible}"
+                Width="480"
+                Background="{DynamicResource PageBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1,0,0,0">
+            <ContentControl Content="{Binding ChatSidebarViewModel}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate x:DataType="vm:ChatSidebarViewModel">
+                        <views:ChatSidebarView DataContext="{Binding}"
+                                              CloseCommand="{Binding #ParentPage.((vm:AgentAnalysisViewModel)DataContext).ToggleChatSidebarCommand}" />
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+        </Border>
+    </Grid>
+</UserControl>
+

@@ -1,0 +1,372 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:agents="using:MarketAssistant.Agents"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.StockSelectionPageView"
+             x:DataType="vm:StockSelectionPageViewModel">
+
+    <Design.DataContext>
+        <vm:StockSelectionPageViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- 加载指示器（优化后的覆盖层） -->
+        <Border Grid.Row="0" Grid.RowSpan="2"
+                Background="#E0FFFFFF"
+                IsVisible="{Binding IsBusy}"
+                ZIndex="1000">
+            <Border Background="{DynamicResource CardBackgroundBrush}"
+                    CornerRadius="16"
+                    Padding="32,24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="320"
+                    MaxWidth="400"
+                    BoxShadow="0 8 32 0 #30000000">
+                <StackPanel Spacing="16">
+                    <!-- 加载动画区域 - 三点脉冲动画 -->
+                    <StackPanel Orientation="Horizontal" 
+                                Spacing="8"
+                                HorizontalAlignment="Center">
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                        
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite" Delay="0:0:0.2">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                        
+                        <Ellipse Width="12" Height="12" 
+                                 Fill="{DynamicResource SystemAccentColor}">
+                            <Ellipse.Styles>
+                                <Style Selector="Ellipse">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:1.4" IterationCount="Infinite" Delay="0:0:0.4">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="20%">
+                                                <Setter Property="Opacity" Value="1.0"/>
+                                            </KeyFrame>
+                                            <KeyFrame Cue="40%">
+                                                <Setter Property="Opacity" Value="0.3"/>
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </Ellipse.Styles>
+                        </Ellipse>
+                    </StackPanel>
+                    
+                    <!-- 文本信息 -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="正在分析中" 
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="AI 正在为您精选优质股票，请稍候..."
+                                   FontSize="14"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="280"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="16" Spacing="16">
+                
+                <!-- 页面标题 -->
+                <TextBlock Text="AI智能选股" 
+                           FontSize="24"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,4"/>
+
+            <!-- 智能选股输入区域 -->
+            <controls:CardView>
+                <StackPanel Spacing="12">
+                    <!-- 选股模式选择器 -->
+                    <TextBlock Text="选股模式" 
+                               FontSize="16" 
+                               FontWeight="Bold"/>
+                    
+                    <!-- 验证提示消息 -->
+                    <Border Background="#FEF3C7"
+                            BorderBrush="#F59E0B"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            IsVisible="{Binding HasValidationMessage}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="ℹ️" 
+                                       FontSize="16"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding ValidationMessage}"
+                                       FontSize="14"
+                                       Foreground="#92400E"
+                                       TextWrapping="Wrap"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <ItemsControl ItemsSource="{Binding SelectionModes}" Height="80">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SelectionModeItem">
+								<Border Classes.mode-card="True"
+                                        Classes.selected="{Binding IsSelected}"
+                                        MinWidth="120">
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Icon}" 
+                                                   FontSize="20" 
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Name}" 
+                                                   FontSize="12" 
+                                                   FontWeight="Bold"
+                                                   Classes="mode-name"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,4,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    
+                    <!-- 统一输入框 -->
+                    <TextBox Text="{Binding CurrentInputContent}"
+                             Watermark="{Binding CurrentPlaceholder}"
+                             Height="120"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             IsVisible="{Binding IsInputAreaVisible}"/>
+                    
+                    <!-- 操作按钮 -->
+                    <StackPanel Orientation="Horizontal" 
+                                Spacing="8"
+                                IsVisible="{Binding IsInputAreaVisible}">
+                        <Button Content="{Binding CurrentButtonText}"
+                                Command="{Binding ExecuteAnalysisCommand}"
+                                IsEnabled="{Binding !IsBusy}"
+                                Background="{DynamicResource SystemAccentColor}"
+                                Foreground="White"
+                                HorizontalAlignment="Stretch"
+                                Padding="16,8"
+                                MinWidth="120"/>
+                        <Button Content="清除"
+                                Command="{Binding ClearContentCommand}"
+                                Padding="16,8"
+                                MinWidth="80"/>
+                    </StackPanel>
+                </StackPanel>
+            </controls:CardView>
+
+            <!-- 快速选股策略 -->
+            <controls:CardView IsVisible="{Binding IsQuickStrategyAreaVisible}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="快速选股策略" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="选择预设的选股策略，快速获得投资建议" 
+                               FontSize="12" 
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                    <ItemsControl ItemsSource="{Binding QuickStrategies}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="agents:QuickSelectionStrategyInfo">
+                                <Border Classes="strategy-card" Margin="4">
+                                    <Grid RowDefinitions="Auto,Auto">
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{Binding Name}" 
+                                                   FontSize="14" 
+                                                   FontWeight="Bold"/>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding Description}" 
+                                                   FontSize="12" 
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,4,0,0"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </controls:CardView>
+            
+            <!-- 选股结果显示区域 -->
+            <controls:CardView IsVisible="{Binding HasResult}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="选股结果" 
+                               FontSize="16" 
+                               FontWeight="SemiBold"/>
+                    
+                    <!-- 分析摘要 -->
+                    <Border Background="{DynamicResource ItemBackgroundBrush}"
+                            CornerRadius="8"
+                            Padding="12">
+                        <Grid RowDefinitions="Auto,Auto">
+                            <TextBlock Grid.Row="0"
+                                       Text="分析摘要" 
+                                       FontSize="16" 
+                                       FontWeight="Bold"/>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding SelectionResult.AnalysisSummary}"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 推荐股票列表 -->
+                    <TextBlock Text="推荐股票" 
+                               FontSize="16" 
+                               FontWeight="Bold" 
+                               Margin="0,8,0,0"/>
+                    
+                    <ScrollViewer MaxHeight="400">
+                        <ItemsControl ItemsSource="{Binding RecommendedStocks}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="8"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="agents:StockRecommendation">
+                                    <Border Background="{DynamicResource ItemBackgroundBrush}"
+                                            CornerRadius="8"
+                                            Padding="12">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                            <!-- 股票代码 -->
+                                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                                       Text="{Binding Symbol}" 
+                                                       FontSize="16" 
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource SystemAccentColor}"
+                                                       VerticalAlignment="Center"/>
+                                            <!-- 股票名称 -->
+                                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                                       Text="{Binding Name}" 
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Margin="0,4,0,0"/>
+                                            
+                                            <!-- 推荐理由标签 -->
+                                            <TextBlock Grid.Row="0" Grid.Column="1"
+                                                       Text="💡 推荐理由" 
+                                                       FontSize="11" 
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource SystemAccentColor}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="16,0,0,0"/>
+                                            <!-- 推荐理由内容 -->
+                                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                                       Text="{Binding Reason}" 
+                                                       FontSize="13"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="2"
+                                                       Margin="16,4,0,0"/>
+                                            
+                                            <!-- 评分 -->
+                                            <TextBlock Grid.Row="0" Grid.Column="2"
+                                                       Text="{Binding RecommendationScore, StringFormat=评分: {0:F1}}" 
+                                                       FontSize="14" 
+                                                       FontWeight="Bold"
+                                                       Foreground="{DynamicResource SystemAccentColor}"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"/>
+                                            <!-- 风险等级 -->
+                                            <TextBlock Grid.Row="1" Grid.Column="2"
+                                                       Text="{Binding RiskLevel}" 
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       HorizontalAlignment="Right"
+                                                       Margin="0,4,0,0"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    
+                    <!-- 风险提示 -->
+                    <Border Background="#FFF4E5"
+                            BorderBrush="#FFB84C"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            Margin="0,16,0,0"
+                            IsVisible="{Binding HasRiskWarnings}">
+                        <Grid RowDefinitions="Auto,Auto">
+                            <TextBlock Grid.Row="0"
+                                       Text="⚠️ 风险提示" 
+                                       FontSize="16" 
+                                       FontWeight="Bold"
+                                       Foreground="#D97706"/>
+                            <TextBlock Grid.Row="1"
+                                       Text="{Binding FormattedRiskWarnings}"
+                                       FontSize="14"
+                                       Foreground="#92400E"
+                                       TextWrapping="Wrap"
+                                       Margin="0,8,0,0"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </controls:CardView>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

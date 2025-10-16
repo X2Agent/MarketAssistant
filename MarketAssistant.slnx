@@ -4,12 +4,6 @@
     <File Path="Directory.Build.props" />
     <File Path="README.md" />
   </Folder>
-  <Project Path="MarketAssistant/MarketAssistant.Mac/MarketAssistant.Mac.csproj">
-    <Deploy />
-  </Project>
-  <Project Path="MarketAssistant/MarketAssistant.WinUI/MarketAssistant.WinUI.csproj">
-    <Platform Project="x64" />
-  </Project>
-  <Project Path="MarketAssistant/MarketAssistant/MarketAssistant.csproj" />
-  <Project Path="TestMarketAssistant/TestMarketAssistant.csproj" />
+  <Project Path="src/MarketAssistant.csproj" />
+  <Project Path="tests/TestMarketAssistant.csproj" />
 </Solution>

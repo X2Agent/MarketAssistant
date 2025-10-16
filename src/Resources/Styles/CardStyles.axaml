@@ -1,0 +1,108 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 选股模式卡片样式 -->
+    <Style Selector="Border.mode-card">
+        <Setter Property="Padding" Value="16,8"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.mode-card.selected">
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+    </Style>
+    <Style Selector="Border.mode-card TextBlock.mode-name">
+        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
+    </Style>
+    <Style Selector="Border.mode-card.selected TextBlock.mode-name">
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- 快速策略卡片样式 -->
+    <Style Selector="Border.strategy-card">
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- 股票卡片样式 -->
+    <Style Selector="Border.stock-card">
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
+        <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <Style Selector="Border.stock-card:pointerover Button.delete-button">
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="IsHitTestVisible" Value="True"/>
+    </Style>
+
+    <!-- 热门股票卡片样式 -->
+    <Style Selector="Border.hot-stock-card">
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="IsHitTestVisible" Value="True"/>
+    </Style>
+
+    <!-- 最近查看卡片样式 -->
+    <Style Selector="Border.recent-stock-card">
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.recent-stock-card:pointerover Button.favorite-button">
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="IsHitTestVisible" Value="True"/>
+    </Style>
+
+    <!-- 新闻卡片样式 -->
+    <Style Selector="Border.news-card">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.news-card TextBlock">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- 功能项样式 -->
+    <Style Selector="Border.featureItem">
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <Style Selector="Border.featureIcon">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="8"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+</Styles>
+

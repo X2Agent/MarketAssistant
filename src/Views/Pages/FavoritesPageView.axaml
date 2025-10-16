@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:stocks="using:MarketAssistant.Applications.Stocks.Models"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.FavoritesPageView"
+             x:DataType="vm:FavoritesPageViewModel">
+
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+    </UserControl.Resources>
+
+    <Design.DataContext>
+        <vm:FavoritesPageViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
+        <controls:CardView Margin="16">
+            <controls:CardView.Header>
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" 
+                               Text="我的收藏" 
+                               FontSize="20" 
+                               FontWeight="Bold" 
+                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <svg:Svg Grid.Column="1" 
+                             Path="/Assets/Images/tab_favorites_on.svg" 
+                             Width="24" 
+                             Height="24" 
+                             VerticalAlignment="Center" />
+                </Grid>
+            </controls:CardView.Header>
+
+            <!-- 主内容区域 -->
+            <Grid>
+                <!-- 加载指示器 -->
+                <StackPanel IsVisible="{Binding IsBusy}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="16">
+                    <controls:LoadingDots DotSize="12" />
+                    <TextBlock Text="正在加载收藏列表..." 
+                               FontSize="14"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- 内容区域（非加载状态） -->
+                <Grid IsVisible="{Binding !IsBusy}">
+                    <!-- 空视图 -->
+                    <StackPanel IsVisible="{Binding !Stocks.Count}"
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center" 
+                                Spacing="12">
+                        <svg:Svg Path="/Assets/Images/tab_favorites.svg" 
+                                 Width="48" 
+                                 Height="48" 
+                                 HorizontalAlignment="Center"/>
+                        <TextBlock Text="暂无收藏股票" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Text="在股票详情页点击收藏按钮添加" 
+                                   HorizontalAlignment="Center" 
+                                   Foreground="{DynamicResource TextSecondaryBrush}" 
+                                   FontSize="12" />
+                    </StackPanel>
+
+                    <!-- 股票网格 -->
+                    <ItemsControl ItemsSource="{Binding Stocks}"
+                                  IsVisible="{Binding Stocks.Count}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="4" VerticalAlignment="Top"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="stocks:StockInfo">
+                            <Border Classes="stock-card"
+                                    Background="{DynamicResource ItemBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12"
+                                    Margin="8"
+                                    Cursor="Hand"
+                                    Tapped="OnStockItemTapped"
+                                    Tag="{Binding .}"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Stretch">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                    <!-- 市场和代码 -->
+                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                                               FontSize="11" 
+                                               Foreground="{DynamicResource TextSecondaryBrush}">
+                                        <Run Text="{Binding Market}"/>
+                                        <Run Text=" "/>
+                                        <Run Text="{Binding Code}"/>
+                                    </TextBlock>
+                                    
+                                    <!-- 股票名称 -->
+                                    <TextBlock Grid.Row="1" Grid.Column="0"
+                                               Text="{Binding Name}" 
+                                               FontSize="13" 
+                                               FontWeight="SemiBold" 
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,4,0,0" />
+                                    
+                                    <!-- 价格和涨跌幅 -->
+                                    <TextBlock Grid.Row="2" Grid.Column="0"
+                                               FontSize="15" 
+                                               FontWeight="Bold" 
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="0,4,0,0">
+                                        <Run Text="{Binding CurrentPrice}"/>
+                                        <Run Text=" " FontSize="13" FontWeight="Normal"/>
+                                        <Run Text="{Binding ChangePercentage}" 
+                                             FontSize="13" 
+                                             FontWeight="Normal"
+                                             Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                    </TextBlock>
+                                    
+                                    <!-- 删除按钮 -->
+                                    <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
+                                            Classes="delete-button"
+                                            Width="28" 
+                                            Height="28" 
+                                            Cursor="Hand"
+                                            Background="{DynamicResource ItemBackgroundBrush}"
+                                            BorderThickness="0"
+                                            CornerRadius="14"
+                                            Padding="0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
+                                            CommandParameter="{Binding .}">
+                                        <PathIcon Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
+                                                  Width="16" 
+                                                  Height="16"
+                                                  Foreground="{StaticResource ErrorBrush}" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                </Grid>
+            </Grid>
+        </controls:CardView>
+    </ScrollViewer>
+</UserControl>
