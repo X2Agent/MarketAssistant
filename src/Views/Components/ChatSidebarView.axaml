@@ -10,7 +10,7 @@
              x:DataType="vm:ChatSidebarViewModel"
              x:Name="Root">
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto" Background="{DynamicResource BackgroundBrush}">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Background="{DynamicResource PageBackgroundBrush}">
         
         <!-- 标题栏 -->
         <Grid Grid.Row="0" 

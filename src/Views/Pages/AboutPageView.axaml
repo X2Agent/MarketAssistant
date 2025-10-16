@@ -46,10 +46,8 @@
                     </Grid>
                 </controls:CardView.Header>
                 <!-- Logo和应用信息 -->
-                <Panel Margin="-16">
-                    <Panel.Background>
-                        <SolidColorBrush Color="{DynamicResource ItemBackground}"/>
-                    </Panel.Background>
+                <Panel Margin="-16"
+                       Background="{DynamicResource ItemBackgroundBrush}">
                 <Grid ColumnDefinitions="Auto, *, Auto"
                       RowDefinitions="Auto"
                       Margin="16">
@@ -163,7 +161,7 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Margin="0,8,0,0"/>
-                    <Border Background="{DynamicResource ItemBackground}"
+                    <Border Background="{DynamicResource ItemBackgroundBrush}"
                             CornerRadius="8"
                             Padding="12"
                             BorderBrush="{DynamicResource BorderBrush}"

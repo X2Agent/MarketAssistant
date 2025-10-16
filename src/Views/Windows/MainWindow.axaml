@@ -9,7 +9,7 @@
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="MarketAssistant.Views.Windows.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/trans_bg.ico"
+        Icon="/Assets/logo.ico"
         Title="MarketAssistant - 智能股票分析助手"
         MinWidth="800"
         MinHeight="600">

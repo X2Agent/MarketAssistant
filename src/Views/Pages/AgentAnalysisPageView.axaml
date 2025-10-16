@@ -67,7 +67,7 @@
         <Border Grid.Column="1" 
                 IsVisible="{Binding IsChatSidebarVisible}"
                 Width="480"
-                Background="{DynamicResource BackgroundBrush}"
+                Background="{DynamicResource PageBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1,0,0,0">
             <ContentControl Content="{Binding ChatSidebarViewModel}">

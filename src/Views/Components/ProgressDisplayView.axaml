@@ -109,7 +109,7 @@
             </StackPanel>
 
             <!-- 提示信息 -->
-            <Border Background="{DynamicResource BackgroundBrush}"
+            <Border Background="{DynamicResource PageBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
