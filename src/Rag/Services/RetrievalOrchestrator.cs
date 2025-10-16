@@ -1,5 +1,6 @@
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -19,20 +20,20 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
     private readonly IQueryRewriteService _queryRewrite;
     private readonly IRerankerService _reranker;
     private readonly VectorStore _vectorStore;
-    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly IEmbeddingFactory _embeddingFactory;
     private readonly ILogger<RetrievalOrchestrator> _logger;
 
     public RetrievalOrchestrator(
         IQueryRewriteService queryRewrite,
         IRerankerService reranker,
         VectorStore vectorStore,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        IEmbeddingFactory embeddingFactory,
         ILogger<RetrievalOrchestrator> logger)
     {
         _queryRewrite = queryRewrite;
         _reranker = reranker;
         _vectorStore = vectorStore;
-        _embeddingGenerator = embeddingGenerator;
+        _embeddingFactory = embeddingFactory;
         _logger = logger;
     }
 
@@ -50,6 +51,9 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         int top = 8,
         CancellationToken cancellationToken = default)
     {
+        // 创建嵌入生成器（使用当前最新配置）
+        var embeddingGenerator = _embeddingFactory.Create();
+        
         var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
         await collection.EnsureCollectionExistsAsync(cancellationToken);
 
@@ -79,7 +83,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
             try
             {
                 // 生成查询向量
-                var queryVector = await _embeddingGenerator.GenerateAsync(q);
+                var queryVector = await embeddingGenerator.GenerateAsync(q);
 
                 // 使用SearchAsync方法，显式指定使用TextEmbedding向量字段
                 var searchResults = collection.SearchAsync(
@@ -110,7 +114,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
             return Array.Empty<TextSearchResult>();
         }
 
-        // 4) 标准去重：通过文本内容合并重复项
+        // 4) 标准去重：通过文本内容合并重复项
         var dedup = merged
             .GroupBy(r => $"{r.Link}|{r.Name}|{r.Value}", StringComparer.Ordinal)
             .Select(g => g.First())

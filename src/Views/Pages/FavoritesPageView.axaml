@@ -131,7 +131,7 @@
                                             Width="28" 
                                             Height="28" 
                                             Cursor="Hand"
-                                            Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                            Background="{DynamicResource ItemBackgroundBrush}"
                                             BorderThickness="0"
                                             CornerRadius="14"
                                             Padding="0"

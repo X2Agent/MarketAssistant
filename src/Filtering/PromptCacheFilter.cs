@@ -1,12 +1,21 @@
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 
 namespace MarketAssistant.Filtering;
 
-internal class PromptCacheFilter(IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
-        VectorStore vectorStore) : CacheBaseFilter, IPromptRenderFilter
+internal class PromptCacheFilter : CacheBaseFilter, IPromptRenderFilter
 {
+    private readonly IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly VectorStore _vectorStore;
+
+    public PromptCacheFilter(IEmbeddingFactory embeddingFactory, VectorStore vectorStore)
+    {
+        _embeddingGenerator = embeddingFactory.Create();
+        _vectorStore = vectorStore;
+    }
+
     public async Task OnPromptRenderAsync(PromptRenderContext context, Func<PromptRenderContext, Task> next)
     {
         // Trigger prompt rendering operation
@@ -15,9 +24,9 @@ internal class PromptCacheFilter(IEmbeddingGenerator<string, Embedding<float>> e
         // Get rendered prompt
         var prompt = context.RenderedPrompt!;
 
-        var promptEmbedding = await embeddingGenerator.GenerateAsync(prompt);
+        var promptEmbedding = await _embeddingGenerator.GenerateAsync(prompt);
 
-        var collection = vectorStore.GetCollection<string, CacheRecord>(CollectionName);
+        var collection = _vectorStore.GetCollection<string, CacheRecord>(CollectionName);
         await collection.EnsureCollectionExistsAsync();
 
         // Search for similar prompts in cache.

@@ -19,7 +19,7 @@
                 Background="#E0FFFFFF"
                 IsVisible="{Binding IsBusy}"
                 ZIndex="1000">
-            <Border Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+            <Border Background="{DynamicResource CardBackgroundBrush}"
                     CornerRadius="16"
                     Padding="32,24"
                     HorizontalAlignment="Center"
@@ -254,7 +254,7 @@
                                FontWeight="SemiBold"/>
                     
                     <!-- 分析摘要 -->
-                    <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                    <Border Background="{DynamicResource ItemBackgroundBrush}"
                             CornerRadius="8"
                             Padding="12">
                         <Grid RowDefinitions="Auto,Auto">
@@ -285,7 +285,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="agents:StockRecommendation">
-                                    <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                                    <Border Background="{DynamicResource ItemBackgroundBrush}"
                                             CornerRadius="8"
                                             Padding="12">
                                         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">

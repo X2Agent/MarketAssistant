@@ -23,10 +23,10 @@
         <Setter Property="Foreground" Value="White"/>
     </Style>
     <Style Selector="Button.period-button:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
     <Style Selector="Button.period-button.selected:pointerover">
-        <Setter Property="Background" Value="{DynamicResource SystemAccentColorDark1}"/>
+        <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
     </Style>
 
     <!-- 功能按钮样式 -->
