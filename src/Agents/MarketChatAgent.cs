@@ -1,14 +1,16 @@
 using MarketAssistant.Agents.Plugins;
+using MarketAssistant.Applications.Settings;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+using ModelContextProtocol.Client;
 
 namespace MarketAssistant.Agents;
 
 /// <summary>
 /// 市场对话代理，专门处理用户与AI的对话交互
+/// 使用 Microsoft Agent Framework API
 /// </summary>
-public class MarketChatAgent
+public class MarketChatAgent : IDisposable
 {
     #region 常量定义
 
@@ -31,43 +33,60 @@ public class MarketChatAgent
 
     #region 私有字段
 
-    private readonly IChatCompletionService _chatCompletionService;
+    private readonly IChatClient _chatClient;
     private readonly ILogger<MarketChatAgent> _logger;
-    private readonly Kernel _kernel;
 
     /// <summary>
     /// 对话历史记录
     /// </summary>
-    private readonly ChatHistory _conversationHistory = new();
+    private readonly List<ChatMessage> _conversationHistory = new();
+
+    /// <summary>
+    /// MCP 工具列表
+    /// </summary>
+    private readonly List<AITool> _mcpTools = new();
+
+    /// <summary>
+    /// MCP 客户端列表
+    /// </summary>
+    private readonly List<IMcpClient> _mcpClients = new();
 
     /// <summary>
     /// 当前股票代码
     /// </summary>
     private string _currentStockCode = string.Empty;
 
-
     /// <summary>
     /// 取消令牌源
     /// </summary>
     private CancellationTokenSource? _currentCancellationTokenSource;
 
+    /// <summary>
+    /// 是否已释放
+    /// </summary>
+    private bool _disposed;
+
     #endregion
 
     #region 构造函数
 
+    /// <summary>
+    /// 创建市场对话代理
+    /// </summary>
+    /// <param name="chatClient">聊天客户端</param>
+    /// <param name="logger">日志记录器</param>
     public MarketChatAgent(
-        ILogger<MarketChatAgent> logger,
-        Kernel kernel)
+        IChatClient chatClient,
+        ILogger<MarketChatAgent> logger)
     {
-        _chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
-        _logger = logger;
-        _kernel = kernel;
+        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 初始化系统消息
         InitializeSystemContext();
 
         // 初始化MCP服务
-        InitializeMcpServices();
+        _ = InitializeMcpServicesAsync();
     }
 
     #endregion
@@ -88,13 +107,12 @@ public class MarketChatAgent
     /// <summary>
     /// 获取当前对话历史（只读）
     /// </summary>
-    public IReadOnlyList<ChatMessageContent> ConversationHistory => _conversationHistory.AsReadOnly();
+    public IReadOnlyList<ChatMessage> ConversationHistory => _conversationHistory.AsReadOnly();
 
     /// <summary>
     /// 当前股票代码
     /// </summary>
     public string CurrentStockCode => _currentStockCode;
-
 
     /// <summary>
     /// 是否正在处理请求
@@ -111,16 +129,14 @@ public class MarketChatAgent
     /// <param name="userMessage">用户消息</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>AI回复</returns>
-    public async Task<ChatMessageContent> SendMessageAsync(string userMessage, CancellationToken cancellationToken = default)
+    public async Task<ChatMessage> SendMessageAsync(string userMessage, CancellationToken cancellationToken = default)
     {
         try
         {
             _logger.LogInformation("处理用户消息: {Message}", userMessage);
 
-            // 不再进行硬编码的主题检测，让AI通过系统提示词自然处理
-
             // 添加用户消息到历史
-            _conversationHistory.AddUserMessage(userMessage);
+            _conversationHistory.Add(new ChatMessage(ChatRole.User, userMessage));
 
             // 检查并管理上下文窗口
             await ManageContextWindowAsync();
@@ -131,21 +147,27 @@ public class MarketChatAgent
 
             try
             {
+                // 构建聊天选项
+                var chatOptions = new ChatOptions
+                {
+                    Tools = _mcpTools,
+                    Temperature = 0.7f
+                };
+
                 // 调用AI服务获取回复
-                var response = await _chatCompletionService.GetChatMessageContentAsync(
+                var chatCompletion = await _chatClient.CompleteAsync(
                     _conversationHistory,
-                    executionSettings: new PromptExecutionSettings
-                    {
-                        FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-                    },
-                    kernel: _kernel,
-                    cancellationToken: cts.Token);
+                    chatOptions,
+                    cts.Token);
+
+                // 从响应中获取助手消息（假设返回类型有 Choices 或 Message 属性）
+                var assistantMessage = new ChatMessage(ChatRole.Assistant, chatCompletion.Message.Text ?? string.Empty);
 
                 // 添加AI回复到历史
-                _conversationHistory.Add(response);
+                _conversationHistory.Add(assistantMessage);
 
                 _logger.LogInformation("AI回复成功");
-                return response;
+                return assistantMessage;
             }
             finally
             {
@@ -155,10 +177,7 @@ public class MarketChatAgent
         catch (OperationCanceledException)
         {
             _logger.LogInformation("用户取消了对话请求");
-            var cancelResponse = new ChatMessageContent(AuthorRole.Assistant, "对话已被取消。")
-            {
-                AuthorName = "市场分析助手"
-            };
+            var cancelResponse = new ChatMessage(ChatRole.Assistant, "对话已被取消。");
             return cancelResponse;
         }
         catch (Exception ex)
@@ -166,10 +185,7 @@ public class MarketChatAgent
             _logger.LogError(ex, "处理AI对话时发生错误");
 
             // 创建错误回复
-            var errorResponse = new ChatMessageContent(AuthorRole.Assistant, "抱歉，我暂时无法回复您的问题，请稍后重试。")
-            {
-                AuthorName = "市场分析助手"
-            };
+            var errorResponse = new ChatMessage(ChatRole.Assistant, "抱歉，我暂时无法回复您的问题，请稍后重试。");
 
             // 将错误回复也添加到历史中
             _conversationHistory.Add(errorResponse);
@@ -184,21 +200,17 @@ public class MarketChatAgent
     /// <param name="userMessage">用户消息</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>流式响应的异步枚举</returns>
-    public async IAsyncEnumerable<StreamingChatMessageContent> SendMessageStreamAsync(
+    public async IAsyncEnumerable<StreamingChatUpdate> SendMessageStreamAsync(
         string userMessage,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("开始流式处理用户消息: {Message}", userMessage);
 
-        // 不再进行硬编码的主题检测
-
         // 添加用户消息到历史
-        _conversationHistory.AddUserMessage(userMessage);
+        _conversationHistory.Add(new ChatMessage(ChatRole.User, userMessage));
 
         // 检查并管理上下文窗口
         await ManageContextWindowAsync();
-
-        // 不再进行硬编码的动态上下文注入
 
         // 创建取消令牌源
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -206,34 +218,38 @@ public class MarketChatAgent
 
         var completeResponse = new StringBuilder();
 
-        // 获取流式响应
-        var streamingEnumerable = _chatCompletionService.GetStreamingChatMessageContentsAsync(
-            _conversationHistory,
-            executionSettings: new PromptExecutionSettings
-            {
-                FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-            },
-            kernel: _kernel,
-            cancellationToken: cts.Token);
-
         try
         {
-            await foreach (var streamingResponse in streamingEnumerable)
+            // 构建聊天选项
+            var chatOptions = new ChatOptions
             {
+                Tools = _mcpTools,
+                Temperature = 0.7f
+            };
+
+            // 获取流式响应
+            await foreach (var update in _chatClient.GetStreamingResponseAsync(
+                _conversationHistory,
+                chatOptions,
+                cts.Token))
+            {
+                var content = update.Text ?? string.Empty;
+                
                 // 累积完整响应
-                if (streamingResponse.Content != null)
+                if (!string.IsNullOrEmpty(content))
                 {
-                    completeResponse.Append(streamingResponse.Content);
+                    completeResponse.Append(content);
                 }
 
                 // 触发流式响应事件
                 StreamingResponse?.Invoke(this, new StreamingResponseEventArgs
                 {
-                    Content = streamingResponse.Content ?? string.Empty,
+                    Content = content,
                     IsComplete = false
                 });
 
-                yield return streamingResponse;
+                // 包装为统一的返回类型
+                yield return new StreamingChatUpdate { Content = content };
             }
         }
         finally
@@ -246,10 +262,7 @@ public class MarketChatAgent
                 var cleanedContent = completeResponse.ToString().Trim();
                 if (!string.IsNullOrEmpty(cleanedContent))
                 {
-                    var fullResponse = new ChatMessageContent(AuthorRole.Assistant, cleanedContent)
-                    {
-                        AuthorName = "市场分析助手"
-                    };
+                    var fullResponse = new ChatMessage(ChatRole.Assistant, cleanedContent);
                     _conversationHistory.Add(fullResponse);
                 }
             }
@@ -290,8 +303,8 @@ public class MarketChatAgent
         // 更新系统上下文
         await UpdateSystemContextAsync();
 
-        // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
-        var hasUserMessages = _conversationHistory.Any(m => m.Role == AuthorRole.User);
+            // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
+        var hasUserMessages = _conversationHistory.Any(m => m.Role == ChatRole.User);
 
         if (hasUserMessages && !string.IsNullOrEmpty(stockCode))
         {
@@ -300,7 +313,7 @@ public class MarketChatAgent
                 : $"分析焦点已从 {previousStockCode} 切换到 {stockCode}";
 
             // 添加切换通知
-            _conversationHistory.AddSystemMessage(switchMessage);
+            _conversationHistory.Add(new ChatMessage(ChatRole.System, switchMessage));
         }
     }
 
@@ -320,11 +333,37 @@ public class MarketChatAgent
     /// <param name="message">系统消息内容</param>
     public void AddSystemMessage(string message)
     {
-        var systemMessage = new ChatMessageContent(AuthorRole.System, message)
+        _conversationHistory.Add(new ChatMessage(ChatRole.System, message));
+    }
+
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _currentCancellationTokenSource?.Cancel();
+        _currentCancellationTokenSource?.Dispose();
+
+        foreach (var mcpClient in _mcpClients)
         {
-            AuthorName = "系统"
-        };
-        _conversationHistory.Add(systemMessage);
+            try
+            {
+                mcpClient.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "释放 MCP 客户端时发生错误");
+            }
+        }
+
+        _mcpClients.Clear();
+        _mcpTools.Clear();
+
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 
     #endregion
@@ -337,36 +376,80 @@ public class MarketChatAgent
     private void InitializeSystemContext()
     {
         var systemPrompt = BuildSystemPrompt(_currentStockCode);
-        _conversationHistory.AddSystemMessage(systemPrompt);
+        _conversationHistory.Add(new ChatMessage(ChatRole.System, systemPrompt));
     }
 
     /// <summary>
     /// 初始化并加载所有配置的MCP服务
     /// </summary>
-    private void InitializeMcpServices()
+    private async Task InitializeMcpServicesAsync()
     {
         try
         {
             _logger.LogInformation("开始初始化MCP服务");
 
-            var mcpFunctions = McpPlugin.GetKernelFunctionsAsync().GetAwaiter().GetResult();
-            var functionCount = mcpFunctions.Count();
+            var configService = MCPServerConfigService.Instance;
+            var enabledConfigs = configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
 
-            if (functionCount > 0)
+            foreach (var config in enabledConfigs)
             {
-                _kernel.Plugins.AddFromFunctions("mcp", mcpFunctions);
-                _logger.LogInformation("成功加载 {Count} 个MCP函数", functionCount);
+                try
+                {
+                    IClientTransport clientTransport = config.TransportType.ToLower() switch
+                    {
+                        "stdio" => CreateStdioTransport(config),
+                        "sse" => McpPlugin.CreateSseTransport(config),
+                        "streamablehttp" => McpPlugin.CreateStreamableHttpTransport(config),
+                        _ => throw new NotSupportedException($"不支持的传输类型: {config.TransportType}")
+                    };
+
+                    var options = new McpClientOptions
+                    {
+                        ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
+                    };
+
+                    var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
+                    _mcpClients.Add(mcpClient);
+
+                    var tools = await mcpClient.ListToolsAsync();
+                    _mcpTools.AddRange(tools.Cast<AITool>());
+
+                    _logger.LogInformation("成功连接到 MCP 服务器 {Name}，加载 {Count} 个工具", 
+                        config.Name, tools.Count);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
+                }
             }
-            else
+
+            if (_mcpTools.Count == 0)
             {
-                _logger.LogWarning("未发现任何可用的MCP函数");
+                _logger.LogInformation("未加载任何 MCP 工具");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "加载MCP插件失败");
-            System.Diagnostics.Debug.WriteLine($"加载 MCP 插件失败: {ex.Message}");
+            _logger.LogError(ex, "初始化 MCP 服务失败");
         }
+    }
+
+    /// <summary>
+    /// 创建 Stdio 传输
+    /// </summary>
+    private static IClientTransport CreateStdioTransport(MCPServerConfig config)
+    {
+        var arguments = string.IsNullOrEmpty(config.Arguments)
+            ? Array.Empty<string>()
+            : config.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        return new StdioClientTransport(new()
+        {
+            Name = config.Name,
+            Command = config.Command,
+            Arguments = arguments,
+            EnvironmentVariables = config.EnvironmentVariables
+        });
     }
 
     /// <summary>
@@ -380,7 +463,7 @@ public class MarketChatAgent
             if (!string.IsNullOrEmpty(analysisContext))
             {
                 var contextContent = $"当前股票分析上下文：\n{analysisContext}";
-                _conversationHistory.AddSystemMessage(contextContent);
+                _conversationHistory.Add(new ChatMessage(ChatRole.System, contextContent));
             }
         }
     }
@@ -402,8 +485,8 @@ public class MarketChatAgent
         var originalCount = _conversationHistory.Count;
 
         // 保留系统消息
-        var systemMessages = _conversationHistory.Where(m => m.Role == AuthorRole.System).ToList();
-        var nonSystemMessages = _conversationHistory.Where(m => m.Role != AuthorRole.System).ToList();
+        var systemMessages = _conversationHistory.Where(m => m.Role == ChatRole.System).ToList();
+        var nonSystemMessages = _conversationHistory.Where(m => m.Role != ChatRole.System).ToList();
 
         // 智能选择要保留的消息
         var selectedMessages = await SelectMessagesForRetentionAsync(nonSystemMessages);
@@ -428,22 +511,22 @@ public class MarketChatAgent
                 var compressionSummary = await CreateCompressionSummaryAsync(messagesToCompress);
                 if (!string.IsNullOrEmpty(compressionSummary))
                 {
-                    _conversationHistory.AddSystemMessage($"之前对话摘要（压缩了 {messagesToCompress.Count} 条消息）：\n{compressionSummary}");
+                    _conversationHistory.Add(new ChatMessage(ChatRole.System, $"之前对话摘要（压缩了 {messagesToCompress.Count} 条消息）：\n{compressionSummary}"));
                 }
                 else
                 {
                     // 如果压缩失败，添加基本的统计信息作为备用
-                    var userMsgCount = messagesToCompress.Count(m => m.Role == AuthorRole.User);
-                    var assistantMsgCount = messagesToCompress.Count(m => m.Role == AuthorRole.Assistant);
+                    var userMsgCount = messagesToCompress.Count(m => m.Role == ChatRole.User);
+                    var assistantMsgCount = messagesToCompress.Count(m => m.Role == ChatRole.Assistant);
                     var fallbackSummary = $"之前进行了 {userMsgCount} 轮用户询问和 {assistantMsgCount} 次AI回复，主要围绕股票 {_currentStockCode} 的相关分析。";
-                    _conversationHistory.AddSystemMessage(fallbackSummary);
+                    _conversationHistory.Add(new ChatMessage(ChatRole.System, fallbackSummary));
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "压缩摘要生成失败，使用备用方案");
                 var fallbackSummary = $"之前的 {messagesToCompress.Count} 条对话已压缩，主要内容涉及股票分析和投资讨论。";
-                _conversationHistory.AddSystemMessage(fallbackSummary);
+                _conversationHistory.Add(new ChatMessage(ChatRole.System, fallbackSummary));
             }
         }
 
@@ -468,12 +551,12 @@ public class MarketChatAgent
     /// </summary>
     /// <param name="messages">所有非系统消息</param>
     /// <returns>选中保留的消息列表</returns>
-    private async Task<List<ChatMessageContent>> SelectMessagesForRetentionAsync(List<ChatMessageContent> messages)
+    private async Task<List<ChatMessage>> SelectMessagesForRetentionAsync(List<ChatMessage> messages)
     {
         if (messages.Count <= MinMessagesAfterCompression)
             return messages;
 
-        var selectedMessages = new List<ChatMessageContent>();
+        var selectedMessages = new List<ChatMessage>();
 
         // 1. 始终保留最近的消息（保证对话连续性）
         var recentMessages = messages.TakeLast(MinMessagesAfterCompression / 2).ToList();
@@ -493,7 +576,7 @@ public class MarketChatAgent
     /// <param name="messages">候选消息列表</param>
     /// <param name="count">要选择的数量</param>
     /// <returns>重要消息列表</returns>
-    private Task<List<ChatMessageContent>> SelectImportantMessagesAsync(List<ChatMessageContent> messages, int count)
+    private Task<List<ChatMessage>> SelectImportantMessagesAsync(List<ChatMessage> messages, int count)
     {
         if (messages.Count <= count)
             return Task.FromResult(messages);
@@ -514,12 +597,13 @@ public class MarketChatAgent
     /// </summary>
     /// <param name="message">消息内容</param>
     /// <returns>重要性得分</returns>
-    private double CalculateMessageImportanceScore(ChatMessageContent message)
+    private double CalculateMessageImportanceScore(ChatMessage message)
     {
-        if (string.IsNullOrWhiteSpace(message.Content))
+        var messageText = message.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(messageText))
             return 0;
 
-        var content = message.Content.ToLowerInvariant();
+        var content = messageText.ToLowerInvariant();
         double score = 0;
 
         // 基础得分：消息长度（较长的消息通常包含更多信息）
@@ -547,7 +631,7 @@ public class MarketChatAgent
             score += 2.0;
 
         // 用户消息相对于AI回复有更高权重（用户问题通常很重要）
-        if (message.Role == AuthorRole.User)
+        if (message.Role == ChatRole.User)
             score *= 1.5;
 
         return score;
@@ -558,13 +642,13 @@ public class MarketChatAgent
     /// </summary>
     /// <param name="messages">要压缩的消息</param>
     /// <returns>压缩摘要</returns>
-    private async Task<string> CreateCompressionSummaryAsync(IEnumerable<ChatMessageContent> messages)
+    private async Task<string> CreateCompressionSummaryAsync(IEnumerable<ChatMessage> messages)
     {
         try
         {
             var messageTexts = messages
-                .Where(m => !string.IsNullOrWhiteSpace(m.Content))
-                .Select(m => $"{m.Role}: {m.Content}")
+                .Where(m => !string.IsNullOrWhiteSpace(m.Text))
+                .Select(m => $"{m.Role}: {m.Text}")
                 .ToList();
 
             if (messageTexts.Count == 0)
@@ -572,25 +656,25 @@ public class MarketChatAgent
 
             // 限制输入长度，避免压缩请求过长
             var combinedText = string.Join("\n\n", messageTexts);
-            if (combinedText.Length > 4000) // 限制输入长度
+            if (combinedText.Length > 4000)
             {
                 combinedText = combinedText.Substring(0, 4000) + "...（内容已截断）";
             }
 
-            // 创建临时对话历史用于压缩，使用更专业的提示词
-            var compressionHistory = new ChatHistory();
-            var compressionPrompt = $"请将以下股票分析对话内容压缩成简洁的摘要。重点保留：\n" +
-                                   $"1. 涉及的股票代码和名称\n" +
-                                   $"2. 关键的分析结论和数据\n" +
-                                   $"3. 重要的投资建议或风险提示\n" +
-                                   $"4. 用户关心的核心问题\n" +
-                                   $"请用3-5句话概括，保持专业性：";
+            // 创建临时对话历史用于压缩
+            var compressionHistory = new List<ChatMessage>
+            {
+                new(ChatRole.System, "请将以下股票分析对话内容压缩成简洁的摘要。重点保留：\n" +
+                                    "1. 涉及的股票代码和名称\n" +
+                                    "2. 关键的分析结论和数据\n" +
+                                    "3. 重要的投资建议或风险提示\n" +
+                                    "4. 用户关心的核心问题\n" +
+                                    "请用3-5句话概括，保持专业性："),
+                new(ChatRole.User, combinedText)
+            };
 
-            compressionHistory.AddSystemMessage(compressionPrompt);
-            compressionHistory.AddUserMessage(combinedText);
-
-            var summary = await _chatCompletionService.GetChatMessageContentAsync(compressionHistory);
-            return summary.Content?.Trim() ?? string.Empty;
+            var chatCompletion = await _chatClient.CompleteAsync(compressionHistory, cancellationToken: CancellationToken.None);
+            return chatCompletion.Message.Text?.Trim() ?? string.Empty;
         }
         catch (Exception ex)
         {
@@ -643,11 +727,11 @@ public class MarketChatAgent
     /// 获取股票分析上下文
     /// </summary>
     /// <returns>分析上下文摘要</returns>
-    private Task<string> GetAnalysisContextAsync(ChatHistory history, string stockCode)
+    private Task<string> GetAnalysisContextAsync(List<ChatMessage> history, string stockCode)
     {
         try
         {
-            if (history.Any())
+            if (history.Count > 0)
             {
                 // 提取分析师的关键观点作为上下文
                 var analysisContext = ExtractAnalysisContext(history, stockCode);
@@ -670,7 +754,7 @@ public class MarketChatAgent
     /// <param name="analysisHistory">分析历史</param>
     /// <param name="stockCode">股票代码</param>
     /// <returns>提取的上下文摘要</returns>
-    private string ExtractAnalysisContext(ChatHistory analysisHistory, string stockCode)
+    private string ExtractAnalysisContext(List<ChatMessage> analysisHistory, string stockCode)
     {
         var contextBuilder = new StringBuilder();
         contextBuilder.Append($"当前分析股票：{stockCode}\n");
@@ -678,18 +762,17 @@ public class MarketChatAgent
 
         // 获取最近的分析师观点（限制长度避免上下文过长）
         var recentMessages = analysisHistory
-            .Where(m => m.Role == AuthorRole.Assistant && !string.IsNullOrWhiteSpace(m.Content))
-            .TakeLast(3) // 只取最近3条分析师观点
+            .Where(m => m.Role == ChatRole.Assistant && !string.IsNullOrWhiteSpace(m.Text))
+            .TakeLast(3)
             .ToList();
 
         foreach (var message in recentMessages)
         {
-            var authorName = message.AuthorName ?? "分析师";
-            var content = message.Content?.Length > 200
-                ? message.Content.Substring(0, 200) + "..."
-                : message.Content;
+            var content = message.Text?.Length > 200
+                ? message.Text.Substring(0, 200) + "..."
+                : message.Text;
 
-            contextBuilder.Append($"- {authorName}: {content}\n");
+            contextBuilder.Append($"- 分析师: {content}\n");
         }
 
         return contextBuilder.ToString().Trim();
@@ -712,6 +795,17 @@ public class StreamingResponseEventArgs : EventArgs
     /// 是否完成
     /// </summary>
     public bool IsComplete { get; set; }
+}
+
+/// <summary>
+/// 流式聊天更新
+/// </summary>
+public class StreamingChatUpdate
+{
+    /// <summary>
+    /// 更新的内容
+    /// </summary>
+    public string Content { get; set; } = string.Empty;
 }
 
 

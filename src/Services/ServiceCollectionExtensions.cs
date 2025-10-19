@@ -6,6 +6,7 @@ using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Filtering;
+using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Parsers;
 using MarketAssistant.Rag.Extensions;
@@ -44,14 +45,14 @@ public static class ServiceCollectionExtensions
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
-        // 注册 Kernel 过滤器
+        // 注册 Kernel 过滤器（保留用于向后兼容）
         services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
         services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
         services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
         services.AddSingleton<IPromptRenderFilter, PromptCacheFilter>();
         services.AddSingleton<IFunctionInvocationFilter, PromptCacheWriteFilter>();
 
-        // 注册 Kernel 和嵌入服务
+        // 注册 Kernel 和嵌入服务（保留用于向后兼容）
         services.AddSingleton<IKernelFactory, KernelFactory>();
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
@@ -61,6 +62,13 @@ public static class ServiceCollectionExtensions
             var svc = serviceProvider.GetRequiredService<IKernelFactory>();
             return svc.CreateKernel();
         });
+
+        // 注册 Agent Framework 服务（新增）
+        services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
+        services.AddSingleton<IAIAgentFactory, AIAgentFactory>();
+        
+        // 注册 MarketChatAgent 工厂（推荐方式：由使用者控制实例生命周期）
+        services.AddSingleton<IMarketChatAgentFactory, MarketChatAgentFactory>();
 
         // 注册向量存储
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
@@ -72,7 +80,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GroundingSearchPlugin>();
         services.AddSingleton<AnalystManager>();
         services.AddSingleton<MarketAnalysisAgent>();
-        services.AddTransient<MarketChatAgent>();
 
         // 注册分析缓存服务
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();

@@ -1,13 +1,14 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure;
-using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Infrastructure.Factories;
+using Microsoft.Extensions.AI;
 
 namespace TestMarketAssistant;
 
 [TestClass]
 public class MarketChatAgentTest : BaseKernelTest
 {
-    private MarketChatAgent _chatAgent;
+    private MarketChatAgent _chatAgent = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -15,7 +16,18 @@ public class MarketChatAgentTest : BaseKernelTest
         BaseInitialize();
 
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketChatAgent>();
-        _chatAgent = new MarketChatAgent(logger, _kernel);
+        
+        // 使用 AIAgentFactory 创建 ChatClient
+        var aiAgentFactory = _serviceProvider.GetRequiredService<IAIAgentFactory>();
+        var configuredClient = aiAgentFactory.CreateChatAgent("你是一个专业的股票市场分析助手。");
+        
+        _chatAgent = new MarketChatAgent(configuredClient.Client, logger);
+    }
+
+    [TestCleanup]
+    public void Cleanup()
+    {
+        _chatAgent?.Dispose();
     }
 
     [TestMethod]
@@ -25,10 +37,10 @@ public class MarketChatAgentTest : BaseKernelTest
         var response = await _chatAgent.SendMessageAsync("你好，我想了解股票投资的基本知识");
 
         Assert.IsNotNull(response);
-        Assert.IsNotNull(response.Content);
-        Assert.IsFalse(string.IsNullOrEmpty(response.Content));
+        Assert.IsNotNull(response.Text);
+        Assert.IsFalse(string.IsNullOrEmpty(response.Text));
 
-        Console.WriteLine($"AI回复: {response.Content}");
+        Console.WriteLine($"AI回复: {response.Text}");
     }
 
     [TestMethod]
@@ -41,10 +53,10 @@ public class MarketChatAgentTest : BaseKernelTest
         var response = await _chatAgent.SendMessageAsync("这只股票的基本面如何？");
 
         Assert.IsNotNull(response);
-        Assert.IsNotNull(response.Content);
-        Assert.IsFalse(string.IsNullOrEmpty(response.Content));
+        Assert.IsNotNull(response.Text);
+        Assert.IsFalse(string.IsNullOrEmpty(response.Text));
 
-        Console.WriteLine($"AI回复: {response.Content}");
+        Console.WriteLine($"AI回复: {response.Text}");
     }
 
     [TestMethod]
@@ -56,14 +68,14 @@ public class MarketChatAgentTest : BaseKernelTest
         var response = await _chatAgent.SendMessageAsync("这两个指标有什么区别？");
 
         Assert.IsNotNull(response);
-        Assert.IsNotNull(response.Content);
+        Assert.IsNotNull(response.Text);
 
         // 验证对话历史
         var history = _chatAgent.ConversationHistory;
         Assert.IsTrue(history.Count > 0);
 
         Console.WriteLine($"对话历史条数: {history.Count}");
-        Console.WriteLine($"最新回复: {response.Content}");
+        Console.WriteLine($"最新回复: {response.Text}");
     }
 
     [TestMethod]
@@ -111,10 +123,10 @@ public class MarketChatAgentTest : BaseKernelTest
         var response = await _chatAgent.SendMessageAsync("今天天气怎么样？");
 
         Assert.IsNotNull(response);
-        Assert.IsNotNull(response.Content);
+        Assert.IsNotNull(response.Text);
         // AI应该能够自然地引导用户回到股票话题
         
-        Console.WriteLine($"AI引导回复: {response.Content}");
+        Console.WriteLine($"AI引导回复: {response.Text}");
     }
 
     [TestMethod]
@@ -140,11 +152,11 @@ public class MarketChatAgentTest : BaseKernelTest
 
         // 测试流式响应
         var allContent = new List<string>();
-        await foreach (var chunk in _chatAgent.SendMessageStreamAsync("请分析sz000001的技术指标"))
+        await foreach (var update in _chatAgent.SendMessageStreamAsync("请分析sz000001的技术指标"))
         {
-            if (!string.IsNullOrEmpty(chunk.Content))
+            if (!string.IsNullOrEmpty(update.Content))
             {
-                allContent.Add(chunk.Content);
+                allContent.Add(update.Content);
             }
         }
 
@@ -179,16 +191,16 @@ public class MarketChatAgentTest : BaseKernelTest
 
         // 测试AI能否根据问题类型智能调整分析角度
         var response1 = await _chatAgent.SendMessageAsync("请分析MACD和RSI指标");
-        Assert.IsNotNull(response1.Content);
+        Assert.IsNotNull(response1.Text);
 
         var response2 = await _chatAgent.SendMessageAsync("这家公司的ROE和市盈率如何？");
-        Assert.IsNotNull(response2.Content);
+        Assert.IsNotNull(response2.Text);
 
         var response3 = await _chatAgent.SendMessageAsync("投资这只股票有什么风险？");
-        Assert.IsNotNull(response3.Content);
+        Assert.IsNotNull(response3.Text);
 
-        Console.WriteLine($"技术分析回复: {response1.Content}");
-        Console.WriteLine($"基本面分析回复: {response2.Content}");
-        Console.WriteLine($"风险分析回复: {response3.Content}");
+        Console.WriteLine($"技术分析回复: {response1.Text}");
+        Console.WriteLine($"基本面分析回复: {response2.Text}");
+        Console.WriteLine($"风险分析回复: {response3.Text}");
     }
 }

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -12,6 +13,7 @@ namespace MarketAssistant.ViewModels;
 public partial class ChatSidebarViewModel : ViewModelBase
 {
     private readonly MarketChatAgent _chatAgent;
+    private readonly IMarketChatAgentFactory _chatAgentFactory;
 
     /// <summary>
     /// 聊天消息集合
@@ -53,10 +55,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        MarketChatAgent chatAgent)
+        IMarketChatAgentFactory chatAgentFactory)
         : base(logger)
     {
-        _chatAgent = chatAgent;
+        _chatAgentFactory = chatAgentFactory;
+        // 创建新的聊天会话
+        _chatAgent = chatAgentFactory.CreateAgent($"session-{Guid.NewGuid():N}");
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
     }
 
