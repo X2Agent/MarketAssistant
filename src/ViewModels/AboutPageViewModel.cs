@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Notification;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -47,7 +46,7 @@ namespace MarketAssistant.ViewModels
 
         public IAsyncRelayCommand CheckUpdateCommand { get; }
         public IAsyncRelayCommand DownloadUpdateCommand { get; }
-        public IAsyncRelayCommand OpenGitHubCommand { get; }
+        public IRelayCommand OpenGitHubCommand { get; }
 
         /// <summary>
         /// 构造函数（使用依赖注入）
@@ -62,7 +61,7 @@ namespace MarketAssistant.ViewModels
 
             CheckUpdateCommand = new AsyncRelayCommand(CheckForUpdateAsync);
             DownloadUpdateCommand = new AsyncRelayCommand(DownloadUpdateAsync, () => HasNewVersion && !IsDownloading);
-            OpenGitHubCommand = new AsyncRelayCommand(OpenGitHubAsync);
+            OpenGitHubCommand = new RelayCommand(OpenGitHub);
 
             // 初始化功能项列表
             InitializeFeatureItems();
@@ -145,7 +144,7 @@ namespace MarketAssistant.ViewModels
                     {
                         // 没有找到资产文件，打开 GitHub Release 页面
                         _notificationService.ShowInfo("将打开 GitHub Release 页面手动下载");
-                        await OpenUrlAsync(_latestRelease.HtmlUrl);
+                        OpenUrl(_latestRelease.HtmlUrl);
                         return;
                     }
 
@@ -216,7 +215,7 @@ namespace MarketAssistant.ViewModels
             }, "下载更新");
         }
 
-        private async Task OpenGitHubAsync()
+        private void OpenGitHub()
         {
             try
             {
@@ -228,7 +227,7 @@ namespace MarketAssistant.ViewModels
             }
         }
 
-        private async Task OpenUrlAsync(string url)
+        private void OpenUrl(string url)
         {
             try
             {
@@ -247,7 +246,7 @@ namespace MarketAssistant.ViewModels
                 IconSource = "/Assets/Images/refresh.svg",
                 Title = "更新日志",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.ChangelogUrl))
+                Command = new RelayCommand(() => OpenUrl(AppInfo.ChangelogUrl))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -255,7 +254,7 @@ namespace MarketAssistant.ViewModels
                 IconSource = "/Assets/Images/globe.svg",
                 Title = "官方网站",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.OfficialWebsite))
+                Command = new RelayCommand(() => OpenUrl(AppInfo.OfficialWebsite))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -263,7 +262,7 @@ namespace MarketAssistant.ViewModels
                 IconSource = "/Assets/Images/feedback.svg",
                 Title = "意见反馈",
                 ButtonText = "反馈",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.FeedbackUrl))
+                Command = new RelayCommand(() => OpenUrl(AppInfo.FeedbackUrl))
             });
 
             FeatureItems.Add(new FeatureItem
@@ -271,7 +270,7 @@ namespace MarketAssistant.ViewModels
                 IconSource = "/Assets/Images/license.svg",
                 Title = "许可证",
                 ButtonText = "查看",
-                Command = new AsyncRelayCommand(() => OpenUrlAsync(AppInfo.LicenseUrl))
+                Command = new RelayCommand(() => OpenUrl(AppInfo.LicenseUrl))
             });
         }
     }
@@ -296,6 +295,6 @@ namespace MarketAssistant.ViewModels
         /// <summary>
         /// 功能项命令
         /// </summary>
-        public IAsyncRelayCommand Command { get; set; } = null!;
+        public IRelayCommand Command { get; set; } = null!;
     }
 }

@@ -13,6 +13,7 @@ using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
@@ -64,11 +65,12 @@ public static class ServiceCollectionExtensions
         });
 
         // 注册 Agent Framework 服务（新增）
+        services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
         services.AddSingleton<IAIAgentFactory, AIAgentFactory>();
-        
-        // 注册 MarketChatAgent 工厂（推荐方式：由使用者控制实例生命周期）
-        services.AddSingleton<IMarketChatAgentFactory, MarketChatAgentFactory>();
+
+        // 注册 MCP 服务（Model Context Protocol）
+        services.AddSingleton<McpService>();
 
         // 注册向量存储
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";

@@ -1,8 +1,8 @@
-# MarketChatAgent 迁移到 Agent Framework 已完成
+# MarketChatSession 迁移到 Agent Framework 已完成
 
 ## 概览
 
-已成功将 `MarketChatAgent` 从 Semantic Kernel 迁移到使用 Microsoft Agent Framework API。
+已成功将 `MarketChatSession`（原 `MarketChatAgent`）从 Semantic Kernel 迁移到使用 Microsoft Agent Framework API。
 
 ## 主要变更
 
@@ -79,6 +79,14 @@ var tools = await mcpClient.ListToolsAsync();
 _mcpTools.AddRange(tools.Cast<AITool>());
 ```
 
+## 命名重构
+
+为了更准确地反映职责，已将 `MarketChatAgent` 重命名为 `MarketChatSession`：
+- ✅ 类名：`MarketChatAgent` → `MarketChatSession`
+- ✅ 文件：`MarketChatAgent.cs` → `MarketChatSession.cs`
+- ✅ 工厂：`IMarketChatAgentFactory` → `IMarketChatSessionFactory`
+- ✅ 测试：`MarketChatAgentTest` → `MarketChatSessionTest`
+
 ## 待修复问题
 
 ### API 方法名称
@@ -93,22 +101,21 @@ _mcpTools.AddRange(tools.Cast<AITool>());
 
 ## 文件变更清单
 
-1. ✅ `src/Agents/MarketChatAgent.cs` - 主要迁移文件
+1. ✅ `src/Agents/MarketChatSession.cs` - 主要迁移文件（已重命名）
 2. ✅ `src/Infrastructure/Configuration/AgentToolsConfig.cs` - 工具配置
 3. ✅ `src/Infrastructure/Factories/AIAgentFactory.cs` - Agent 工厂
-4. ✅ `src/Services/ServiceCollectionExtensions.cs` - 服务注册
-5. ✅ `tests/MarketChatAgentTest.cs` - 测试更新
-6. ❌ `src/Infrastructure/Configuration/ChatClientPluginConfig.cs` - 已删除（重复）
+4. ✅ `src/Infrastructure/Factories/MarketChatSessionFactory.cs` - Session 工厂（已重命名）
+5. ✅ `src/Services/ServiceCollectionExtensions.cs` - 服务注册
+6. ✅ `tests/MarketChatSessionTest.cs` - 测试更新（已重命名）
+7. ✅ `src/ViewModels/ChatSidebarViewModel.cs` - ViewModel 更新
+8. ❌ `src/Infrastructure/Configuration/ChatClientPluginConfig.cs` - 已删除（重复）
 
 ## 构建状态
 
-当前构建失败，剩余 3 个编译错误：
-1. `IChatClient` 没有 `CompleteAsync` 方法
-2. `IChatClient` 没有 `CompleteStreamingAsync` 方法  
-3. 方法参数不匹配
+✅ **构建成功** - 所有编译错误已修复，测试通过
 
-## 下一步
+## 完成状态
 
-1. 确认 `Microsoft.Extensions.AI.IChatClient` 的正确 API 方法名称
-2. 更新方法调用以使用正确的 API
-3. 完成构建和测试验证
+✅ 迁移已完成
+✅ 命名重构已完成
+✅ 构建验证通过

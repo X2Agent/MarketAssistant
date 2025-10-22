@@ -14,7 +14,7 @@ namespace MarketAssistant.Infrastructure.Configuration;
 /// </summary>
 public interface IAgentToolsConfig
 {
-    IList<AIFunction> GetToolsForAgent(AnalysisAgents analysisAgent);
+    IList<AITool> GetToolsForAgent(AnalysisAgents analysisAgent);
 }
 
 /// <summary>
@@ -49,9 +49,9 @@ public class AgentToolsConfig : IAgentToolsConfig
     /// <summary>
     /// 获取指定分析代理所需的工具列表
     /// </summary>
-    public IList<AIFunction> GetToolsForAgent(AnalysisAgents analysisAgent)
+    public IList<AITool> GetToolsForAgent(AnalysisAgents analysisAgent)
     {
-        var tools = new List<AIFunction>();
+        var tools = new List<AITool>();
 
         switch (analysisAgent)
         {

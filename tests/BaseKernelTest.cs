@@ -6,6 +6,7 @@ using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,7 @@ public class BaseKernelTest
         builder.Services.AddSingleton<PlaywrightService>();
         builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
         builder.Services.AddSingleton<StockSelectionManager>();
+        builder.Services.AddSingleton<McpService>();
         builder.Services.AddHttpClient();
 
         // 从环境变量获取ApiKey

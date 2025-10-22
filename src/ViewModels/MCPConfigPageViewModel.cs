@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Notification;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -14,7 +14,8 @@ namespace MarketAssistant.ViewModels;
 public partial class MCPConfigPageViewModel : ViewModelBase
 {
     private readonly MCPServerConfigService _configService;
-    private readonly INotificationService? _notificationService;
+    private readonly INotificationService _notificationService;
+    private readonly McpService _mcpService;
 
     [ObservableProperty]
     private ObservableCollection<MCPServerConfig> _serverConfigs = new();
@@ -58,18 +59,15 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     private MCPServerConfig? _editingConfig;
 
-    public MCPConfigPageViewModel() : this(null, null)
-    {
-        // 设计时构造函数
-    }
-
     public MCPConfigPageViewModel(
-        INotificationService? notificationService,
+        INotificationService notificationService,
+        McpService mcpService,
         ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
         _configService = MCPServerConfigService.Instance;
         _notificationService = notificationService;
+        _mcpService = mcpService;
         LoadServerConfigs();
     }
 
@@ -102,7 +100,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     {
         // 清空选中项，避免与编辑状态冲突
         SelectedConfig = null;
-        
+
         _editingConfig = new MCPServerConfig
         {
             Id = Guid.NewGuid().ToString(),
@@ -252,38 +250,59 @@ public partial class MCPConfigPageViewModel : ViewModelBase
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
             // 尝试连接并获取工具列表
-            var functions = await McpPlugin.GetKernelFunctionsAsync(testConfig);
-            var functionCount = functions.Count();
+            // 使用注入的服务或创建临时实例（仅用于测试）
+            var service = _mcpService;
+            var shouldDispose = false;
 
-            if (functionCount > 0)
+            if (service == null)
             {
-                TestStatus = $"连接成功！发现 {functionCount} 个工具";
-                _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {functionCount} 个工具");
-                Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, functionCount);
+                service = new McpService();
+                shouldDispose = true;
             }
-            else
+
+            try
             {
-                TestStatus = "连接成功，但未发现可用工具";
-                _notificationService?.ShowWarning("连接成功，但未发现可用工具");
-                Logger?.LogWarning("MCP服务器连接成功但无工具: {Name}", Name);
+                var functions = await service.GetKernelFunctionsAsync([testConfig]);
+                var functionCount = functions.Count;
+
+                if (functionCount > 0)
+                {
+                    TestStatus = $"连接成功！发现 {functionCount} 个工具";
+                    _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {functionCount} 个工具");
+                    Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, functionCount);
+                }
+                else
+                {
+                    TestStatus = "连接成功，但未发现可用工具";
+                    _notificationService?.ShowWarning("连接成功，但未发现可用工具");
+                    Logger?.LogWarning("MCP服务器连接成功但无工具: {Name}", Name);
+                }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            TestStatus = "连接超时";
-            _notificationService?.ShowError("连接超时，请检查服务器配置");
-            Logger?.LogWarning("MCP服务器连接超时: {Name}", Name);
-        }
-        catch (Exception ex)
-        {
-            TestStatus = $"连接失败: {ex.Message}";
-            _notificationService?.ShowError($"连接失败: {ex.Message}");
-            Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
+            catch (OperationCanceledException)
+            {
+                TestStatus = "连接超时";
+                _notificationService?.ShowError("连接超时，请检查服务器配置");
+                Logger?.LogWarning("MCP服务器连接超时: {Name}", Name);
+            }
+            catch (Exception ex)
+            {
+                TestStatus = $"连接失败: {ex.Message}";
+                _notificationService?.ShowError($"连接失败: {ex.Message}");
+                Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
+            }
+            finally
+            {
+                // 如果是临时创建的服务，需要释放
+                if (shouldDispose && service != null)
+                {
+                    await service.DisposeAsync();
+                }
+            }
         }
         finally
         {
             IsTesting = false;
-            
+
             // 3秒后清除状态信息
             _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
         }

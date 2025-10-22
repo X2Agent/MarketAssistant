@@ -2,6 +2,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Mcp;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -12,8 +14,7 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class ChatSidebarViewModel : ViewModelBase
 {
-    private readonly MarketChatAgent _chatAgent;
-    private readonly IMarketChatAgentFactory _chatAgentFactory;
+    private readonly MarketChatSession _chatSession;
 
     /// <summary>
     /// 聊天消息集合
@@ -55,12 +56,16 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        IMarketChatAgentFactory chatAgentFactory)
+        IChatClientFactory chatClientFactory,
+        ILoggerFactory loggerFactory,
+        McpService mcpService)
         : base(logger)
     {
-        _chatAgentFactory = chatAgentFactory;
         // 创建新的聊天会话
-        _chatAgent = chatAgentFactory.CreateAgent($"session-{Guid.NewGuid():N}");
+        var chatClient = chatClientFactory.CreateClient();
+        var sessionLogger = loggerFactory.CreateLogger<MarketChatSession>();
+        _chatSession = new MarketChatSession(chatClient, sessionLogger, mcpService);
+
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
     }
 
@@ -107,7 +112,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
             var contentBuilder = new System.Text.StringBuilder();
             bool hasReceivedContent = false;
 
-            await foreach (var chunk in _chatAgent.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
+            await foreach (var chunk in _chatSession.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
                 if (!string.IsNullOrEmpty(chunk.Content))
                 {
@@ -177,7 +182,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     {
         StockCode = stockCode;
 
-        await _chatAgent.UpdateStockContextAsync(stockCode);
+        await _chatSession.UpdateStockContextAsync(stockCode);
 
         ChatMessages.Clear();
 
@@ -186,7 +191,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         {
             if (!string.IsNullOrWhiteSpace(analysisMessage.Content))
             {
-                _chatAgent.AddSystemMessage($"分析师观点：{analysisMessage.Content}");
+                _chatSession.AddAssistantMessage($"分析师观点：{analysisMessage.Content}");
 
                 var displayMessage = new ChatMessageAdapter(analysisMessage);
                 ChatMessages.Add(displayMessage);
@@ -216,7 +221,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         var systemMessage = new ChatMessageAdapter(content, false, "系统");
         ChatMessages.Add(systemMessage);
 
-        _chatAgent.AddSystemMessage(content);
+        _chatSession.AddAssistantMessage(content);
     }
 
     /// <summary>
@@ -234,8 +239,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
     public void ClearChatHistory()
     {
         ChatMessages.Clear();
-        _chatAgent.ClearHistory();
-        AddWelcomeMessage();
-    }
+        _chatSession.ClearHistory();
+            AddWelcomeMessage();
+                           }
 }
 

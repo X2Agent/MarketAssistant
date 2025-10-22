@@ -1,4 +1,6 @@
-﻿using MarketAssistant.Agents.Plugins;
+﻿using MarketAssistant.Services.Mcp;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 
@@ -12,7 +14,10 @@ public class MCPTest : BaseKernelTest
     {
         var kernel = CreateKernelWithChatCompletion();
 
-        kernel.Plugins.AddFromFunctions("tavily", await McpPlugin.GetKernelFunctionsAsync());
+        var service = kernel.Services.GetRequiredService<McpService>();
+        var configs = McpService.GetEnabledConfigs();
+        var functions = await service.GetKernelFunctionsAsync(configs);
+        kernel.Plugins.AddFromFunctions("tavily", functions);
 
         OpenAIPromptExecutionSettings executionSettings = new()
         {

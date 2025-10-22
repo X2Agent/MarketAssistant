@@ -1,16 +1,14 @@
-using MarketAssistant.Agents.Plugins;
-using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using ModelContextProtocol.Client;
 
 namespace MarketAssistant.Agents;
 
 /// <summary>
-/// 市场对话代理，专门处理用户与AI的对话交互
-/// 使用 Microsoft Agent Framework API
+/// 市场对话会话管理器，处理用户与AI的对话交互
+/// 管理对话历史、上下文和工具集成
 /// </summary>
-public class MarketChatAgent : IDisposable
+public class MarketChatSession : IDisposable
 {
     #region 常量定义
 
@@ -34,7 +32,7 @@ public class MarketChatAgent : IDisposable
     #region 私有字段
 
     private readonly IChatClient _chatClient;
-    private readonly ILogger<MarketChatAgent> _logger;
+    private readonly ILogger<MarketChatSession> _logger;
 
     /// <summary>
     /// 对话历史记录
@@ -47,9 +45,9 @@ public class MarketChatAgent : IDisposable
     private readonly List<AITool> _mcpTools = new();
 
     /// <summary>
-    /// MCP 客户端列表
+    /// MCP 服务
     /// </summary>
-    private readonly List<IMcpClient> _mcpClients = new();
+    private readonly McpService _mcpService;
 
     /// <summary>
     /// 当前股票代码
@@ -71,16 +69,19 @@ public class MarketChatAgent : IDisposable
     #region 构造函数
 
     /// <summary>
-    /// 创建市场对话代理
+    /// 创建市场对话会话
     /// </summary>
     /// <param name="chatClient">聊天客户端</param>
     /// <param name="logger">日志记录器</param>
-    public MarketChatAgent(
+    /// <param name="mcpService">MCP 服务</param>
+    public MarketChatSession(
         IChatClient chatClient,
-        ILogger<MarketChatAgent> logger)
+        ILogger<MarketChatSession> logger,
+        McpService mcpService)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
 
         // 初始化系统消息
         InitializeSystemContext();
@@ -97,8 +98,6 @@ public class MarketChatAgent : IDisposable
     /// 流式响应事件
     /// </summary>
     public event EventHandler<StreamingResponseEventArgs>? StreamingResponse;
-
-
 
     #endregion
 
@@ -155,13 +154,13 @@ public class MarketChatAgent : IDisposable
                 };
 
                 // 调用AI服务获取回复
-                var chatCompletion = await _chatClient.CompleteAsync(
+                var chatCompletion = await _chatClient.GetResponseAsync(
                     _conversationHistory,
                     chatOptions,
                     cts.Token);
 
                 // 从响应中获取助手消息（假设返回类型有 Choices 或 Message 属性）
-                var assistantMessage = new ChatMessage(ChatRole.Assistant, chatCompletion.Message.Text ?? string.Empty);
+                var assistantMessage = new ChatMessage(ChatRole.Assistant, chatCompletion.Text ?? string.Empty);
 
                 // 添加AI回复到历史
                 _conversationHistory.Add(assistantMessage);
@@ -234,7 +233,7 @@ public class MarketChatAgent : IDisposable
                 cts.Token))
             {
                 var content = update.Text ?? string.Empty;
-                
+
                 // 累积完整响应
                 if (!string.IsNullOrEmpty(content))
                 {
@@ -303,7 +302,7 @@ public class MarketChatAgent : IDisposable
         // 更新系统上下文
         await UpdateSystemContextAsync();
 
-            // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
+        // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
         var hasUserMessages = _conversationHistory.Any(m => m.Role == ChatRole.User);
 
         if (hasUserMessages && !string.IsNullOrEmpty(stockCode))
@@ -331,9 +330,9 @@ public class MarketChatAgent : IDisposable
     /// 添加系统消息
     /// </summary>
     /// <param name="message">系统消息内容</param>
-    public void AddSystemMessage(string message)
+    public void AddAssistantMessage(string message)
     {
-        _conversationHistory.Add(new ChatMessage(ChatRole.System, message));
+        _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, message));
     }
 
     /// <summary>
@@ -347,19 +346,15 @@ public class MarketChatAgent : IDisposable
         _currentCancellationTokenSource?.Cancel();
         _currentCancellationTokenSource?.Dispose();
 
-        foreach (var mcpClient in _mcpClients)
+        try
         {
-            try
-            {
-                mcpClient.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "释放 MCP 客户端时发生错误");
-            }
+            _mcpService.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "释放 MCP 服务时发生错误");
         }
 
-        _mcpClients.Clear();
         _mcpTools.Clear();
 
         _disposed = true;
@@ -388,68 +383,23 @@ public class MarketChatAgent : IDisposable
         {
             _logger.LogInformation("开始初始化MCP服务");
 
-            var configService = MCPServerConfigService.Instance;
-            var enabledConfigs = configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
-
-            foreach (var config in enabledConfigs)
-            {
-                try
-                {
-                    IClientTransport clientTransport = config.TransportType.ToLower() switch
-                    {
-                        "stdio" => CreateStdioTransport(config),
-                        "sse" => McpPlugin.CreateSseTransport(config),
-                        "streamablehttp" => McpPlugin.CreateStreamableHttpTransport(config),
-                        _ => throw new NotSupportedException($"不支持的传输类型: {config.TransportType}")
-                    };
-
-                    var options = new McpClientOptions
-                    {
-                        ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
-                    };
-
-                    var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
-                    _mcpClients.Add(mcpClient);
-
-                    var tools = await mcpClient.ListToolsAsync();
-                    _mcpTools.AddRange(tools.Cast<AITool>());
-
-                    _logger.LogInformation("成功连接到 MCP 服务器 {Name}，加载 {Count} 个工具", 
-                        config.Name, tools.Count);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
-                }
-            }
+            var enabledConfigs = McpService.GetEnabledConfigs();
+            var tools = await _mcpService.GetAIToolsAsync(enabledConfigs, manageClientLifetime: true);
+            _mcpTools.AddRange(tools);
 
             if (_mcpTools.Count == 0)
             {
                 _logger.LogInformation("未加载任何 MCP 工具");
+            }
+            else
+            {
+                _logger.LogInformation("成功加载 {Count} 个 MCP 工具", _mcpTools.Count);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "初始化 MCP 服务失败");
         }
-    }
-
-    /// <summary>
-    /// 创建 Stdio 传输
-    /// </summary>
-    private static IClientTransport CreateStdioTransport(MCPServerConfig config)
-    {
-        var arguments = string.IsNullOrEmpty(config.Arguments)
-            ? Array.Empty<string>()
-            : config.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-        return new StdioClientTransport(new()
-        {
-            Name = config.Name,
-            Command = config.Command,
-            Arguments = arguments,
-            EnvironmentVariables = config.EnvironmentVariables
-        });
     }
 
     /// <summary>
@@ -673,8 +623,8 @@ public class MarketChatAgent : IDisposable
                 new(ChatRole.User, combinedText)
             };
 
-            var chatCompletion = await _chatClient.CompleteAsync(compressionHistory, cancellationToken: CancellationToken.None);
-            return chatCompletion.Message.Text?.Trim() ?? string.Empty;
+            var chatCompletion = await _chatClient.GetResponseAsync(compressionHistory, cancellationToken: CancellationToken.None);
+            return chatCompletion.Text?.Trim() ?? string.Empty;
         }
         catch (Exception ex)
         {

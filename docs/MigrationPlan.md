@@ -23,7 +23,7 @@ MarketAssistant 是一个基于 Avalonia UI 的桌面应用程序，主要功能
    - Microsoft.SemanticKernel.Rag (1.65.0-preview)
 
 2. **主要使用场景**
-   - Agent 实现 (MarketAnalysisAgent, MarketChatAgent)
+   - Agent 实现 (MarketAnalysisAgent, MarketChatSession)
    - 插件系统 (StockBasicPlugin, GroundingSearchPlugin)
    - 过滤器 (PromptCacheFilter, PromptCacheWriteFilter)
    - Kernel 工厂 (KernelFactory)
@@ -62,7 +62,7 @@ MarketAssistant 是一个基于 Avalonia UI 的桌面应用程序，主要功能
 
 2. **迁移 Agent 实现**
    - 更新 MarketAnalysisAgent 使用新的 Agent API
-   - 更新 MarketChatAgent 使用新的 Agent API
+   - 更新 MarketChatSession 使用新的 Agent API
    - 更新 AnalystManager 使用新的 Agent API
 
 3. **迁移插件系统**
@@ -124,13 +124,13 @@ MarketAssistant 是一个基于 Avalonia UI 的桌面应用程序，主要功能
 ### 步骤 2: 更新命名空间
 
 #### 命名空间映射
-| Semantic Kernel | Microsoft Agent Framework |
-|----------------|---------------------------|
-| Microsoft.SemanticKernel | Microsoft.Extensions.AI / Microsoft.Agents.AI |
-| Microsoft.SemanticKernel.Agents | Microsoft.Agents.AI |
-| Microsoft.SemanticKernel.ChatCompletion | Microsoft.Extensions.AI |
-| Microsoft.SemanticKernel.Plugins | Microsoft.Extensions.AI |
-| Microsoft.SemanticKernel.Rag | Microsoft.Agents.Rag (待确认) |
+| Semantic Kernel                         | Microsoft Agent Framework                     |
+| --------------------------------------- | --------------------------------------------- |
+| Microsoft.SemanticKernel                | Microsoft.Extensions.AI / Microsoft.Agents.AI |
+| Microsoft.SemanticKernel.Agents         | Microsoft.Agents.AI                           |
+| Microsoft.SemanticKernel.ChatCompletion | Microsoft.Extensions.AI                       |
+| Microsoft.SemanticKernel.Plugins        | Microsoft.Extensions.AI                       |
+| Microsoft.SemanticKernel.Rag            | Microsoft.Agents.Rag (待确认)                 |
 
 **注意**：Agent Framework 使用 `Microsoft.Extensions.AI` 作为核心抽象层，`Microsoft.Agents.AI` 提供具体实现。
 
