@@ -1,5 +1,6 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.Plugins;
+using MarketAssistant.Agents.Workflows;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
@@ -98,9 +99,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHomeStockService, HomeStockService>();
         services.AddSingleton<INewsUpdateService, NewsUpdateService>();
 
-        // 注册AI选股相关服务
-        services.AddSingleton<StockSelectionManager>();
+        // 注册AI选股相关服务（使用 Agent Framework Workflows）
+        services.AddSingleton<StockSelectionWorkflow>();
         services.AddSingleton<StockSelectionService>();
+        
+        // 注册 Workflow Executors 的 Logger（用于依赖注入）
+        services.AddSingleton<ILogger<GenerateCriteriaExecutor>>(sp => 
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<GenerateCriteriaExecutor>());
+        services.AddSingleton<ILogger<ScreenStocksExecutor>>(sp => 
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<ScreenStocksExecutor>());
+        services.AddSingleton<ILogger<AnalyzeStocksExecutor>>(sp => 
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<AnalyzeStocksExecutor>());
 
         // 注册版本更新服务
         services.AddSingleton<IReleaseService, GitHubReleaseService>();

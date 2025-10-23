@@ -1,22 +1,23 @@
-using MarketAssistant.Agents;
+using MarketAssistant.Agents.Workflows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.StockSelection;
 
 /// <summary>
 /// AI选股服务 - 业务逻辑层，负责对外API和业务规则
+/// 使用 Agent Framework Workflows 实现确定性选股流程
 /// </summary>
 public class StockSelectionService : IDisposable
 {
-    private readonly StockSelectionManager _selectionManager;
+    private readonly StockSelectionWorkflow _selectionWorkflow;
     private readonly ILogger<StockSelectionService> _logger;
     private bool _disposed = false;
 
     public StockSelectionService(
-        StockSelectionManager selectionManager,
+        StockSelectionWorkflow selectionWorkflow,
         ILogger<StockSelectionService> logger)
     {
-        _selectionManager = selectionManager ?? throw new ArgumentNullException(nameof(selectionManager));
+        _selectionWorkflow = selectionWorkflow ?? throw new ArgumentNullException(nameof(selectionWorkflow));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -41,8 +42,8 @@ public class StockSelectionService : IDisposable
             // 业务逻辑：验证和预处理请求
             var validatedRequest = ValidateAndNormalizeUserRequest(request);
 
-            // 调用AI Manager进行分析
-            var result = await _selectionManager.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
+            // 调用工作流进行分析
+            var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
 
             // 业务逻辑：后处理和结果优化
             var optimizedResult = OptimizeUserBasedResult(result, validatedRequest);
@@ -78,8 +79,8 @@ public class StockSelectionService : IDisposable
             // 业务逻辑：验证和预处理请求
             var validatedRequest = ValidateAndNormalizeNewsRequest(request);
 
-            // 调用AI Manager进行分析
-            var result = await _selectionManager.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
+            // 调用工作流进行分析
+            var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
 
             // 业务逻辑：后处理和结果优化
             var optimizedResult = OptimizeNewsBasedResult(result, validatedRequest);
@@ -326,7 +327,7 @@ public class StockSelectionService : IDisposable
     {
         if (!_disposed && disposing)
         {
-            _selectionManager?.Dispose();
+            _selectionWorkflow?.Dispose();
             _disposed = true;
         }
     }
