@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Plugins.Models;
 
-namespace MarketAssistant.Agents.Workflows;
+namespace MarketAssistant.Agents.StockSelection.Models;
 
 /// <summary>
 /// 工作流请求模型（统一的输入）
@@ -13,15 +13,12 @@ public record StockSelectionWorkflowRequest
     public bool IsNewsAnalysis { get; init; }
 
     // 用户需求分析相关字段
-    public string? UserRequirements { get; init; }
+    public string? Content { get; init; }
     public string? RiskPreference { get; init; }
     public decimal? InvestmentAmount { get; init; }
     public int? InvestmentHorizon { get; init; }
     public List<string> PreferredSectors { get; init; } = new();
     public List<string> ExcludedSectors { get; init; } = new();
-
-    // 新闻分析相关字段
-    public string? NewsContent { get; init; }
 
     // 通用字段
     public int MaxRecommendations { get; init; } = 10;
@@ -32,7 +29,6 @@ public record StockSelectionWorkflowRequest
 /// </summary>
 public record ScreeningResult
 {
-    public string CriteriaJson { get; init; } = "";
     public List<ScreenerStockInfo> ScreenedStocks { get; init; } = new();
     public StockCriteria? Criteria { get; init; }
 }

@@ -1,6 +1,6 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.Plugins.Models;
-using MarketAssistant.Agents.Workflows;
+using MarketAssistant.Agents.StockSelection;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 

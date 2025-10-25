@@ -1,12 +1,11 @@
-using MarketAssistant.Agents.Plugins;
+using MarketAssistant.Agents.StockSelection.Executors;
+using MarketAssistant.Agents.StockSelection.Models;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Browser;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 
-namespace MarketAssistant.Agents.Workflows;
+namespace MarketAssistant.Agents.StockSelection;
 
 /// <summary>
 /// AI选股工作流，使用 Agent Framework Workflows 实现确定性三步骤流程
@@ -15,19 +14,16 @@ namespace MarketAssistant.Agents.Workflows;
 public class StockSelectionWorkflow : IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly IKernelFactory _kernelFactory;
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ILogger<StockSelectionWorkflow> _logger;
     private bool _disposed = false;
 
     public StockSelectionWorkflow(
         IServiceProvider serviceProvider,
-        IKernelFactory kernelFactory,
         IChatClientFactory chatClientFactory,
         ILogger<StockSelectionWorkflow> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _kernelFactory = kernelFactory ?? throw new ArgumentNullException(nameof(kernelFactory));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -42,7 +38,7 @@ public class StockSelectionWorkflow : IDisposable
         var workflowRequest = new StockSelectionWorkflowRequest
         {
             IsNewsAnalysis = false,
-            UserRequirements = request.UserRequirements,
+            Content = request.UserRequirements,
             RiskPreference = request.RiskPreference,
             InvestmentAmount = request.InvestmentAmount,
             InvestmentHorizon = request.InvestmentHorizon,
@@ -64,7 +60,7 @@ public class StockSelectionWorkflow : IDisposable
         var workflowRequest = new StockSelectionWorkflowRequest
         {
             IsNewsAnalysis = true,
-            NewsContent = request.NewsContent,
+            Content = request.NewsContent,
             MaxRecommendations = request.MaxRecommendations
         };
 
@@ -80,12 +76,12 @@ public class StockSelectionWorkflow : IDisposable
     {
         try
         {
-            _logger.LogInformation("开始执行选股工作流，分析类型: {Type}", 
+            _logger.LogInformation("开始执行选股工作流，分析类型: {Type}",
                 request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
             // 创建三个 Executor
             var generateCriteriaExecutor = new GenerateCriteriaExecutor(
-                _kernelFactory,
+                _chatClientFactory,
                 _serviceProvider.GetRequiredService<ILogger<GenerateCriteriaExecutor>>()
             );
 
@@ -94,11 +90,7 @@ public class StockSelectionWorkflow : IDisposable
                 _serviceProvider.GetRequiredService<ILogger<ScreenStocksExecutor>>()
             );
 
-            if (!_chatClientFactory.TryCreateClient(out var chatClient, out var chatError))
-            {
-                _logger.LogError("ChatClient 创建失败: {Error}", chatError);
-                return CreateDefaultResult(chatError);
-            }
+            var chatClient = _chatClientFactory.CreateClient();
 
             var analyzeStocksExecutor = new AnalyzeStocksExecutor(
                 chatClient,
@@ -116,7 +108,7 @@ public class StockSelectionWorkflow : IDisposable
             var workflow = builder.Build();
 
             // 执行工作流
-            await using Run run = await InProcessExecution.RunAsync(workflow, request, cancellationToken);
+            await using Run run = await InProcessExecution.RunAsync(workflow, request, runId: null, cancellationToken);
 
             StockSelectionResult? finalResult = null;
 
@@ -135,13 +127,8 @@ public class StockSelectionWorkflow : IDisposable
 
                     case WorkflowOutputEvent workflowOutput:
                         finalResult = workflowOutput.Data as StockSelectionResult;
-                        _logger.LogInformation("工作流完成，推荐股票数量: {Count}", 
+                        _logger.LogInformation("工作流完成，推荐股票数量: {Count}",
                             finalResult?.Recommendations?.Count ?? 0);
-                        break;
-
-                    case ExecutorErrorEvent executorError:
-                        _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}", 
-                            executorError.ExecutorId, executorError.Exception?.Message);
                         break;
                 }
             }

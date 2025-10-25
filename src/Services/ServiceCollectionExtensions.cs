@@ -1,6 +1,7 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.Plugins;
-using MarketAssistant.Agents.Workflows;
+using MarketAssistant.Agents.StockSelection;
+using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;

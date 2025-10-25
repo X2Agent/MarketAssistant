@@ -1,17 +1,18 @@
+using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.StockSelection.Models;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.Agents.AI.Workflows.Reflection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using System.Text.Json;
 
-namespace MarketAssistant.Agents.Workflows;
+namespace MarketAssistant.Agents.StockSelection.Executors;
 
 /// <summary>
 /// 步骤3: AI分析筛选结果的 Executor（使用结构化输出）
 /// 对筛选出的股票进行深度分析并生成推荐报告
 /// </summary>
 internal sealed class AnalyzeStocksExecutor :
-    ReflectingExecutor<AnalyzeStocksExecutor>("AnalyzeStocks"),
+    ReflectingExecutor<AnalyzeStocksExecutor>,
     IMessageHandler<ScreeningResult, StockSelectionResult>
 {
     private readonly IChatClient _chatClient;
@@ -21,7 +22,7 @@ internal sealed class AnalyzeStocksExecutor :
     public AnalyzeStocksExecutor(
         IChatClient chatClient,
         StockSelectionWorkflowRequest originalRequest,
-        ILogger<AnalyzeStocksExecutor> logger)
+        ILogger<AnalyzeStocksExecutor> logger) : base("AnalyzeStocks")
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _originalRequest = originalRequest ?? throw new ArgumentNullException(nameof(originalRequest));
@@ -56,28 +57,33 @@ internal sealed class AnalyzeStocksExecutor :
             var systemPrompt = GetAnalysisInstructions(_originalRequest.IsNewsAnalysis);
             var userPrompt = BuildAnalysisPrompt(_originalRequest, stocksDataText);
 
-            // 使用结构化输出（ChatResponseFormat.Json）
-            var messages = new List<ChatMessage>
-            {
-                new(ChatRole.System, systemPrompt),
-                new(ChatRole.User, userPrompt)
-            };
-
+            // 使用结构化输出
             var options = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.Json,  // 强制返回 JSON
+                ResponseFormat = ChatResponseFormat.ForJsonSchema(
+                    schema: AIJsonUtilities.CreateJsonSchema(typeof(StockSelectionResult)),
+                    schemaName: "StockSelectionResult",
+                    schemaDescription: "股票选择分析结果，包含推荐股票列表和分析报告"),
                 Temperature = 0.2f,
                 MaxOutputTokens = 8000
             };
 
             // 执行 AI 分析（纯分析，无工具调用）
-            var response = await _chatClient.CompleteAsync(messages, options, cancellationToken);
-            var responseText = response.Message.Text ?? "{}";
+            var response = await _chatClient.GetResponseAsync(
+                [
+                    new ChatMessage(ChatRole.System, systemPrompt),
+                    new ChatMessage(ChatRole.User, userPrompt)
+                ],
+                options,
+                cancellationToken);
 
-            _logger.LogInformation("[步骤3/3] AI分析完成，响应长度: {Length}", responseText.Length);
+            var result = JsonSerializer.Deserialize<StockSelectionResult>(response.Text, JsonSerializerOptions.Web);
 
-            // 解析 JSON 响应为结构化结果
-            var result = ParseAnalysisResponse(responseText);
+            if (result == null)
+            {
+                _logger.LogWarning("[步骤3/3] 响应反序列化失败");
+                return CreateDefaultResult();
+            }
 
             _logger.LogInformation("[步骤3/3] 分析完成，推荐 {Count} 只股票，置信度: {Score}",
                 result.Recommendations.Count, result.ConfidenceScore);
@@ -137,13 +143,13 @@ internal sealed class AnalyzeStocksExecutor :
         if (request.IsNewsAnalysis)
         {
             sb.AppendLine("【新闻内容】");
-            sb.AppendLine(request.NewsContent);
+            sb.AppendLine(request.Content);
             sb.AppendLine();
         }
         else
         {
             sb.AppendLine("【用户需求】");
-            sb.AppendLine($"需求描述: {request.UserRequirements}");
+            sb.AppendLine($"需求描述: {request.Content}");
             sb.AppendLine($"风险偏好: {request.RiskPreference}");
 
             if (request.InvestmentAmount.HasValue)
@@ -251,32 +257,6 @@ internal sealed class AnalyzeStocksExecutor :
         }
     }
 
-    /// <summary>
-    /// 解析分析响应
-    /// </summary>
-    private StockSelectionResult ParseAnalysisResponse(string responseText)
-    {
-        try
-        {
-            var result = JsonSerializer.Deserialize<StockSelectionResult>(
-                responseText,
-                new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    PropertyNameCaseInsensitive = true
-                }
-            );
-
-            return result ?? CreateDefaultResult();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "解析响应JSON失败，原始片段: {Snippet}",
-                SafeSnippet(responseText));
-            return CreateDefaultResult();
-        }
-    }
-
     private StockSelectionResult CreateDefaultResult()
     {
         return new StockSelectionResult
@@ -286,8 +266,4 @@ internal sealed class AnalyzeStocksExecutor :
             AnalysisSummary = "解析分析结果失败"
         };
     }
-
-    private static string SafeSnippet(string text, int max = 200)
-        => string.IsNullOrEmpty(text) ? string.Empty : (text.Length <= max ? text : text.Substring(0, max) + "...");
 }
-

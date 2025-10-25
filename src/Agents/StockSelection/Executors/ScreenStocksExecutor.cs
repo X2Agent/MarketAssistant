@@ -1,34 +1,34 @@
 using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.StockSelection.Models;
 using MarketAssistant.Services.Browser;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Agents.AI.Workflows.Reflection;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
-namespace MarketAssistant.Agents.Workflows;
+namespace MarketAssistant.Agents.StockSelection.Executors;
 
 /// <summary>
 /// 步骤2: 执行股票筛选的 Executor（确定性调用，无 AI 参与）
 /// 直接调用 StockScreenerPlugin 进行股票筛选
 /// </summary>
 internal sealed class ScreenStocksExecutor :
-    ReflectingExecutor<ScreenStocksExecutor>("ScreenStocks"),
-    IMessageHandler<string, ScreeningResult>
+    ReflectingExecutor<ScreenStocksExecutor>,
+    IMessageHandler<StockCriteria, ScreeningResult>
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ScreenStocksExecutor> _logger;
 
     public ScreenStocksExecutor(
         IServiceProvider serviceProvider,
-        ILogger<ScreenStocksExecutor> logger)
+        ILogger<ScreenStocksExecutor> logger) : base("ScreenStocks")
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async ValueTask<ScreeningResult> HandleAsync(
-        string criteriaJson,
+        StockCriteria criteria,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
@@ -36,15 +36,9 @@ internal sealed class ScreenStocksExecutor :
 
         try
         {
-            // 反序列化筛选条件
-            var criteria = JsonSerializer.Deserialize<StockCriteria>(
-                criteriaJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
-
             if (criteria == null)
             {
-                throw new InvalidOperationException("筛选条件 JSON 解析失败");
+                throw new ArgumentNullException(nameof(criteria), "筛选条件不能为空");
             }
 
             _logger.LogInformation("[步骤2/3] 筛选条件: 市场={Market}, 行业={Industry}, 条件数={Count}",
@@ -61,7 +55,6 @@ internal sealed class ScreenStocksExecutor :
 
             return new ScreeningResult
             {
-                CriteriaJson = criteriaJson,
                 ScreenedStocks = stocks,
                 Criteria = criteria
             };
