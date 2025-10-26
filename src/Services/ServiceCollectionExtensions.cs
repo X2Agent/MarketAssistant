@@ -1,4 +1,6 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Agents.StockSelection.Executors;
@@ -104,13 +106,23 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StockSelectionWorkflow>();
         services.AddSingleton<StockSelectionService>();
         
-        // 注册 Workflow Executors 的 Logger（用于依赖注入）
+        // 注册 StockSelection Workflow Executors 的 Logger
         services.AddSingleton<ILogger<GenerateCriteriaExecutor>>(sp => 
             sp.GetRequiredService<ILoggerFactory>().CreateLogger<GenerateCriteriaExecutor>());
         services.AddSingleton<ILogger<ScreenStocksExecutor>>(sp => 
             sp.GetRequiredService<ILoggerFactory>().CreateLogger<ScreenStocksExecutor>());
         services.AddSingleton<ILogger<AnalyzeStocksExecutor>>(sp => 
             sp.GetRequiredService<ILoggerFactory>().CreateLogger<AnalyzeStocksExecutor>());
+
+        // 注册市场分析相关服务（使用 Agent Framework Workflows - 最佳实践）
+        services.AddSingleton<MarketAnalysisWorkflow>();
+        services.AddSingleton<MarketAnalysisAgent>();
+        
+        // 注册 MarketAnalysis Workflow Executors 的 Logger
+        services.AddSingleton<ILogger<AnalysisAggregatorExecutor>>(sp => 
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<AnalysisAggregatorExecutor>());
+        services.AddSingleton<ILogger<CoordinatorExecutor>>(sp => 
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<CoordinatorExecutor>());
 
         // 注册版本更新服务
         services.AddSingleton<IReleaseService, GitHubReleaseService>();

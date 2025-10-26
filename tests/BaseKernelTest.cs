@@ -1,5 +1,9 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.Plugins;
+using MarketAssistant.Agents.StockSelection;
+using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure.Configuration;
@@ -58,7 +62,10 @@ public class BaseKernelTest
 
         builder.Services.AddSingleton<PlaywrightService>();
         builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
-        builder.Services.AddSingleton<StockSelectionManager>();
+        builder.Services.AddSingleton<IChatClientFactory, ChatClientFactory>();
+        builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
+        builder.Services.AddSingleton<StockSelectionWorkflow>();
+        builder.Services.AddSingleton<MarketAnalysisWorkflow>();
         builder.Services.AddSingleton<McpService>();
         builder.Services.AddHttpClient();
 
@@ -100,7 +107,6 @@ public class BaseKernelTest
         });
 
         builder.Services.AddRagServices();
-        builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
         builder.Services.AddKernel().AddOpenAIChatCompletion(
                 modelId,

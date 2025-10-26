@@ -1,4 +1,5 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,10 +17,8 @@ public class MarketAnalysisAgentTest : BaseKernelTest
     {
         BaseInitialize();
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketAnalysisAgent>();
-        var analystManagerLogger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<AnalystManager>();
-        var kernelPluginConfig = _kernel.Services.GetRequiredService<IKernelPluginConfig>();
-        var analystManager = new AnalystManager(_kernel, analystManagerLogger, _userSettingService, kernelPluginConfig);
-        _marketAnalysisAgent = new MarketAnalysisAgent(logger, analystManager);
+        var marketAnalysisWorkflow = _kernel.Services.GetRequiredService<MarketAnalysisWorkflow>();
+        _marketAnalysisAgent = new MarketAnalysisAgent(logger, marketAnalysisWorkflow);
     }
 
     [TestMethod]

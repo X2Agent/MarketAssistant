@@ -1,6 +1,6 @@
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Applications.StockSelection;
-using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -11,22 +11,20 @@ namespace TestMarketAssistant;
 public sealed class StockSelectionServiceTest : BaseKernelTest
 {
     private StockSelectionService _stockSelectionService = null!;
-    private StockSelectionManager _stockSelectionManager = null!;
+    private StockSelectionWorkflow _stockSelectionWorkflow = null!;
     private Mock<ILogger<StockSelectionService>> _mockLogger = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        // 直接使用测试 Kernel 上下文中的 IKernelFactory
-        var factory = _kernel.Services.GetRequiredService<IKernelFactory>();
-        _stockSelectionManager = new StockSelectionManager(_kernel.Services, factory, managerLogger.Object);
+        // 从测试 Kernel 上下文中获取 StockSelectionWorkflow
+        _stockSelectionWorkflow = _kernel.Services.GetRequiredService<StockSelectionWorkflow>();
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();
 
         // 创建选股服务
-        _stockSelectionService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
+        _stockSelectionService = new StockSelectionService(_stockSelectionWorkflow, _mockLogger.Object);
     }
 
     // 不再需要回调委托
@@ -48,7 +46,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void TestStockSelectionService_Constructor_WithNullManager_ShouldThrowArgumentNullException()
+    public void TestStockSelectionService_Constructor_WithNullWorkflow_ShouldThrowArgumentNullException()
     {
         // Act
         new StockSelectionService(null!, _mockLogger.Object);
@@ -59,7 +57,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     public void TestStockSelectionService_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        new StockSelectionService(_stockSelectionManager, null!);
+        new StockSelectionService(_stockSelectionWorkflow, null!);
     }
 
     #endregion
@@ -292,7 +290,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     public void TestStockSelectionService_Dispose_ShouldNotThrowException()
     {
         // Arrange
-        var tempService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
+        var tempService = new StockSelectionService(_stockSelectionWorkflow, _mockLogger.Object);
 
         // Act & Assert
         try
@@ -309,7 +307,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     public void TestStockSelectionService_Dispose_MultipleCalls_ShouldNotThrowException()
     {
         // Arrange
-        var tempService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
+        var tempService = new StockSelectionService(_stockSelectionWorkflow, _mockLogger.Object);
 
         // Act & Assert
         try
