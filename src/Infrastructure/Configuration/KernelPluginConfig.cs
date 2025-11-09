@@ -34,34 +34,35 @@ public class KernelPluginConfig : IKernelPluginConfig
 
         _groundingSearchPlugin = new GroundingSearchPlugin(orchestrator!, webTextSearchFactory!, userSettingService, logger!);
     }
-    public Kernel PluginConfig(Kernel kernel, AnalysisAgents analysisAgent)
+    public Kernel PluginConfig(Kernel kernel, AnalysisAgent agent)
     {
         var k = kernel.Clone();
-        switch (analysisAgent)
+        
+        if (agent == AnalysisAgent.FundamentalAnalyst)
         {
-            //DocumentPlugin
-            case AnalysisAgents.FundamentalAnalystAgent:
-                k.Plugins.AddFromObject(_stockBasicPlugin);
-                break;
-            case AnalysisAgents.TechnicalAnalystAgent:
-                k.Plugins.AddFromObject(_stockTechnicalPlugin);
-                break;
-            case AnalysisAgents.FinancialAnalystAgent:
-                k.Plugins.AddFromObject(_stockFinancialPlugin);
-                break;
-            case AnalysisAgents.MarketSentimentAnalystAgent:
-                //k.Plugins.AddFromType<WebSearchEnginePlugin>();
-                k.Plugins.AddFromType<SearchUrlPlugin>();
-                break;
-            case AnalysisAgents.NewsEventAnalystAgent:
-                k.Plugins.AddFromObject(_stockNewsPlugin);
-                break;
-            case AnalysisAgents.CoordinatorAnalystAgent:
-                k.Plugins.AddFromObject(_groundingSearchPlugin);
-                break;
-            default:
-                break;
+            k.Plugins.AddFromObject(_stockBasicPlugin);
         }
+        else if (agent == AnalysisAgent.TechnicalAnalyst)
+        {
+            k.Plugins.AddFromObject(_stockTechnicalPlugin);
+        }
+        else if (agent == AnalysisAgent.FinancialAnalyst)
+        {
+            k.Plugins.AddFromObject(_stockFinancialPlugin);
+        }
+        else if (agent == AnalysisAgent.MarketSentimentAnalyst)
+        {
+            k.Plugins.AddFromType<SearchUrlPlugin>();
+        }
+        else if (agent == AnalysisAgent.NewsEventAnalyst)
+        {
+            k.Plugins.AddFromObject(_stockNewsPlugin);
+        }
+        else if (agent == AnalysisAgent.CoordinatorAnalyst)
+        {
+            k.Plugins.AddFromObject(_groundingSearchPlugin);
+        }
+        
         return k;
     }
 }

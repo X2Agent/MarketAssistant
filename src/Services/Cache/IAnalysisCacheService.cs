@@ -1,25 +1,26 @@
-using MarketAssistant.Models;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 
 namespace MarketAssistant.Services.Cache;
 
 /// <summary>
-/// 分析结果缓存服务接口
+/// 分析结果缓存服务接口（彻底重构版）
+/// 缓存完整的 MarketAnalysisReport 而不是单个 AnalystResult
 /// </summary>
 public interface IAnalysisCacheService : IDisposable
 {
     /// <summary>
-    /// 获取缓存的分析结果
+    /// 获取缓存的市场分析报告
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
-    /// <returns>缓存的分析结果，如果没有缓存则返回null</returns>
-    Task<AnalystResult?> GetCachedAnalysisAsync(string stockSymbol);
+    /// <returns>缓存的分析报告，如果没有缓存则返回 null</returns>
+    Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string stockSymbol);
 
     /// <summary>
-    /// 缓存分析结果
+    /// 缓存市场分析报告
     /// </summary>
     /// <param name="stockSymbol">股票代码</param>
-    /// <param name="analysisResult">分析结果</param>
-    Task CacheAnalysisAsync(string stockSymbol, AnalystResult analysisResult);
+    /// <param name="report">分析报告</param>
+    Task CacheAnalysisAsync(string stockSymbol, MarketAnalysisReport report);
 
     /// <summary>
     /// 清除指定股票的缓存
@@ -27,4 +28,3 @@ public interface IAnalysisCacheService : IDisposable
     /// <param name="stockSymbol">股票代码</param>
     Task ClearCacheAsync(string stockSymbol);
 }
-

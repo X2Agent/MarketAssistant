@@ -13,7 +13,7 @@ namespace MarketAssistant.Services.Mcp;
 public class McpService : IAsyncDisposable
 {
     private readonly ILogger<McpService>? _logger;
-    private readonly List<IMcpClient> _mcpClients = new();
+    private readonly List<McpClient> _mcpClients = new();
     private bool _disposed;
 
     /// <summary>
@@ -47,7 +47,7 @@ public class McpService : IAsyncDisposable
                     ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
                 };
 
-                var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
+                var mcpClient = await McpClient.CreateAsync(clientTransport, options);
 
                 if (manageClientLifetime)
                 {
@@ -90,7 +90,7 @@ public class McpService : IAsyncDisposable
                 };
 
                 // 对于 KernelFunction，使用 using 模式自动释放客户端
-                await using var mcpClient = await McpClientFactory.CreateAsync(clientTransport, options);
+                await using var mcpClient = await McpClient.CreateAsync(clientTransport, options);
 
                 var tools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
                 kernelFunctions.AddRange(tools.Select(aiFunction => aiFunction.AsKernelFunction()));
@@ -157,7 +157,7 @@ public class McpService : IAsyncDisposable
     /// </summary>
     private static IClientTransport CreateSseTransport(MCPServerConfig config)
     {
-        return new SseClientTransport(new()
+        return new HttpClientTransport(new()
         {
             Name = config.Name,
             TransportMode = HttpTransportMode.AutoDetect,
@@ -170,7 +170,7 @@ public class McpService : IAsyncDisposable
     /// </summary>
     private static IClientTransport CreateStreamableHttpTransport(MCPServerConfig config)
     {
-        return new SseClientTransport(new()
+        return new HttpClientTransport(new()
         {
             Name = config.Name,
             TransportMode = HttpTransportMode.StreamableHttp,

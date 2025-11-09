@@ -14,7 +14,7 @@ namespace MarketAssistant.Infrastructure.Configuration;
 /// </summary>
 public interface IAgentToolsConfig
 {
-    IList<AITool> GetToolsForAgent(AnalysisAgents analysisAgent);
+    IList<AITool> GetToolsForAgent(AnalysisAgent agent);
 }
 
 /// <summary>
@@ -49,49 +49,54 @@ public class AgentToolsConfig : IAgentToolsConfig
     /// <summary>
     /// 获取指定分析代理所需的工具列表
     /// </summary>
-    public IList<AITool> GetToolsForAgent(AnalysisAgents analysisAgent)
+    public IList<AITool> GetToolsForAgent(AnalysisAgent agent)
     {
         var tools = new List<AITool>();
 
-        switch (analysisAgent)
+        if (agent == AnalysisAgent.FundamentalAnalyst)
         {
-            case AnalysisAgents.FundamentalAnalystAgent:
-                tools.AddRange(ConvertPluginToTools(_stockBasicPlugin));
-                break;
-            case AnalysisAgents.TechnicalAnalystAgent:
-                tools.AddRange(ConvertPluginToTools(_stockTechnicalPlugin));
-                break;
-            case AnalysisAgents.FinancialAnalystAgent:
-                tools.AddRange(ConvertPluginToTools(_stockFinancialPlugin));
-                break;
-            case AnalysisAgents.MarketSentimentAnalystAgent:
-                // 需要时添加 SearchUrlPlugin 工具
-                break;
-            case AnalysisAgents.NewsEventAnalystAgent:
-                tools.AddRange(ConvertPluginToTools(_stockNewsPlugin));
-                break;
-            case AnalysisAgents.CoordinatorAnalystAgent:
-                tools.AddRange(ConvertPluginToTools(_groundingSearchPlugin));
-                break;
-            default:
-                break;
+            tools.AddRange(ConvertPluginToTools(_stockBasicPlugin));
+        }
+        else if (agent == AnalysisAgent.TechnicalAnalyst)
+        {
+            tools.AddRange(ConvertPluginToTools(_stockTechnicalPlugin));
+        }
+        else if (agent == AnalysisAgent.FinancialAnalyst)
+        {
+            tools.AddRange(ConvertPluginToTools(_stockFinancialPlugin));
+        }
+        else if (agent == AnalysisAgent.MarketSentimentAnalyst)
+        {
+            // 需要时添加 SearchUrlPlugin 工具
+        }
+        else if (agent == AnalysisAgent.NewsEventAnalyst)
+        {
+            tools.AddRange(ConvertPluginToTools(_stockNewsPlugin));
+        }
+        else if (agent == AnalysisAgent.CoordinatorAnalyst)
+        {
+            tools.AddRange(ConvertPluginToTools(_groundingSearchPlugin));
         }
 
         return tools;
     }
 
     /// <summary>
-    /// 将 Semantic Kernel 插件转换为 Agent Framework 工具
-    /// 注意：这是临时实现，完整迁移需要使用 AIFunctionFactory.Create()
+    /// 将插件实例转换为 Agent Framework 的 AIFunction 列表
+    /// 使用 Semantic Kernel 的 AsAIFunctions 扩展方法
     /// </summary>
-    private IEnumerable<AIFunction> ConvertPluginToTools(object plugin)
+    private IEnumerable<AIFunction> ConvertPluginToTools(object pluginInstance)
     {
-        // TODO: 这里需要实际实现将插件方法转换为 AIFunction
-        // 当前返回空列表，完整实现需要：
-        // 1. 反射插件类中标记为 [KernelFunction] 的方法
-        // 2. 使用 AIFunctionFactory.Create() 将方法转换为 AIFunction
-        // 3. 或者重构插件使用新的注解系统
-        return new List<AIFunction>();
+        var tools = new List<AIFunction>();
+
+        // 使用 Semantic Kernel 的 KernelPluginFactory 创建 KernelPlugin
+        var plugin = Microsoft.SemanticKernel.KernelPluginFactory.CreateFromObject(pluginInstance);
+
+        // 使用 AsAIFunctions 扩展方法将 KernelPlugin 转换为 AIFunction
+        var aiFunctions = plugin.AsAIFunctions();
+        tools.AddRange(aiFunctions);
+
+        return tools;
     }
 }
 

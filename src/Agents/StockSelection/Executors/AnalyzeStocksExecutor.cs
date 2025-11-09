@@ -1,35 +1,32 @@
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Agents.StockSelection.Models;
+using MarketAssistant.Applications.StockSelection.Models;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Agents.AI.Workflows.Reflection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.StockSelection.Executors;
 
 /// <summary>
-/// 步骤3: AI分析筛选结果的 Executor（使用结构化输出）
+/// 步骤3: AI分析筛选结果的 Executor（基于 Executor<TInput, TOutput> 模式）
 /// 对筛选出的股票进行深度分析并生成推荐报告
 /// </summary>
-internal sealed class AnalyzeStocksExecutor :
-    ReflectingExecutor<AnalyzeStocksExecutor>,
-    IMessageHandler<ScreeningResult, StockSelectionResult>
+public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelectionResult>
 {
     private readonly IChatClient _chatClient;
-    private readonly StockSelectionWorkflowRequest _originalRequest;
     private readonly ILogger<AnalyzeStocksExecutor> _logger;
 
     public AnalyzeStocksExecutor(
-        IChatClient chatClient,
-        StockSelectionWorkflowRequest originalRequest,
+        IChatClientFactory chatClientFactory,
         ILogger<AnalyzeStocksExecutor> logger) : base("AnalyzeStocks")
     {
-        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
-        _originalRequest = originalRequest ?? throw new ArgumentNullException(nameof(originalRequest));
+        if (chatClientFactory == null) throw new ArgumentNullException(nameof(chatClientFactory));
+        _chatClient = chatClientFactory.CreateClient();
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async ValueTask<StockSelectionResult> HandleAsync(
+    public override async ValueTask<StockSelectionResult> HandleAsync(
         ScreeningResult input,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
@@ -38,6 +35,19 @@ internal sealed class AnalyzeStocksExecutor :
 
         try
         {
+            // 从输入中获取原始请求
+            var originalRequest = input.OriginalRequest;
+            if (originalRequest == null)
+            {
+                _logger.LogError("[步骤3/3] 缺少原始请求信息");
+                return new StockSelectionResult
+                {
+                    Recommendations = new List<StockRecommendation>(),
+                    ConfidenceScore = 0,
+                    AnalysisSummary = "分析失败：缺少原始请求信息"
+                };
+            }
+
             // 检查是否有筛选结果
             if (input.ScreenedStocks.Count == 0)
             {
@@ -54,8 +64,8 @@ internal sealed class AnalyzeStocksExecutor :
             var stocksDataText = FormatScreenedStocksForAnalysis(input.ScreenedStocks);
 
             // 构建分析提示词
-            var systemPrompt = GetAnalysisInstructions(_originalRequest.IsNewsAnalysis);
-            var userPrompt = BuildAnalysisPrompt(_originalRequest, stocksDataText);
+            var systemPrompt = GetAnalysisInstructions(originalRequest.IsNewsAnalysis);
+            var userPrompt = BuildAnalysisPrompt(originalRequest, stocksDataText);
 
             // 使用结构化输出
             var options = new ChatOptions
@@ -82,12 +92,13 @@ internal sealed class AnalyzeStocksExecutor :
             if (result == null)
             {
                 _logger.LogWarning("[步骤3/3] 响应反序列化失败");
-                return CreateDefaultResult();
+                result = CreateDefaultResult();
             }
 
             _logger.LogInformation("[步骤3/3] 分析完成，推荐 {Count} 只股票，置信度: {Score}",
                 result.Recommendations.Count, result.ConfidenceScore);
 
+            // 返回最终结果（框架会自动传递）
             return result;
         }
         catch (Exception ex)

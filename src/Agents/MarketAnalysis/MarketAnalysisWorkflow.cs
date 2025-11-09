@@ -6,7 +6,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 
 namespace MarketAssistant.Agents.MarketAnalysis;
 
@@ -16,12 +15,13 @@ namespace MarketAssistant.Agents.MarketAnalysis;
 /// </summary>
 public class MarketAnalysisWorkflow : IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IChatClientFactory _chatClientFactory;
+    private readonly AnalysisDispatcherExecutor _dispatcherExecutor;
+    private readonly AnalysisAggregatorExecutor _aggregatorExecutor;
+    private readonly CoordinatorExecutor _coordinatorExecutor;
     private readonly IUserSettingService _userSettingService;
-    private readonly IKernelPluginConfig _kernelPluginConfig;
-    private readonly Kernel _kernel;
+    private readonly IAnalystAgentFactory _analystAgentFactory;
     private readonly ILogger<MarketAnalysisWorkflow> _logger;
+
     private bool _disposed = false;
 
     /// <summary>
@@ -29,19 +29,24 @@ public class MarketAnalysisWorkflow : IDisposable
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
 
+    /// <summary>
+    /// 单个分析师结果接收事件
+    /// </summary>
+    public event EventHandler<ChatMessage>? AnalystResultReceived;
+
     public MarketAnalysisWorkflow(
-        IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
+        AnalysisDispatcherExecutor dispatcherExecutor,
+        AnalysisAggregatorExecutor aggregatorExecutor,
+        CoordinatorExecutor coordinatorExecutor,
         IUserSettingService userSettingService,
-        IKernelPluginConfig kernelPluginConfig,
-        Kernel kernel,
+        IAnalystAgentFactory analystAgentFactory,
         ILogger<MarketAnalysisWorkflow> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+        _dispatcherExecutor = dispatcherExecutor ?? throw new ArgumentNullException(nameof(dispatcherExecutor));
+        _aggregatorExecutor = aggregatorExecutor ?? throw new ArgumentNullException(nameof(aggregatorExecutor));
+        _coordinatorExecutor = coordinatorExecutor ?? throw new ArgumentNullException(nameof(coordinatorExecutor));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _kernelPluginConfig = kernelPluginConfig ?? throw new ArgumentNullException(nameof(kernelPluginConfig));
-        _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+        _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -50,7 +55,6 @@ public class MarketAnalysisWorkflow : IDisposable
     /// </summary>
     public async Task<MarketAnalysisReport> AnalyzeAsync(
         string stockSymbol,
-        string? customPrompt = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -64,13 +68,6 @@ public class MarketAnalysisWorkflow : IDisposable
                 IsInProgress = true
             });
 
-            // 创建分析请求
-            var request = new MarketAnalysisRequest
-            {
-                StockSymbol = stockSymbol,
-                Prompt = customPrompt
-            };
-
             // 获取启用的分析师列表
             var enabledAnalysts = GetEnabledAnalysts();
             if (enabledAnalysts.Count == 0)
@@ -80,6 +77,13 @@ public class MarketAnalysisWorkflow : IDisposable
 
             // 创建分析师代理
             var analystAgents = CreateAnalystAgents(enabledAnalysts);
+
+            // 创建分析请求（包含预期的分析师数量）
+            var request = new MarketAnalysisRequest
+            {
+                StockSymbol = stockSymbol,
+                ExpectedAnalystCount = analystAgents.Count
+            };
 
             // 构建工作流
             var workflow = BuildWorkflow(request, analystAgents);
@@ -145,7 +149,7 @@ public class MarketAnalysisWorkflow : IDisposable
             {
                 case ExecutorInvokedEvent executorInvoked:
                     _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
-                    
+
                     // 更新进度：显示当前正在执行的步骤
                     string stageName = executorInvoked.ExecutorId switch
                     {
@@ -154,7 +158,7 @@ public class MarketAnalysisWorkflow : IDisposable
                         "Coordinator" => "正在生成综合报告",
                         _ => "正在分析"
                     };
-                    
+
                     OnProgressChanged(new AnalysisProgressEventArgs
                     {
                         CurrentAnalyst = executorInvoked.ExecutorId,
@@ -184,6 +188,27 @@ public class MarketAnalysisWorkflow : IDisposable
                 case WorkflowOutputEvent workflowOutput:
                     finalReport = workflowOutput.Data as MarketAnalysisReport;
                     _logger.LogInformation("工作流完成，生成最终报告");
+
+                    // 触发每个分析师的消息接收事件
+                    if (finalReport != null)
+                    {
+                        foreach (var message in finalReport.AnalystMessages)
+                        {
+                            OnAnalystResultReceived(message);
+                        }
+
+                        // 触发协调分析师的最终报告（使用 Summary 作为简短总结）
+                        if (!string.IsNullOrEmpty(finalReport.CoordinatorResult.Summary))
+                        {
+                            var coordinatorMessage = new ChatMessage(
+                                ChatRole.Assistant,
+                                finalReport.CoordinatorResult.Summary)
+                            {
+                                AuthorName = "CoordinatorAnalystAgent"
+                            };
+                            OnAnalystResultReceived(coordinatorMessage);
+                        }
+                    }
                     break;
             }
         }
@@ -194,125 +219,81 @@ public class MarketAnalysisWorkflow : IDisposable
     /// <summary>
     /// 获取启用的分析师列表
     /// </summary>
-    private List<AnalysisAgents> GetEnabledAnalysts()
+    private List<AnalysisAgent> GetEnabledAnalysts()
     {
         var roleSettings = _userSettingService.CurrentSetting.AnalystRoleSettings;
-        var enabledAnalysts = new List<AnalysisAgents>();
+        var enabledAnalysts = new List<AnalysisAgent>();
 
         if (roleSettings.EnableFundamentalAnalyst)
-            enabledAnalysts.Add(AnalysisAgents.FundamentalAnalystAgent);
+            enabledAnalysts.Add(AnalysisAgent.FundamentalAnalyst);
 
         if (roleSettings.EnableMarketSentimentAnalyst)
-            enabledAnalysts.Add(AnalysisAgents.MarketSentimentAnalystAgent);
+            enabledAnalysts.Add(AnalysisAgent.MarketSentimentAnalyst);
 
         if (roleSettings.EnableFinancialAnalyst)
-            enabledAnalysts.Add(AnalysisAgents.FinancialAnalystAgent);
+            enabledAnalysts.Add(AnalysisAgent.FinancialAnalyst);
 
         if (roleSettings.EnableTechnicalAnalyst)
-            enabledAnalysts.Add(AnalysisAgents.TechnicalAnalystAgent);
+            enabledAnalysts.Add(AnalysisAgent.TechnicalAnalyst);
 
         if (roleSettings.EnableNewsEventAnalyst)
-            enabledAnalysts.Add(AnalysisAgents.NewsEventAnalystAgent);
+            enabledAnalysts.Add(AnalysisAgent.NewsEventAnalyst);
 
         return enabledAnalysts;
     }
 
     /// <summary>
-    /// 创建分析师代理
+    /// 创建分析师代理（使用 Factory 模式）
     /// </summary>
-    private List<ChatClientAgent> CreateAnalystAgents(List<AnalysisAgents> analystTypes)
+    private List<ChatClientAgent> CreateAnalystAgents(List<AnalysisAgent> agents)
     {
-        var agents = new List<ChatClientAgent>();
-        var chatClient = _chatClientFactory.CreateClient();
-
-        foreach (var analystType in analystTypes)
-        {
-            try
-            {
-                // 加载 YAML 配置
-                string yamlPath = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "Agents",
-                    "Yaml",
-                    $"{analystType}.yaml");
-
-                if (!File.Exists(yamlPath))
-                {
-                    _logger.LogWarning("未找到分析师配置文件: {YamlPath}，跳过该分析师", yamlPath);
-                    continue;
-                }
-
-                string yamlContent = File.ReadAllText(yamlPath);
-                PromptTemplateConfig templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-                // 创建 ChatClientAgent（直接作为工作流节点）
-                var agent = new ChatClientAgent(
-                    chatClient,
-                    name: analystType.ToString(),
-                    instructions: templateConfig.Template ?? "你是一位专业的市场分析师。");
-
-                agents.Add(agent);
-
-                _logger.LogInformation("成功创建分析师代理: {AnalystName}", analystType);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "创建分析师代理时发生错误: {AnalystType}", analystType);
-            }
-        }
-
-        return agents;
+        _logger.LogInformation("开始创建分析师代理，数量: {Count}", agents.Count);
+        var createdAgents = _analystAgentFactory.CreateAnalysts(agents);
+        _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
+        return createdAgents;
     }
 
     /// <summary>
-    /// 构建并发工作流（Fan-Out/Fan-In 模式）
-    /// 分发器 → 多个分析师并发工作 → 聚合器 → 协调分析师
+    /// 构建并发工作流（使用框架原生并发编排）
+    /// 参考: https://learn.microsoft.com/zh-cn/agent-framework/user-guide/workflows/orchestrations/concurrent
+    /// 
+    /// 流程：
+    /// [Dispatcher] → [并发分析师团队（框架自动收集）] → [Aggregator（聚合器）] → [Coordinator]
     /// </summary>
     private Workflow BuildWorkflow(
         MarketAnalysisRequest request,
         List<ChatClientAgent> analystAgents)
     {
-        // 创建 Executors
-        var dispatcher = new AnalysisDispatcherExecutor(
-            _serviceProvider.GetRequiredService<ILogger<AnalysisDispatcherExecutor>>());
-
-        var aggregator = new AnalysisAggregatorExecutor(
-            request,
-            analystAgents.Count,
-            _serviceProvider.GetRequiredService<ILogger<AnalysisAggregatorExecutor>>());
-
-        var coordinator = new CoordinatorExecutor(
-            _chatClientFactory.CreateClient(),
-            _serviceProvider.GetRequiredService<ILogger<CoordinatorExecutor>>());
-
-        // 构建工作流：
-        // [Dispatcher] 接收请求并广播
-        //      ↓ ↓ ↓ ↓ (Fan-Out: 广播给所有分析师)
+        // 构建标准 Fan-Out/Fan-In 工作流（优化版）：
+        // 
+        // [Dispatcher] MarketAnalysisRequest → ChatMessage
+        //      ↓
+        // Fan-Out: ChatMessage 自动广播给所有分析师
+        //      ↓ ↓ ↓ ↓
         // [Analyst1] [Analyst2] [Analyst3] ... (并发执行)
-        //      ↓ ↓ ↓ ↓ (Fan-In: 收集所有结果)
-        // [Aggregator] 聚合所有分析结果
+        //      ↓ ↓ ↓ ↓
+        // [Aggregator] Fan-In: 框架自动收集所有分析师的消息 → AggregatedAnalysisResult
         //      ↓
-        // [Coordinator] 生成最终综合报告
-        //      ↓
-        // MarketAnalysisReport (输出)
+        // [Coordinator] AggregatedAnalysisResult → MarketAnalysisReport (输出)
 
         // 1. 创建工作流，Dispatcher 作为入口节点
-        var builder = new WorkflowBuilder(dispatcher);
+        var builder = new WorkflowBuilder(_dispatcherExecutor);
 
-        // 2. Fan-Out: Dispatcher 连接到所有分析师（并发广播）
+        // 2. Fan-Out: Dispatcher → 所有分析师（Dispatcher 返回 ChatMessage 自动分发）
         foreach (var analyst in analystAgents)
         {
-            builder.AddEdge(dispatcher, analyst);
+            builder.AddEdge(_dispatcherExecutor, analyst);
         }
 
-        // 3. Fan-In: 所有分析师的输出聚合到 Aggregator
-        builder.AddFanInEdge(aggregator, sources: [.. analystAgents]);
+        // 3. Fan-In: 所有分析师 → Aggregator
+        // 框架会自动收集所有源（分析师）的消息，并作为 IEnumerable<ChatMessage> 传递给 Aggregator
+        builder.AddFanInEdge(_aggregatorExecutor, sources: [.. analystAgents]);
 
-        // 4. Aggregator 连接到 Coordinator
-        builder.AddEdge(aggregator, coordinator);
+        // 4. Aggregator → Coordinator（将聚合结果传递给协调分析师）
+        builder.AddEdge(_aggregatorExecutor, _coordinatorExecutor);
 
         // 5. 设置输出来自 Coordinator
-        builder.WithOutputFrom(coordinator);
+        builder.WithOutputFrom(_coordinatorExecutor);
 
         return builder.Build();
     }
@@ -323,6 +304,14 @@ public class MarketAnalysisWorkflow : IDisposable
     protected virtual void OnProgressChanged(AnalysisProgressEventArgs e)
     {
         ProgressChanged?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// 触发分析师结果接收事件
+    /// </summary>
+    protected virtual void OnAnalystResultReceived(ChatMessage message)
+    {
+        AnalystResultReceived?.Invoke(this, message);
     }
 
     public void Dispose()

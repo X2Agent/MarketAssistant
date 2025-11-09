@@ -1,19 +1,20 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Models;
-using MarketAssistant.Parsers;
 using MarketAssistant.Services.Cache;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
-/// 分析报告视图模型
+/// 分析报告视图模型（彻底重构版，基于新的 AnalystResult 模型）
+/// 不考虑向后兼容，直接使用结构化数据
 /// </summary>
 public partial class AnalysisReportViewModel : ViewModelBase
 {
-    private readonly IAnalystDataParser _analystDataParser;
     private readonly IAnalysisCacheService _analysisCacheService;
 
     [ObservableProperty]
@@ -23,245 +24,169 @@ public partial class AnalysisReportViewModel : ViewModelBase
     private string _stockSymbol = string.Empty;
 
     [ObservableProperty]
+    private string _coordinatorSummary = string.Empty;
+
+    // === 聚合的结构化数据（来自所有分析师） ===
+    
+    [ObservableProperty]
+    private float _overallScore;
+
+    [ObservableProperty]
+    private string _investmentRating = string.Empty;
+
+    [ObservableProperty]
     private string _targetPrice = string.Empty;
 
     [ObservableProperty]
-    private string _priceChange = string.Empty;
+    private string _priceChangeExpectation = string.Empty;
 
     [ObservableProperty]
-    private string _recommendation = string.Empty;
+    private string _timeHorizon = string.Empty;
 
     [ObservableProperty]
     private string _riskLevel = string.Empty;
 
     [ObservableProperty]
-    private string _confidenceLevel = string.Empty;
-
-    [ObservableProperty]
-    private float _overallScore;
-
-    [ObservableProperty]
-    private string _consensusInfo = string.Empty;
-
-    [ObservableProperty]
-    private string _disagreementInfo = string.Empty;
-
-    public ObservableCollection<AnalysisDataItem> AnalysisData { get; } = new();
-
-    [ObservableProperty]
-    private ObservableCollection<AnalysisDataItem> _technicalIndicators = new();
-
-    [ObservableProperty]
-    private ObservableCollection<AnalysisDataItem> _fundamentalIndicators = new();
-
-    [ObservableProperty]
-    private ObservableCollection<AnalysisDataItem> _financialData = new();
-
-    [ObservableProperty]
-    private ObservableCollection<AnalysisDataItem> _marketSentimentData = new();
-
-    [ObservableProperty]
-    private ObservableCollection<AnalysisDataItem> _newsEventData = new();
-
-    public ObservableCollection<string> InvestmentHighlights { get; } = new();
-    public ObservableCollection<string> RiskFactors { get; } = new();
-    public ObservableCollection<string> OperationSuggestions { get; } = new();
-    public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
-
-    [ObservableProperty]
-    private bool _hasConsensusInfo;
-
-    [ObservableProperty]
-    private bool _hasDisagreementInfo;
-
-    [ObservableProperty]
-    private bool _hasConsensusOrDisagreement;
+    private float _confidencePercentage;
 
     [ObservableProperty]
     private string _scorePercentage = "0/10";
 
-    public AnalysisReportViewModel(IAnalystDataParser analystDataParser,
+    // === 聚合的列表数据 ===
+    
+    public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
+    public ObservableCollection<string> InvestmentHighlights { get; } = new();
+    public ObservableCollection<string> RiskFactors { get; } = new();
+    public ObservableCollection<string> OperationSuggestions { get; } = new();
+
+    // === Coordinator 专用（意见汇总） ===
+    
+    [ObservableProperty]
+    private string _consensusAnalysis = string.Empty;
+
+    [ObservableProperty]
+    private string _disagreementAnalysis = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasConsensusAnalysis;
+
+    [ObservableProperty]
+    private bool _hasDisagreementAnalysis;
+
+    // === 各分析师的消息 ===
+    
+    public ObservableCollection<ChatMessage> AnalystMessages { get; } = new();
+
+    public AnalysisReportViewModel(
          IAnalysisCacheService analysisCacheService,
         ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
-        _analystDataParser = analystDataParser;
         _analysisCacheService = analysisCacheService;
-    }
-
-    partial void OnConsensusInfoChanged(string value)
-    {
-        HasConsensusInfo = !string.IsNullOrEmpty(value);
-        UpdateConsensusOrDisagreement();
-    }
-
-    partial void OnDisagreementInfoChanged(string value)
-    {
-        HasDisagreementInfo = !string.IsNullOrEmpty(value);
-        UpdateConsensusOrDisagreement();
     }
 
     partial void OnOverallScoreChanged(float value)
     {
-        ScorePercentage = $"{value}/10";
+        ScorePercentage = $"{value:F1}/10";
     }
 
     /// <summary>
-    /// 更新组合状态
-    /// </summary>
-    private void UpdateConsensusOrDisagreement()
-    {
-        HasConsensusOrDisagreement = HasConsensusInfo || HasDisagreementInfo;
-    }
-
-    /// <summary>
-    /// 更新分类数据集合的缓存
-    /// </summary>
-    private void UpdateFilteredCollections()
-    {
-        var technicalItems = AnalysisData.Where(x =>
-            x.DataType.Contains("Technical", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("技术", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Indicator", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("指标", StringComparison.OrdinalIgnoreCase)).ToList();
-
-        TechnicalIndicators.Clear();
-        foreach (var item in technicalItems)
-        {
-            TechnicalIndicators.Add(item);
-        }
-
-        var fundamentalItems = AnalysisData.Where(x =>
-            x.DataType.Contains("Fundamental", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("基本面", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("基础", StringComparison.OrdinalIgnoreCase)).ToList();
-
-        FundamentalIndicators.Clear();
-        foreach (var item in fundamentalItems)
-        {
-            FundamentalIndicators.Add(item);
-        }
-
-        var financialItems = AnalysisData.Where(x =>
-            x.DataType.Contains("Financial", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("财务", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Finance", StringComparison.OrdinalIgnoreCase)).ToList();
-
-        FinancialData.Clear();
-        foreach (var item in financialItems)
-        {
-            FinancialData.Add(item);
-        }
-
-        var sentimentItems = AnalysisData.Where(x =>
-            x.DataType.Contains("Sentiment", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("情绪", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Market", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("市场", StringComparison.OrdinalIgnoreCase)).ToList();
-
-        MarketSentimentData.Clear();
-        foreach (var item in sentimentItems)
-        {
-            MarketSentimentData.Add(item);
-        }
-
-        var newsItems = AnalysisData.Where(x =>
-            x.DataType.Contains("News", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("Event", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("新闻", StringComparison.OrdinalIgnoreCase) ||
-            x.DataType.Contains("事件", StringComparison.OrdinalIgnoreCase)).ToList();
-
-        NewsEventData.Clear();
-        foreach (var item in newsItems)
-        {
-            NewsEventData.Add(item);
-        }
-    }
-
-    /// <summary>
-    /// 处理分析消息
+    /// 处理分析消息（兼容旧接口，实际已不使用）
     /// </summary>
     public void ProcessAnalysisMessage(AnalysisMessage message)
     {
-        if (message?.Sender == nameof(AnalysisAgents.CoordinatorAnalystAgent))
-        {
-            _ = ParseAnalystOpinionAsync(message.Content);
-        }
+        Logger?.LogWarning("ProcessAnalysisMessage 已弃用，请使用 UpdateWithReport");
     }
 
     /// <summary>
-    /// 异步处理分析消息
+    /// 异步处理分析消息（兼容旧接口，实际已不使用）
     /// </summary>
-    public async Task ProcessAnalysisMessageAsync(AnalysisMessage message)
+    public Task ProcessAnalysisMessageAsync(AnalysisMessage message)
     {
-        if (message?.Sender == nameof(AnalysisAgents.CoordinatorAnalystAgent))
-        {
-            await ParseAnalystOpinionAsync(message.Content);
-        }
-    }
-
-    private async Task ParseAnalystOpinionAsync(string opinion)
-    {
-        if (string.IsNullOrEmpty(opinion))
-        {
-            Logger?.LogWarning("分析师意见为空，无法解析");
-            return;
-        }
-
-        await SafeExecuteAsync(async () =>
-        {
-            Logger?.LogInformation("开始解析分析师意见");
-
-            var result = await _analystDataParser.ParseDataAsync(opinion);
-
-            if (result != null)
-            {
-                UpdateWithResult(result);
-                await _analysisCacheService.CacheAnalysisAsync(StockSymbol, result);
-            }
-        }, "解析分析师意见");
+        Logger?.LogWarning("ProcessAnalysisMessageAsync 已弃用，请使用 UpdateWithReport");
+        return Task.CompletedTask;
     }
 
     /// <summary>
-    /// 使用分析结果更新视图模型
+    /// 使用完整的市场分析报告更新视图模型（方案 A：极简化版）
+    /// 直接使用 Coordinator 的综合判断（唯一的结构化数据来源）
+    /// 专业分析师只提供自然语言分析，结构化数据全部由 Coordinator 提供
     /// </summary>
-    public void UpdateWithResult(AnalystResult result)
+    public void UpdateWithReport(MarketAnalysisReport report)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         ClearAllData();
 
-        StockSymbol = result.StockSymbol;
-        TargetPrice = result.TargetPrice;
-        PriceChange = result.PriceChange;
-        Recommendation = !string.IsNullOrEmpty(result.InvestmentRating) ? result.InvestmentRating : result.Rating;
-        RiskLevel = result.RiskLevel;
-        ConfidenceLevel = result.ConfidencePercentage > 0 ? $"{result.ConfidencePercentage}%" : "--";
-        OverallScore = result.OverallScore;
+        try
+        {
+            StockSymbol = report.StockSymbol;
+            
+            var coordinatorResult = report.CoordinatorResult;
+            
+            // 绑定 Coordinator 的结构化数据（无需 null 判断，CoordinatorResult 的属性都有默认值）
+            OverallScore = coordinatorResult.OverallScore;
+            InvestmentRating = coordinatorResult.InvestmentRating;
+            TargetPrice = coordinatorResult.TargetPrice;
+            PriceChangeExpectation = coordinatorResult.PriceChangeExpectation;
+            TimeHorizon = coordinatorResult.TimeHorizon;
+            RiskLevel = coordinatorResult.RiskLevel;
+            ConfidencePercentage = coordinatorResult.ConfidencePercentage;
 
-        IsReportVisible = true;
+            foreach (var (dimension, score) in coordinatorResult.DimensionScores)
+            {
+                DimensionScores.Add(new ScoreItem { Name = dimension, Score = score });
+            }
 
-        foreach (var score in result.DimensionScores)
-            DimensionScores.Add(new ScoreItem { Name = score.Key, Score = score.Value });
+            foreach (var highlight in coordinatorResult.InvestmentHighlights)
+            {
+                InvestmentHighlights.Add(highlight);
+            }
 
-        ConsensusInfo = result.ConsensusInfo;
-        DisagreementInfo = result.DisagreementInfo;
+            foreach (var risk in coordinatorResult.RiskFactors)
+            {
+                RiskFactors.Add(risk);
+            }
 
-        foreach (var highlight in result.InvestmentHighlights)
-            InvestmentHighlights.Add(highlight);
+            foreach (var suggestion in coordinatorResult.OperationSuggestions)
+            {
+                OperationSuggestions.Add(suggestion);
+            }
 
-        foreach (var risk in result.RiskFactors)
-            RiskFactors.Add(risk);
+            ConsensusAnalysis = coordinatorResult.ConsensusAnalysis;
+            DisagreementAnalysis = coordinatorResult.DisagreementAnalysis;
+            HasConsensusAnalysis = !string.IsNullOrWhiteSpace(ConsensusAnalysis);
+            HasDisagreementAnalysis = !string.IsNullOrWhiteSpace(DisagreementAnalysis);
 
-        foreach (var suggestion in result.OperationSuggestions)
-            OperationSuggestions.Add(suggestion);
+            CoordinatorSummary = coordinatorResult.Summary;
 
-        foreach (var dataItem in result.AnalysisData)
-            AnalysisData.Add(dataItem);
+            // 添加各专业分析师的自然语言分析（无结构化数据）
+                foreach (var message in report.AnalystMessages)
+                {
+                    AnalystMessages.Add(message);
+                }
 
-        IsReportVisible = true;
+            IsReportVisible = true;
 
-        NotifyFilteredCollectionsChanged();
+            Logger?.LogInformation(
+                "报告视图已更新：股票 {StockSymbol}，综合评分 {Score}，最终评级 {Rating}",
+                StockSymbol, OverallScore, InvestmentRating);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "更新报告视图时发生错误");
+            throw;
+        }
+    }
 
-        Logger?.LogInformation($"分析报告更新完成，股票代码：{StockSymbol}，评级：{Recommendation}");
+    /// <summary>
+    /// 使用单个分析消息更新视图模型（已完全废弃）
+    /// </summary>
+    [Obsolete("此方法已废弃，请使用 UpdateWithReport")]
+    public void UpdateWithResult(ChatMessage message)
+    {
+        Logger?.LogWarning("UpdateWithResult 已废弃");
+        throw new NotSupportedException("请使用 UpdateWithReport 方法");
     }
 
     private void ClearAllData()
@@ -270,193 +195,91 @@ public partial class AnalysisReportViewModel : ViewModelBase
         InvestmentHighlights.Clear();
         RiskFactors.Clear();
         OperationSuggestions.Clear();
-        AnalysisData.Clear();
-        ConsensusInfo = string.Empty;
-        DisagreementInfo = string.Empty;
+        AnalystMessages.Clear();
 
-        HasConsensusInfo = false;
-        HasDisagreementInfo = false;
-        HasConsensusOrDisagreement = false;
-        ScorePercentage = "0/10";
-
-        TechnicalIndicators.Clear();
-        FundamentalIndicators.Clear();
-        FinancialData.Clear();
-        MarketSentimentData.Clear();
-        NewsEventData.Clear();
-    }
-
-    private void NotifyFilteredCollectionsChanged()
-    {
-        UpdateFilteredCollections();
+            StockSymbol = string.Empty;
+            CoordinatorSummary = string.Empty;
+            OverallScore = 0f;
+            ConfidencePercentage = 0f;
+            InvestmentRating = string.Empty;
+            TargetPrice = string.Empty;
+            PriceChangeExpectation = string.Empty;
+            TimeHorizon = string.Empty;
+            RiskLevel = string.Empty;
+            ConsensusAnalysis = string.Empty;
+            DisagreementAnalysis = string.Empty;
+            HasConsensusAnalysis = false;
+            HasDisagreementAnalysis = false;
     }
 
     /// <summary>
-    /// 加载模拟数据用于调试和演示
+    /// 加载示例数据（用于 UI 设计和测试）
+    /// 方案 A：专业分析师只有自然语言，结构化数据来自 Coordinator
     /// </summary>
-    public void LoadMockData(string stockCode)
+    public void LoadSampleData()
     {
         ClearAllData();
 
-        StockSymbol = stockCode;
-        TargetPrice = "目标价：¥45.80";
-        PriceChange = "+15.5%";
-        Recommendation = "买入";
-        RiskLevel = "中等";
-        ConfidenceLevel = "85%";
-        OverallScore = 7.8f;
+        StockSymbol = "600519.SH";
+        CoordinatorSummary = "综合研判：建议买入";
+        
+        // 结构化数据（来自 Coordinator）
+        OverallScore = 8.2f;
+        InvestmentRating = "买入";
+        TargetPrice = "180-200元";
+        PriceChangeExpectation = "上涨 10-15%";
+        TimeHorizon = "长期 1-2 年";
+        RiskLevel = "中风险";
+        ConfidencePercentage = 85f;
+
+        // 维度评分
+        DimensionScores.Add(new ScoreItem { Name = "基本面", Score = 8.5f });
+        DimensionScores.Add(new ScoreItem { Name = "技术面", Score = 7.8f });
+        DimensionScores.Add(new ScoreItem { Name = "市场情绪", Score = 8.3f });
+
+        // 投资亮点
+        InvestmentHighlights.Add("行业龙头地位稳固，品牌护城河深厚");
+        InvestmentHighlights.Add("盈利能力强劲，ROE 持续保持高位");
+        InvestmentHighlights.Add("技术面呈多头排列，上升趋势明确");
+
+        // 风险因素
+        RiskFactors.Add("估值处于历史高位，存在回调风险");
+        RiskFactors.Add("行业竞争加剧，市场份额可能受到挑战");
+
+        // 操作建议
+        OperationSuggestions.Add("建议在合理估值区间分批建仓");
+        OperationSuggestions.Add("设置止损位，控制回撤风险");
+
+        // 共识与分歧
+        ConsensusAnalysis = "各分析师一致看好公司基本面和行业地位";
+        DisagreementAnalysis = "技术分析师认为短期存在回调风险，基本面分析师认为长期配置价值显著";
+        HasConsensusAnalysis = true;
+        HasDisagreementAnalysis = true;
+
+        // 专业分析师的自然语言分析（直接使用 ChatMessage）
+        AnalystMessages.Add(new ChatMessage(ChatRole.Assistant, 
+            "公司基本面稳健，行业地位突出，盈利能力强劲，品牌护城河深厚。建议长期持有。")
+        {
+            AuthorName = "基本面分析师"
+        });
+
+        AnalystMessages.Add(new ChatMessage(ChatRole.Assistant,
+            "技术面呈上升趋势，多头排列明显，支撑位稳固。短期可能面临回调，建议回调后买入。")
+        {
+            AuthorName = "技术分析师"
+        });
 
         IsReportVisible = true;
 
-        // 维度评分
-        DimensionScores.Add(new ScoreItem { Name = "技术面", Score = 8.2f });
-        DimensionScores.Add(new ScoreItem { Name = "基本面", Score = 7.5f });
-        DimensionScores.Add(new ScoreItem { Name = "资金面", Score = 7.8f });
-        DimensionScores.Add(new ScoreItem { Name = "市场情绪", Score = 8.0f });
-
-        // 投资亮点
-        InvestmentHighlights.Add("技术面多头排列，短期趋势明确向上");
-        InvestmentHighlights.Add("基本面稳健，盈利能力持续改善");
-        InvestmentHighlights.Add("资金面积极，机构资金持续流入");
-        InvestmentHighlights.Add("估值合理，仍有上升空间");
-
-        // 风险因素
-        RiskFactors.Add("市场整体波动可能影响短期走势");
-        RiskFactors.Add("行业竞争加剧，需关注市场份额变化");
-        RiskFactors.Add("宏观经济政策调整带来的不确定性");
-
-        // 操作建议
-        OperationSuggestions.Add("目标价位：当前价格+15% 作为第一目标");
-        OperationSuggestions.Add("止损位：跌破 MA20 考虑减仓");
-        OperationSuggestions.Add("持有周期：建议 3-6 个月");
-        OperationSuggestions.Add("建议仓位：不超过总资产的 20%");
-
-        // 分析数据 - 技术指标
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "技术指标",
-            Name = "MA5",
-            Value = "¥39.85",
-            Signal = "看多",
-            Strategy = "5日均线呈上升趋势"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "技术指标",
-            Name = "MA10",
-            Value = "¥38.92",
-            Signal = "看多",
-            Strategy = "10日均线支撑明显"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "技术指标",
-            Name = "RSI",
-            Value = "65",
-            Signal = "中性",
-            Strategy = "处于相对强势区间"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "技术指标",
-            Name = "MACD",
-            Value = "正值放大",
-            Signal = "看多",
-            Strategy = "柱状图由负转正，动能增强"
-        });
-
-        // 分析数据 - 基本面
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "基本面",
-            Name = "营收增长率",
-            Value = "12.3%",
-            Unit = "%",
-            Impact = "正面",
-            Strategy = "同比增长，盈利能力稳定"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "基本面",
-            Name = "毛利率",
-            Value = "35%",
-            Unit = "%",
-            Impact = "正面",
-            Strategy = "成本控制良好"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "基本面",
-            Name = "ROE",
-            Value = "15.2%",
-            Unit = "%",
-            Impact = "正面",
-            Strategy = "股东回报率较为理想"
-        });
-
-        // 分析数据 - 财务数据
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "财务数据",
-            Name = "资产负债率",
-            Value = "45%",
-            Unit = "%",
-            Impact = "正面",
-            Strategy = "财务结构健康"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "财务数据",
-            Name = "流动比率",
-            Value = "1.8",
-            Impact = "正面",
-            Strategy = "短期偿债能力强"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "财务数据",
-            Name = "现金流",
-            Value = "充裕",
-            Impact = "正面",
-            Strategy = "经营活动现金流为正"
-        });
-
-        // 分析数据 - 市场情绪
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "市场情绪",
-            Name = "成交量变化",
-            Value = "+20%",
-            Unit = "%",
-            Signal = "积极",
-            Strategy = "较前期放大，资金关注度提升"
-        });
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "市场情绪",
-            Name = "机构持仓",
-            Value = "增持",
-            Signal = "积极",
-            Strategy = "机构资金持续流入"
-        });
-
-        // 分析数据 - 新闻事件
-        AnalysisData.Add(new AnalysisDataItem
-        {
-            DataType = "新闻事件",
-            Name = "最新动态",
-            Value = "积极",
-            Impact = "正面",
-            Strategy = "公司发布利好公告，市场反应积极"
-        });
-
-        // 共识与分歧
-        ConsensusInfo = "技术面和基本面分析师对该股票整体看多，认为短期和中期都有上涨空间";
-        DisagreementInfo = "对于上涨幅度存在分歧，技术分析师预期较为激进（+20%），基本面分析师相对保守（+10%）";
-
-        NotifyFilteredCollectionsChanged();
-
-        Logger?.LogInformation($"已加载模拟分析数据，股票代码：{StockSymbol}");
+        Logger?.LogInformation("已加载示例数据（方案 A：专业分析师纯自然语言）");
     }
 }
 
+/// <summary>
+/// 评分项（用于维度评分展示）
+/// </summary>
+public class ScoreItem
+{
+    public string Name { get; set; } = string.Empty;
+    public float Score { get; set; }
+}

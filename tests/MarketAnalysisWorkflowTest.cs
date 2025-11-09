@@ -54,23 +54,21 @@ public sealed class MarketAnalysisWorkflowTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestMarketAnalysisWorkflow_AnalyzeAsync_WithCustomPrompt_ShouldUseCustomPrompt()
+    public async Task TestMarketAnalysisWorkflow_AnalyzeAsync_WithAnotherStock_ShouldReturnReport()
     {
         // Arrange
         string stockSymbol = "600519";
-        string customPrompt = "请重点分析该股票的估值水平和成长性";
 
         // Act
-        var report = await _workflow.AnalyzeAsync(stockSymbol, customPrompt);
+        var report = await _workflow.AnalyzeAsync(stockSymbol);
 
         // Assert
         Assert.IsNotNull(report);
         Assert.AreEqual(stockSymbol, report.StockSymbol);
         Assert.IsTrue(report.AnalystResults.Count > 0);
 
-        Console.WriteLine($"=== 自定义提示词测试结果 ===");
+        Console.WriteLine($"=== 不同股票分析测试结果 ===");
         Console.WriteLine($"股票代码: {report.StockSymbol}");
-        Console.WriteLine($"自定义提示: {customPrompt}");
         Console.WriteLine($"分析师数量: {report.AnalystResults.Count}");
     }
 

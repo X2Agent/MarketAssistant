@@ -5,13 +5,13 @@ using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Filtering;
 using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.StockScreener;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -55,16 +55,22 @@ public class BaseKernelTest
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
-        // Add filters with logging.
-        builder.Services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
-        builder.Services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
-        builder.Services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
-
         builder.Services.AddSingleton<PlaywrightService>();
+        builder.Services.AddSingleton<StockScreenerService>();
         builder.Services.AddSingleton<IKernelFactory, KernelFactory>();
         builder.Services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         builder.Services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
+        
+        // Register StockSelection Workflow and Executors
+        builder.Services.AddSingleton<GenerateCriteriaExecutor>();
+        builder.Services.AddSingleton<ScreenStocksExecutor>();
+        builder.Services.AddSingleton<AnalyzeStocksExecutor>();
         builder.Services.AddSingleton<StockSelectionWorkflow>();
+        
+        // Register MarketAnalysis Workflow and Executors
+        builder.Services.AddSingleton<AnalysisDispatcherExecutor>();
+        builder.Services.AddSingleton<AnalysisAggregatorExecutor>();
+        builder.Services.AddSingleton<CoordinatorExecutor>();
         builder.Services.AddSingleton<MarketAnalysisWorkflow>();
         builder.Services.AddSingleton<McpService>();
         builder.Services.AddHttpClient();
@@ -121,7 +127,6 @@ public class BaseKernelTest
             .AddFromType<StockTechnicalPlugin>()
             .AddFromType<StockFinancialPlugin>()
             .AddFromType<StockNewsPlugin>()
-            .AddFromType<StockScreenerPlugin>()
             .AddFromType<ConversationSummaryPlugin>()
             .AddFromType<GroundingSearchPlugin>()
             .AddFromType<TextPlugin>();

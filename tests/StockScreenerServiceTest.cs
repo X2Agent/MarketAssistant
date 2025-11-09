@@ -1,24 +1,24 @@
-using MarketAssistant.Agents.Plugins;
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.StockScreener;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace TestMarketAssistant;
 
 [TestClass]
-public sealed class StockScreenerPluginTest : BaseKernelTest
+public sealed class StockScreenerServiceTest : BaseKernelTest
 {
-    private StockScreenerPlugin _plugin = null!;
-    private Mock<ILogger<StockScreenerPlugin>> _mockLogger = null!;
+    private StockScreenerService _service = null!;
+    private Mock<ILogger<StockScreenerService>> _mockLogger = null!;
     private PlaywrightService _playwrightService = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        _mockLogger = new Mock<ILogger<StockScreenerPlugin>>();
+        _mockLogger = new Mock<ILogger<StockScreenerService>>();
         _playwrightService = new PlaywrightService(_userSettingService, null);
-        _plugin = new StockScreenerPlugin(_playwrightService, _mockLogger.Object);
+        _service = new StockScreenerService(_playwrightService, _mockLogger.Object);
     }
 
     [TestCleanup]
@@ -33,26 +33,26 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     #region 构造函数测试
 
     [TestMethod]
-    public void TestXueqiuStockScreenerPlugin_Constructor_WithValidParameters_ShouldCreateInstance()
+    public void TestXueqiuStockScreenerService_Constructor_WithValidParameters_ShouldCreateInstance()
     {
         // Act & Assert
-        Assert.IsNotNull(_plugin);
+        Assert.IsNotNull(_service);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void TestXueqiuStockScreenerPlugin_Constructor_WithNullPlaywrightService_ShouldThrowArgumentNullException()
+    public void TestXueqiuStockScreenerService_Constructor_WithNullPlaywrightService_ShouldThrowArgumentNullException()
     {
         // Act
-        new StockScreenerPlugin(null!, _mockLogger.Object);
+        new StockScreenerService(null!, _mockLogger.Object);
     }
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public void TestXueqiuStockScreenerPlugin_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
+    public void TestXueqiuStockScreenerService_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
     {
         // Act
-        new StockScreenerPlugin(_playwrightService, null!);
+        new StockScreenerService(_playwrightService, null!);
     }
 
     #endregion
@@ -60,7 +60,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     #region 新的统一API测试
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithDefaultCriteria_ShouldReturnStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithDefaultCriteria_ShouldReturnStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -72,7 +72,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -88,7 +88,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMarketCapFilter_ShouldReturnFilteredStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithMarketCapFilter_ShouldReturnFilteredStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -109,7 +109,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -126,7 +126,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithPEFilter_ShouldReturnValidStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithPEFilter_ShouldReturnValidStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -147,7 +147,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -164,7 +164,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMultipleIndicators_ShouldReturnValidStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithMultipleIndicators_ShouldReturnValidStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -199,7 +199,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -220,7 +220,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithSnowballIndicators_ShouldReturnValidStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithSnowballIndicators_ShouldReturnValidStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -248,7 +248,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -264,7 +264,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithMarketIndicators_ShouldReturnValidStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithMarketIndicators_ShouldReturnValidStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -292,7 +292,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -309,10 +309,10 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     [TestMethod]
     [ExpectedException(typeof(ArgumentNullException))]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithNullCriteria_ShouldThrowArgumentNullException()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithNullCriteria_ShouldThrowArgumentNullException()
     {
         // Act
-        await _plugin.ScreenStocksAsync(null!);
+        await _service.ScreenStocksAsync(null!);
     }
 
     #endregion
@@ -320,7 +320,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     #region 行业筛选测试
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithIndustryFilter_ShouldReturnFilteredStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithIndustryFilter_ShouldReturnFilteredStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -341,7 +341,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -358,7 +358,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithBankIndustry_ShouldReturnBankStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithBankIndustry_ShouldReturnBankStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -370,7 +370,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -387,7 +387,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
     }
 
     [TestMethod]
-    public async Task TestXueqiuStockScreenerPlugin_ScreenStocksAsync_WithInvalidIndustry_ShouldUseDefaultAndReturnStocks()
+    public async Task TestXueqiuStockScreenerService_ScreenStocksAsync_WithInvalidIndustry_ShouldUseDefaultAndReturnStocks()
     {
         // Arrange
         var criteria = new StockCriteria
@@ -399,7 +399,7 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
         };
 
         // Act
-        var result = await _plugin.ScreenStocksAsync(criteria);
+        var result = await _service.ScreenStocksAsync(criteria);
 
         // Assert
         Assert.IsNotNull(result);
@@ -417,3 +417,4 @@ public sealed class StockScreenerPluginTest : BaseKernelTest
 
     #endregion
 }
+

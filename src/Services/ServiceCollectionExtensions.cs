@@ -1,4 +1,3 @@
-using MarketAssistant.Agents;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.Plugins;
@@ -9,10 +8,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Filtering;
-using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Parsers;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
@@ -21,6 +17,7 @@ using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.StockScreener;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
 using Microsoft.Extensions.AI;
@@ -50,13 +47,6 @@ public static class ServiceCollectionExtensions
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
-        // 注册 Kernel 过滤器（保留用于向后兼容）
-        services.AddSingleton<IFunctionInvocationFilter, FunctionInvocationLoggingFilter>();
-        services.AddSingleton<IPromptRenderFilter, PromptRenderLoggingFilter>();
-        services.AddSingleton<IAutoFunctionInvocationFilter, AutoFunctionInvocationLoggingFilter>();
-        services.AddSingleton<IPromptRenderFilter, PromptCacheFilter>();
-        services.AddSingleton<IFunctionInvocationFilter, PromptCacheWriteFilter>();
-
         // 注册 Kernel 和嵌入服务（保留用于向后兼容）
         services.AddSingleton<IKernelFactory, KernelFactory>();
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
@@ -71,6 +61,7 @@ public static class ServiceCollectionExtensions
         // 注册 Agent Framework 服务（新增）
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
+        services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<IAIAgentFactory, AIAgentFactory>();
 
         // 注册 MCP 服务（Model Context Protocol）
@@ -84,8 +75,6 @@ public static class ServiceCollectionExtensions
         services.AddRagServices();
         services.AddSingleton<TelegramService>();
         services.AddSingleton<GroundingSearchPlugin>();
-        services.AddSingleton<AnalystManager>();
-        services.AddSingleton<MarketAnalysisAgent>();
 
         // 注册分析缓存服务
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -97,32 +86,27 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StockFavoriteService>();
         services.AddSingleton<StockInfoCache>();
         services.AddSingleton<PlaywrightService>();
+        services.AddSingleton<StockScreenerService>();
 
         // 注册主页相关服务
         services.AddSingleton<IHomeStockService, HomeStockService>();
         services.AddSingleton<INewsUpdateService, NewsUpdateService>();
 
         // 注册AI选股相关服务（使用 Agent Framework Workflows）
+        services.AddSingleton<GenerateCriteriaExecutor>();
+        services.AddSingleton<ScreenStocksExecutor>();
+        services.AddSingleton<AnalyzeStocksExecutor>();
         services.AddSingleton<StockSelectionWorkflow>();
         services.AddSingleton<StockSelectionService>();
-        
-        // 注册 StockSelection Workflow Executors 的 Logger
-        services.AddSingleton<ILogger<GenerateCriteriaExecutor>>(sp => 
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger<GenerateCriteriaExecutor>());
-        services.AddSingleton<ILogger<ScreenStocksExecutor>>(sp => 
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger<ScreenStocksExecutor>());
-        services.AddSingleton<ILogger<AnalyzeStocksExecutor>>(sp => 
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger<AnalyzeStocksExecutor>());
 
         // 注册市场分析相关服务（使用 Agent Framework Workflows - 最佳实践）
+        services.AddSingleton<AnalysisDispatcherExecutor>();
+        services.AddSingleton<AnalysisAggregatorExecutor>();
+        services.AddSingleton<CoordinatorExecutor>();
         services.AddSingleton<MarketAnalysisWorkflow>();
-        services.AddSingleton<MarketAnalysisAgent>();
-        
+
         // 注册 MarketAnalysis Workflow Executors 的 Logger
-        services.AddSingleton<ILogger<AnalysisAggregatorExecutor>>(sp => 
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger<AnalysisAggregatorExecutor>());
-        services.AddSingleton<ILogger<CoordinatorExecutor>>(sp => 
-            sp.GetRequiredService<ILoggerFactory>().CreateLogger<CoordinatorExecutor>());
+        // （通过 DI 自动注入，无需额外配置）
 
         // 注册版本更新服务
         services.AddSingleton<IReleaseService, GitHubReleaseService>();
@@ -133,9 +117,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBrowserService, BrowserService>();
         services.AddSingleton<NavigationService>();
 
-        // 注册AI解析器
-        services.AddAnalystDataParsers();
-
+        // 注意：AI解析器已移除，分析师直接返回结构化 JSON
+        
         return services;
     }
 

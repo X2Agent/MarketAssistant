@@ -1,8 +1,6 @@
-using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using Microsoft.SemanticKernel.Text;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace MarketAssistant.Rag.Services;
 

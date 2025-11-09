@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Services.StockScreener.Models;
 
 namespace MarketAssistant.Agents.StockSelection.Models;
 
@@ -19,17 +19,43 @@ public record StockSelectionWorkflowRequest
     public int? InvestmentHorizon { get; init; }
     public List<string> PreferredSectors { get; init; } = new();
     public List<string> ExcludedSectors { get; init; } = new();
-
-    // 通用字段
     public int MaxRecommendations { get; init; } = 10;
 }
 
 /// <summary>
-/// 筛选结果中间数据（步骤2的输出）
+/// 步骤1的输出：筛选条件生成结果
+/// </summary>
+public record CriteriaGenerationResult
+{
+    /// <summary>
+    /// 生成的筛选条件
+    /// </summary>
+    public StockCriteria Criteria { get; init; } = new();
+
+    /// <summary>
+    /// 原始请求（用于传递到后续步骤）
+    /// </summary>
+    public StockSelectionWorkflowRequest OriginalRequest { get; init; } = new();
+}
+
+/// <summary>
+/// 步骤2的输出：筛选结果
 /// </summary>
 public record ScreeningResult
 {
+    /// <summary>
+    /// 筛选得到的股票列表
+    /// </summary>
     public List<ScreenerStockInfo> ScreenedStocks { get; init; } = new();
+
+    /// <summary>
+    /// 使用的筛选条件
+    /// </summary>
     public StockCriteria? Criteria { get; init; }
+
+    /// <summary>
+    /// 原始请求信息（用于步骤3分析）
+    /// </summary>
+    public StockSelectionWorkflowRequest? OriginalRequest { get; init; }
 }
 

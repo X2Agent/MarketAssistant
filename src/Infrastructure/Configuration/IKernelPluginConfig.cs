@@ -5,6 +5,6 @@ namespace MarketAssistant.Infrastructure.Configuration;
 
 public interface IKernelPluginConfig
 {
-    Kernel PluginConfig(Kernel kernel, AnalysisAgents analysisAgent);
+    Kernel PluginConfig(Kernel kernel, AnalysisAgent agent);
 }
 

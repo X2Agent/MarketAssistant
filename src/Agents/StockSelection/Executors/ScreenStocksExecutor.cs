@@ -1,34 +1,30 @@
-using MarketAssistant.Agents.Plugins;
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Agents.StockSelection.Models;
-using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.StockScreener;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Agents.AI.Workflows.Reflection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.StockSelection.Executors;
 
 /// <summary>
-/// 步骤2: 执行股票筛选的 Executor（确定性调用，无 AI 参与）
-/// 直接调用 StockScreenerPlugin 进行股票筛选
+/// 步骤2: 执行股票筛选的 Executor（基于 Executor<TInput, TOutput> 模式）
+/// 直接调用 StockScreenerService 进行股票筛选
 /// </summary>
-internal sealed class ScreenStocksExecutor :
-    ReflectingExecutor<ScreenStocksExecutor>,
-    IMessageHandler<StockCriteria, ScreeningResult>
+public sealed class ScreenStocksExecutor : Executor<CriteriaGenerationResult, ScreeningResult>
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly StockScreenerService _stockScreenerService;
     private readonly ILogger<ScreenStocksExecutor> _logger;
 
     public ScreenStocksExecutor(
-        IServiceProvider serviceProvider,
+        StockScreenerService stockScreenerService,
         ILogger<ScreenStocksExecutor> logger) : base("ScreenStocks")
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _stockScreenerService = stockScreenerService ?? throw new ArgumentNullException(nameof(stockScreenerService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async ValueTask<ScreeningResult> HandleAsync(
-        StockCriteria criteria,
+    public override async ValueTask<ScreeningResult> HandleAsync(
+        CriteriaGenerationResult input,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
@@ -36,27 +32,25 @@ internal sealed class ScreenStocksExecutor :
 
         try
         {
-            if (criteria == null)
+            if (input?.Criteria == null)
             {
-                throw new ArgumentNullException(nameof(criteria), "筛选条件不能为空");
+                throw new ArgumentNullException(nameof(input), "筛选条件不能为空");
             }
 
             _logger.LogInformation("[步骤2/3] 筛选条件: 市场={Market}, 行业={Industry}, 条件数={Count}",
-                criteria.Market, criteria.Industry, criteria.Criteria.Count);
+                input.Criteria.Market, input.Criteria.Industry, input.Criteria.Criteria.Count);
 
-            // 创建 StockScreenerPlugin 并执行筛选（100% 确定性，无 AI 参与）
-            var playwrightService = _serviceProvider.GetRequiredService<PlaywrightService>();
-            var pluginLogger = _serviceProvider.GetRequiredService<ILogger<StockScreenerPlugin>>();
-            var plugin = new StockScreenerPlugin(playwrightService, pluginLogger);
-
-            List<ScreenerStockInfo> stocks = await plugin.ScreenStocksAsync(criteria);
+            // 调用 StockScreenerService 执行筛选（100% 确定性，无 AI 参与）
+            List<ScreenerStockInfo> stocks = await _stockScreenerService.ScreenStocksAsync(input.Criteria);
 
             _logger.LogInformation("[步骤2/3] 筛选完成，获得 {Count} 只股票", stocks.Count);
 
+            // 返回筛选结果（框架会自动传递给下游）
             return new ScreeningResult
             {
                 ScreenedStocks = stocks,
-                Criteria = criteria
+                Criteria = input.Criteria,
+                OriginalRequest = input.OriginalRequest
             };
         }
         catch (Exception ex)

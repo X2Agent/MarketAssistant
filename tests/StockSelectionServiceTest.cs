@@ -1,6 +1,6 @@
-using MarketAssistant.Agents;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;

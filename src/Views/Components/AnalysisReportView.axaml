@@ -45,7 +45,7 @@
                 
                 <!-- 1. 股票基本信息 -->
                 <controls:CardView>
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
                         <StackPanel Grid.Column="0">
                             <TextBlock Text="股票代码" Classes="Label"/>
                             <TextBlock Text="{Binding StockSymbol}" Classes="Value"/>
@@ -55,10 +55,16 @@
                             <TextBlock Text="{Binding TargetPrice}" Classes="Value"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="价格变化预期" Classes="Label"/>
-                            <TextBlock Text="{Binding PriceChange}" 
+                            <TextBlock Text="价格预期" Classes="Label"/>
+                            <TextBlock Text="{Binding PriceChangeExpectation}" 
                                        Classes="Value"
                                        Foreground="{DynamicResource SuccessBrush}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="3">
+                            <TextBlock Text="投资期限" Classes="Label"/>
+                            <TextBlock Text="{Binding TimeHorizon}" 
+                                       Classes="Value"
+                                       Foreground="{DynamicResource PrimaryBrush}"/>
                         </StackPanel>
                     </Grid>
                 </controls:CardView>
@@ -68,11 +74,11 @@
                     <controls:CardView Grid.Column="0">
                         <StackPanel>
                             <TextBlock Text="投资建议" Classes="Label"/>
-                            <TextBlock Text="{Binding Recommendation}" 
+                            <TextBlock Text="{Binding InvestmentRating}" 
                                        FontSize="20" 
                                        FontWeight="Bold" 
                                        Margin="0,4"/>
-                            <TextBlock Text="{Binding ConfidenceLevel}" 
+                            <TextBlock Text="{Binding ConfidencePercentage, StringFormat='{}{0:F1}% 置信度'}" 
                                        FontSize="11" 
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
@@ -214,12 +220,12 @@
                 <!-- 5. 分析师共识与分歧 -->
                 <Grid ColumnDefinitions="*,*" 
                       ColumnSpacing="12" 
-                      IsVisible="{Binding HasConsensusOrDisagreement}">
+                      IsVisible="{Binding HasConsensusAnalysis}">
                     <controls:CardView Grid.Column="0" 
-                                       IsVisible="{Binding HasConsensusInfo}">
+                                       IsVisible="{Binding HasConsensusAnalysis}">
                         <StackPanel Spacing="12">
                             <TextBlock Text="🤝 核心共识" Classes="SectionTitle"/>
-                            <TextBlock Text="{Binding ConsensusInfo}" 
+                            <TextBlock Text="{Binding ConsensusAnalysis}" 
                                        FontSize="13"
                                        TextWrapping="Wrap"
                                        LineHeight="20"/>
@@ -227,16 +233,27 @@
                     </controls:CardView>
 
                     <controls:CardView Grid.Column="1" 
-                                       IsVisible="{Binding HasDisagreementInfo}">
+                                       IsVisible="{Binding HasDisagreementAnalysis}">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="💭 主要分歧" Classes="SectionTitle"/>
-                            <TextBlock Text="{Binding DisagreementInfo}" 
+                            <TextBlock Text="💭 主要分歧及判断" Classes="SectionTitle"/>
+                            <TextBlock Text="{Binding DisagreementAnalysis}" 
                                        FontSize="13"
                                        TextWrapping="Wrap"
                                        LineHeight="20"/>
                         </StackPanel>
                     </controls:CardView>
                 </Grid>
+
+                <!-- 6. 协调分析师综合报告（自然语言） -->
+                <controls:CardView>
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="📊 协调分析师综合报告" Classes="SectionTitle"/>
+                        <TextBlock Text="{Binding CoordinatorSummary}" 
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   LineHeight="20"/>
+                    </StackPanel>
+                </controls:CardView>
             </StackPanel>
         </ScrollViewer>
         

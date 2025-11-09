@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
-             xmlns:agents="using:MarketAssistant.Agents"
+             xmlns:models="using:MarketAssistant.Applications.StockSelection.Models"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.StockSelectionPageView"
              x:DataType="vm:StockSelectionPageViewModel">
@@ -225,7 +225,7 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="agents:QuickSelectionStrategyInfo">
+                            <DataTemplate x:DataType="models:QuickSelectionStrategyInfo">
                                 <Border Classes="strategy-card" Margin="4">
                                     <Grid RowDefinitions="Auto,Auto">
                                         <TextBlock Grid.Row="0"
@@ -284,7 +284,7 @@
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="agents:StockRecommendation">
+                                <DataTemplate x:DataType="models:StockRecommendation">
                                     <Border Background="{DynamicResource ItemBackgroundBrush}"
                                             CornerRadius="8"
                                             Padding="12">

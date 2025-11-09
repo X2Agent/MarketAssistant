@@ -1,6 +1,5 @@
-using MarketAssistant.Rag;
-using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -53,7 +52,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
     {
         // 创建嵌入生成器（使用当前最新配置）
         var embeddingGenerator = _embeddingFactory.Create();
-        
+
         var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
         await collection.EnsureCollectionExistsAsync(cancellationToken);
 

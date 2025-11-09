@@ -1,20 +1,19 @@
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
-using Microsoft.SemanticKernel;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Services.StockScreener;
 
 /// <summary>
-/// 雪球网股票筛选插件，通过Playwright自动化操作xueqiu.com股票筛选器
+/// 雪球网股票筛选服务，通过Playwright自动化操作xueqiu.com股票筛选器
 /// </summary>
-public sealed class StockScreenerPlugin
+public sealed class StockScreenerService
 {
     private readonly PlaywrightService _playwrightService;
-    private readonly ILogger<StockScreenerPlugin> _logger;
+    private readonly ILogger<StockScreenerService> _logger;
     private const string XUEQIU_SCREENER_URL = "https://xueqiu.com/stock/screener";
 
     /// <summary>
@@ -67,9 +66,9 @@ public sealed class StockScreenerPlugin
         { "tr", new StockScreeningCriteria { Code = "tr", DisplayName = "当日换手率" } }
     };
 
-    public StockScreenerPlugin(
+    public StockScreenerService(
         PlaywrightService playwrightService,
-        ILogger<StockScreenerPlugin> logger)
+        ILogger<StockScreenerService> logger)
     {
         _playwrightService = playwrightService ?? throw new ArgumentNullException(nameof(playwrightService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -78,9 +77,7 @@ public sealed class StockScreenerPlugin
     /// <summary>
     /// 从雪球网筛选股票
     /// </summary>
-    [KernelFunction("screen_stocks"), Description("根据具体指标筛选股票")]
-    public async Task<List<ScreenerStockInfo>> ScreenStocksAsync(
-        [Description("筛选条件")] StockCriteria criteria)
+    public async Task<List<ScreenerStockInfo>> ScreenStocksAsync(StockCriteria criteria)
     {
         if (criteria == null)
             throw new ArgumentNullException(nameof(criteria));
@@ -965,3 +962,4 @@ public sealed class StockScreenerPlugin
 
     #endregion
 }
+

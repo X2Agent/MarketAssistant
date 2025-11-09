@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Agents;
 using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 

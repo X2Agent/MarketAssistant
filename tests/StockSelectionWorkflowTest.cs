@@ -1,6 +1,8 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Agents.StockSelection;
+using MarketAssistant.Agents.StockSelection.Models;
+using MarketAssistant.Applications.StockSelection.Models;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 

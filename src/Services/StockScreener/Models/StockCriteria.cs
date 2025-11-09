@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Plugins.Models;
+namespace MarketAssistant.Services.StockScreener.Models;
 
 /// <summary>
 /// 股票筛选参数
@@ -29,3 +29,4 @@ public class StockCriteria
     /// </summary>
     public int Limit { get; set; } = 20;
 }
+

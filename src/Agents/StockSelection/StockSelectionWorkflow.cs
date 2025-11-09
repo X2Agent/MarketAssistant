@@ -1,8 +1,7 @@
 using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Agents.StockSelection.Models;
-using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.StockSelection;
@@ -13,18 +12,21 @@ namespace MarketAssistant.Agents.StockSelection;
 /// </summary>
 public class StockSelectionWorkflow : IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IChatClientFactory _chatClientFactory;
+    private readonly GenerateCriteriaExecutor _generateCriteriaExecutor;
+    private readonly ScreenStocksExecutor _screenStocksExecutor;
+    private readonly AnalyzeStocksExecutor _analyzeStocksExecutor;
     private readonly ILogger<StockSelectionWorkflow> _logger;
     private bool _disposed = false;
 
     public StockSelectionWorkflow(
-        IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
+        GenerateCriteriaExecutor generateCriteriaExecutor,
+        ScreenStocksExecutor screenStocksExecutor,
+        AnalyzeStocksExecutor analyzeStocksExecutor,
         ILogger<StockSelectionWorkflow> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+        _generateCriteriaExecutor = generateCriteriaExecutor ?? throw new ArgumentNullException(nameof(generateCriteriaExecutor));
+        _screenStocksExecutor = screenStocksExecutor ?? throw new ArgumentNullException(nameof(screenStocksExecutor));
+        _analyzeStocksExecutor = analyzeStocksExecutor ?? throw new ArgumentNullException(nameof(analyzeStocksExecutor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -79,31 +81,12 @@ public class StockSelectionWorkflow : IDisposable
             _logger.LogInformation("开始执行选股工作流，分析类型: {Type}",
                 request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
-            // 创建三个 Executor
-            var generateCriteriaExecutor = new GenerateCriteriaExecutor(
-                _chatClientFactory,
-                _serviceProvider.GetRequiredService<ILogger<GenerateCriteriaExecutor>>()
-            );
-
-            var screenStocksExecutor = new ScreenStocksExecutor(
-                _serviceProvider,
-                _serviceProvider.GetRequiredService<ILogger<ScreenStocksExecutor>>()
-            );
-
-            var chatClient = _chatClientFactory.CreateClient();
-
-            var analyzeStocksExecutor = new AnalyzeStocksExecutor(
-                chatClient,
-                request,
-                _serviceProvider.GetRequiredService<ILogger<AnalyzeStocksExecutor>>()
-            );
-
             // 构建顺序工作流: 步骤1 → 步骤2 → 步骤3
-            var builder = new WorkflowBuilder(generateCriteriaExecutor);
+            var builder = new WorkflowBuilder(_generateCriteriaExecutor);
             builder
-                .AddEdge(generateCriteriaExecutor, screenStocksExecutor)
-                .AddEdge(screenStocksExecutor, analyzeStocksExecutor)
-                .WithOutputFrom(analyzeStocksExecutor);
+                .AddEdge(_generateCriteriaExecutor, _screenStocksExecutor)
+                .AddEdge(_screenStocksExecutor, _analyzeStocksExecutor)
+                .WithOutputFrom(_analyzeStocksExecutor);
 
             var workflow = builder.Build();
 

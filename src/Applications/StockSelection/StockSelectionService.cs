@@ -1,5 +1,5 @@
-using MarketAssistant.Agents;
 using MarketAssistant.Agents.StockSelection;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.StockSelection;

@@ -1,8 +1,10 @@
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Services.Cache;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -13,7 +15,7 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class AgentAnalysisViewModel : ViewModelBase
 {
-    private readonly MarketAnalysisAgent _marketAnalysisAgent;
+    private readonly MarketAnalysisWorkflow _marketAnalysisWorkflow;
     private readonly IAnalysisCacheService _analysisCacheService;
 
     private string _stockCode = "";
@@ -112,13 +114,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     public ICommand SendMessageCommand => ChatSidebarViewModel?.SendMessageCommand ?? new RelayCommand(() => { });
 
     public AgentAnalysisViewModel(
-        MarketAnalysisAgent marketAnalysisAgent,
+        MarketAnalysisWorkflow marketAnalysisWorkflow,
         AnalysisReportViewModel analysisReportViewModel,
         IAnalysisCacheService analysisCacheService,
         ChatSidebarViewModel chatSidebarViewModel,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
-        _marketAnalysisAgent = marketAnalysisAgent;
+        _marketAnalysisWorkflow = marketAnalysisWorkflow;
         _analysisReportViewModel = analysisReportViewModel;
         _analysisCacheService = analysisCacheService;
 
@@ -132,8 +134,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
     private void SubscribeToEvents()
     {
-        _marketAnalysisAgent.ProgressChanged += OnAnalysisProgressChanged;
-        _marketAnalysisAgent.AnalysisCompleted += OnAnalysisCompleted;
+        _marketAnalysisWorkflow.ProgressChanged += OnAnalysisProgressChanged;
+        _marketAnalysisWorkflow.AnalystResultReceived += OnAnalysisCompleted;
     }
 
     /// <summary>
@@ -159,12 +161,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase
         AnalysisStage = e.StageDescription;
     }
 
-    private void OnAnalysisCompleted(object? sender, ChatMessageContent e)
+    private void OnAnalysisCompleted(object? sender, ChatMessage e)
     {
         var message = new AnalysisMessage
         {
             Sender = e.AuthorName ?? string.Empty,
-            Content = e.Content ?? string.Empty,
+            Content = e.Text ?? string.Empty,
             Timestamp = DateTime.Now,
         };
 
@@ -182,11 +184,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
         await SafeExecuteAsync(async () =>
         {
-            var cachedResult = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
-            if (cachedResult != null)
+            var cachedReport = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
+            if (cachedReport != null)
             {
                 Logger?.LogInformation("从缓存加载分析结果: {StockCode}", StockCode);
-                AnalysisReportViewModel.UpdateWithResult(cachedResult);
+                AnalysisReportViewModel.UpdateWithReport(cachedReport);
                 return;
             }
 
@@ -248,26 +250,28 @@ public partial class AgentAnalysisViewModel : ViewModelBase
             }
 
             // 加载模拟的分析报告数据
-            AnalysisReportViewModel.LoadMockData(StockCode);
+            AnalysisReportViewModel.LoadSampleData();
 #else
-            var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
-            foreach (var message in history)
+            var report = await _marketAnalysisWorkflow.AnalyzeAsync(StockCode);
+            
+            // 处理分析结果（AnalystResultReceived 事件已经触发，这里处理 ChatHistory）
+            foreach (var message in report.ChatHistory)
             {
-                if (message.Role != Microsoft.SemanticKernel.ChatCompletion.AuthorRole.Assistant)
+                if (message.Role != Microsoft.Extensions.AI.ChatRole.Assistant)
                 {
                     continue;
                 }
-                if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
+                if (string.IsNullOrEmpty(message.Text?.Replace("\n\n", "")))
                 {
                     continue;
                 }
                 var analysisMessage = new AnalysisMessage
                 {
                     Sender = message.AuthorName ?? string.Empty,
-                    Content = message.Content ?? string.Empty,
+                    Content = message.Text ?? string.Empty,
                     Timestamp = DateTime.Now,
                 };
-                if (message.Metadata.TryGetValue("Usage", out var usageObject))
+                if (message.AdditionalProperties != null && message.AdditionalProperties.TryGetValue("Usage", out var usageObject))
                 {
                     if (usageObject is OpenAI.Chat.ChatTokenUsage openAIUsage)
                     {
@@ -278,6 +282,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
                 AnalysisMessages.Add(analysisMessage);
             }
+            
+            // TODO: 缓存整个分析报告（需要扩展 IAnalysisCacheService 支持 MarketAnalysisReport）
+            // await _analysisCacheService.CacheAnalysisAsync(StockCode, report);
 #endif
             if (ChatSidebarViewModel != null)
             {

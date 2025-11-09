@@ -1,20 +1,17 @@
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Agents.StockSelection.Models;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Agents.AI.Workflows.Reflection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.StockSelection.Executors;
 
 /// <summary>
-/// 步骤1: 生成股票筛选条件的 Executor
+/// 步骤1: 生成股票筛选条件的 Executor（基于 Executor<TInput, TOutput> 模式）
 /// 将用户需求或新闻内容转换为结构化的筛选条件 JSON
 /// </summary>
-internal sealed class GenerateCriteriaExecutor :
-    ReflectingExecutor<GenerateCriteriaExecutor>,
-    IMessageHandler<StockSelectionWorkflowRequest, StockCriteria>
+public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRequest, CriteriaGenerationResult>
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ILogger<GenerateCriteriaExecutor> _logger;
@@ -27,7 +24,7 @@ internal sealed class GenerateCriteriaExecutor :
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async ValueTask<StockCriteria> HandleAsync(
+    public override async ValueTask<CriteriaGenerationResult> HandleAsync(
         StockSelectionWorkflowRequest input,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
@@ -80,7 +77,12 @@ internal sealed class GenerateCriteriaExecutor :
             _logger.LogInformation("[步骤1/3] 筛选条件生成完成，包含 {Count} 个条件",
                 criteria.Criteria?.Count ?? 0);
 
-            return criteria;
+            // 返回结果（框架会自动传递给下游）
+            return new CriteriaGenerationResult
+            {
+                Criteria = criteria,
+                OriginalRequest = input
+            };
         }
         catch (Exception ex)
         {
@@ -270,24 +272,24 @@ internal sealed class GenerateCriteriaExecutor :
         if (input.IsNewsAnalysis)
         {
             return $"""
-新闻内容：
-{input.Content}
+                新闻内容：
+                {input.Content}
 
-推荐股票数量限制：{input.MaxRecommendations}
+                推荐股票数量限制：{input.MaxRecommendations}
 
-请根据新闻内容生成股票筛选条件。
-""";
+                请根据新闻内容生成股票筛选条件。
+                """;
         }
         else
         {
             return $"""
-用户需求：
-{input.Content}
+                用户需求：
+                {input.Content}
 
-推荐股票数量限制：{input.MaxRecommendations}
+                推荐股票数量限制：{input.MaxRecommendations}
 
-请根据用户需求生成股票筛选条件。
-""";
+                请根据用户需求生成股票筛选条件。
+                """;
         }
     }
 }
