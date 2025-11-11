@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
 using Microsoft.Playwright;
@@ -30,30 +31,6 @@ public class StockNewsPlugin
                 throw new InvalidOperationException($"Kernel 未就绪: {errMsg}");
         }
         return serviceProvider.GetRequiredService<Kernel>();
-    }
-
-    /// <summary>
-    /// 获取财联社股票代码格式（如 SH600000、SZ000001）
-    /// </summary>
-    private string GetStockCodeWithPrefix(string stockCode)
-    {
-        // 提取所有数字字符
-        string digits = new string(stockCode.Where(char.IsDigit).ToArray());
-
-        string prefix = GetExchangePrefix(digits);
-        return $"{prefix}{digits}";
-
-        static string GetExchangePrefix(string digits)
-        {
-            // 沪市逻辑：60开头、688开头（科创板）、900开头（B股）
-            if (digits.StartsWith("60") ||
-                digits.StartsWith("688") ||
-                digits.StartsWith("900"))
-                return "SH";
-
-            // 深市逻辑（其他所有情况）：00开头、300开头（创业板）、200开头（B股）
-            return "SZ";
-        }
     }
 
     /// <summary>
@@ -98,7 +75,7 @@ public class StockNewsPlugin
     {
         try
         {
-            stockSymbol = GetStockCodeWithPrefix(stockSymbol).ToLower();
+            stockSymbol = StockSymbolConverter.ToClsFormat(stockSymbol).ToLower();
 
             var url = $"https://www.cls.cn/stock?code={stockSymbol}";
 

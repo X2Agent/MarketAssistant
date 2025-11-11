@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.SemanticKernel;
 using System.ComponentModel;
@@ -17,32 +18,9 @@ public sealed class StockTechnicalPlugin
         _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
     }
 
-    private string ConvertStockSymbol(string stockCode)
-    {
-        // 提取所有数字字符
-        string digits = new string(stockCode.Where(char.IsDigit).ToArray());
-
-        // 解析交易所标识
-        string suffix = GetExchangeSuffix(digits);
-
-        return $"{digits}.{suffix}";
-
-        string GetExchangeSuffix(string digits)
-        {
-            // 沪市逻辑：60开头、688开头（科创板）、900开头（B股）
-            if (digits.StartsWith("60") ||
-                digits.StartsWith("688") ||
-                digits.StartsWith("900"))
-                return "SH";
-
-            // 深市逻辑（其他所有情况）：00开头、300开头（创业板）、200开头（B股）
-            return "SZ";
-        }
-    }
-
     private async Task<T> GetStockIndicatorAsync<T>(string indicator, string stockSymbol)
     {
-        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{ConvertStockSymbol(stockSymbol)}/d/n?token={_zhiTuToken}&lt=30";
+        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{StockSymbolConverter.ToZhiTuFormat(stockSymbol)}/d/n?token={_zhiTuToken}&lt=30";
         using var httpClient = _httpClientFactory.CreateClient();
         var response = await httpClient.GetStringAsync(url);
         var items = JsonSerializer.Deserialize<List<T>>(response);
