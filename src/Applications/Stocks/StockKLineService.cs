@@ -1,5 +1,6 @@
 using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -210,7 +211,7 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+            string formattedSymbol = StockSymbolConverter.ToZhiTuFormat(symbol);
 
             // 构建API URL
             string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "d", adjustType, startDate, endDate);
@@ -254,7 +255,7 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+            string formattedSymbol = StockSymbolConverter.ToZhiTuFormat(symbol);
 
             // 构建API URL
             string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "w", adjustType, startDate, endDate);
@@ -298,7 +299,7 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+            string formattedSymbol = StockSymbolConverter.ToZhiTuFormat(symbol);
 
             // 构建API URL
             string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "m", adjustType, startDate, endDate);
@@ -327,51 +328,6 @@ public class StockKLineService
     }
 
     /// <summary>
-    /// 将股票代码格式化为zhituapi所需格式
-    /// </summary>
-    /// <param name="symbol">原始股票代码</param>
-    /// <returns>格式化后的股票代码（如000001.SZ）</returns>
-    private string FormatSymbolForZhiTu(string symbol)
-    {
-        // 如果已经是zhituapi格式，直接返回
-        if (symbol.Contains("."))
-        {
-            return symbol.ToUpper();
-        }
-
-        // 处理常见的A股代码格式
-        if (symbol.StartsWith("sz") || symbol.StartsWith("sh"))
-        {
-            string code = symbol.Substring(2);
-            string market = symbol.StartsWith("sz") ? "SZ" : "SH";
-            return $"{code}.{market}";
-        }
-
-        // 如果是纯数字代码，根据规则判断市场
-        if (symbol.All(char.IsDigit))
-        {
-            // 深市：000、001、002、003、300、301、399开头
-            if (symbol.StartsWith("000") || symbol.StartsWith("001") ||
-                symbol.StartsWith("002") || symbol.StartsWith("003") ||
-                symbol.StartsWith("300") || symbol.StartsWith("301") ||
-                symbol.StartsWith("399"))
-            {
-                return $"{symbol}.SZ";
-            }
-            // 沪市：600、601、603、605、688、900开头
-            else if (symbol.StartsWith("600") || symbol.StartsWith("601") ||
-                     symbol.StartsWith("603") || symbol.StartsWith("605") ||
-                     symbol.StartsWith("688") || symbol.StartsWith("900"))
-            {
-                return $"{symbol}.SH";
-            }
-        }
-
-        // 默认返回原始代码
-        return symbol.ToUpper();
-    }
-
-    /// <summary>
     /// 从zhituapi获取分钟级K线数据
     /// </summary>
     /// <param name="symbol">股票代码（如000001.SZ）</param>
@@ -394,7 +350,7 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+            string formattedSymbol = StockSymbolConverter.ToZhiTuFormat(symbol);
 
             // 构建API URL
             string apiUrl = BuildZhiTuApiUrl(formattedSymbol, interval, adjustType, startDate, endDate);
@@ -449,7 +405,7 @@ public class StockKLineService
             ValidateKLineParameters(symbol);
 
             // 处理股票代码格式
-            string formattedSymbol = FormatSymbolForZhiTu(symbol);
+            string formattedSymbol = StockSymbolConverter.ToZhiTuFormat(symbol);
 
             // 构建API URL
             string apiUrl = BuildZhiTuApiUrl(formattedSymbol, "y", adjustType, startDate, endDate);
