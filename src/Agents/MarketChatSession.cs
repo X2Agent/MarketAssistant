@@ -384,7 +384,7 @@ public class MarketChatSession : IDisposable
             _logger.LogInformation("开始初始化MCP服务");
 
             var enabledConfigs = McpService.GetEnabledConfigs();
-            var tools = await _mcpService.GetAIToolsAsync(enabledConfigs, manageClientLifetime: true);
+            var tools = await _mcpService.GetAIToolsAsync(enabledConfigs);
             _mcpTools.AddRange(tools);
 
             if (_mcpTools.Count == 0)

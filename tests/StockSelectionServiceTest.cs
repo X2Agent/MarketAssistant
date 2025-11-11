@@ -8,7 +8,7 @@ using Moq;
 namespace TestMarketAssistant;
 
 [TestClass]
-public sealed class StockSelectionServiceTest : BaseKernelTest
+public sealed class StockSelectionServiceTest : BaseAgentTest
 {
     private StockSelectionService _stockSelectionService = null!;
     private StockSelectionWorkflow _stockSelectionWorkflow = null!;
@@ -18,7 +18,7 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
     public void Initialize()
     {
         // 从测试 Kernel 上下文中获取 StockSelectionWorkflow
-        _stockSelectionWorkflow = _kernel.Services.GetRequiredService<StockSelectionWorkflow>();
+        _stockSelectionWorkflow = _serviceProvider.GetRequiredService<StockSelectionWorkflow>();
 
         // 创建服务日志Mock
         _mockLogger = new Mock<ILogger<StockSelectionService>>();

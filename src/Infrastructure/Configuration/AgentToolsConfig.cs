@@ -2,6 +2,7 @@ using MarketAssistant.Agents;
 using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -37,7 +38,10 @@ public class AgentToolsConfig : IAgentToolsConfig
         _stockBasicPlugin = new StockBasicPlugin(httpClientFactory, userSettingService);
         _stockTechnicalPlugin = new StockTechnicalPlugin(httpClientFactory, userSettingService);
         _stockFinancialPlugin = new StockFinancialPlugin(httpClientFactory, userSettingService);
-        _stockNewsPlugin = new StockNewsPlugin(serviceProvider);
+        _stockNewsPlugin = new StockNewsPlugin(
+            serviceProvider,
+            serviceProvider.GetRequiredService<PlaywrightService>(),
+            serviceProvider.GetRequiredService<IChatClientFactory>());
 
         var orchestrator = serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
         var webTextSearchFactory = serviceProvider.GetRequiredService<IWebTextSearchFactory>();

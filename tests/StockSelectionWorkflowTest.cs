@@ -12,14 +12,14 @@ namespace TestMarketAssistant;
 /// StockSelectionWorkflow 测试（基于 Agent Framework Workflows）
 /// </summary>
 [TestClass]
-public sealed class StockSelectionWorkflowTest : BaseKernelTest
+public sealed class StockSelectionWorkflowTest : BaseAgentTest
 {
     private StockSelectionWorkflow _stockSelectionWorkflow = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        _stockSelectionWorkflow = _kernel.Services.GetRequiredService<StockSelectionWorkflow>();
+        _stockSelectionWorkflow = _serviceProvider.GetRequiredService<StockSelectionWorkflow>();
     }
 
     [TestCleanup]
@@ -93,7 +93,7 @@ public sealed class StockSelectionWorkflowTest : BaseKernelTest
         // Arrange
         var request = new NewsBasedSelectionRequest
         {
-            NewsContent = "7 月 14 日消息，据央视新闻报道，相关数据显示，2025 年我国新能源汽车人才缺口高达上百万，智驾工程师供需比仅为 0.38。",
+            NewsContent = "7 月 14 日消息，据央视新闻报道，相关数据显示，2025 年我国新能源汽车人才缺口高达上百万，智驾工程师供需比仅为 0.38",
             MaxRecommendations = 5
         };
 
@@ -115,7 +115,7 @@ public sealed class StockSelectionWorkflowTest : BaseKernelTest
         // Arrange - 测试工作流的确定性三步骤执行
         var request = new StockRecommendationRequest
         {
-            UserRequirements = "寻找科技行业的价值股，市值超过50亿，市盈率小于30",
+            UserRequirements = "寻找科技行业的价值股，市值超过50亿，市盈率小于20",
             RiskPreference = "moderate",
             MaxRecommendations = 5
         };
@@ -128,9 +128,9 @@ public sealed class StockSelectionWorkflowTest : BaseKernelTest
         Assert.IsNotNull(result.Recommendations, "推荐列表不应为 null");
 
         Console.WriteLine($"=== 确定性三步骤工作流测试 ===");
-        Console.WriteLine($"步骤1: 生成筛选条件 - ✓");
-        Console.WriteLine($"步骤2: 执行股票筛选 - ✓");
-        Console.WriteLine($"步骤3: AI分析结果 - ✓");
+        Console.WriteLine($"步骤1: 生成筛选条件 - 完成");
+        Console.WriteLine($"步骤2: 执行股票筛选 - 完成");
+        Console.WriteLine($"步骤3: AI分析结果 - 完成");
         Console.WriteLine($"\n最终结果:");
         Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
         Console.WriteLine($"置信度: {result.ConfidenceScore:F1}%");
@@ -215,7 +215,7 @@ public sealed class StockSelectionWorkflowTest : BaseKernelTest
         Assert.IsNull(mcCriteria.MaxValue, "市值最大值应为 null");
 
         // 输出成功信息
-        Console.WriteLine("✅ StockCriteria JSON 反序列化测试成功！");
+        Console.WriteLine("✓ StockCriteria JSON 反序列化测试成功！");
         Console.WriteLine($"市场: {result.Market}");
         Console.WriteLine($"行业: {result.Industry}");
         Console.WriteLine($"返回数量限制: {result.Limit}");

@@ -23,7 +23,7 @@ public class GitHubReleaseServiceTest
         _httpHandlerMock = new Mock<HttpMessageHandler>();
         var httpClient = new HttpClient(_httpHandlerMock.Object);
         httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(httpClient);
-        
+
         _loggerMock = new Mock<ILogger<GitHubReleaseService>>();
         _service = new GitHubReleaseService(httpClientFactoryMock.Object, _loggerMock.Object);
     }
@@ -249,7 +249,7 @@ public class GitHubReleaseServiceTest
             // Assert
             Assert.AreEqual(savePath, result);
             Assert.IsTrue(File.Exists(savePath));
-            
+
             // 如果有进度报告，验证最后一个应该是100%
             if (progressReports.Count > 0)
             {

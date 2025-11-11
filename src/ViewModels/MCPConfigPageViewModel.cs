@@ -262,14 +262,14 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
             try
             {
-                var functions = await service.GetKernelFunctionsAsync([testConfig]);
-                var functionCount = functions.Count;
+                var tools = await service.GetAIToolsAsync([testConfig]);
+                var toolCount = tools.Count;
 
-                if (functionCount > 0)
+                if (toolCount > 0)
                 {
-                    TestStatus = $"连接成功！发现 {functionCount} 个工具";
-                    _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {functionCount} 个工具");
-                    Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, functionCount);
+                    TestStatus = $"连接成功！发现 {toolCount} 个工具";
+                    _notificationService?.ShowSuccess($"连接成功！MCP服务器提供 {toolCount} 个工具");
+                    Logger?.LogInformation("MCP服务器测试连接成功: {Name}, 工具数: {Count}", Name, toolCount);
                 }
                 else
                 {

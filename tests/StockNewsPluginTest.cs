@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,12 +23,15 @@ namespace TestMarketAssistant
 
             var serviceCollection = new ServiceCollection();
             serviceCollection.AddHttpClient();
+            serviceCollection.AddLogging();
             serviceCollection.AddSingleton(mockUserSettingService.Object);
             serviceCollection.AddSingleton<PlaywrightService>();
-            serviceCollection.AddSingleton<Kernel>();
+            serviceCollection.AddSingleton<IChatClientFactory, ChatClientFactory>();
             _serviceProvider = serviceCollection.BuildServiceProvider();
 
-            _stockNewsPlugin = new StockNewsPlugin(_serviceProvider);
+            var playwrightService = _serviceProvider.GetRequiredService<PlaywrightService>();
+            var chatClientFactory = _serviceProvider.GetRequiredService<IChatClientFactory>();
+            _stockNewsPlugin = new StockNewsPlugin(_serviceProvider, playwrightService, chatClientFactory);
         }
 
         [TestMethod]

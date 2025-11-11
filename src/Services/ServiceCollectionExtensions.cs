@@ -20,9 +20,7 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.StockScreener;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using Serilog;
 
 namespace MarketAssistant.Services;
@@ -47,22 +45,13 @@ public static class ServiceCollectionExtensions
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
-        // 注册 Kernel 和嵌入服务（保留用于向后兼容）
-        services.AddSingleton<IKernelFactory, KernelFactory>();
+        // 注册 Kernel 和嵌入服务（保留用于 RAG 和提示词模板）
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IKernelPluginConfig, KernelPluginConfig>();
 
-        services.AddSingleton(serviceProvider =>
-        {
-            var svc = serviceProvider.GetRequiredService<IKernelFactory>();
-            return svc.CreateKernel();
-        });
-
-        // 注册 Agent Framework 服务（新增）
+        // 注册 Agent Framework 服务
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
-        services.AddSingleton<IAIAgentFactory, AIAgentFactory>();
 
         // 注册 MCP 服务（Model Context Protocol）
         services.AddSingleton<McpService>();
@@ -118,7 +107,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<NavigationService>();
 
         // 注意：AI解析器已移除，分析师直接返回结构化 JSON
-        
+
         return services;
     }
 

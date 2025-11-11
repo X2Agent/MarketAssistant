@@ -1,35 +1,30 @@
 using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
+using Microsoft.Extensions.AI;
 using Microsoft.Playwright;
-using Microsoft.SemanticKernel;
 using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Plugins;
 
+/// <summary>
+/// 股票新闻插件（Agent Framework 版本）
+/// 提供股票新闻获取和内容提取功能
+/// </summary>
 public class StockNewsPlugin
 {
-    readonly IServiceProvider serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
     private readonly PlaywrightService _playwrightService;
+    private readonly IChatClientFactory _chatClientFactory;
 
-    public StockNewsPlugin(IServiceProvider serviceProvider)
+    public StockNewsPlugin(
+        IServiceProvider serviceProvider,
+        PlaywrightService playwrightService,
+        IChatClientFactory chatClientFactory)
     {
-        this.serviceProvider = serviceProvider;
-        _playwrightService = serviceProvider.GetRequiredService<PlaywrightService>();
-    }
-
-    private Kernel GetKernel()
-    {
-        // 优先使用用户 Kernel 服务，失败时再尝试直接解析（兼容旧逻辑）
-        var userSvc = serviceProvider.GetService<IKernelFactory>();
-        if (userSvc != null)
-        {
-            if (userSvc.TryCreateKernel(out var k, out var errMsg))
-                return k;
-            if (!string.IsNullOrEmpty(errMsg))
-                throw new InvalidOperationException($"Kernel 未就绪: {errMsg}");
-        }
-        return serviceProvider.GetRequiredService<Kernel>();
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _playwrightService = playwrightService ?? throw new ArgumentNullException(nameof(playwrightService));
+        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
     }
 
     /// <summary>
@@ -57,12 +52,9 @@ public class StockNewsPlugin
     }
 
     /// <summary>
-    /// 根据新闻Url获取新闻详情
+    /// 根据新闻URL获取新闻详情
     /// </summary>
-    /// <param name="url"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
-    private async Task<string> GetNewsContentAsync(string url)
+    private async Task<string> GetNewsContentAsync(string url, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -75,17 +67,46 @@ public class StockNewsPlugin
                 return article.TextContent;
             }
 
-            // 使用YAML插件进行内容识别
-            string promptYaml = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Agents", "Plugins", "Yaml", "extract_article_content.yaml"));
-            var kernel = GetKernel();
-            KernelFunction extractContentFunc = kernel.CreateFunctionFromPromptYaml(promptYaml);
-            var result = await extractContentFunc.InvokeAsync(kernel, new() { ["html_content"] = article.Content });
-            return result.GetValue<string>() ?? "";
+            // 使用 IChatClient 直接进行内容提取（Agent Framework 方式）
+            return await ExtractArticleContentAsync(article.Content, cancellationToken);
         }
         catch (Exception ex)
         {
             throw new Exception($"处理新闻内容时发生错误: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// 从HTML内容中提取文章正文（使用AI）
+    /// </summary>
+    private async Task<string> ExtractArticleContentAsync(string htmlContent, CancellationToken cancellationToken = default)
+    {
+        var chatClient = _chatClientFactory.CreateClient();
+
+        var systemPrompt = @"你是一个专业的网页内容提取专家。请从HTML内容中提取出文章的主要内容。
+
+要求：
+1. 去除所有广告、导航栏、页脚等非文章内容
+2. 保持文章的原始格式和段落结构
+3. 仅返回正文文本内容，不需要其他信息
+
+请直接返回提取的正文内容，不需要JSON格式或其他标记。";
+
+        var userPrompt = $"HTML内容：\n{htmlContent}";
+
+        var response = await chatClient.GetResponseAsync(
+            [
+                new ChatMessage(ChatRole.System, systemPrompt),
+                new ChatMessage(ChatRole.User, userPrompt)
+            ],
+            new ChatOptions
+            {
+                Temperature = 0.3f,
+                MaxOutputTokens = 4096
+            },
+            cancellationToken);
+
+        return response.Text ?? string.Empty;
     }
 
     /// <summary>
@@ -150,8 +171,10 @@ public class StockNewsPlugin
         }
     }
 
-    [KernelFunction("get_stock_news_context"), Description("获取指定股票的聚合新闻上下文，一次返回最近且相关的新闻要点。默认返回精简要点，可通过 response_format 控制详细程度。")]
-    [return: Description("返回高信号的新闻上下文条目列表（Title/Source/Url/Summary）。concise 模式仅返回必要要点；detailed 模式包含更长摘要片段。")]
+    /// <summary>
+    /// 获取指定股票的聚合新闻上下文（Tool Function）
+    /// </summary>
+    [Description("获取指定股票的聚合新闻上下文，一次返回最近且相关的新闻要点。默认返回精简要点，可通过 response_format 控制详细程度。")]
     public async Task<IEnumerable<NewsItem>> GetStockNewsContextAsync(
         [Description("股票代码，支持含前缀或仅数字")] string stockSymbol,
         [Description("返回的新闻条数上限，默认 5，建议 1-10")] int topK = 5,

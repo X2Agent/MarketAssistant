@@ -17,6 +17,9 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+#if DEBUG
+        this.AttachDeveloperTools();
+#endif
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -60,7 +63,7 @@ public partial class App : Application
         {
             // 清理全局异常处理器
             GlobalExceptionHandler.Cleanup();
-            
+
             // 刷新并关闭日志
             Log.CloseAndFlush();
         }

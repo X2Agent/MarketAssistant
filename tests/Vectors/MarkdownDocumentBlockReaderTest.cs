@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class MarkdownDocumentBlockReaderTest : BaseKernelTest
+public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 {
     private MarkdownDocumentBlockReader _reader = null!;
     private string _testMarkdownContent = null!;
@@ -17,7 +17,7 @@ public class MarkdownDocumentBlockReaderTest : BaseKernelTest
         base.BaseInitialize();
 
         // Get MarkdownDocumentBlockReader from DI container
-        _reader = _kernel.Services.GetRequiredService<MarkdownDocumentBlockReader>();
+        _reader = _serviceProvider.GetRequiredService<MarkdownDocumentBlockReader>();
 
         // 创建测试 Markdown 内容
         _testMarkdownContent = """
@@ -113,8 +113,8 @@ public class MarkdownDocumentBlockReaderTest : BaseKernelTest
             System.Diagnostics.Debug.WriteLine($"发现图片块: Order={imageBlock.Order}, Description='{imageBlock.Description}', Caption='{imageBlock.Caption}', ImageBytes.Length={imageBlock.ImageBytes?.Length ?? 0}");
         }
 
-        // 验证具体的图片数量（应该有3张图片）
-        Assert.AreEqual(3, imageBlocks.Count, $"应该提取到3个图片块，实际提取到{imageBlocks.Count}个");
+        // 验证具体的图片数量（应该3张图片）
+        Assert.AreEqual(3, imageBlocks.Count, $"应该提取3个图片块，实际提取到{imageBlocks.Count}个");
 
         // 验证图片描述
         var descriptions = imageBlocks.Select(img => img.Description).ToList();
@@ -130,7 +130,7 @@ public class MarkdownDocumentBlockReaderTest : BaseKernelTest
         var blocks = await _reader.ReadBlocksAsync(_testFilePath);
         var blocksList = blocks.ToList();
 
-        // Assert - 验证标题块
+        // Assert - 验证标题�?
         var headingBlocks = blocksList.OfType<HeadingBlock>().ToList();
         Assert.IsTrue(headingBlocks.Count > 0, "应该提取到至少一个标题块");
 
@@ -147,7 +147,7 @@ public class MarkdownDocumentBlockReaderTest : BaseKernelTest
         var blocks = await _reader.ReadBlocksAsync(_testFilePath);
         var blocksList = blocks.ToList();
 
-        // Assert - 验证表格块
+        // Assert - 验证表格�?
         var tableBlocks = blocksList.OfType<TableBlock>().ToList();
         Assert.IsTrue(tableBlocks.Count > 0, "应该提取到至少一个表格块");
 

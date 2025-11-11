@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Settings;
-using Microsoft.SemanticKernel;
+using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Plugins;
@@ -17,8 +17,8 @@ public sealed class StockBasicPlugin
         _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
     }
 
-    [KernelFunction("get_stock_info"), Description("根据股票代码获取股票基本数据")]
-    public async Task<StockQuoteInfo> GetStockInfoAsync(string stockSymbol)
+    [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
+    public async Task<StockQuoteInfo> GetStockInfoAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -71,8 +71,8 @@ public sealed class StockBasicPlugin
         }
     }
 
-    [KernelFunction("get_stock_company_info"), Description("根据股票代码获取上市公司基本面")]
-    public async Task<StockCompanyInfo> GetStockCompanyInfoAsync(string stockSymbol)
+    [Description("根据股票代码获取上市公司基本面信息，包括公司简介、主营业务、所属行业等")]
+    public async Task<StockCompanyInfo> GetStockCompanyInfoAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -91,5 +91,11 @@ public sealed class StockBasicPlugin
         {
             throw new Exception($"处理公司基本面数据时发生错误: {ex.Message}", ex);
         }
+    }
+
+    public IEnumerable<AIFunction> GetFunctions()
+    {
+        yield return AIFunctionFactory.Create(GetStockInfoAsync);
+        yield return AIFunctionFactory.Create(GetStockCompanyInfoAsync);
     }
 }

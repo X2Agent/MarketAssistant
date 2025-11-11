@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 using System.Windows.Input;
 
 namespace MarketAssistant.Views.Components;
@@ -22,11 +21,6 @@ public partial class ChatSidebarView : UserControl
     public ChatSidebarView()
     {
         InitializeComponent();
-    }
-
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
     }
 }
 

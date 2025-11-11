@@ -1,4 +1,4 @@
-﻿using MarketAssistant.Agents;
+using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Mcp;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant;
 
 [TestClass]
-public class MarketChatSessionTest : BaseKernelTest
+public class MarketChatSessionTest : BaseAgentTest
 {
     private MarketChatSession _chatSession = null!;
 
@@ -20,11 +20,11 @@ public class MarketChatSessionTest : BaseKernelTest
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketChatSession>();
 
         // 使用 ChatClientFactory 创建 ChatClient
-        var chatClientFactory = _kernel.Services.GetRequiredService<IChatClientFactory>();
+        var chatClientFactory = _serviceProvider.GetRequiredService<IChatClientFactory>();
         var chatClient = chatClientFactory.CreateClient();
 
-        // 从 DI 容器获取 McpService  
-        var mcpService = _kernel.Services.GetRequiredService<McpService>();
+        // 从 DI 容器中获取 McpService  
+        var mcpService = _serviceProvider.GetRequiredService<McpService>();
 
         _chatSession = new MarketChatSession(chatClient, logger, mcpService);
     }
@@ -38,8 +38,8 @@ public class MarketChatSessionTest : BaseKernelTest
     [TestMethod]
     public async Task TestBasicChatAsync()
     {
-        // 测试基本对话功能
-        var response = await _chatSession.SendMessageAsync("你好，我想了解股票投资的基本知识");
+        // 测试基础对话功能
+        var response = await _chatSession.SendMessageAsync("你好，请介绍股票投资的基础知识");
 
         Assert.IsNotNull(response);
         Assert.IsNotNull(response.Text);
@@ -54,7 +54,7 @@ public class MarketChatSessionTest : BaseKernelTest
         // 设置股票上下文
         await _chatSession.UpdateStockContextAsync("sz002594");
 
-        // 测试带股票上下文的对话
+        // 测试带有股票上下文的对话
         var response = await _chatSession.SendMessageAsync("这只股票的基本面如何？");
 
         Assert.IsNotNull(response);
@@ -69,8 +69,8 @@ public class MarketChatSessionTest : BaseKernelTest
     {
         // 测试多轮对话
         await _chatSession.SendMessageAsync("什么是市盈率？");
-        await _chatSession.SendMessageAsync("那市净率呢？");
-        var response = await _chatSession.SendMessageAsync("这两个指标有什么区别？");
+        await _chatSession.SendMessageAsync("有何意义？");
+        var response = await _chatSession.SendMessageAsync("这两个指标有什么区别");
 
         Assert.IsNotNull(response);
         Assert.IsNotNull(response.Text);
@@ -92,10 +92,10 @@ public class MarketChatSessionTest : BaseKernelTest
         // 验证有历史记录
         Assert.IsTrue(_chatSession.ConversationHistory.Count > 0);
 
-        // 清空历史
+        // 清除历史
         _chatSession.ClearHistory();
 
-        // 验证历史已清空（应该只剩系统消息）
+        // 验证历史被清空（应该只剩系统消息）
         Assert.IsTrue(_chatSession.ConversationHistory.Count <= 1);
     }
 
@@ -108,10 +108,10 @@ public class MarketChatSessionTest : BaseKernelTest
         // 添加大量消息来测试上下文窗口管理
         for (int i = 0; i < 50; i++)
         {
-            await _chatSession.SendMessageAsync($"这是第{i}条测试消息，关于sz002594的股票分析。");
+            await _chatSession.SendMessageAsync($"这是第{i}次测试消息，关于sz002594的股票分析。");
         }
 
-        // 检查对话历史是否有内容
+        // 测试对话历史是否被管理
         Assert.IsTrue(_chatSession.ConversationHistory.Count > 0);
         Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
 
@@ -124,14 +124,14 @@ public class MarketChatSessionTest : BaseKernelTest
         // 设置股票上下文
         await _chatSession.UpdateStockContextAsync("sz002594");
 
-        // 发送与股票无关的消息，测试AI是否能自然引导回主题
-        var response = await _chatSession.SendMessageAsync("今天天气怎么样？");
+        // 询问与股票无关的消息，测试AI是否能自然地引导回相关话题
+        var response = await _chatSession.SendMessageAsync("今天的天气怎么样");
 
         Assert.IsNotNull(response);
         Assert.IsNotNull(response.Text);
-        // AI应该能够自然地引导用户回到股票话题
+        // AI应该能够自然地回复用户或引导回股票话题
 
-        Console.WriteLine($"AI引导回复: {response.Text}");
+        Console.WriteLine($"AI的回复: {response.Text}");
     }
 
     [TestMethod]
@@ -157,7 +157,7 @@ public class MarketChatSessionTest : BaseKernelTest
 
         // 测试流式响应
         var allContent = new List<string>();
-        await foreach (var update in _chatSession.SendMessageStreamAsync("请分析sz000001的技术指标"))
+        await foreach (var update in _chatSession.SendMessageStreamAsync("分析sz000001的技术指标"))
         {
             if (!string.IsNullOrEmpty(update.Content))
             {
@@ -177,14 +177,14 @@ public class MarketChatSessionTest : BaseKernelTest
     {
         var cts = new CancellationTokenSource();
 
-        // 启动一个长时间运行的任务
+        // 启动一个可能耗时较长的请求
         var task = _chatSession.SendMessageAsync("请详细分析市场趋势", cts.Token);
 
         // 立即取消
         _chatSession.CancelCurrentRequest();
         cts.Cancel();
 
-        // 验证任务状态
+        // 验证取消状态
         Assert.IsTrue(_chatSession.IsProcessing == false);
     }
 
@@ -194,18 +194,18 @@ public class MarketChatSessionTest : BaseKernelTest
         // 设置股票上下文
         await _chatSession.UpdateStockContextAsync("sz000858");
 
-        // 测试AI能否根据问题类型智能调整分析角度
-        var response1 = await _chatSession.SendMessageAsync("请分析MACD和RSI指标");
+        // 测试AI能否智能调用可能的插件来回答深度
+        var response1 = await _chatSession.SendMessageAsync("分析MACD和RSI指标");
         Assert.IsNotNull(response1.Text);
 
-        var response2 = await _chatSession.SendMessageAsync("这家公司的ROE和市盈率如何？");
+        var response2 = await _chatSession.SendMessageAsync("这家公司的ROE和净利润如何？");
         Assert.IsNotNull(response2.Text);
 
         var response3 = await _chatSession.SendMessageAsync("投资这只股票有什么风险？");
         Assert.IsNotNull(response3.Text);
 
         Console.WriteLine($"技术分析回复: {response1.Text}");
-        Console.WriteLine($"基本面分析回复: {response2.Text}");
+        Console.WriteLine($"财务分析回复: {response2.Text}");
         Console.WriteLine($"风险分析回复: {response3.Text}");
     }
 }

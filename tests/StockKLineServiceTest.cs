@@ -17,7 +17,7 @@ public class StockKLineServiceTest
     {
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
-        // 创建模拟的用户设置服务
+        // 创建模拟的用户设置服�?
         _mockUserSettingService = new Mock<IUserSettingService>();
         var testUserSetting = new UserSetting
         {

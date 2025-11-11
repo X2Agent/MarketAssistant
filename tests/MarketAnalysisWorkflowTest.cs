@@ -7,14 +7,14 @@ namespace TestMarketAssistant;
 /// MarketAnalysisWorkflow 测试（基于 Agent Framework Workflows 并发工作流）
 /// </summary>
 [TestClass]
-public sealed class MarketAnalysisWorkflowTest : BaseKernelTest
+public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
 {
     private MarketAnalysisWorkflow _workflow = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        _workflow = _kernel.Services.GetRequiredService<MarketAnalysisWorkflow>();
+        _workflow = _serviceProvider.GetRequiredService<MarketAnalysisWorkflow>();
     }
 
     [TestCleanup]
@@ -35,21 +35,22 @@ public sealed class MarketAnalysisWorkflowTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(report);
         Assert.AreEqual(stockSymbol, report.StockSymbol);
-        Assert.IsNotNull(report.AnalystResults);
-        Assert.IsTrue(report.AnalystResults.Count > 0, "应该至少有一位分析师的结果");
-        Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorSummary), "协调分析师应该生成总结报告");
-        Assert.IsNotNull(report.ChatHistory);
+        Assert.IsNotNull(report.AnalystMessages);
+        Assert.IsTrue(report.AnalystMessages.Count > 0, "应该至少有一位分析师的结果");
+        Assert.IsNotNull(report.CoordinatorResult, "协调分析师应该生成结果");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary), "协调分析师应该生成总结报告");
 
         Console.WriteLine($"=== 市场分析工作流测试结果 ===");
         Console.WriteLine($"股票代码: {report.StockSymbol}");
-        Console.WriteLine($"分析师数量: {report.AnalystResults.Count}");
-        Console.WriteLine($"协调总结长度: {report.CoordinatorSummary.Length} 字符");
-        Console.WriteLine($"对话历史条数: {report.ChatHistory.Count}");
+        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
+        Console.WriteLine($"协调总结长度: {report.CoordinatorResult.Summary.Length} 字符");
+        Console.WriteLine($"对话历史条数: {report.AnalystMessages.Count}");
 
         Console.WriteLine($"\n各分析师结果:");
-        foreach (var result in report.AnalystResults)
+        foreach (var message in report.AnalystMessages)
         {
-            Console.WriteLine($"  - {result.AnalystName}: {result.Content.Substring(0, Math.Min(50, result.Content.Length))}...");
+            var content = message.Text ?? string.Empty;
+            Console.WriteLine($"  - {message.AuthorName}: {content.Substring(0, Math.Min(50, content.Length))}...");
         }
     }
 
@@ -65,11 +66,11 @@ public sealed class MarketAnalysisWorkflowTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(report);
         Assert.AreEqual(stockSymbol, report.StockSymbol);
-        Assert.IsTrue(report.AnalystResults.Count > 0);
+        Assert.IsTrue(report.AnalystMessages.Count > 0);
 
         Console.WriteLine($"=== 不同股票分析测试结果 ===");
         Console.WriteLine($"股票代码: {report.StockSymbol}");
-        Console.WriteLine($"分析师数量: {report.AnalystResults.Count}");
+        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
     }
 
     [TestMethod]
@@ -117,8 +118,8 @@ public sealed class MarketAnalysisWorkflowTest : BaseKernelTest
 
         Console.WriteLine($"=== 并发性能测试结果 ===");
         Console.WriteLine($"执行时间: {elapsedTime.TotalSeconds:F2} 秒");
-        Console.WriteLine($"分析师数量: {report.AnalystResults.Count}");
-        Console.WriteLine($"平均每位分析师: {elapsedTime.TotalSeconds / report.AnalystResults.Count:F2} 秒");
+        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
+        Console.WriteLine($"平均每位分析师: {elapsedTime.TotalSeconds / report.AnalystMessages.Count:F2} 秒");
     }
 }
 

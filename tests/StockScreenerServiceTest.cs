@@ -7,7 +7,7 @@ using Moq;
 namespace TestMarketAssistant;
 
 [TestClass]
-public sealed class StockScreenerServiceTest : BaseKernelTest
+public sealed class StockScreenerServiceTest : BaseAgentTest
 {
     private StockScreenerService _service = null!;
     private Mock<ILogger<StockScreenerService>> _mockLogger = null!;
@@ -116,7 +116,7 @@ public sealed class StockScreenerServiceTest : BaseKernelTest
         Assert.IsTrue(result.Count <= criteria.Limit);
 
         Console.WriteLine($"=== 雪球市值筛选测试结果 ===");
-        Console.WriteLine($"筛选条件: 市值范围={criteria.Criteria[0].MinValue / 100000000:F0}-{criteria.Criteria[0].MaxValue / 100000000:F0}亿元");
+        Console.WriteLine($"筛选条件: 市值范围 {criteria.Criteria[0].MinValue / 100000000:F0}-{criteria.Criteria[0].MaxValue / 100000000:F0}亿元");
         Console.WriteLine($"返回股票数量: {result.Count}");
 
         foreach (var stock in result.Take(5))
@@ -303,7 +303,7 @@ public sealed class StockScreenerServiceTest : BaseKernelTest
 
         foreach (var stock in result.Take(3))
         {
-            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 涨跌: {stock.Pct:F2}%, 成交量: {stock.Volume}万");
+            Console.WriteLine($"股票: {stock.Name} ({stock.Symbol}) - 涨跌: {stock.Pct:F2}%, 成交量: {stock.Volume}股");
         }
     }
 

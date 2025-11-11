@@ -5,7 +5,7 @@ using Microsoft.SemanticKernel.Data;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class RerankerServiceTest : BaseKernelTest
+public class RerankerServiceTest : BaseAgentTest
 {
     private IRerankerService _rerankerService = null!;
 
@@ -13,7 +13,7 @@ public class RerankerServiceTest : BaseKernelTest
     public void Initialize()
     {
         base.BaseInitialize();
-        _rerankerService = _kernel.Services.GetRequiredService<IRerankerService>();
+        _rerankerService = _serviceProvider.GetRequiredService<IRerankerService>();
     }
 
     #region Service Resolution Tests

@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class PdfFileTest : BaseKernelTest
+public class PdfFileTest : BaseAgentTest
 {
     private IMarkdownConverter _converter = null!;
     private IDocumentBlockReader _reader = null!;
@@ -19,8 +19,8 @@ public class PdfFileTest : BaseKernelTest
         base.BaseInitialize();
 
         // 从 DI 容器获取工厂
-        _converterFactory = _kernel.Services.GetRequiredService<MarkdownConverterFactory>();
-        _readerFactory = _kernel.Services.GetRequiredService<DocumentBlockReaderFactory>();
+        _converterFactory = _serviceProvider.GetRequiredService<MarkdownConverterFactory>();
+        _readerFactory = _serviceProvider.GetRequiredService<DocumentBlockReaderFactory>();
 
         // 获取PDF转换器
         _converter = _converterFactory.GetConverter("test.pdf")!;
@@ -115,7 +115,7 @@ public class PdfFileTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
 
-        // 验证基本的文本结构保存
+        // 验证基本的文本结构保留
         var lines = result.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.IsTrue(lines.Length > 0, "应该包含至少一行文本");
 
@@ -201,7 +201,7 @@ public class PdfFileTest : BaseKernelTest
         foreach (var block in textBlocks.Take(3)) // 检查前3个有文本的块
         {
             var text = block.GetText();
-            Assert.IsFalse(string.IsNullOrWhiteSpace(text), "文档块的文本内容不应为空白");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(text), "文档块的文本内容不应为空");
             Console.WriteLine($"文档块文本: {text.Substring(0, Math.Min(100, text.Length))}...");
         }
     }

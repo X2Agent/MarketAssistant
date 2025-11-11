@@ -1,11 +1,11 @@
 using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Settings;
-using Microsoft.SemanticKernel;
+using Microsoft.Extensions.AI;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace MarketAssistant.Agents.Plugins;
 
-[Description("根据股票代码获取技术指标")]
 public sealed class StockTechnicalPlugin
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -53,19 +53,27 @@ public sealed class StockTechnicalPlugin
         return items.Last();
     }
 
-    [KernelFunction("get_stock_kdj"), Description("获取近30日最新日线KDJ")]
-    public Task<StockKDJ> GetStockKDJAsync(string stockSymbol)
-    => GetStockIndicatorAsync<StockKDJ>("kdj", stockSymbol);
+    [Description("获取近30日最新日线KDJ")]
+    public Task<StockKDJ> GetStockKDJAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+        => GetStockIndicatorAsync<StockKDJ>("kdj", stockSymbol);
 
-    [KernelFunction("get_stock_macd"), Description("获取近30日最新日线MACD")]
-    public Task<StockMACD> GetStockMACDAsync(string stockSymbol)
+    [Description("获取近30日最新日线MACD")]
+    public Task<StockMACD> GetStockMACDAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
         => GetStockIndicatorAsync<StockMACD>("macd", stockSymbol);
 
-    [KernelFunction("get_stock_boll"), Description("获取近30日最新日线BOLL")]
-    public Task<StockBoll> GetStockBOLLAsync(string stockSymbol)
+    [Description("获取近30日最新日线BOLL")]
+    public Task<StockBoll> GetStockBOLLAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
         => GetStockIndicatorAsync<StockBoll>("boll", stockSymbol);
 
-    [KernelFunction("get_stock_ma"), Description("获取近30日最新日线MA")]
-    public Task<StockMA> GetStockMAAsync(string stockSymbol)
+    [Description("获取近30日最新日线MA")]
+    public Task<StockMA> GetStockMAAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
         => GetStockIndicatorAsync<StockMA>("ma", stockSymbol);
+
+    public IEnumerable<AIFunction> GetFunctions()
+    {
+        yield return AIFunctionFactory.Create(GetStockKDJAsync);
+        yield return AIFunctionFactory.Create(GetStockMACDAsync);
+        yield return AIFunctionFactory.Create(GetStockBOLLAsync);
+        yield return AIFunctionFactory.Create(GetStockMAAsync);
+    }
 }

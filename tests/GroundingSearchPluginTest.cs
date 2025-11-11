@@ -10,7 +10,7 @@ namespace TestMarketAssistant;
 /// 验证SearchAsync方法正常调用
 /// </summary>
 [TestClass]
-public class GroundingSearchPluginTest : BaseKernelTest
+public class GroundingSearchPluginTest : BaseAgentTest
 {
     /// <summary>
     /// 测试SearchAsync方法能正常调用
@@ -19,9 +19,9 @@ public class GroundingSearchPluginTest : BaseKernelTest
     public async Task SearchAsync_CanCallSuccessfully()
     {
         // Arrange - 手动创建插件实例（与其他插件测试保持一致）
-        var orchestrator = _kernel.Services.GetRequiredService<IRetrievalOrchestrator>();
-        var webTextSearchFactory = _kernel.Services.GetRequiredService<IWebTextSearchFactory>();
-        var logger = _kernel.Services.GetRequiredService<Microsoft.Extensions.Logging.ILogger<GroundingSearchPlugin>>();
+        var orchestrator = _serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
+        var webTextSearchFactory = _serviceProvider.GetRequiredService<IWebTextSearchFactory>();
+        var logger = _serviceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<GroundingSearchPlugin>>();
 
         var plugin = new GroundingSearchPlugin(orchestrator, webTextSearchFactory, _userSettingService, logger);
 

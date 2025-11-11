@@ -1,7 +1,8 @@
 using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Settings;
-using Microsoft.SemanticKernel;
+using Microsoft.Extensions.AI;
 using System.ComponentModel;
+using System.Text.Json;
 
 namespace MarketAssistant.Agents.Plugins;
 
@@ -16,8 +17,8 @@ public class StockFinancialPlugin
         _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
     }
 
-    [KernelFunction("get_fund_flow"), Description("获取股票资金流数据")]
-    public async Task<FundFlow> GetFundFlowAsync(string stockSymbol)
+    [Description("获取股票资金流数据")]
+    public async Task<FundFlow> GetFundFlowAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -52,8 +53,8 @@ public class StockFinancialPlugin
         }
     }
 
-    [KernelFunction("get_financial_data"), Description("获取上市公司近四个季度的主要财务指标")]
-    public async Task<List<StockFinancialData>> GetFinancialDataAsync(string stockSymbol)
+    [Description("获取上市公司近四个季度的主要财务指标")]
+    public async Task<List<StockFinancialData>> GetFinancialDataAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -75,8 +76,8 @@ public class StockFinancialPlugin
         }
     }
 
-    [KernelFunction("get_quarterly_profit"), Description("获取上市公司近一年各季度的利润数据")]
-    public async Task<List<QuarterlyProfit>> GetQuarterlyProfitAsync(string stockSymbol)
+    [Description("获取上市公司近一年各季度的利润数据")]
+    public async Task<List<QuarterlyProfit>> GetQuarterlyProfitAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -98,8 +99,8 @@ public class StockFinancialPlugin
         }
     }
 
-    [KernelFunction("get_quarterly_cash_flow"), Description("获取上市公司近一年各季度的现金流数据")]
-    public async Task<List<QuarterlyCashFlow>> GetQuarterlyCashFlowAsync(string stockSymbol)
+    [Description("获取上市公司近一年各季度的现金流数据")]
+    public async Task<List<QuarterlyCashFlow>> GetQuarterlyCashFlowAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
     {
         try
         {
@@ -119,5 +120,13 @@ public class StockFinancialPlugin
         {
             throw new Exception($"处理季度现金流数据时发生错误: {ex.Message}", ex);
         }
+    }
+
+    public IEnumerable<AIFunction> GetFunctions()
+    {
+        yield return AIFunctionFactory.Create(GetFundFlowAsync);
+        yield return AIFunctionFactory.Create(GetFinancialDataAsync);
+        yield return AIFunctionFactory.Create(GetQuarterlyProfitAsync);
+        yield return AIFunctionFactory.Create(GetQuarterlyCashFlowAsync);
     }
 }

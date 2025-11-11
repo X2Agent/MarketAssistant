@@ -8,7 +8,6 @@ using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
@@ -268,7 +267,7 @@ public partial class SettingsPageViewModel : ViewModelBase
 
             // 创建嵌入生成器（只在实际需要时创建）
             var embeddingGenerator = _embeddingFactory.Create();
-            
+
             // 使用 UserSetting 中定义的集合名称
             var collectionName = UserSetting.VectorCollectionName;
             var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
@@ -312,7 +311,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                     VectorizingProgress = (int)((double)currentIndex / totalFiles * 100);
                     VectorizingProgressText = $"正在处理 {currentIndex}/{totalFiles}: {fileName}";
 
-                    Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]", 
+                    Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]",
                         currentIndex, totalFiles, fileName, fileExtension);
 
                     // 执行向量化
@@ -326,7 +325,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                     failedCount++;
                     failedFiles.Add(fileName);
                     Logger?.LogError(ex, "✗ 向量化失败: {FileName} - {ErrorMessage}", fileName, ex.Message);
-                    
+
                     // 单个文件失败不中断整体流程，继续处理下一个
                 }
             }
@@ -347,11 +346,11 @@ public partial class SettingsPageViewModel : ViewModelBase
                 {
                     failedList += $"\n... 还有 {failedFiles.Count - 5} 个";
                 }
-                
+
                 _notificationService.ShowWarning(
                     $"向量化完成：\n✓ 成功 {successCount} 个\n✗ 失败 {failedCount} 个\n\n失败文件：\n- {failedList}");
-                
-                Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个", 
+
+                Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个",
                     successCount, failedCount, totalFiles);
             }
         }

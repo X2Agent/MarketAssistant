@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml;
 
 namespace MarketAssistant.Views.Components;
 
@@ -57,11 +56,6 @@ public partial class ProgressDisplayView : UserControl
                 stageLabel.Text = change.NewValue?.ToString() ?? string.Empty;
             }
         }
-    }
-
-    private void InitializeComponent()
-    {
-        AvaloniaXamlLoader.Load(this);
     }
 }
 

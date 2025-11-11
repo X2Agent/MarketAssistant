@@ -1,7 +1,6 @@
 using MarketAssistant.Applications.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using ModelContextProtocol.Client;
 
 namespace MarketAssistant.Services.Mcp;
@@ -26,14 +25,12 @@ public class McpService : IAsyncDisposable
     }
 
     /// <summary>
-    /// 获取 MCP 工具作为 AITool 列表（用于新的 Agent Framework）
+    /// 获取 MCP 工具作为 AITool 列表
     /// </summary>
     /// <param name="configs">MCP 服务器配置列表</param>
-    /// <param name="manageClientLifetime">是否管理客户端生命周期</param>
     /// <returns>AITool 列表</returns>
     public async Task<List<AITool>> GetAIToolsAsync(
-        IEnumerable<MCPServerConfig> configs,
-        bool manageClientLifetime = true)
+        IEnumerable<MCPServerConfig> configs)
     {
         var tools = new List<AITool>();
 
@@ -49,10 +46,7 @@ public class McpService : IAsyncDisposable
 
                 var mcpClient = await McpClient.CreateAsync(clientTransport, options);
 
-                if (manageClientLifetime)
-                {
-                    _mcpClients.Add(mcpClient);
-                }
+                _mcpClients.Add(mcpClient);
 
                 var mcpTools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
                 tools.AddRange(mcpTools.Cast<AITool>());
@@ -67,44 +61,6 @@ public class McpService : IAsyncDisposable
         }
 
         return tools;
-    }
-
-    /// <summary>
-    /// 获取 MCP 工具作为 KernelFunction 列表（用于 Semantic Kernel）
-    /// </summary>
-    /// <param name="configs">MCP 服务器配置列表</param>
-    /// <returns>KernelFunction 列表</returns>
-    public async Task<List<KernelFunction>> GetKernelFunctionsAsync(
-        IEnumerable<MCPServerConfig> configs)
-    {
-        var kernelFunctions = new List<KernelFunction>();
-
-        foreach (var config in configs)
-        {
-            try
-            {
-                var clientTransport = CreateClientTransport(config);
-                var options = new McpClientOptions
-                {
-                    ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
-                };
-
-                // 对于 KernelFunction，使用 using 模式自动释放客户端
-                await using var mcpClient = await McpClient.CreateAsync(clientTransport, options);
-
-                var tools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
-                kernelFunctions.AddRange(tools.Select(aiFunction => aiFunction.AsKernelFunction()));
-
-                _logger?.LogInformation("成功连接到 MCP 服务器 {Name}，加载 {Count} 个 Kernel 函数",
-                    config.Name, tools.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
-            }
-        }
-
-        return kernelFunctions;
     }
 
     /// <summary>

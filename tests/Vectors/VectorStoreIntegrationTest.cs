@@ -6,7 +6,7 @@ using Microsoft.Extensions.VectorData;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class VectorStoreIntegrationTest : BaseKernelTest
+public class VectorStoreIntegrationTest : BaseAgentTest
 {
     private IEmbeddingGenerator<string, Embedding<float>>? _embeddingGenerator;
     private VectorStore? _vectorStore;
@@ -15,8 +15,8 @@ public class VectorStoreIntegrationTest : BaseKernelTest
     public void VectorStoreIntegrationTestInitialize()
     {
         base.BaseInitialize();
-        _embeddingGenerator = _kernel.Services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-        _vectorStore = _kernel.Services.GetService<VectorStore>();
+        _embeddingGenerator = _serviceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
+        _vectorStore = _serviceProvider.GetService<VectorStore>();
     }
 
     [TestMethod]

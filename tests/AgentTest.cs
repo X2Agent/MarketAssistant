@@ -1,11 +1,12 @@
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.Agents;
-using Microsoft.SemanticKernel.ChatCompletion;
+using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.Factories;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant;
 
 [TestClass]
-public class AgentTest : BaseKernelTest
+public class AgentTest : BaseAgentTest
 {
     public const string FundamentalAnalystContent = @"
         股票代码/名称：sh601606 长城军工  
@@ -94,104 +95,112 @@ public class AgentTest : BaseKernelTest
     public async Task TestCoordinatorAnalystAsync()
     {
         var prompt = "请对股票 sh601606 进行综合分析，提供投资建议。";
-        var agent = CreateAgentFromYaml("CoordinatorAnalystAgent");
-        agent.Arguments.Add("history", new List<string> { FundamentalAnalystContent, NewsEventAnalystContent, FinancialAnalystContent });
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User, prompt)).ToListAsync();
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.CoordinatorAnalyst);
+        
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "以下是其他分析师的分析结果：\n\n" + 
+                $"基本面分析：{FundamentalAnalystContent}\n\n" +
+                $"新闻事件分析：{NewsEventAnalystContent}\n\n" +
+                $"财务分析：{FinancialAnalystContent}"),
+            new(ChatRole.User, prompt)
+        };
 
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 
     [TestMethod]
     public async Task TestFinancialAnalystAsync()
     {
-        var agent = CreateAgentFromYaml("FinancialAnalystAgent");
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.FinancialAnalyst);
 
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sh601606 进行财务分析，提供投资建议。")).ToListAsync();
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sh601606 进行财务分析，提供投资建议。")
+        };
 
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 
     [TestMethod]
     public async Task TestFundamentalAnalystAsync()
     {
-        var agent = CreateAgentFromYaml("FundamentalAnalystAgent");
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.FundamentalAnalyst);
 
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sh601606 进行分析，提供投资建议。")).ToListAsync();
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sh601606 进行分析，提供投资建议。")
+        };
 
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 
     [TestMethod]
     public async Task TestTechnicalAnalystAsync()
     {
-        var agent = CreateAgentFromYaml("TechnicalAnalystAgent");
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.TechnicalAnalyst);
 
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sz002594 进行技术分析，提供投资建议。如果获取技术指标失败则模拟假的技术指标来测试")).ToListAsync();
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sz002594 进行技术分析，提供投资建议。如果获取技术指标失败则模拟假的技术指标来测试")
+        };
 
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 
     [TestMethod]
     public async Task TestMarketSentimentAnalystAsync()
     {
-        var agent = CreateAgentFromYaml("MarketSentimentAnalystAgent");
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.MarketSentimentAnalyst);
 
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sz002594 进行市场情绪分析，忽略技术指标，提供投资建议。")).ToListAsync();
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sz002594 进行市场情绪分析，忽略技术指标，提供投资建议。")
+        };
 
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 
     [TestMethod]
     public async Task TestNewsEventAnalystAsync()
     {
-        var agent = CreateAgentFromYaml("NewsEventAnalystAgent");
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalysisAgent.NewsEventAnalyst);
 
-        var content = await agent.InvokeAsync(new ChatMessageContent(AuthorRole.User,
-            "请对股票 sz002594 进行新闻事件分析，提供投资建议。")).ToListAsync();
-
-        Assert.IsTrue(content.Count > 0);
-        Console.WriteLine(content.First().Message);
-    }
-
-    /// <summary>
-    /// 从YAML文件创建ChatCompletionAgent
-    /// </summary>
-    /// <param name="agentName">代理名称</param>
-    /// <returns>ChatCompletionAgent实例</returns>
-    private ChatCompletionAgent CreateAgentFromYaml(string agentName)
-    {
-        string agentYamlPath = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "MarketAssistant", "MarketAssistant", "Agents", "yaml", $"{agentName}.yaml");
-        if (!File.Exists(agentYamlPath))
+        var messages = new List<ChatMessage>
         {
-            throw new Exception($"未找到分析师配置文件: {agentYamlPath}。请确保已正确配置并放置在Agents/yaml目录下。");
-        }
-
-        string yamlContent = File.ReadAllText(agentYamlPath);
-        PromptTemplateConfig templateConfig = KernelFunctionYaml.ToPromptTemplateConfig(yamlContent);
-
-        var globalGuidelines = @"
-        ## 分析准则
-        - 采用1-10分量化评估
-        - 提供具体价格点位和数值区间
-        - 控制总字数300字内
-        - 直接输出专业分析，无需询问
-        ";
-
-        ChatCompletionAgent chatCompletionAgent =
-        new ChatCompletionAgent(templateConfig, new KernelPromptTemplateFactory())
-        {
-            Kernel = _kernel
+            new(ChatRole.User, "请对股票 sz002594 进行新闻事件分析，提供投资建议。")
         };
 
-        return chatCompletionAgent;
+        var response = await agent.RunAsync(messages);
+        var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result));
+        Console.WriteLine(result);
     }
 }

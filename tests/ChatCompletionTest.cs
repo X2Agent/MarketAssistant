@@ -1,39 +1,62 @@
-﻿using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+﻿using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.Configuration;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant;
 
+/// <summary>
+/// ChatClient 测试 - 基于 Agent Framework
+/// </summary>
 [TestClass]
-public class ChatCompletionTest : BaseKernelTest
+public class ChatCompletionTest : BaseAgentTest
 {
-    IChatCompletionService _chatCompletionService;
+    private IChatClient _chatClient = null!;
+    private IAgentToolsConfig _toolsConfig = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         BaseInitialize(); // 调用基类初始化方法
-        _chatCompletionService = _kernel.GetRequiredService<IChatCompletionService>();
+        _chatClient = _chatClientFactory.CreateClient();
+        _toolsConfig = _serviceProvider.GetRequiredService<IAgentToolsConfig>();
     }
 
     [TestMethod]
     public async Task TestChatAsync()
     {
-        var history = new ChatHistory();
-        history.AddUserMessage("股票 sz002594 的价格");
-        var r = await _chatCompletionService.GetChatMessageContentAsync(history, executionSettings: new PromptExecutionSettings
+        var messages = new List<ChatMessage>
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-        }, kernel: _kernel);
+            new(ChatRole.User, "股票 sz002594 的价格")
+        };
+
+        var tools = _toolsConfig.GetToolsForAgent(AnalysisAgent.FundamentalAnalyst);
+        
+        var response = await _chatClient.GetResponseAsync(messages, new ChatOptions
+        {
+            Tools = tools
+        });
+
+        Assert.IsNotNull(response);
+        Console.WriteLine(response.Text);
     }
 
     [TestMethod]
     public async Task TestMACDAsync()
     {
-        var history = new ChatHistory();
-        history.AddUserMessage("获取股票 sz002594 的K线日线MACD数据");
-        var r = await _chatCompletionService.GetChatMessageContentAsync(history, executionSettings: new PromptExecutionSettings
+        var messages = new List<ChatMessage>
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
-        }, kernel: _kernel);
+            new(ChatRole.User, "获取股票 sz002594 的K线日线MACD数据")
+        };
+
+        var tools = _toolsConfig.GetToolsForAgent(AnalysisAgent.TechnicalAnalyst);
+        
+        var response = await _chatClient.GetResponseAsync(messages, new ChatOptions
+        {
+            Tools = tools
+        });
+
+        Assert.IsNotNull(response);
+        Console.WriteLine(response.Text);
     }
 }

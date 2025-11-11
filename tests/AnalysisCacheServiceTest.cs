@@ -1,5 +1,6 @@
-using MarketAssistant.Models;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Services.Cache;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -39,7 +40,7 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "AAPL";
-        var analysisResult = CreateTestAnalysisResult(stockSymbol);
+        var analysisResult = CreateTestAnalysisReport(stockSymbol);
 
         // Act
         await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
@@ -48,7 +49,7 @@ public class AnalysisCacheServiceTest
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
         Assert.AreEqual(stockSymbol, cachedResult.StockSymbol);
-        Assert.AreEqual("买入", cachedResult.Rating);
+        Assert.AreEqual("买入", cachedResult.CoordinatorResult.InvestmentRating);
     }
 
     /// <summary>
@@ -59,7 +60,7 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "MSFT";
-        var analysisResult = CreateTestAnalysisResult(stockSymbol);
+        var analysisResult = CreateTestAnalysisReport(stockSymbol);
         await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
 
         // Act
@@ -68,7 +69,7 @@ public class AnalysisCacheServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.AreEqual(stockSymbol, result.StockSymbol);
-        Assert.AreEqual(8.5f, result.OverallScore);
+        Assert.AreEqual(8.5f, result.CoordinatorResult.OverallScore);
     }
 
     /// <summary>
@@ -92,10 +93,10 @@ public class AnalysisCacheServiceTest
     {
         // Arrange
         var stockSymbol = "GOOGL";
-        var firstResult = CreateTestAnalysisResult(stockSymbol);
-        firstResult.Rating = "卖出";
-        var secondResult = CreateTestAnalysisResult(stockSymbol);
-        secondResult.Rating = "买入";
+        var firstResult = CreateTestAnalysisReport(stockSymbol);
+        firstResult.CoordinatorResult.InvestmentRating = "卖出";
+        var secondResult = CreateTestAnalysisReport(stockSymbol);
+        secondResult.CoordinatorResult.InvestmentRating = "买入";
 
         // Act
         await _cacheService.CacheAnalysisAsync(stockSymbol, firstResult);
@@ -104,17 +105,24 @@ public class AnalysisCacheServiceTest
         // Assert
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
-        Assert.AreEqual("买入", cachedResult.Rating);
+        Assert.AreEqual("买入", cachedResult.CoordinatorResult.InvestmentRating);
     }
 
-    private AnalystResult CreateTestAnalysisResult(string stockSymbol)
+    private MarketAnalysisReport CreateTestAnalysisReport(string stockSymbol)
     {
-        return new AnalystResult
+        return new MarketAnalysisReport
         {
             StockSymbol = stockSymbol,
-            Rating = "买入",
-            OverallScore = 8.5f,
-            TargetPrice = "180-200美元"
+            AnalystMessages = new List<ChatMessage>
+            {
+                new(ChatRole.Assistant, "Test content") { AuthorName = "TestAnalyst" }
+            },
+            CoordinatorResult = new CoordinatorResult
+            {
+                InvestmentRating = "买入",
+                OverallScore = 8.5f,
+                TargetPrice = "180-200美元"
+            }
         };
     }
 }
