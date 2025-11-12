@@ -7,7 +7,7 @@ on:
     branches: [ main, develop ]
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
 
 jobs:
   build-windows:
@@ -46,7 +46,7 @@ jobs:
       run: dotnet restore MarketAssistant.slnx
     
     - name: Build
-      run: dotnet build src/MarketAssistant.csproj -c Release --no-restore -r osx-x64
+      run: dotnet build src/MarketAssistant.csproj -c Release --no-restore -r osx-x64 -p:ErrorOnDuplicatePublishOutputFiles=false
 
   build-linux:
     name: Build Linux

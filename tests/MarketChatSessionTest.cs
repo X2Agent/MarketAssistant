@@ -52,7 +52,7 @@ public class MarketChatSessionTest : BaseAgentTest
     public async Task TestStockContextChatAsync()
     {
         // 设置股票上下文
-        await _chatSession.UpdateStockContextAsync("sz002594");
+        _chatSession.SetStockCode("sz002594");
 
         // 测试带有股票上下文的对话
         var response = await _chatSession.SendMessageAsync("这只股票的基本面如何？");
@@ -103,7 +103,7 @@ public class MarketChatSessionTest : BaseAgentTest
     public async Task TestContextWindowManagementAsync()
     {
         // 设置股票上下文
-        await _chatSession.UpdateStockContextAsync("sz002594");
+        _chatSession.SetStockCode("sz002594");
 
         // 添加大量消息来测试上下文窗口管理
         for (int i = 0; i < 50; i++)
@@ -122,7 +122,7 @@ public class MarketChatSessionTest : BaseAgentTest
     public async Task TestTopicGuidanceAsync()
     {
         // 设置股票上下文
-        await _chatSession.UpdateStockContextAsync("sz002594");
+        _chatSession.SetStockCode("sz002594");
 
         // 询问与股票无关的消息，测试AI是否能自然地引导回相关话题
         var response = await _chatSession.SendMessageAsync("今天的天气怎么样");
@@ -138,7 +138,7 @@ public class MarketChatSessionTest : BaseAgentTest
     public async Task TestStreamingResponseAsync()
     {
         // 设置股票上下文
-        await _chatSession.UpdateStockContextAsync("sz000001");
+        _chatSession.SetStockCode("sz000001");
 
         var streamingContent = new List<string>();
         bool streamingCompleted = false;
@@ -192,7 +192,7 @@ public class MarketChatSessionTest : BaseAgentTest
     public async Task TestIntelligentAnalysisAsync()
     {
         // 设置股票上下文
-        await _chatSession.UpdateStockContextAsync("sz000858");
+        _chatSession.SetStockCode("sz000858");
 
         // 测试AI能否智能调用可能的插件来回答深度
         var response1 = await _chatSession.SendMessageAsync("分析MACD和RSI指标");

@@ -126,8 +126,8 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 
 ## 🛠️ 技术栈
 
-- Avalonia UI 11.3.7
-- .NET 9.0
+- Avalonia UI 11.3.8
+- .NET 10.0
 - Semantic Kernel
 - CommunityToolkit.Mvvm
   

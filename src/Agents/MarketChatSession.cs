@@ -74,14 +74,23 @@ public class MarketChatSession : IDisposable
     /// <param name="chatClient">聊天客户端</param>
     /// <param name="logger">日志记录器</param>
     /// <param name="mcpService">MCP 服务</param>
+    /// <param name="initialStockCode">可选的初始股票代码</param>
     public MarketChatSession(
         IChatClient chatClient,
         ILogger<MarketChatSession> logger,
-        McpService mcpService)
+        McpService mcpService,
+        string? initialStockCode = null)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
+        
+        // 设置初始股票代码
+        _currentStockCode = initialStockCode ?? string.Empty;
+        if (!string.IsNullOrEmpty(_currentStockCode))
+        {
+            _logger.LogInformation("初始化对话会话，股票代码: {StockCode}", _currentStockCode);
+        }
 
         // 初始化系统消息
         InitializeSystemContext();
@@ -287,33 +296,16 @@ public class MarketChatSession : IDisposable
     }
 
     /// <summary>
-    /// 更新股票上下文
+    /// 设置股票代码（用于初始化场景，不修改对话历史）
     /// </summary>
     /// <param name="stockCode">股票代码</param>
-    public async Task UpdateStockContextAsync(string stockCode)
+    public void SetStockCode(string stockCode)
     {
         if (_currentStockCode == stockCode)
             return;
-
-        var previousStockCode = _currentStockCode;
+            
         _currentStockCode = stockCode;
-        _logger.LogInformation("更新股票上下文: {PreviousStock} -> {NewStock}", previousStockCode, stockCode);
-
-        // 更新系统上下文
-        await UpdateSystemContextAsync();
-
-        // 只在有实际对话历史时才添加切换提示，避免空对话时的冗余消息
-        var hasUserMessages = _conversationHistory.Any(m => m.Role == ChatRole.User);
-
-        if (hasUserMessages && !string.IsNullOrEmpty(stockCode))
-        {
-            var switchMessage = string.IsNullOrEmpty(previousStockCode)
-                ? $"开始分析股票: {stockCode}"
-                : $"分析焦点已从 {previousStockCode} 切换到 {stockCode}";
-
-            // 添加切换通知
-            _conversationHistory.Add(new ChatMessage(ChatRole.System, switchMessage));
-        }
+        _logger.LogInformation("设置股票代码: {StockCode}", stockCode);
     }
 
     /// <summary>
@@ -401,24 +393,6 @@ public class MarketChatSession : IDisposable
             _logger.LogError(ex, "初始化 MCP 服务失败");
         }
     }
-
-    /// <summary>
-    /// 更新系统上下文
-    /// </summary>
-    private async Task UpdateSystemContextAsync()
-    {
-        if (!string.IsNullOrEmpty(_currentStockCode))
-        {
-            var analysisContext = await GetAnalysisContextAsync(_conversationHistory, _currentStockCode);
-            if (!string.IsNullOrEmpty(analysisContext))
-            {
-                var contextContent = $"当前股票分析上下文：\n{analysisContext}";
-                _conversationHistory.Add(new ChatMessage(ChatRole.System, contextContent));
-            }
-        }
-    }
-
-
 
     /// <summary>
     /// 管理上下文窗口
@@ -671,61 +645,6 @@ public class MarketChatSession : IDisposable
         return string.IsNullOrEmpty(stockCode)
             ? basePrompt
             : $"{basePrompt}\n\n**当前分析焦点：{stockCode}**";
-    }
-
-    /// <summary>
-    /// 获取股票分析上下文
-    /// </summary>
-    /// <returns>分析上下文摘要</returns>
-    private Task<string> GetAnalysisContextAsync(List<ChatMessage> history, string stockCode)
-    {
-        try
-        {
-            if (history.Count > 0)
-            {
-                // 提取分析师的关键观点作为上下文
-                var analysisContext = ExtractAnalysisContext(history, stockCode);
-                return Task.FromResult(analysisContext);
-            }
-
-            // 如果没有分析历史，返回基础上下文
-            return Task.FromResult($"当前股票：{stockCode}。您可以询问关于该股票的技术分析、基本面分析、市场情绪等问题，我会为您提供专业的分析。");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "获取股票分析上下文失败，股票代码: {StockCode}", stockCode);
-            return Task.FromResult(string.Empty);
-        }
-    }
-
-    /// <summary>
-    /// 从分析历史中提取关键上下文
-    /// </summary>
-    /// <param name="analysisHistory">分析历史</param>
-    /// <param name="stockCode">股票代码</param>
-    /// <returns>提取的上下文摘要</returns>
-    private string ExtractAnalysisContext(List<ChatMessage> analysisHistory, string stockCode)
-    {
-        var contextBuilder = new StringBuilder();
-        contextBuilder.Append($"当前分析股票：{stockCode}\n");
-        contextBuilder.Append("最近的分析观点摘要：\n");
-
-        // 获取最近的分析师观点（限制长度避免上下文过长）
-        var recentMessages = analysisHistory
-            .Where(m => m.Role == ChatRole.Assistant && !string.IsNullOrWhiteSpace(m.Text))
-            .TakeLast(3)
-            .ToList();
-
-        foreach (var message in recentMessages)
-        {
-            var content = message.Text?.Length > 200
-                ? message.Text.Substring(0, 200) + "..."
-                : message.Text;
-
-            contextBuilder.Append($"- 分析师: {content}\n");
-        }
-
-        return contextBuilder.ToString().Trim();
     }
 
     #endregion

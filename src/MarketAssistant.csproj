@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -59,10 +59,10 @@
     <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.251110.2" />
     <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251110.2" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.10.2-preview.1.25552.1" />
-	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.9" />
+	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
 	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 	<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
-	<PackageReference Include="Microsoft.Playwright" Version="1.55.0" />
+	<PackageReference Include="Microsoft.Playwright" Version="1.56.0" />
 	<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.67.1-preview" />
 	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.67.1-preview" />
 	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.67.1-alpha" />
@@ -74,7 +74,6 @@
 	<PackageReference Include="SmartReader" Version="0.10.2" />
 	<PackageReference Include="Svg.Controls.Skia.Avalonia" Version="11.3.6.2" />
 	<PackageReference Include="Svg.Skia" Version="3.2.1" />
-	<PackageReference Include="System.Linq.Async" Version="6.0.3" />
 	<!-- Added for CLIP ONNX embedding support -->
 	<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
 	<!-- 添加用于Preferences和FileSystem替代的包 -->
@@ -90,5 +89,18 @@
     <None Update="Agents\Yaml\*.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- macOS 平台特定配置 - 修复 WebView 相关本地库问题 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
+    <!-- 跳过不存在的本地库检查 -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- 排除可选的本地库文件 -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
+    <Content Remove="**/libEGL.dylib" />
+    <Content Remove="**/libGLESv2.dylib" />
   </ItemGroup>
 </Project>

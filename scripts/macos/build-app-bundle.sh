@@ -42,6 +42,7 @@ dotnet publish src/MarketAssistant.csproj \
     -p:UseAppHost=true \
     -p:DebugType=None \
     -p:DebugSymbols=false \
+    -p:ErrorOnDuplicatePublishOutputFiles=false \
     -o "$PUBLISH_DIR"
 
 if [ $? -ne 0 ]; then

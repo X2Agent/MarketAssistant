@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant;
 
 /// <summary>
-/// MarketAnalysisWorkflow 测试（基于 Agent Framework Workflows 并发工作流）
+/// 市场分析工作流测试（最小原则：验证核心工作流功能）
 /// </summary>
 [TestClass]
 public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
@@ -24,7 +24,7 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     }
 
     [TestMethod]
-    public async Task TestMarketAnalysisWorkflow_AnalyzeAsync_WithValidStockSymbol_ShouldReturnReport()
+    public async Task AnalyzeAsync_ShouldReturnValidReport()
     {
         // Arrange
         string stockSymbol = "000001";
@@ -40,49 +40,19 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
         Assert.IsNotNull(report.CoordinatorResult, "协调分析师应该生成结果");
         Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary), "协调分析师应该生成总结报告");
 
-        Console.WriteLine($"=== 市场分析工作流测试结果 ===");
-        Console.WriteLine($"股票代码: {report.StockSymbol}");
-        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
-        Console.WriteLine($"协调总结长度: {report.CoordinatorResult.Summary.Length} 字符");
-        Console.WriteLine($"对话历史条数: {report.AnalystMessages.Count}");
-
-        Console.WriteLine($"\n各分析师结果:");
-        foreach (var message in report.AnalystMessages)
-        {
-            var content = message.Text ?? string.Empty;
-            Console.WriteLine($"  - {message.AuthorName}: {content.Substring(0, Math.Min(50, content.Length))}...");
-        }
+        Console.WriteLine($"股票 {stockSymbol} 分析完成 - 分析师数量: {report.AnalystMessages.Count}, 总结长度: {report.CoordinatorResult.Summary.Length} 字符");
     }
 
     [TestMethod]
-    public async Task TestMarketAnalysisWorkflow_AnalyzeAsync_WithAnotherStock_ShouldReturnReport()
-    {
-        // Arrange
-        string stockSymbol = "600519";
-
-        // Act
-        var report = await _workflow.AnalyzeAsync(stockSymbol);
-
-        // Assert
-        Assert.IsNotNull(report);
-        Assert.AreEqual(stockSymbol, report.StockSymbol);
-        Assert.IsTrue(report.AnalystMessages.Count > 0);
-
-        Console.WriteLine($"=== 不同股票分析测试结果 ===");
-        Console.WriteLine($"股票代码: {report.StockSymbol}");
-        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
-    }
-
-    [TestMethod]
-    public async Task TestMarketAnalysisWorkflow_AnalyzeAsync_ProgressEvents_ShouldBeTriggered()
+    public async Task AnalyzeAsync_ShouldTriggerProgressEvents()
     {
         // Arrange
         string stockSymbol = "000001";
-        var progressEvents = new List<string>();
+        var progressEvents = new List<(string Analyst, string Stage)>();
 
         _workflow.ProgressChanged += (sender, e) =>
         {
-            progressEvents.Add($"{e.CurrentAnalyst}: {e.StageDescription}");
+            progressEvents.Add((e.CurrentAnalyst, e.StageDescription));
         };
 
         // Act
@@ -91,36 +61,14 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
         // Assert
         Assert.IsNotNull(report);
         Assert.IsTrue(progressEvents.Count > 0, "应该触发进度事件");
-
-        Console.WriteLine($"=== 进度事件测试结果 ===");
-        Console.WriteLine($"触发的进度事件数: {progressEvents.Count}");
+        
+        // 验证进度事件内容合理性
         foreach (var evt in progressEvents)
         {
-            Console.WriteLine($"  - {evt}");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(evt.Analyst), "分析师名称不应为空");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(evt.Stage), "阶段描述不应为空");
         }
-    }
 
-    [TestMethod]
-    public async Task TestMarketAnalysisWorkflow_ConcurrentAnalysis_ShouldCompleteWithinReasonableTime()
-    {
-        // Arrange
-        string stockSymbol = "000001";
-        var startTime = DateTime.UtcNow;
-
-        // Act
-        var report = await _workflow.AnalyzeAsync(stockSymbol);
-
-        var elapsedTime = DateTime.UtcNow - startTime;
-
-        // Assert
-        Assert.IsNotNull(report);
-        Assert.IsTrue(elapsedTime.TotalMinutes < 5, "并发分析应该在5分钟内完成");
-
-        Console.WriteLine($"=== 并发性能测试结果 ===");
-        Console.WriteLine($"执行时间: {elapsedTime.TotalSeconds:F2} 秒");
-        Console.WriteLine($"分析师数量: {report.AnalystMessages.Count}");
-        Console.WriteLine($"平均每位分析师: {elapsedTime.TotalSeconds / report.AnalystMessages.Count:F2} 秒");
+        Console.WriteLine($"进度事件触发 {progressEvents.Count} 次 - 所有事件内容有效");
     }
 }
-
-

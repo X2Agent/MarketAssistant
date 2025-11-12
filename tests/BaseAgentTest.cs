@@ -1,7 +1,5 @@
-using MarketAssistant.Agents;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
-using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Applications.Settings;
@@ -71,7 +69,7 @@ public class BaseAgentTest
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
-        services.AddSingleton<IUserSettingService>(provider =>
+        services.AddSingleton(provider =>
         {
             var testUserSetting = new UserSetting
             {

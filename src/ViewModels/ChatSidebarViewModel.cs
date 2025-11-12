@@ -181,8 +181,9 @@ public partial class ChatSidebarViewModel : ViewModelBase
     public async Task InitializeWithAnalysisHistory(string stockCode, IEnumerable<AnalysisMessage> analysisMessages)
     {
         StockCode = stockCode;
-
-        await _chatSession.UpdateStockContextAsync(stockCode);
+        
+        // 设置股票代码（不需要异步操作）
+        _chatSession.SetStockCode(stockCode);
 
         ChatMessages.Clear();
 
