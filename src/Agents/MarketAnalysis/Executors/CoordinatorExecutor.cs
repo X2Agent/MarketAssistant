@@ -83,7 +83,11 @@ public sealed class CoordinatorExecutor : Executor<AggregatedAnalysisResult, Mar
                 agentResponse.Messages.Count(m => m.Contents.Any(c => c is FunctionCallContent)));
 
             // 🎉 直接反序列化为 CoordinatorResult
-            var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(JsonSerializerOptions.Web);
+            var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(jsonOptions);
 
             if (coordinatorResult == null)
             {

@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform;
 using MarketAssistant.Applications.Stocks.Models;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using WebViewControl;
 
 namespace MarketAssistant.Views.Components;
@@ -14,7 +14,6 @@ namespace MarketAssistant.Views.Components;
 public class StockWebChartView : UserControl
 {
     private bool _isInitialized = false;
-    private readonly ILogger<StockWebChartView>? _logger;
     private WebView? _webView;
     private StackPanel? _loadingPanel;
     private StackPanel? _errorPanel;
@@ -103,7 +102,6 @@ public class StockWebChartView : UserControl
         {
             _isInitialized = true;
             HideLoading();
-            _logger?.LogInformation("WebView 导航完成，图表已初始化");
         });
     }
 
@@ -131,8 +129,6 @@ public class StockWebChartView : UserControl
                 return;
             }
 
-            _logger?.LogInformation("开始加载图表 HTML，长度: {Length}", htmlContent.Length);
-
             // 监听 WebView 加载完成事件（必须在 LoadHtml 之前注册）
             _webView.Navigated += OnWebViewNavigated;
 
@@ -141,7 +137,6 @@ public class StockWebChartView : UserControl
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "图表初始化失败");
             ShowError($"初始化失败: {ex.Message}");
         }
     }
@@ -174,12 +169,10 @@ public class StockWebChartView : UserControl
             }
 
             // 如果都失败，返回默认HTML
-            _logger?.LogWarning("无法找到HTML文件: {FileName}，使用默认HTML", htmlFileName);
             return GetDefaultChartHtml();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger?.LogError(ex, "加载HTML文件失败");
             return GetDefaultChartHtml();
         }
     }
@@ -332,7 +325,6 @@ public class StockWebChartView : UserControl
             // 首次调用时才初始化图表（延迟初始化）
             if (!_isInitialized)
             {
-                _logger?.LogInformation("首次加载图表数据，开始初始化 WebView");
                 await InitializeChartAsync();
             }
 
@@ -359,19 +351,15 @@ public class StockWebChartView : UserControl
 
                     // 取消加载状态
                     _webView.ExecuteScript("window.stockChartInterface.setLoading(false);");
-
-                    _logger?.LogInformation("图表数据已更新，数据点: {Count}", kLineData.Count());
                 }
                 catch (Exception jsEx)
                 {
-                    _logger?.LogError(jsEx, "执行JavaScript失败");
                     ShowError($"更新图表失败: {jsEx.Message}");
                 }
             });
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "更新图表失败");
             ShowError($"更新失败: {ex.Message}");
         }
     }

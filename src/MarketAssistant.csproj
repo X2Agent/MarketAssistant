@@ -83,9 +83,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Agents\Plugins\Yaml\*.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="Agents\Yaml\*.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

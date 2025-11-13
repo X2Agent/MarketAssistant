@@ -48,7 +48,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
             // 创建结构化输出的 JSON Schema
             var schema = AIJsonUtilities.CreateJsonSchema(typeof(StockCriteria));
 
-            // 配置聊天选项（使用结构化输出）
+            // 配置聊天选项
             var chatOptions = new ChatOptions
             {
                 ResponseFormat = ChatResponseFormat.ForJsonSchema(
@@ -69,7 +69,11 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
                 cancellationToken);
 
             // 获取响应文本并反序列化为 StockCriteria 对象以验证格式
-            var criteria = JsonSerializer.Deserialize<StockCriteria>(response.Text, JsonSerializerOptions.Web);
+            var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            var criteria = JsonSerializer.Deserialize<StockCriteria>(response.Text, jsonOptions);
             if (criteria == null)
             {
                 throw new InvalidOperationException("筛选条件 JSON 解析失败");
@@ -77,7 +81,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
             _logger.LogInformation("[步骤1/3] 筛选条件生成完成，包含 {Count} 个条件",
                 criteria.Criteria?.Count ?? 0);
 
-            // 返回结果（框架会自动传递给下游）
+            // 返回结果
             return new CriteriaGenerationResult
             {
                 Criteria = criteria,
@@ -97,7 +101,8 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
     private string BuildUserRequirementSystemPrompt()
     {
         return """
-你是一个专业的需求转换助手，负责将用户的文字需求转换为标准的股票筛选条件。
+## 主要任务
+分析用户需求，生成合理的筛选条件。
 
 ## 需求转换规则
 
@@ -113,18 +118,26 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - 高ROE/盈利能力强 → roediluted > 15
 - 低市盈率 → pettm < 20
 - 低市净率 → pb < 3
+- 市盈率X倍以下 → pettm < X
+- 市净率X倍以下 → pb < X
 
 ### 财务表现
 - 业绩好/盈利增长 → npay > 10
 - 营收增长 → oiy > 10
 - 高股息/分红股 → dy_l > 2
 - 每股净资产高 → bps > 10
+- 净利润增长X%以上 → npay > X
+- 营收增长X%以上 → oiy > X
+- 股息率X%以上 → dy_l > X
 
 ### 市场表现
 - 活跃股/成交活跃 → amount > 100000000, tr > 2
 - 强势股 → pct60 > 20
 - 近期涨幅大 → pct20 > 10
 - 抗跌股 → pct20 > -5
+- 近X日涨幅大于Y% → pctX > Y
+- 成交额X亿以上 → amount > X*100000000
+- 换手率X%以上 → tr > X
 
 ### 价格相关
 - 股价X元以下 → current < X
@@ -133,15 +146,30 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - 中价股 → current: 10-50
 - 高价股 → current > 50
 
+### 行业映射（用户提到行业时使用以下精确名称）
+- 科技股/AI/芯片/云计算/5G/大数据/软件 → **计算机设备** 或 **软件开发**
+- 半导体/芯片制造/集成电路/存储器 → **半导体**
+- 新能源/电动车电池/光伏/风电/储能 → **电池** 或 **光伏设备** 或 **风电设备**
+- 医药/新药研发/疫苗/生物技术 → **化学制药** 或 **生物制品** 或 **医疗器械**
+- 消费/白酒/饮料/食品 → **白酒** 或 **饮料乳品** 或 **食品加工**
+- 银行/金融 → **股份制银行** 或 **国有大型银行**
+- 房地产/地产 → **房地产开发**
+- 汽车/新能源车 → **乘用车** 或 **汽车零部件**
+- 通信/5G/通信设备 → **通信设备** 或 **通信服务**
+- 电力/电网/发电 → **电力**
+- 化工 → **化学原料** 或 **化学制品**
+- 机械/工程机械 → **工程机械** 或 **专用设备**
+- 家电 → **白色家电** 或 **小家电**
+
 ## 支持的筛选指标
 
-### 基本指标 (basic)
+### 基本指标 (basic) - 15个
 - mc: 总市值
 - fmc: 流通市值
 - pettm: 市盈率TTM
 - pelyr: 市盈率LYR
 - pb: 市净率MRQ
-- psr: 市销率
+- psr: 市销率(倍)
 - roediluted: 净资产收益率
 - bps: 每股净资产
 - eps: 每股收益
@@ -152,7 +180,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - oiy: 营业收入同比增长
 - niota: 总资产报酬率
 
-### 行情指标 (market)
+### 行情指标 (market) - 14个
 - current: 当前价
 - pct: 当日涨跌幅
 - pct5: 近5日涨跌幅
@@ -168,20 +196,33 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - tr: 当日换手率
 - chgpct: 当日振幅
 
-### 雪球指标 (snowball)
+### 雪球指标 (snowball) - 9个
 - follow: 累计关注人数
 - tweet: 累计讨论次数
 - deal: 累计交易分享数
 - follow7d: 一周新增关注
 - tweet7d: 一周新增讨论数
 - deal7d: 一周新增交易分享数
+- follow7dpct: 一周关注增长率
+- tweet7dpct: 一周讨论增长率
+- deal7dpct: 一周交易分享增长率
 
 ## 输出要求
-分析用户需求，生成符合 StockCriteria 格式的结构化输出。
-- criteria 数组包含具体的筛选条件
-- market 字段固定为 "全部A股"
-- industry 字段为具体行业名称或空字符串
-- limit 字段为推荐股票数量限制
+
+**严格按照以下完整JSON格式输出：**
+{
+  "criteria": [
+    {
+      "code": "指标代码",
+      "displayName": "指标中文名",
+      "minValue": 最小值或null,
+      "maxValue": 最大值或null
+    }
+  ],
+  "market": "全部A股",
+  "industry": "行业名称或空字符串",
+  "limit": 推荐股票数量限制
+}
 """;
     }
 
@@ -191,8 +232,6 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
     private string BuildNewsAnalysisSystemPrompt()
     {
         return """
-你是专业的财经新闻分析师，负责将新闻内容转换为精确的股票筛选条件。
-
 ## 任务
 分析新闻内容，识别相关行业，判断情感倾向，并生成对应的股票筛选条件。
 
@@ -214,6 +253,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 **家电新闻**（空调、冰箱、小家电）→ **白色家电** 或 **小家电**  
 
 ## 指标说明
+
 ### 基本指标
 - mc: 总市值（元，如100亿=10000000000）  
 - npay: 净利润同比增长率（%）  
@@ -256,11 +296,21 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - roediluted > 8  
 
 ## 输出要求
-生成符合 StockCriteria 格式的结构化输出。
-- criteria 数组包含具体的筛选条件
-- market 字段固定为 "全部A股"
-- industry 字段为单个行业名称
-- limit 字段为推荐股票数量限制
+
+**严格按照以下JSON格式输出：**
+{
+  "criteria": [
+    {
+      "code": "指标代码",
+      "displayName": "指标中文名",
+      "minValue": 最小值或null,
+      "maxValue": 最大值或null
+    }
+  ],
+  "market": "全部A股",
+  "industry": "单个行业名称",
+  "limit": 推荐股票数量限制
+}
 """;
     }
 

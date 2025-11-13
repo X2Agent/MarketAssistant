@@ -16,6 +16,7 @@ public class StockCriteria
     /// <summary>
     /// 市场类型：全部A股、沪市A股、深市A股等
     /// </summary>
+    [Description("市场类型")]
     public string Market { get; set; } = "全部A股";
 
     /// <summary>
@@ -27,6 +28,7 @@ public class StockCriteria
     /// <summary>
     /// 返回数量限制
     /// </summary>
+    [Description("数量限制")]
     public int Limit { get; set; } = 20;
 }
 

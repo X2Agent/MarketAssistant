@@ -45,7 +45,7 @@ public class McpServiceTest
         };
 
         // Act & Assert
-        Assert.ThrowsException<NotSupportedException>(() =>
+        Assert.ThrowsExactly<NotSupportedException>(() =>
         {
             McpService.CreateClientTransport(config);
         });

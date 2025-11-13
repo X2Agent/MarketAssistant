@@ -40,12 +40,12 @@ public sealed class ScreenStocksExecutor : Executor<CriteriaGenerationResult, Sc
             _logger.LogInformation("[步骤2/3] 筛选条件: 市场={Market}, 行业={Industry}, 条件数={Count}",
                 input.Criteria.Market, input.Criteria.Industry, input.Criteria.Criteria.Count);
 
-            // 调用 StockScreenerService 执行筛选（100% 确定性，无 AI 参与）
+            // 调用 StockScreenerService 执行筛选
             List<ScreenerStockInfo> stocks = await _stockScreenerService.ScreenStocksAsync(input.Criteria);
 
             _logger.LogInformation("[步骤2/3] 筛选完成，获得 {Count} 只股票", stocks.Count);
 
-            // 返回筛选结果（框架会自动传递给下游）
+            // 返回筛选结果
             return new ScreeningResult
             {
                 ScreenedStocks = stocks,

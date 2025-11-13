@@ -130,9 +130,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase
             Command = SelectedConfig.Command,
             Arguments = SelectedConfig.Arguments,
             IsEnabled = SelectedConfig.IsEnabled,
-            EnvironmentVariables = SelectedConfig.EnvironmentVariables != null
-                ? new Dictionary<string, string?>(SelectedConfig.EnvironmentVariables)
-                : null
+            EnvironmentVariables = SelectedConfig.EnvironmentVariables
         };
         LoadConfigToUI(_editingConfig);
         IsEditing = true;
@@ -228,23 +226,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase
                 TransportType = TransportType,
                 Command = Command,
                 Arguments = Arguments,
-                IsEnabled = true
+                IsEnabled = true,
+                EnvironmentVariables = ParseEnvironmentVariables()
             };
-
-            // 解析环境变量
-            if (!string.IsNullOrWhiteSpace(EnvironmentVariablesText))
-            {
-                testConfig.EnvironmentVariables = new Dictionary<string, string?>();
-                var lines = EnvironmentVariablesText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines)
-                {
-                    var parts = line.Split('=', 2);
-                    if (parts.Length == 2)
-                    {
-                        testConfig.EnvironmentVariables[parts[0].Trim()] = parts[1].Trim();
-                    }
-                }
-            }
 
             // 设置超时
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -375,21 +359,30 @@ public partial class MCPConfigPageViewModel : ViewModelBase
         config.Command = Command;
         config.Arguments = Arguments;
         config.IsEnabled = IsEnabled;
+        config.EnvironmentVariables = ParseEnvironmentVariables();
+    }
 
-        // 解析环境变量文本
-        config.EnvironmentVariables = new Dictionary<string, string>();
+    /// <summary>
+    /// 解析环境变量文本（格式: KEY=VALUE，每行一个）
+    /// </summary>
+    private Dictionary<string, string?> ParseEnvironmentVariables()
+    {
+        var result = new Dictionary<string, string?>();
+
         if (!string.IsNullOrWhiteSpace(EnvironmentVariablesText))
         {
-            var lines = EnvironmentVariablesText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = EnvironmentVariablesText.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
             foreach (var line in lines)
             {
                 var parts = line.Split('=', 2);
                 if (parts.Length == 2)
                 {
-                    config.EnvironmentVariables[parts[0].Trim()] = parts[1].Trim();
+                    result[parts[0].Trim()] = parts[1].Trim();
                 }
             }
         }
+
+        return result;
     }
 
     partial void OnSelectedConfigChanged(MCPServerConfig? value)

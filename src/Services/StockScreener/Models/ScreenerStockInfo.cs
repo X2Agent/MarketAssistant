@@ -204,10 +204,5 @@ public class ScreenerStockInfo
     /// 当日振幅(%)
     /// </summary>
     public decimal ChgPct { get; set; }
-
-    /// <summary>
-    /// 动态数据字典，存储其他指标
-    /// </summary>
-    public Dictionary<string, string> ExtraData { get; set; } = new();
 }
 

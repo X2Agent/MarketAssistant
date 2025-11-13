@@ -684,8 +684,6 @@ public sealed class StockScreenerService
                 catch (Exception ex)
                 {
                     _logger.LogDebug(ex, "解析列 {DataKey} 时发生错误: {Value}", dataKey, cellText);
-                    // 将无法解析的数据存储到 ExtraData 中
-                    stock.ExtraData[dataKey] = cellText.Trim();
                 }
             }
 
@@ -885,8 +883,7 @@ public sealed class StockScreenerService
                 break;
 
             default:
-                // 其他未定义的字段存储到 ExtraData 中
-                stock.ExtraData[dataKey] = cellText;
+                // 忽略未定义的字段
                 break;
         }
     }

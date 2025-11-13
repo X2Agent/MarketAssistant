@@ -280,14 +280,11 @@ public class MarketAnalysisWorkflow : IDisposable
         var builder = new WorkflowBuilder(_dispatcherExecutor);
 
         // 2. Fan-Out: Dispatcher → 所有分析师（Dispatcher 返回 ChatMessage 自动分发）
-        foreach (var analyst in analystAgents)
-        {
-            builder.AddEdge(_dispatcherExecutor, analyst);
-        }
+        builder.AddFanOutEdge(_dispatcherExecutor, [.. analystAgents]);
 
         // 3. Fan-In: 所有分析师 → Aggregator
         // 框架会自动收集所有源（分析师）的消息，并作为 IEnumerable<ChatMessage> 传递给 Aggregator
-        builder.AddFanInEdge(_aggregatorExecutor, sources: [.. analystAgents]);
+        builder.AddFanInEdge([.. analystAgents], _aggregatorExecutor);
 
         // 4. Aggregator → Coordinator（将聚合结果传递给协调分析师）
         builder.AddEdge(_aggregatorExecutor, _coordinatorExecutor);
