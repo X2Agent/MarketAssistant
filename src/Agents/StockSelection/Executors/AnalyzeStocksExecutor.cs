@@ -5,6 +5,8 @@ using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
 
 namespace MarketAssistant.Agents.StockSelection.Executors;
 
@@ -263,109 +265,31 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
     }
 
     /// <summary>
-    /// 获取分析指令（System Prompt）
+    /// 获取分析指令（System Prompt）- 统一的分析指令
     /// </summary>
     private string GetAnalysisInstructions(bool isNewsAnalysis)
     {
-        if (isNewsAnalysis)
-        {
-            return @"
-你是一位专业的新闻热点分析师和投资顾问，擅长基于新闻热点提供股票投资建议。
+        return @"
+你是专业的投资顾问，基于用户需求/新闻热点和股票数据提供投资建议。
 
-## 分析流程
-1. **理解新闻热点**：分析新闻内容，识别关键主题、受益行业和影响时长
-2. **评估股票关联性**：判断每只股票与新闻热点的相关度
-3. **综合评分**：结合财务数据（PE、PB、ROE等）、市场表现和新闻相关性进行评分
-4. **筛选推荐**：选择3-8只最优股票，说明推荐理由
+## 核心职责
+从第三方推荐的股票中，进行多维度分析，输出结构化推荐报告（3-8只股票）。
 
-## 评估标准
-- **新闻相关性**（权重40%）：股票所属行业、业务与新闻主题的关联程度
-- **财务质量**（权重30%）：ROE、利润增长、估值水平
-- **市场表现**（权重20%）：近期涨跌幅、成交活跃度、换手率
-- **风险因素**（权重10%）：估值风险、行业风险、市场风险
+## 评估维度（灵活权重）
+- 财务质量：ROE、利润、成长性、现金流、EPS/BPS
+- 估值水平：PE/PB/PS合理性、低估/高估判断、股息率
+- 市场表现：涨跌幅、流动性（成交额/换手率）、市场情绪
+- 需求匹配：风险偏好、期限、行业偏好，或新闻关联度
+- 社交热度：雪球关注/讨论及增长（参考）
 
-## 输出格式
-**严格按照以下JSON格式输出，不要添加markdown代码块标识：**
-
-{
-  ""analysisSummary"": ""新闻分析总结"",
-  ""hotspotAnalysis"": ""热点分析和趋势判断"",
-  ""marketImpact"": ""对市场的影响分析"",
-  ""recommendations"": [
-    {
-      ""symbol"": ""股票代码"",
-      ""name"": ""股票名称"",
-      ""recommendationScore"": 85,
-      ""reason"": ""推荐理由，必须说明与新闻的关联"",
-      ""expectedReturn"": 15.5,
-      ""riskLevel"": ""中风险"",
-      ""newsRelevance"": ""与新闻的具体关联说明""
-    }
-  ],
-  ""riskWarnings"": [""风险提示1"", ""风险提示2""],
-  ""investmentStrategy"": ""投资策略建议"",
-  ""confidenceScore"": 75
-}
-
-## 关键要求
-⚠️ 推荐股票数量：3-8只（优选高质量标的）
-⚠️ 数值类型：评分、收益率使用数字，不加引号
-⚠️ 风险等级：只能是 ""低风险""、""中风险""、""高风险"" 之一
-⚠️ 推荐理由：必须说明与新闻的具体关联，不能泛泛而谈
-⚠️ 如果所有股票都不适合，recommendations 可以为空数组
+## 输出要求
+严格按JSON Schema输出，关键约束：
+1. **数值类型**：评分、收益率、仓位、价格等用数字（不加引号）
+2. **风险等级**：仅限 ""低风险""/""中风险""/""高风险""
+3. **推荐理由**：必须包含具体财务数据+估值判断+需求匹配说明
+4. **可选字段**：无法预测的字段设null
+5. **空结果**：无合适股票时，recommendations设空数组[]
 ";
-        }
-        else
-        {
-            return @"
-你是一位专业的投资顾问，擅长根据用户的需求提供投资建议。
-
-## 分析流程
-1. **理解用户需求**：分析用户的投资目标、风险偏好、期限和金额
-2. **评估股票质量**：审查财务指标（PE、PB、ROE、增长率等）
-3. **匹配需求**：判断每只股票是否符合用户的风险偏好和投资目标
-4. **筛选推荐**：选择3-8只最优股票，提供具体理由
-
-## 评估标准
-- **财务质量**（权重35%）：ROE、净利润增长、营收增长、现金流
-- **估值合理性**（权重25%）：PE、PB是否合理，是否被低估
-- **风险匹配度**（权重25%）：是否符合用户风险偏好
-- **市场表现**（权重15%）：近期表现、流动性、市值规模
-
-## 风险偏好匹配原则
-- **保守型**：选择低PE、低PB、高ROE、稳定盈利、大盘股
-- **稳健型**：选择中等估值、稳定增长、中大盘股
-- **激进型**：选择高成长、创新业务、可接受较高估值
-
-## 输出格式
-**严格按照以下JSON格式输出，不要添加markdown代码块标识：**
-
-{
-  ""analysisSummary"": ""分析总结"",
-  ""marketEnvironmentAnalysis"": ""市场环境分析"",
-  ""recommendations"": [
-    {
-      ""symbol"": ""股票代码"",
-      ""name"": ""股票名称"",
-      ""recommendationScore"": 85,
-      ""reason"": ""推荐理由，说明为何符合用户需求"",
-      ""expectedReturn"": 15.5,
-      ""riskLevel"": ""中风险""
-    }
-  ],
-  ""riskWarnings"": [""风险提示1"", ""风险提示2""],
-  ""investmentAdvice"": ""投资建议"",
-  ""confidenceScore"": 75
-}
-
-## 关键要求
-⚠️ 推荐股票数量：3-8只（优选高质量标的）
-⚠️ 数值类型：评分、收益率使用数字，不加引号
-⚠️ 风险等级：只能是 ""低风险""、""中风险""、""高风险"" 之一
-⚠️ 推荐理由：必须结合具体财务数据和用户需求
-⚠️ 如果所有股票都不适合，recommendations 可以为空数组
-";
-        }
     }
 
     private StockSelectionResult CreateDefaultResult()
