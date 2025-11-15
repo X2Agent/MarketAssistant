@@ -65,7 +65,7 @@ public class BaseAgentTest
         var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "Qwen/Qwen3-32B";
+        var modelId = "deepseek-ai/DeepSeek-V3.2-Exp";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务
@@ -137,5 +137,8 @@ public class BaseAgentTest
         return services.BuildServiceProvider();
     }
 }
+
+
+
 
 

@@ -5,8 +5,6 @@ using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.Text;
-using System.Text.Json;
 
 namespace MarketAssistant.Agents.StockSelection.Executors;
 
@@ -18,6 +16,11 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
 {
     private readonly IChatClient _chatClient;
     private readonly ILogger<AnalyzeStocksExecutor> _logger;
+
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public AnalyzeStocksExecutor(
         IChatClientFactory chatClientFactory,
@@ -92,27 +95,31 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
             // 添加调试日志：输出AI原始响应
             _logger.LogDebug("[步骤3/3] AI原始响应: {Response}", response.Text);
 
-            // 使用忽略大小写的选项进行反序列化
-            var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            var result = JsonSerializer.Deserialize<StockSelectionResult>(response.Text, jsonOptions);
+            var result = JsonSerializer.Deserialize<StockSelectionResult>(response.Text, JsonOptions);
 
             if (result == null)
             {
                 _logger.LogWarning("[步骤3/3] 响应反序列化失败，原始响应: {Response}", response.Text);
                 result = CreateDefaultResult();
             }
-            else if (result.Recommendations.Count == 0)
+            else
             {
-                _logger.LogWarning("[步骤3/3] AI未生成任何推荐股票，原始响应: {Response}", response.Text);
+                // 验证必填字段
+                var validationErrors = ValidateResult(result);
+                if (validationErrors.Count > 0)
+                {
+                    _logger.LogWarning("[步骤3/3] AI返回数据验证失败: {Errors}", string.Join("; ", validationErrors));
+                }
+
+                if (result.Recommendations.Count == 0)
+                {
+                    _logger.LogWarning("[步骤3/3] AI未生成任何推荐股票，原始响应: {Response}", response.Text);
+                }
             }
 
             _logger.LogInformation("[步骤3/3] 分析完成，推荐 {Count} 只股票，置信度: {Score}",
                 result.Recommendations.Count, result.ConfidenceScore);
 
-            // 返回最终结果（框架会自动传递）
             return result;
         }
         catch (Exception ex)
@@ -125,6 +132,51 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
                 AnalysisSummary = $"分析失败: {ex.Message}"
             };
         }
+    }
+
+    /// <summary>
+    /// 验证 StockSelectionResult 的必填字段
+    /// </summary>
+    private List<string> ValidateResult(StockSelectionResult result)
+    {
+        var errors = new List<string>();
+
+        // SelectionType 是枚举，不需要验证是否为空（枚举有默认值）
+        // 但可以验证是否为有效的枚举值
+        if (!Enum.IsDefined(typeof(SelectionType), result.SelectionType))
+            errors.Add($"SelectionType 值无效: {result.SelectionType}");
+
+        if (string.IsNullOrWhiteSpace(result.AnalysisSummary))
+            errors.Add("AnalysisSummary 不能为空");
+
+        if (string.IsNullOrWhiteSpace(result.MarketEnvironmentAnalysis))
+            errors.Add("MarketEnvironmentAnalysis 不能为空");
+
+        if (string.IsNullOrWhiteSpace(result.InvestmentAdvice))
+            errors.Add("InvestmentAdvice 不能为空");
+
+        if (result.RiskWarnings == null || result.RiskWarnings.Count == 0)
+            errors.Add("RiskWarnings 不能为空");
+
+        // 验证每只推荐股票
+        for (int i = 0; i < result.Recommendations.Count; i++)
+        {
+            var stock = result.Recommendations[i];
+            if (string.IsNullOrWhiteSpace(stock.Symbol))
+                errors.Add($"第{i + 1}只股票的 Symbol 不能为空");
+
+            if (string.IsNullOrWhiteSpace(stock.Name))
+                errors.Add($"第{i + 1}只股票的 Name 不能为空");
+
+            if (string.IsNullOrWhiteSpace(stock.Reason))
+                errors.Add($"第{i + 1}只股票的 Reason 不能为空");
+
+            // RiskLevel 是枚举，验证是否为有效值
+            if (!Enum.IsDefined(typeof(RiskLevel), stock.RiskLevel))
+                errors.Add($"第{i + 1}只股票的 RiskLevel 值无效: {stock.RiskLevel}");
+        }
+
+        return errors;
     }
 
     /// <summary>
@@ -265,7 +317,7 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
     }
 
     /// <summary>
-    /// 获取分析指令（System Prompt）- 统一的分析指令
+    /// 获取分析指令（System Prompt）- 简洁版，依赖 JSON Schema 约束
     /// </summary>
     private string GetAnalysisInstructions(bool isNewsAnalysis)
     {
@@ -273,22 +325,23 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
 你是专业的投资顾问，基于用户需求/新闻热点和股票数据提供投资建议。
 
 ## 核心职责
-从第三方推荐的股票中，进行多维度分析，输出结构化推荐报告（3-8只股票）。
+从筛选出的股票中进行多维度分析，输出结构化推荐报告。
 
 ## 评估维度（灵活权重）
-- 财务质量：ROE、利润、成长性、现金流、EPS/BPS
-- 估值水平：PE/PB/PS合理性、低估/高估判断、股息率
-- 市场表现：涨跌幅、流动性（成交额/换手率）、市场情绪
-- 需求匹配：风险偏好、期限、行业偏好，或新闻关联度
-- 社交热度：雪球关注/讨论及增长（参考）
+1. **财务质量**：ROE、利润增长率、现金流、EPS/BPS
+2. **估值水平**：PE/PB/PS 合理性、低估/高估判断、股息率
+3. **市场表现**：涨跌幅、流动性（成交额/换手率）、技术面趋势
+4. **需求匹配**：风险偏好、投资期限、行业偏好" + (isNewsAnalysis ? "，或新闻关联度" : "") + @"
+5. **社交热度**：雪球关注/讨论及增长趋势（辅助参考）
 
-## 输出要求
-严格按JSON Schema输出，关键约束：
-1. **数值类型**：评分、收益率、仓位、价格等用数字（不加引号）
-2. **风险等级**：仅限 ""低风险""/""中风险""/""高风险""
-3. **推荐理由**：必须包含具体财务数据+估值判断+需求匹配说明
-4. **可选字段**：无法预测的字段设null
-5. **空结果**：无合适股票时，recommendations设空数组[]
+## 分析要点
+- 选出最优股票时，优先考虑财务健康度和估值合理性
+- 推荐理由必须包含具体数据支撑，避免空泛描述
+- 风险提示应针对个股和市场环境的具体风险
+- 如无合适标的，可返回空推荐列表
+
+## 输出格式
+严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。
 ";
     }
 
@@ -296,9 +349,13 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
     {
         return new StockSelectionResult
         {
+            SelectionType = SelectionType.UserRequest, // 设置默认枚举值
             Recommendations = new List<StockRecommendation>(),
             ConfidenceScore = 0,
-            AnalysisSummary = "解析分析结果失败"
+            AnalysisSummary = "解析分析结果失败",
+            MarketEnvironmentAnalysis = "无可用分析",
+            InvestmentAdvice = "建议重新尝试分析",
+            RiskWarnings = new List<string> { "分析失败，请联系技术支持" }
         };
     }
 }

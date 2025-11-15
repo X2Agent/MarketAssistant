@@ -235,7 +235,7 @@ public class StockSelectionService : IDisposable
         {
             // 保守型投资者，过滤掉高风险股票
             result.Recommendations = result.Recommendations
-                .Where(r => r.RiskLevel != "高风险")
+                .Where(r => r.RiskLevel != RiskLevel.High)
                 .ToList();
         }
         else if (request.RiskPreference == "aggressive")

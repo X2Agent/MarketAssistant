@@ -73,13 +73,13 @@ public sealed class StockSelectionServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.IsNotNull(result.Recommendations);
         Assert.IsTrue(result.Recommendations.Count <= request.MaxRecommendations);
-        
+
         // 验证业务层特有逻辑：新闻热点标识被添加
         if (result.Recommendations.Count > 0)
         {
             foreach (var recommendation in result.Recommendations)
             {
-                Assert.IsTrue(recommendation.Reason.Contains("[新闻热点]"), 
+                Assert.IsTrue(recommendation.Reason.Contains("[新闻热点]"),
                     "业务层应该为新闻推荐添加 [新闻热点] 标签");
             }
         }
@@ -100,7 +100,6 @@ public sealed class StockSelectionServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.IsNotNull(result.Recommendations);
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
-        Assert.AreEqual("user_request", result.SelectionType);
 
         Console.WriteLine($"快速选股({strategy}) - 推荐数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
     }

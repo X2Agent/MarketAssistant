@@ -22,7 +22,7 @@ public sealed class StockScreenerServiceTest
     public void Initialize()
     {
         _mockLogger = new Mock<ILogger<StockScreenerService>>();
-        
+
         // 创建 Mock 的 IUserSettingService (不需要任何真实配置)
         var mockUserSettingService = new Mock<IUserSettingService>();
         mockUserSettingService.Setup(s => s.CurrentSetting)
@@ -32,7 +32,7 @@ public sealed class StockScreenerServiceTest
                 Endpoint = "http://localhost",
                 ApiKey = "test-key"
             });
-        
+
         _playwrightService = new PlaywrightService(mockUserSettingService.Object, null);
         _service = new StockScreenerService(_playwrightService, _mockLogger.Object);
     }
@@ -59,8 +59,8 @@ public sealed class StockScreenerServiceTest
         // Arrange
         var criteria = new StockCriteria
         {
-            Market = "全部A股",
-            Industry = "全部",
+            Market = MarketType.AllAShares,
+            Industry = IndustryType.All,
             Limit = 10,
             Criteria = new List<StockScreeningCriteria>()
         };
@@ -82,8 +82,8 @@ public sealed class StockScreenerServiceTest
         // Arrange - 测试单个条件筛选（市值）
         var criteria = new StockCriteria
         {
-            Market = "全部A股",
-            Industry = "全部",
+            Market = MarketType.AllAShares,
+            Industry = IndustryType.All,
             Limit = 15,
             Criteria = new List<StockScreeningCriteria>
             {
@@ -114,8 +114,8 @@ public sealed class StockScreenerServiceTest
         // Arrange - 测试多条件组合筛选
         var criteria = new StockCriteria
         {
-            Market = "全部A股",
-            Industry = "全部",
+            Market = MarketType.AllAShares,
+            Industry = IndustryType.All,
             Limit = 20,
             Criteria = new List<StockScreeningCriteria>
             {

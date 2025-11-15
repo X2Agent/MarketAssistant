@@ -16,6 +16,22 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ILogger<GenerateCriteriaExecutor> _logger;
 
+    /// <summary>
+    /// 用于生成 JSON Schema 的序列化选项（camelCase 属性命名）
+    /// </summary>
+    private static readonly JsonSerializerOptions SchemaOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    /// <summary>
+    /// 用于反序列化 AI 响应的序列化选项（Web 默认配置 + 大小写不敏感）
+    /// </summary>
+    private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     public GenerateCriteriaExecutor(
         IChatClientFactory chatClientFactory,
         ILogger<GenerateCriteriaExecutor> logger) : base("GenerateCriteria")
@@ -46,7 +62,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
             var chatClient = _chatClientFactory.CreateClient();
 
             // 创建结构化输出的 JSON Schema
-            var schema = AIJsonUtilities.CreateJsonSchema(typeof(StockCriteria));
+            var schema = AIJsonUtilities.CreateJsonSchema(typeof(StockCriteria), serializerOptions: SchemaOptions);
 
             // 配置聊天选项
             var chatOptions = new ChatOptions
@@ -69,11 +85,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
                 cancellationToken);
 
             // 获取响应文本并反序列化为 StockCriteria 对象以验证格式
-            var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            var criteria = JsonSerializer.Deserialize<StockCriteria>(response.Text, jsonOptions);
+            var criteria = JsonSerializer.Deserialize<StockCriteria>(response.Text, DeserializationOptions);
             if (criteria == null)
             {
                 throw new InvalidOperationException("筛选条件 JSON 解析失败");
@@ -146,20 +158,27 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - 中价股 → current: 10-50
 - 高价股 → current > 50
 
-### 行业映射（用户提到行业时使用以下精确名称）
-- 科技股/AI/芯片/云计算/5G/大数据/软件 → **计算机设备** 或 **软件开发**
-- 半导体/芯片制造/集成电路/存储器 → **半导体**
-- 新能源/电动车电池/光伏/风电/储能 → **电池** 或 **光伏设备** 或 **风电设备**
-- 医药/新药研发/疫苗/生物技术 → **化学制药** 或 **生物制品** 或 **医疗器械**
-- 消费/白酒/饮料/食品 → **白酒** 或 **饮料乳品** 或 **食品加工**
-- 银行/金融 → **股份制银行** 或 **国有大型银行**
-- 房地产/地产 → **房地产开发**
-- 汽车/新能源车 → **乘用车** 或 **汽车零部件**
-- 通信/5G/通信设备 → **通信设备** 或 **通信服务**
-- 电力/电网/发电 → **电力**
-- 化工 → **化学原料** 或 **化学制品**
-- 机械/工程机械 → **工程机械** 或 **专用设备**
-- 家电 → **白色家电** 或 **小家电**
+### 行业选择规则
+
+**识别原则**：
+1. 如果用户**未明确提到**任何行业、领域或板块 → 使用 **All**（默认值）
+2. 如果用户**明确提到**某个具体行业或领域 → 根据下表选择最匹配的行业枚举值
+
+**行业映射表**（优先匹配具体行业）：
+- 科技股/AI/人工智能/芯片/云计算/5G/大数据/软件 → **ComputerEquipment** 或 **SoftwareDevelopment**
+- 半导体/芯片制造/集成电路/存储器 → **Semiconductor**
+- 新能源/电动车电池/光伏/风电/储能 → **Battery** 或 **PhotovoltaicEquipment** 或 **WindPowerEquipment**
+- 医药/新药研发/疫苗/生物技术 → **ChemicalPharmaceutical** 或 **BiologicalProducts** 或 **MedicalDevices**
+- 消费/白酒/饮料/食品 → **Liquor** 或 **BeveragesDairy** 或 **FoodProcessing**
+- 银行/金融 → **JointStockBank** 或 **StateBanks**
+- 房地产/地产 → **RealEstateDevelopment**
+- 汽车/新能源车 → **PassengerVehicles** 或 **AutoParts**
+- 通信/5G/通信设备 → **CommunicationEquipment** 或 **CommunicationServices**
+- 电力/电网/发电 → **Power**
+- 化工 → **ChemicalMaterials** 或 **ChemicalProducts**
+- 机械/工程机械 → **ConstructionMachinery** 或 **SpecializedEquipment**
+- 家电 → **WhiteAppliances** 或 **SmallAppliances**
+- 没有提到任何行业 → **All**
 
 ## 支持的筛选指标
 
@@ -206,23 +225,6 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - follow7dpct: 一周关注增长率
 - tweet7dpct: 一周讨论增长率
 - deal7dpct: 一周交易分享增长率
-
-## 输出要求
-
-**严格按照以下完整JSON格式输出：**
-{
-  "criteria": [
-    {
-      "code": "指标代码",
-      "displayName": "指标中文名",
-      "minValue": 最小值或null,
-      "maxValue": 最大值或null
-    }
-  ],
-  "market": "全部A股",
-  "industry": "行业名称或空字符串",
-  "limit": 推荐股票数量限制
-}
 """;
     }
 
@@ -235,22 +237,28 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 ## 任务
 分析新闻内容，识别相关行业，判断情感倾向，并生成对应的股票筛选条件。
 
-## 新闻类型识别与行业映射
-根据新闻内容关键词，选择相关性最高的单个行业（必须使用以下精确名称）：
+## 新闻行业识别规则
 
-**科技类新闻**（AI、芯片、云计算、5G、大数据、软件）→ **计算机设备** 或 **软件开发**  
-**半导体新闻**（芯片制造、集成电路、存储器）→ **半导体**  
-**新能源类新闻**（电动车电池、光伏、风电、储能）→ **电池** 或 **光伏设备** 或 **风电设备**  
-**医药类新闻**（新药研发、疫苗、生物技术）→ **化学制药** 或 **生物制品** 或 **医疗器械**  
-**消费类新闻**（白酒、饮料、食品）→ **白酒** 或 **饮料乳品** 或 **食品加工**  
-**银行类新闻**（银行业务、金融政策）→ **股份制银行** 或 **国有大型银行**  
-**房地产新闻**（地产政策、房价调控）→ **房地产开发**  
-**汽车新闻**（传统汽车、新能源车）→ **乘用车** 或 **汽车零部件**  
-**通信新闻**（5G、通信设备、运营商）→ **通信设备** 或 **通信服务**  
-**电力新闻**（电网、发电、新能源）→ **电力**  
-**化工新闻**（化学原料、精细化工）→ **化学原料** 或 **化学制品**  
-**机械新闻**（工程机械、专用设备）→ **工程机械** 或 **专用设备**  
-**家电新闻**（空调、冰箱、小家电）→ **白色家电** 或 **小家电**  
+**识别原则**：
+1. 如果新闻**明确涉及某个具体行业或技术领域** → 根据下表选择最相关的行业枚举值
+2. 只有在新闻是**宏观经济、多行业政策、跨行业综合报道**时 → 使用 **All**
+
+**行业映射表**（根据新闻内容关键词选择，优先匹配具体行业）：
+
+**科技类新闻**（AI、人工智能、芯片、云计算、5G、大数据、软件）→ **ComputerEquipment** 或 **SoftwareDevelopment**  
+**半导体新闻**（芯片制造、集成电路、存储器）→ **Semiconductor**  
+**新能源类新闻**（电动车电池、光伏、风电、储能）→ **Battery** 或 **PhotovoltaicEquipment** 或 **WindPowerEquipment**  
+**医药类新闻**（新药研发、疫苗、生物技术）→ **ChemicalPharmaceutical** 或 **BiologicalProducts** 或 **MedicalDevices**  
+**消费类新闻**（白酒、饮料、食品）→ **Liquor** 或 **BeveragesDairy** 或 **FoodProcessing**  
+**银行类新闻**（银行业务、金融政策）→ **JointStockBank** 或 **StateBanks**  
+**房地产新闻**（地产政策、房价调控）→ **RealEstateDevelopment**  
+**汽车新闻**（传统汽车、新能源车）→ **PassengerVehicles** 或 **AutoParts**  
+**通信新闻**（5G、通信设备、运营商）→ **CommunicationEquipment** 或 **CommunicationServices**  
+**电力新闻**（电网、发电、新能源）→ **Power**  
+**化工新闻**（化学原料、精细化工）→ **ChemicalMaterials** 或 **ChemicalProducts**  
+**机械新闻**（工程机械、专用设备）→ **ConstructionMachinery** 或 **SpecializedEquipment**  
+**家电新闻**（空调、冰箱、小家电）→ **WhiteAppliances** 或 **SmallAppliances**  
+**宏观经济、货币政策、多行业新闻** → **All**
 
 ## 指标说明
 
@@ -272,7 +280,7 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 
 **积极新闻 → 成长股策略**  
 - npay > 15  
-- roediluted > 12  
+- ro ediluted > 12  
 - pct20 > -5  
 
 **政策利好 → 龙头股策略**  
@@ -294,23 +302,6 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 - dy_l > 2  
 - pb < 2  
 - roediluted > 8  
-
-## 输出要求
-
-**严格按照以下JSON格式输出：**
-{
-  "criteria": [
-    {
-      "code": "指标代码",
-      "displayName": "指标中文名",
-      "minValue": 最小值或null,
-      "maxValue": 最大值或null
-    }
-  ],
-  "market": "全部A股",
-  "industry": "单个行业名称",
-  "limit": 推荐股票数量限制
-}
 """;
     }
 

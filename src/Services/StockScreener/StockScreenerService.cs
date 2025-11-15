@@ -1,8 +1,8 @@
+using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.StockScreener.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
-using System.ComponentModel;
 using System.Text.RegularExpressions;
 
 namespace MarketAssistant.Services.StockScreener;
@@ -142,7 +142,7 @@ public sealed class StockScreenerService
     /// <summary>
     /// 设置市场类型
     /// </summary>
-    private async Task SetMarketType(IPage page, string market)
+    private async Task SetMarketType(IPage page, MarketType market)
     {
         try
         {
@@ -150,7 +150,9 @@ public sealed class StockScreenerService
             var marketSelect = await page.QuerySelectorAsync(".stockScreener-range-market select");
             if (marketSelect != null)
             {
-                var marketValue = market switch
+                // 使用 GetDescription() 获取枚举的描述值（中文名称）
+                var marketStr = market.GetDescription();
+                var marketValue = marketStr switch
                 {
                     "全部A股" => "sh_sz",
                     "沪市A股" => "sha",
@@ -160,7 +162,7 @@ public sealed class StockScreenerService
 
                 await marketSelect.SelectOptionAsync([marketValue]);
                 await Task.Delay(1000);
-                _logger.LogInformation("已设置市场类型: {Market} -> {Value}", market, marketValue);
+                _logger.LogInformation("已设置市场类型: {Market} -> {Value}", marketStr, marketValue);
             }
         }
         catch (Exception ex)
@@ -172,15 +174,17 @@ public sealed class StockScreenerService
     /// <summary>
     /// 设置行业
     /// </summary>
-    private async Task SetIndustry(IPage page, string industry)
+    private async Task SetIndustry(IPage page, IndustryType industry)
     {
         try
         {
-            if (string.IsNullOrEmpty(industry) || industry == "全部")
+            if (industry == IndustryType.All)
             {
                 _logger.LogDebug("使用默认行业筛选条件：全部");
                 return;
             }
+
+            var industryStr = industry.GetDescription();
 
             // 查找行业选择下拉框
             var industrySelect = await page.QuerySelectorAsync(".stockScreener-range-industry select");
@@ -191,17 +195,17 @@ public sealed class StockScreenerService
             }
 
             // 根据行业名称获取对应的值
-            var industryValue = GetIndustryValue(industry);
+            var industryValue = GetIndustryValue(industryStr);
             if (string.IsNullOrEmpty(industryValue))
             {
-                _logger.LogWarning("未找到行业 '{Industry}' 对应的值，使用模糊匹配", industry);
+                _logger.LogWarning("未找到行业 '{Industry}' 对应的值，使用模糊匹配", industryStr);
 
                 // 尝试模糊匹配
                 var options = await industrySelect.QuerySelectorAllAsync("option");
                 foreach (var option in options)
                 {
                     var text = await option.InnerTextAsync();
-                    if (text.Contains(industry))
+                    if (text.Contains(industryStr))
                     {
                         industryValue = await option.GetAttributeAsync("value") ?? "";
                         _logger.LogInformation("通过模糊匹配找到行业: {Industry} -> {Value}", text, industryValue);
@@ -213,14 +217,14 @@ public sealed class StockScreenerService
             if (!string.IsNullOrEmpty(industryValue))
             {
                 await industrySelect.SelectOptionAsync(industryValue);
-                _logger.LogInformation("已选择行业: {Industry} (值: {Value})", industry, industryValue);
+                _logger.LogInformation("已选择行业: {Industry} (值: {Value})", industryStr, industryValue);
 
                 // 等待页面更新
                 await page.WaitForTimeoutAsync(500);
             }
             else
             {
-                _logger.LogWarning("无法找到匹配的行业: {Industry}", industry);
+                _logger.LogWarning("无法找到匹配的行业: {Industry}", industryStr);
             }
         }
         catch (Exception ex)

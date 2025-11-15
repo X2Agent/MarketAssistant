@@ -5,6 +5,7 @@
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:models="using:MarketAssistant.Applications.StockSelection.Models"
+             xmlns:converts="using:MarketAssistant.Converts"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.StockSelectionPageView"
              x:DataType="vm:StockSelectionPageViewModel">
@@ -12,6 +13,11 @@
     <Design.DataContext>
         <vm:StockSelectionPageViewModel/>
     </Design.DataContext>
+
+    <UserControl.Resources>
+        <converts:NullableValueConverter x:Key="NullableValueConverter"/>
+        <converts:NullableVisibilityConverter x:Key="NullableVisibilityConverter"/>
+    </UserControl.Resources>
 
     <Grid RowDefinitions="Auto,*">
         <!-- 加载指示器（优化后的覆盖层） -->
@@ -248,93 +254,313 @@
             
             <!-- 选股结果显示区域 -->
             <controls:CardView IsVisible="{Binding HasResult}">
-                <StackPanel Spacing="12">
+                <StackPanel Spacing="16">
                     <TextBlock Text="选股结果" 
-                               FontSize="16" 
-                               FontWeight="SemiBold"/>
+                               FontSize="18" 
+                               FontWeight="Bold"/>
+                    
+                    <!-- AI 置信度显示 -->
+                    <Border Background="#F0F9FF"
+                            BorderBrush="#3B82F6"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            Padding="16">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <StackPanel Grid.Column="0" 
+                                        Orientation="Horizontal" 
+                                        Spacing="8"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="🤖" 
+                                           FontSize="20"/>
+                                <TextBlock Text="AI 置信度" 
+                                           FontSize="15" 
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
+                            <ProgressBar Grid.Column="1"
+                                         Value="{Binding SelectionResult.ConfidenceScore}"
+                                         Maximum="100"
+                                         Height="10"
+                                         Margin="16,0"
+                                         CornerRadius="5"
+                                         VerticalAlignment="Center"/>
+                            
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding SelectionResult.ConfidenceScore, StringFormat={}{0:F1}%}"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Foreground="#3B82F6"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
                     
                     <!-- 分析摘要 -->
                     <Border Background="{DynamicResource ItemBackgroundBrush}"
                             CornerRadius="8"
-                            Padding="12">
-                        <Grid RowDefinitions="Auto,Auto">
-                            <TextBlock Grid.Row="0"
-                                       Text="分析摘要" 
-                                       FontSize="16" 
+                            Padding="16">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="📋 分析摘要" 
+                                       FontSize="15" 
                                        FontWeight="Bold"/>
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding SelectionResult.AnalysisSummary}"
+                            <TextBlock Text="{Binding SelectionResult.AnalysisSummary}"
                                        FontSize="14"
                                        TextWrapping="Wrap"
-                                       Margin="0,8,0,0"/>
-                        </Grid>
+                                       LineHeight="22"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 市场环境分析 -->
+                    <Border Background="{DynamicResource ItemBackgroundBrush}"
+                            CornerRadius="8"
+                            Padding="16">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="📊 市场环境分析" 
+                                       FontSize="15" 
+                                       FontWeight="Bold"/>
+                            <TextBlock Text="{Binding SelectionResult.MarketEnvironmentAnalysis}"
+                                       FontSize="14"
+                                       TextWrapping="Wrap"
+                                       LineHeight="22"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 投资建议 -->
+                    <Border Background="#DBEAFE"
+                            BorderBrush="#3B82F6"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            Padding="16">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="💼 投资建议" 
+                                       FontSize="15" 
+                                       FontWeight="Bold"
+                                       Foreground="#1E40AF"/>
+                            <TextBlock Text="{Binding SelectionResult.InvestmentAdvice}"
+                                       FontSize="14"
+                                       Foreground="#1E3A8A"
+                                       TextWrapping="Wrap"
+                                       LineHeight="22"/>
+                        </StackPanel>
                     </Border>
                     
                     <!-- 推荐股票列表 -->
-                    <TextBlock Text="推荐股票" 
+                    <TextBlock Text="📈 推荐股票" 
                                FontSize="16" 
                                FontWeight="Bold" 
                                Margin="0,8,0,0"/>
                     
-                    <ScrollViewer MaxHeight="400">
+                    <ScrollViewer MaxHeight="600">
                         <ItemsControl ItemsSource="{Binding RecommendedStocks}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Spacing="8"/>
+                                    <StackPanel Spacing="12"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:StockRecommendation">
                                     <Border Background="{DynamicResource ItemBackgroundBrush}"
-                                            CornerRadius="8"
-                                            Padding="12">
-                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
-                                            <!-- 股票代码 -->
-                                            <TextBlock Grid.Row="0" Grid.Column="0"
-                                                       Text="{Binding Symbol}" 
-                                                       FontSize="16" 
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource SystemAccentColor}"
-                                                       VerticalAlignment="Center"/>
-                                            <!-- 股票名称 -->
-                                            <TextBlock Grid.Row="1" Grid.Column="0"
-                                                       Text="{Binding Name}" 
-                                                       FontSize="12"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       Margin="0,4,0,0"/>
+                                            CornerRadius="10"
+                                            Padding="16"
+                                            BoxShadow="0 2 8 0 #15000000">
+                                        <StackPanel Spacing="12">
                                             
-                                            <!-- 推荐理由标签 -->
-                                            <TextBlock Grid.Row="0" Grid.Column="1"
-                                                       Text="💡 推荐理由" 
-                                                       FontSize="11" 
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource SystemAccentColor}"
-                                                       VerticalAlignment="Center"
-                                                       Margin="16,0,0,0"/>
-                                            <!-- 推荐理由内容 -->
-                                            <TextBlock Grid.Row="1" Grid.Column="1"
-                                                       Text="{Binding Reason}" 
-                                                       FontSize="13"
-                                                       TextWrapping="Wrap"
-                                                       MaxLines="2"
-                                                       Margin="16,4,0,0"/>
+                                            <!-- 第一部分：股票基本信息 + 推荐评分 -->
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="{Binding Symbol}" 
+                                                               FontSize="18" 
+                                                               FontWeight="Bold"
+                                                               Foreground="{DynamicResource SystemAccentColor}"/>
+                                                    <TextBlock Text="{Binding Name}" 
+                                                               FontSize="13"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                    
+                                                <!-- 推荐评分高亮 -->
+                                                <Border Grid.Column="1"
+                                                        Background="{DynamicResource SystemAccentColor}"
+                                                        CornerRadius="8"
+                                                        Padding="12,8">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="{Binding RecommendationScore, StringFormat={}{0:F1}}"
+                                                                   FontSize="22"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="White"
+                                                                   HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="推荐分"
+                                                                   FontSize="10"
+                                                                   Foreground="White"
+                                                                   HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
                                             
-                                            <!-- 评分 -->
-                                            <TextBlock Grid.Row="0" Grid.Column="2"
-                                                       Text="{Binding RecommendationScore, StringFormat=评分: {0:F1}}" 
-                                                       FontSize="14" 
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource SystemAccentColor}"
-                                                       HorizontalAlignment="Right"
-                                                       VerticalAlignment="Center"/>
-                                            <!-- 风险等级 -->
-                                            <TextBlock Grid.Row="1" Grid.Column="2"
-                                                       Text="{Binding RiskLevel}" 
-                                                       FontSize="11"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       HorizontalAlignment="Right"
-                                                       Margin="0,4,0,0"/>
-                                        </Grid>
+                                            <!-- 第二部分：核心投资指标（始终显示，保持布局一致）-->
+                                            <Grid ColumnDefinitions="*,*,*">
+                                                <!-- 目标价格 -->
+                                                <Border Grid.Column="0"
+                                                        Background="#ECFDF5"
+                                                        CornerRadius="6"
+                                                        Padding="10,8"
+                                                        Margin="0,0,4,0">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="🎯 目标价"
+                                                                   FontSize="11"
+                                                                   Foreground="#065F46"
+                                                                   FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding TargetPrice, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}元|待定}"
+                                                                   FontSize="15"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="#059669"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                
+                                                <!-- 预期收益率 -->
+                                                <Border Grid.Column="1"
+                                                        Background="#EFF6FF"
+                                                        CornerRadius="6"
+                                                        Padding="10,8"
+                                                        Margin="4,0">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="📈 预期收益"
+                                                                   FontSize="11"
+                                                                   Foreground="#1E40AF"
+                                                                   FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding ExpectedReturn, Converter={StaticResource NullableValueConverter}, ConverterParameter=+{0:F1}%|待定}"
+                                                                   FontSize="15"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="#2563EB"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                
+                                                <!-- 止损价格 -->
+                                                <Border Grid.Column="2"
+                                                        Background="#FEE2E2"
+                                                        CornerRadius="6"
+                                                        Padding="10,8"
+                                                        Margin="4,0,0,0">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="🛡️ 止损价"
+                                                                   FontSize="11"
+                                                                   Foreground="#991B1B"
+                                                                   FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding StopLoss, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}元|待定}"
+                                                                   FontSize="15"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="#DC2626"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                            
+                                            <!-- 第三部分：次要投资策略指标（有值才显示，保持界面简洁）-->
+                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                                <!-- 建议仓位（仅有值时显示）-->
+                                                <Border Background="#FEF3C7"
+                                                        BorderBrush="#F59E0B"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6"
+                                                        Padding="10,6"
+                                                        IsVisible="{Binding RecommendedPosition, Converter={StaticResource NullableVisibilityConverter}}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="💰"
+                                                                   FontSize="14"
+                                                                   VerticalAlignment="Center"/>
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="建议仓位"
+                                                                       FontSize="10"
+                                                                       Foreground="#92400E"/>
+                                                            <TextBlock Text="{Binding RecommendedPosition, StringFormat={}{0:F0}%}"
+                                                                       FontSize="14"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="#92400E"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                
+                                                <!-- 持有期限（仅有值时显示）-->
+                                                <Border Background="#DBEAFE"
+                                                        BorderBrush="#3B82F6"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6"
+                                                        Padding="10,6"
+                                                        IsVisible="{Binding RecommendedHoldingPeriod, Converter={StaticResource NullableVisibilityConverter}}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="⏱️"
+                                                                   FontSize="14"
+                                                                   VerticalAlignment="Center"/>
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="持有期限"
+                                                                       FontSize="10"
+                                                                       Foreground="#1E40AF"/>
+                                                            <TextBlock Text="{Binding RecommendedHoldingPeriod, StringFormat={}{0}天}"
+                                                                       FontSize="14"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="#1E40AF"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                                
+                                                <!-- 风险等级（始终显示）-->
+                                                <Border Background="#FEE2E2"
+                                                        BorderBrush="#EF4444"
+                                                        BorderThickness="1"
+                                                        CornerRadius="6"
+                                                        Padding="10,6">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <TextBlock Text="⚠️"
+                                                                   FontSize="14"
+                                                                   VerticalAlignment="Center"/>
+                                                        <StackPanel Spacing="2">
+                                                            <TextBlock Text="风险等级"
+                                                                       FontSize="10"
+                                                                       Foreground="#991B1B"/>
+                                                            <TextBlock Text="{Binding RiskLevel}"
+                                                                       FontSize="14"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="#991B1B"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                            
+                                            <!-- 第四部分：推荐理由卡片 -->
+                                            <Border Background="#FFFBEB"
+                                                    BorderBrush="#F59E0B"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Padding="12">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Text="💡 推荐理由"
+                                                               FontSize="12"
+                                                               FontWeight="Bold"
+                                                               Foreground="#D97706"/>
+                                                    <TextBlock Text="{Binding Reason}"
+                                                               FontSize="13"
+                                                               TextWrapping="Wrap"
+                                                               LineHeight="20"
+                                                               Foreground="#78350F"/>
+                                                </StackPanel>
+                                            </Border>
+                                            
+                                            <!-- 第五部分：分隔线 -->
+                                            <Border Height="1"
+                                                    Background="{DynamicResource DividerBrush}"/>
+                                            
+                                            <!-- 第六部分：操作按钮 -->
+                                            <StackPanel Orientation="Horizontal" 
+                                                        Spacing="8">
+                                                <Button Content="查看详情" 
+                                                        Padding="12,6"
+                                                        FontSize="12"
+                                                        CornerRadius="6"/>
+                                                <Button Content="加入自选" 
+                                                        Padding="12,6"
+                                                        FontSize="12"
+                                                        CornerRadius="6"/>
+                                            </StackPanel>
+                                        </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -344,24 +570,22 @@
                     <!-- 风险提示 -->
                     <Border Background="#FFF4E5"
                             BorderBrush="#FFB84C"
-                            BorderThickness="1"
+                            BorderThickness="2"
                             CornerRadius="8"
-                            Padding="12"
-                            Margin="0,16,0,0"
+                            Padding="16"
+                            Margin="0,8,0,0"
                             IsVisible="{Binding HasRiskWarnings}">
-                        <Grid RowDefinitions="Auto,Auto">
-                            <TextBlock Grid.Row="0"
-                                       Text="⚠️ 风险提示" 
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="⚠️ 风险提示" 
                                        FontSize="16" 
                                        FontWeight="Bold"
                                        Foreground="#D97706"/>
-                            <TextBlock Grid.Row="1"
-                                       Text="{Binding FormattedRiskWarnings}"
+                            <TextBlock Text="{Binding FormattedRiskWarnings}"
                                        FontSize="14"
                                        Foreground="#92400E"
                                        TextWrapping="Wrap"
-                                       Margin="0,8,0,0"/>
-                        </Grid>
+                                       LineHeight="22"/>
+                        </StackPanel>
                     </Border>
                 </StackPanel>
             </controls:CardView>
