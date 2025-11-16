@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Models;
 using MarketAssistant.Services.Cache;
 using Microsoft.Extensions.AI;
@@ -126,11 +127,12 @@ public partial class AnalysisReportViewModel : ViewModelBase
             
             // 绑定 Coordinator 的结构化数据（无需 null 判断，CoordinatorResult 的属性都有默认值）
             OverallScore = coordinatorResult.OverallScore;
-            InvestmentRating = coordinatorResult.InvestmentRating;
+            InvestmentRating = coordinatorResult.InvestmentRating.GetDescription();
             TargetPrice = coordinatorResult.TargetPrice;
             PriceChangeExpectation = coordinatorResult.PriceChangeExpectation;
-            TimeHorizon = coordinatorResult.TimeHorizon;
-            RiskLevel = coordinatorResult.RiskLevel;
+            TimeHorizon = coordinatorResult.TimeHorizon.GetDescription() + 
+                          (string.IsNullOrWhiteSpace(coordinatorResult.TimeHorizonDescription) ? "" : $" ({coordinatorResult.TimeHorizonDescription})");
+            RiskLevel = coordinatorResult.RiskLevel.GetDescription();
             ConfidencePercentage = coordinatorResult.ConfidencePercentage;
 
             foreach (var (dimension, score) in coordinatorResult.DimensionScores)

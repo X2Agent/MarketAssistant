@@ -82,12 +82,6 @@
 	<PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="Agents\Yaml\*.yaml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
   <!-- macOS 平台特定配置 - 修复 WebView 相关本地库问题 -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
     <!-- 跳过不存在的本地库检查 -->
