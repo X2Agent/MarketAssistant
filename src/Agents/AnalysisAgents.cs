@@ -36,7 +36,12 @@ public sealed class AnalysisAgent
   严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
         Temperature = 0.1f,
         TopP = 0.9f,
-        TopK= 10
+        TopK= 10,
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(
+            schema: AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult)),
+            schemaName: nameof(FinancialAnalysisResult),
+            schemaDescription: "财务分析师的结构化分析结果，包含财务健康、盈利质量、现金流和风险预警"
+        )
     };
 
     public static readonly AnalysisAgent TechnicalAnalyst = new(
@@ -66,7 +71,12 @@ public sealed class AnalysisAgent
   严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
         Temperature = 0.0f,
         TopP = 0.0f,
-        TopK = 1
+        TopK = 1,
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(
+            schema: AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult)),
+            schemaName: nameof(TechnicalAnalysisResult),
+            schemaDescription: "技术分析师的结构化分析结果，包含图表形态、关键价位、技术指标和交易策略"
+        )
     };
 
     public static readonly AnalysisAgent FundamentalAnalyst = new(
@@ -94,7 +104,12 @@ public sealed class AnalysisAgent
   严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
         Temperature = 0.2f,
         TopP = 0.6f,
-        TopK = 8
+        TopK = 8,
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(
+            schema: AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult)),
+            schemaName: nameof(FundamentalAnalysisResult),
+            schemaDescription: "基本面分析师的结构化分析结果，包含公司基本面、行业竞争和投资价值评估"
+        )
     };
 
     public static readonly AnalysisAgent MarketSentimentAnalyst = new(
@@ -124,7 +139,12 @@ public sealed class AnalysisAgent
   严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
         Temperature = 0.4f,
         TopP = 0.7f,
-        TopK= 10
+        TopK= 10,
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(
+            schema: AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult)),
+            schemaName: nameof(MarketSentimentAnalysisResult),
+            schemaDescription: "市场情绪分析师的结构化分析结果，包含市场情绪、资金流向、投资者行为和短期策略"
+        )
     };
 
     public static readonly AnalysisAgent NewsEventAnalyst = new(
@@ -156,7 +176,12 @@ public sealed class AnalysisAgent
   严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
         Temperature = 0.2f,
         TopP = 0.75f,
-        TopK = 10
+        TopK = 10,
+        ResponseFormat = ChatResponseFormat.ForJsonSchema(
+            schema: AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult)),
+            schemaName: nameof(NewsEventAnalysisResult),
+            schemaDescription: "新闻事件分析师的结构化分析结果，包含事件解读、影响评估和投资启示"
+        )
     };
 
     public static readonly AnalysisAgent CoordinatorAnalyst = new(
