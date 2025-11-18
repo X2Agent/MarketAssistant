@@ -49,9 +49,18 @@ public sealed class AnalysisDispatcherExecutor : Executor<string>
                 "分发器开始处理股票 {StockSymbol} 的分析请求，期望 {Count} 位分析师",
                 stockSymbol, _expectedAnalystCount);
 
-            // 保存配置到 workflow state
-            await context.QueueStateUpdateAsync(WorkflowStateKeys.StockSymbol, stockSymbol, cancellationToken);
-            await context.QueueStateUpdateAsync(WorkflowStateKeys.ExpectedAnalystCount, _expectedAnalystCount, cancellationToken);
+            // https://github.com/microsoft/agent-framework/issues/2162
+            // 保存配置到 workflow state（显式指定 scope 确保跨 Executor 可见）
+            await context.QueueStateUpdateAsync(
+                WorkflowStateKeys.StockSymbol,
+                stockSymbol,
+                WorkflowStateKeys.Scope,
+                cancellationToken);
+            await context.QueueStateUpdateAsync(
+                WorkflowStateKeys.ExpectedAnalystCount,
+                _expectedAnalystCount,
+                WorkflowStateKeys.Scope,
+                cancellationToken);
 
             // 构建分析提示词并广播给所有分析师（Fan-Out）
             // 注意：接收的 Agent 会排队消息，但不会立即处理，直到收到 TurnToken

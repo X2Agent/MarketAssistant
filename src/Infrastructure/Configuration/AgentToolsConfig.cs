@@ -59,15 +59,15 @@ public class AgentToolsConfig : IAgentToolsConfig
 
         if (agent == AnalysisAgent.FundamentalAnalyst)
         {
-            tools.AddRange(ConvertPluginToTools(_stockBasicPlugin));
+            tools.AddRange(_stockBasicPlugin.GetFunctions());
         }
         else if (agent == AnalysisAgent.TechnicalAnalyst)
         {
-            tools.AddRange(ConvertPluginToTools(_stockTechnicalPlugin));
+            tools.AddRange(_stockTechnicalPlugin.GetFunctions());
         }
         else if (agent == AnalysisAgent.FinancialAnalyst)
         {
-            tools.AddRange(ConvertPluginToTools(_stockFinancialPlugin));
+            tools.AddRange(_stockFinancialPlugin.GetFunctions());
         }
         else if (agent == AnalysisAgent.MarketSentimentAnalyst)
         {
@@ -75,30 +75,12 @@ public class AgentToolsConfig : IAgentToolsConfig
         }
         else if (agent == AnalysisAgent.NewsEventAnalyst)
         {
-            tools.AddRange(ConvertPluginToTools(_stockNewsPlugin));
+            tools.AddRange(_stockNewsPlugin.GetFunctions());
         }
         else if (agent == AnalysisAgent.CoordinatorAnalyst)
         {
-            tools.AddRange(ConvertPluginToTools(_groundingSearchPlugin));
+            tools.AddRange(_groundingSearchPlugin.GetFunctions());
         }
-
-        return tools;
-    }
-
-    /// <summary>
-    /// 将插件实例转换为 Agent Framework 的 AIFunction 列表
-    /// 使用 Semantic Kernel 的 AsAIFunctions 扩展方法
-    /// </summary>
-    private IEnumerable<AIFunction> ConvertPluginToTools(object pluginInstance)
-    {
-        var tools = new List<AIFunction>();
-
-        // 使用 Semantic Kernel 的 KernelPluginFactory 创建 KernelPlugin
-        var plugin = Microsoft.SemanticKernel.KernelPluginFactory.CreateFromObject(pluginInstance);
-
-        // 使用 AsAIFunctions 扩展方法将 KernelPlugin 转换为 AIFunction
-        var aiFunctions = plugin.AsAIFunctions();
-        tools.AddRange(aiFunctions);
 
         return tools;
     }

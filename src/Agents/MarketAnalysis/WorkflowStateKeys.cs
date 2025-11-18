@@ -7,14 +7,19 @@ namespace MarketAssistant.Agents.MarketAnalysis;
 internal static class WorkflowStateKeys
 {
     /// <summary>
+    /// 工作流状态的作用域（确保不同 Executor 访问相同的状态空间）
+    /// </summary>
+    public const string Scope = "MarketAnalysisWorkflow";
+
+    /// <summary>
     /// 股票代码的状态键
     /// </summary>
-    public const string StockSymbol = "stockSymbol";
+    public const string StockSymbol = nameof(StockSymbol);
 
     /// <summary>
     /// 预期分析师数量的状态键
     /// </summary>
-    public const string ExpectedAnalystCount = "expectedAnalystCount";
+    public const string ExpectedAnalystCount = nameof(ExpectedAnalystCount);
 }
 
 

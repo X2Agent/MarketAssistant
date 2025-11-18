@@ -13,12 +13,12 @@ public interface IAnalystAgentFactory
     /// <summary>
     /// 创建指定类型的分析师代理
     /// </summary>
-    ChatClientAgent CreateAnalyst(AnalysisAgent agent);
+    AIAgent CreateAnalyst(AnalysisAgent agent);
 
     /// <summary>
     /// 批量创建分析师代理
     /// </summary>
-    List<ChatClientAgent> CreateAnalysts(IEnumerable<AnalysisAgent> agents);
+    List<AIAgent> CreateAnalysts(IEnumerable<AnalysisAgent> agents);
 }
 
 /// <summary>
@@ -44,7 +44,7 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     /// <summary>
     /// 创建带有自定义 ChatOptions 的分析师代理（用于结构化输出）
     /// </summary>
-    public ChatClientAgent CreateAnalyst(AnalysisAgent analyst)
+    public AIAgent CreateAnalyst(AnalysisAgent analyst)
     {
         try
         {
@@ -55,15 +55,15 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             var chatClient = _chatClientFactory.CreateClient();
 
             // 3. 创建 ChatClientAgent
-            var baseAgent = chatClient.CreateAIAgent(new ChatClientAgentOptions(analyst.Instructions, analyst.Name,
-                description: analyst.Description, tools: tools)
+            var baseAgent = chatClient.CreateAIAgent(new ChatClientAgentOptions(analyst.Instructions, analyst.Name, analyst.Description)
             {
                 ChatOptions = new ChatOptions
                 {
-                    ResponseFormat = analyst.ResponseFormat,
                     TopK = analyst.TopK,
                     TopP = analyst.TopP,
-                    Temperature = analyst.Temperature
+                    Temperature = analyst.Temperature,
+                    Tools = tools,
+                    ResponseFormat = analyst.ResponseFormat
                 }
             });
 
@@ -73,7 +73,7 @@ public class AnalystAgentFactory : IAnalystAgentFactory
                 tools.Count);
 
             // 4. 添加代理运行中间件和函数调用中间件
-            return (ChatClientAgent)baseAgent
+            return baseAgent
                 .AsBuilder()
                 .Use(runFunc: CreateAgentRunMiddleware(analyst.Name), runStreamingFunc: null)
                 .Use(CreateFunctionInvocationMiddleware(analyst.Name))
@@ -89,9 +89,9 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     /// <summary>
     /// 批量创建分析师代理
     /// </summary>
-    public List<ChatClientAgent> CreateAnalysts(IEnumerable<AnalysisAgent> agents)
+    public List<AIAgent> CreateAnalysts(IEnumerable<AnalysisAgent> agents)
     {
-        var createdAgents = new List<ChatClientAgent>();
+        var createdAgents = new List<AIAgent>();
 
         foreach (var agent in agents)
         {

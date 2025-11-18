@@ -238,7 +238,7 @@ public class MarketAnalysisWorkflow : IDisposable
     /// <summary>
     /// 创建分析师代理（使用 Factory 模式）
     /// </summary>
-    private List<ChatClientAgent> CreateAnalystAgents(List<AnalysisAgent> agents)
+    private List<AIAgent> CreateAnalystAgents(List<AnalysisAgent> agents)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", agents.Count);
         var createdAgents = _analystAgentFactory.CreateAnalysts(agents);
@@ -253,7 +253,7 @@ public class MarketAnalysisWorkflow : IDisposable
     /// 流程：
     /// [Dispatcher] → [并发分析师团队] → [Aggregator] → [Coordinator]
     /// </summary>
-    private Workflow BuildWorkflow(int analystCount, List<ChatClientAgent> analystAgents)
+    private Workflow BuildWorkflow(int analystCount, List<AIAgent> analystAgents)
     {
         // 构建标准 Fan-Out/Fan-In 工作流：
         // 
@@ -274,16 +274,17 @@ public class MarketAnalysisWorkflow : IDisposable
         var builder = new WorkflowBuilder(dispatcher);
 
         // 3. Fan-Out: Dispatcher → 所有分析师（Dispatcher 广播 ChatMessage）
+        // AIAgent 可以直接用于工作流，框架会自动处理
         builder.AddFanOutEdge(dispatcher, [.. analystAgents]);
 
-        // 3. Fan-In: 所有分析师 → Aggregator
-        // 框架会自动收集所有源（分析师）的消息，并作为 IEnumerable<ChatMessage> 传递给 Aggregator
+        // 4. Fan-In: 所有分析师 → Aggregator
+        // 框架会自动收集所有源（分析师）的消息，并作为 List<ChatMessage> 一次性传递给 Aggregator
         builder.AddFanInEdge([.. analystAgents], _aggregatorExecutor);
 
-        // 4. Aggregator → Coordinator（将聚合结果传递给协调分析师）
+        // 5. Aggregator → Coordinator（将聚合结果传递给协调分析师）
         builder.AddEdge(_aggregatorExecutor, _coordinatorExecutor);
 
-        // 5. 设置输出来自 Coordinator
+        // 6. 设置输出来自 Coordinator
         builder.WithOutputFrom(_coordinatorExecutor);
 
         return builder.Build();

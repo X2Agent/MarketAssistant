@@ -4,18 +4,29 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 
 /// <summary>
 /// 协调分析师 Executor（优化版：使用框架原生结构化输出）
 /// 负责汇总各分析师的分析并生成最终报告
-/// 使用 ChatClientAgent 支持工具调用 + 结构化输出
+/// 使用 AIAgent 支持工具调用 + 结构化输出
 /// </summary>
 public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnalysisReport>
 {
-    private readonly ChatClientAgent _coordinatorAgent;
+    private readonly AIAgent _coordinatorAgent;
     private readonly ILogger<CoordinatorExecutor> _logger;
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters =
+        {
+            // 添加枚举转换器，支持字符串格式（使用原始枚举名称，如 "Hold"）
+            new JsonStringEnumConverter()
+        }
+    };
 
     public CoordinatorExecutor(
         IAnalystAgentFactory analystAgentFactory,
@@ -39,6 +50,8 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
+        _logger.LogWarning("🔍 [DEBUG] CoordinatorExecutor.HandleAsync 被调用，收到 {Count} 条消息", analystMessages?.Count ?? 0);
+
         ArgumentNullException.ThrowIfNull(analystMessages);
 
         if (analystMessages.Count == 0)
@@ -46,21 +59,21 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
             throw new ArgumentException("没有分析师数据", nameof(analystMessages));
         }
 
+        // 从工作流状态读取股票代码
+        var stockSymbol = await context.ReadStateAsync<string>(WorkflowStateKeys.StockSymbol, WorkflowStateKeys.Scope, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(stockSymbol))
+        {
+            throw new InvalidOperationException("无法从工作流状态中获取股票代码");
+        }
+
+        _logger.LogInformation(
+            "协调分析师开始生成最终报告，股票: {StockSymbol}, 分析师数量: {Count}",
+            stockSymbol,
+            analystMessages.Count);
+
         try
         {
-            // 从工作流状态读取股票代码
-            var stockSymbol = await context.ReadStateAsync<string>(WorkflowStateKeys.StockSymbol, cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(stockSymbol))
-            {
-                throw new InvalidOperationException("无法从工作流状态中获取股票代码");
-            }
-
-            _logger.LogInformation(
-                "协调分析师开始生成最终报告，股票: {StockSymbol}, 分析师数量: {Count}",
-                stockSymbol,
-                analystMessages.Count);
-
             // 构建聊天消息列表
             var messages = new List<ChatMessage>(analystMessages)
             {
@@ -86,16 +99,9 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
                 throw new InvalidOperationException("协调分析师未能生成报告");
             }
 
-            _logger.LogInformation(
-                "协调分析师生成报告完成，调用了 {ToolCount} 次工具",
-                agentResponse.Messages.Count(m => m.Contents.Any(c => c is FunctionCallContent)));
-
             // 🎉 直接反序列化为 CoordinatorResult
-            var jsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
-            {
-                PropertyNameCaseInsensitive = true
-            };
-            var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(jsonOptions);
+
+            var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(JsonOptions);
 
             if (coordinatorResult == null)
             {

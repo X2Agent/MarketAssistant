@@ -1,5 +1,4 @@
 using MarketAssistant.Agents.Plugins.Models;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.AI;
@@ -195,5 +194,10 @@ public class StockNewsPlugin
             // 以可读错误提示帮助代理调整调用策略
             throw new Exception($"获取聚合新闻上下文失败: {ex.Message}. 可尝试：降低 topK、将 response_format 设为 'concise' 或缩小时间范围。", ex);
         }
+    }
+
+    public IEnumerable<AIFunction> GetFunctions()
+    {
+        yield return AIFunctionFactory.Create(GetStockNewsContextAsync);
     }
 }

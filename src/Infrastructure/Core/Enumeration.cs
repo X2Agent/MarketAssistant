@@ -6,7 +6,7 @@ public class Enumeration : IComparable
 {
     public string Name { get; private set; }
 
-    public string Instructions { get; private set; }
+    public string Instructions { get; init; }
 
     protected Enumeration(string name, string instructions)
         => (Name, Instructions) = (name, instructions);

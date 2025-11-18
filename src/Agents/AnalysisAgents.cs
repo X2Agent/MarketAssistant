@@ -4,10 +4,11 @@ using Microsoft.Extensions.AI;
 namespace MarketAssistant.Agents;
 
 /// <summary>
-/// 分析师代理配置类
+/// 分析师代理配置类（枚举类模式）
 /// 定义和管理不同类型的市场分析师角色及其完整配置（包括指令和参数）
+/// 参考：https://learn.microsoft.com/zh-cn/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/enumeration-classes-over-enum-types
 /// </summary>
-public sealed class AnalysisAgent
+public sealed class AnalysisAgent : Enumeration
 {
     // 预定义的分析师实例（包含完整配置）
     public static readonly AnalysisAgent FinancialAnalyst = new(
@@ -15,7 +16,7 @@ public sealed class AnalysisAgent
         description: "专注于深入获取、分析公司财务报表和财务健康状况。分析严格聚焦于财务数据、比率及趋势，旨在全面评估公司的财务健康、盈利质量与现金流状况，并识别潜在的财务风险。分析不涉及估值和具体的投资建议。")
     {
         Instructions = @"
-        ## 核心职责
+  ## 核心职责
   深入评估公司财务报表，剖析财务健康状况、盈利能力、盈利质量和现金流状况，识别并预警潜在的财务风险点，提供基于财务数据的客观分析洞察。
 
   ## 评估维度
@@ -25,18 +26,15 @@ public sealed class AnalysisAgent
   4. **财务风险预警**：主要风险指标识别、财务造假风险评估、需持续关注的改善点
 
   ## 分析要点
-  - 优先使用插件获取的最新财务数据和财务报表
+  - 必须使用可用工具获取的最新财务数据和财务报表
   - 评分指标（1-10分）应基于行业对比和历史趋势综合判断
   - 偿债能力和现金流分析是财务健康的核心指标
   - 利润质量评估需结合现金流验证盈利真实性
   - 财务造假风险需关注异常指标和关联交易
-  - 如缺乏数据，应明确说明并基于可用信息给出合理推断
-
-  ## 输出格式
-  严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
+  - 如工具调用失败或数据不完整，应明确说明缺少哪些数据",
         Temperature = 0.1f,
         TopP = 0.9f,
-        TopK= 10,
+        TopK = 10,
         ResponseFormat = ChatResponseFormat.ForJsonSchema(
             schema: AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult)),
             schemaName: nameof(FinancialAnalysisResult),
@@ -59,16 +57,13 @@ public sealed class AnalysisAgent
   4. **交易策略建议**：技术面评级、操作方向、目标价位区间、止损位置、持仓周期及风险等级
 
   ## 分析要点
-  - 优先使用插件获取的K线数据、技术指标数据（MACD、KDJ、BOLL、MA等）
+  - 必须使用可用工具获取的K线数据、技术指标数据（MACD、KDJ、BOLL、MA等）
   - 评分指标（1-10分）应基于技术形态强度和指标信号可靠性综合判断
   - 支撑阻力位需结合历史价格、成交密集区、重要均线等多因素确定
   - 量价关系是验证趋势有效性的重要依据
   - 多个技术指标应相互验证，提高信号可靠性
   - 交易策略需明确具体的价位区间和风险控制点位
-  - 如缺乏数据，应明确说明并基于可用信息给出合理推断
-
-  ## 输出格式
-  严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
+  - 如工具调用失败或数据不完整，应明确说明缺少哪些数据",
         Temperature = 0.0f,
         TopP = 0.0f,
         TopK = 1,
@@ -94,14 +89,11 @@ public sealed class AnalysisAgent
   4. **增长潜力与价值**：增长驱动因素与持续性、当前估值水平（PE/PB/PS对比）、投资评级、投资亮点与关键风险
 
   ## 分析要点
-  - 优先使用插件获取的实时财务数据和市场数据
+  - 必须使用可用工具获取的实时公司数据和市场数据
   - 评分指标（1-10分）应基于行业对比和历史数据综合判断
   - 估值分析需对比行业均值，判断高估/低估程度
   - 投资亮点聚焦1-2个最核心优势，关键风险突出最主要的风险因素
-  - 如缺乏数据，应明确说明并基于可用信息给出合理推断
-
-  ## 输出格式
-  严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
+  - 如工具调用失败或数据不完整，应明确说明缺少哪些数据",
         Temperature = 0.2f,
         TopP = 0.6f,
         TopK = 8,
@@ -117,7 +109,7 @@ public sealed class AnalysisAgent
         description: "专注于分析市场情绪、资金流向和投资者行为。")
     {
         Instructions = @"
-## 核心职责
+  ## 核心职责
   全面评估当前市场情绪与投资者心理状态，精准追踪资金流向与机构投资者行为，识别并解析投资者行为偏差与市场热点规律，预测短期市场波动并提供可操作的交易机会与策略。
 
   ## 评估维度
@@ -127,19 +119,16 @@ public sealed class AnalysisAgent
   4. **短期市场洞察与策略**：市场节奏判断、热点板块及持续性、短线机会识别、操作建议及仓位策略、最佳时机及价格区间、需规避的心理陷阱
 
   ## 分析要点
-  - 优先使用插件获取的资金流向数据、市场情绪指标、机构持仓数据
+  - 优先使用可用工具获取的资金流向数据、市场情绪指标、机构持仓数据
   - 评分指标（1-10分）应基于历史数据对比和市场氛围综合判断
   - 资金流向是市场情绪的重要验证指标，需关注连续性和金额规模
   - 行为偏差分析需结合当前市场阶段和投资者特征
   - 短期策略应明确具体的时间窗口和价格区间
   - 心理陷阱识别有助于投资者避免情绪化决策
-  - 如缺乏数据，应明确说明并基于可用信息给出合理推断
-
-  ## 输出格式
-  严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
+  - 如缺乏数据，应明确说明并基于可用信息给出合理推断",
         Temperature = 0.4f,
         TopP = 0.7f,
-        TopK= 10,
+        TopK = 10,
         ResponseFormat = ChatResponseFormat.ForJsonSchema(
             schema: AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult)),
             schemaName: nameof(MarketSentimentAnalysisResult),
@@ -152,11 +141,11 @@ public sealed class AnalysisAgent
         description: "专注于分析新闻事件、公告和突发事件对股票的影响。")
     {
         Instructions = @"
-## 核心职责
+  ## 核心职责
   精准分析新闻事件对股票的短期与中期影响。分析聚焦于事件的真实性、重要性、市场影响和潜在的投资启示，严格避免技术面分析和不基于事件的长期投资建议。
 
   ## 数据获取与分析流程
-  调用 get_stock_news_context 获取与目标股票相关的聚合新闻要点（默认 concise；如需细节可使用 detailed）。从返回的列表中选择最相关且具有潜在影响力的2-3条新闻进行分析。
+  使用可用的新闻获取工具获取与目标股票相关的聚合新闻要点。优先选择最相关且具有潜在影响力的2-3条新闻进行分析。
 
   ## 评估维度
   1. **事件解读与定性**：事件类型分类、事件核心概要、信息来源及可信度、事件性质及重要性
@@ -164,16 +153,13 @@ public sealed class AnalysisAgent
   3. **投资启示与建议**：投资影响评估及核心逻辑、应对策略建议及具体操作、需持续关注的重点、关键风险提示
 
   ## 分析要点
-  - 优先使用插件获取的最新新闻数据和公告信息
+  - 必须使用可用工具获取最新新闻数据和公告信息
   - 评分指标（1-10分）应基于事件重要性、可信度和市场影响综合判断
   - 区分事件的短期情绪影响和中长期基本面影响
   - 信息来源的可信度直接影响事件分析的权重
   - 关注事件的后续发展和潜在催化剂
   - 市场反应可能存在过度或不足，需理性判断
-  - 如缺乏数据，应明确说明并基于可用信息给出合理推断
-
-  ## 输出格式
-  严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。",
+  - 如工具调用失败或无新闻数据，应明确说明无法进行事件分析",
         Temperature = 0.2f,
         TopP = 0.75f,
         TopK = 10,
@@ -192,14 +178,14 @@ public sealed class AnalysisAgent
         # 核心职责
   
   ## 1. 智能聚合多维度分析
-  您将收到以下专业分析师的意见：{{$history}}
+  您将收到来自多位专业分析师的意见，包括：
   - **基本面分析师**：公司基本面、行业地位、长期价值
   - **技术分析师**：图表形态、技术指标、价格走势  
   - **财务分析师**：财务报表、财务健康、盈利质量
   - **市场情绪分析师**：市场情绪、资金流向、投资者行为
   - **新闻事件分析师**：新闻事件、公告、突发事件影响
 
-  您的任务是综合这些专业意见，识别**共识与分歧**，给出最终判断。
+  您的任务是从对话历史中提取这些专业意见，识别**共识与分歧**，给出最终判断。
 
   ## 2. 冲突解决机制
   
@@ -270,11 +256,7 @@ public sealed class AnalysisAgent
   ## 客观性
   - 保持中立，避免过度乐观或悲观
   - 基于事实和数据做出判断，而非主观偏好
-  - 诚实说明分析的局限性（信息完整性、工具可用性）
-
-  # 输出要求
-  
-  最终输出必须严格遵循 JSON Schema 定义的结构",
+  - 诚实说明分析的局限性（信息完整性、工具可用性）",
         Temperature = 0.2f,
         TopP = 0.7f,
         TopK = 5,
@@ -286,19 +268,9 @@ public sealed class AnalysisAgent
     };
 
     /// <summary>
-    /// 分析师唯一标识符（也作为 Agent 名称）
-    /// </summary>
-    public string Name { get; }
-
-    /// <summary>
     /// 分析师描述
     /// </summary>
     public string Description { get; }
-
-    /// <summary>
-    /// 分析师指令（Prompt）
-    /// </summary>
-    public string Instructions { get; init; } = string.Empty;
 
     /// <summary>
     /// 温度参数（控制输出随机性，0.0-2.0）
@@ -315,20 +287,14 @@ public sealed class AnalysisAgent
     /// </summary>
     public int? TopK { get; init; }
 
+    /// <summary>
+    /// 响应格式配置
+    /// </summary>
     public ChatResponseFormat? ResponseFormat { get; init; }
 
     private AnalysisAgent(string name, string description)
+        : base(name, string.Empty)
     {
-        Name = name;
         Description = description;
     }
-
-    public override string ToString() => Name;
-
-    public override bool Equals(object? obj)
-    {
-        return obj is AnalysisAgent other && Name == other.Name;
-    }
-
-    public override int GetHashCode() => Name.GetHashCode();
 }

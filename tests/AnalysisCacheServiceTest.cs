@@ -49,7 +49,7 @@ public class AnalysisCacheServiceTest
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
         Assert.AreEqual(stockSymbol, cachedResult.StockSymbol);
-        Assert.AreEqual("买入", cachedResult.CoordinatorResult.InvestmentRating);
+        Assert.AreEqual(InvestmentRating.Buy, cachedResult.CoordinatorResult.InvestmentRating);
     }
 
     /// <summary>
@@ -94,9 +94,9 @@ public class AnalysisCacheServiceTest
         // Arrange
         var stockSymbol = "GOOGL";
         var firstResult = CreateTestAnalysisReport(stockSymbol);
-        firstResult.CoordinatorResult.InvestmentRating = "卖出";
+        firstResult.CoordinatorResult.InvestmentRating = InvestmentRating.Sell;
         var secondResult = CreateTestAnalysisReport(stockSymbol);
-        secondResult.CoordinatorResult.InvestmentRating = "买入";
+        secondResult.CoordinatorResult.InvestmentRating = InvestmentRating.Buy;
 
         // Act
         await _cacheService.CacheAnalysisAsync(stockSymbol, firstResult);
@@ -105,7 +105,7 @@ public class AnalysisCacheServiceTest
         // Assert
         var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
         Assert.IsNotNull(cachedResult);
-        Assert.AreEqual("买入", cachedResult.CoordinatorResult.InvestmentRating);
+        Assert.AreEqual(InvestmentRating.Buy, cachedResult.CoordinatorResult.InvestmentRating);
     }
 
     private MarketAnalysisReport CreateTestAnalysisReport(string stockSymbol)
@@ -119,7 +119,7 @@ public class AnalysisCacheServiceTest
             },
             CoordinatorResult = new CoordinatorResult
             {
-                InvestmentRating = "买入",
+                InvestmentRating = InvestmentRating.Buy,
                 OverallScore = 8.5f,
                 TargetPrice = "180-200美元"
             }
