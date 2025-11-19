@@ -3,18 +3,17 @@ using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Agents.Tools;
 
-public sealed class StockBasicPlugin
+public sealed class StockBasicTools
 {
-    //https://cxdata.caixin.com/stock/details/101002165
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string _zhiTuToken;
+    private readonly IUserSettingService _userSettingService;
 
-    public StockBasicPlugin(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
+    public StockBasicTools(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
     }
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
@@ -79,7 +78,8 @@ public sealed class StockBasicPlugin
             // 只保留 stockSymbol 中的数字部分
             stockSymbol = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            var url = $"https://api.zhituapi.com/hs/gs/gsjj/{stockSymbol}?token={_zhiTuToken}";
+            var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+            var url = $"https://api.zhituapi.com/hs/gs/gsjj/{stockSymbol}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);

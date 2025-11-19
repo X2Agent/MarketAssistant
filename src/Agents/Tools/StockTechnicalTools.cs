@@ -1,26 +1,25 @@
 using MarketAssistant.Agents.Plugins.Models;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
-using System.Text.Json;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Agents.Tools;
 
-public sealed class StockTechnicalPlugin
+public sealed class StockTechnicalTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string _zhiTuToken;
+    private readonly IUserSettingService _userSettingService;
 
-    public StockTechnicalPlugin(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
+    public StockTechnicalTools(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
     }
 
     private async Task<T> GetStockIndicatorAsync<T>(string indicator, string stockSymbol)
     {
-        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{StockSymbolConverter.ToZhiTuFormat(stockSymbol)}/d/n?token={_zhiTuToken}&lt=30";
+        var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{StockSymbolConverter.ToZhiTuFormat(stockSymbol)}/d/n?token={token}&lt=30";
         using var httpClient = _httpClientFactory.CreateClient();
         var response = await httpClient.GetStringAsync(url);
         var items = JsonSerializer.Deserialize<List<T>>(response);

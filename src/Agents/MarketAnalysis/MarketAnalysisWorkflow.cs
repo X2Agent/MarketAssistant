@@ -212,25 +212,25 @@ public class MarketAnalysisWorkflow : IDisposable
     /// <summary>
     /// 获取启用的分析师列表
     /// </summary>
-    private List<AnalysisAgent> GetEnabledAnalysts()
+    private List<AnalystType> GetEnabledAnalysts()
     {
         var roleSettings = _userSettingService.CurrentSetting.AnalystRoleSettings;
-        var enabledAnalysts = new List<AnalysisAgent>();
+        var enabledAnalysts = new List<AnalystType>();
 
         if (roleSettings.EnableFundamentalAnalyst)
-            enabledAnalysts.Add(AnalysisAgent.FundamentalAnalyst);
+            enabledAnalysts.Add(AnalystType.FundamentalAnalyst);
 
         if (roleSettings.EnableMarketSentimentAnalyst)
-            enabledAnalysts.Add(AnalysisAgent.MarketSentimentAnalyst);
+            enabledAnalysts.Add(AnalystType.MarketSentimentAnalyst);
 
         if (roleSettings.EnableFinancialAnalyst)
-            enabledAnalysts.Add(AnalysisAgent.FinancialAnalyst);
+            enabledAnalysts.Add(AnalystType.FinancialAnalyst);
 
         if (roleSettings.EnableTechnicalAnalyst)
-            enabledAnalysts.Add(AnalysisAgent.TechnicalAnalyst);
+            enabledAnalysts.Add(AnalystType.TechnicalAnalyst);
 
         if (roleSettings.EnableNewsEventAnalyst)
-            enabledAnalysts.Add(AnalysisAgent.NewsEventAnalyst);
+            enabledAnalysts.Add(AnalystType.NewsEventAnalyst);
 
         return enabledAnalysts;
     }
@@ -238,10 +238,10 @@ public class MarketAnalysisWorkflow : IDisposable
     /// <summary>
     /// 创建分析师代理（使用 Factory 模式）
     /// </summary>
-    private List<AIAgent> CreateAnalystAgents(List<AnalysisAgent> agents)
+    private List<AIAgent> CreateAnalystAgents(List<AnalystType> analystTypes)
     {
-        _logger.LogInformation("开始创建分析师代理，数量: {Count}", agents.Count);
-        var createdAgents = _analystAgentFactory.CreateAnalysts(agents);
+        _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
+        var createdAgents = _analystAgentFactory.CreateAnalysts(analystTypes);
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
         return createdAgents;
     }

@@ -1,5 +1,4 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,25 +13,21 @@ namespace TestMarketAssistant;
 public class AnalystAgentFactoryTest : BaseAgentTest
 {
     [TestMethod]
-    public void TestAnalystAgentFactory_CreateFinancialAnalyst_HasCorrectTools()
+    public void TestAnalystAgentFactory_CreateFinancialAnalyst_ShouldSucceed()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var toolsConfig = _serviceProvider.GetRequiredService<IAgentToolsConfig>();
 
-        var agent = agentFactory.CreateAnalyst(AnalysisAgent.FinancialAnalyst);
-        var tools = toolsConfig.GetToolsForAgent(AnalysisAgent.FinancialAnalyst);
+        var agent = agentFactory.CreateAnalyst(AnalystType.FinancialAnalyst);
 
-        Assert.IsNotNull(agent);
-        Assert.IsTrue(tools.Count > 0, "FinancialAnalyst 应该配置了工具");
-
-        Console.WriteLine($"FinancialAnalyst 配置了 {tools.Count} 个工具");
+        Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
+        Console.WriteLine("成功创建 FinancialAnalyst");
     }
 
     [TestMethod]
     public async Task TestNewsEventAnalyst_CallsNewsToolCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalysisAgent.NewsEventAnalyst);
+        var agent = agentFactory.CreateAnalyst(AnalystType.NewsEventAnalyst);
 
         // 模拟调用，提示明确要求使用工具
         var messages = new List<ChatMessage>
@@ -70,13 +65,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestFundamentalAnalyst_CallsToolsCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var toolsConfig = _serviceProvider.GetRequiredService<IAgentToolsConfig>();
-        var agent = agentFactory.CreateAnalyst(AnalysisAgent.FundamentalAnalyst);
-        var tools = toolsConfig.GetToolsForAgent(AnalysisAgent.FundamentalAnalyst);
+        var agent = agentFactory.CreateAnalyst(AnalystType.FundamentalAnalyst);
 
-        Assert.IsNotNull(agent);
-        Assert.IsTrue(tools.Count > 0, "FundamentalAnalyst 应该配置了工具");
-        Console.WriteLine($"FundamentalAnalyst 配置了 {tools.Count} 个工具");
+        Assert.IsNotNull(agent, "应该成功创建 FundamentalAnalyst");
+        Console.WriteLine("成功创建 FundamentalAnalyst");
 
         // 模拟调用，提示明确要求使用工具进行基本面分析
         var messages = new List<ChatMessage>
@@ -122,7 +114,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestCoordinatorAnalyst_HandlesMultipleAnalystInputs()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalysisAgent.CoordinatorAnalyst);
+        var agent = agentFactory.CreateAnalyst(AnalystType.CoordinatorAnalyst);
 
         // 模拟其他分析师的输出作为历史消息
         var messages = new List<ChatMessage>

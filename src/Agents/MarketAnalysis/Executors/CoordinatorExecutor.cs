@@ -37,7 +37,7 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 在构造函数中创建 Agent（确保 tools 配置正确）
-        _coordinatorAgent = analystAgentFactory.CreateAnalyst(AnalysisAgent.CoordinatorAnalyst);
+        _coordinatorAgent = analystAgentFactory.CreateAnalyst(AnalystType.CoordinatorAnalyst);
 
         _logger.LogInformation("协调分析师 Agent 已创建（支持工具调用 + 结构化输出）");
     }

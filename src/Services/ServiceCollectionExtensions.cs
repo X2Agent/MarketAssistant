@@ -1,8 +1,8 @@
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
-using MarketAssistant.Agents.Plugins;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Agents.StockSelection.Executors;
+using MarketAssistant.Agents.Tools;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Stocks;
@@ -45,12 +45,19 @@ public static class ServiceCollectionExtensions
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
+        // 注册 Agent Tool 类
+        services.AddSingleton<StockBasicTools>();
+        services.AddSingleton<StockFinancialTools>();
+        services.AddSingleton<StockTechnicalTools>();
+        services.AddSingleton<GroundingSearchTools>();
+        services.AddSingleton<StockNewsTools>();
+        services.AddSingleton<MarketSentimentTools>();
+
         // 注册 Kernel 和嵌入服务（保留用于 RAG 和提示词模板）
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
 
         // 注册 Agent Framework 服务
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
-        services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
 
         // 注册 MCP 服务（Model Context Protocol）
@@ -63,7 +70,7 @@ public static class ServiceCollectionExtensions
         // 注册 RAG 和分析服务
         services.AddRagServices();
         services.AddSingleton<TelegramService>();
-        services.AddSingleton<GroundingSearchPlugin>();
+        services.AddSingleton<GroundingSearchTools>();
 
         // 注册分析缓存服务
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();

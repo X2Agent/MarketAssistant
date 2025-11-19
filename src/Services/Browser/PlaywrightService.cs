@@ -40,7 +40,7 @@ public class PlaywrightService : IAsyncDisposable
     /// <summary>
     /// 获取Browser实例，如果尚未初始化则进行初始化
     /// </summary>
-    private async Task<IBrowser> GetBrowserAsync()
+    public async Task<IBrowser> GetBrowserAsync()
     {
         if (_browser?.IsConnected == true)
         {

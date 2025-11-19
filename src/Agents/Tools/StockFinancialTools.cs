@@ -2,19 +2,18 @@ using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
-using System.Text.Json;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Agents.Tools;
 
-public class StockFinancialPlugin
+public class StockFinancialTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly string _zhiTuToken;
+    private readonly IUserSettingService _userSettingService;
 
-    public StockFinancialPlugin(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
+    public StockFinancialTools(IHttpClientFactory httpClientFactory, IUserSettingService userSettingService)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _zhiTuToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
     }
 
     [Description("获取股票资金流数据")]
@@ -61,8 +60,8 @@ public class StockFinancialPlugin
             // 只保留 stockSymbol 中的数字部分
             string stockCode = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            // 获取最新财报数据
-            var url = $"https://api.zhituapi.com/hs/gs/cwzb/{stockCode}?token={_zhiTuToken}";
+            var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+            var url = $"https://api.zhituapi.com/hs/gs/cwzb/{stockCode}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
@@ -84,8 +83,8 @@ public class StockFinancialPlugin
             // 只保留 stockSymbol 中的数字部分
             string stockCode = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            // 获取季度利润数据
-            var url = $"https://api.zhituapi.com/hs/gs/jdlr/{stockCode}?token={_zhiTuToken}";
+            var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+            var url = $"https://api.zhituapi.com/hs/gs/jdlr/{stockCode}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
@@ -107,8 +106,8 @@ public class StockFinancialPlugin
             // 只保留 stockSymbol 中的数字部分
             string stockCode = new string(stockSymbol.Where(char.IsDigit).ToArray());
 
-            // 获取季度现金流数据
-            var url = $"https://api.zhituapi.com/hs/gs/jdxj/{stockCode}?token={_zhiTuToken}";
+            var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+            var url = $"https://api.zhituapi.com/hs/gs/jdxj/{stockCode}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);

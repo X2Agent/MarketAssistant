@@ -2,8 +2,8 @@ using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Agents.StockSelection.Executors;
+using MarketAssistant.Agents.Tools;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
@@ -101,10 +101,17 @@ public class BaseAgentTest
         services.AddSingleton<StockScreenerService>();
         services.AddSingleton<McpService>();
 
+        // 注册 Agent Tool 类
+        services.AddSingleton<StockBasicTools>();
+        services.AddSingleton<StockFinancialTools>();
+        services.AddSingleton<StockTechnicalTools>();
+        services.AddSingleton<GroundingSearchTools>();
+        services.AddSingleton<StockNewsTools>();
+        services.AddSingleton<MarketSentimentTools>();
+
         // 注册 Agent Framework 服务
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IAgentToolsConfig, AgentToolsConfig>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
 
         // 注册 StockSelection Workflow and Executors
@@ -137,9 +144,3 @@ public class BaseAgentTest
         return services.BuildServiceProvider();
     }
 }
-
-
-
-
-
-

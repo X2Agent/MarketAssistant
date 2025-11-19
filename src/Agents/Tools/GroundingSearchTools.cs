@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Data;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Agents.Tools;
 
 /// <summary>
 /// 智能搜索插件，根据用户设置自动选择最适合的搜索策略：
@@ -16,18 +16,18 @@ namespace MarketAssistant.Agents.Plugins;
 /// - 混合搜索：当用户同时启用知识库和网络搜索时
 /// - 空结果：当用户都未启用时，返回空结果
 /// </summary>
-public class GroundingSearchPlugin
+public class GroundingSearchTools
 {
     private readonly IRetrievalOrchestrator _orchestrator;
     private readonly IWebTextSearchFactory _webTextSearchFactory;
     private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<GroundingSearchPlugin> _logger;
+    private readonly ILogger<GroundingSearchTools> _logger;
 
-    public GroundingSearchPlugin(
+    public GroundingSearchTools(
         IRetrievalOrchestrator orchestrator,
         IWebTextSearchFactory webTextSearchFactory,
         IUserSettingService userSettingService,
-        ILogger<GroundingSearchPlugin> logger)
+        ILogger<GroundingSearchTools> logger)
     {
         _orchestrator = orchestrator;
         _webTextSearchFactory = webTextSearchFactory;

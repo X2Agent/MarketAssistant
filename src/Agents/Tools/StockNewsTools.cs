@@ -5,24 +5,17 @@ using Microsoft.Extensions.AI;
 using Microsoft.Playwright;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Plugins;
+namespace MarketAssistant.Agents.Tools;
 
-/// <summary>
-/// 股票新闻插件（Agent Framework 版本）
-/// 提供股票新闻获取和内容提取功能
-/// </summary>
-public class StockNewsPlugin
+public class StockNewsTools
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly PlaywrightService _playwrightService;
     private readonly IChatClientFactory _chatClientFactory;
 
-    public StockNewsPlugin(
-        IServiceProvider serviceProvider,
+    public StockNewsTools(
         PlaywrightService playwrightService,
         IChatClientFactory chatClientFactory)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _playwrightService = playwrightService ?? throw new ArgumentNullException(nameof(playwrightService));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
     }
@@ -132,7 +125,7 @@ public class StockNewsPlugin
                         newsList.Add(new NewsItem()
                         {
                             Title = title,
-                            Url = link ?? "",
+                            Link = link ?? "",
                             Source = source
                         });
                     }
@@ -171,7 +164,7 @@ public class StockNewsPlugin
                 {
                     try
                     {
-                        var content = await GetNewsContentAsync(item.Url);
+                        var content = await GetNewsContentAsync(item.Link);
 
                         // 简单截断作为摘要片段，避免长文本占用上下文
                         if (!string.IsNullOrWhiteSpace(content))
@@ -201,3 +194,4 @@ public class StockNewsPlugin
         yield return AIFunctionFactory.Create(GetStockNewsContextAsync);
     }
 }
+
