@@ -150,5 +150,92 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine($"测试执行异常: {ex.Message}");
         }
     }
+
+    [TestMethod]
+    public async Task TestFinancialAnalyst_CallsToolsCorrectly()
+    {
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalystType.FinancialAnalyst);
+
+        Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
+        Console.WriteLine("成功创建 FinancialAnalyst");
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sz002594 进行财务分析，重点关注盈利能力和偿债能力。")
+        };
+
+        try
+        {
+            var response = await agent.RunAsync(messages);
+            var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+            Assert.IsFalse(string.IsNullOrWhiteSpace(result), "FinancialAnalyst 应该返回分析结果");
+            Console.WriteLine("财务分析结果:");
+            Console.WriteLine(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"测试执行异常: {ex.Message}");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestMarketSentimentAnalyst_CallsToolsCorrectly()
+    {
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalystType.MarketSentimentAnalyst);
+
+        Assert.IsNotNull(agent, "应该成功创建 MarketSentimentAnalyst");
+        Console.WriteLine("成功创建 MarketSentimentAnalyst");
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请分析股票 sz002594 的市场情绪和资金流向。")
+        };
+
+        try
+        {
+            var response = await agent.RunAsync(messages);
+            var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+            Assert.IsFalse(string.IsNullOrWhiteSpace(result), "MarketSentimentAnalyst 应该返回分析结果");
+            Console.WriteLine("市场情绪分析结果:");
+            Console.WriteLine(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"测试执行异常: {ex.Message}");
+        }
+    }
+
+    [TestMethod]
+    public async Task TestTechnicalAnalyst_CallsToolsCorrectly()
+    {
+        var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
+        var agent = agentFactory.CreateAnalyst(AnalystType.TechnicalAnalyst);
+
+        Assert.IsNotNull(agent, "应该成功创建 TechnicalAnalyst");
+        Console.WriteLine("成功创建 TechnicalAnalyst");
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "请对股票 sz002594 进行技术面分析，查看K线形态和技术指标。")
+        };
+
+        try
+        {
+            var response = await agent.RunAsync(messages);
+            var result = response.Messages.LastOrDefault()?.Text ?? string.Empty;
+
+            Assert.IsFalse(string.IsNullOrWhiteSpace(result), "TechnicalAnalyst 应该返回分析结果");
+            Console.WriteLine("技术分析结果:");
+            Console.WriteLine(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"测试执行异常: {ex.Message}");
+        }
+    }
 }
 

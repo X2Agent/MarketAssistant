@@ -80,66 +80,115 @@ public sealed class ToolsIntegrationTest
     #region StockFinancialTools 测试
 
     [TestMethod]
-    public async Task StockFinancialTools_GetFundFlow_ShouldReturnData()
+    public async Task StockFinancialTools_GetBalanceSheet_ShouldReturnData()
     {
         // Arrange
         var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
         var tools = new StockFinancialTools(httpClientFactory, _mockUserSettingService.Object);
 
         // Act
-        var result = await tools.GetFundFlowAsync("sz002594");
+        var result = await tools.GetBalanceSheetAsync("sz002594");
 
         // Assert
-        Assert.IsNotNull(result, "资金流向数据不应为空");
-        Console.WriteLine($"主力净流入: {result.MainFundDiff}");
+        Assert.IsNotNull(result, "资产负债表数据不应为空");
+        Assert.IsTrue(result.Count > 0, "资产负债表应至少包含一条记录");
+        Console.WriteLine($"资产负债表记录数: {result.Count}, 最近报告期: {result[0].EndDate}");
+        if (result[0].TotalAssets.HasValue)
+        {
+            Console.WriteLine($"总资产: {result[0].TotalAssets.Value}");
+        }
     }
 
     [TestMethod]
-    public async Task StockFinancialTools_GetFinancialData_ShouldReturnData()
+    public async Task StockFinancialTools_GetIncomeStatement_ShouldReturnData()
     {
         // Arrange
         var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
         var tools = new StockFinancialTools(httpClientFactory, _mockUserSettingService.Object);
 
         // Act
-        var result = await tools.GetFinancialDataAsync("sz002594");
+        var result = await tools.GetIncomeStatementAsync("sz002594");
 
         // Assert
-        Assert.IsNotNull(result, "财务数据不应为空");
-        Assert.IsTrue(result.Count > 0, "财务数据应至少包含一条记录");
-        Console.WriteLine($"财务数据记录数: {result.Count}");
+        Assert.IsNotNull(result, "利润表数据不应为空");
+        Assert.IsTrue(result.Count > 0, "利润表应至少包含一条记录");
+        Console.WriteLine($"利润表记录数: {result.Count}, 最近报告期: {result[0].EndDate}");
+        if (result[0].OperatingRevenue.HasValue)
+        {
+            Console.WriteLine($"营业收入: {result[0].OperatingRevenue.Value}");
+        }
+        if (result[0].NetProfit.HasValue)
+        {
+            Console.WriteLine($"净利润: {result[0].NetProfit.Value}");
+        }
     }
 
     [TestMethod]
-    public async Task StockFinancialTools_GetQuarterlyProfit_ShouldReturnData()
+    public async Task StockFinancialTools_GetCashFlowStatement_ShouldReturnData()
     {
         // Arrange
         var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
         var tools = new StockFinancialTools(httpClientFactory, _mockUserSettingService.Object);
 
         // Act
-        var result = await tools.GetQuarterlyProfitAsync("sz002594");
+        var result = await tools.GetCashFlowStatementAsync("sz002594");
 
         // Assert
-        Assert.IsNotNull(result, "季度利润数据不应为空");
-        Assert.IsTrue(result.Count > 0, "季度利润数据应至少包含一条记录");
-        Console.WriteLine($"最近季度营收: {result[0].Income}");
+        Assert.IsNotNull(result, "现金流量表数据不应为空");
+        Assert.IsTrue(result.Count > 0, "现金流量表应至少包含一条记录");
+        Console.WriteLine($"现金流量表记录数: {result.Count}, 最近报告期: {result[0].EndDate}");
+        if (result[0].NetCashFlowFromOperating.HasValue)
+        {
+            Console.WriteLine($"经营活动现金流量净额: {result[0].NetCashFlowFromOperating.Value}");
+        }
     }
 
     [TestMethod]
-    public async Task StockFinancialTools_GetQuarterlyCashFlow_ShouldReturnData()
+    public async Task StockFinancialTools_GetFinancialRatios_ShouldReturnData()
     {
         // Arrange
         var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
         var tools = new StockFinancialTools(httpClientFactory, _mockUserSettingService.Object);
 
         // Act
-        var result = await tools.GetQuarterlyCashFlowAsync("sz002594");
+        var result = await tools.GetFinancialRatiosAsync("sz002594");
 
         // Assert
-        Assert.IsNotNull(result, "季度现金流数据不应为空");
-        Assert.IsTrue(result.Count > 0, "季度现金流数据应至少包含一条记录");
-        Console.WriteLine($"最近季度经营现金流净额: {result[0].OperatingCashflowNet}");
+        Assert.IsNotNull(result, "财务主要指标数据不应为空");
+        Assert.IsTrue(result.Count > 0, "财务主要指标应至少包含一条记录");
+        Console.WriteLine($"财务主要指标记录数: {result.Count}, 最近报告期: {result[0].EndDate}");
+        if (result[0].ReturnOnEquity.HasValue)
+        {
+            Console.WriteLine($"净资产收益率: {result[0].ReturnOnEquity.Value}%");
+        }
+        if (result[0].GrossMargin.HasValue)
+        {
+            Console.WriteLine($"销售毛利率: {result[0].GrossMargin.Value}%");
+        }
+    }
+
+    [TestMethod]
+    public async Task StockFinancialTools_GetCapitalStructure_ShouldReturnData()
+    {
+        // Arrange
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var tools = new StockFinancialTools(httpClientFactory, _mockUserSettingService.Object);
+
+        // Act
+        var result = await tools.GetCapitalStructureAsync("sz002594");
+
+        // Assert
+        Assert.IsNotNull(result, "公司股本结构数据不应为空");
+        Assert.IsTrue(result.Count > 0, "股本结构应至少包含一条记录");
+        Console.WriteLine($"股本结构记录数: {result.Count}, 最近变动日期: {result[0].ChangeDate}");
+        if (result[0].TotalShares.HasValue)
+        {
+            Console.WriteLine($"总股本: {result[0].TotalShares.Value}");
+        }
+        if (result[0].CirculatingAShares.HasValue)
+        {
+            Console.WriteLine($"流通A股: {result[0].CirculatingAShares.Value}");
+        }
     }
 
     #endregion
@@ -233,6 +282,85 @@ public sealed class ToolsIntegrationTest
         // Assert
         Assert.IsNotNull(result, "新闻上下文不应为空");
         Console.WriteLine($"新闻摘要: {result}");
+    }
+
+    #endregion
+
+    #region MarketSentimentTools 测试
+
+    [TestMethod]
+    public async Task MarketSentimentTools_GetFundFlow_ShouldReturnData()
+    {
+        // Arrange
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var tools = new MarketSentimentTools(httpClientFactory, _mockUserSettingService.Object);
+
+        // Act
+        var result = await tools.GetFundFlowAsync("sz002594");
+
+        // Assert
+        Assert.IsNotNull(result, "资金流向数据不应为空");
+        Console.WriteLine($"主力净流入: {result.MainFundDiff}");
+    }
+
+    [TestMethod]
+    public async Task MarketSentimentTools_GetTopShareholders_ShouldReturnData()
+    {
+        // Arrange
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var tools = new MarketSentimentTools(httpClientFactory, _mockUserSettingService.Object);
+
+        // Act
+        var result = await tools.GetTopShareholdersAsync("sz002594");
+
+        // Assert
+        Assert.IsNotNull(result, "十大股东信息不应为空");
+        Assert.IsTrue(result.Count > 0, "十大股东应至少包含一条记录");
+        Console.WriteLine($"十大股东记录数: {result.Count}");
+        if (result.Count > 0)
+        {
+            Console.WriteLine($"第一大股东: {result[0].ShareholderName}, 持股比例: {result[0].ShareholdingRatio}");
+        }
+    }
+
+    [TestMethod]
+    public async Task MarketSentimentTools_GetTopCirculatingShareholders_ShouldReturnData()
+    {
+        // Arrange
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var tools = new MarketSentimentTools(httpClientFactory, _mockUserSettingService.Object);
+
+        // Act
+        var result = await tools.GetTopCirculatingShareholdersAsync("sz002594");
+
+        // Assert
+        Assert.IsNotNull(result, "十大流通股东信息不应为空");
+        Assert.IsTrue(result.Count > 0, "十大流通股东应至少包含一条记录");
+        Console.WriteLine($"十大流通股东记录数: {result.Count}");
+        if (result.Count > 0)
+        {
+            Console.WriteLine($"第一大流通股东: {result[0].ShareholderName}, 持股比例: {result[0].ShareholdingRatio}");
+        }
+    }
+
+    [TestMethod]
+    public async Task MarketSentimentTools_GetShareholderCount_ShouldReturnData()
+    {
+        // Arrange
+        var httpClientFactory = _serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var tools = new MarketSentimentTools(httpClientFactory, _mockUserSettingService.Object);
+
+        // Act
+        var result = await tools.GetShareholderCountAsync("sz002594");
+
+        // Assert
+        Assert.IsNotNull(result, "股东数信息不应为空");
+        Assert.IsTrue(result.Count > 0, "股东数应至少包含一条记录");
+        Console.WriteLine($"股东数历史记录数: {result.Count}");
+        if (result.Count > 0)
+        {
+            Console.WriteLine($"最近截止日期: {result[0].EndDate}, 股东总数: {result[0].TotalShareholders}");
+        }
     }
 
     #endregion

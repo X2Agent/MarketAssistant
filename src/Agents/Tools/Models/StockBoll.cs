@@ -27,4 +27,9 @@ public class StockBoll
     /// </summary>
     [JsonPropertyName("m")]
     public decimal? M { get; set; }
+
+    /// <summary>
+    /// 数据的自然语言描述，辅助大模型理解
+    /// </summary>
+    public string Description => $"日期: {T}, 上轨(Upper): {U}, 中轨(Middle): {M}, 下轨(Lower): {D}";
 }

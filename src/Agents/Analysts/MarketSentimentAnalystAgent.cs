@@ -10,9 +10,18 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public class MarketSentimentAnalystAgent : AnalystAgentBase
 {
+    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult));
+
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: (JsonElement)Schema,
+        schemaName: nameof(MarketSentimentAnalysisResult),
+        schemaDescription: "市场情绪分析师的结构化分析结果，包含市场情绪、资金流向、投资者行为和短期策略"
+    );
+
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
-        StockFinancialTools financialTools)
+        StockFinancialTools financialTools,
+        MarketSentimentTools marketSentimentTools)
         : base(
             chatClient,
             instructions: GetInstructions(),
@@ -21,16 +30,15 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
             temperature: 0.4f,
             topP: 0.7f,
             topK: 10,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult)),
-                schemaName: nameof(MarketSentimentAnalysisResult),
-                schemaDescription: "市场情绪分析师的结构化分析结果，包含市场情绪、资金流向、投资者行为和短期策略"
-            ),
-            tools: CreateTools(financialTools))
+            responseFormat: null,
+            tools: [.. financialTools.GetFunctions(), .. marketSentimentTools.GetFunctions()])
     {
     }
 
-    private static string GetInstructions() => @"
+    private static string GetInstructions()
+    {
+        var schemaJson = JsonSerializer.Serialize(Schema, new JsonSerializerOptions { WriteIndented = true });
+        return $@"
 ## 核心职责
 全面评估当前市场情绪与投资者心理状态，精准追踪资金流向与机构投资者行为，识别并解析投资者行为偏差与市场热点规律，预测短期市场波动并提供可操作的交易机会与策略。
 
@@ -47,12 +55,10 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
 - 行为偏差分析需结合当前市场阶段和投资者特征
 - 短期策略应明确具体的时间窗口和价格区间
 - 心理陷阱识别有助于投资者避免情绪化决策
-- 如缺乏数据，应明确说明并基于可用信息给出合理推断";
+- 如缺乏数据，应明确说明并基于可用信息给出合理推断
 
-    private static IList<AITool> CreateTools(StockFinancialTools financialTools)
-    {
-        var tools = new List<AITool>();
-        tools.AddRange(financialTools.GetFunctions());
-        return tools;
+## 输出格式
+仅输出符合以下 Schema 的纯 JSON 字符串，严禁包含 Markdown 格式（如 ```json）或任何解释性文字：
+{schemaJson}";
     }
 }

@@ -10,9 +10,16 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public class TechnicalAnalystAgent : AnalystAgentBase
 {
+    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult));
+
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: (JsonElement)Schema,
+        schemaName: nameof(TechnicalAnalysisResult),
+        schemaDescription: "技术分析师的结构化分析结果，包含图表形态、关键价位、技术指标和交易策略"
+    );
+
     public TechnicalAnalystAgent(
         IChatClient chatClient,
-        StockBasicTools basicTools,
         StockTechnicalTools technicalTools)
         : base(
             chatClient,
@@ -22,16 +29,15 @@ public class TechnicalAnalystAgent : AnalystAgentBase
             temperature: 0.0f,
             topP: 0.0f,
             topK: 1,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult)),
-                schemaName: nameof(TechnicalAnalysisResult),
-                schemaDescription: "技术分析师的结构化分析结果，包含图表形态、关键价位、技术指标和交易策略"
-            ),
-            tools: CreateTools(basicTools, technicalTools))
+            responseFormat: null,
+            tools: [.. technicalTools.GetFunctions()])
     {
     }
 
-    private static string GetInstructions() => @"
+    private static string GetInstructions()
+    {
+        var schemaJson = JsonSerializer.Serialize(Schema, new JsonSerializerOptions { WriteIndented = true });
+        return $@"
 ## 核心职责
 解析图表形态、技术指标信号，定位关键价位，提供量化交易建议。所有分析严格基于技术面，不涉及任何基本面或市场情绪考量。
 
@@ -48,10 +54,10 @@ public class TechnicalAnalystAgent : AnalystAgentBase
 - 量价关系是验证趋势有效性的重要依据
 - 多个技术指标应相互验证，提高信号可靠性
 - 交易策略需明确具体的价位区间和风险控制点位
-- 如工具调用失败或数据不完整，应明确说明缺少哪些数据";
+- 如工具调用失败或数据不完整，应明确说明缺少哪些数据
 
-    private static IList<AITool> CreateTools(StockBasicTools basicTools, StockTechnicalTools technicalTools)
-    {
-        return [.. basicTools.GetFunctions(), .. technicalTools.GetFunctions()];
+## 输出格式
+仅输出符合以下 Schema 的纯 JSON 字符串，严禁包含 Markdown 格式（如 ```json）或任何解释性文字：
+{schemaJson}";
     }
 }

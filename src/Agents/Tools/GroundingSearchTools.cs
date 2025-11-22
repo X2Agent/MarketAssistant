@@ -4,8 +4,8 @@ using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel.Data;
 using System.ComponentModel;
+using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Agents.Tools;
 
@@ -55,10 +55,6 @@ public class GroundingSearchTools
         {
             var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top);
             return searchResults.Take(top).ToList();
-            //return new KernelSearchResults<TextSearchResult>(AsAsync(searchResults.Take(top)), searchResults.Count, new Dictionary<string, object?>
-            //{
-            //    {"query", query}
-            //});
         }
         catch (Exception ex)
         {

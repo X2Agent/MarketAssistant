@@ -10,6 +10,14 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public class NewsEventAnalystAgent : AnalystAgentBase
 {
+    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult));
+
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: (JsonElement)Schema,
+        schemaName: nameof(NewsEventAnalysisResult),
+        schemaDescription: "新闻事件分析师的结构化分析结果，包含事件解读、影响评估和投资启示"
+    );
+
     public NewsEventAnalystAgent(
         IChatClient chatClient,
         StockNewsTools newsTools)
@@ -21,16 +29,15 @@ public class NewsEventAnalystAgent : AnalystAgentBase
             temperature: 0.2f,
             topP: 0.75f,
             topK: 10,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult)),
-                schemaName: nameof(NewsEventAnalysisResult),
-                schemaDescription: "新闻事件分析师的结构化分析结果，包含事件解读、影响评估和投资启示"
-            ),
-            tools: CreateTools(newsTools))
+            responseFormat: null,
+            tools: [.. newsTools.GetFunctions()])
     {
     }
 
-    private static string GetInstructions() => @"
+    private static string GetInstructions()
+    {
+        var schemaJson = JsonSerializer.Serialize(Schema, new JsonSerializerOptions { WriteIndented = true });
+        return $@"
 ## 核心职责
 精准分析新闻事件对股票的短期与中期影响。分析聚焦于事件的真实性、重要性、市场影响和潜在的投资启示，严格避免技术面分析和不基于事件的长期投资建议。
 
@@ -49,12 +56,10 @@ public class NewsEventAnalystAgent : AnalystAgentBase
 - 信息来源的可信度直接影响事件分析的权重
 - 关注事件的后续发展和潜在催化剂
 - 市场反应可能存在过度或不足，需理性判断
-- 如工具调用失败或无新闻数据，应明确说明无法进行事件分析";
+- 如工具调用失败或无新闻数据，应明确说明无法进行事件分析
 
-    private static IList<AITool> CreateTools(StockNewsTools newsTools)
-    {
-        var tools = new List<AITool>();
-        tools.AddRange(newsTools.GetFunctions());
-        return tools;
+## 输出格式
+仅输出符合以下 Schema 的纯 JSON 字符串，严禁包含 Markdown 格式（如 ```json）或任何解释性文字：
+{schemaJson}";
     }
 }

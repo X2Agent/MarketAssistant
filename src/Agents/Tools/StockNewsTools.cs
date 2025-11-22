@@ -145,7 +145,7 @@ public class StockNewsTools
     /// </summary>
     [Description("获取指定股票的聚合新闻上下文，一次返回最近且相关的新闻要点。默认返回精简要点，可通过 response_format 控制详细程度。")]
     public async Task<IEnumerable<NewsItem>> GetStockNewsContextAsync(
-        [Description("股票代码，支持含前缀或仅数字")] string stockSymbol,
+        [Description("股票代码")] string stockSymbol,
         [Description("返回的新闻条数上限，默认 5，建议 1-10")] int topK = 5,
         [Description("响应格式：concise | detailed。默认 concise 更省 token")] string responseFormat = "concise")
     {

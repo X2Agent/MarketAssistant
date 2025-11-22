@@ -10,6 +10,14 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
+    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult));
+
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: (JsonElement)Schema,
+        schemaName: nameof(FundamentalAnalysisResult),
+        schemaDescription: "基本面分析师的结构化分析结果，包含公司基本面、行业竞争和投资价值评估"
+    );
+
     public FundamentalAnalystAgent(
         IChatClient chatClient,
         StockBasicTools basicTools)
@@ -21,16 +29,15 @@ public class FundamentalAnalystAgent : AnalystAgentBase
             temperature: 0.2f,
             topP: 0.6f,
             topK: 8,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult)),
-                schemaName: nameof(FundamentalAnalysisResult),
-                schemaDescription: "基本面分析师的结构化分析结果，包含公司基本面、行业竞争和投资价值评估"
-            ),
-            tools: CreateTools(basicTools))
+            responseFormat: null,
+            tools: [.. basicTools.GetFunctions()])
     {
     }
 
-    private static string GetInstructions() => @"
+    private static string GetInstructions()
+    {
+        var schemaJson = JsonSerializer.Serialize(Schema, new JsonSerializerOptions { WriteIndented = true });
+        return $@"
 ## 核心职责
 透彻分析公司的基本面状况、商业模式及盈利能力，准确评估公司在所属行业中的地位、竞争格局与优势，预测并识别公司的长期增长驱动因素和投资价值，揭示潜在的关键风险因素与投资亮点。
 
@@ -45,12 +52,10 @@ public class FundamentalAnalystAgent : AnalystAgentBase
 - 评分指标（1-10分）应基于行业对比和历史数据综合判断
 - 估值分析需对比行业均值，判断高估/低估程度
 - 投资亮点聚焦1-2个最核心优势，关键风险突出最主要的风险因素
-- 如工具调用失败或数据不完整，应明确说明缺少哪些数据";
+- 如工具调用失败或数据不完整，应明确说明缺少哪些数据
 
-    private static IList<AITool> CreateTools(StockBasicTools basicTools)
-    {
-        var tools = new List<AITool>();
-        tools.AddRange(basicTools.GetFunctions());
-        return tools;
+## 输出格式
+仅输出符合以下 Schema 的纯 JSON 字符串，严禁包含 Markdown 格式（如 ```json）或任何解释性文字：
+{schemaJson}";
     }
 }

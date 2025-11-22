@@ -31,19 +31,19 @@ public sealed class StockTechnicalTools
     }
 
     [Description("获取近30日最新日线KDJ")]
-    public Task<StockKDJ> GetStockKDJAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public Task<StockKDJ> GetStockKDJAsync([Description("股票代码")] string stockSymbol)
         => GetStockIndicatorAsync<StockKDJ>("kdj", stockSymbol);
 
     [Description("获取近30日最新日线MACD")]
-    public Task<StockMACD> GetStockMACDAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public Task<StockMACD> GetStockMACDAsync([Description("股票代码")] string stockSymbol)
         => GetStockIndicatorAsync<StockMACD>("macd", stockSymbol);
 
     [Description("获取近30日最新日线BOLL")]
-    public Task<StockBoll> GetStockBOLLAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public Task<StockBoll> GetStockBOLLAsync([Description("股票代码")] string stockSymbol)
         => GetStockIndicatorAsync<StockBoll>("boll", stockSymbol);
 
     [Description("获取近30日最新日线MA")]
-    public Task<StockMA> GetStockMAAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public Task<StockMA> GetStockMAAsync([Description("股票代码")] string stockSymbol)
         => GetStockIndicatorAsync<StockMA>("ma", stockSymbol);
 
     public IEnumerable<AIFunction> GetFunctions()

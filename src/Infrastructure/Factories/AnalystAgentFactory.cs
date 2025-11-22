@@ -1,12 +1,7 @@
 using MarketAssistant.Agents;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Tools;
-using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Rag.Interfaces;
-using MarketAssistant.Services.Browser;
-using MarketAssistant.Services.Settings;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure.Factories;
@@ -39,6 +34,7 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     private readonly StockTechnicalTools _stockTechnicalTools;
     private readonly GroundingSearchTools _groundingSearchTools;
     private readonly StockNewsTools _newsTools;
+    private readonly MarketSentimentTools _marketSentimentTools;
     private readonly ILogger<AnalystAgentFactory> _logger;
 
     public AnalystAgentFactory(
@@ -48,13 +44,15 @@ public class AnalystAgentFactory : IAnalystAgentFactory
         StockTechnicalTools stockTechnicalTools,
         GroundingSearchTools groundingSearchTools,
         StockNewsTools newsTools,
-        ILogger<AnalystAgentFactory> logger)
+        MarketSentimentTools marketSentimentTools,
+    ILogger<AnalystAgentFactory> logger)
     {
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _stockBasicTools = stockBasicTools ?? throw new ArgumentNullException(nameof(stockBasicTools));
         _stockFinancialTools = stockFinancialTools ?? throw new ArgumentNullException(nameof(stockFinancialTools));
         _stockTechnicalTools = stockTechnicalTools ?? throw new ArgumentNullException(nameof(stockTechnicalTools));
         _groundingSearchTools = groundingSearchTools ?? throw new ArgumentNullException(nameof(groundingSearchTools));
+        _marketSentimentTools = marketSentimentTools ?? throw new ArgumentNullException(nameof(groundingSearchTools));
         _newsTools = newsTools ?? throw new ArgumentNullException(nameof(newsTools));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -73,12 +71,10 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             {
                 AnalystType.FinancialAnalyst => new FinancialAnalystAgent(
                     chatClient,
-                    _stockBasicTools,
                     _stockFinancialTools),
 
                 AnalystType.TechnicalAnalyst => new TechnicalAnalystAgent(
                     chatClient,
-                    _stockBasicTools,
                     _stockTechnicalTools),
 
                 AnalystType.FundamentalAnalyst => new FundamentalAnalystAgent(
@@ -87,7 +83,8 @@ public class AnalystAgentFactory : IAnalystAgentFactory
 
                 AnalystType.MarketSentimentAnalyst => new MarketSentimentAnalystAgent(
                     chatClient,
-                    _stockFinancialTools),
+                    _stockFinancialTools,
+                    _marketSentimentTools),
 
                 AnalystType.NewsEventAnalyst => new NewsEventAnalystAgent(
                     chatClient,

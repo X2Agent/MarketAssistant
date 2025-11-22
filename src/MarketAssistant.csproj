@@ -23,7 +23,7 @@
     <!-- macOS 特定配置 -->
     <CFBundleName>MarketAssistant</CFBundleName>
     <CFBundleDisplayName>Market Assistant</CFBundleDisplayName>
-    <CFBundleIdentifier>com.marketassistant.app</CFBundleIdentifier>
+    <CFBundleIdentifier>xyz.haoai.market</CFBundleIdentifier>
     <CFBundleVersion>1.0.0</CFBundleVersion>
     <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
     <CFBundlePackageType>APPL</CFBundlePackageType>
@@ -46,29 +46,29 @@
 
   <ItemGroup>
     <PackageReference Include="AdaptiveCards" Version="3.1.0" />
-    <PackageReference Include="Avalonia" Version="11.3.8" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.8" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.8" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.8" />
+    <PackageReference Include="Avalonia" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.9" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.9" />
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.1.0">
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.1.1">
 	  <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 	  <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
 	</PackageReference>
     <PackageReference Include="Markdig" Version="0.43.0" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251110.2" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.251110.2" />
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251110.2" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251114.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.251114.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251114.1" />
 	<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.10.2-preview.1.25552.1" />
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
 	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 	<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+	<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
 	<PackageReference Include="Microsoft.Playwright" Version="1.56.0" />
 	<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.67.1-preview" />
-	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Core" Version="1.67.1-preview" />
 	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.67.1-alpha" />
 	<PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
-	<PackageReference Include="PdfPig" Version="0.1.11" />
+	<PackageReference Include="PdfPig" Version="0.1.12" />
 	<PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
 	<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
 	<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />

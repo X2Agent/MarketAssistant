@@ -93,7 +93,9 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
 
                 await foreach (var searchResult in searchResults)
                 {
-                    var textResult = new TextSearchResult(searchResult.Record.Text)
+                    // Microsoft.SemanticKernel.Data.TextSearchResult 构造函数接收 string value
+                    // Name 和 Link 是它的属性，不是构造函数参数
+                    var textResult = new TextSearchResult(value: searchResult.Record.Text)
                     {
                         Name = searchResult.Record.ParagraphId,
                         Link = searchResult.Record.DocumentUri

@@ -10,9 +10,16 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public class FinancialAnalystAgent : AnalystAgentBase
 {
+    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult));
+
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: (JsonElement)Schema,
+        schemaName: nameof(FinancialAnalysisResult),
+        schemaDescription: "财务分析师的结构化分析结果，包含财务健康、盈利质量、现金流和风险预警"
+    );
+
     public FinancialAnalystAgent(
         IChatClient chatClient,
-        StockBasicTools basicTools,
         StockFinancialTools financialTools)
         : base(
             chatClient,
@@ -22,16 +29,15 @@ public class FinancialAnalystAgent : AnalystAgentBase
             temperature: 0.1f,
             topP: 0.9f,
             topK: 10,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult)),
-                schemaName: nameof(FinancialAnalysisResult),
-                schemaDescription: "财务分析师的结构化分析结果，包含财务健康、盈利质量、现金流和风险预警"
-            ),
-            tools: CreateTools(basicTools, financialTools))
+            responseFormat: null,
+            tools: [.. financialTools.GetFunctions()])
     {
     }
 
-    private static string GetInstructions() => @"
+    private static string GetInstructions()
+    {
+        var schemaJson = JsonSerializer.Serialize(Schema, new JsonSerializerOptions { WriteIndented = true });
+        return $@"
 ## 核心职责
 深入评估公司财务报表，剖析财务健康状况、盈利能力、盈利质量和现金流状况，识别并预警潜在的财务风险点，提供基于财务数据的客观分析洞察。
 
@@ -47,13 +53,10 @@ public class FinancialAnalystAgent : AnalystAgentBase
 - 偿债能力和现金流分析是财务健康的核心指标
 - 利润质量评估需结合现金流验证盈利真实性
 - 财务造假风险需关注异常指标和关联交易
-- 如工具调用失败或数据不完整，应明确说明缺少哪些数据";
+- 如工具调用失败或数据不完整，应明确说明缺少哪些数据
 
-    private static IList<AITool> CreateTools(StockBasicTools basicTools, StockFinancialTools financialTools)
-    {
-        var tools = new List<AITool>();
-        tools.AddRange(basicTools.GetFunctions());
-        tools.AddRange(financialTools.GetFunctions());
-        return tools;
+## 输出格式
+仅输出符合以下 Schema 的纯 JSON 字符串，严禁包含 Markdown 格式（如 ```json）或任何解释性文字：
+{schemaJson}";
     }
 }

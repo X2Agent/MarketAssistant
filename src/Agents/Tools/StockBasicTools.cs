@@ -17,7 +17,7 @@ public sealed class StockBasicTools
     }
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
-    public async Task<StockQuoteInfo> GetStockInfoAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public async Task<StockQuoteInfo> GetStockInfoAsync([Description("股票代码")] string stockSymbol)
     {
         try
         {
@@ -71,7 +71,7 @@ public sealed class StockBasicTools
     }
 
     [Description("根据股票代码获取上市公司基本面信息，包括公司简介、主营业务、所属行业等")]
-    public async Task<StockCompanyInfo> GetStockCompanyInfoAsync([Description("股票代码，支持含前缀或仅数字")] string stockSymbol)
+    public async Task<StockCompanyInfo> GetStockCompanyInfoAsync([Description("股票代码")] string stockSymbol)
     {
         try
         {

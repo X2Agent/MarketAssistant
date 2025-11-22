@@ -1,7 +1,8 @@
 namespace MarketAssistant.Rag.Interfaces;
 
 /// <summary>
-/// ֧��ͬʱ��ȡ�ı���ͼƬ���������ĵ���ȡ����
+/// 支持从文档中读取文本、图片、表格等块级内容的抽象接口。
+/// 设计目标是将复杂文档（PDF、Markdown、Word 等）拆分为可索引的内容块。
 /// </summary>
 public interface IDocumentBlockReader
 {
@@ -12,33 +13,33 @@ public interface IDocumentBlockReader
 public enum DocumentBlockType
 {
     /// <summary>
-    /// ��ͨ�ı�����
+    /// 普通文本段落
     /// </summary>
     Text,
 
     /// <summary>
-    /// ���⣨��ͬ����ı����в�ͬ��������Ҫ�ԣ�
+    /// 标题（Heading），有层级信息
     /// </summary>
     Heading,
 
     /// <summary>
-    /// �б������/�����б���
+    /// 列表（有序或无序）
     /// </summary>
     List,
 
     /// <summary>
-    /// ��������
+    /// 表格数据
     /// </summary>
     Table,
 
     /// <summary>
-    /// ͼƬ/ͼ��
+    /// 图片或视觉内容块
     /// </summary>
     Image
 }
 
 /// <summary>
-/// �ĵ������
+/// 文档块的基类，包含公共属性（类型、顺序、标题/说明等）。
 /// </summary>
 public abstract class DocumentBlock
 {
@@ -48,7 +49,7 @@ public abstract class DocumentBlock
 }
 
 /// <summary>
-/// �ı���
+/// 文本块
 /// </summary>
 public sealed class TextBlock : DocumentBlock
 {
@@ -61,12 +62,12 @@ public sealed class TextBlock : DocumentBlock
 }
 
 /// <summary>
-/// �����
+/// 标题块，包含层级（Level 对应 H1-H6）
 /// </summary>
 public sealed class HeadingBlock : DocumentBlock
 {
     public required string Text { get; init; }
-    public required int Level { get; init; } // 1-6����ӦH1-H6
+    public required int Level { get; init; } // 1-6 对应 H1-H6
 
     public HeadingBlock()
     {
@@ -75,7 +76,7 @@ public sealed class HeadingBlock : DocumentBlock
 }
 
 /// <summary>
-/// �б���
+/// 列表块
 /// </summary>
 public sealed class ListBlock : DocumentBlock
 {
@@ -88,14 +89,14 @@ public sealed class ListBlock : DocumentBlock
     }
 
     /// <summary>
-    /// �б����ı���ʾ��������������
+    /// 将列表项合并为文本表示（用于索引或展示）
     /// </summary>
     public string Text => string.Join("\n", Items.Select((item, index) =>
         ListType == ListType.Ordered ? $"{index + 1}. {item}" : $"- {item}"));
 }
 
 /// <summary>
-/// �����
+/// 表格块，包含原始 Markdown 表示与行数据
 /// </summary>
 public sealed class TableBlock : DocumentBlock
 {
@@ -110,19 +111,19 @@ public sealed class TableBlock : DocumentBlock
     }
 
     /// <summary>
-    /// ������ı���ʾ��������������
+    /// 表格的文本表示，包含可选标题和 Markdown 内容
     /// </summary>
     public string Text => (TableCaption != null ? TableCaption + "\n" : string.Empty) + Markdown;
 }
 
 /// <summary>
-/// ͼƬ��
+/// 图片块，包含字节数据和可选描述
 /// </summary>
 public sealed class ImageBlock : DocumentBlock
 {
     public required byte[] ImageBytes { get; init; }
-    public string? Description { get; init; } // AI���ɵ�ͼƬ����
-    public string? ImagePath { get; init; } // ͼƬ����Ч·�����ѽ�����
+    public string? Description { get; init; } // AI 生成的图片描述
+    public string? ImagePath { get; init; } // 图片的原始路径（如果有）
 
     public ImageBlock()
     {
@@ -130,34 +131,34 @@ public sealed class ImageBlock : DocumentBlock
     }
 
     /// <summary>
-    /// ͼƬ���ı���ʾ��������������
+    /// 图片的文本表示，优先使用 AI 描述，其次使用 Caption，最后使用占位符
     /// </summary>
-    public string Text => Description ?? Caption ?? "[ͼƬ]";
+    public string Text => Description ?? Caption ?? "[图片]";
 }
 
 /// <summary>
-/// �б�����
+/// 列表类型枚举
 /// </summary>
 public enum ListType
 {
     /// <summary>
-    /// �����б���bullet points��
+    /// 无序列表（bullet points）
     /// </summary>
     Unordered,
 
     /// <summary>
-    /// �����б���numbered��
+    /// 有序列表（numbered）
     /// </summary>
     Ordered
 }
 
 /// <summary>
-/// DocumentBlock ��չ����
+/// DocumentBlock 的扩展方法
 /// </summary>
 public static class DocumentBlockExtensions
 {
     /// <summary>
-    /// ��ȡ�����ĵ�����ı���ʾ��������������
+    /// 获取块的文本表示，便于索引或拼接
     /// </summary>
     public static string GetText(this DocumentBlock block)
     {
@@ -173,7 +174,7 @@ public static class DocumentBlockExtensions
     }
 
     /// <summary>
-    /// �жϿ��Ƿ������Ч�ı�����
+    /// 判断块是否包含可用于索引的文本内容
     /// </summary>
     public static bool HasTextContent(this DocumentBlock block)
     {
