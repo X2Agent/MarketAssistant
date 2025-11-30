@@ -4,7 +4,7 @@ namespace MarketAssistant.Services.Cache;
 
 /// <summary>
 /// 分析结果缓存服务接口（彻底重构版）
-/// 缓存完整的 MarketAnalysisReport 而不是单个 AnalystResult
+/// 缓存完整的 MarketAnalysisReport
 /// </summary>
 public interface IAnalysisCacheService : IDisposable
 {

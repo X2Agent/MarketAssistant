@@ -1,6 +1,8 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -8,6 +10,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// 新闻事件分析师代理
 /// 专注于分析新闻事件、公告和突发事件对股票的影响
 /// </summary>
+[DisplayName("新闻事件分析师")]
+[Description("专注于新闻事件对股票的影响分析")]
 public class NewsEventAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult));

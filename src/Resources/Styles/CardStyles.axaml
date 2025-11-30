@@ -3,15 +3,15 @@
 
     <!-- 选股模式卡片样式 -->
     <Style Selector="Border.mode-card">
-        <Setter Property="Padding" Value="16,8"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="{StaticResource PagePadding}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.mode-card.selected">
-        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
         <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
     </Style>
     <Style Selector="Border.mode-card TextBlock.mode-name">
@@ -23,9 +23,9 @@
 
     <!-- 快速策略卡片样式 -->
     <Style Selector="Border.strategy-card">
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -35,9 +35,9 @@
     <Style Selector="Border.stock-card">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
@@ -52,9 +52,9 @@
     <Style Selector="Border.hot-stock-card">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
@@ -66,9 +66,9 @@
     <Style Selector="Border.recent-stock-card">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.recent-stock-card:pointerover Button.favorite-button">
@@ -79,8 +79,8 @@
     <!-- 新闻卡片样式 -->
     <Style Selector="Border.news-card">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
@@ -88,20 +88,25 @@
     </Style>
 
     <!-- 功能项样式 -->
-    <Style Selector="Border.featureItem">
+    <Style Selector="Border.feature-item">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="Margin" Value="0,0,0,8"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
     </Style>
 
-    <Style Selector="Border.featureIcon">
+    <Style Selector="Border.feature-icon">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.feature-title">
+        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
 </Styles>

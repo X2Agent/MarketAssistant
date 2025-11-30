@@ -9,11 +9,11 @@
 
     <!-- 时间周期按钮样式 -->
     <Style Selector="Button.period-button">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="Padding" Value="12,6"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
@@ -30,23 +30,23 @@
     </Style>
 
     <!-- 功能按钮样式 -->
-    <Style Selector="Button.featureButton">
+    <Style Selector="Button.feature-button">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Height" Value="32"/>
-        <Setter Property="Padding" Value="8,0"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
 
     <!-- 成功按钮样式 -->
     <Style Selector="Button.success">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -55,8 +55,8 @@
     <Style Selector="Button.warning">
         <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

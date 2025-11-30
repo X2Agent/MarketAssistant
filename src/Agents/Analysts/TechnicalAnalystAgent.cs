@@ -1,6 +1,8 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -8,6 +10,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// 技术分析师代理
 /// 专注于图表形态、技术指标和交易策略分析
 /// </summary>
+[DisplayName("技术分析师")]
+[Description("专注于图表模式和技术指标分析")]
 public class TechnicalAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult));

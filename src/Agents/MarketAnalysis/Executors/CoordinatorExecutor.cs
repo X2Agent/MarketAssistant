@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI;
@@ -37,7 +38,7 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 在构造函数中创建 Agent（确保 tools 配置正确）
-        _coordinatorAgent = analystAgentFactory.CreateAnalyst(AnalystType.CoordinatorAnalyst);
+        _coordinatorAgent = analystAgentFactory.CreateAnalyst<CoordinatorAnalystAgent>();
 
         _logger.LogInformation("协调分析师 Agent 已创建（支持工具调用 + 结构化输出）");
     }
@@ -74,8 +75,14 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
 
         try
         {
+            // 过滤消息：移除包含工具调用(FunctionCallContent)和结果(FunctionResultContent)的消息
+            // 这样可以显著减少 Token 消耗，并避免 Coordinator 被中间过程干扰
+            var filteredMessages = analystMessages
+                .Where(m => !m.Contents.Any(c => c is FunctionCallContent or FunctionResultContent))
+                .ToList();
+
             // 构建聊天消息列表
-            var messages = new List<ChatMessage>(analystMessages)
+            var messages = new List<ChatMessage>(filteredMessages)
             {
                 // 添加用户请求：生成综合报告
                 new ChatMessage(
@@ -100,7 +107,6 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
             }
 
             // 🎉 直接反序列化为 CoordinatorResult
-
             var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(JsonOptions);
 
             if (coordinatorResult == null)

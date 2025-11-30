@@ -3,8 +3,8 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         x:Class="MarketAssistant.Views.Windows.NotificationWindow"
-        Width="320"
-        Height="72"
+        Width="{StaticResource NotificationWidth}"
+        Height="{StaticResource NotificationHeight}"
         CanResize="False"
         ShowInTaskbar="False"
         SystemDecorations="None"
@@ -14,26 +14,26 @@
         WindowStartupLocation="Manual">
     
     <Border Name="NotificationBorder"
-            Background="#2D2D30"
-            BorderBrush="#3F3F46"
-            BorderThickness="1"
-            CornerRadius="8"
-            Padding="12"
-            Margin="8"
-            BoxShadow="0 4 16 0 #60000000">
+            Background="{StaticResource NotificationDarkBackgroundBrush}"
+            BorderBrush="{StaticResource NotificationDarkBorderBrush}"
+            BorderThickness="{StaticResource DefaultBorderThickness}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource SmallMargin}"
+            BoxShadow="{StaticResource NotificationBoxShadow}">
         
         <Grid ColumnDefinitions="Auto,*,Auto">
             
             <!-- 图标区域 -->
             <Border Grid.Column="0"
-                    Width="32"
-                    Height="32"
-                    CornerRadius="16"
-                    Background="#4CAF50"
+                    Width="{StaticResource MediumIconSize}"
+                    Height="{StaticResource MediumIconSize}"
+                    CornerRadius="{StaticResource LargeCornerRadius}"
+                    Background="{StaticResource NotificationIconSuccessBrush}"
                     VerticalAlignment="Center"
-                    Margin="0,0,12,0">
+                    Margin="{StaticResource DefaultMargin}">
                 <TextBlock Text="✓"
-                           FontSize="18"
+                           FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"
                            Foreground="White"
                            HorizontalAlignment="Center"
@@ -45,9 +45,9 @@
                         VerticalAlignment="Center">
                 <TextBlock Name="MessageText"
                            Text="操作成功"
-                           FontSize="14"
+                           FontSize="{StaticResource LabelFontSize}"
                            FontWeight="Medium"
-                           Foreground="#FFFFFF"
+                           Foreground="{StaticResource NotificationTextLightBrush}"
                            TextWrapping="Wrap"/>
             </StackPanel>
             
@@ -55,27 +55,27 @@
             <Button Grid.Column="2"
                     Name="CloseButton"
                     Content="✕"
-                    Width="24"
-                    Height="24"
-                    FontSize="16"
-                    Foreground="#8F8F8F"
+                    Width="{StaticResource DefaultIconSize}"
+                    Height="{StaticResource DefaultIconSize}"
+                    FontSize="{StaticResource SectionTitleFontSize}"
+                    Foreground="{StaticResource NotificationTextSecondaryBrush}"
                     Background="Transparent"
-                    BorderThickness="0"
+                    BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
-                    Margin="8,0,0,0"
+                    Margin="{StaticResource SmallHorizontalMargin}"
                     Padding="0"
-                    CornerRadius="12"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
                     Cursor="Hand">
                 <Button.Styles>
                     <Style Selector="Button:pointerover">
-                        <Setter Property="Background" Value="#3F3F46"/>
-                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                        <Setter Property="Background" Value="{StaticResource NotificationDarkHoverBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
                     </Style>
                     <Style Selector="Button:pressed">
-                        <Setter Property="Background" Value="#4F4F56"/>
-                        <Setter Property="Foreground" Value="#FFFFFF"/>
+                        <Setter Property="Background" Value="{StaticResource NotificationDarkPressedBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
                     </Style>
                 </Button.Styles>
             </Button>

@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Models;
+using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -12,8 +14,10 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 股票详情页ViewModel
 /// </summary>
-public partial class StockPageViewModel : ViewModelBase
+public partial class StockPageViewModel : ViewModelBase, INavigationAware<StockNavigationParameter>
 {
+    public override string Title => "股票详情";
+
     private readonly StockKLineService _stockKLineService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
 
@@ -55,7 +59,6 @@ public partial class StockPageViewModel : ViewModelBase
     public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
     public bool IsMonthlySelected => CurrentKLineType == KLineType.Monthly;
 
-    public IRelayCommand RefreshDataCommand { get; private set; }
     public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
     public IRelayCommand NavigateToAnalysisCommand { get; private set; }
 
@@ -65,7 +68,6 @@ public partial class StockPageViewModel : ViewModelBase
     {
         _stockKLineService = stockKLineService;
 
-        RefreshDataCommand = new RelayCommand(RefreshDataAsync);
         ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
     }
@@ -73,7 +75,7 @@ public partial class StockPageViewModel : ViewModelBase
     /// <summary>
     /// 设置股票代码（异步加载数据，避免阻塞UI）
     /// </summary>
-    public void SetStockCode(string code)
+    private void SetStockCode(string code)
     {
         StockCode = code;
         if (!string.IsNullOrEmpty(code))
@@ -102,16 +104,17 @@ public partial class StockPageViewModel : ViewModelBase
     /// <summary>
     /// 刷新股票数据
     /// </summary>
-    private async void RefreshDataAsync()
+    [RelayCommand]
+    private async Task RefreshDataAsync()
     {
         if (!string.IsNullOrEmpty(StockCode))
         {
-            await LoadStockDataAsync(StockCode);
+            await SafeExecuteAsync(async () => await LoadStockDataAsync(StockCode), "刷新数据");
         }
     }
 
     /// <summary>
-    /// 导航到股票分析页面
+    /// 导航到股票详情页
     /// </summary>
     private void NavigateToAnalysisAsync()
     {
@@ -119,10 +122,7 @@ public partial class StockPageViewModel : ViewModelBase
             return;
 
         // 发送导航消息到分析页面
-        WeakReferenceMessenger.Default.Send(new NavigationMessage("Analysis", new Dictionary<string, object>
-        {
-            { "code", StockCode }
-        }));
+        WeakReferenceMessenger.Default.Send(new NavigationMessage("Analysis", new StockNavigationParameter(StockCode, StockName)));
     }
 
     /// <summary>
@@ -181,12 +181,6 @@ public partial class StockPageViewModel : ViewModelBase
             KLineDataSet = kLineDataSet;
             KLineData = new ObservableCollection<StockKLineData>(kLineDataSet.Data);
 
-            // 如果StockName为空，使用股票代码
-            if (string.IsNullOrEmpty(StockName))
-            {
-                StockName = stockCode;
-            }
-
             // 计算价格信息
             CalculatePriceInfo(kLineDataSet.Data);
         }
@@ -231,5 +225,28 @@ public partial class StockPageViewModel : ViewModelBase
             PriceChange = 0;
             PriceChangePercent = 0;
         }
+    }
+
+    public void OnNavigatedTo(StockNavigationParameter parameter)
+    {
+        if (!string.IsNullOrEmpty(parameter.StockCode))
+        {
+            if (!string.IsNullOrEmpty(parameter.StockName))
+            {
+                StockName = parameter.StockName;
+            }
+            else
+            {
+                // 如果没有传递名称，重置为空或保持代码
+                StockName = parameter.StockCode;
+            }
+            SetStockCode(parameter.StockCode);
+        }
+    }
+
+    public void OnNavigatedFrom()
+    {
+        // 离开页面时可以取消正在进行的加载
+        _loadingCancellationTokenSource?.Cancel();
     }
 }

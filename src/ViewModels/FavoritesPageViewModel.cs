@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Models;
 using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -28,11 +29,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     /// 构造函数
     /// </summary>
     public FavoritesPageViewModel(
-        StockFavoriteService favoriteService, 
+        StockFavoriteService favoriteService,
         StockService stockService,
         StockInfoCache stockInfoCache,
         IDialogService dialogService,
-        ILogger<FavoritesPageViewModel> logger) 
+        ILogger<FavoritesPageViewModel> logger)
         : base(logger)
     {
         _favoriteService = favoriteService;
@@ -52,7 +53,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
         {
             // 获取收藏列表
             var favoritesCodes = _favoriteService.GetFavoritesCodes();
-            
+
             Stocks.Clear();
 
             // 使用并发加载所有股票数据
@@ -67,44 +68,41 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     {
         const int maxConcurrency = 3; // 最多同时请求3个股票数据
         var semaphore = new SemaphoreSlim(maxConcurrency);
-        var tasks = new List<Task<StockInfo?>>();
 
-        foreach (var favorite in favorites)
+        var tasks = favorites.Select(async favorite =>
         {
-            var task = Task.Run(async () =>
+            await semaphore.WaitAsync();
+            try
             {
-                await semaphore.WaitAsync();
-                try
+                // 先尝试从缓存获取
+                var stockInfo = _stockInfoCache.Get(favorite.Code, favorite.Market);
+
+                // 如果缓存中没有,则从网络获取
+                if (stockInfo == null)
                 {
-                    // 先尝试从缓存获取
-                    var stockInfo = _stockInfoCache.Get(favorite.Code, favorite.Market);
-                    
-                    // 如果缓存中没有,则从网络获取
-                    if (stockInfo == null)
+                    stockInfo = await _stockService.GetStockInfoAsync(favorite.Code, favorite.Market);
+                    // 缓存获取到的数据
+                    if (stockInfo != null)
                     {
-                        stockInfo = await _stockService.GetStockInfoAsync(favorite.Code, favorite.Market);
-                        // 缓存获取到的数据
                         _stockInfoCache.Set(stockInfo);
                     }
-                    
-                    return stockInfo;
                 }
-                catch (Exception ex)
-                {
-                    Logger?.LogError(ex, $"加载股票 {favorite.Code} 数据时出错");
-                    return null;
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            });
 
-            tasks.Add(task);
-        }
+                return stockInfo;
+            }
+            catch (Exception ex)
+            {
+                Logger?.LogError(ex, $"加载股票 {favorite.Code} 数据时出错");
+                return null;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
 
         var results = await Task.WhenAll(tasks);
-        
+
         // 在UI线程上批量添加结果
         foreach (var stockInfo in results)
         {
@@ -124,7 +122,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
         if (stock == null) return;
 
         WeakReferenceMessenger.Default.Send(
-            new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stock.FullCode } }));
+            new NavigationMessage("Stock", new StockNavigationParameter(stock.FullCode, stock.Name)));
     }
 
     /// <summary>
@@ -154,10 +152,10 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
                 {
                     Stocks.Remove(stockToRemove);
                 }
-                
+
                 // 再从持久化存储中移除
                 _favoriteService.RemoveFavorite(stock.Code, stock.Market);
-                
+
                 Logger?.LogInformation($"已取消收藏股票: {stock.Name}({stock.Code})");
                 await Task.CompletedTask;
             }, "取消收藏");

@@ -1,6 +1,4 @@
-using Avalonia.Threading;
 using MarketAssistant.Services.Dialog;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure.Core;
@@ -46,16 +44,12 @@ public sealed class GlobalExceptionHandler
     {
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
-        
+
         // 注册 Avalonia 的 UI 线程异常处理
         if (Dispatcher.UIThread != null)
         {
             Dispatcher.UIThread.UnhandledException += OnDispatcherUnhandledException;
         }
-
-#if DEBUG
-        AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
-#endif
     }
 
     /// <summary>
@@ -102,28 +96,17 @@ public sealed class GlobalExceptionHandler
     private void OnDispatcherUnhandledException(object sender, Avalonia.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
         _logger.LogError(e.Exception, "UI 线程发生未处理的异常");
-        
+
         var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception);
-        
+
         // 标记异常已处理，防止应用崩溃
         e.Handled = true;
-        
+
         // 显示错误对话框
         Dispatcher.UIThread.Post(async () =>
         {
             await ShowErrorAsync("操作失败", message);
         });
-    }
-
-    /// <summary>
-    /// 处理第一次机会异常（仅调试模式）
-    /// </summary>
-    private void OnFirstChanceException(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
-    {
-        if (e.Exception is not (OperationCanceledException or TaskCanceledException))
-        {
-            _logger.LogDebug(e.Exception, "第一次机会异常: {Message}", e.Exception.Message);
-        }
     }
 
     /// <summary>
@@ -303,15 +286,11 @@ public sealed class GlobalExceptionHandler
 
             AppDomain.CurrentDomain.UnhandledException -= _instance.OnUnhandledException;
             TaskScheduler.UnobservedTaskException -= _instance.OnUnobservedTaskException;
-            
+
             if (Dispatcher.UIThread != null)
             {
                 Dispatcher.UIThread.UnhandledException -= _instance.OnDispatcherUnhandledException;
             }
-
-#if DEBUG
-            AppDomain.CurrentDomain.FirstChanceException -= _instance.OnFirstChanceException;
-#endif
 
             _instance = null;
         }

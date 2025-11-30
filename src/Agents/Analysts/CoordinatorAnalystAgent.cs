@@ -1,7 +1,9 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Agents.AI.Data;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -9,6 +11,10 @@ namespace MarketAssistant.Agents.Analysts;
 /// 协调分析师代理
 /// 整合多维度分析师结论并提供投资建议
 /// </summary>
+[DisplayName("协调分析师")]
+[Description("整合多维度分析师结论并提供投资建议")]
+[RequiredAnalyst]
+
 public class CoordinatorAnalystAgent : AnalystAgentBase
 {
     public CoordinatorAnalystAgent(

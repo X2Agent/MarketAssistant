@@ -133,7 +133,7 @@ public sealed class StockScreenerService
         catch (Exception ex)
         {
             _logger.LogError(ex, "筛选股票时发生错误");
-            throw new InvalidOperationException($"筛选股票失败: {ex.Message}", ex);
+            throw new FriendlyException($"筛选股票失败: {ex.Message}", ex);
         }
     }
 

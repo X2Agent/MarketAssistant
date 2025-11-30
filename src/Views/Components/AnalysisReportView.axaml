@@ -11,125 +11,125 @@
 
     <UserControl.Styles>
         <!-- 卡片标题样式 -->
-        <Style Selector="TextBlock.SectionTitle">
-            <Setter Property="FontSize" Value="15"/>
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
         </Style>
         
         <!-- 标签样式 -->
-        <Style Selector="TextBlock.Label">
-            <Setter Property="FontSize" Value="12"/>
+        <Style Selector="TextBlock.label">
+            <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         </Style>
         
         <!-- 值样式 -->
-        <Style Selector="TextBlock.Value">
-            <Setter Property="FontSize" Value="16"/>
+        <Style Selector="TextBlock.value">
+            <Setter Property="FontSize" Value="{StaticResource SectionTitleFontSize}"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,4,0,0"/>
+            <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
         </Style>
         
         <!-- 列表项样式 -->
-        <Style Selector="TextBlock.ListItem">
-            <Setter Property="FontSize" Value="13"/>
+        <Style Selector="TextBlock.list-item">
+            <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Margin" Value="{StaticResource TinyMargin}"/>
         </Style>
     </UserControl.Styles>
 
     <Grid>
         <!-- 主要内容区域 -->
         <ScrollViewer IsVisible="{Binding IsReportVisible}">
-            <StackPanel Margin="12" Spacing="12">
+            <StackPanel Margin="{StaticResource DefaultMargin}" Spacing="{StaticResource DefaultSpacing}">
                 
                 <!-- 1. 股票基本信息 -->
                 <controls:CardView>
-                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="12">
+                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="{StaticResource DefaultSpacing}">
                         <StackPanel Grid.Column="0">
-                            <TextBlock Text="股票代码" Classes="Label"/>
-                            <TextBlock Text="{Binding StockSymbol}" Classes="Value"/>
+                            <TextBlock Text="股票代码" Classes="label"/>
+                            <TextBlock Text="{Binding StockSymbol}" Classes="value"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="目标价格" Classes="Label"/>
-                            <TextBlock Text="{Binding TargetPrice}" Classes="Value"/>
+                            <TextBlock Text="目标价格" Classes="label"/>
+                            <TextBlock Text="{Binding TargetPrice}" Classes="value"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="价格预期" Classes="Label"/>
+                            <TextBlock Text="价格预期" Classes="label"/>
                             <TextBlock Text="{Binding PriceChangeExpectation}" 
-                                       Classes="Value"
+                                       Classes="value"
                                        Foreground="{DynamicResource SuccessBrush}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="3">
-                            <TextBlock Text="投资期限" Classes="Label"/>
+                            <TextBlock Text="投资期限" Classes="label"/>
                             <TextBlock Text="{Binding TimeHorizon}" 
-                                       Classes="Value"
+                                       Classes="value"
                                        Foreground="{DynamicResource PrimaryBrush}"/>
                         </StackPanel>
                     </Grid>
                 </controls:CardView>
 
                 <!-- 2. 核心指标卡片组 -->
-                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{StaticResource DefaultSpacing}">
                     <controls:CardView Grid.Column="0">
                         <StackPanel>
-                            <TextBlock Text="投资建议" Classes="Label"/>
+                            <TextBlock Text="投资建议" Classes="label"/>
                             <TextBlock Text="{Binding InvestmentRating}" 
-                                       FontSize="20" 
+                                       FontSize="{StaticResource LargeFontSize}" 
                                        FontWeight="Bold" 
-                                       Margin="0,4"/>
+                                       Margin="{StaticResource TinyMargin}"/>
                             <TextBlock Text="{Binding ConfidencePercentage, StringFormat='{}{0:F1}% 置信度'}" 
-                                       FontSize="11" 
+                                       FontSize="{StaticResource TinyFontSize}" 
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
                     </controls:CardView>
 
                     <controls:CardView Grid.Column="1">
                         <StackPanel>
-                            <TextBlock Text="风险等级" Classes="Label"/>
+                            <TextBlock Text="风险等级" Classes="label"/>
                             <TextBlock Text="{Binding RiskLevel}" 
-                                       FontSize="20" 
+                                       FontSize="{StaticResource LargeFontSize}" 
                                        FontWeight="Bold" 
                                        Foreground="{DynamicResource ErrorBrush}" 
-                                       Margin="0,4"/>
+                                       Margin="{StaticResource TinyMargin}"/>
                         </StackPanel>
                     </controls:CardView>
 
                     <controls:CardView Grid.Column="2">
                         <StackPanel>
-                            <TextBlock Text="综合评分" Classes="Label"/>
+                            <TextBlock Text="综合评分" Classes="label"/>
                             <TextBlock Text="{Binding OverallScore}" 
-                                       FontSize="20" 
+                                       FontSize="{StaticResource LargeFontSize}" 
                                        FontWeight="Bold" 
                                        Foreground="{DynamicResource PrimaryBrush}" 
-                                       Margin="0,4"/>
+                                       Margin="{StaticResource TinyMargin}"/>
                             <TextBlock Text="{Binding ScorePercentage}" 
-                                       FontSize="11" 
+                                       FontSize="{StaticResource TinyFontSize}" 
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
                     </controls:CardView>
                 </Grid>
 
                 <!-- 3. 操作建议与维度评分 -->
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DefaultSpacing}">
                     <!-- 操作建议 -->
                     <controls:CardView Grid.Column="0">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="📋 操作建议" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="📋 操作建议" Classes="section-title"/>
                             <ItemsControl ItemsSource="{Binding OperationSuggestions}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
-                                            <Ellipse Width="6" 
-                                                     Height="6" 
+                                        <DockPanel Margin="{StaticResource TinyMargin}">
+                                            <Ellipse DockPanel.Dock="Left"
+                                                     Width="{StaticResource TinyIconSize}" 
+                                                     Height="{StaticResource TinyIconSize}" 
                                                      Fill="{DynamicResource PrimaryBrush}" 
-                                                     VerticalAlignment="Top"
-                                                     Margin="0,6,8,0"/>
-                                            <TextBlock Grid.Column="1" 
-                                                       Text="{Binding .}" 
-                                                       Classes="ListItem"
-                                                       LineHeight="20"/>
-                                        </Grid>
+                                                     VerticalAlignment="Center"
+                                                     Margin="{StaticResource SmallRightMargin}"/>
+                                            <TextBlock Text="{Binding .}" 
+                                                       Classes="list-item"
+                                                       LineHeight="{StaticResource SmallIconSize}"/>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -138,30 +138,30 @@
 
                     <!-- 维度评分 -->
                     <controls:CardView Grid.Column="1">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="📊 维度评分" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="📊 维度评分" Classes="section-title"/>
                             <ItemsControl ItemsSource="{Binding DimensionScores}">
                                 <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:ScoreItem">
-                                        <StackPanel Margin="0,8,0,0" Spacing="6">
-                                            <Grid ColumnDefinitions="*,60" ColumnSpacing="12">
-                                                <TextBlock Text="{Binding Name}" 
-                                                           FontSize="13" 
-                                                           TextTrimming="CharacterEllipsis"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1"
+                                    <DataTemplate x:DataType="vm:ScoreItem">
+                                        <StackPanel Margin="{StaticResource SmallTopMargin}" Spacing="{StaticResource TinySpacing}">
+                                            <DockPanel LastChildFill="True">
+                                                <TextBlock DockPanel.Dock="Right"
                                                            Text="{Binding FormattedScore}" 
                                                            FontWeight="Bold" 
-                                                           FontSize="13" 
+                                                           FontSize="{StaticResource BodyFontSize}" 
                                                            Foreground="{DynamicResource PrimaryBrush}"
-                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"
+                                                           Margin="{StaticResource DefaultLeftMargin}"/>
+                                                <TextBlock Text="{Binding Name}" 
+                                                           FontSize="{StaticResource BodyFontSize}" 
+                                                           TextTrimming="CharacterEllipsis"
                                                            VerticalAlignment="Center"/>
-                                            </Grid>
+                                            </DockPanel>
                                             <ProgressBar Value="{Binding ScorePercentage}" 
-                                                         Height="8" 
+                                                         Height="{StaticResource SmallSpacing}" 
                                                          Minimum="0" 
                                                          Maximum="1"
-                                                         CornerRadius="4"/>
+                                                         CornerRadius="{StaticResource TinyCornerRadius}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -171,23 +171,23 @@
                 </Grid>
 
                 <!-- 4. 投资亮点与风险因素 -->
-                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource DefaultSpacing}">
                     <controls:CardView Grid.Column="0">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="💡 投资亮点" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="💡 投资亮点" Classes="section-title"/>
                             <ItemsControl ItemsSource="{Binding InvestmentHighlights}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
-                                            <Ellipse Width="6" 
-                                                     Height="6" 
+                                        <DockPanel Margin="{StaticResource TinyMargin}">
+                                            <Ellipse DockPanel.Dock="Left"
+                                                     Width="{StaticResource TinyIconSize}" 
+                                                     Height="{StaticResource TinyIconSize}" 
                                                      Fill="{DynamicResource SuccessBrush}" 
                                                      VerticalAlignment="Center" 
-                                                     Margin="0,0,8,0"/>
-                                            <TextBlock Grid.Column="1" 
-                                                       Text="{Binding .}" 
-                                                       Classes="ListItem"/>
-                                        </Grid>
+                                                     Margin="{StaticResource SmallRightMargin}"/>
+                                            <TextBlock Text="{Binding .}" 
+                                                       Classes="list-item"/>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -195,21 +195,21 @@
                     </controls:CardView>
 
                     <controls:CardView Grid.Column="1">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="⚠️ 风险因素" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="⚠️ 风险因素" Classes="section-title"/>
                             <ItemsControl ItemsSource="{Binding RiskFactors}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Grid ColumnDefinitions="Auto,*" Margin="0,4">
-                                            <Ellipse Width="6" 
-                                                     Height="6" 
+                                        <DockPanel Margin="{StaticResource TinyMargin}">
+                                            <Ellipse DockPanel.Dock="Left"
+                                                     Width="{StaticResource TinyIconSize}" 
+                                                     Height="{StaticResource TinyIconSize}" 
                                                      Fill="{DynamicResource ErrorBrush}" 
                                                      VerticalAlignment="Center" 
-                                                     Margin="0,0,8,0"/>
-                                            <TextBlock Grid.Column="1" 
-                                                       Text="{Binding .}" 
-                                                       Classes="ListItem"/>
-                                        </Grid>
+                                                     Margin="{StaticResource SmallRightMargin}"/>
+                                            <TextBlock Text="{Binding .}" 
+                                                       Classes="list-item"/>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -219,39 +219,39 @@
 
                 <!-- 5. 分析师共识与分歧 -->
                 <Grid ColumnDefinitions="*,*" 
-                      ColumnSpacing="12" 
+                      ColumnSpacing="{StaticResource DefaultSpacing}" 
                       IsVisible="{Binding HasConsensusAnalysis}">
                     <controls:CardView Grid.Column="0" 
                                        IsVisible="{Binding HasConsensusAnalysis}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="🤝 核心共识" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="🤝 核心共识" Classes="section-title"/>
                             <TextBlock Text="{Binding ConsensusAnalysis}" 
-                                       FontSize="13"
+                                       FontSize="{StaticResource BodyFontSize}"
                                        TextWrapping="Wrap"
-                                       LineHeight="20"/>
+                                       LineHeight="{StaticResource SmallIconSize}"/>
                         </StackPanel>
                     </controls:CardView>
 
                     <controls:CardView Grid.Column="1" 
                                        IsVisible="{Binding HasDisagreementAnalysis}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="💭 主要分歧及判断" Classes="SectionTitle"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="💭 主要分歧及判断" Classes="section-title"/>
                             <TextBlock Text="{Binding DisagreementAnalysis}" 
-                                       FontSize="13"
+                                       FontSize="{StaticResource BodyFontSize}"
                                        TextWrapping="Wrap"
-                                       LineHeight="20"/>
+                                       LineHeight="{StaticResource SmallIconSize}"/>
                         </StackPanel>
                     </controls:CardView>
                 </Grid>
 
                 <!-- 6. 协调分析师综合报告（自然语言） -->
                 <controls:CardView>
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="📊 协调分析师综合报告" Classes="SectionTitle"/>
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="📊 协调分析师综合报告" Classes="section-title"/>
                         <TextBlock Text="{Binding CoordinatorSummary}" 
-                                   FontSize="13"
+                                   FontSize="{StaticResource BodyFontSize}"
                                    TextWrapping="Wrap"
-                                   LineHeight="20"/>
+                                   LineHeight="{StaticResource SmallIconSize}"/>
                     </StackPanel>
                 </controls:CardView>
             </StackPanel>
@@ -259,16 +259,16 @@
         
         <!-- 加载指示器 -->
         <Border IsVisible="{Binding IsBusy}" 
-                Background="#E0FFFFFF"
+                Background="{StaticResource OverlayBrush}"
                 ZIndex="1000">
             <StackPanel HorizontalAlignment="Center" 
                         VerticalAlignment="Center" 
-                        Spacing="16">
+                        Spacing="{StaticResource LargeSpacing}">
                 <ProgressBar IsIndeterminate="True" 
-                             Width="48" 
-                             Height="48"/>
+                             Width="{StaticResource AppLogoSize}" 
+                             Height="{StaticResource AppLogoSize}"/>
                 <TextBlock Text="正在解析分析数据..." 
-                           FontSize="15" 
+                           FontSize="{StaticResource MediumFontSize}" 
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
             </StackPanel>
         </Border>

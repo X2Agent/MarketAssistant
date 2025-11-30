@@ -156,7 +156,7 @@ public class LocalImageStorageServiceTest
     public async Task SaveImageAsync_WithNullImageBytes_ShouldThrowArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(null!, "test.png", TestDocumentPath));
     }
 
@@ -164,7 +164,7 @@ public class LocalImageStorageServiceTest
     public async Task SaveImageAsync_WithEmptyImageBytes_ShouldThrowArgumentException()
     {
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(Array.Empty<byte>(), "test.png", TestDocumentPath));
     }
 
@@ -175,7 +175,7 @@ public class LocalImageStorageServiceTest
         var largeImageBytes = new byte[11 * 1024 * 1024]; // 11MB
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(largeImageBytes, "large.png", TestDocumentPath));
     }
 
@@ -186,7 +186,7 @@ public class LocalImageStorageServiceTest
         var imageBytes = CreateTestImageBytes();
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(imageBytes, "test.png", null!));
     }
 
@@ -197,7 +197,7 @@ public class LocalImageStorageServiceTest
         var imageBytes = CreateTestImageBytes();
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(imageBytes, "test.png", ""));
     }
 
@@ -208,7 +208,7 @@ public class LocalImageStorageServiceTest
         var imageBytes = CreateTestImageBytes();
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             () => _service.SaveImageAsync(imageBytes, "test.png", "   "));
     }
 
@@ -241,7 +241,7 @@ public class LocalImageStorageServiceTest
         cts.Cancel();
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(
             () => _service.SaveImageAsync(imageBytes, "test.png", TestDocumentPath, cts.Token));
     }
 

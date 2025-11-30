@@ -119,18 +119,18 @@ public class StockKLineService
 
             if (zhiTuData == null || !zhiTuData.Any())
             {
-                throw new Exception($"获取{dataType}数据失败: 返回数据为空");
+                throw new FriendlyException($"获取{dataType}数据失败: 返回数据为空");
             }
 
             return zhiTuData;
         }
         catch (HttpRequestException ex)
         {
-            throw new Exception($"获取{dataType}数据失败: 网络请求错误 - {ex.Message}", ex);
+            throw new FriendlyException($"获取{dataType}数据失败: 网络请求错误 - {ex.Message}", ex);
         }
         catch (JsonException ex)
         {
-            throw new Exception($"获取{dataType}数据失败: 数据解析错误 - {ex.Message}", ex);
+            throw new FriendlyException($"获取{dataType}数据失败: 数据解析错误 - {ex.Message}", ex);
         }
     }
 
@@ -190,7 +190,7 @@ public class StockKLineService
         string errorInfo = !string.IsNullOrEmpty(symbol) ? $"股票代码: {symbol}" : "";
 
         _logger.LogError(ex, "获取{DataType}数据时发生错误 - {ErrorInfo}", dataType, errorInfo);
-        throw new Exception($"获取{dataType}数据失败: {ex.Message}", ex);
+        throw new FriendlyException($"获取{dataType}数据失败: {ex.Message}", ex);
     }
 
     #endregion

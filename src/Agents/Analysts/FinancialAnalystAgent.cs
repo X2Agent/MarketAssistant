@@ -1,6 +1,8 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -8,6 +10,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// 财务分析师代理
 /// 专注于深入分析公司财务报表和财务健康状况
 /// </summary>
+[DisplayName("财务分析师")]
+[Description("专注于财务报表和财务健康分析")]
 public class FinancialAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult));

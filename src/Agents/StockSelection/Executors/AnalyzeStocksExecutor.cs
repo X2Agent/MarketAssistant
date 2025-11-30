@@ -14,7 +14,7 @@ namespace MarketAssistant.Agents.StockSelection.Executors;
 /// </summary>
 public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelectionResult>
 {
-    private readonly IChatClient _chatClient;
+    private readonly IChatClientFactory _chatClientFactory;
     private readonly ILogger<AnalyzeStocksExecutor> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
@@ -27,7 +27,7 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
         ILogger<AnalyzeStocksExecutor> logger) : base("AnalyzeStocks")
     {
         if (chatClientFactory == null) throw new ArgumentNullException(nameof(chatClientFactory));
-        _chatClient = chatClientFactory.CreateClient();
+        _chatClientFactory = chatClientFactory;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -84,7 +84,7 @@ public sealed class AnalyzeStocksExecutor : Executor<ScreeningResult, StockSelec
             };
 
             // 执行 AI 分析（纯分析，无工具调用）
-            var response = await _chatClient.GetResponseAsync(
+            var response = await _chatClientFactory.CreateClient().GetResponseAsync(
                 [
                     new ChatMessage(ChatRole.System, systemPrompt),
                     new ChatMessage(ChatRole.User, userPrompt)

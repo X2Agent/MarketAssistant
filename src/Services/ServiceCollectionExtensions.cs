@@ -37,10 +37,7 @@ public static class ServiceCollectionExtensions
     {
         // 注册基础服务
         services.AddHttpClient();
-        services.AddMemoryCache(options =>
-        {
-            options.SizeLimit = 50 * 1024 * 1024; // 50MB 限制
-        });
+        services.AddMemoryCache();
 
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();

@@ -1,6 +1,4 @@
-using MarketAssistant.Agents;
 using MarketAssistant.Agents.Analysts;
-using MarketAssistant.Agents.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Logging;
 
@@ -12,126 +10,76 @@ namespace MarketAssistant.Infrastructure.Factories;
 public interface IAnalystAgentFactory
 {
     /// <summary>
-    /// 根据 AnalystType 类型创建对应的代理
+    /// 根据类型创建对应的代理（动态调用，运行时检查）
     /// </summary>
-    AIAgent CreateAnalyst(AnalystType analystType);
+    AIAgent CreateAnalyst(Type agentType);
 
     /// <summary>
-    /// 批量创建分析师代理
+    /// 创建指定类型的分析师代理（泛型版本，提供编译时类型检查）
     /// </summary>
-    List<AIAgent> CreateAnalysts(IEnumerable<AnalystType> analystTypes);
+    /// <typeparam name="TAgent">代理类型，必须继承自 AnalystAgentBase</typeparam>
+    TAgent CreateAnalyst<TAgent>() where TAgent : AnalystAgentBase;
 }
 
 /// <summary>
 /// 分析师代理工厂实现
-/// 负责创建配置好的分析师代理（基于 DelegatingAIAgent 模式）
+/// 负责创建配置好的分析师代理（使用 DI 容器）
 /// </summary>
 public class AnalystAgentFactory : IAnalystAgentFactory
 {
+    private readonly IServiceProvider _serviceProvider;
     private readonly IChatClientFactory _chatClientFactory;
-    private readonly StockBasicTools _stockBasicTools;
-    private readonly StockFinancialTools _stockFinancialTools;
-    private readonly StockTechnicalTools _stockTechnicalTools;
-    private readonly GroundingSearchTools _groundingSearchTools;
-    private readonly StockNewsTools _newsTools;
-    private readonly MarketSentimentTools _marketSentimentTools;
     private readonly ILogger<AnalystAgentFactory> _logger;
 
     public AnalystAgentFactory(
+        IServiceProvider serviceProvider,
         IChatClientFactory chatClientFactory,
-        StockBasicTools stockBasicTools,
-        StockFinancialTools stockFinancialTools,
-        StockTechnicalTools stockTechnicalTools,
-        GroundingSearchTools groundingSearchTools,
-        StockNewsTools newsTools,
-        MarketSentimentTools marketSentimentTools,
-    ILogger<AnalystAgentFactory> logger)
+        ILogger<AnalystAgentFactory> logger)
     {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _stockBasicTools = stockBasicTools ?? throw new ArgumentNullException(nameof(stockBasicTools));
-        _stockFinancialTools = stockFinancialTools ?? throw new ArgumentNullException(nameof(stockFinancialTools));
-        _stockTechnicalTools = stockTechnicalTools ?? throw new ArgumentNullException(nameof(stockTechnicalTools));
-        _groundingSearchTools = groundingSearchTools ?? throw new ArgumentNullException(nameof(groundingSearchTools));
-        _marketSentimentTools = marketSentimentTools ?? throw new ArgumentNullException(nameof(groundingSearchTools));
-        _newsTools = newsTools ?? throw new ArgumentNullException(nameof(newsTools));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
-    /// 根据 AnalystType 类型创建对应的代理
-    /// 每个代理类自己管理配置和工具
+    /// 根据类型创建对应的代理
     /// </summary>
-    public AIAgent CreateAnalyst(AnalystType analystType)
+    public AIAgent CreateAnalyst(Type agentType)
     {
         try
         {
+            // 严格限制必须是 AnalystAgentBase 的子类
+            if (!typeof(AnalystAgentBase).IsAssignableFrom(agentType))
+            {
+                throw new ArgumentException($"Type {agentType.Name} must inherit from AnalystAgentBase", nameof(agentType));
+            }
+
+            // 创建 ChatClient
             var chatClient = _chatClientFactory.CreateClient();
 
-            AIAgent agent = analystType switch
-            {
-                AnalystType.FinancialAnalyst => new FinancialAnalystAgent(
-                    chatClient,
-                    _stockFinancialTools),
-
-                AnalystType.TechnicalAnalyst => new TechnicalAnalystAgent(
-                    chatClient,
-                    _stockTechnicalTools),
-
-                AnalystType.FundamentalAnalyst => new FundamentalAnalystAgent(
-                    chatClient,
-                    _stockBasicTools),
-
-                AnalystType.MarketSentimentAnalyst => new MarketSentimentAnalystAgent(
-                    chatClient,
-                    _stockFinancialTools,
-                    _marketSentimentTools),
-
-                AnalystType.NewsEventAnalyst => new NewsEventAnalystAgent(
-                    chatClient,
-                    _newsTools),
-
-                AnalystType.CoordinatorAnalyst => new CoordinatorAnalystAgent(
-                    chatClient,
-                    _groundingSearchTools),
-
-                _ => throw new ArgumentException($"Unknown analyst type: {analystType}", nameof(analystType))
-            };
+            // 使用 ActivatorUtilities.CreateInstance
+            // 显式传递 chatClient，其他依赖从 DI 获取
+            var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, chatClient);
 
             _logger.LogInformation(
-                "成功创建分析师代理: {AnalystType}, 实例类型: {AgentType}",
-                analystType,
-                agent.GetType().Name);
+                "成功创建分析师代理: {AgentType}",
+                agentType.Name);
 
             return agent;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "创建分析师代理时发生错误: {AnalystType}", analystType);
+            _logger.LogError(ex, "创建分析师代理时发生错误: {AgentType}", agentType.Name);
             throw;
         }
     }
 
     /// <summary>
-    /// 批量创建分析师代理
+    /// 创建指定类型的分析师代理（泛型版本）
     /// </summary>
-    public List<AIAgent> CreateAnalysts(IEnumerable<AnalystType> analystTypes)
+    public TAgent CreateAnalyst<TAgent>() where TAgent : AnalystAgentBase
     {
-        var createdAgents = new List<AIAgent>();
-
-        foreach (var analystType in analystTypes)
-        {
-            try
-            {
-                var createdAgent = CreateAnalyst(analystType);
-                createdAgents.Add(createdAgent);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "跳过创建分析师代理: {AnalystType}", analystType);
-            }
-        }
-
-        _logger.LogInformation("批量创建分析师代理完成，成功创建: {Count} 个", createdAgents.Count);
-        return createdAgents;
+        return (TAgent)CreateAnalyst(typeof(TAgent));
     }
 }
+

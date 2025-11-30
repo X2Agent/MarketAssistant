@@ -1,4 +1,4 @@
-using MarketAssistant.Agents;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +17,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
 
-        var agent = agentFactory.CreateAnalyst(AnalystType.FinancialAnalyst);
+        var agent = agentFactory.CreateAnalyst<FinancialAnalystAgent>();
 
         Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
         Console.WriteLine("成功创建 FinancialAnalyst");
@@ -27,7 +27,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestNewsEventAnalyst_CallsNewsToolCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.NewsEventAnalyst);
+        var agent = agentFactory.CreateAnalyst<NewsEventAnalystAgent>();
 
         // 模拟调用，提示明确要求使用工具
         var messages = new List<ChatMessage>
@@ -65,7 +65,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestFundamentalAnalyst_CallsToolsCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.FundamentalAnalyst);
+        var agent = agentFactory.CreateAnalyst<FundamentalAnalystAgent>();
 
         Assert.IsNotNull(agent, "应该成功创建 FundamentalAnalyst");
         Console.WriteLine("成功创建 FundamentalAnalyst");
@@ -114,7 +114,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestCoordinatorAnalyst_HandlesMultipleAnalystInputs()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.CoordinatorAnalyst);
+        var agent = agentFactory.CreateAnalyst<CoordinatorAnalystAgent>();
 
         // 模拟其他分析师的输出作为历史消息
         var messages = new List<ChatMessage>
@@ -155,7 +155,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestFinancialAnalyst_CallsToolsCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.FinancialAnalyst);
+        var agent = agentFactory.CreateAnalyst<FinancialAnalystAgent>();
 
         Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
         Console.WriteLine("成功创建 FinancialAnalyst");
@@ -184,7 +184,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestMarketSentimentAnalyst_CallsToolsCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.MarketSentimentAnalyst);
+        var agent = agentFactory.CreateAnalyst<MarketSentimentAnalystAgent>();
 
         Assert.IsNotNull(agent, "应该成功创建 MarketSentimentAnalyst");
         Console.WriteLine("成功创建 MarketSentimentAnalyst");
@@ -213,7 +213,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     public async Task TestTechnicalAnalyst_CallsToolsCorrectly()
     {
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(AnalystType.TechnicalAnalyst);
+        var agent = agentFactory.CreateAnalyst<TechnicalAnalystAgent>();
 
         Assert.IsNotNull(agent, "应该成功创建 TechnicalAnalyst");
         Console.WriteLine("成功创建 TechnicalAnalyst");

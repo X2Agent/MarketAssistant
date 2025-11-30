@@ -1,6 +1,8 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -8,6 +10,9 @@ namespace MarketAssistant.Agents.Analysts;
 /// 基本面分析师代理
 /// 专注于分析公司基本面、行业地位和长期价值
 /// </summary>
+[DisplayName("基本面分析师")]
+[Description("整合了策略分析师和股票研究分析师的功能")]
+[RequiredAnalyst]
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult));

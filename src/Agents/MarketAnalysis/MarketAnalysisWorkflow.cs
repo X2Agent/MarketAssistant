@@ -1,3 +1,5 @@
+using MarketAssistant.Agents.Analysts;
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Factories;
@@ -6,6 +8,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 namespace MarketAssistant.Agents.MarketAnalysis;
 
@@ -203,34 +206,53 @@ public class MarketAnalysisWorkflow : IDisposable
                         }
                     }
                     break;
+                case ExecutorFailedEvent executorFailed:
+                    _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
+                        executorFailed.ExecutorId,
+                        executorFailed.Data.Message);
+                    throw new FriendlyException(executorFailed.Data.Message);
             }
         }
 
-        return finalReport ?? throw new InvalidOperationException("工作流未返回分析报告");
+        return finalReport ?? throw new FriendlyException("工作流未返回分析报告");
     }
 
     /// <summary>
     /// 获取启用的分析师列表
     /// </summary>
-    private List<AnalystType> GetEnabledAnalysts()
+    private List<Type> GetEnabledAnalysts()
     {
-        var roleSettings = _userSettingService.CurrentSetting.AnalystRoleSettings;
-        var enabledAnalysts = new List<AnalystType>();
+        var enabledAnalysts = new List<Type>();
+        var enabledAnalystRoles = _userSettingService.CurrentSetting.EnabledAnalystRoles;
 
-        if (roleSettings.EnableFundamentalAnalyst)
-            enabledAnalysts.Add(AnalystType.FundamentalAnalyst);
+        // 获取所有 AnalystAgentBase 的非抽象子类
+        var agentTypes = typeof(AnalystAgentBase).Assembly.GetTypes()
+            .Where(t => t.IsSubclassOf(typeof(AnalystAgentBase)) && !t.IsAbstract);
 
-        if (roleSettings.EnableMarketSentimentAnalyst)
-            enabledAnalysts.Add(AnalystType.MarketSentimentAnalyst);
+        foreach (var agentType in agentTypes)
+        {
+            // 排除 CoordinatorAnalystAgent，它由CoordinatorExecutor独自管理
+            if (agentType.Name == nameof(CoordinatorAnalystAgent)) continue;
 
-        if (roleSettings.EnableFinancialAnalyst)
-            enabledAnalysts.Add(AnalystType.FinancialAnalyst);
+            var agentClassName = agentType.Name;
 
-        if (roleSettings.EnableTechnicalAnalyst)
-            enabledAnalysts.Add(AnalystType.TechnicalAnalyst);
+            bool isRequired = agentType.GetCustomAttribute<RequiredAnalystAttribute>() != null;
 
-        if (roleSettings.EnableNewsEventAnalyst)
-            enabledAnalysts.Add(AnalystType.NewsEventAnalyst);
+            // 确定启用状态
+            bool isEnabled = false;
+            if (enabledAnalystRoles.TryGetValue(agentClassName, out var userEnabled))
+            {
+                isEnabled = userEnabled;
+            }
+
+            // 必需的角色始终启用
+            if (isRequired) isEnabled = true;
+
+            if (isEnabled)
+            {
+                enabledAnalysts.Add(agentType);
+            }
+        }
 
         return enabledAnalysts;
     }
@@ -238,10 +260,24 @@ public class MarketAnalysisWorkflow : IDisposable
     /// <summary>
     /// 创建分析师代理（使用 Factory 模式）
     /// </summary>
-    private List<AIAgent> CreateAnalystAgents(List<AnalystType> analystTypes)
+    private List<AIAgent> CreateAnalystAgents(List<Type> analystTypes)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
-        var createdAgents = _analystAgentFactory.CreateAnalysts(analystTypes);
+
+        var createdAgents = new List<AIAgent>();
+        foreach (var type in analystTypes)
+        {
+            try
+            {
+                var agent = _analystAgentFactory.CreateAnalyst(type);
+                createdAgents.Add(agent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "跳过创建分析师代理: {AgentType}", type.Name);
+            }
+        }
+
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
         return createdAgents;
     }

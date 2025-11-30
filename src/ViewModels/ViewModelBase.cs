@@ -17,6 +17,11 @@ public abstract class ViewModelBase : ObservableObject
         set => SetProperty(ref _isBusy, value);
     }
 
+    /// <summary>
+    /// 页面标题
+    /// </summary>
+    public virtual string Title => string.Empty;
+
     protected ViewModelBase(ILogger? logger = null)
     {
         Logger = logger;

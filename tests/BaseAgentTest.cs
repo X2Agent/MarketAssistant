@@ -78,12 +78,12 @@ public class BaseAgentTest
                 EmbeddingModelId = "BAAI/bge-m3",
                 Endpoint = endpoint,
                 ApiKey = apiKey,
-                AnalystRoleSettings = new MarketAnalystRoleSettings
+                EnabledAnalystRoles = new Dictionary<string, bool>
                 {
-                    EnableFinancialAnalyst = true,
-                    EnableMarketSentimentAnalyst = false,
-                    EnableTechnicalAnalyst = false,
-                    EnableNewsEventAnalyst = true
+                    { "FinancialAnalystAgent", true },
+                    { "MarketSentimentAnalystAgent", false },
+                    { "TechnicalAnalystAgent", false },
+                    { "NewsEventAnalystAgent", true }
                 },
                 EnableWebSearch = true,
                 WebSearchApiKey = searchApiKey,

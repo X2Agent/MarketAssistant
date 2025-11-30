@@ -92,7 +92,6 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
             }
             _logger.LogInformation("[步骤1/3] 筛选条件生成完成，包含 {Count} 个条件",
                 criteria.Criteria?.Count ?? 0);
-
             // 返回结果
             return new CriteriaGenerationResult
             {
@@ -103,7 +102,14 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤1/3] 生成筛选条件失败");
-            throw new InvalidOperationException($"生成筛选条件失败: {ex.Message}", ex);
+            // 检查是否为 FriendlyException，如果是则直接抛出
+            if (ex is FriendlyException)
+            {
+                throw;
+            }
+
+            // 将其他异常包装为 FriendlyException，以便在 UI 层显示友好错误
+            throw new FriendlyException(ex.Message);
         }
     }
 
@@ -119,17 +125,17 @@ public sealed class GenerateCriteriaExecutor : Executor<StockSelectionWorkflowRe
 ## 需求转换规则
 
 ### 市值类别
-- 大盘股/蓝筹股 → mc >= 100000000000
-- 中盘股 → mc: 10000000000-100000000000  
-- 小盘股 → mc < 10000000000
+- 大盘股/蓝筹股 → mc >= 30000000000
+- 中盘股 → mc: 15000000000-30000000000  
+- 小盘股 → mc < 15000000000
 - 市值X亿以上 → mc >= X*100000000
 
 ### 估值指标
-- 价值股/低估值/便宜 → pettm < 15, pb < 2
-- 成长股/高成长 → npay > 20, oiy > 15
-- 高ROE/盈利能力强 → roediluted > 15
-- 低市盈率 → pettm < 20
-- 低市净率 → pb < 3
+- 价值股/低估值/便宜 → pettm < 40, pb < 4
+- 成长股/高成长 → npay > 10, oiy > 10
+- 高ROE/盈利能力强 → roediluted > 10
+- 低市盈率 → pettm < 40
+- 低市净率 → pb < 4
 - 市盈率X倍以下 → pettm < X
 - 市净率X倍以下 → pb < X
 

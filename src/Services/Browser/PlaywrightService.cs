@@ -30,6 +30,7 @@ public class PlaywrightService : IAsyncDisposable
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
+    private bool _disposed;
 
     public PlaywrightService(IUserSettingService userSettingService, ILogger<PlaywrightService>? logger)
     {
@@ -69,11 +70,15 @@ public class PlaywrightService : IAsyncDisposable
     /// </summary>
     public async Task<T> ExecuteWithPageAsync<T>(Func<IPage, Task<T>> action, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(PlaywrightService));
+
         var actualTimeout = timeout ?? TimeSpan.FromSeconds(DefaultTimeoutSeconds);
-        
+
         await _pageLock.WaitAsync(cancellationToken);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, nameof(PlaywrightService));
+
             var browser = await GetBrowserAsync();
 
             await using var context = await CreateBrowserContextAsync(browser);
@@ -84,7 +89,10 @@ public class PlaywrightService : IAsyncDisposable
         }
         finally
         {
-            _pageLock.Release();
+            if (!_disposed)
+            {
+                _pageLock.Release();
+            }
         }
     }
 
@@ -216,18 +224,36 @@ public class PlaywrightService : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
+        // 第一次检查：无锁快速路径，避免已释放时获取锁的开销
+        if (_disposed)
+        {
+            return;
+        }
+
         await _initLock.WaitAsync();
         try
         {
+            // 第二次检查：持锁后再次验证，防止多线程竞态条件
+            // 场景：多个线程同时通过第一次检查，但只有第一个线程应该执行释放
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            // 清理浏览器资源
             await CleanupAsync();
+
+            // 在持锁状态下释放 SemaphoreSlim，确保没有其他线程在等待
+            _pageLock.Dispose();
         }
         finally
         {
             _initLock.Release();
+            _initLock.Dispose();
         }
 
-        _initLock.Dispose();
-        _pageLock.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Mcp;
+using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -11,10 +13,13 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// MCP服务器配置页ViewModel - 对应 MCPServerConfigViewModel
 /// </summary>
-public partial class MCPConfigPageViewModel : ViewModelBase
+public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 {
+    public override string Title => "MCP服务器配置";
+
     private readonly MCPServerConfigService _configService;
     private readonly INotificationService _notificationService;
+    private readonly IDialogService _dialogService;
     private readonly McpService _mcpService;
 
     [ObservableProperty]
@@ -25,9 +30,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isEditing;
-
-    [ObservableProperty]
-    private bool _showDeleteConfirmation;
 
     [ObservableProperty]
     private bool _isTesting;
@@ -61,12 +63,14 @@ public partial class MCPConfigPageViewModel : ViewModelBase
 
     public MCPConfigPageViewModel(
         INotificationService notificationService,
+        IDialogService dialogService,
         McpService mcpService,
         ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
         _configService = MCPServerConfigService.Instance;
         _notificationService = notificationService;
+        _dialogService = dialogService;
         _mcpService = mcpService;
         LoadServerConfigs();
     }
@@ -296,32 +300,23 @@ public partial class MCPConfigPageViewModel : ViewModelBase
     /// 删除服务器（显示确认对话框）
     /// </summary>
     [RelayCommand]
-    private void DeleteServer()
-    {
-        ShowDeleteConfirmation = true;
-    }
-
-    /// <summary>
-    /// 确认删除
-    /// </summary>
-    [RelayCommand]
-    private void ConfirmDelete()
+    private async Task DeleteServer()
     {
         if (SelectedConfig == null) return;
 
-        _configService.DeleteConfig(SelectedConfig.Id);
-        LoadServerConfigs();
-        ShowDeleteConfirmation = false;
-        IsEditing = false;
-    }
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "确认删除",
+            "确定要删除此服务器配置吗？此操作无法撤销。",
+            "删除",
+            "取消");
 
-    /// <summary>
-    /// 取消删除
-    /// </summary>
-    [RelayCommand]
-    private void CancelDelete()
-    {
-        ShowDeleteConfirmation = false;
+        if (confirmed)
+        {
+            _configService.DeleteConfig(SelectedConfig.Id);
+            LoadServerConfigs();
+            IsEditing = false;
+            _notificationService?.ShowSuccess("删除成功");
+        }
     }
 
     /// <summary>
@@ -391,5 +386,20 @@ public partial class MCPConfigPageViewModel : ViewModelBase
         {
             EditServer();
         }
+    }
+
+    public void OnNavigatedFrom()
+    {
+        // 离开页面时如果正在编辑但未保存，自动取消编辑状态
+        if (IsEditing)
+        {
+            CancelEdit();
+        }
+    }
+
+    public void OnNavigatedTo(object? parameter)
+    {
+        // 每次进入页面时刷新配置列表，确保数据最新
+        LoadServerConfigs();
     }
 }

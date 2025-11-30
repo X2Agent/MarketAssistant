@@ -79,9 +79,9 @@ public class UserSetting : INotifyPropertyChanged
     public string WebSearchProvider { get; set; } = "Bing";
 
     /// <summary>
-    /// 市场分析师角色配置
+    /// 启用的分析师角色字典 Key: AgentName, Value: IsEnabled
     /// </summary>
-    public MarketAnalystRoleSettings AnalystRoleSettings { get; set; } = new MarketAnalystRoleSettings();
+    public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = new();
 
     #region INotifyPropertyChanged Implementation
 

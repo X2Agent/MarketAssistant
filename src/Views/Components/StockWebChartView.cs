@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform;
@@ -20,9 +21,36 @@ public class StockWebChartView : UserControl
     private TextBlock? _errorText;
     private Button? _retryButton;
 
+    // 定义依赖属性，支持 MVVM 绑定
+    public static readonly StyledProperty<IEnumerable<StockKLineData>?> DataProperty =
+        AvaloniaProperty.Register<StockWebChartView, IEnumerable<StockKLineData>?>(nameof(Data));
+
+    /// <summary>
+    /// K线数据源
+    /// </summary>
+    public IEnumerable<StockKLineData>? Data
+    {
+        get => GetValue(DataProperty);
+        set => SetValue(DataProperty, value);
+    }
+
     public StockWebChartView()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// 监听属性变化
+    /// </summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == DataProperty)
+        {
+            // 当数据源发生变化时，自动更新图表
+            _ = UpdateChartAsync(change.NewValue as IEnumerable<StockKLineData>);
+        }
     }
 
     private void InitializeComponent()

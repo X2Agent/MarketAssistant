@@ -34,7 +34,7 @@ public class AnalysisCacheService : IAnalysisCacheService
 
         if (_memoryCache.TryGetValue(cacheKey, out MarketAnalysisReport? cachedReport))
         {
-            _logger.LogInformation("从缓存获取分析报告: {StockSymbol}, 分析师数量: {Count}", 
+            _logger.LogInformation("从缓存获取分析报告: {StockSymbol}, 分析师数量: {Count}",
                 stockSymbol, cachedReport?.AnalystMessages.Count ?? 0);
             return Task.FromResult(cachedReport);
         }
@@ -65,9 +65,9 @@ public class AnalysisCacheService : IAnalysisCacheService
         });
 
         _logger.LogInformation(
-            "已缓存分析报告: {StockSymbol}, 分析师数量: {Count}, 过期时间: {Expiration}", 
-            stockSymbol, 
-            report.AnalystMessages.Count, 
+            "已缓存分析报告: {StockSymbol}, 分析师数量: {Count}, 过期时间: {Expiration}",
+            stockSymbol,
+            report.AnalystMessages.Count,
             _cacheExpiration);
 
         return Task.CompletedTask;

@@ -153,7 +153,7 @@ public class GitHubReleaseServiceTest
             .ThrowsAsync(new HttpRequestException("Network error"));
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<FriendlyException>(
+        await Assert.ThrowsExactlyAsync<FriendlyException>(
             async () => await _service.CheckForUpdateAsync("1.0.0"));
     }
 
@@ -164,7 +164,7 @@ public class GitHubReleaseServiceTest
         SetupHttpResponse(HttpStatusCode.Forbidden, new List<ReleaseInfo>());
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<FriendlyException>(
+        await Assert.ThrowsExactlyAsync<FriendlyException>(
             async () => await _service.CheckForUpdateAsync("1.0.0"));
     }
 
@@ -172,7 +172,7 @@ public class GitHubReleaseServiceTest
     public async Task CheckForUpdateAsync_EmptyVersion_ThrowsException()
     {
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<FriendlyException>(
+        await Assert.ThrowsExactlyAsync<FriendlyException>(
             async () => await _service.CheckForUpdateAsync(""));
     }
 
@@ -269,7 +269,7 @@ public class GitHubReleaseServiceTest
     public async Task DownloadUpdateAsync_InvalidUrl_ThrowsException()
     {
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<FriendlyException>(
+        await Assert.ThrowsExactlyAsync<FriendlyException>(
             async () => await _service.DownloadUpdateAsync("", "somepath"));
     }
 
@@ -286,7 +286,7 @@ public class GitHubReleaseServiceTest
             .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.NotFound));
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<FriendlyException>(
+        await Assert.ThrowsExactlyAsync<FriendlyException>(
             async () => await _service.DownloadUpdateAsync(
                 "https://github.com/test/app.zip",
                 Path.GetTempFileName()));

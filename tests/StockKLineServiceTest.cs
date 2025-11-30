@@ -36,7 +36,6 @@ public class StockKLineServiceTest
     {
         // Arrange
         string symbol = "600000";
-        string expectedFormattedSymbol = "600000.SH";
 
         // Act
         var result = await _stockKLineService.GetDailyKLineDataAsync(symbol);
@@ -53,7 +52,6 @@ public class StockKLineServiceTest
     {
         // Arrange
         string symbol = "000001.SZ";
-        string expectedFormattedSymbol = "000001.SZ";
 
         // Act
         var result = await _stockKLineService.GetWeeklyKLineDataAsync(symbol);
@@ -70,7 +68,6 @@ public class StockKLineServiceTest
     {
         // Arrange
         string symbol = "601398.SH";
-        string expectedFormattedSymbol = "601398.SH";
 
         // Act
         var result = await _stockKLineService.GetMonthlyKLineDataAsync(symbol);
@@ -87,7 +84,6 @@ public class StockKLineServiceTest
     {
         // Arrange
         string symbol = "600000.SH";
-        string expectedFormattedSymbol = "600000.SH";
         string interval = "5";
 
         // Act

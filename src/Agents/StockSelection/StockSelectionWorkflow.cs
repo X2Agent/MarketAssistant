@@ -76,53 +76,48 @@ public class StockSelectionWorkflow : IDisposable
         StockSelectionWorkflowRequest request,
         CancellationToken cancellationToken)
     {
-        try
+        _logger.LogInformation("开始执行选股工作流，分析类型: {Type}",
+            request.IsNewsAnalysis ? "新闻热点" : "用户需求");
+
+        // 构建顺序工作流: 步骤1 → 步骤2 → 步骤3
+        var builder = new WorkflowBuilder(_generateCriteriaExecutor);
+        builder
+            .AddEdge(_generateCriteriaExecutor, _screenStocksExecutor)
+            .AddEdge(_screenStocksExecutor, _analyzeStocksExecutor)
+            .WithOutputFrom(_analyzeStocksExecutor);
+
+        var workflow = builder.Build();
+
+        // 执行工作流
+        await using Run run = await InProcessExecution.RunAsync(workflow, request, runId: null, cancellationToken);
+
+        StockSelectionResult? finalResult = null;
+
+        // 处理工作流事件
+        foreach (WorkflowEvent evt in run.NewEvents)
         {
-            _logger.LogInformation("开始执行选股工作流，分析类型: {Type}",
-                request.IsNewsAnalysis ? "新闻热点" : "用户需求");
-
-            // 构建顺序工作流: 步骤1 → 步骤2 → 步骤3
-            var builder = new WorkflowBuilder(_generateCriteriaExecutor);
-            builder
-                .AddEdge(_generateCriteriaExecutor, _screenStocksExecutor)
-                .AddEdge(_screenStocksExecutor, _analyzeStocksExecutor)
-                .WithOutputFrom(_analyzeStocksExecutor);
-
-            var workflow = builder.Build();
-
-            // 执行工作流
-            await using Run run = await InProcessExecution.RunAsync(workflow, request, runId: null, cancellationToken);
-
-            StockSelectionResult? finalResult = null;
-
-            // 处理工作流事件
-            foreach (WorkflowEvent evt in run.NewEvents)
+            switch (evt)
             {
-                switch (evt)
-                {
-                    case ExecutorInvokedEvent executorInvoked:
-                        _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
-                        break;
-
-                    case ExecutorCompletedEvent executorComplete:
-                        _logger.LogInformation("步骤完成: {ExecutorId}", executorComplete.ExecutorId);
-                        break;
-
-                    case WorkflowOutputEvent workflowOutput:
-                        finalResult = workflowOutput.Data as StockSelectionResult;
-                        _logger.LogInformation("工作流完成，推荐股票数量: {Count}",
-                            finalResult?.Recommendations?.Count ?? 0);
-                        break;
-                }
+                case ExecutorInvokedEvent executorInvoked:
+                    _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                    break;
+                case ExecutorCompletedEvent executorComplete:
+                    _logger.LogInformation("步骤完成: {ExecutorId}", executorComplete.ExecutorId);
+                    break;
+                case WorkflowOutputEvent workflowOutput:
+                    finalResult = workflowOutput.Data as StockSelectionResult;
+                    _logger.LogInformation("工作流完成，推荐股票数量: {Count}",
+                        finalResult?.Recommendations?.Count ?? 0);
+                    break;
+                case ExecutorFailedEvent executorFailed:
+                    _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
+                        executorFailed.ExecutorId,
+                        executorFailed.Data.Message);
+                    throw new FriendlyException(executorFailed.Data.Message);
             }
+        }
 
-            return finalResult ?? CreateDefaultResult("工作流未返回结果");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "工作流执行失败");
-            return CreateDefaultResult($"工作流执行异常: {ex.Message}");
-        }
+        return finalResult ?? CreateDefaultResult("工作流未返回结果");
     }
 
     /// <summary>

@@ -1,6 +1,8 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using Microsoft.Extensions.AI;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -8,6 +10,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// 市场情绪分析师代理
 /// 专注于分析市场情绪、资金流向和投资者行为
 /// </summary>
+[DisplayName("市场情绪分析师")]
+[Description("整合了行为金融分析师和市场分析师的功能")]
 public class MarketSentimentAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult));

@@ -276,17 +276,17 @@ public class StockService
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "GetHotStocksAsync HTTP请求异常: {Message}", ex.Message);
-            throw;
+            throw new FriendlyException($"获取热门股票失败: 网络请求错误 - {ex.Message}", ex);
         }
         catch (JsonException ex)
         {
             _logger.LogError(ex, "GetHotStocksAsync JSON解析异常: {Message}", ex.Message);
-            throw;
+            throw new FriendlyException($"获取热门股票失败: 数据解析错误 - {ex.Message}", ex);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetHotStocksAsync未知异常: {Message}", ex.Message);
-            throw;
+            throw new FriendlyException($"获取热门股票失败: {ex.Message}", ex);
         }
     }
 }
