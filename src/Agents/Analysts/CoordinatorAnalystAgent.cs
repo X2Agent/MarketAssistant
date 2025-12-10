@@ -1,8 +1,11 @@
 using MarketAssistant.Agents.Analysts.Attributes;
+using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
-using Microsoft.Agents.AI.Data;
+using MarketAssistant.Services.Settings;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Analysts;
@@ -17,9 +20,17 @@ namespace MarketAssistant.Agents.Analysts;
 
 public class CoordinatorAnalystAgent : AnalystAgentBase
 {
+    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
+        schema: AIJsonUtilities.CreateJsonSchema(typeof(CoordinatorResult)),
+        schemaName: nameof(CoordinatorResult),
+        schemaDescription: "协调分析师的综合分析结果，包含投资建议、评分、风险评估等结构化数据"
+    );
+
     public CoordinatorAnalystAgent(
         IChatClient chatClient,
-        GroundingSearchTools searchTools)
+        GroundingSearchTools searchTools,
+        IUserSettingService userSettingService,
+        ILoggerFactory loggerFactory)
         : base(
             chatClient,
             instructions: GetInstructions(),
@@ -28,60 +39,13 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
             temperature: 0.2f,
             topP: 0.7f,
             topK: 5,
-            responseFormat: ChatResponseFormat.ForJsonSchema(
-                schema: AIJsonUtilities.CreateJsonSchema(typeof(CoordinatorResult)),
-                schemaName: nameof(CoordinatorResult),
-                schemaDescription: "Coordinator 的综合分析结果，包含投资建议、评分、风险评估等结构化数据"
-            ),
-            tools: null, // 不再使用工具调用，改为通过 ContextProvider 注入搜索结果
+            responseFormat: ResponseFormat,
+            tools: [AIFunctionFactory.Create(searchTools.SearchAsync)],
             aiContextProviderFactory: ctx =>
             {
-                TextSearchProviderOptions textSearchOptions = new()
-                {
-                    // 在每次模型调用前运行搜索，并保持简短的对话上下文滚动窗口
-                    SearchTime = TextSearchProviderOptions.TextSearchBehavior.BeforeAIInvoke,
-                    RecentMessageMemoryLimit = 6,
-                };
-
-                return new TextSearchProvider(
-                    async (query, ct) =>
-                    {
-                        // 使用 GroundingSearchTools 进行混合搜索（本地 RAG + Web 搜索）
-                        var searchResults = await searchTools.SearchAsync(query);
-
-                        // 映射搜索结果到 TextSearchProvider 所需的格式
-                        // 注意：TextSearchProvider.TextSearchResult 只有无参构造函数，且核心内容可能通过 "Text" 或 "Value" 属性设置
-                        // 由于前面 build 错误提示没有 Value/Text 属性，尝试直接使用对象初始化器设置所有可能得属性
-                        // 经过多次失败，我们采用最保险的方案：如果库有不一致，可能需要反射或查看元数据，但这里我们假设它必然有一个承载内容的属性
-                        // 根据 Microsoft.Agents.AI.Data 的常见模式，它可能是一个具有 string Value {get; set;} 的记录或类
-                        // 但既然 Value 报错，Text 没报错（或者之前的报错被忽略了），我们再试一次 Text，并确保无参构造
-                        // 如果 Text 也不行，那可能是 Content。
-
-                        // 鉴于之前提示 Name/Link 也不存在，这非常奇怪，可能我们引用的 TextSearchResult 不是我们要的那个
-                        // 检查命名空间 using Microsoft.Agents.AI.Data; 
-
-                        // 终极方案：如果真的无法匹配属性，可能是版本差异，这里先尝试用对象初始化器只设置 Text，如果 Text 也不行，
-                        // 那么这个 TextSearchResult 类可能只有一个 Value 属性，或者是完全不同的结构。
-                        // 但根据 SemanticKernel 的类似实现，它通常有 Name, Link, Value/Text。
-
-                        // 让我们尝试使用最简单的构造，如果不行，可能需要反编译查看。
-                        // 此处假设 Text 是可用属性。
-
-                        var results = searchResults.Select(r =>
-                            new TextSearchProvider.TextSearchResult
-                            {
-                                // 尝试使用 Text 属性。如果编译通过，说明这就是正确属性。
-                                // 同时把所有元数据塞进去，因为 Name/Link 看来是不存在的。
-                                // 之前的尝试中，Text属性报错可能是因为我们也试图使用了带参构造函数。
-                                // 这次严格使用无参构造 + 对象初始化器。
-                                Text = $"[Source: {r.Name ?? "Unknown"} Link: {r.Link ?? "N/A"}] {r.Value ?? string.Empty}"
-                            });
-
-                        return results;
-                    },
-                    ctx.SerializedState,
-                    ctx.JsonSerializerOptions,
-                    textSearchOptions);
+                return new InvestmentPreferenceContextProvider(
+                    userSettingService.CurrentSetting.InvestmentPreference,
+                    loggerFactory.CreateLogger<InvestmentPreferenceContextProvider>());
             })
     {
     }
@@ -99,12 +63,30 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
 
   您的任务是从对话历史中提取这些专业意见，识别**共识与分歧**，给出最终判断。
   
-  ## 2. 知识增强与验证
-  您已接入增强搜索能力（RAG + Web Search），系统会在您回答前自动检索相关信息并注入上下文。
-  请利用这些信息：
-  - 验证分析师提到的关键数据（如财报数据、新闻事件）
-  - 补充最新的市场动态（如突发新闻、最新政策）
+  ## 2. 知识增强与验证 (RAG + Web)
+  
+  ### 数据源说明：
+  1. **内部知识库**：可能包含用户上传的私有文档、历史研报、会议纪要、内部策略文件等。
+  2. **互联网**：实时新闻、公告、市场数据。
+
+  ### 何时调用搜索？
+  **仅在以下极端情况下调用搜索**：
+  1. **严重分歧**：分析师给出的投资方向完全相反（如一个强烈买入，一个强烈卖出）。
+  2. **关键缺失**：缺少做出最终决策所需的决定性数据（如财报发布日期、重大重组进展）。
+  
+  **注意**：对于一般的评分差异（如7分 vs 6分）或细节不一致，**不要调用搜索**，直接基于现有信息进行权衡。
+
+  ### 搜索策略与限制（严格执行）
+  - **次数限制**：针对一个股票，**最多允许调用三次**搜索工具。
+  - **逐步求证**：
+    1. 首次搜索：构造包含核心矛盾的综合查询。
+    2. 补充搜索：如果首次结果不足，可针对特定缺失点进行补充搜索（如“XX公司 2024 Q3 财报”）。
+  - **停止机制**：一旦获得足够信息解决分歧，或达到**三次**上限，**必须**立即停止搜索并生成最终报告。
+  
+  请利用搜索结果：
   - 解决分析师之间的观点冲突
+  - 验证数据的准确性
+  - 增强最终判断的置信度
 
   ## 3. 冲突解决机制
   

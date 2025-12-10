@@ -230,16 +230,33 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:QuickSelectionStrategyInfo">
-                                <Border Classes="strategy-card" Margin="{StaticResource TinyMargin}">
-                                    <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="{Binding Name}" 
-                                                   FontSize="{StaticResource LabelFontSize}" 
-                                                   FontWeight="Bold"/>
-                                        <TextBlock Text="{Binding Description}" 
-                                                   FontSize="{StaticResource SmallFontSize}" 
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
+                                <Border Classes="strategy-card" Margin="{StaticResource SmallMargin}">
+                                    <Grid ColumnDefinitions="Auto, *">
+                                        <!-- 图标 -->
+                                        <Border Grid.Column="0"
+                                                Width="{StaticResource LargeIconSize}" 
+                                                Height="{StaticResource LargeIconSize}"
+                                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                                Background="{DynamicResource SurfaceVariantBrush}"
+                                                Margin="{StaticResource RightMargin}"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Icon}"
+                                                       FontSize="{StaticResource TitleFontSize}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- 文本内容 -->
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontSize="{StaticResource LabelFontSize}" 
+                                                       FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding Description}" 
+                                                       FontSize="{StaticResource SmallFontSize}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

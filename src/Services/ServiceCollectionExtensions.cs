@@ -166,7 +166,6 @@ public static class ServiceCollectionExtensions
         logging.ClearProviders();
         logging.AddSerilog(Log.Logger);
 
-        logging.AddConsole();
         logging.SetMinimumLevel(LogLevel.Information);
 
         return logging;

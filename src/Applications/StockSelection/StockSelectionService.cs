@@ -138,6 +138,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.ValueStocks,
                 Name = "价值股筛选",
+                Icon = "💎",
                 Description = "筛选PE低、PB低、ROE高的优质价值股",
                 Scenario = "适合稳健型投资者，追求长期价值投资",
                 RiskLevel = "低风险"
@@ -146,6 +147,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.GrowthStocks,
                 Name = "成长股筛选",
+                Icon = "🚀",
                 Description = "筛选营收和利润高增长的成长型股票",
                 Scenario = "适合积极型投资者，追求高成长收益",
                 RiskLevel = "中高风险"
@@ -154,6 +156,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.ActiveStocks,
                 Name = "活跃股筛选",
+                Icon = "🔥",
                 Description = "筛选换手率高、成交活跃的热门股票",
                 Scenario = "适合短线交易者，追求市场热点",
                 RiskLevel = "高风险"
@@ -162,6 +165,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.LargeCap,
                 Name = "大盘股筛选",
+                Icon = "🏢",
                 Description = "筛选市值大、业绩稳定的蓝筹股",
                 Scenario = "适合保守型投资者，追求稳定收益",
                 RiskLevel = "低风险"
@@ -170,6 +174,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.SmallCap,
                 Name = "小盘股筛选",
+                Icon = "🌱",
                 Description = "筛选市值较小、具有成长潜力的股票",
                 Scenario = "适合风险偏好较高的投资者",
                 RiskLevel = "高风险"
@@ -178,6 +183,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.Dividend,
                 Name = "高股息筛选",
+                Icon = "💰",
                 Description = "筛选股息率高、分红稳定的股票",
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"

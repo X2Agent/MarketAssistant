@@ -13,10 +13,12 @@
     
     <!-- 应用程序信息 -->
     <AssemblyName>MarketAssistant</AssemblyName>
+	<AssemblyVersion>1.0.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
-    <Company>MarketAssistant</Company>
+    <Version>1.0.0-beta1</Version>
+    <Company>X2Agent</Company>
     <Product>Market Assistant</Product>
+    <AssemblyTitle>Market Assistant</AssemblyTitle>
     <Copyright>Copyright © 2025</Copyright>
     <Description>AI-powered market analysis assistant</Description>
     
@@ -55,19 +57,18 @@
 	  <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 	  <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
 	</PackageReference>
-    <PackageReference Include="Markdig" Version="0.43.0" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251114.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Hosting" Version="1.0.0-preview.251114.1" />
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251114.1" />
-	<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.10.2-preview.1.25552.1" />
+    <PackageReference Include="Markdig" Version="0.44.0" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-preview.251204.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-preview.251204.1" />
+	<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.0.1-preview.1.25571.5" />
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
 	<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
 	<PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
 	<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
-	<PackageReference Include="Microsoft.Playwright" Version="1.56.0" />
-	<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.67.1-preview" />
-	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.67.1-alpha" />
-	<PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
+	<PackageReference Include="Microsoft.Playwright" Version="1.57.0" />
+	<PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.68.0-preview" />
+	<PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.68.0-alpha" />
+	<PackageReference Include="ModelContextProtocol" Version="0.5.0-preview.1" />
 	<PackageReference Include="PdfPig" Version="0.1.12" />
 	<PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
 	<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />

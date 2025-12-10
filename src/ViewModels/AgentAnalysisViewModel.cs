@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
-using MarketAssistant.Models;
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.AI;
@@ -23,9 +23,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
 
     [ObservableProperty]
     private string _stockCode = "";
-
-    [ObservableProperty]
-    private string _currentAnalyst = "准备中";
 
     [ObservableProperty]
     private bool _isAnalysisInProgress;
@@ -108,7 +105,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
     private void SubscribeToEvents()
     {
         _marketAnalysisWorkflow.ProgressChanged += OnAnalysisProgressChanged;
-        _marketAnalysisWorkflow.AnalystResultReceived += OnAnalysisCompleted;
     }
 
     /// <summary>
@@ -131,18 +127,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            CurrentAnalyst = e.CurrentAnalyst;
             IsAnalysisInProgress = e.IsInProgress;
             AnalysisStage = e.StageDescription;
-        });
-    }
-
-    private void OnAnalysisCompleted(object? sender, ChatMessage e)
-    {
-        Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            // 实时将消息转发给侧边栏
-            ChatSidebarViewModel?.AddAnalysisMessage(e);
         });
     }
 
@@ -156,6 +142,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
 
         await SafeExecuteAsync(async () =>
         {
+            // 重置进度状态
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AnalysisStage = "准备开始...";
+            });
+
             // 1. 尝试从缓存加载
             var cachedReport = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
             if (cachedReport != null)
@@ -187,6 +179,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 AnalysisReportViewModel.UpdateWithReport(report);
+                if (ChatSidebarViewModel != null)
+                {
+                    await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
+                }
                 // 缓存操作不需要在 UI 线程等待，可以放飞或在后台等待
                 _ = _analysisCacheService.CacheAnalysisAsync(StockCode, report);
             });

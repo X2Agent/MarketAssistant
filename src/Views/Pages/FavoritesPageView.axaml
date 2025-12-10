@@ -13,6 +13,7 @@
 
     <UserControl.Resources>
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+        <converts:NullableVisibilityConverter x:Key="NullableVisibilityConverter"/>
     </UserControl.Resources>
 
     <Design.DataContext>
@@ -82,62 +83,85 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="stocks:StockInfo">
                             <Border Classes="stock-card"
-                                    Padding="{StaticResource SmallCardPadding}"
                                     Margin="{StaticResource SmallMargin}"
                                     Tapped="OnStockItemTapped"
                                     Tag="{Binding .}"
-                                    VerticalAlignment="Top"
-                                    HorizontalAlignment="Stretch">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <!-- 股票信息 -->
-                                    <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                                        <!-- 市场和代码 -->
-                                        <TextBlock FontSize="{StaticResource TinyFontSize}" 
-                                                   Foreground="{DynamicResource TextSecondaryBrush}">
-                                            <Run Text="{Binding Market}"/>
-                                            <Run Text=" "/>
-                                            <Run Text="{Binding Code}"/>
-                                        </TextBlock>
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Top">
+                                <Grid RowDefinitions="Auto,Auto,Auto">
+                                    <!-- 顶部信息栏 -->
+                                    <Grid ColumnDefinitions="*,Auto" Margin="{StaticResource BottomMargin}">
+                                        <StackPanel Orientation="Horizontal" 
+                                                    Spacing="{StaticResource TinySpacing}"
+                                                    VerticalAlignment="Center">
+                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                                    Padding="{StaticResource TinyPadding}">
+                                                <TextBlock FontSize="{StaticResource SmallFontSize}" 
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center">
+                                                    <Run Text="{Binding Market}"/>
+                                                    <Run Text="{Binding Code}"/>
+                                                </TextBlock>
+                                            </Border>
+                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                                    Padding="{StaticResource TinyPadding}"
+                                                    IsVisible="{Binding SectorName, Converter={StaticResource NullableVisibilityConverter}}">
+                                                <TextBlock Text="{Binding SectorName}"
+                                                           FontSize="{StaticResource SmallFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
                                         
-                                        <!-- 股票名称 -->
-                                        <TextBlock Text="{Binding Name}" 
-                                                   FontSize="{StaticResource BodyFontSize}" 
-                                                   FontWeight="SemiBold" 
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        
-                                        <!-- 价格和涨跌幅 -->
-                                        <TextBlock FontSize="{StaticResource MediumFontSize}" 
-                                                   FontWeight="Bold" 
-                                                   Foreground="{DynamicResource TextPrimaryBrush}">
-                                            <Run Text="{Binding CurrentPrice}"/>
-                                            <Run Text=" " FontSize="{StaticResource BodyFontSize}" FontWeight="Normal"/>
-                                            <Run Text="{Binding ChangePercentage}" 
-                                                 FontSize="{StaticResource BodyFontSize}" 
-                                                 FontWeight="Normal"
-                                                 Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                        </TextBlock>
-                                    </StackPanel>
+                                        <!-- 删除按钮 -->
+                                        <Button Grid.Column="1"
+                                                Classes="delete-button"
+                                                Width="{StaticResource TinyIconButtonSize}" 
+                                                Height="{StaticResource TinyIconButtonSize}" 
+                                                Cursor="Hand"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Padding="0"
+                                                Tapped="OnDeleteButtonTapped"
+                                                Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
+                                                CommandParameter="{Binding .}">
+                                            <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                                      Width="{StaticResource TinyIconSize}" 
+                                                      Height="{StaticResource TinyIconSize}"
+                                                      Foreground="{DynamicResource ErrorBrush}" />
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- 股票名称 -->
+                                    <TextBlock Grid.Row="1"
+                                               Text="{Binding Name}" 
+                                               FontSize="{StaticResource SubTitleFontSize}" 
+                                               FontWeight="Bold" 
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               Margin="{StaticResource BottomMargin}"/>
                                     
-                                    <!-- 删除按钮 -->
-                                    <Button Grid.Column="1"
-                                            Classes="delete-button"
-                                            Width="{StaticResource TinyIconButtonSize}" 
-                                            Height="{StaticResource TinyIconButtonSize}" 
-                                            Cursor="Hand"
-                                            Background="{DynamicResource ItemBackgroundBrush}"
-                                            BorderThickness="{StaticResource NoBorderThickness}"
-                                            CornerRadius="{StaticResource LargeCornerRadius}"
-                                            Padding="0"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Top"
-                                            Tapped="OnDeleteButtonTapped"
-                                            Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
-                                            CommandParameter="{Binding .}">
-                                        <PathIcon Data="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z"
-                                                  Width="{StaticResource TinyIconSize}" 
-                                                  Height="{StaticResource TinyIconSize}"
-                                                  Foreground="{StaticResource ErrorBrush}" />
-                                    </Button>
+                                    <!-- 底部价格信息 -->
+                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
+                                        <TextBlock Text="{Binding CurrentPrice}" 
+                                                   FontSize="{StaticResource LargeFontSize}" 
+                                                   FontWeight="Bold" 
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        
+                                        <Border Grid.Column="1"
+                                                Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                                Padding="{StaticResource TinyPadding}"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding ChangePercentage}" 
+                                                       FontSize="{StaticResource SmallFontSize}" 
+                                                       FontWeight="Bold"
+                                                       Foreground="White"/>
+                                        </Border>
+                                    </Grid>
                                 </Grid>
                             </Border>
                         </DataTemplate>

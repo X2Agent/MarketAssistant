@@ -38,9 +38,11 @@ namespace MarketAssistant.ViewModels
         [ObservableProperty]
         private string _releaseNotes = "";
 
-        public string AppName => AppInfo.ProductName;
+        public string AppName => AppInfo.Title;
         public string Version => $"v {AppInfo.Version}";
         public string Description => AppInfo.Description;
+        public string Company => AppInfo.Company;
+        public string Copyright => AppInfo.Copyright;
 
         public ObservableCollection<FeatureItem> FeatureItems { get; } = new ObservableCollection<FeatureItem>();
 

@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Extensions;
-using MarketAssistant.Services.Cache;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -14,8 +13,6 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class AnalysisReportViewModel : ViewModelBase
 {
-    private readonly IAnalysisCacheService _analysisCacheService;
-
     [ObservableProperty]
     private bool _isReportVisible;
 
@@ -54,6 +51,7 @@ public partial class AnalysisReportViewModel : ViewModelBase
     // === 聚合的列表数据 ===
 
     public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
+
     public ObservableCollection<string> InvestmentHighlights { get; } = new();
     public ObservableCollection<string> RiskFactors { get; } = new();
     public ObservableCollection<string> OperationSuggestions { get; } = new();
@@ -77,11 +75,9 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public ObservableCollection<ChatMessage> AnalystMessages { get; } = new();
 
     public AnalysisReportViewModel(
-         IAnalysisCacheService analysisCacheService,
         ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
-        _analysisCacheService = analysisCacheService;
     }
 
     partial void OnOverallScoreChanged(float value)
@@ -116,10 +112,13 @@ public partial class AnalysisReportViewModel : ViewModelBase
             RiskLevel = coordinatorResult.RiskLevel.GetDescription();
             ConfidencePercentage = coordinatorResult.ConfidencePercentage;
 
-            foreach (var (dimension, score) in coordinatorResult.DimensionScores)
-            {
-                DimensionScores.Add(new ScoreItem { Name = dimension, Score = score });
-            }
+            // 将强类型数据转换为列表供 UI 绑定
+            DimensionScores.Clear();
+            DimensionScores.Add(new ScoreItem { Name = "基本面", Score = coordinatorResult.DimensionScores.Fundamental });
+            DimensionScores.Add(new ScoreItem { Name = "技术面", Score = coordinatorResult.DimensionScores.Technical });
+            DimensionScores.Add(new ScoreItem { Name = "财务面", Score = coordinatorResult.DimensionScores.Financial });
+            DimensionScores.Add(new ScoreItem { Name = "市场情绪", Score = coordinatorResult.DimensionScores.Sentiment });
+            DimensionScores.Add(new ScoreItem { Name = "新闻事件", Score = coordinatorResult.DimensionScores.News });
 
             foreach (var highlight in coordinatorResult.InvestmentHighlights)
             {

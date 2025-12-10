@@ -61,6 +61,12 @@ public partial class SettingsPageViewModel : ViewModelBase
     // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
 
+    // 风险承受能力选项
+    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
+
+    // 投资期限选项
+    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
+
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";

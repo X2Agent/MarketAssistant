@@ -1,15 +1,10 @@
-using Avalonia.Animation;
-using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.Stocks.Models;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Models;
 using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-using System.Linq;
 
 namespace MarketAssistant.ViewModels;
 

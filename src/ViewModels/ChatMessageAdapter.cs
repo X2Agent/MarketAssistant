@@ -1,139 +1,146 @@
+using AdaptiveCards;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Extensions.AI;
+using AdaptiveCardConverter = MarketAssistant.Infrastructure.AdaptiveCards.AdaptiveCardConverter;
 
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
-/// æ¶ˆæ¯çŠ¶æ€æšä¸¾
+/// ÏûÏ¢×´Ì¬Ã¶¾Ù
 /// </summary>
 public enum MessageStatus
 {
     /// <summary>
-    /// å‘é€ä¸­ï¼ˆæ­£åœ¨æ€è€ƒï¼‰
+    /// ·¢ËÍÖĞ£¨ÕıÔÚË¼¿¼£©
     /// </summary>
     Sending,
 
     /// <summary>
-    /// æ­£åœ¨æ¥æ”¶æµå¼å†…å®¹
+    /// ÕıÔÚ½ÓÊÕÁ÷Ê½ÄÚÈİ
     /// </summary>
     Streaming,
 
     /// <summary>
-    /// å·²å‘é€
+    /// ÒÑ·¢ËÍ
     /// </summary>
     Sent,
 
     /// <summary>
-    /// å‘é€å¤±è´¥
+    /// ·¢ËÍÊ§°Ü
     /// </summary>
     Failed
 }
 
 /// <summary>
-/// ChatMessageContentçš„MVVMé€‚é…å™¨ï¼Œæ”¯æŒUIç»‘å®š
+/// ChatMessageµÄMVVMÊÊÅäÆ÷£¬Ö§³ÖUI°ó¶¨
 /// </summary>
 public partial class ChatMessageAdapter : ObservableObject
 {
-    private readonly ChatMessageContent? _originalMessage;
+    private static readonly AdaptiveCardConverter _converter = new();
 
     /// <summary>
-    /// æ¶ˆæ¯å”¯ä¸€æ ‡è¯†
-    /// </summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-
-    /// <summary>
-    /// æ¶ˆæ¯å†…å®¹
+    /// ÏûÏ¢ÄÚÈİ
     /// </summary>
     [ObservableProperty]
     private string _content = string.Empty;
 
     /// <summary>
-    /// æ˜¯å¦ä¸ºç”¨æˆ·æ¶ˆæ¯
+    /// ÊÇ·ñÎªÓÃ»§ÏûÏ¢
     /// </summary>
     [ObservableProperty]
     private bool _isUser;
 
     /// <summary>
-    /// å‘é€æ—¶é—´
+    /// ·¢ËÍÊ±¼ä
     /// </summary>
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
 
     /// <summary>
-    /// æ ¼å¼åŒ–çš„æ—¶é—´å­—ç¬¦ä¸²
+    /// ¸ñÊ½»¯µÄÊ±¼ä×Ö·û´®
     /// </summary>
     public string FormattedTime => Timestamp.ToString("HH:mm");
 
     /// <summary>
-    /// å‘é€è€…åç§°
+    /// ·¢ËÍÕßÃû³Æ
     /// </summary>
     [ObservableProperty]
     private string _sender = string.Empty;
 
     /// <summary>
-    /// æ¶ˆæ¯çŠ¶æ€
+    /// ÏûÏ¢×´Ì¬
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsThinking))]
     private MessageStatus _status = MessageStatus.Sent;
 
     /// <summary>
-    /// åŸå§‹çš„SK ChatMessageContentå¯¹è±¡
+    /// ÊÇ·ñÕıÔÚË¼¿¼£¨·¢ËÍÖĞ£©
     /// </summary>
-    public ChatMessageContent? OriginalMessage => _originalMessage;
+    public bool IsThinking => Status == MessageStatus.Sending;
 
     /// <summary>
-    /// ä»ChatMessageContentåˆ›å»ºé€‚é…å™¨
+    /// Adaptive Card ¶ÔÏó
     /// </summary>
-    public ChatMessageAdapter(ChatMessageContent messageContent)
+    public AdaptiveCard? AdaptiveCard { get; private set; }
+
+    /// <summary>
+    /// ÊÇ·ñÎª Adaptive Card
+    /// </summary>
+    public bool IsAdaptiveCard => AdaptiveCard != null;
+
+    partial void OnContentChanged(string value)
     {
-        _originalMessage = messageContent;
-        Content = messageContent.Content ?? string.Empty;
-        IsUser = messageContent.Role == AuthorRole.User;
-        Sender = messageContent.AuthorName ?? GetDefaultSenderName(messageContent.Role);
-        Status = MessageStatus.Sent;
+        // Re-evaluate Adaptive Card if content changes (e.g. streaming complete)
+        if (AdaptiveCard == null && IsJsonContent(value))
+        {
+            var legacyCard = _converter.Convert(value);
+            if (legacyCard != null)
+            {
+                AdaptiveCard = legacyCard;
+                OnPropertyChanged(nameof(IsAdaptiveCard));
+            }
+        }
+    }
+
+    private bool IsJsonContent(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return false;
+        content = content.Trim();
+
+        // Fast check for brackets
+        if (!((content.StartsWith("{") && content.EndsWith("}")) ||
+              (content.StartsWith("[") && content.EndsWith("]"))))
+        {
+            return false;
+        }
+
+        try
+        {
+            JsonDocument.Parse(content);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
-    /// åˆ›å»ºç”¨æˆ·æ¶ˆæ¯é€‚é…å™¨
+    /// ´Ó Microsoft.Extensions.AI.ChatMessage ´´½¨ÊÊÅäÆ÷
     /// </summary>
-    public ChatMessageAdapter(string content, bool isUser, string? sender = null)
-    {
-        Content = content;
-        IsUser = isUser;
-        Sender = sender ?? (isUser ? "ç”¨æˆ·" : "åŠ©æ‰‹");
-        Status = MessageStatus.Sent;
-    }
-
-    /// <summary>
-    /// ä» Microsoft.Extensions.AI.ChatMessage åˆ›å»ºé€‚é…å™¨
-    /// </summary>
-    public ChatMessageAdapter(Microsoft.Extensions.AI.ChatMessage chatMessage)
+    public ChatMessageAdapter(ChatMessage chatMessage)
     {
         Content = chatMessage.Text ?? string.Empty;
-        IsUser = chatMessage.Role == Microsoft.Extensions.AI.ChatRole.User;
-        Sender = chatMessage.AuthorName ?? (IsUser ? "ç”¨æˆ·" : "åŠ©æ‰‹");
+        IsUser = chatMessage.Role == ChatRole.User;
+        Sender = chatMessage.AuthorName ?? (IsUser ? "ÓÃ»§" : "ÖúÊÖ");
         Status = MessageStatus.Sent;
         Timestamp = chatMessage.CreatedAt ?? DateTimeOffset.Now;
-    }
 
-    /// <summary>
-    /// åˆ›å»ºç³»ç»Ÿæ¶ˆæ¯é€‚é…å™¨
-    /// </summary>
-    public static ChatMessageAdapter CreateSystemMessage(string content, string? sender = null)
-    {
-        return new ChatMessageAdapter(content, false, sender ?? "ç³»ç»Ÿ");
-    }
-
-    /// <summary>
-    /// æ ¹æ®è§’è‰²è·å–é»˜è®¤å‘é€è€…åç§°
-    /// </summary>
-    private static string GetDefaultSenderName(AuthorRole role)
-    {
-        if (role == AuthorRole.User) return "ç”¨æˆ·";
-        if (role == AuthorRole.Assistant) return "åŠ©æ‰‹";
-        if (role == AuthorRole.System) return "ç³»ç»Ÿ";
-        if (role == AuthorRole.Tool) return "å·¥å…·";
-        return "æœªçŸ¥";
+        // Fallback: Try converting legacy analysis JSON to card
+        if (AdaptiveCard == null && IsJsonContent(Content))
+        {
+            AdaptiveCard = _converter.Convert(Content);
+        }
     }
 }
 

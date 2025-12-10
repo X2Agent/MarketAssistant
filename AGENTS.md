@@ -67,34 +67,47 @@ dotnet run --project src/MarketAssistant.csproj -c Debug
 
 ## 三、测试与质量检查
 
-### 1. 运行全部测试
+### 1. 智能体验证策略（必需）
+
+智能体在完成代码编辑后，**必须**根据改动类型执行验证：
+
+#### A. 必须执行构建验证 (`dotnet build`)
+涉及以下目录或文件的修改，必须确保编译通过：
+- **业务逻辑**：`src/Applications/`, `src/Services/`, `src/Agents/` (含 Plugins)
+- **基础设施**：`src/Infrastructure/`, `src/Rag/`, `src/Models/`, `src/Parsers/`
+- **UI 层**：`src/Views/`, `src/ViewModels/`, `src/Resources/`, `src/Converts/`
+- **配置**：`src/config/`
+
+#### B. 可选执行单元测试 (`dotnet test`)
+仅在以下情况执行：
+- 用户明确要求执行测试
+- 进行重大架构重构
+- 修复已知的测试失败问题
+
+#### C. 无需验证
+- 文档（README.md, AGENTS.md 等）
+- 纯注释修改
+- 资产文件（图片等）
+
+### 2. 运行全部测试
 
 ```bash
 dotnet test tests/TestMarketAssistant.csproj -c Debug --logger "trx;LogFileName=TestResults.trx"
 ```
 
-### 2. 按名称过滤运行
+### 3. 按名称过滤运行
 
 ```bash
 dotnet test tests/TestMarketAssistant.csproj --filter FullyQualifiedName~StockServiceTest
 ```
 
-### 3. 代码格式（若需）
+### 4. 代码格式（若需）
 
 ```bash
 dotnet format --verify-no-changes
 # 如需自动修复：
 dotnet format
 ```
-
-智能体在完成代码编辑后的验证策略：
-
-- **核心代码改动**（Services、Agents、Plugins、Applications 业务逻辑）：执行 `dotnet build` 验证编译通过，测试为可选项
-- **UI 改动**（Views、样式、资源）：执行 `dotnet build` 验证编译通过
-- **文档改动**（README、AGENTS.md 等）：无需执行构建或测试
-- **配置改动**（YAML、设置）：执行 `dotnet build` 验证编译通过
-
-如构建失败，应尝试修复直至通过。单元测试仅在用户明确要求或重大重构时执行。
 
 ---
 
@@ -125,9 +138,15 @@ dotnet format
 
 UI 与样式（Avalonia AXAML）：
 
-- AXAML/样式中的 `Padding`/`Margin`/间距使用 4 的倍数（4/8/12/16），且不超过 16（来源：团队偏好）。
-- 统一遵循现有 `src/Resources/Styles/` 配置，避免在视图中硬编码颜色与字体。
-- 视图文件使用 `.axaml` 扩展名（Avalonia XAML）。
+- **文件格式**：视图文件必须使用 `.axaml` 扩展名。
+- **布局约束**：
+  - `Padding`/`Margin`/间距必须使用 **4 的倍数**（4/8/12/16），且原则上不超过 16。
+  - **禁止硬编码数值**：布局数值应使用 `src/Resources/Styles/Spacing.axaml` 中的资源（如 `{StaticResource SmallMargin}`），或在 `UserControl.Resources` 中定义局部资源。
+- **样式管理**：
+  - 统一遵循 `src/Resources/Styles/` 中的集中式样式资源。
+  - 避免在视图中硬编码颜色与字体。
+- **控件使用**：优先使用 Avalonia 内置控件，必要时参考现有自定义控件。
+- **资产管理**：非必要不改动图片与资产文件；若必须更改，需监控构建体积。
 
 > 说明：以上 UI 间距约束来自项目偏好设置 [[memory:4590929]]。
 
@@ -178,55 +197,9 @@ dotnet publish src/MarketAssistant.csproj -c Release -r linux-x64 --self-contain
 
 ---
 
-## 八、对智能体的补充指令
-
-### 验证策略
-
-根据改动类型选择合适的验证方式：
-
-#### 所有代码改动（必需）
-- 修改或新增插件（`src/Agents/Plugins/`）
-- 修改业务逻辑（`src/Applications/`、`src/Services/`）
-- 修改 Agent 核心代码（`src/Agents/`）
-- 修改基础设施（`src/Infrastructure/`、`src/Rag/`）
-- 修改数据模型或解析器（`src/Models/`、`src/Parsers/`）
-- 修改 UI 视图（`src/Views/`）
-- 修改 ViewModel（`src/ViewModels/`）
-- 修改样式资源（`src/Resources/Styles/`）
-- 修改转换器（`src/Converts/`）
-- 修改配置文件（`src/config/`）
-
-**验证命令**：`dotnet build`（确保编译通过）
-
-#### 单元测试（可选）
-单元测试仅在以下情况执行：
-- 用户明确要求执行测试
-- 进行重大架构重构
-- 修复已知的测试失败问题
-
-**测试命令**：`dotnet test`（可针对相关测试文件过滤执行）
-
-#### 无需验证的场景
-- 修改文档（README.md、AGENTS.md、BUILD.md 等）
-- 修改注释
-- 修改资产文件（图片、图标等）
-
-### 其他开发指令
-
-- 修改或新增插件时：
-  - 在 `src/Agents/Plugins/` 下新增实现，确保代码编译通过。
-  - 同时在 `tests/` 添加或更新对应测试（但不需要自动执行测试）。
-  - 如引入新配置项，更新 `src/config/models.yaml` 示例并在本文件"配置与运行时约定"处补充说明。
-- 涉及 UI 的改动：
-  - 遵循"4 的倍数、不超过 16"的间距规范。
-  - 尽量通过 `src/Resources/Styles/` 中的样式资源集中管理。
-  - 使用 `.axaml` 文件扩展名（Avalonia XAML）。
-  - 优先使用 Avalonia 内置控件，必要时参考现有自定义控件实现。
-- 非必要不改动图片与资产文件；若必须更改，请确保最终构建体积可控。
-
 ---
 
-## 九、PR 与提交规范
+## 八、PR 与提交规范
 
 - 提交信息建议格式：`[模块] 变更概要`，例如：`[Plugins] 新增资金流插件与测试`。
 - 所有代码改动需确保构建通过；单元测试为可选，由开发者根据实际情况决定是否执行。
@@ -235,7 +208,7 @@ dotnet publish src/MarketAssistant.csproj -c Release -r linux-x64 --self-contain
 
 ---
 
-## 十、常见问题（FAQ）
+## 九、常见问题（FAQ）
 
 - Q：测试是否为必需？
   - A：不是必需的。智能体默认只确保代码编译通过，测试为可选项，仅在用户明确要求或重大重构时执行。

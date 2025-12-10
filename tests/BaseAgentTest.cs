@@ -35,7 +35,6 @@ public class BaseAgentTest
     {
         var loggerFactory = LoggerFactory.Create(builder =>
         {
-            builder.AddConsole();
             builder.SetMinimumLevel(LogLevel.Debug);
         });
         _logger = loggerFactory.CreateLogger<BaseAgentTest>();
@@ -55,7 +54,6 @@ public class BaseAgentTest
         // 配置日志
         services.AddLogging(builder =>
         {
-            builder.AddConsole();
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
@@ -65,7 +63,7 @@ public class BaseAgentTest
         var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
 
         // 硬编码ModelId和Endpoint
-        var modelId = "deepseek-ai/DeepSeek-V3.2-Exp";
+        var modelId = "deepseek-ai/DeepSeek-V3.2";
         var endpoint = "https://api.siliconflow.cn";
 
         // 注册依赖服务

@@ -61,24 +61,17 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 ### 股票收藏
 ![股票收藏](images/2.png)
 
-### 基本设置
-![基本设置](images/3.png)
+### AI选股
+![AI选股](images/3.png)
+
+### 软件设置
+![软件设置](images/4.png)
+
+### 股票详情
+![股票详情](images/6.png)
 
 ### 分析报告
-![分析报告](images/4-1.png)
-
-![分析报告](images/4-2.png)
-
-### 结构化报告 
-![结构化报告](images/5-1.png)
-
-![结构化报告](images/5-2.png)
-
-### K线
-![K线](images/6.png)
-
-### AI选股
-![AI选股](images/7.png)
+![分析报告](images/7.png)
 
 ## 🔍 性能优化建议
 
@@ -90,7 +83,7 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 - 合理设置分析师角色，避免不必要的API调用
 - 持续优化提示词
 
-## � 应用优势
+## 🌟 应用优势
 
 ### 智能化程度高
 - 多个AI分析师协作，提供全方位分析视角
@@ -128,12 +121,11 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 
 - Avalonia UI 11.3.8
 - .NET 10.0
-- Semantic Kernel
-- CommunityToolkit.Mvvm
+- MAF(Microsoft Agent Framework)
   
 ## 🙏 鸣谢
 
-本项目大部分代码由 AI 智能编程助手生成。在此特别感谢 Trae AI、Copilot、Cursor 强大的代码生成能力，为本项目的开发提供了极大帮助。
+本项目大部分代码由 AI 智能编程助手生成。在此特别感谢Copilot、Cursor 强大的代码生成能力，为本项目的开发提供了极大帮助。
 
 
 ## 📄 许可证

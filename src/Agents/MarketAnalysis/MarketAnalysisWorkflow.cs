@@ -32,11 +32,6 @@ public class MarketAnalysisWorkflow : IDisposable
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
 
-    /// <summary>
-    /// 单个分析师结果接收事件
-    /// </summary>
-    public event EventHandler<ChatMessage>? AnalystResultReceived;
-
     public MarketAnalysisWorkflow(
         AnalysisAggregatorExecutor aggregatorExecutor,
         CoordinatorExecutor coordinatorExecutor,
@@ -66,7 +61,6 @@ public class MarketAnalysisWorkflow : IDisposable
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
-                CurrentAnalyst = "系统",
                 StageDescription = "正在准备分析环境",
                 IsInProgress = true
             });
@@ -86,7 +80,6 @@ public class MarketAnalysisWorkflow : IDisposable
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
-                CurrentAnalyst = "分析师团队",
                 StageDescription = $"{enabledAnalysts.Count} 位分析师正在并发分析",
                 IsInProgress = true
             });
@@ -96,7 +89,6 @@ public class MarketAnalysisWorkflow : IDisposable
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
-                CurrentAnalyst = "系统",
                 StageDescription = "分析完成",
                 IsInProgress = false
             });
@@ -108,7 +100,6 @@ public class MarketAnalysisWorkflow : IDisposable
             _logger.LogError(ex, "执行市场分析工作流时发生错误");
             OnProgressChanged(new AnalysisProgressEventArgs
             {
-                CurrentAnalyst = "系统",
                 StageDescription = $"分析失败: {ex.Message}",
                 IsInProgress = false
             });
@@ -157,7 +148,6 @@ public class MarketAnalysisWorkflow : IDisposable
 
                     OnProgressChanged(new AnalysisProgressEventArgs
                     {
-                        CurrentAnalyst = executorInvoked.ExecutorId,
                         StageDescription = stageName,
                         IsInProgress = true
                     });
@@ -172,39 +162,11 @@ public class MarketAnalysisWorkflow : IDisposable
                     _logger.LogDebug("代理更新 [{AgentId}]: {Data}",
                         agentUpdate.ExecutorId,
                         agentUpdate.Data);
-
-                    OnProgressChanged(new AnalysisProgressEventArgs
-                    {
-                        CurrentAnalyst = agentUpdate.ExecutorId,
-                        StageDescription = $"正在分析... {agentUpdate.Data}",
-                        IsInProgress = true
-                    });
                     break;
 
                 case WorkflowOutputEvent workflowOutput:
                     finalReport = workflowOutput.Data as MarketAnalysisReport;
                     _logger.LogInformation("工作流完成，生成最终报告");
-
-                    // 触发每个分析师的消息接收事件
-                    if (finalReport != null)
-                    {
-                        foreach (var message in finalReport.AnalystMessages)
-                        {
-                            OnAnalystResultReceived(message);
-                        }
-
-                        // 触发协调分析师的最终报告（使用 Summary 作为简短总结）
-                        if (!string.IsNullOrEmpty(finalReport.CoordinatorResult.Summary))
-                        {
-                            var coordinatorMessage = new ChatMessage(
-                                ChatRole.Assistant,
-                                finalReport.CoordinatorResult.Summary)
-                            {
-                                AuthorName = "CoordinatorAnalystAgent"
-                            };
-                            OnAnalystResultReceived(coordinatorMessage);
-                        }
-                    }
                     break;
                 case ExecutorFailedEvent executorFailed:
                     _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
@@ -334,14 +296,6 @@ public class MarketAnalysisWorkflow : IDisposable
         ProgressChanged?.Invoke(this, e);
     }
 
-    /// <summary>
-    /// 触发分析师结果接收事件
-    /// </summary>
-    protected virtual void OnAnalystResultReceived(ChatMessage message)
-    {
-        AnalystResultReceived?.Invoke(this, message);
-    }
-
     public void Dispose()
     {
         Dispose(true);
@@ -362,11 +316,6 @@ public class MarketAnalysisWorkflow : IDisposable
 /// </summary>
 public sealed class AnalysisProgressEventArgs : EventArgs
 {
-    /// <summary>
-    /// 当前工作的分析师名称
-    /// </summary>
-    public string CurrentAnalyst { get; set; } = string.Empty;
-
     /// <summary>
     /// 当前阶段描述
     /// </summary>

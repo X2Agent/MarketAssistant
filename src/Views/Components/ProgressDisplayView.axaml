@@ -23,6 +23,19 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <!-- 旋转动画样式 -->
+        <Style Selector="Path.Spin">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </UserControl.Styles>
     
     <Border Background="{DynamicResource CardBackgroundBrush}"
@@ -58,53 +71,24 @@
                              Opacity="0.1"
                              Classes="Pulse"/>
                     
-                    <!-- 中圆 - 进度环 -->
-                    <Ellipse Width="{StaticResource ProgressCircleInnerSize}" 
-                             Height="{StaticResource ProgressCircleInnerSize}"
-                             Stroke="{DynamicResource BorderBrush}"
-                             StrokeThickness="{StaticResource TinySpacing}"
-                             Fill="Transparent"/>
-                    
-                    <!-- 进度百分比显示 -->
-                    <TextBlock x:Name="ProgressPercentage"
-                               Text="0%"
-                               FontSize="{StaticResource TitleFontSize}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource PrimaryBrush}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
+                    <!-- 旋转的 Loading 图标 -->
+                    <Path Classes="Spin"
+                          Width="32" Height="32"
+                          Data="M16,4 A12,12 0 1,1 4,16"
+                          Stroke="{DynamicResource PrimaryBrush}"
+                          StrokeThickness="4"
+                          StrokeLineCap="Round"
+                          RenderTransformOrigin="50%,50%"/>
                 </Grid>
-
-                <!-- 水平进度条 -->
-                <ProgressBar x:Name="ProgressBar"
-                             Height="{StaticResource TinySpacing}"
-                             Width="{StaticResource ProgressBarWidth}"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="0"
-                             CornerRadius="{StaticResource TinyCornerRadius}"
-                             Foreground="{DynamicResource PrimaryBrush}"
-                             Background="{DynamicResource BorderBrush}"
-                             HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- 阶段说明 -->
             <StackPanel Spacing="{StaticResource SmallSpacing}">
-                <TextBlock x:Name="StageLabel"
-                           Text="正在准备分析..."
+                <TextBlock Text="{Binding #Root.AnalysisStage}"
                            FontSize="{StaticResource LabelFontSize}"
                            FontWeight="Medium"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-                
-                <TextBlock x:Name="DetailLabel"
-                           Text="即将开始智能分析"
-                           FontSize="{StaticResource SmallFontSize}"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           MaxWidth="{StaticResource ProgressDetailMaxWidth}"/>
             </StackPanel>
 
             <!-- 提示信息 -->

@@ -17,7 +17,6 @@
             <!-- 进度显示区域 - 仅在分析时显示 -->
             <views:ProgressDisplayView 
                 IsVisible="{Binding IsBusy}"
-                IsProgressVisible="{Binding IsBusy}"
                 IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
                 AnalysisStage="{Binding AnalysisStage}"/>
 
@@ -35,12 +34,13 @@
                 <!-- 水印控件 -->
                 <controls:WatermarkView 
                     Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！" 
-                    OpacityValue="0.4" 
+                    OpacityValue="0.15" 
                     Angle="-30" 
                     FontSize="{StaticResource ExtraLargeFontSize}" 
                     HorizontalRepeatCount="2" 
                     VerticalRepeatCount="4" 
-                    ZIndex="999" />
+                    ZIndex="999" 
+                    IsHitTestVisible="False"/>
             
                 <!-- 浮动操作按钮(FAB) -->
                 <Button HorizontalAlignment="Right" 

@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks.Models;
-using MarketAssistant.Models;
 using MarketAssistant.ViewModels.Home;
 using Microsoft.Extensions.Logging;
 

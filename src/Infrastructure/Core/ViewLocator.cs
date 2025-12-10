@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using MarketAssistant.ViewModels;
+using MarketAssistant.ViewModels.Demo;
+using MarketAssistant.Views.Demo;
 using MarketAssistant.Views.Pages;
 
 namespace MarketAssistant.Infrastructure.Core;
@@ -40,6 +42,7 @@ public class ViewLocator : IDataTemplate
             MCPConfigPageViewModel => new MCPConfigPageView { DataContext = data },
             StockPageViewModel => new StockPageView { DataContext = data },
             AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
+            ChatSidebarDemoViewModel => new ChatSidebarDemoView { DataContext = data },
             _ => new TextBlock { Text = $"未找到视图: {viewModelType.Name}" }
         };
     }

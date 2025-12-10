@@ -117,13 +117,37 @@ public class AnalystAgentFactoryTest : BaseAgentTest
         var agent = agentFactory.CreateAnalyst<CoordinatorAnalystAgent>();
 
         // 模拟其他分析师的输出作为历史消息
+        // 构造冲突场景：基本面看好，技术面看空
+        var fundamentalJson = """
+            {
+                "BasicInfo": { "Symbol": "SH600519", "Name": "贵州茅台" },
+                "Fundamentals": { "Score": 8.5, "Summary": "行业龙头，护城河深厚，长期价值显著。" },
+                "GrowthValue": { "Rating": "Buy", "ValuationStatus": "Undervalued" }
+            }
+            """;
+
+        var technicalJson = """
+            {
+                "PatternTrend": { "CurrentTrend": "Down", "TrendStrength": 8 },
+                "PriceLevels": { "SupportLevel": 1500, "ResistanceLevel": 1600 },
+                "Strategy": { "Rating": "Sell", "Action": "Reduce", "TargetPrice": 1450 }
+            }
+            """;
+
+        var financialJson = """
+            {
+                "HealthAssessment": { "OverallScore": 9, "Summary": "资产负债表极其健康，现金流充裕。" },
+                "ProfitQuality": { "Roe": 25.5, "GrossMargin": 92.0 }
+            }
+            """;
+
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, "你将收到来自多位分析师的意见，请综合分析并给出投资建议。"),
-            new(ChatRole.User, "基本面分析师认为该股票基本面评分 7/10，行业前景良好。"),
-            new(ChatRole.User, "技术分析师认为该股票技术面评分 4/10，存在破位风险。"),
-            new(ChatRole.User, "财务分析师认为该股票财务健康度 6/10，现金流较为稳定。"),
-            new(ChatRole.User, "请对股票进行综合评估，如果需要更多信息，可以使用搜索工具验证。")
+            new(ChatRole.User, $"基本面分析师报告：\n{fundamentalJson}"),
+            new(ChatRole.User, $"技术分析师报告：\n{technicalJson}"),
+            new(ChatRole.User, $"财务分析师报告：\n{financialJson}"),
+            new(ChatRole.User, "请对股票进行综合评估。注意基本面和技术面存在分歧，请分析原因并利用搜索工具验证市场共识，给出最终判断。")
         };
 
         try
@@ -135,19 +159,31 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("综合分析结果:");
             Console.WriteLine(result);
 
-            // 检查是否识别了冲突并可能使用了搜索工具
+            // 检查是否识别了冲突并使用了搜索工具
             var functionCalls = response.Messages
                 .Where(m => m.Contents.Any(c => c is FunctionCallContent))
                 .ToList();
 
             if (functionCalls.Any())
             {
-                Console.WriteLine($"\nCoordinator 进行了 {functionCalls.Count} 次工具调用（可能用于解决分歧）");
+                Console.WriteLine($"\nCoordinator 进行了 {functionCalls.Count} 次工具调用以解决分歧");
+                foreach (var msg in functionCalls)
+                {
+                    foreach (var content in msg.Contents.OfType<FunctionCallContent>())
+                    {
+                        Console.WriteLine($"- 调用工具: {content.Name}, 参数: {content.Arguments}");
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine("\n警告: Coordinator 未进行工具调用。在理想情况下，面对明显分歧应调用搜索工具。");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
+            throw;
         }
     }
 

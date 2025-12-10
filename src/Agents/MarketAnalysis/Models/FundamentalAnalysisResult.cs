@@ -249,7 +249,7 @@ public sealed class GrowthAndValue
     /// </summary>
     [MinLength(1)]
     [MaxLength(2)]
-    [Description("1-2点核心投资优势")]
+    [Description("核心投资优势")]
     public List<string> InvestmentHighlights { get; set; } = new();
 
     /// <summary>

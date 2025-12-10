@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Markdown.Avalonia;
@@ -281,6 +282,8 @@ public class RichTextBlock : UserControl
         if (_markdownViewer == null)
         {
             _markdownViewer = new MarkdownScrollViewer();
+            _markdownViewer.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
+            _markdownViewer.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
             _contentContainer!.Content = _markdownViewer;
         }
 

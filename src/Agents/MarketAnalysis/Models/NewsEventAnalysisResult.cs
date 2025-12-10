@@ -209,7 +209,7 @@ public sealed class InvestmentInsight
     /// </summary>
     [MinLength(1)]
     [MaxLength(2)]
-    [Description("1-2个需要持续关注的后续发展或潜在催化剂")]
+    [Description("需要持续关注的后续发展或潜在催化剂")]
     public List<string> FocusPoints { get; set; } = new();
 
     /// <summary>

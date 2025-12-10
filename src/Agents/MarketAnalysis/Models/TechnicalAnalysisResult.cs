@@ -50,7 +50,7 @@ public sealed class ChartPatternTrend
     /// 趋势强度评分（1-10分）
     /// </summary>
     [Range(1, 10)]
-    [Description("趋势强度评分，基于趋势持续性和角度。评分标准：" + ScoringStandards.TrendStrength)]
+    [Description("趋势强度评分，基于趋势持续性和角度。评分标准：" + ScoringStandards.Strength)]
     public float TrendStrengthScore { get; set; }
 
     /// <summary>
@@ -115,7 +115,7 @@ public sealed class KeyPriceLevels
     /// </summary>
     [MinLength(1)]
     [MaxLength(2)]
-    [Description("1-2个核心阻力价格点位，单位：元")]
+    [Description("核心阻力价格点位，单位：元")]
     public List<decimal> ResistanceLevels { get; set; } = new();
 
     /// <summary>

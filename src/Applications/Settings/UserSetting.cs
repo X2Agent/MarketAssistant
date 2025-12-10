@@ -83,6 +83,13 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = new();
 
+    private InvestmentPreference _investmentPreference = new();
+    public InvestmentPreference InvestmentPreference
+    {
+        get => _investmentPreference;
+        set => SetProperty(ref _investmentPreference, value);
+    }
+
     #region INotifyPropertyChanged Implementation
 
     public event PropertyChangedEventHandler? PropertyChanged;

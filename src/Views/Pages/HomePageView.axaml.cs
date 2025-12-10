@@ -25,13 +25,21 @@ public partial class HomePageView : UserControl
         {
             // 标记事件已处理，防止AutoCompleteBox处理
             e.Handled = true;
-            
+
             // 关闭下拉框
             viewModel.Search.IsSearchResultVisible = false;
-            
+
             // 执行导航
             viewModel.Search.SelectStockCommand.Execute(selectedStock);
         }
+    }
+
+    /// <summary>
+    /// 阻止事件冒泡
+    /// </summary>
+    private void OnPreventTapped(object? sender, TappedEventArgs e)
+    {
+        e.Handled = true;
     }
 
     /// <summary>
@@ -39,12 +47,6 @@ public partial class HomePageView : UserControl
     /// </summary>
     private void HotStockCard_Tapped(object? sender, RoutedEventArgs e)
     {
-        // 如果点击的是 Button 或其子元素，不处理
-        if (e.Source is Button || IsDescendantOf(e.Source as Control, typeof(Button)))
-        {
-            return;
-        }
-
         if (sender is Border border &&
             border.Tag is HotStock hotStock &&
             DataContext is HomePageViewModel viewModel)
@@ -58,12 +60,6 @@ public partial class HomePageView : UserControl
     /// </summary>
     private void RecentStockCard_Tapped(object? sender, RoutedEventArgs e)
     {
-        // 如果点击的是 Button 或其子元素，不处理
-        if (e.Source is Button || IsDescendantOf(e.Source as Control, typeof(Button)))
-        {
-            return;
-        }
-
         if (sender is Border border &&
             border.Tag is StockItem stockItem &&
             DataContext is HomePageViewModel viewModel)
@@ -83,21 +79,5 @@ public partial class HomePageView : UserControl
         {
             viewModel.News.OpenNewsCommand.Execute(telegram);
         }
-    }
-
-    /// <summary>
-    /// 检查控件是否是指定类型的后代
-    /// </summary>
-    private bool IsDescendantOf(Control? control, Type ancestorType)
-    {
-        while (control != null)
-        {
-            if (ancestorType.IsInstanceOfType(control))
-            {
-                return true;
-            }
-            control = control.Parent as Control;
-        }
-        return false;
     }
 }

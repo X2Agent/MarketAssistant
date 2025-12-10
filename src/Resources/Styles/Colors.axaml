@@ -28,7 +28,8 @@
             <!-- 背景层级 - 三层体系更清晰 -->
             <SolidColorBrush x:Key='PageBackgroundBrush'>#FAFAFA</SolidColorBrush>
             <SolidColorBrush x:Key='CardBackgroundBrush'>#FFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#F5F5F5</SolidColorBrush>
+            <!-- 列表项背景 - 统一使用白色卡片背景，去除灰色底 -->
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#FFFFFF</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#EEEEEE</SolidColorBrush>
             
             <!-- 文本颜色 - 增强对比度 -->
@@ -53,7 +54,8 @@
             <!-- 背景层级 - 深色模式三层体系 -->
             <SolidColorBrush x:Key='PageBackgroundBrush'>#121212</SolidColorBrush>
             <SolidColorBrush x:Key='CardBackgroundBrush'>#1E1E1E</SolidColorBrush>
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#2C2C2C</SolidColorBrush>
+            <!-- 列表项背景 - 与卡片背景保持一致 -->
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#1E1E1E</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#383838</SolidColorBrush>
             
             <!-- 文本颜色 - 适合深色背景 -->
@@ -129,6 +131,7 @@
     <BoxShadows x:Key="ElevatedBoxShadow">0 8 32 0 #30000000</BoxShadows>
     <BoxShadows x:Key="CardBoxShadow">0 2 8 0 #15000000</BoxShadows>
     <BoxShadows x:Key="SubtleBoxShadow">0 2 8 0 #10000000</BoxShadows>
+    <BoxShadows x:Key="SmallBoxShadow">0 1 3 0 #20000000</BoxShadows>
     
     <!-- ========== 语义化颜色组 - Warning (警告/琥珀色系) ========== -->
     <Color x:Key="WarningLight">#FEF3C7</Color>

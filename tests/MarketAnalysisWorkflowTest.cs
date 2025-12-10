@@ -48,11 +48,11 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     {
         // Arrange
         string stockSymbol = "000001";
-        var progressEvents = new List<(string Analyst, string Stage)>();
+        var progressEvents = new List<string>();
 
         _workflow.ProgressChanged += (sender, e) =>
         {
-            progressEvents.Add((e.CurrentAnalyst, e.StageDescription));
+            progressEvents.Add(e.StageDescription);
         };
 
         // Act
@@ -61,12 +61,11 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
         // Assert
         Assert.IsNotNull(report);
         Assert.IsTrue(progressEvents.Count > 0, "应该触发进度事件");
-        
+
         // 验证进度事件内容合理性
         foreach (var evt in progressEvents)
         {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(evt.Analyst), "分析师名称不应为空");
-            Assert.IsFalse(string.IsNullOrWhiteSpace(evt.Stage), "阶段描述不应为空");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(evt), "阶段描述不应为空");
         }
 
         Console.WriteLine($"进度事件触发 {progressEvents.Count} 次 - 所有事件内容有效");

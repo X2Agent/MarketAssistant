@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Mcp;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -90,7 +91,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(UserInput))
             return;
 
-        var userMessage = new ChatMessageAdapter(UserInput.Trim(), true, "用户");
+        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" });
         ChatMessages.Add(userMessage);
 
         var currentInput = UserInput;
@@ -99,7 +100,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         IsProcessing = true;
         SendButtonText = "⏹";
 
-        var aiMessage = new ChatMessageAdapter("", false, "市场分析助手")
+        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" })
         {
             Status = MessageStatus.Sending
         };
@@ -170,7 +171,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
             ? "欢迎使用智能对话功能！请先选择要分析的股票。"
             : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。";
 
-        var welcomeMessage = new ChatMessageAdapter(content, false, "市场分析助手");
+        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" });
         ChatMessages.Add(welcomeMessage);
     }
 
@@ -205,10 +206,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         }
         else
         {
-            var contextMessage = new ChatMessageAdapter(
-                $"以上是关于 {stockCode} 的历史分析数据。您可以基于这些信息继续提问。",
-                false,
-                "系统");
+            var contextMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.System, $"以上是关于 {stockCode} 的历史分析数据。您可以基于这些信息继续提问。") { AuthorName = "系统" });
             ChatMessages.Add(contextMessage);
         }
     }
@@ -234,7 +232,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     public void AddSystemMessage(string content)
     {
-        var systemMessage = new ChatMessageAdapter(content, false, "系统");
+        var systemMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.System, content) { AuthorName = "系统" });
         ChatMessages.Add(systemMessage);
 
         _chatSession.AddAssistantMessage(content);

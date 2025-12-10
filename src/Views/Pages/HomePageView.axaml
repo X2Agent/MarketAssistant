@@ -14,6 +14,7 @@
 
     <UserControl.Resources>
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+        <converts:NumberFormatConverter x:Key="NumberFormatConverter"/>
     </UserControl.Resources>
 
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
@@ -132,11 +133,12 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="x:String">
-                                                        <Border BorderBrush="{DynamicResource BorderBrush}"
+                                                        <Border Background="{DynamicResource SurfaceBrush}"
+                                                                BorderBrush="{DynamicResource BorderBrush}"
                                                                 BorderThickness="{StaticResource DefaultBorderThickness}"
                                                                 CornerRadius="{StaticResource TinyCornerRadius}"
-                                                                Padding="{StaticResource TinyMargin}"
-                                                                Margin="{StaticResource TinyBottomMargin}">
+                                                                Padding="{StaticResource TinyPadding}"
+                                                                Margin="{StaticResource TinyMargin}">
                                                             <TextBlock Text="{Binding .}"
                                                                        FontSize="{StaticResource SmallFontSize}"
                                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -188,60 +190,62 @@
                             <DataTemplate x:DataType="stocks:HotStock">
                                 <Border Classes="hot-stock-card" 
                                         Margin="{StaticResource TinyMargin}" 
+                                        Padding="{StaticResource DefaultCardPadding}"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        CornerRadius="{StaticResource DefaultCornerRadius}"
                                         Tapped="HotStockCard_Tapped"
                                         Tag="{Binding .}">
-                                    <Grid ColumnDefinitions="Auto,4,Auto,*,Auto,Auto,Auto"
-                                          RowDefinitions="Auto,Auto,Auto"
-                                          Cursor="Hand">
-                                        <!-- 左侧信息 -->
-                                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                                   Text="{Binding Market}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="2"
-                                                   Text="{Binding Code}"
-                                                   FontSize="{StaticResource TinyFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Cursor="Hand">
                                         
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
-                                                   Text="{Binding Name}"
-                                                   FontSize="{StaticResource BodyFontSize}"
-                                                   FontWeight="SemiBold"/>
-                                        
-                                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                                   Text="{Binding CurrentPrice}"
-                                                   FontSize="{StaticResource MediumFontSize}"
-                                                   FontWeight="Bold"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="2"
-                                                   Text="{Binding ChangePercentage}"
-                                                   FontSize="{StaticResource BodyFontSize}"
-                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
-                                                   Margin="{StaticResource TinyLeftMargin}"/>
-                                        
-                                        <!-- 右侧热度与收藏 -->
-                                        <TextBlock Grid.Row="0" Grid.Column="4"
+                                        <!-- Row 0: Code & Heat Label -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="{Binding Market}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding Code}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
                                                    Text="热度"
                                                    FontSize="{StaticResource MiniFontSize}"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="4"
-                                                   Text="{Binding HeatIndex}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 1: Name & Heat Value -->
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding Name}"
+                                                   FontSize="{StaticResource BodyFontSize}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="{StaticResource TinyVerticalMargin}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                   Text="{Binding HeatIndex, Converter={StaticResource NumberFormatConverter}}"
                                                    FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="Bold"
-                                                   HorizontalAlignment="Center"
                                                    Foreground="{DynamicResource PrimaryBrush}"
-                                                   Margin="{StaticResource TinyLeftMargin}"/>
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 2: Price & Favorite -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CurrentPrice}"
+                                                       FontSize="{StaticResource MediumFontSize}"
+                                                       FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ChangePercentage}"
+                                                       FontSize="{StaticResource BodyFontSize}"
+                                                       Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                                       VerticalAlignment="Bottom"/>
+                                        </StackPanel>
                                         
-                                        <Button Grid.Row="2" Grid.Column="4"
+                                        <Button Grid.Row="2" Grid.Column="1"
                                                 Classes="favorite-button"
                                                 Background="Transparent"
                                                 Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotStocks.AddToFavoriteCommand}"
                                                 CommandParameter="{Binding .}"
+                                                Tapped="OnPreventTapped"
                                                 Width="{StaticResource SmallIconSize}"
                                                 Height="{StaticResource SmallIconSize}"
                                                 Padding="0"
-                                                Margin="{StaticResource TinyTopMargin}"
-                                                HorizontalAlignment="Center">
+                                                HorizontalAlignment="Right">
                                             <svg:Svg Path="/Assets/Images/tab_favorites.svg"
                                                      Width="{StaticResource MiniIconSize}"
                                                      Height="{StaticResource MiniIconSize}"/>
@@ -288,6 +292,7 @@
                                                     Background="Transparent"
                                                     Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentStocks.AddToFavoriteCommand}"
                                                     CommandParameter="{Binding .}"
+                                                    Tapped="OnPreventTapped"
                                                     Width="{StaticResource DefaultIconSize}"
                                                     Height="{StaticResource DefaultIconSize}"
                                                     Padding="0"

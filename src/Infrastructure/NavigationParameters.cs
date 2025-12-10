@@ -1,4 +1,4 @@
-namespace MarketAssistant.Models;
+namespace MarketAssistant.Infrastructure;
 
 /// <summary>
 /// 股票导航参数

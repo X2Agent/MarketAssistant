@@ -4,8 +4,8 @@ using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel;
 using Microsoft.SemanticKernel.Data;
+using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Tools;
 
@@ -35,14 +35,16 @@ public class GroundingSearchTools
         _logger = logger;
     }
 
-    [Description("信息搜索：当现有信息缺失、需实时补充或更新动态时使用。返回格式化证据片段，含 Name/Link/Value。")]
+    [Description("综合信息检索工具。可同时检索互联网公开信息和内部知识库（如用户文档、历史研报）。")]
     public async Task<List<TextSearchResult>> SearchAsync(
-        [Description("搜索的查询语句或关键词，如'公司名 财务数据'、'行业 趋势变化'等")] string query,
+        [Description("搜索的查询语句或关键词。")] string query,
         [Description("返回结果数量，建议3-6个")] int top = 6)
     {
         // 参数约束：避免极端模式使用和极端参数
         if (top <= 0) top = 3;
         if (top > 6) top = 6;
+
+        _logger.LogDebug("开始搜索 - 查询: {Query}, 数量: {Top}", query, top);
 
         var userSetting = _userSettingService.CurrentSetting;
         var hasKnowledgeEnabled = userSetting.LoadKnowledge;

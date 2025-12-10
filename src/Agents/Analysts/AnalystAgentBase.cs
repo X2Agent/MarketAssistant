@@ -55,13 +55,13 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         IList<AITool>? tools,
         Func<AIContextProviderFactoryContext, AIContextProvider>? aiContextProviderFactory)
     {
-        var options = new ChatClientAgentOptions(
-            instructions,
-            name,
-            description)
+        var options = new ChatClientAgentOptions
         {
+            Name = name,
+            Description = description,
             ChatOptions = new ChatOptions
             {
+                Instructions = instructions,
                 TopK = topK,
                 TopP = topP,
                 Temperature = temperature,

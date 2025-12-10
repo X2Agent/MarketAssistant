@@ -52,6 +52,11 @@ public class QuickSelectionStrategyInfo
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// 策略图标
+    /// </summary>
+    public string Icon { get; set; } = string.Empty;
+
+    /// <summary>
     /// 策略描述
     /// </summary>
     public string Description { get; set; } = string.Empty;

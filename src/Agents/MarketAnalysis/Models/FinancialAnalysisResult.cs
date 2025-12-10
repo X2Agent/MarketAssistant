@@ -44,14 +44,14 @@ public sealed class FinancialHealth
     /// 流动比率
     /// </summary>
     [Range(0, 100)]
-    [Description("流动比率，范围0-100，无数据时设为null")]
+    [Description("流动比率，无数据时设为null")]
     public float? CurrentRatio { get; set; }
 
     /// <summary>
     /// 速动比率
     /// </summary>
     [Range(0, 100)]
-    [Description("速动比率，范围0-100，无数据时设为null")]
+    [Description("速动比率，无数据时设为null")]
     public float? QuickRatio { get; set; }
 
     /// <summary>
@@ -262,7 +262,7 @@ public sealed class FinancialRiskWarning
     /// </summary>
     [MinLength(1)]
     [MaxLength(2)]
-    [Description("1-2个最异常或需关注的财务指标，如高负债、现金流压力等")]
+    [Description("异常或需关注的财务指标，如高负债、现金流压力等")]
     public List<string> KeyRiskIndicators { get; set; } = new();
 
     /// <summary>
@@ -291,7 +291,7 @@ public sealed class FinancialRiskWarning
     /// </summary>
     [MinLength(1)]
     [MaxLength(2)]
-    [Description("1-2个财务层面需持续关注或改善的方面")]
+    [Description("财务层面需持续关注或改善的方面")]
     public List<string> MonitoringPoints { get; set; } = new();
 }
 

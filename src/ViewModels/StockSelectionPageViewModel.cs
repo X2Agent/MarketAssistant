@@ -4,8 +4,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.StockSelection;
 using MarketAssistant.Applications.StockSelection.Models;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Models;
 using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
