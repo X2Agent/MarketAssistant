@@ -28,6 +28,11 @@ public class ChatClientFactory : IChatClientFactory
     private IChatClient? _cachedClient;
     private string? _lastError;
 
+    // 缓存用于创建客户端的配置，以便检测变更
+    private string? _cachedModelId;
+    private string? _cachedEndpoint;
+    private string? _cachedApiKey;
+
     public ChatClientFactory(IUserSettingService userSettingService)
     {
         _userSettingService = userSettingService;
@@ -37,39 +42,63 @@ public class ChatClientFactory : IChatClientFactory
     {
         lock (_lock)
         {
-            // 返回缓存的客户端
-            if (_cachedClient != null)
-                return _cachedClient;
+            var userSetting = _userSettingService.CurrentSetting;
+            var modelId = userSetting.ModelId;
+            var apiKey = userSetting.ApiKey;
+            var endpoint = userSetting.Endpoint;
 
-            // 如果之前创建失败，返回缓存的错误
-            if (!string.IsNullOrEmpty(_lastError))
+            // 检查配置是否变更，如果未变更且有缓存，则返回缓存
+            if (_cachedClient != null &&
+                _cachedModelId == modelId &&
+                _cachedEndpoint == endpoint &&
+                _cachedApiKey == apiKey)
+            {
+                return _cachedClient;
+            }
+
+            // 如果配置变更，重置错误状态
+            _lastError = null;
+
+            // 如果之前创建失败且配置未变，返回缓存的错误
+            if (!string.IsNullOrEmpty(_lastError) &&
+                _cachedModelId == modelId &&
+                _cachedEndpoint == endpoint &&
+                _cachedApiKey == apiKey)
                 throw new FriendlyException(_lastError);
 
             try
             {
-                var userSetting = _userSettingService.CurrentSetting;
-
-                if (string.IsNullOrWhiteSpace(userSetting.ModelId))
+                if (string.IsNullOrWhiteSpace(modelId))
                     throw new FriendlyException("AI 功能未配置:请先在设置页面选择 AI 模型");
-                if (string.IsNullOrWhiteSpace(userSetting.ApiKey))
-                    throw new FriendlyException("AI 功能未配置：请先在设置页面配置 API Key");
-                if (string.IsNullOrWhiteSpace(userSetting.Endpoint))
-                    throw new FriendlyException("AI 功能未配置：请先在设置页面配置 API 端点");
+                if (string.IsNullOrWhiteSpace(apiKey))
+                    throw new FriendlyException("AI 功能未配置:请先在设置页面配置 API Key");
+                if (string.IsNullOrWhiteSpace(endpoint))
+                    throw new FriendlyException("AI 功能未配置:请先在设置页面配置 API 端点");
 
                 var openAIClient = new OpenAIClient(
-                    new ApiKeyCredential(userSetting.ApiKey),
+                    new ApiKeyCredential(apiKey),
                     new OpenAIClientOptions
                     {
-                        Endpoint = new Uri(userSetting.Endpoint)
+                        Endpoint = new Uri(endpoint)
                     }
                 );
 
-                _cachedClient = openAIClient.GetChatClient(userSetting.ModelId).AsIChatClient();
+                _cachedClient = openAIClient.GetChatClient(modelId).AsIChatClient();
+
+                // 更新缓存的配置
+                _cachedModelId = modelId;
+                _cachedEndpoint = endpoint;
+                _cachedApiKey = apiKey;
+
                 return _cachedClient;
             }
             catch (Exception ex)
             {
                 _lastError = ex.Message;
+                // 即使失败也记录当前配置，避免重复尝试相同配置
+                _cachedModelId = modelId;
+                _cachedEndpoint = endpoint;
+                _cachedApiKey = apiKey;
                 throw new FriendlyException(_lastError);
             }
         }

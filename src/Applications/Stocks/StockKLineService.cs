@@ -11,14 +11,14 @@ namespace MarketAssistant.Applications.Stocks;
 public class StockKLineService
 {
     private readonly HttpClient _httpClient;
-    private readonly string _zhiTuApiToken;
+    private readonly IUserSettingService _userSettingService;
     private readonly ILogger<StockKLineService> _logger;
     private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
 
     public StockKLineService(ILogger<StockKLineService> logger, IUserSettingService userSettingService)
     {
         _httpClient = new HttpClient();
-        _zhiTuApiToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _userSettingService = userSettingService;
         _logger = logger;
     }
 
@@ -47,7 +47,8 @@ public class StockKLineService
     /// <returns>完整的API URL</returns>
     private string BuildZhiTuApiUrl(string symbol, string interval, string adjustType = "n", DateTime? startDate = null, DateTime? endDate = null)
     {
-        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={_zhiTuApiToken}";
+        var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={token}";
 
         // 如果没有指定时间范围，根据不同的interval设置合理的默认时间范围
         DateTime defaultStartDate;

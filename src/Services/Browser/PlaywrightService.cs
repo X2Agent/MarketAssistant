@@ -30,6 +30,7 @@ public class PlaywrightService : IAsyncDisposable
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
+    private string? _cachedBrowserPath;
     private bool _disposed;
 
     public PlaywrightService(IUserSettingService userSettingService, ILogger<PlaywrightService>? logger)
@@ -43,7 +44,10 @@ public class PlaywrightService : IAsyncDisposable
     /// </summary>
     public async Task<IBrowser> GetBrowserAsync()
     {
-        if (_browser?.IsConnected == true)
+        var currentBrowserPath = _userSettingService.CurrentSetting.BrowserPath;
+
+        // 检查浏览器是否连接且路径未变更
+        if (_browser?.IsConnected == true && _cachedBrowserPath == currentBrowserPath)
         {
             return _browser;
         }
@@ -51,12 +55,22 @@ public class PlaywrightService : IAsyncDisposable
         await _initLock.WaitAsync();
         try
         {
-            if (_browser?.IsConnected == true)
+            // 双重检查
+            if (_browser?.IsConnected == true && _cachedBrowserPath == currentBrowserPath)
             {
                 return _browser;
             }
 
+            // 如果路径变更或浏览器未连接，重新初始化
+            if (_browser != null)
+            {
+                await _browser.CloseAsync();
+                await _browser.DisposeAsync();
+                _browser = null;
+            }
+
             await InitializeBrowserAsync();
+            _cachedBrowserPath = currentBrowserPath;
             return _browser!;
         }
         finally

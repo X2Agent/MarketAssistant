@@ -197,9 +197,4 @@ public class ScoreItem
     /// 格式化的评分文本 (e.g. "8.5")
     /// </summary>
     public string FormattedScore => $"{Score:F1}";
-
-    /// <summary>
-    /// 评分百分比 (0.0 - 1.0)，用于进度条
-    /// </summary>
-    public double ScorePercentage => Score / 10.0;
 }

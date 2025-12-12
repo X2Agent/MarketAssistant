@@ -3,7 +3,6 @@ using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools;
 using MarketAssistant.Services.Settings;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
@@ -40,7 +39,8 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
             topP: 0.7f,
             topK: 5,
             responseFormat: ResponseFormat,
-            tools: [AIFunctionFactory.Create(searchTools.SearchAsync)],
+            //todo 暂时注释搜索工具，会调用次数限制不住会浪费
+            //tools: [AIFunctionFactory.Create(searchTools.SearchAsync)], 
             aiContextProviderFactory: ctx =>
             {
                 return new InvestmentPreferenceContextProvider(
