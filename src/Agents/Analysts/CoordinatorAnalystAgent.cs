@@ -41,6 +41,7 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
             responseFormat: ResponseFormat,
             //todo 暂时注释搜索工具，会调用次数限制不住会浪费
             //tools: [AIFunctionFactory.Create(searchTools.SearchAsync)], 
+            tools: null,
             aiContextProviderFactory: ctx =>
             {
                 return new InvestmentPreferenceContextProvider(
