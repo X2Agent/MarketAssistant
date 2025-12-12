@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class DocxFileTest : BaseKernelTest
+public class DocxFileTest : BaseAgentTest
 {
     private IMarkdownConverter _converter = null!;
     private IDocumentBlockReader _reader = null!;
@@ -19,8 +19,8 @@ public class DocxFileTest : BaseKernelTest
         base.BaseInitialize();
 
         // 从 DI 容器获取工厂
-        _converterFactory = _kernel.Services.GetRequiredService<MarkdownConverterFactory>();
-        _readerFactory = _kernel.Services.GetRequiredService<DocumentBlockReaderFactory>();
+        _converterFactory = _serviceProvider.GetRequiredService<MarkdownConverterFactory>();
+        _readerFactory = _serviceProvider.GetRequiredService<DocumentBlockReaderFactory>();
 
         // 获取DOCX转换器
         _converter = _converterFactory.GetConverter("test.docx")!;
@@ -183,7 +183,7 @@ public class DocxFileTest : BaseKernelTest
         foreach (var block in textBlocks.Take(3)) // 检查前3个有文本的块
         {
             var text = block.GetText();
-            Assert.IsFalse(string.IsNullOrWhiteSpace(text), "文档块的文本内容不应为空白");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(text), "文档块的文本内容不应为空");
             Console.WriteLine($"文档块文本: {text.Substring(0, Math.Min(100, text.Length))}...");
         }
     }

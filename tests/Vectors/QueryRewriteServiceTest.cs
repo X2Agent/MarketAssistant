@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class QueryRewriteServiceTest : BaseKernelTest
+public class QueryRewriteServiceTest : BaseAgentTest
 {
     private IQueryRewriteService _service = null!;
 
@@ -12,7 +12,7 @@ public class QueryRewriteServiceTest : BaseKernelTest
     public void Initialize()
     {
         base.BaseInitialize();
-        _service = _kernel.Services.GetRequiredService<IQueryRewriteService>();
+        _service = _serviceProvider.GetRequiredService<IQueryRewriteService>();
     }
 
     #region Service Resolution Tests

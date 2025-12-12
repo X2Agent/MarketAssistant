@@ -283,7 +283,7 @@ act -P ubuntu-latest=catthehacker/ubuntu:act-latest
 ### 问题 2: .NET SDK 版本不匹配
 
 **检查：**
-- 工作流中的 `DOTNET_VERSION` 是否正确（当前 9.0.x）
+- 工作流中的 `DOTNET_VERSION` 是否正确（当前 10.0.x）
 - 本地 .NET SDK 版本
 
 ```bash
@@ -442,5 +442,5 @@ certutil -encode certificate.p12 certificate.base64
 ---
 
 **维护者**: MarketAssistant Team  
-**最后更新**: 2025-10-11
+**最后更新**: 2025-11-12
 

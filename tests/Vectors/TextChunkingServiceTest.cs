@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class TextChunkingServiceTest : BaseKernelTest
+public class TextChunkingServiceTest : BaseAgentTest
 {
     private ITextChunkingService _service = null!;
 
@@ -12,7 +12,7 @@ public class TextChunkingServiceTest : BaseKernelTest
     public void Setup()
     {
         base.BaseInitialize();
-        _service = _kernel.Services.GetRequiredService<ITextChunkingService>();
+        _service = _serviceProvider.GetRequiredService<ITextChunkingService>();
     }
 
     [TestMethod]

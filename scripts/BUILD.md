@@ -43,7 +43,7 @@ MarketAssistant/
 
 ### 所有平台
 
-- **.NET 9.0 SDK** 或更高版本
+- **.NET 10.0 SDK** 或更高版本
 - 无需额外工作负载（Avalonia 通过 NuGet 包提供所有依赖）
 
 ```bash
@@ -415,8 +415,8 @@ dpkg-sig --sign builder MarketAssistant_1.0.0_amd64.deb
 
 ### 通用配置
 
-- **目标框架**: `net9.0`
-- **UI 框架**: Avalonia UI 11.3.7
+- **目标框架**: `net10.0`
+- **UI 框架**: Avalonia UI 11.3.8
 - **发布模式**: 自包含 (self-contained)
 - **ReadyToRun**: 启用（提高启动性能）
 - **UseAppHost**: 启用（创建平台原生可执行文件）
@@ -574,7 +574,7 @@ dpkg-deb --contents Release/Linux/MarketAssistant_1.0.0_amd64.deb
 - [Avalonia macOS 部署](https://docs.avaloniaui.net/docs/deployment/macOS)
 - [Avalonia Debian/Ubuntu 打包](https://docs.avaloniaui.net/docs/deployment/debian-ubuntu)
 - [Avalonia Native AOT](https://docs.avaloniaui.net/docs/deployment/native-aot)
-- [.NET 9.0 发布指南](https://docs.microsoft.com/dotnet/core/deploying/)
+- [.NET 10.0 发布指南](https://docs.microsoft.com/dotnet/core/deploying/)
 - [AGENTS.md](../AGENTS.md) - 开发者指南
 
 ---

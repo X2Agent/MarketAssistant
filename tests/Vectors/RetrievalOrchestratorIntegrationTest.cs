@@ -10,7 +10,7 @@ namespace TestMarketAssistant.Vectors;
 /// RetrievalOrchestrator 集成测试 - 验证RetrieveAsync能否正常工作
 /// </summary>
 [TestClass]
-public class RetrievalOrchestratorIntegrationTest : BaseKernelTest
+public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
 {
     private IRetrievalOrchestrator _retrievalOrchestrator = null!;
     private IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator = null!;
@@ -23,9 +23,9 @@ public class RetrievalOrchestratorIntegrationTest : BaseKernelTest
         base.BaseInitialize();
 
         // 从 DI 容器获取所有服务
-        _embeddingGenerator = _kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-        _vectorStore = _kernel.Services.GetRequiredService<VectorStore>();
-        _retrievalOrchestrator = _kernel.Services.GetRequiredService<IRetrievalOrchestrator>();
+        _embeddingGenerator = _serviceProvider.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+        _vectorStore = _serviceProvider.GetRequiredService<VectorStore>();
+        _retrievalOrchestrator = _serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
 
         // 创建测试集合并添加测试数据
         _collectionName = $"test_retrieval_{Guid.NewGuid():N}";
@@ -107,9 +107,9 @@ public class RetrievalOrchestratorIntegrationTest : BaseKernelTest
         // 验证RetrieveAsync能否正常工作
         var query = "股票投资分析";
 
-        Console.WriteLine($"执行检索查询: '{query}'");
+        Console.WriteLine($"执行检索查�? '{query}'");
 
-        // 执行检索
+        // 执行检�?
         var results = await _retrievalOrchestrator.RetrieveAsync(
             query,
             _collectionName,
@@ -118,9 +118,9 @@ public class RetrievalOrchestratorIntegrationTest : BaseKernelTest
         // 验证结果
         Assert.IsNotNull(results, "检索结果不应为null");
         Assert.IsTrue(results.Count > 0, "应该返回至少一个结果");
-        Assert.IsTrue(results.Count <= 5, "结果数量不应超过请求的top值");
+        Assert.IsTrue(results.Count <= 5, "结果数量不应超过请求的top数");
 
-        Console.WriteLine($"检索完成，返回 {results.Count} 个结果:");
+        Console.WriteLine($"检索完成，返回 {results.Count} 个结果");
 
         // 验证结果的质量
         foreach (var result in results)

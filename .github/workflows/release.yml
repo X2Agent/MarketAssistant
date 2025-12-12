@@ -14,7 +14,7 @@ on:
         default: '1.0.0'
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
   APP_NAME: MarketAssistant
   
 jobs:

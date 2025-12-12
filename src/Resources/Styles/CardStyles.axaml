@@ -1,44 +1,78 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- 选股模式卡片样式 -->
+    <!-- ================================================================== -->
+    <!-- 基础交互卡片样式 (公共定义) -->
+    <!-- 包含: 策略卡片、股票卡片、热门股票卡片、最近查看卡片 -->
+    <!-- ================================================================== -->
+    <Style Selector="Border.strategy-card, Border.stock-card, Border.hot-stock-card, Border.recent-stock-card">
+        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.strategy-card:pointerover, Border.stock-card:pointerover, Border.hot-stock-card:pointerover, Border.recent-stock-card:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
+        <Setter Property="RenderTransform" Value="{StaticResource HoverLiftTransform}"/>
+    </Style>
+
+    <!-- ================================================================== -->
+    <!-- 选股模式卡片样式 (独立定义，因样式差异较大) -->
+    <!-- ================================================================== -->
     <Style Selector="Border.mode-card">
-        <Setter Property="Padding" Value="16,8"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Padding" Value="{StaticResource PagePadding}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.mode-card:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
     </Style>
     <Style Selector="Border.mode-card.selected">
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
     </Style>
     <Style Selector="Border.mode-card TextBlock.mode-name">
-        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
     </Style>
     <Style Selector="Border.mode-card.selected TextBlock.mode-name">
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
-    <!-- 快速策略卡片样式 -->
+    <!-- ================================================================== -->
+    <!-- 各卡片特定属性 -->
+    <!-- ================================================================== -->
+
+    <!-- 快速策略卡片 -->
     <Style Selector="Border.strategy-card">
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
-        <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
     </Style>
 
-    <!-- 股票卡片样式 -->
+    <!-- 股票卡片 -->
     <Style Selector="Border.stock-card">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
     </Style>
     <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
         <Setter Property="Opacity" Value="0.8"/>
@@ -48,28 +82,18 @@
         <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
-    <!-- 热门股票卡片样式 -->
+    <!-- 热门股票卡片 -->
     <Style Selector="Border.hot-stock-card">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="8,6"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
         <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
-    <!-- 最近查看卡片样式 -->
+    <!-- 最近查看卡片 -->
     <Style Selector="Border.recent-stock-card">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
     </Style>
     <Style Selector="Border.recent-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
@@ -79,8 +103,8 @@
     <!-- 新闻卡片样式 -->
     <Style Selector="Border.news-card">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="12"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
@@ -88,20 +112,34 @@
     </Style>
 
     <!-- 功能项样式 -->
-    <Style Selector="Border.featureItem">
+    <Style Selector="Border.feature-item">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="Padding" Value="12"/>
-        <Setter Property="Margin" Value="0,0,0,8"/>
-        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
     </Style>
 
-    <Style Selector="Border.featureIcon">
+    <Style Selector="Border.feature-item:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+    </Style>
+
+    <Style Selector="Border.feature-icon">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+    
+    <Style Selector="TextBlock.feature-title">
+        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
 </Styles>

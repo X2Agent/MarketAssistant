@@ -7,75 +7,71 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public static class AppInfo
 {
+    private static readonly Assembly _assembly = Assembly.GetExecutingAssembly();
+
     #region 应用基本信息
 
     /// <summary>
-    /// 应用名称（用于文件系统路径等）
+    /// 应用名称（用于文件系统路径等，对应 AssemblyName）
     /// </summary>
-    public const string AppName = "MarketAssistant";
+    public static string AppName => _assembly.GetName().Name ?? "MarketAssistant";
 
     /// <summary>
-    /// 应用包名（程序集名称）
+    /// 应用版本（优先使用语义化版本）
     /// </summary>
-    public static string PackageName => Assembly.GetExecutingAssembly().GetName().Name ?? "MarketAssistant";
+    public static string Version
+    {
+        get
+        {
+            // 尝试获取语义化版本（对应 csproj 中的 <Version>）
+            var version = _assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
 
-    /// <summary>
-    /// 应用版本
-    /// </summary>
-    public static string Version => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+            // 去除可能包含的 commit hash (例如 1.0.1+git_hash)
+            if (!string.IsNullOrEmpty(version) && version.Contains('+'))
+            {
+                version = version.Split('+')[0];
+            }
+
+            // 如果获取失败，回退到 AssemblyVersion (通常是 1.0.1.0 格式)
+            if (string.IsNullOrEmpty(version))
+            {
+                version = _assembly.GetName().Version?.ToString();
+            }
+
+            // 如果还是空，返回默认值
+            return version ?? "1.0.0";
+        }
+    }
+
 
     /// <summary>
     /// 应用产品名称
     /// </summary>
-    public const string ProductName = "Market Assistant";
+    public static string Product => _assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? "Market Assistant";
 
     /// <summary>
-    /// 应用标题
+    /// 应用标题（对应 AssemblyTitle，如果为空则使用 Product）
     /// </summary>
-    public const string Title = "Market Assistant";
+    public static string Title => _assembly.GetCustomAttribute<AssemblyTitleAttribute>()?.Title ?? Product;
 
     /// <summary>
     /// 公司名称
     /// </summary>
-    public const string Company = "X2Agent";
+    public static string Company => _assembly.GetCustomAttribute<AssemblyCompanyAttribute>()?.Company ?? "X2Agent";
 
     /// <summary>
     /// 版权信息
     /// </summary>
-    public const string Copyright = "Copyright © X2Agent";
+    public static string Copyright => _assembly.GetCustomAttribute<AssemblyCopyrightAttribute>()?.Copyright ?? "Copyright © X2Agent";
 
     /// <summary>
     /// 应用描述
     /// </summary>
-    public const string Description = "AI大模型构建的股票分析助手";
-
-    /// <summary>
-    /// 应用根目录
-    /// </summary>
-    public static string AppRootDirectory => AppDomain.CurrentDomain.BaseDirectory;
-
-    #endregion
-
-    #region 应用显示信息
-
-    /// <summary>
-    /// 应用显示名称（用于UI显示）
-    /// </summary>
-    public const string AppDisplayName = "Market Assistant";
+    public static string Description => _assembly.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description ?? "AI大模型构建的股票分析助手";
 
     #endregion
 
     #region GitHub相关常量
-
-    /// <summary>
-    /// GitHub仓库所有者
-    /// </summary>
-    public const string GitHubOwner = "X2Agent";
-
-    /// <summary>
-    /// GitHub仓库名称
-    /// </summary>
-    public const string GitHubRepo = "MarketAssistant";
 
     /// <summary>
     /// GitHub API基础URL
@@ -85,7 +81,7 @@ public static class AppInfo
     /// <summary>
     /// 用户代理字符串
     /// </summary>
-    public const string UserAgent = "MarketAssistant";
+    public const string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 
     #endregion
 
@@ -111,11 +107,6 @@ public static class AppInfo
     /// </summary>
     public const string CacheDirectoryName = "Cache";
 
-    /// <summary>
-    /// 应用数据目录名称
-    /// </summary>
-    public const string AppDataDirectoryName = "AppData";
-
     #endregion
 
     #region 网站和URL常量
@@ -128,22 +119,22 @@ public static class AppInfo
     /// <summary>
     /// 更新日志地址
     /// </summary>
-    public const string ChangelogUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/releases";
+    public static string ChangelogUrl => $"https://github.com/{Company}/{AppName}/releases";
 
     /// <summary>
     /// 意见反馈地址
     /// </summary>
-    public const string FeedbackUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/issues";
+    public static string FeedbackUrl => $"https://github.com/{Company}/{AppName}/issues";
 
     /// <summary>
     /// GitHub仓库地址
     /// </summary>
-    public const string GitHubRepoUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}";
+    public static string GitHubRepoUrl => $"https://github.com/{Company}/{AppName}";
 
     /// <summary>
     /// 许可证地址
     /// </summary>
-    public const string LicenseUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/blob/main/LICENSE";
+    public static string LicenseUrl => $"https://github.com/{Company}/{AppName}/blob/main/LICENSE";
 
     #endregion
 }

@@ -9,44 +9,68 @@
 
     <!-- 时间周期按钮样式 -->
     <Style Selector="Button.period-button">
-        <Setter Property="FontSize" Value="12"/>
-        <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="Padding" Value="12,6"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="{DynamicResource SystemAccentColor}"/>
-    </Style>
-    <Style Selector="Button.period-button.selected">
-        <Setter Property="Background" Value="{DynamicResource SystemAccentColor}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="{StaticResource SmallHorizontalMargin}"/>
+        <Setter Property="Height" Value="{StaticResource SmallButtonHeight}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                <BrushTransition Property="Foreground" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.period-button:pointerover">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
-    <Style Selector="Button.period-button.selected:pointerover">
-        <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
+    <Style Selector="Button.period-button.selected">
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- 操作按钮样式 -->
+    <Style Selector="Button.action-button">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="{StaticResource HorizontalMargin}"/>
+        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.action-button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
     </Style>
 
     <!-- 功能按钮样式 -->
-    <Style Selector="Button.featureButton">
+    <Style Selector="Button.feature-button">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Height" Value="32"/>
-        <Setter Property="Padding" Value="8,0"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
+        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
 
     <!-- 成功按钮样式 -->
     <Style Selector="Button.success">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -55,14 +79,14 @@
     <Style Selector="Button.warning">
         <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
         <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
-    <!-- 删除按钮样式（悬停显示） -->
-    <Style Selector="Button.delete-button">
+    <!-- 悬停显示按钮基础样式 (删除/收藏) -->
+    <Style Selector="Button.delete-button, Button.favorite-button">
         <Setter Property="Opacity" Value="0"/>
         <Setter Property="IsHitTestVisible" Value="False"/>
         <Setter Property="Transitions">
@@ -72,17 +96,10 @@
         </Setter>
     </Style>
 
-    <!-- 收藏按钮样式（悬停显示） -->
+    <!-- 收藏按钮特定样式 -->
     <Style Selector="Button.favorite-button">
-        <Setter Property="Opacity" Value="0"/>
-        <Setter Property="IsHitTestVisible" Value="False"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-            </Transitions>
-        </Setter>
     </Style>
 
 </Styles>

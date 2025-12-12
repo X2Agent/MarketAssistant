@@ -1,7 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Agents;
+using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Applications.StockSelection.Models;
+using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -44,6 +47,8 @@ public enum SelectionModeType
 public partial class StockSelectionPageViewModel : ViewModelBase
 {
     private readonly StockSelectionService _stockSelectionService;
+    private readonly StockFavoriteService _stockFavoriteService;
+    private readonly IDialogService _dialogService;
 
     [ObservableProperty]
     private string _userRequirements = string.Empty;
@@ -164,9 +169,13 @@ public partial class StockSelectionPageViewModel : ViewModelBase
     /// </summary>
     public StockSelectionPageViewModel(
         ILogger<StockSelectionPageViewModel> logger,
-        StockSelectionService stockSelectionService) : base(logger)
+        StockSelectionService stockSelectionService,
+        StockFavoriteService stockFavoriteService,
+        IDialogService dialogService) : base(logger)
     {
         _stockSelectionService = stockSelectionService;
+        _stockFavoriteService = stockFavoriteService;
+        _dialogService = dialogService;
         _ = LoadQuickStrategiesAsync();
         _ = LoadSelectionModesAsync();
     }
@@ -188,6 +197,40 @@ public partial class StockSelectionPageViewModel : ViewModelBase
         OnPropertyChanged(nameof(RecommendedStocks));
         OnPropertyChanged(nameof(FormattedRiskWarnings));
         OnPropertyChanged(nameof(HasRiskWarnings));
+    }
+
+    [RelayCommand]
+    private void ViewStockDetail(StockRecommendation? stock)
+    {
+        if (stock == null) return;
+
+        WeakReferenceMessenger.Default.Send(
+            new NavigationMessage("Stock", new StockNavigationParameter(stock.Symbol, stock.Name)));
+    }
+
+    [RelayCommand]
+    private async Task AddToFavorites(StockRecommendation? stock)
+    {
+        if (stock == null) return;
+
+        // 解析 Symbol，例如 SH600000 -> Market: SH, Code: 600000
+        string market = "CN";
+        string code = stock.Symbol;
+
+        if (stock.Symbol.Length > 2 && (stock.Symbol.StartsWith("SH") || stock.Symbol.StartsWith("SZ")))
+        {
+            market = stock.Symbol.Substring(0, 2);
+            code = stock.Symbol.Substring(2);
+        }
+
+        if (_stockFavoriteService.IsFavorite(code, market))
+        {
+            await _dialogService.ShowMessageAsync("提示", $"{stock.Name} ({stock.Symbol}) 已在自选列表中");
+            return;
+        }
+
+        _stockFavoriteService.AddFavorite(code, market);
+        await _dialogService.ShowMessageAsync("成功", $"已将 {stock.Name} ({stock.Symbol}) 加入自选");
     }
 
     [RelayCommand]

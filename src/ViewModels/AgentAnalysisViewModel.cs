@@ -1,8 +1,11 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Agents;
+using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Services.Cache;
+using MarketAssistant.Services.Navigation;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.SemanticKernel;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -11,58 +14,27 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 代理分析页面视图模型
 /// </summary>
-public partial class AgentAnalysisViewModel : ViewModelBase
+public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<StockNavigationParameter>
 {
-    private readonly MarketAnalysisAgent _marketAnalysisAgent;
+    public override string Title => "AI股票分析";
+
+    private readonly MarketAnalysisWorkflow _marketAnalysisWorkflow;
     private readonly IAnalysisCacheService _analysisCacheService;
 
+    [ObservableProperty]
     private string _stockCode = "";
-    public string StockCode
-    {
-        get => _stockCode;
-        set
-        {
-            _stockCode = value;
-            OnPropertyChanged();
-        }
-    }
 
-    private string _currentAnalyst = "准备中";
-    public string CurrentAnalyst
-    {
-        get => _currentAnalyst;
-        set => SetProperty(ref _currentAnalyst, value);
-    }
-
+    [ObservableProperty]
     private bool _isAnalysisInProgress;
-    public bool IsAnalysisInProgress
-    {
-        get => _isAnalysisInProgress;
-        set => SetProperty(ref _isAnalysisInProgress, value);
-    }
 
+    [ObservableProperty]
     private string _analysisStage = "等待开始分析";
-    public string AnalysisStage
-    {
-        get => _analysisStage;
-        set => SetProperty(ref _analysisStage, value);
-    }
 
-    public ObservableCollection<AnalysisMessage> AnalysisMessages { get; } = new ObservableCollection<AnalysisMessage>();
-
+    [ObservableProperty]
     private AnalysisReportViewModel _analysisReportViewModel;
-    public AnalysisReportViewModel AnalysisReportViewModel
-    {
-        get => _analysisReportViewModel;
-        set => SetProperty(ref _analysisReportViewModel, value);
-    }
 
+    [ObservableProperty]
     private bool _isChatSidebarVisible;
-    public bool IsChatSidebarVisible
-    {
-        get => _isChatSidebarVisible;
-        set => SetProperty(ref _isChatSidebarVisible, value);
-    }
 
     public ICommand ToggleChatSidebarCommand { get; private set; }
 
@@ -112,13 +84,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     public ICommand SendMessageCommand => ChatSidebarViewModel?.SendMessageCommand ?? new RelayCommand(() => { });
 
     public AgentAnalysisViewModel(
-        MarketAnalysisAgent marketAnalysisAgent,
+        MarketAnalysisWorkflow marketAnalysisWorkflow,
         AnalysisReportViewModel analysisReportViewModel,
         IAnalysisCacheService analysisCacheService,
         ChatSidebarViewModel chatSidebarViewModel,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
-        _marketAnalysisAgent = marketAnalysisAgent;
+        _marketAnalysisWorkflow = marketAnalysisWorkflow;
         _analysisReportViewModel = analysisReportViewModel;
         _analysisCacheService = analysisCacheService;
 
@@ -132,8 +104,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
     private void SubscribeToEvents()
     {
-        _marketAnalysisAgent.ProgressChanged += OnAnalysisProgressChanged;
-        _marketAnalysisAgent.AnalysisCompleted += OnAnalysisCompleted;
+        _marketAnalysisWorkflow.ProgressChanged += OnAnalysisProgressChanged;
     }
 
     /// <summary>
@@ -154,22 +125,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
     private void OnAnalysisProgressChanged(object? sender, AnalysisProgressEventArgs e)
     {
-        CurrentAnalyst = e.CurrentAnalyst;
-        IsAnalysisInProgress = e.IsInProgress;
-        AnalysisStage = e.StageDescription;
-    }
-
-    private void OnAnalysisCompleted(object? sender, ChatMessageContent e)
-    {
-        var message = new AnalysisMessage
+        Dispatcher.UIThread.InvokeAsync(() =>
         {
-            Sender = e.AuthorName ?? string.Empty,
-            Content = e.Content ?? string.Empty,
-            Timestamp = DateTime.Now,
-        };
-
-        AnalysisMessages.Add(message);
-        _ = AnalysisReportViewModel.ProcessAnalysisMessageAsync(message);
+            IsAnalysisInProgress = e.IsInProgress;
+            AnalysisStage = e.StageDescription;
+        });
     }
 
     /// <summary>
@@ -182,107 +142,51 @@ public partial class AgentAnalysisViewModel : ViewModelBase
 
         await SafeExecuteAsync(async () =>
         {
-            var cachedResult = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
-            if (cachedResult != null)
+            // 重置进度状态
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                AnalysisStage = "准备开始...";
+            });
+
+            // 1. 尝试从缓存加载
+            var cachedReport = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
+            if (cachedReport != null)
             {
                 Logger?.LogInformation("从缓存加载分析结果: {StockCode}", StockCode);
-                AnalysisReportViewModel.UpdateWithResult(cachedResult);
+
+                // 更新 UI（结构化报告 + 侧边栏历史）
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    AnalysisReportViewModel.UpdateWithReport(cachedReport);
+                    if (ChatSidebarViewModel != null)
+                    {
+                        await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, cachedReport.AnalystMessages);
+                    }
+                });
                 return;
             }
 
-            Logger?.LogInformation("缓存中没有结果，开始新的分析: {StockCode}", StockCode);
-            AnalysisMessages.Clear();
+            // 2. 缓存未命中，执行新分析
+            Logger?.LogInformation("开始新的分析: {StockCode}", StockCode);
 
-#if DEBUG
-            var mockAnalysisMessages = new List<AnalysisMessage>
-            {
-                new AnalysisMessage
-                {
-                    Sender = "技术分析师",
-                    Content = $"【技术面分析】{StockCode} 当前技术指标显示：\n\n" +
-                             "• MA5 和 MA10 呈现金叉形态，短期趋势向好\n" +
-                             "• RSI 指标为 65，处于相对强势区间\n" +
-                             "• MACD 柱状图由负转正，动能开始增强\n" +
-                             "• 成交量较前期放大约 20%，资金关注度提升\n\n" +
-                             "**技术面评级：看多** 📈",
-                    Timestamp = DateTime.Now.AddMinutes(-5),
-                    InputTokenCount = 156
-                },
-                new AnalysisMessage
-                {
-                    Sender = "基本面分析师",
-                    Content = $"【基本面分析】{StockCode} 财务状况评估：\n\n" +
-                             "• 最新季度营收同比增长 12.3%，盈利能力稳定\n" +
-                             "• 毛利率维持在 35% 左右，成本控制良好\n" +
-                             "• 资产负债率 45%，财务结构健康\n" +
-                             "• ROE 为 15.2%，股东回报率较为理想\n" +
-                             "• 现金流充裕，经营活动现金流为正\n\n" +
-                             "**基本面评级：中性偏多** 📊",
-                    Timestamp = DateTime.Now.AddMinutes(-4),
-                    InputTokenCount = 189
-                },
-                new AnalysisMessage
-                {
-                    Sender = "综合策略分析师",
-                    Content = $"【投资建议】{StockCode} 综合评估报告：\n\n" +
-                             "**综合评级：买入** 🎯\n\n" +
-                             "**核心逻辑：**\n" +
-                             "1. 技术面多头排列，短期趋势明确向上\n" +
-                             "2. 基本面稳健，盈利能力持续改善\n" +
-                             "3. 资金面积极，机构资金持续流入\n" +
-                             "4. 估值合理，仍有上升空间\n\n" +
-                             "**操作建议：**\n" +
-                             "• 目标价位：当前价格+15% 作为第一目标\n" +
-                             "• 止损位：跌破 MA20 考虑减仓\n" +
-                             "• 持有周期：建议 3-6 个月\n\n" +
-                             "**风险提示：** 请注意控制仓位，做好风险管理 📋",
-                    Timestamp = DateTime.Now.AddMinutes(-1),
-                    InputTokenCount = 225
-                }
-            };
+            // 清空侧边栏（准备接收实时消息）
+            await Dispatcher.UIThread.InvokeAsync(() => ChatSidebarViewModel?.InitializeEmpty());
 
-            foreach (var mockMessage in mockAnalysisMessages)
-            {
-                AnalysisMessages.Add(mockMessage);
-                await Task.Delay(200);
-            }
+            // 执行工作流（耗时操作，OnAnalysisCompleted 会实时更新侧边栏）
+            var report = await _marketAnalysisWorkflow.AnalyzeAsync(StockCode);
 
-            // 加载模拟的分析报告数据
-            AnalysisReportViewModel.LoadMockData(StockCode);
-#else
-            var history = await _marketAnalysisAgent.AnalysisAsync(StockCode);
-            foreach (var message in history)
+            // 3. 分析完成，更新最终报告并缓存
+            await Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                if (message.Role != Microsoft.SemanticKernel.ChatCompletion.AuthorRole.Assistant)
+                AnalysisReportViewModel.UpdateWithReport(report);
+                if (ChatSidebarViewModel != null)
                 {
-                    continue;
+                    await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
                 }
-                if (string.IsNullOrEmpty(message.Content.Replace("\n\n", "")))
-                {
-                    continue;
-                }
-                var analysisMessage = new AnalysisMessage
-                {
-                    Sender = message.AuthorName ?? string.Empty,
-                    Content = message.Content ?? string.Empty,
-                    Timestamp = DateTime.Now,
-                };
-                if (message.Metadata.TryGetValue("Usage", out var usageObject))
-                {
-                    if (usageObject is OpenAI.Chat.ChatTokenUsage openAIUsage)
-                    {
-                        analysisMessage.InputTokenCount = openAIUsage.InputTokenCount;
-                        analysisMessage.OutputTokenCount = openAIUsage.OutputTokenCount;
-                    }
-                }
+                // 缓存操作不需要在 UI 线程等待，可以放飞或在后台等待
+                _ = _analysisCacheService.CacheAnalysisAsync(StockCode, report);
+            });
 
-                AnalysisMessages.Add(analysisMessage);
-            }
-#endif
-            if (ChatSidebarViewModel != null)
-            {
-                await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, AnalysisMessages);
-            }
         }, "股票分析");
     }
 
@@ -292,6 +196,26 @@ public partial class AgentAnalysisViewModel : ViewModelBase
     private void ToggleChatSidebar()
     {
         IsChatSidebarVisible = !IsChatSidebarVisible;
+    }
+
+    public void OnNavigatedTo(StockNavigationParameter parameter)
+    {
+        if (!string.IsNullOrEmpty(parameter.StockCode))
+        {
+            StockCode = parameter.StockCode;
+            Logger?.LogInformation("导航到 AI 股票分析页面，股票代码: {Code}", StockCode);
+            // 异步加载数据
+            _ = LoadAnalysisDataAsync();
+        }
+        else
+        {
+            Logger?.LogInformation("导航到 AI 股票分析页面，但未提供股票代码");
+        }
+    }
+
+    public void OnNavigatedFrom()
+    {
+        // 离开页面时的清理工作
     }
 }
 

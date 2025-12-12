@@ -18,120 +18,141 @@
         <vm:MCPConfigPageViewModel/>
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="300,*">
+    <Grid ColumnDefinitions="320,*">
         <!-- 左侧服务器列表 -->
         <Border Grid.Column="0" 
-                Background="{DynamicResource CardBackgroundBrush}"
+                Background="{DynamicResource ItemBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,0,1,0"
-                Padding="16">
+                BorderThickness="{StaticResource RightBorderThickness}">
             <Grid RowDefinitions="Auto,*">
-                <!-- 添加服务器按钮 -->
-                <Button Grid.Row="0" 
-                        Content="添加服务器" 
-                        Command="{Binding AddServerCommand}" 
-                        Background="{StaticResource SuccessBrush}"
-                        Foreground="White"
-                        HorizontalAlignment="Stretch"
-                        Margin="0,0,0,12" />
+                <!-- 顶部操作区 -->
+                <Border Grid.Row="0" 
+                        Padding="{StaticResource PagePadding}" 
+                        BorderBrush="{DynamicResource BorderBrush}" 
+                        BorderThickness="{StaticResource BottomBorderThickness}"
+                        Background="{DynamicResource CardBackgroundBrush}">
+                    <Button Content="添加服务器" 
+                            Command="{Binding AddServerCommand}" 
+                            Classes="action-button"
+                            Background="{DynamicResource SuccessBrush}"
+                            Foreground="White"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"/>
+                </Border>
 
                 <!-- 服务器列表 -->
-                <ScrollViewer Grid.Row="1">
-                    <ItemsControl ItemsSource="{Binding ServerConfigs}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="settings:MCPServerConfig">
-                                <Border Background="{DynamicResource ItemBackgroundBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="6"
-                                        Padding="12"
-                                        Margin="0,0,0,8"
-                                        Cursor="Hand"
-                                        Tapped="OnServerItemTapped"
-                                        Tag="{Binding .}">
+                <ScrollViewer Grid.Row="1" Padding="{StaticResource SmallPadding}">
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <ItemsControl ItemsSource="{Binding ServerConfigs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:MCPServerConfig">
+                                    <Border Background="{DynamicResource CardBackgroundBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="{StaticResource DefaultBorderThickness}"
+                                            CornerRadius="{StaticResource SmallCornerRadius}"
+                                            Padding="{StaticResource DefaultCardPadding}"
+                                            Margin="{StaticResource TinyBottomMargin}"
+                                            Cursor="Hand"
+                                            Tapped="OnServerItemTapped"
+                                            Tag="{Binding .}">
+                                        <Border.Styles>
+                                            <Style Selector="Border:pointerover">
+                                                <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+                                            </Style>
+                                        </Border.Styles>
 
-                                    <Grid RowDefinitions="Auto,Auto,Auto">
-                                        <TextBlock Grid.Row="0"
-                                                   Text="{Binding Name}" 
-                                                   FontWeight="Bold"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding Description}" 
-                                                   FontSize="12" 
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   Margin="0,4,0,0"/>
-                                        <StackPanel Grid.Row="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="8"
-                                                    Margin="0,4,0,0">
-                                            <TextBlock Text="{Binding TransportType}" 
-                                                       FontSize="10" 
-                                                       Foreground="{StaticResource PrimaryBrush}"/>
-                                            <TextBlock Text="{Binding IsEnabled, StringFormat={}{0}启用}" 
-                                                       FontSize="10" 
-                                                       Foreground="{StaticResource SuccessBrush}"/>
+                                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Text="{Binding Name}" 
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                        CornerRadius="{StaticResource TinyCornerRadius}"
+                                                        Padding="{StaticResource TinyHorizontalMargin}"
+                                                        IsVisible="{Binding IsEnabled}">
+                                                    <TextBlock Text="启用" 
+                                                               FontSize="{StaticResource MiniFontSize}" 
+                                                               Foreground="{DynamicResource SuccessBrush}"/>
+                                                </Border>
+                                            </Grid>
+                                            
+                                            <TextBlock Text="{Binding Description}" 
+                                                       FontSize="{StaticResource SmallFontSize}" 
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxLines="2"/>
+                                            
+                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                    HorizontalAlignment="Left"
+                                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                                    Padding="{StaticResource TinyHorizontalMargin}">
+                                                <TextBlock Text="{Binding TransportType}" 
+                                                           FontSize="{StaticResource MiniFontSize}" 
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </Border>
                                         </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
-                <!-- 空视图 -->
-                <Grid Grid.Row="1"
-                      RowDefinitions="Auto,Auto"
-                      IsVisible="{Binding !ServerConfigs.Count}"
-                      HorizontalAlignment="Center"
-                      VerticalAlignment="Center">
-                    <TextBlock Grid.Row="0"
-                               Text="暂无服务器配置" 
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               HorizontalAlignment="Center"/>
-                    <TextBlock Grid.Row="1"
-                               Text="点击上方按钮添加" 
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               HorizontalAlignment="Center"
-                               Margin="0,8,0,0"/>
-                </Grid>
+                        <!-- 空视图 -->
+                        <StackPanel IsVisible="{Binding !ServerConfigs.Count}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="{StaticResource SmallSpacing}"
+                                    Margin="{StaticResource LogoTopMargin}">
+                            <TextBlock Text="暂无服务器配置" 
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="点击上方按钮添加" 
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextDisabledBrush}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
         </Border>
 
         <!-- 右侧配置详情 -->
         <Grid Grid.Column="1" RowDefinitions="*,Auto">
             <!-- 编辑表单区域 -->
-            <ScrollViewer Grid.Row="0" Padding="16">
-                <StackPanel IsVisible="{Binding IsEditing}" Spacing="16">
+            <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Padding="{StaticResource PagePadding}">
+                <StackPanel IsVisible="{Binding IsEditing}" Spacing="{StaticResource LargeSpacing}" Margin="0,0,0,80">
                     <!-- 基本信息 -->
-                    <controls:CardView Header="基本信息">
-                        <StackPanel Spacing="12">
+                    <controls:CardView Header="基本信息" Padding="{StaticResource CardPadding}">
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <!-- 服务器名称 -->
-                            <StackPanel Spacing="8">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="#dc3545"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="名称"/>
                                 </TextBlock>
-                                <TextBox Text="{Binding Name}" Watermark="请输入服务器名称"/>
+                                <TextBox Text="{Binding Name}" 
+                                         Watermark="请输入服务器名称"
+                                         Classes="clearButton"/>
                             </StackPanel>
 
                             <!-- 服务器描述 -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="描述" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="描述" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding Description}" 
                                          Watermark="请输入服务器描述"
-                                         Height="100"
+                                         Height="{StaticResource TextAreaHeight}"
                                          AcceptsReturn="True"
-                                         TextWrapping="Wrap"/>
+                                         TextWrapping="Wrap"
+                                         Classes="clearButton"/>
                             </StackPanel>
 
                             <!-- 服务器类型 -->
-                            <StackPanel Spacing="8">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="#dc3545"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="类型"/>
                                 </TextBlock>
-                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource LargeSpacing}">
                                     <RadioButton GroupName="transportType" 
                                                  Content="标准输入/输出(stdio)"
                                                  IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"/>
@@ -145,72 +166,66 @@
                             </StackPanel>
 
                             <!-- 命令/URL配置 (stdio) -->
-                            <StackPanel Spacing="8" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="#dc3545"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
+                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="命令"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" Watermark="请输入命令，如 npx"/>
                             </StackPanel>
 
                             <!-- 命令/URL配置 (sse) -->
-                            <StackPanel Spacing="8" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}">
+                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" Watermark="请输入 URL，如 http://localhost:3000/sse"/>
                                 <TextBlock Text="提示：URL示例 http://localhost:3000/sse" 
-                                           FontSize="12" 
+                                           FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
                             <!-- 命令/URL配置 (streamableHttp) -->
-                            <StackPanel Spacing="8" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}">
-                                <TextBlock FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}">
+                                <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
+                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" Watermark="请输入 URL，如 http://localhost:3000/mcp"/>
                                 <TextBlock Text="提示：URL示例 http://localhost:3000/mcp" 
-                                           FontSize="12" 
+                                           FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
                             <!-- 参数配置 (仅stdio) -->
-                            <StackPanel Spacing="8" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
-                                <TextBlock Text="参数" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
+                                <TextBlock Text="参数" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding Arguments}" 
                                          Watermark="请输入命令参数，如-y @modelcontextprotocol/server-github"
-                                         Height="100"
+                                         Height="{StaticResource ModeSelectionHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>
                                 <TextBlock Text="提示：多个参数请用空格分隔" 
-                                           FontSize="12" 
+                                           FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
                             <!-- 环境变量配置 (仅stdio) -->
-                            <StackPanel Spacing="8" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
-                                <TextBlock Text="环境变量" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
+                                <TextBlock Text="环境变量" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding EnvironmentVariablesText}"
                                          Watermark="KEY1=value1&#10;KEY2=value2"
-                                         Height="150"
+                                         Height="{StaticResource CompactTextAreaHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>
                                 <TextBlock Text="每行一个环境变量，格式为KEY=value" 
-                                           FontSize="12" 
+                                           FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
                             <!-- 是否启用 -->
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <CheckBox IsChecked="{Binding IsEnabled}"/>
-                                <TextBlock Text="启用" 
-                                           FontSize="14" 
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
+                            <CheckBox IsChecked="{Binding IsEnabled}" Content="启用此服务器"/>
                         </StackPanel>
                     </controls:CardView>
                 </StackPanel>
@@ -221,18 +236,18 @@
                     IsVisible="{Binding IsEditing}"
                     Background="{DynamicResource CardBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="0,1,0,0"
-                    Padding="16,12">
+                    BorderThickness="{StaticResource TopBorderThickness}"
+                    Padding="{StaticResource PagePadding}">
                 <Grid ColumnDefinitions="*,Auto">
                     <!-- 测试状态显示 -->
                     <StackPanel Grid.Column="0" 
                                 Orientation="Horizontal" 
-                                Spacing="8"
+                                Spacing="{StaticResource SmallSpacing}"
                                 VerticalAlignment="Center"
                                 IsVisible="{Binding IsTesting}">
                         <ProgressBar IsIndeterminate="True" 
-                                     Width="80" 
-                                     Height="4"
+                                     Width="{StaticResource SmallButtonMinWidth}" 
+                                     Height="{StaticResource TinySpacing}"
                                      VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding TestStatus}" 
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -248,78 +263,35 @@
                     <!-- 按钮组 -->
                     <StackPanel Grid.Column="1" 
                                 Orientation="Horizontal" 
-                                Spacing="12">
+                                Spacing="{StaticResource DefaultSpacing}">
                         <Button Content="取消" 
                                 Command="{Binding CancelEditCommand}"
-                                MinWidth="100"
-                                Padding="16,8"/>
+                                Classes="action-button"
+                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
+                        
                         <Button Content="删除" 
                                 Command="{Binding DeleteServerCommand}"
-                                Background="{StaticResource ErrorBrush}"
+                                Classes="action-button"
+                                Background="{DynamicResource ErrorBrush}"
                                 Foreground="White"
-                                MinWidth="100"
-                                Padding="16,8"
+                                MinWidth="{StaticResource MediumButtonMinWidth}"
                                 IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                        
                         <Button Content="测试连接" 
                                 Command="{Binding TestConnectionCommand}"
                                 IsEnabled="{Binding !IsTesting}"
-                                Background="{StaticResource InfoBrush}"
+                                Classes="action-button"
+                                Background="{DynamicResource InfoBrush}"
                                 Foreground="White"
-                                MinWidth="100"
-                                Padding="16,8"/>
+                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
+                        
                         <Button Content="保存" 
                                 Command="{Binding SaveServerCommand}"
                                 IsEnabled="{Binding !IsTesting}"
-                                Background="{StaticResource PrimaryBrush}"
+                                Classes="action-button"
+                                Background="{DynamicResource PrimaryBrush}"
                                 Foreground="White"
-                                MinWidth="100"
-                                Padding="16,8"/>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- 删除确认对话框 -->
-            <Border Grid.Row="0" Grid.RowSpan="2"
-                    IsVisible="{Binding ShowDeleteConfirmation}"
-                    Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Width="400"
-                    Height="200"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="0 4 16 0 #33000000"
-                    Padding="16">
-                <Grid RowDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
-                    <TextBlock Grid.Row="0"
-                               Text="确认删除" 
-                               FontSize="18" 
-                               FontWeight="Bold" 
-                               HorizontalAlignment="Center"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    <TextBlock Grid.Row="1"
-                               Text="确定要删除此服务器配置吗？此操作无法撤销。" 
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="0,16,0,0"/>
-                    <StackPanel Grid.Row="2"
-                                Orientation="Horizontal" 
-                                HorizontalAlignment="Center" 
-                                Spacing="16"
-                                Margin="0,16,0,0">
-                        <Button Content="取消" 
-                                Command="{Binding CancelDeleteCommand}" 
-                                Background="{DynamicResource ItemBackgroundBrush}"
-                                Foreground="{DynamicResource TextPrimaryBrush}"
-                                Width="120"/>
-                        <Button Content="删除" 
-                                Command="{Binding ConfirmDeleteCommand}" 
-                                Background="#dc3545"
-                                Foreground="White"
-                                Width="120"/>
+                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -329,10 +301,14 @@
                         IsVisible="{Binding IsEditing, Converter={x:Static BoolConverters.Not}}"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Spacing="16">
+                        Spacing="{StaticResource LargeSpacing}">
                 <TextBlock Text="请选择或添加MCP服务器" 
                            Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="18"
+                           FontSize="{StaticResource SubTitleFontSize}"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="在左侧列表中选择一个服务器进行编辑，或点击“添加服务器”创建新配置" 
+                           Foreground="{DynamicResource TextDisabledBrush}"
+                           FontSize="{StaticResource BodyFontSize}"
                            HorizontalAlignment="Center"/>
             </StackPanel>
         </Grid>

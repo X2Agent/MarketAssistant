@@ -17,7 +17,6 @@
             <!-- 进度显示区域 - 仅在分析时显示 -->
             <views:ProgressDisplayView 
                 IsVisible="{Binding IsBusy}"
-                IsProgressVisible="{Binding IsBusy}"
                 IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
                 AnalysisStage="{Binding AnalysisStage}"/>
 
@@ -35,41 +34,39 @@
                 <!-- 水印控件 -->
                 <controls:WatermarkView 
                     Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！" 
-                    OpacityValue="0.4" 
+                    OpacityValue="0.15" 
                     Angle="-30" 
-                    FontSize="28" 
+                    FontSize="{StaticResource ExtraLargeFontSize}" 
                     HorizontalRepeatCount="2" 
                     VerticalRepeatCount="4" 
-                    ZIndex="999" />
+                    ZIndex="999" 
+                    IsHitTestVisible="False"/>
             
                 <!-- 浮动操作按钮(FAB) -->
-                <StackPanel HorizontalAlignment="Right" 
-                            VerticalAlignment="Bottom" 
-                            ZIndex="1000" 
-                            Margin="0,0,16,16" 
-                            Spacing="8">
-                    <!-- 聊天按钮 -->
-                    <Button Content="💬" 
-                            FontSize="24"
-                            Width="56"
-                            Height="56"
-                            CornerRadius="28"
-                            Background="{DynamicResource PrimaryBrush}"
-                            Command="{Binding ToggleChatSidebarCommand}"
-                            ToolTip.Tip="智能对话"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"/>                
-                </StackPanel>
+                <Button HorizontalAlignment="Right" 
+                        VerticalAlignment="Bottom" 
+                        ZIndex="1000" 
+                        Margin="{StaticResource FABMargin}" 
+                        Content="💬" 
+                        FontSize="{StaticResource TitleFontSize}"
+                        Width="{StaticResource FABSize}"
+                        Height="{StaticResource FABSize}"
+                        CornerRadius="{StaticResource FABCornerRadius}"
+                        Background="{DynamicResource PrimaryBrush}"
+                        Command="{Binding ToggleChatSidebarCommand}"
+                        ToolTip.Tip="智能对话"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"/>
             </Grid>
         </Grid>
 
         <!-- 聊天侧边栏 -->
         <Border Grid.Column="1" 
                 IsVisible="{Binding IsChatSidebarVisible}"
-                Width="480"
-                Background="{DynamicResource PageBackgroundBrush}"
+                Width="{StaticResource SidebarWidth}"
+                Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="1,0,0,0">
+                BorderThickness="{StaticResource LeftBorderThickness}">
             <ContentControl Content="{Binding ChatSidebarViewModel}">
                 <ContentControl.ContentTemplate>
                     <DataTemplate x:DataType="vm:ChatSidebarViewModel">

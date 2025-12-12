@@ -23,105 +23,88 @@
                 </Animation>
             </Style.Animations>
         </Style>
+        <!-- 旋转动画样式 -->
+        <Style Selector="Path.Spin">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </UserControl.Styles>
     
     <Border Background="{DynamicResource CardBackgroundBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="1"
-            CornerRadius="12"
-            Padding="32,24"
+            BorderThickness="{StaticResource DefaultBorderThickness}"
+            CornerRadius="{StaticResource DefaultCornerRadius}"
+            Padding="{StaticResource ProgressDialogPadding}"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            Width="420"
-            BoxShadow="0 4 16 0 #20000000">
+            Width="{StaticResource ProgressDialogWidth}">
         
-        <StackPanel Spacing="24">
+        <StackPanel Spacing="{StaticResource DefaultIconSize}">
             
             <!-- 标题 -->
             <TextBlock Text="🤖 AI 分析中..."
-                       FontSize="20"
+                       FontSize="{StaticResource LargeFontSize}"
                        FontWeight="Bold"
                        HorizontalAlignment="Center"
                        Foreground="{DynamicResource PrimaryBrush}"/>
 
             <!-- 进度指示器区域 -->
-            <StackPanel Spacing="16" HorizontalAlignment="Center">
+            <StackPanel Spacing="{StaticResource LargeSpacing}" HorizontalAlignment="Center">
                 
                 <!-- 圆形脉动指示器 -->
-                <Grid Width="100" 
-                      Height="100"
+                <Grid Width="{StaticResource ProgressCircleSize}" 
+                      Height="{StaticResource ProgressCircleSize}"
                       HorizontalAlignment="Center">
                     
                     <!-- 外圆 - 脉动效果 -->
-                    <Ellipse Width="100" 
-                             Height="100"
+                    <Ellipse Width="{StaticResource ProgressCircleSize}" 
+                             Height="{StaticResource ProgressCircleSize}"
                              Fill="{DynamicResource PrimaryBrush}"
                              Opacity="0.1"
                              Classes="Pulse"/>
                     
-                    <!-- 中圆 - 进度环 -->
-                    <Ellipse Width="80" 
-                             Height="80"
-                             Stroke="{DynamicResource BorderBrush}"
-                             StrokeThickness="4"
-                             Fill="Transparent"/>
-                    
-                    <!-- 进度百分比显示 -->
-                    <TextBlock x:Name="ProgressPercentage"
-                               Text="0%"
-                               FontSize="24"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource PrimaryBrush}"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
+                    <!-- 旋转的 Loading 图标 -->
+                    <Path Classes="Spin"
+                          Width="32" Height="32"
+                          Data="M16,4 A12,12 0 1,1 4,16"
+                          Stroke="{DynamicResource PrimaryBrush}"
+                          StrokeThickness="4"
+                          StrokeLineCap="Round"
+                          RenderTransformOrigin="50%,50%"/>
                 </Grid>
-
-                <!-- 水平进度条 -->
-                <ProgressBar x:Name="ProgressBar"
-                             Height="6"
-                             Width="300"
-                             Minimum="0"
-                             Maximum="100"
-                             Value="0"
-                             CornerRadius="3"
-                             Foreground="{DynamicResource PrimaryBrush}"
-                             Background="{DynamicResource BorderBrush}"
-                             HorizontalAlignment="Center"/>
             </StackPanel>
 
             <!-- 阶段说明 -->
-            <StackPanel Spacing="8">
-                <TextBlock x:Name="StageLabel"
-                           Text="正在准备分析..."
-                           FontSize="14"
+            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                <TextBlock Text="{Binding #Root.AnalysisStage}"
+                           FontSize="{StaticResource LabelFontSize}"
                            FontWeight="Medium"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-                
-                <TextBlock x:Name="DetailLabel"
-                           Text="即将开始智能分析"
-                           FontSize="12"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           TextWrapping="Wrap"
-                           TextAlignment="Center"
-                           MaxWidth="350"/>
             </StackPanel>
 
             <!-- 提示信息 -->
             <Border Background="{DynamicResource PageBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="12,8">
+                    BorderThickness="{StaticResource DefaultBorderThickness}"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    Padding="{StaticResource DefaultCardPadding}">
                 <StackPanel Orientation="Horizontal" 
                             HorizontalAlignment="Center"
-                            Spacing="8">
+                            Spacing="{StaticResource SmallSpacing}">
                     <TextBlock Text="💡"
-                               FontSize="14"
+                               FontSize="{StaticResource LabelFontSize}"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text="分析过程可能需要 30-60 秒，请耐心等待"
-                               FontSize="12"
+                    <TextBlock Text="分析过程可能需要 1-3 分钟，请耐心等待"
+                               FontSize="{StaticResource SmallFontSize}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
                 </StackPanel>

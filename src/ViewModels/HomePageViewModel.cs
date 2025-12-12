@@ -56,7 +56,7 @@ public class HomePageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnStockSelected(object? sender, StockItem stock)
     {
-        NavigateToStock(stock.Code, stock);
+        NavigateToStock(stock);
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public class HomePageViewModel : ViewModelBase, IDisposable
     {
         var stockCode = $"{stock.Market}{stock.Code}".ToLower();
         var stockItem = new StockItem { Name = stock.Name, Code = stockCode };
-        NavigateToStock(stockCode, stockItem);
+        NavigateToStock(stockItem);
     }
 
     /// <summary>
@@ -74,25 +74,22 @@ public class HomePageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnRecentStockSelected(object? sender, StockItem stock)
     {
-        NavigateToStock(stock.Code, stock);
+        NavigateToStock(stock);
     }
 
     /// <summary>
     /// 导航到股票详情页
     /// </summary>
-    private void NavigateToStock(string stockCode, StockItem? stockItem = null)
+    private void NavigateToStock(StockItem stockItem)
     {
         // 立即发送导航消息，不阻塞UI
         WeakReferenceMessenger.Default.Send(
-            new NavigationMessage("Stock", new Dictionary<string, object> { { "code", stockCode } }));
+            new NavigationMessage("Stock", new StockNavigationParameter(stockItem.Code, stockItem.Name)));
 
-        Logger?.LogInformation($"导航到股票详情页: {stockCode}");
+        Logger?.LogInformation($"导航到股票详情页: {stockItem.Code}");
 
         // 异步添加到最近查看，不阻塞导航
-        if (stockItem != null)
-        {
-            _ = Task.Run(() => RecentStocks.AddToRecentStocks(stockItem));
-        }
+        _ = Task.Run(() => RecentStocks.AddToRecentStocks(stockItem));
     }
 
     /// <summary>

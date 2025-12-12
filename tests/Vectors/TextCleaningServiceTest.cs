@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class TextCleaningServiceTest : BaseKernelTest
+public class TextCleaningServiceTest : BaseAgentTest
 {
     private ITextCleaningService _service = null!;
 
@@ -12,7 +12,7 @@ public class TextCleaningServiceTest : BaseKernelTest
     public void Setup()
     {
         base.BaseInitialize();
-        _service = _kernel.Services.GetRequiredService<ITextCleaningService>();
+        _service = _serviceProvider.GetRequiredService<ITextCleaningService>();
     }
 
     [TestMethod]

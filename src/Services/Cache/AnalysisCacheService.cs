@@ -1,11 +1,12 @@
-using MarketAssistant.Models;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Cache;
 
 /// <summary>
-/// 分析结果缓存服务
+/// 分析结果缓存服务（彻底重构版）
+/// 缓存完整的 MarketAnalysisReport，更符合业务逻辑
 /// </summary>
 public class AnalysisCacheService : IAnalysisCacheService
 {
@@ -20,39 +21,54 @@ public class AnalysisCacheService : IAnalysisCacheService
     }
 
     /// <summary>
-    /// 获取缓存的分析结果
+    /// 获取缓存的市场分析报告
     /// </summary>
-    public Task<AnalystResult?> GetCachedAnalysisAsync(string stockSymbol)
+    public Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string stockSymbol)
     {
-        var cacheKey = GenerateCacheKey(stockSymbol);
-
-        if (_memoryCache.TryGetValue(cacheKey, out AnalystResult? cachedResult))
+        if (string.IsNullOrWhiteSpace(stockSymbol))
         {
-            _logger.LogInformation("从缓存获取分析结果: {StockSymbol}", stockSymbol);
-            return Task.FromResult(cachedResult);
+            throw new ArgumentNullException(nameof(stockSymbol));
         }
 
-        return Task.FromResult<AnalystResult?>(null);
+        var cacheKey = GenerateCacheKey(stockSymbol);
+
+        if (_memoryCache.TryGetValue(cacheKey, out MarketAnalysisReport? cachedReport))
+        {
+            _logger.LogInformation("从缓存获取分析报告: {StockSymbol}, 分析师数量: {Count}",
+                stockSymbol, cachedReport?.AnalystMessages.Count ?? 0);
+            return Task.FromResult(cachedReport);
+        }
+
+        _logger.LogInformation("缓存未命中: {StockSymbol}", stockSymbol);
+        return Task.FromResult<MarketAnalysisReport?>(null);
     }
 
     /// <summary>
-    /// 缓存分析结果
+    /// 缓存市场分析报告
     /// </summary>
-    public Task CacheAnalysisAsync(string stockSymbol, AnalystResult analysisResult)
+    public Task CacheAnalysisAsync(string stockSymbol, MarketAnalysisReport report)
     {
+        if (string.IsNullOrWhiteSpace(stockSymbol))
+        {
+            throw new ArgumentNullException(nameof(stockSymbol));
+        }
+
+        ArgumentNullException.ThrowIfNull(report);
+
         var cacheKey = GenerateCacheKey(stockSymbol);
 
-        var cacheOptions = new MemoryCacheEntryOptions
+        _memoryCache.Set(cacheKey, report, new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = _cacheExpiration,
-            Priority = CacheItemPriority.Normal,
-            Size = EstimateAnalysisResultSize(analysisResult)
-        };
+            SlidingExpiration = TimeSpan.FromMinutes(30),
+            Priority = CacheItemPriority.Normal
+        });
 
-        _memoryCache.Set(cacheKey, analysisResult, cacheOptions);
-
-        _logger.LogInformation("缓存分析结果: {StockSymbol}, 过期时间: {ExpiresAt}",
-            stockSymbol, DateTime.UtcNow.Add(_cacheExpiration));
+        _logger.LogInformation(
+            "已缓存分析报告: {StockSymbol}, 分析师数量: {Count}, 过期时间: {Expiration}",
+            stockSymbol,
+            report.AnalystMessages.Count,
+            _cacheExpiration);
 
         return Task.CompletedTask;
     }
@@ -62,74 +78,27 @@ public class AnalysisCacheService : IAnalysisCacheService
     /// </summary>
     public Task ClearCacheAsync(string stockSymbol)
     {
+        if (string.IsNullOrWhiteSpace(stockSymbol))
+        {
+            throw new ArgumentNullException(nameof(stockSymbol));
+        }
+
         var cacheKey = GenerateCacheKey(stockSymbol);
         _memoryCache.Remove(cacheKey);
-
-        _logger.LogInformation("清除缓存: {StockSymbol}", stockSymbol);
-
+        _logger.LogInformation("已清除缓存: {StockSymbol}", stockSymbol);
         return Task.CompletedTask;
     }
-
-    /// <summary>
-    /// 释放资源
-    /// </summary>
-    public void Dispose()
-    {
-        // IMemoryCache 由DI容器管理，不需要手动释放
-    }
-
-    #region 私有方法
 
     /// <summary>
     /// 生成缓存键
     /// </summary>
     private string GenerateCacheKey(string stockSymbol)
     {
-        return $"{stockSymbol.ToUpperInvariant()}_{DateTime.UtcNow:yyyyMMdd}";
+        return $"MarketAnalysisReport_{stockSymbol}";
     }
 
-    /// <summary>
-    /// 估算 AnalystResult 的内存大小
-    /// </summary>
-    private long EstimateAnalysisResultSize(AnalystResult analysisResult)
+    public void Dispose()
     {
-        long size = 0;
-
-        // 基本字符串属性
-        size += (analysisResult.StockSymbol?.Length ?? 0) * 2;
-        size += (analysisResult.TargetPrice?.Length ?? 0) * 2;
-        size += (analysisResult.PriceChange?.Length ?? 0) * 2;
-        size += (analysisResult.Rating?.Length ?? 0) * 2;
-        size += (analysisResult.InvestmentRating?.Length ?? 0) * 2;
-        size += (analysisResult.RiskLevel?.Length ?? 0) * 2;
-        size += (analysisResult.ConsensusInfo?.Length ?? 0) * 2;
-        size += (analysisResult.DisagreementInfo?.Length ?? 0) * 2;
-
-        // 数值类型
-        size += sizeof(float) * 2; // OverallScore + ConfidencePercentage
-
-        // 字典和列表
-        size += analysisResult.DimensionScores.Count * 32; // 估算键值对大小
-        size += analysisResult.InvestmentHighlights.Sum(x => x?.Length ?? 0) * 2;
-        size += analysisResult.RiskFactors.Sum(x => x?.Length ?? 0) * 2;
-        size += analysisResult.OperationSuggestions.Sum(x => x?.Length ?? 0) * 2;
-
-        // 分析数据项
-        foreach (var item in analysisResult.AnalysisData)
-        {
-            size += (item.DataType?.Length ?? 0) * 2;
-            size += (item.Name?.Length ?? 0) * 2;
-            size += (item.Value?.Length ?? 0) * 2;
-            size += (item.Unit?.Length ?? 0) * 2;
-            size += (item.Signal?.Length ?? 0) * 2;
-            size += (item.Impact?.Length ?? 0) * 2;
-            size += (item.Strategy?.Length ?? 0) * 2;
-            size += 64; // 对象开销
-        }
-
-        return Math.Max(size, 1); // 至少1字节，避免0大小
+        // IMemoryCache 由 DI 容器管理，无需手动释放
     }
-
-    #endregion
 }
-

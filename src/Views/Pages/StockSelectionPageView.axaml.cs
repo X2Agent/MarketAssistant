@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using MarketAssistant.Agents;
+using MarketAssistant.Applications.StockSelection.Models;
 using MarketAssistant.ViewModels;
 
 namespace MarketAssistant.Views.Pages;

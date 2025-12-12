@@ -8,16 +8,15 @@
             <ControlTemplate TargetType="controls:CardView">
                 <Border Background="{DynamicResource CardBackgroundBrush}"
                         BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="16"
-                        BoxShadow="0 2 4 0 #19000000">
+                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        CornerRadius="{StaticResource CardCornerRadius}"
+                        Padding="{StaticResource CardPadding}">
                     
                     <Grid RowDefinitions="Auto,Auto,Auto,*">
                         <!-- 字符串标题 -->
                         <TextBlock x:Name="PART_StringHeaderLabel"
                                    Grid.Row="0"
-                                   FontSize="16"
+                                   FontSize="{StaticResource SectionTitleFontSize}"
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    IsVisible="False"/>
@@ -30,8 +29,8 @@
                         <!-- 分隔线 -->
                         <Border x:Name="PART_Divider"
                                 Grid.Row="2"
-                                Height="1"
-                                Margin="0,12,0,12"
+                                Height="{StaticResource DividerHeight}"
+                                Margin="{StaticResource DefaultMargin}"
                                 Background="{DynamicResource DividerBrush}"
                                 IsVisible="False"/>
 

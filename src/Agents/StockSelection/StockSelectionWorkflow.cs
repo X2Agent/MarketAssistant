@@ -1,0 +1,150 @@
+using MarketAssistant.Agents.StockSelection.Executors;
+using MarketAssistant.Agents.StockSelection.Models;
+using MarketAssistant.Applications.StockSelection.Models;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.Logging;
+
+namespace MarketAssistant.Agents.StockSelection;
+
+/// <summary>
+/// AI选股工作流，使用 Agent Framework Workflows 实现确定性三步骤流程
+/// 第1步: 生成筛选条件 → 第2步: 执行筛选 → 第3步: AI分析结果
+/// </summary>
+public class StockSelectionWorkflow : IDisposable
+{
+    private readonly GenerateCriteriaExecutor _generateCriteriaExecutor;
+    private readonly ScreenStocksExecutor _screenStocksExecutor;
+    private readonly AnalyzeStocksExecutor _analyzeStocksExecutor;
+    private readonly ILogger<StockSelectionWorkflow> _logger;
+    private bool _disposed = false;
+
+    public StockSelectionWorkflow(
+        GenerateCriteriaExecutor generateCriteriaExecutor,
+        ScreenStocksExecutor screenStocksExecutor,
+        AnalyzeStocksExecutor analyzeStocksExecutor,
+        ILogger<StockSelectionWorkflow> logger)
+    {
+        _generateCriteriaExecutor = generateCriteriaExecutor ?? throw new ArgumentNullException(nameof(generateCriteriaExecutor));
+        _screenStocksExecutor = screenStocksExecutor ?? throw new ArgumentNullException(nameof(screenStocksExecutor));
+        _analyzeStocksExecutor = analyzeStocksExecutor ?? throw new ArgumentNullException(nameof(analyzeStocksExecutor));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// 执行基于用户需求的AI选股分析（使用工作流）
+    /// </summary>
+    public async Task<StockSelectionResult> AnalyzeUserRequirementAsync(
+        StockRecommendationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var workflowRequest = new StockSelectionWorkflowRequest
+        {
+            IsNewsAnalysis = false,
+            Content = request.UserRequirements,
+            RiskPreference = request.RiskPreference,
+            InvestmentAmount = request.InvestmentAmount,
+            InvestmentHorizon = request.InvestmentHorizon,
+            PreferredSectors = request.PreferredSectors,
+            ExcludedSectors = request.ExcludedSectors,
+            MaxRecommendations = request.MaxRecommendations
+        };
+
+        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+    }
+
+    /// <summary>
+    /// 执行基于新闻内容的AI选股分析（使用工作流）
+    /// </summary>
+    public async Task<StockSelectionResult> AnalyzeNewsHotspotAsync(
+        NewsBasedSelectionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var workflowRequest = new StockSelectionWorkflowRequest
+        {
+            IsNewsAnalysis = true,
+            Content = request.NewsContent,
+            MaxRecommendations = request.MaxRecommendations
+        };
+
+        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+    }
+
+    /// <summary>
+    /// 执行完整的选股工作流（确定性三步骤）
+    /// </summary>
+    private async Task<StockSelectionResult> ExecuteWorkflowAsync(
+        StockSelectionWorkflowRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("开始执行选股工作流，分析类型: {Type}",
+            request.IsNewsAnalysis ? "新闻热点" : "用户需求");
+
+        // 构建顺序工作流: 步骤1 → 步骤2 → 步骤3
+        var builder = new WorkflowBuilder(_generateCriteriaExecutor);
+        builder
+            .AddEdge(_generateCriteriaExecutor, _screenStocksExecutor)
+            .AddEdge(_screenStocksExecutor, _analyzeStocksExecutor)
+            .WithOutputFrom(_analyzeStocksExecutor);
+
+        var workflow = builder.Build();
+
+        // 执行工作流
+        await using Run run = await InProcessExecution.RunAsync(workflow, request, runId: null, cancellationToken);
+
+        StockSelectionResult? finalResult = null;
+
+        // 处理工作流事件
+        foreach (WorkflowEvent evt in run.NewEvents)
+        {
+            switch (evt)
+            {
+                case ExecutorInvokedEvent executorInvoked:
+                    _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                    break;
+                case ExecutorCompletedEvent executorComplete:
+                    _logger.LogInformation("步骤完成: {ExecutorId}", executorComplete.ExecutorId);
+                    break;
+                case WorkflowOutputEvent workflowOutput:
+                    finalResult = workflowOutput.Data as StockSelectionResult;
+                    _logger.LogInformation("工作流完成，推荐股票数量: {Count}",
+                        finalResult?.Recommendations?.Count ?? 0);
+                    break;
+                case ExecutorFailedEvent executorFailed:
+                    _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
+                        executorFailed.ExecutorId,
+                        executorFailed.Data.Message);
+                    throw new FriendlyException(executorFailed.Data.Message);
+            }
+        }
+
+        return finalResult ?? CreateDefaultResult("工作流未返回结果");
+    }
+
+    /// <summary>
+    /// 创建默认结果
+    /// </summary>
+    private StockSelectionResult CreateDefaultResult(string? problem = null)
+    {
+        return new StockSelectionResult
+        {
+            Recommendations = new List<StockRecommendation>(),
+            ConfidenceScore = 0,
+            AnalysisSummary = problem ?? "分析过程中遇到问题，请稍后重试。"
+        };
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            _disposed = true;
+        }
+    }
+}
+

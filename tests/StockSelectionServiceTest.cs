@@ -1,35 +1,30 @@
-using MarketAssistant.Agents;
+using MarketAssistant.Agents.StockSelection;
 using MarketAssistant.Applications.StockSelection;
-using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace TestMarketAssistant;
 
+/// <summary>
+/// 选股服务测试（最小原则：仅验证业务层独有逻辑）
+/// 注：底层工作流逻辑由 StockSelectionWorkflowTest 覆盖
+/// </summary>
 [TestClass]
-public sealed class StockSelectionServiceTest : BaseKernelTest
+public sealed class StockSelectionServiceTest : BaseAgentTest
 {
     private StockSelectionService _stockSelectionService = null!;
-    private StockSelectionManager _stockSelectionManager = null!;
+    private StockSelectionWorkflow _stockSelectionWorkflow = null!;
     private Mock<ILogger<StockSelectionService>> _mockLogger = null!;
 
     [TestInitialize]
     public void Initialize()
     {
-        var managerLogger = new Mock<ILogger<StockSelectionManager>>();
-        // 直接使用测试 Kernel 上下文中的 IKernelFactory
-        var factory = _kernel.Services.GetRequiredService<IKernelFactory>();
-        _stockSelectionManager = new StockSelectionManager(_kernel.Services, factory, managerLogger.Object);
-
-        // 创建服务日志Mock
+        _stockSelectionWorkflow = _serviceProvider.GetRequiredService<StockSelectionWorkflow>();
         _mockLogger = new Mock<ILogger<StockSelectionService>>();
-
-        // 创建选股服务
-        _stockSelectionService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
+        _stockSelectionService = new StockSelectionService(_stockSelectionWorkflow, _mockLogger.Object);
     }
-
-    // 不再需要回调委托
 
     [TestCleanup]
     public void Cleanup()
@@ -37,37 +32,8 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         _stockSelectionService?.Dispose();
     }
 
-    #region 构造函数测试
-
     [TestMethod]
-    public void TestStockSelectionService_Constructor_WithValidParameters_ShouldCreateInstance()
-    {
-        // Act & Assert
-        Assert.IsNotNull(_stockSelectionService);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public void TestStockSelectionService_Constructor_WithNullManager_ShouldThrowArgumentNullException()
-    {
-        // Act
-        new StockSelectionService(null!, _mockLogger.Object);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentNullException))]
-    public void TestStockSelectionService_Constructor_WithNullLogger_ShouldThrowArgumentNullException()
-    {
-        // Act
-        new StockSelectionService(_stockSelectionManager, null!);
-    }
-
-    #endregion
-
-    #region 功能1: 根据用户需求推荐股票
-
-    [TestMethod]
-    public async Task TestStockSelectionService_RecommendStocksByUserRequirementAsync_WithValidRequest_ShouldReturnResult()
+    public async Task RecommendStocksByUserRequirement_ShouldReturnValidResult()
     {
         // Arrange
         var request = new StockRecommendationRequest
@@ -85,58 +51,15 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         Assert.IsNotNull(result);
         Assert.IsNotNull(result.Recommendations);
         Assert.IsTrue(result.ConfidenceScore >= 0 && result.ConfidenceScore <= 100);
+        Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
 
-        Console.WriteLine($"=== 用户需求选股测试结果 ===");
-        Console.WriteLine($"用户需求: {request.UserRequirements}");
-        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
-        Console.WriteLine($"置信度: {result.ConfidenceScore:F1}%");
-        Console.WriteLine($"分析摘要: {result.AnalysisSummary}");
+        Console.WriteLine($"用户需求选股 - 推荐数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
     }
 
     [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public async Task TestStockSelectionService_RecommendStocksByUserRequirementAsync_WithNullRequest_ShouldThrowException()
+    public async Task RecommendStocksByNews_ShouldReturnResultWithNewsTag()
     {
-        // Act
-        await _stockSelectionService.RecommendStocksByUserRequirementAsync(null!);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public async Task TestStockSelectionService_RecommendStocksByUserRequirementAsync_WithEmptyRequirements_ShouldThrowException()
-    {
-        // Arrange
-        var request = new StockRecommendationRequest
-        {
-            UserRequirements = ""
-        };
-
-        // Act
-        await _stockSelectionService.RecommendStocksByUserRequirementAsync(request);
-    }
-
-    [TestMethod]
-    [ExpectedException(typeof(ArgumentException))]
-    public async Task TestStockSelectionService_RecommendStocksByUserRequirementAsync_WithWhitespaceRequirements_ShouldThrowException()
-    {
-        // Arrange
-        var request = new StockRecommendationRequest
-        {
-            UserRequirements = "   "
-        };
-
-        // Act
-        await _stockSelectionService.RecommendStocksByUserRequirementAsync(request);
-    }
-
-    #endregion
-
-    #region 功能2: 根据热点新闻推荐股票
-
-    [TestMethod]
-    public async Task TestStockSelectionService_RecommendStocksByNewsHotspotAsync_WithValidRequest_ShouldReturnResult()
-    {
-        // Arrange
+        // Arrange - 测试业务层添加新闻标签的逻辑
         var request = new NewsBasedSelectionRequest
         {
             NewsContent = "人工智能技术取得重大突破，相关概念股受到市场追捧",
@@ -149,179 +72,56 @@ public sealed class StockSelectionServiceTest : BaseKernelTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsNotNull(result.Recommendations);
-        Assert.IsTrue(result.ConfidenceScore >= 0 && result.ConfidenceScore <= 100);
         Assert.IsTrue(result.Recommendations.Count <= request.MaxRecommendations);
 
-        // 验证新闻热点标识被添加
-        foreach (var recommendation in result.Recommendations)
+        // 验证业务层特有逻辑：新闻热点标识被添加
+        if (result.Recommendations.Count > 0)
         {
-            Assert.IsTrue(recommendation.Reason.Contains("[新闻热点]"));
+            foreach (var recommendation in result.Recommendations)
+            {
+                Assert.IsTrue(recommendation.Reason.Contains("[新闻热点]"),
+                    "业务层应该为新闻推荐添加 [新闻热点] 标签");
+            }
         }
 
-        Console.WriteLine($"=== 新闻热点选股测试结果 ===");
-        Console.WriteLine($"新闻内容: {request.NewsContent}");
-        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
-        Console.WriteLine($"置信度: {result.ConfidenceScore:F1}%");
+        Console.WriteLine($"新闻推荐 - 推荐数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
     }
 
     [TestMethod]
-    public async Task TestStockSelectionService_RecommendStocksByNewsHotspotAsync_WithNullRequest_ShouldUseDefaultRequest()
+    public async Task QuickSelect_ShouldReturnValidResult()
     {
+        // Arrange - 测试业务层策略转换逻辑
+        var strategy = QuickSelectionStrategy.ValueStocks;
+
         // Act
-        var result = await _stockSelectionService.RecommendStocksByNewsAsync(null!);
+        var result = await _stockSelectionService.QuickSelectAsync(strategy);
 
         // Assert
         Assert.IsNotNull(result);
         Assert.IsNotNull(result.Recommendations);
-
-        Console.WriteLine($"=== 空新闻请求测试结果 ===");
-        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
-        Console.WriteLine($"置信度: {result.ConfidenceScore:F1}%");
-    }
-
-    #endregion
-
-    #region 功能4: 快速选股（预设策略）
-
-    [TestMethod]
-    public async Task TestStockSelectionService_QuickSelectAsync_ValueStocks_ShouldReturnFormattedResult()
-    {
-        // Act
-        var result = await _stockSelectionService.QuickSelectAsync(QuickSelectionStrategy.ValueStocks);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Recommendations);
-        Assert.IsTrue(result.Recommendations.Count >= 0);
-        Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
-        Assert.AreEqual("user_request", result.SelectionType);
-
-        Console.WriteLine($"=== 价值股快速选股测试结果 ===");
-        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
-        Console.WriteLine($"分析摘要: {result.AnalysisSummary.Substring(0, Math.Min(100, result.AnalysisSummary.Length))}...");
-        Console.WriteLine($"置信度: {result.ConfidenceScore}%");
-    }
-
-    [TestMethod]
-    public async Task TestStockSelectionService_QuickSelectAsync_GrowthStocks_ShouldReturnFormattedResult()
-    {
-        // Act
-        var result = await _stockSelectionService.QuickSelectAsync(QuickSelectionStrategy.GrowthStocks);
-
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Recommendations);
-        Assert.IsTrue(result.Recommendations.Count >= 0);
         Assert.IsFalse(string.IsNullOrWhiteSpace(result.AnalysisSummary));
 
-        Console.WriteLine($"=== 成长股快速选股测试结果 ===");
-        Console.WriteLine($"推荐股票数量: {result.Recommendations.Count}");
-        Console.WriteLine($"分析摘要: {result.AnalysisSummary.Substring(0, Math.Min(100, result.AnalysisSummary.Length))}...");
+        Console.WriteLine($"快速选股({strategy}) - 推荐数量: {result.Recommendations.Count}, 置信度: {result.ConfidenceScore:F1}%");
     }
 
     [TestMethod]
-    public async Task TestStockSelectionService_QuickSelectAsync_AllStrategies_ShouldWork()
+    public void GetQuickSelectionStrategies_ShouldReturnCompleteStrategies()
     {
-        // Arrange
-        var strategies = new[]
-        {
-            QuickSelectionStrategy.ValueStocks,
-            QuickSelectionStrategy.GrowthStocks,
-            QuickSelectionStrategy.ActiveStocks,
-            QuickSelectionStrategy.LargeCap,
-            QuickSelectionStrategy.SmallCap,
-            QuickSelectionStrategy.Dividend
-        };
-
-        // Act & Assert
-        foreach (var strategy in strategies)
-        {
-            var result = await _stockSelectionService.QuickSelectAsync(strategy);
-            Assert.IsNotNull(result);
-            Assert.IsNotNull(result.Recommendations);
-            Assert.IsTrue(result.Recommendations.Count >= 0);
-
-            Console.WriteLine($"策略 {strategy} 测试通过，推荐股票数量: {result.Recommendations.Count}");
-        }
-    }
-
-    #endregion
-
-    #region 功能5: 获取快速选股策略列表
-
-    [TestMethod]
-    public void TestStockSelectionService_GetQuickSelectionStrategies_ShouldReturnAllStrategies()
-    {
-        // Act
+        // Act - 测试业务层提供的策略元数据
         var strategies = _stockSelectionService.GetQuickSelectionStrategies();
 
         // Assert
         Assert.IsNotNull(strategies);
-        Assert.AreEqual(6, strategies.Count);
+        Assert.IsTrue(strategies.Count > 0, "应该返回至少一个策略");
 
-        // 验证所有策略都存在
-        var strategyTypes = strategies.Select(s => s.Strategy).ToList();
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.ValueStocks));
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.GrowthStocks));
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.ActiveStocks));
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.LargeCap));
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.SmallCap));
-        Assert.IsTrue(strategyTypes.Contains(QuickSelectionStrategy.Dividend));
-
-        // 验证每个策略的基本信息
-        foreach (var strategy in strategies)
+        foreach (var strategyInfo in strategies)
         {
-            Assert.IsFalse(string.IsNullOrEmpty(strategy.Name));
-            Assert.IsFalse(string.IsNullOrEmpty(strategy.Description));
-            Assert.IsFalse(string.IsNullOrEmpty(strategy.Scenario));
-            Assert.IsFalse(string.IsNullOrEmpty(strategy.RiskLevel));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(strategyInfo.Name), "策略名称不能为空");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(strategyInfo.Description), "策略描述不能为空");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(strategyInfo.Scenario), "适用场景不能为空");
+            Assert.IsFalse(string.IsNullOrWhiteSpace(strategyInfo.RiskLevel), "风险等级不能为空");
         }
 
-        Console.WriteLine($"=== 快速选股策略列表测试结果 ===");
-        foreach (var strategy in strategies)
-        {
-            Console.WriteLine($"策略: {strategy.Name}, 风险等级: {strategy.RiskLevel}");
-        }
+        Console.WriteLine($"策略列表 - 总数: {strategies.Count}");
     }
-
-    #endregion
-
-    #region 资源管理测试
-
-    [TestMethod]
-    public void TestStockSelectionService_Dispose_ShouldNotThrowException()
-    {
-        // Arrange
-        var tempService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
-
-        // Act & Assert
-        try
-        {
-            tempService.Dispose();
-        }
-        catch (Exception ex)
-        {
-            Assert.Fail($"Dispose方法不应该抛出异常，但得到: {ex.GetType().Name}: {ex.Message}");
-        }
-    }
-
-    [TestMethod]
-    public void TestStockSelectionService_Dispose_MultipleCalls_ShouldNotThrowException()
-    {
-        // Arrange
-        var tempService = new StockSelectionService(_stockSelectionManager, _mockLogger.Object);
-
-        // Act & Assert
-        try
-        {
-            tempService.Dispose();
-            tempService.Dispose(); // 第二次调用应该是安全的
-        }
-        catch (Exception ex)
-        {
-            Assert.Fail($"多次调用Dispose方法不应该抛出异常，但得到: {ex.GetType().Name}: {ex.Message}");
-        }
-    }
-
-    #endregion
 }

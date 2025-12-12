@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class DocumentBlockMapperTest : BaseKernelTest
+public class DocumentBlockMapperTest : BaseAgentTest
 {
     private ITextCleaningService _cleaningService = null!;
     private ITextChunkingService _chunkingService = null!;
@@ -16,8 +16,8 @@ public class DocumentBlockMapperTest : BaseKernelTest
     {
         base.BaseInitialize();
 
-        _cleaningService = _kernel.Services.GetRequiredService<ITextCleaningService>();
-        _chunkingService = _kernel.Services.GetRequiredService<ITextChunkingService>();
+        _cleaningService = _serviceProvider.GetRequiredService<ITextCleaningService>();
+        _chunkingService = _serviceProvider.GetRequiredService<ITextChunkingService>();
         _mapper = new DocumentBlockMapper(_cleaningService, _chunkingService);
     }
 

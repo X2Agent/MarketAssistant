@@ -7,7 +7,7 @@ using Microsoft.Extensions.VectorData;
 namespace TestMarketAssistant.Vectors;
 
 [TestClass]
-public class RagIngestionServiceIntegrationTest : BaseKernelTest
+public class RagIngestionServiceIntegrationTest : BaseAgentTest
 {
     private IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator = null!;
     private VectorStore _vectorStore = null!;
@@ -21,11 +21,11 @@ public class RagIngestionServiceIntegrationTest : BaseKernelTest
         base.BaseInitialize();
 
         // 获取服务
-        _embeddingGenerator = _kernel.Services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-        _vectorStore = _kernel.Services.GetRequiredService<VectorStore>();
+        _embeddingGenerator = _serviceProvider.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+        _vectorStore = _serviceProvider.GetRequiredService<VectorStore>();
 
         // 从 DI 容器获取 RagIngestionService
-        _ragIngestionService = _kernel.Services.GetRequiredService<IRagIngestionService>();
+        _ragIngestionService = _serviceProvider.GetRequiredService<IRagIngestionService>();
 
         // 创建测试集合
         _collectionName = $"test_ingest_{Guid.NewGuid():N}";

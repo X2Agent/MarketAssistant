@@ -1,10 +1,7 @@
 # 支持的AI模型配置
 models:
-  - Qwen/Qwen3-32B
-  - Qwen/Qwen3-235B-A22B
-  - Tongyi-Zhiwen/QwenLong-L1-32B
-  - deepseek-ai/DeepSeek-R1
-  - deepseek-ai/DeepSeek-V3.1
-  - zai-org/GLM-4.5
-  - zai-org/GLM-4.5-Air
-  - moonshotai/Kimi-K2-Instruct
+  - deepseek-ai/DeepSeek-V3.2
+  - zai-org/GLM-4.6
+  - moonshotai/Kimi-K2-Thinking
+  - MiniMaxAI/MiniMax-M2
+  - Qwen/Qwen3-Omni-30B-A3B-Instruct

@@ -3,7 +3,7 @@
 
     <!-- 搜索结果列表样式 -->
     <Style Selector="ListBoxItem">
-        <Setter Property="Padding" Value="8"/>
+        <Setter Property="Padding" Value="{StaticResource SmallMargin}"/>
     </Style>
 
 </Styles>

@@ -1,6 +1,5 @@
-using MarketAssistant.Rag;
-using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
@@ -53,7 +52,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
     {
         // 创建嵌入生成器（使用当前最新配置）
         var embeddingGenerator = _embeddingFactory.Create();
-        
+
         var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
         await collection.EnsureCollectionExistsAsync(cancellationToken);
 
@@ -94,7 +93,9 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
 
                 await foreach (var searchResult in searchResults)
                 {
-                    var textResult = new TextSearchResult(searchResult.Record.Text)
+                    // Microsoft.SemanticKernel.Data.TextSearchResult 构造函数接收 string value
+                    // Name 和 Link 是它的属性，不是构造函数参数
+                    var textResult = new TextSearchResult(value: searchResult.Record.Text)
                     {
                         Name = searchResult.Record.ParagraphId,
                         Link = searchResult.Record.DocumentUri

@@ -28,7 +28,8 @@
             <!-- 背景层级 - 三层体系更清晰 -->
             <SolidColorBrush x:Key='PageBackgroundBrush'>#FAFAFA</SolidColorBrush>
             <SolidColorBrush x:Key='CardBackgroundBrush'>#FFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#F5F5F5</SolidColorBrush>
+            <!-- 列表项背景 - 统一使用白色卡片背景，去除灰色底 -->
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#FFFFFF</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#EEEEEE</SolidColorBrush>
             
             <!-- 文本颜色 - 增强对比度 -->
@@ -53,7 +54,8 @@
             <!-- 背景层级 - 深色模式三层体系 -->
             <SolidColorBrush x:Key='PageBackgroundBrush'>#121212</SolidColorBrush>
             <SolidColorBrush x:Key='CardBackgroundBrush'>#1E1E1E</SolidColorBrush>
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#2C2C2C</SolidColorBrush>
+            <!-- 列表项背景 - 与卡片背景保持一致 -->
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#1E1E1E</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#383838</SolidColorBrush>
             
             <!-- 文本颜色 - 适合深色背景 -->
@@ -96,5 +98,125 @@
     <!-- 向后兼容的别名 - 逐步迁移 -->
     <SolidColorBrush x:Key="UpColorBrush" Color="{StaticResource BullishRed}"/>
     <SolidColorBrush x:Key="DownColorBrush" Color="{StaticResource BearishGreen}"/>
+    
+    <!-- ========== 半透明背景色 ========== -->
+    <SolidColorBrush x:Key="OverlayBrush" Color="#E0FFFFFF"/>
+    <SolidColorBrush x:Key="DarkOverlayBrush" Color="#80000000"/>
+    <SolidColorBrush x:Key="LightOverlayBrush" Color="#40FFFFFF"/>
+    
+    <!-- ========== 通知窗口专用颜色 ========== -->
+    <Color x:Key="NotificationDarkBackground">#2D2D30</Color>
+    <Color x:Key="NotificationDarkBorder">#3F3F46</Color>
+    <Color x:Key="NotificationDarkHover">#3F3F46</Color>
+    <Color x:Key="NotificationDarkPressed">#4F4F56</Color>
+    <Color x:Key="NotificationIconSuccess">#4CAF50</Color>
+    <Color x:Key="NotificationTextLight">#FFFFFF</Color>
+    <Color x:Key="NotificationTextSecondary">#8F8F8F</Color>
+    <Color x:Key="NotificationShadow">#60000000</Color>
+    
+    <SolidColorBrush x:Key="NotificationDarkBackgroundBrush" Color="{StaticResource NotificationDarkBackground}"/>
+    <SolidColorBrush x:Key="NotificationDarkBorderBrush" Color="{StaticResource NotificationDarkBorder}"/>
+    <SolidColorBrush x:Key="NotificationDarkHoverBrush" Color="{StaticResource NotificationDarkHover}"/>
+    <SolidColorBrush x:Key="NotificationDarkPressedBrush" Color="{StaticResource NotificationDarkPressed}"/>
+    <SolidColorBrush x:Key="NotificationIconSuccessBrush" Color="{StaticResource NotificationIconSuccess}"/>
+    <SolidColorBrush x:Key="NotificationTextLightBrush" Color="{StaticResource NotificationTextLight}"/>
+    <SolidColorBrush x:Key="NotificationTextSecondaryBrush" Color="{StaticResource NotificationTextSecondary}"/>
+    
+    <!-- ========== 对话框专用颜色 ========== -->
+    <Color x:Key="DialogDangerBackground">#dc3545</Color>
+    <SolidColorBrush x:Key="DialogDangerBackgroundBrush" Color="{StaticResource DialogDangerBackground}"/>
+    
+    <!-- ========== 阴影定义 ========== -->
+    <BoxShadows x:Key="NotificationBoxShadow">0 4 16 0 #60000000</BoxShadows>
+    <BoxShadows x:Key="ElevatedBoxShadow">0 8 32 0 #30000000</BoxShadows>
+    <BoxShadows x:Key="CardBoxShadow">0 2 8 0 #15000000</BoxShadows>
+    <BoxShadows x:Key="SubtleBoxShadow">0 2 8 0 #10000000</BoxShadows>
+    <BoxShadows x:Key="SmallBoxShadow">0 1 3 0 #20000000</BoxShadows>
+    
+    <!-- ========== 语义化颜色组 - Warning (警告/琥珀色系) ========== -->
+    <Color x:Key="WarningLight">#FEF3C7</Color>
+    <Color x:Key="WarningBorder">#F59E0B</Color>
+    <Color x:Key="WarningText">#92400E</Color>
+    <Color x:Key="WarningTextDark">#78350F</Color>
+    <Color x:Key="WarningAccent">#D97706</Color>
+    <Color x:Key="WarningBackground">#FFFBEB</Color>
+    <Color x:Key="WarningBackgroundAlt">#FFF4E5</Color>
+    <Color x:Key="WarningBorderAlt">#FFB84C</Color>
+    
+    <SolidColorBrush x:Key="WarningLightBrush" Color="{StaticResource WarningLight}"/>
+    <SolidColorBrush x:Key="WarningBorderBrush" Color="{StaticResource WarningBorder}"/>
+    <SolidColorBrush x:Key="WarningTextBrush" Color="{StaticResource WarningText}"/>
+    <SolidColorBrush x:Key="WarningTextDarkBrush" Color="{StaticResource WarningTextDark}"/>
+    <SolidColorBrush x:Key="WarningDarkTextBrush" Color="{StaticResource WarningAccent}"/>
+    <SolidColorBrush x:Key="WarningDeepTextBrush" Color="{StaticResource WarningTextDark}"/>
+    <SolidColorBrush x:Key="WarningAccentBrush" Color="{StaticResource WarningAccent}"/>
+    <SolidColorBrush x:Key="WarningBackgroundBrush" Color="{StaticResource WarningBackground}"/>
+    <SolidColorBrush x:Key="WarningBackgroundAltBrush" Color="{StaticResource WarningBackgroundAlt}"/>
+    <SolidColorBrush x:Key="WarningBorderAltBrush" Color="{StaticResource WarningBorderAlt}"/>
+    
+    <!-- ========== 语义化颜色组 - Info (信息/蓝色系) ========== -->
+    <Color x:Key="InfoLight">#DBEAFE</Color>
+    <Color x:Key="InfoBorder">#3B82F6</Color>
+    <Color x:Key="InfoText">#1E40AF</Color>
+    <Color x:Key="InfoTextDark">#1E3A8A</Color>
+    <Color x:Key="InfoAccent">#2563EB</Color>
+    <Color x:Key="InfoBackground">#EFF6FF</Color>
+    <Color x:Key="InfoBackgroundAlt">#F0F9FF</Color>
+    
+    <SolidColorBrush x:Key="InfoLightBrush" Color="{StaticResource InfoLight}"/>
+    <SolidColorBrush x:Key="InfoBorderBrush" Color="{StaticResource InfoBorder}"/>
+    <SolidColorBrush x:Key="InfoTextBrush" Color="{StaticResource InfoText}"/>
+    <SolidColorBrush x:Key="InfoTextDarkBrush" Color="{StaticResource InfoTextDark}"/>
+    <SolidColorBrush x:Key="InfoDarkTextBrush" Color="{StaticResource InfoAccent}"/>
+    <SolidColorBrush x:Key="InfoDeepTextBrush" Color="{StaticResource InfoTextDark}"/>
+    <SolidColorBrush x:Key="InfoAccentBrush" Color="{StaticResource InfoAccent}"/>
+    <SolidColorBrush x:Key="InfoBackgroundBrush" Color="{StaticResource InfoBackground}"/>
+    <SolidColorBrush x:Key="InfoBackgroundAltBrush" Color="{StaticResource InfoBackgroundAlt}"/>
+    
+    <!-- ========== 语义化颜色组 - Success (成功/绿色系) ========== -->
+    <Color x:Key="SuccessLight">#ECFDF5</Color>
+    <Color x:Key="SuccessBorder">#10B981</Color>
+    <Color x:Key="SuccessText">#065F46</Color>
+    <Color x:Key="SuccessAccent">#059669</Color>
+    <Color x:Key="SuccessBackground">#ECFDF5</Color>
+    
+    <SolidColorBrush x:Key="SuccessLightBrush" Color="{StaticResource SuccessLight}"/>
+    <SolidColorBrush x:Key="SuccessBorderBrush" Color="{StaticResource SuccessBorder}"/>
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="{StaticResource SuccessText}"/>
+    <SolidColorBrush x:Key="SuccessDarkTextBrush" Color="#047857"/>
+    <SolidColorBrush x:Key="SuccessDeepTextBrush" Color="{StaticResource SuccessAccent}"/>
+    <SolidColorBrush x:Key="SuccessAccentBrush" Color="{StaticResource SuccessAccent}"/>
+    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="{StaticResource SuccessBackground}"/>
+    
+    <!-- ========== 语义化颜色组 - Danger/Error (危险/错误/红色系) ========== -->
+    <Color x:Key="DangerLight">#FEE2E2</Color>
+    <Color x:Key="DangerBackground">#FEF2F2</Color>
+    <Color x:Key="DangerBorder">#EF4444</Color>
+    <Color x:Key="DangerText">#991B1B</Color>
+    <Color x:Key="DangerAccent">#DC2626</Color>
+    <Color x:Key="ErrorBackground">#FEE2E2</Color>
+    <Color x:Key="ErrorLight">#FFF4E5</Color>
+    <Color x:Key="ErrorText">#991B1B</Color>
+    <Color x:Key="ErrorDarkText">#DC2626</Color>
+    <Color x:Key="ErrorDeepText">#7F1D1D</Color>
+    
+    <SolidColorBrush x:Key="DangerLightBrush" Color="{StaticResource DangerLight}"/>
+    <SolidColorBrush x:Key="DangerBackgroundBrush" Color="{StaticResource DangerBackground}"/>
+    <SolidColorBrush x:Key="DangerBorderBrush" Color="{StaticResource DangerBorder}"/>
+    <SolidColorBrush x:Key="DangerTextBrush" Color="{StaticResource DangerText}"/>
+    <SolidColorBrush x:Key="DangerAccentBrush" Color="{StaticResource DangerAccent}"/>
+    <SolidColorBrush x:Key="ErrorBackgroundBrush" Color="{StaticResource ErrorBackground}"/>
+    <SolidColorBrush x:Key="ErrorLightBrush" Color="{StaticResource ErrorLight}"/>
+    <SolidColorBrush x:Key="ErrorBorderBrush" Color="{StaticResource DangerBorder}"/>
+    <SolidColorBrush x:Key="ErrorTextBrush" Color="{StaticResource ErrorText}"/>
+    <SolidColorBrush x:Key="ErrorDarkTextBrush" Color="{StaticResource ErrorDarkText}"/>
+    <SolidColorBrush x:Key="ErrorDeepTextBrush" Color="{StaticResource ErrorDeepText}"/>
+    
+    <!-- ========== 特殊用途颜色 ========== -->
+    <Color x:Key="RequiredFieldColor">#dc3545</Color>
+    <Color x:Key="PrimaryButtonColor">#007bff</Color>
+    
+    <SolidColorBrush x:Key="RequiredFieldBrush" Color="{StaticResource RequiredFieldColor}"/>
+    <SolidColorBrush x:Key="PrimaryButtonBrush" Color="{StaticResource PrimaryButtonColor}"/>
 
 </ResourceDictionary>

@@ -193,7 +193,7 @@ git push origin v1.0.0
 ## 📋 前置要求
 
 ### 所有平台
-- .NET 9.0 SDK
+- .NET 10.0 SDK
 - PowerShell Core (用于运行主脚本)
 
 ### macOS

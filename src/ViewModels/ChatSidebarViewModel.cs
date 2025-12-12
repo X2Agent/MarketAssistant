@@ -1,6 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Mcp;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -11,7 +14,7 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class ChatSidebarViewModel : ViewModelBase
 {
-    private readonly MarketChatAgent _chatAgent;
+    private readonly MarketChatSession _chatSession;
 
     /// <summary>
     /// 聊天消息集合
@@ -53,10 +56,16 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        MarketChatAgent chatAgent)
+        IChatClientFactory chatClientFactory,
+        ILoggerFactory loggerFactory,
+        McpService mcpService)
         : base(logger)
     {
-        _chatAgent = chatAgent;
+        // 创建新的聊天会话
+        var chatClient = chatClientFactory.CreateClient();
+        var sessionLogger = loggerFactory.CreateLogger<MarketChatSession>();
+        _chatSession = new MarketChatSession(chatClient, sessionLogger, mcpService);
+
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
     }
 
@@ -82,7 +91,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(UserInput))
             return;
 
-        var userMessage = new ChatMessageAdapter(UserInput.Trim(), true, "用户");
+        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" });
         ChatMessages.Add(userMessage);
 
         var currentInput = UserInput;
@@ -91,7 +100,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         IsProcessing = true;
         SendButtonText = "⏹";
 
-        var aiMessage = new ChatMessageAdapter("", false, "市场分析助手")
+        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" })
         {
             Status = MessageStatus.Sending
         };
@@ -103,7 +112,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
             var contentBuilder = new System.Text.StringBuilder();
             bool hasReceivedContent = false;
 
-            await foreach (var chunk in _chatAgent.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
+            await foreach (var chunk in _chatSession.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
                 if (!string.IsNullOrEmpty(chunk.Content))
                 {
@@ -162,29 +171,30 @@ public partial class ChatSidebarViewModel : ViewModelBase
             ? "欢迎使用智能对话功能！请先选择要分析的股票。"
             : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。";
 
-        var welcomeMessage = new ChatMessageAdapter(content, false, "市场分析助手");
+        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" });
         ChatMessages.Add(welcomeMessage);
     }
 
     /// <summary>
     /// 初始化分析历史记录
     /// </summary>
-    public async Task InitializeWithAnalysisHistory(string stockCode, IEnumerable<AnalysisMessage> analysisMessages)
+    public async Task InitializeWithAnalysisHistory(string stockCode, IEnumerable<Microsoft.Extensions.AI.ChatMessage> analysisMessages)
     {
         StockCode = stockCode;
 
-        await _chatAgent.UpdateStockContextAsync(stockCode);
+        // 设置股票代码（不需要异步操作）
+        _chatSession.SetStockCode(stockCode);
 
         ChatMessages.Clear();
 
         bool hasVisibleMessages = false;
-        foreach (var analysisMessage in analysisMessages)
+        foreach (var message in analysisMessages)
         {
-            if (!string.IsNullOrWhiteSpace(analysisMessage.Content))
+            if (!string.IsNullOrWhiteSpace(message.Text))
             {
-                _chatAgent.AddSystemMessage($"分析师观点：{analysisMessage.Content}");
+                _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
 
-                var displayMessage = new ChatMessageAdapter(analysisMessage);
+                var displayMessage = new ChatMessageAdapter(message);
                 ChatMessages.Add(displayMessage);
                 hasVisibleMessages = true;
             }
@@ -196,12 +206,25 @@ public partial class ChatSidebarViewModel : ViewModelBase
         }
         else
         {
-            var contextMessage = new ChatMessageAdapter(
-                $"以上是关于 {stockCode} 的历史分析数据。您可以基于这些信息继续提问。",
-                false,
-                "系统");
+            var contextMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.System, $"以上是关于 {stockCode} 的历史分析数据。您可以基于这些信息继续提问。") { AuthorName = "系统" });
             ChatMessages.Add(contextMessage);
         }
+    }
+
+    /// <summary>
+    /// 添加单条分析消息
+    /// </summary>
+    public void AddAnalysisMessage(Microsoft.Extensions.AI.ChatMessage message)
+    {
+        if (string.IsNullOrWhiteSpace(message.Text))
+            return;
+
+        // 添加到会话上下文
+        _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
+
+        // 添加到 UI 列表
+        var displayMessage = new ChatMessageAdapter(message);
+        ChatMessages.Add(displayMessage);
     }
 
     /// <summary>
@@ -209,10 +232,10 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     public void AddSystemMessage(string content)
     {
-        var systemMessage = new ChatMessageAdapter(content, false, "系统");
+        var systemMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.System, content) { AuthorName = "系统" });
         ChatMessages.Add(systemMessage);
 
-        _chatAgent.AddSystemMessage(content);
+        _chatSession.AddAssistantMessage(content);
     }
 
     /// <summary>
@@ -230,7 +253,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     public void ClearChatHistory()
     {
         ChatMessages.Clear();
-        _chatAgent.ClearHistory();
+        _chatSession.ClearHistory();
         AddWelcomeMessage();
     }
 }

@@ -13,7 +13,7 @@ namespace TestMarketAssistant.Vectors;
 /// 4. 边界条件和错误场景
 /// </summary>
 [TestClass]
-public class ClipImageEmbeddingServiceTest : BaseKernelTest
+public class ClipImageEmbeddingServiceTest : BaseAgentTest
 {
     private IImageEmbeddingService _service = null!;
 
@@ -36,7 +36,7 @@ public class ClipImageEmbeddingServiceTest : BaseKernelTest
         // 清理模型环境变量，默认走哈希降级（真实路径存在时会自动加载）
         Environment.SetEnvironmentVariable("CLIP_IMAGE_ONNX", null);
 
-        _service = _kernel.Services.GetRequiredService<IImageEmbeddingService>();
+        _service = _serviceProvider.GetRequiredService<IImageEmbeddingService>();
     }
 
     [TestCleanup]
@@ -73,7 +73,7 @@ public class ClipImageEmbeddingServiceTest : BaseKernelTest
         var result1 = await _service.GenerateAsync(imageBytes);
         var result2 = await _service.GenerateAsync(imageBytes);
 
-        // Assert - 默认哈希降级应保证确定性；若加载真实模型，允许不同但维度相等
+        // Assert - 默认哈希降级应保证确定性；若加载真实模型，允许不同但维度相同
         Assert.AreEqual(result1.Vector.Length, result2.Vector.Length, "向量维度应一致");
         // 当未加载模型（走哈希降级）时，两次应完全一致
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")))
@@ -104,7 +104,7 @@ public class ClipImageEmbeddingServiceTest : BaseKernelTest
     public async Task GenerateAsync_WithCancellation_ShouldComplete()
     {
         // Arrange
-        using var cts = new CancellationTokenSource();
+        using         var cts = new CancellationTokenSource();
         cts.Cancel(); // 立即取消
 
         // Act & Assert - 哈希降级不支持取消，但应该快速完成
@@ -134,7 +134,7 @@ public class ClipImageEmbeddingServiceTest : BaseKernelTest
     public void Dispose_ShouldReleaseResources()
     {
         // Arrange
-        var service = _kernel.Services.GetRequiredService<IImageEmbeddingService>();
+        var service = _serviceProvider.GetRequiredService<IImageEmbeddingService>();
 
         // Act & Assert - 应该不抛出异常
         if (service is IDisposable disposable)

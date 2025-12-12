@@ -11,14 +11,14 @@ namespace MarketAssistant.Applications.Stocks;
 public class StockKLineService
 {
     private readonly HttpClient _httpClient;
-    private readonly string _zhiTuApiToken;
+    private readonly IUserSettingService _userSettingService;
     private readonly ILogger<StockKLineService> _logger;
     private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
 
     public StockKLineService(ILogger<StockKLineService> logger, IUserSettingService userSettingService)
     {
         _httpClient = new HttpClient();
-        _zhiTuApiToken = userSettingService.CurrentSetting.ZhiTuApiToken;
+        _userSettingService = userSettingService;
         _logger = logger;
     }
 
@@ -47,7 +47,8 @@ public class StockKLineService
     /// <returns>完整的API URL</returns>
     private string BuildZhiTuApiUrl(string symbol, string interval, string adjustType = "n", DateTime? startDate = null, DateTime? endDate = null)
     {
-        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={_zhiTuApiToken}";
+        var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={token}";
 
         // 如果没有指定时间范围，根据不同的interval设置合理的默认时间范围
         DateTime defaultStartDate;
@@ -119,18 +120,18 @@ public class StockKLineService
 
             if (zhiTuData == null || !zhiTuData.Any())
             {
-                throw new Exception($"获取{dataType}数据失败: 返回数据为空");
+                throw new FriendlyException($"获取{dataType}数据失败: 返回数据为空");
             }
 
             return zhiTuData;
         }
         catch (HttpRequestException ex)
         {
-            throw new Exception($"获取{dataType}数据失败: 网络请求错误 - {ex.Message}", ex);
+            throw new FriendlyException($"获取{dataType}数据失败: 网络请求错误 - {ex.Message}", ex);
         }
         catch (JsonException ex)
         {
-            throw new Exception($"获取{dataType}数据失败: 数据解析错误 - {ex.Message}", ex);
+            throw new FriendlyException($"获取{dataType}数据失败: 数据解析错误 - {ex.Message}", ex);
         }
     }
 
@@ -190,7 +191,7 @@ public class StockKLineService
         string errorInfo = !string.IsNullOrEmpty(symbol) ? $"股票代码: {symbol}" : "";
 
         _logger.LogError(ex, "获取{DataType}数据时发生错误 - {ErrorInfo}", dataType, errorInfo);
-        throw new Exception($"获取{dataType}数据失败: {ex.Message}", ex);
+        throw new FriendlyException($"获取{dataType}数据失败: {ex.Message}", ex);
     }
 
     #endregion

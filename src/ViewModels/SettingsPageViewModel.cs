@@ -2,16 +2,19 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Agents.Analysts;
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Reflection;
 using YamlDotNet.Serialization;
 
 namespace MarketAssistant.ViewModels;
@@ -36,6 +39,10 @@ public partial class SettingsPageViewModel : ViewModelBase
     [ObservableProperty]
     private ObservableCollection<string> _models = [];
 
+    // 分析师角色列表
+    [ObservableProperty]
+    private ObservableCollection<AnalystRoleViewModel> _analystRoles = new();
+
     // 判断知识库目录是否有效 - 计算属性
     public bool IsKnowledgeDirectoryValid => !string.IsNullOrEmpty(UserSetting.KnowledgeFileDirectory) && Directory.Exists(UserSetting.KnowledgeFileDirectory);
 
@@ -54,71 +61,15 @@ public partial class SettingsPageViewModel : ViewModelBase
     // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
 
+    // 风险承受能力选项
+    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
+
+    // 投资期限选项
+    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
+
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
-
-    // 协调分析师启用状态 - 计算属性
-    public bool EnableAnalysisSynthesizer => UserSetting.AnalystRoleSettings.EnableAnalysisSynthesizer;
-
-    // 基本面分析师启用状态 - 计算属性
-    public bool EnableFundamentalAnalyst => UserSetting.AnalystRoleSettings.EnableFundamentalAnalyst;
-
-    // 市场情绪分析师启用状态 - 代理属性
-    public bool EnableMarketSentimentAnalyst
-    {
-        get => UserSetting.AnalystRoleSettings.EnableMarketSentimentAnalyst;
-        set
-        {
-            if (UserSetting.AnalystRoleSettings.EnableMarketSentimentAnalyst != value)
-            {
-                UserSetting.AnalystRoleSettings.EnableMarketSentimentAnalyst = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    // 财务分析师启用状态 - 代理属性
-    public bool EnableFinancialAnalyst
-    {
-        get => UserSetting.AnalystRoleSettings.EnableFinancialAnalyst;
-        set
-        {
-            if (UserSetting.AnalystRoleSettings.EnableFinancialAnalyst != value)
-            {
-                UserSetting.AnalystRoleSettings.EnableFinancialAnalyst = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    // 技术分析师启用状态 - 代理属性
-    public bool EnableTechnicalAnalyst
-    {
-        get => UserSetting.AnalystRoleSettings.EnableTechnicalAnalyst;
-        set
-        {
-            if (UserSetting.AnalystRoleSettings.EnableTechnicalAnalyst != value)
-            {
-                UserSetting.AnalystRoleSettings.EnableTechnicalAnalyst = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    // 新闻事件分析师启用状态 - 代理属性
-    public bool EnableNewsEventAnalyst
-    {
-        get => UserSetting.AnalystRoleSettings.EnableNewsEventAnalyst;
-        set
-        {
-            if (UserSetting.AnalystRoleSettings.EnableNewsEventAnalyst != value)
-            {
-                UserSetting.AnalystRoleSettings.EnableNewsEventAnalyst = value;
-                OnPropertyChanged();
-            }
-        }
-    }
 
     /// <summary>
     /// 构造函数（使用依赖注入）
@@ -153,6 +104,45 @@ public partial class SettingsPageViewModel : ViewModelBase
         await LoadModelsAsync();
         // 加载用户设置
         UserSetting = _userSettingService.CurrentSetting;
+        // 加载分析师角色
+        LoadAnalystRoles();
+    }
+
+    private void LoadAnalystRoles()
+    {
+        AnalystRoles.Clear();
+        var agentTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(a => a.GetTypes())
+            .Where(t => t.IsSubclassOf(typeof(AnalystAgentBase)) && !t.IsAbstract);
+
+        foreach (var type in agentTypes)
+        {
+            var displayName = type.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName ?? type.Name;
+            var description = type.GetCustomAttribute<DescriptionAttribute>()?.Description ?? "";
+            var isRequired = type.GetCustomAttribute<RequiredAnalystAttribute>() != null;
+
+            // 使用类名作为ID
+            var id = type.Name;
+
+            // 从设置中获取启用状态
+            var isEnabled = false;
+            if (UserSetting.EnabledAnalystRoles.TryGetValue(id, out var enabled))
+            {
+                isEnabled = enabled;
+            }
+
+            // 强制必需的角色为启用
+            if (isRequired) isEnabled = true;
+
+            AnalystRoles.Add(new AnalystRoleViewModel
+            {
+                Id = id,
+                Name = displayName,
+                Description = description,
+                IsRequired = isRequired,
+                IsEnabled = isEnabled
+            });
+        }
     }
 
     /// <summary>
@@ -268,7 +258,7 @@ public partial class SettingsPageViewModel : ViewModelBase
 
             // 创建嵌入生成器（只在实际需要时创建）
             var embeddingGenerator = _embeddingFactory.Create();
-            
+
             // 使用 UserSetting 中定义的集合名称
             var collectionName = UserSetting.VectorCollectionName;
             var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
@@ -312,7 +302,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                     VectorizingProgress = (int)((double)currentIndex / totalFiles * 100);
                     VectorizingProgressText = $"正在处理 {currentIndex}/{totalFiles}: {fileName}";
 
-                    Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]", 
+                    Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]",
                         currentIndex, totalFiles, fileName, fileExtension);
 
                     // 执行向量化
@@ -326,7 +316,7 @@ public partial class SettingsPageViewModel : ViewModelBase
                     failedCount++;
                     failedFiles.Add(fileName);
                     Logger?.LogError(ex, "✗ 向量化失败: {FileName} - {ErrorMessage}", fileName, ex.Message);
-                    
+
                     // 单个文件失败不中断整体流程，继续处理下一个
                 }
             }
@@ -347,11 +337,11 @@ public partial class SettingsPageViewModel : ViewModelBase
                 {
                     failedList += $"\n... 还有 {failedFiles.Count - 5} 个";
                 }
-                
+
                 _notificationService.ShowWarning(
                     $"向量化完成：\n✓ 成功 {successCount} 个\n✗ 失败 {failedCount} 个\n\n失败文件：\n- {failedList}");
-                
-                Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个", 
+
+                Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个",
                     successCount, failedCount, totalFiles);
             }
         }
@@ -375,6 +365,12 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         SafeExecute(() =>
         {
+            // 同步分析师角色设置
+            foreach (var role in AnalystRoles)
+            {
+                UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
+            }
+
             _userSettingService.UpdateSettings(UserSetting);
             _notificationService.ShowSuccess("设置已保存");
             Logger?.LogInformation("保存设置");
@@ -391,6 +387,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         {
             _userSettingService.ResetSettings();
             UserSetting = _userSettingService.CurrentSetting;
+            LoadAnalystRoles(); // 重新加载角色
             OnPropertyChanged(nameof(UserSetting));
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");

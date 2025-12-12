@@ -1,8 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Infrastructure.Core;
-using System.Text.Json;
-using MarketAssistant.Infrastructure.Core;
-
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
@@ -67,14 +62,14 @@ public class MCPServerConfigService
         try
         {
             // 确保目录存在
-            string directory = Path.GetDirectoryName(_configFilePath);
+            var directory = Path.GetDirectoryName(_configFilePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
             }
 
             // 序列化配置对象
-            string json = JsonSerializer.Serialize(_serverConfigs, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(_serverConfigs, new JsonSerializerOptions { WriteIndented = true });
 
             // 保存到文件
             File.WriteAllText(_configFilePath, json);
@@ -127,7 +122,7 @@ public class MCPServerConfigService
     /// </summary>
     /// <param name="id">配置ID</param>
     /// <returns>MCP服务器配置，如果不存在则返回null</returns>
-    public MCPServerConfig GetConfig(string id)
+    public MCPServerConfig? GetConfig(string id)
     {
         return _serverConfigs.FirstOrDefault(c => c.Id == id);
     }

@@ -1,22 +1,24 @@
-using MarketAssistant.Agents;
+using MarketAssistant.Agents.StockSelection;
+using MarketAssistant.Applications.StockSelection.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.StockSelection;
 
 /// <summary>
 /// AI选股服务 - 业务逻辑层，负责对外API和业务规则
+/// 使用 Agent Framework Workflows 实现确定性选股流程
 /// </summary>
 public class StockSelectionService : IDisposable
 {
-    private readonly StockSelectionManager _selectionManager;
+    private readonly StockSelectionWorkflow _selectionWorkflow;
     private readonly ILogger<StockSelectionService> _logger;
     private bool _disposed = false;
 
     public StockSelectionService(
-        StockSelectionManager selectionManager,
+        StockSelectionWorkflow selectionWorkflow,
         ILogger<StockSelectionService> logger)
     {
-        _selectionManager = selectionManager ?? throw new ArgumentNullException(nameof(selectionManager));
+        _selectionWorkflow = selectionWorkflow ?? throw new ArgumentNullException(nameof(selectionWorkflow));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -41,8 +43,8 @@ public class StockSelectionService : IDisposable
             // 业务逻辑：验证和预处理请求
             var validatedRequest = ValidateAndNormalizeUserRequest(request);
 
-            // 调用AI Manager进行分析
-            var result = await _selectionManager.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
+            // 调用工作流进行分析
+            var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
 
             // 业务逻辑：后处理和结果优化
             var optimizedResult = OptimizeUserBasedResult(result, validatedRequest);
@@ -78,8 +80,8 @@ public class StockSelectionService : IDisposable
             // 业务逻辑：验证和预处理请求
             var validatedRequest = ValidateAndNormalizeNewsRequest(request);
 
-            // 调用AI Manager进行分析
-            var result = await _selectionManager.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
+            // 调用工作流进行分析
+            var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
 
             // 业务逻辑：后处理和结果优化
             var optimizedResult = OptimizeNewsBasedResult(result, validatedRequest);
@@ -136,6 +138,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.ValueStocks,
                 Name = "价值股筛选",
+                Icon = "💎",
                 Description = "筛选PE低、PB低、ROE高的优质价值股",
                 Scenario = "适合稳健型投资者，追求长期价值投资",
                 RiskLevel = "低风险"
@@ -144,6 +147,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.GrowthStocks,
                 Name = "成长股筛选",
+                Icon = "🚀",
                 Description = "筛选营收和利润高增长的成长型股票",
                 Scenario = "适合积极型投资者，追求高成长收益",
                 RiskLevel = "中高风险"
@@ -152,6 +156,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.ActiveStocks,
                 Name = "活跃股筛选",
+                Icon = "🔥",
                 Description = "筛选换手率高、成交活跃的热门股票",
                 Scenario = "适合短线交易者，追求市场热点",
                 RiskLevel = "高风险"
@@ -160,6 +165,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.LargeCap,
                 Name = "大盘股筛选",
+                Icon = "🏢",
                 Description = "筛选市值大、业绩稳定的蓝筹股",
                 Scenario = "适合保守型投资者，追求稳定收益",
                 RiskLevel = "低风险"
@@ -168,6 +174,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.SmallCap,
                 Name = "小盘股筛选",
+                Icon = "🌱",
                 Description = "筛选市值较小、具有成长潜力的股票",
                 Scenario = "适合风险偏好较高的投资者",
                 RiskLevel = "高风险"
@@ -176,6 +183,7 @@ public class StockSelectionService : IDisposable
             {
                 Strategy = QuickSelectionStrategy.Dividend,
                 Name = "高股息筛选",
+                Icon = "💰",
                 Description = "筛选股息率高、分红稳定的股票",
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"
@@ -233,7 +241,7 @@ public class StockSelectionService : IDisposable
         {
             // 保守型投资者，过滤掉高风险股票
             result.Recommendations = result.Recommendations
-                .Where(r => r.RiskLevel != "高风险")
+                .Where(r => r.RiskLevel != RiskLevel.High)
                 .ToList();
         }
         else if (request.RiskPreference == "aggressive")
@@ -326,7 +334,7 @@ public class StockSelectionService : IDisposable
     {
         if (!_disposed && disposing)
         {
-            _selectionManager?.Dispose();
+            _selectionWorkflow?.Dispose();
             _disposed = true;
         }
     }

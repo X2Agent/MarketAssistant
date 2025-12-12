@@ -14,12 +14,13 @@
 
     <UserControl.Resources>
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+        <converts:NumberFormatConverter x:Key="NumberFormatConverter"/>
     </UserControl.Resources>
 
-    <Grid Margin="16" RowDefinitions="Auto,*">
+    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
         
         <!-- 顶部搜索区域 -->
-        <controls:CardView Grid.Row="0" Margin="0,0,0,12">
+        <controls:CardView Grid.Row="0" Margin="{StaticResource BottomMargin}">
             <Grid ColumnDefinitions="*,Auto">
                 <AutoCompleteBox x:Name="StockSearchBox"
                                  Grid.Column="0"
@@ -29,32 +30,27 @@
                                  FilterMode="None"
                                  Text="{Binding Search.SearchQuery, Mode=TwoWay}"
                                  IsDropDownOpen="{Binding Search.IsSearchResultVisible, Mode=TwoWay}"
-                                 MaxDropDownHeight="400"
+                                 MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
                                  Background="Transparent"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
-                                 FontSize="16"
-                                 Padding="12,8">
+                                 FontSize="{StaticResource SectionTitleFontSize}"
+                                 Padding="{StaticResource SmallCardPadding}">
                     <AutoCompleteBox.ItemTemplate>
                         <DataTemplate x:DataType="stocks:StockItem">
                             <Border Background="Transparent"
                                     Cursor="Hand"
                                     PointerPressed="SearchResultItem_PointerPressed"
                                     Tag="{Binding .}">
-                                <Grid ColumnDefinitions="*,Auto" 
-                                      Margin="4" 
-                                      RowDefinitions="Auto,Auto">
-                                    <TextBlock Grid.Row="0" 
-                                               Text="{Binding Name}" 
+                                <StackPanel Margin="{StaticResource TinyMargin}">
+                                    <TextBlock Text="{Binding Name}" 
                                                FontWeight="SemiBold"
-                                               FontSize="14"
+                                               FontSize="{StaticResource LabelFontSize}"
                                                IsHitTestVisible="False"/>
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding Code}" 
-                                               FontSize="12"
+                                    <TextBlock Text="{Binding Code}" 
+                                               FontSize="{StaticResource SmallFontSize}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
-                                               Margin="0,2,0,0"
                                                IsHitTestVisible="False"/>
-                                </Grid>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </AutoCompleteBox.ItemTemplate>
@@ -64,19 +60,19 @@
                 <Border Grid.Column="1"
                        IsVisible="{Binding Search.IsSearching}"
                        Background="{DynamicResource CardBackgroundBrush}"
-                       CornerRadius="12"
-                       Padding="12,6"
+                       CornerRadius="{StaticResource DefaultCornerRadius}"
+                       Padding="{StaticResource SmallCardPadding}"
                        VerticalAlignment="Center"
-                       Margin="8,0,0,0">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                       Margin="{StaticResource SmallLeftMargin}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                         <!-- 搜索图标 -->
                         <svg:Svg Path="/Assets/Images/search_icon.svg"
-                                Width="16"
-                                Height="16"
+                                Width="{StaticResource TinyIconSize}"
+                                Height="{StaticResource TinyIconSize}"
                                 VerticalAlignment="Center"/>
 
                         <!-- 三点波浪动画 -->
-                        <controls:LoadingDots DotSize="6" DotSpacing="4" />
+                        <controls:LoadingDots DotSize="{StaticResource DotIconSize}" DotSpacing="{StaticResource TinySpacing}" />
                     </StackPanel>
                 </Border>
             </Grid>
@@ -87,19 +83,19 @@
               ColumnDefinitions="2*,3*,1*">
             
             <!-- 左侧：7*24小时新闻快讯 -->
-            <controls:CardView Grid.Column="0" Margin="0,0,8,0">
+            <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" 
                                    Text="7*24小时快讯" 
-                                   FontSize="16" 
+                                   FontSize="{StaticResource SectionTitleFontSize}" 
                                FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1"
                                    Text="{Binding News.TelegraphRefreshCountdown}"
-                                   FontSize="12"
+                                   FontSize="{StaticResource SmallFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    VerticalAlignment="Center"
-                                   Margin="8,0,0,0"/>
+                                   Margin="{StaticResource SmallLeftMargin}"/>
                     </Grid>
                 </controls:CardView.Header>
                 
@@ -107,7 +103,7 @@
                     <ItemsControl ItemsSource="{Binding News.Telegraphs}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Spacing="8"/>
+                                <StackPanel Spacing="{StaticResource SmallSpacing}"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
@@ -115,50 +111,50 @@
                                 <Border Classes="news-card"
                                         Tapped="NewsCard_Tapped"
                                         Tag="{Binding .}">
-                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
-                                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                                   Text="{Binding Title}"
-                                                   FontSize="14" 
-                                                   FontWeight="SemiBold"
-                                                   TextWrapping="Wrap"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                                   Text="{Binding Content}"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   TextWrapping="Wrap"
-                                                   MaxLines="3"
-                                                   Margin="0,4,0,0"/>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <!-- 左侧内容 -->
+                                        <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontSize="{StaticResource LabelFontSize}" 
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Content}"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="3"/>
+                                            
+                                            <!-- 关联股票标签 -->
+                                            <ItemsControl ItemsSource="{Binding Stocks}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{DynamicResource SurfaceBrush}"
+                                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                                BorderThickness="{StaticResource DefaultBorderThickness}"
+                                                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                                                Padding="{StaticResource TinyPadding}"
+                                                                Margin="{StaticResource TinyMargin}">
+                                                            <TextBlock Text="{Binding .}"
+                                                                       FontSize="{StaticResource SmallFontSize}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
                                         
-                                        <!-- 关联股票标签 -->
-                                        <ItemsControl Grid.Row="2" Grid.Column="0"
-                                                      ItemsSource="{Binding Stocks}" 
-                                                      Margin="0,4,0,0">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="x:String">
-                                                    <Border BorderBrush="{DynamicResource BorderBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="4"
-                                                            Padding="4,2"
-                                                            Margin="0,0,4,4">
-                                                        <TextBlock Text="{Binding .}"
-                                                                   FontSize="12"
-                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Grid.RowSpan="3"
+                                        <!-- 右侧时间 -->
+                                        <TextBlock Grid.Column="1"
                                                    Text="{Binding Time}"
-                                                   FontSize="14"
+                                                   FontSize="{StaticResource LabelFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"
-                                                   Margin="8,0,0,0"/>
+                                                   Margin="{StaticResource SmallLeftMargin}"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -168,17 +164,17 @@
             </controls:CardView>
             
             <!-- 中间：热门推荐 -->
-            <controls:CardView Grid.Column="1" Margin="0,0,8,0">
+            <controls:CardView Grid.Column="1" Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
                                    Text="热门推荐"
-                                   FontSize="16" 
+                                   FontSize="{StaticResource SectionTitleFontSize}" 
                                    FontWeight="SemiBold"/>
                         <svg:Svg Grid.Column="1"
                                  Path="/Assets/Images/trending_icon.svg"
-                                 Width="20"
-                                 Height="20"
+                                 Width="{StaticResource SmallIconSize}"
+                                 Height="{StaticResource SmallIconSize}"
                                  VerticalAlignment="Center"/>
                     </Grid>
                 </controls:CardView.Header>
@@ -193,66 +189,66 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="stocks:HotStock">
                                 <Border Classes="hot-stock-card" 
-                                        Margin="4,2" 
+                                        Margin="{StaticResource TinyMargin}" 
+                                        Padding="{StaticResource DefaultCardPadding}"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        CornerRadius="{StaticResource DefaultCornerRadius}"
                                         Tapped="HotStockCard_Tapped"
                                         Tag="{Binding .}">
-                                    <Grid ColumnDefinitions="Auto,4,Auto,*,Auto,Auto,Auto"
-                                          RowDefinitions="Auto,Auto,Auto"
-                                          Cursor="Hand">
-                                        <!-- 左侧信息 -->
-                                        <TextBlock Grid.Row="0" Grid.Column="0"
-                                                   Text="{Binding Market}"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="2"
-                                                   Text="{Binding Code}"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Cursor="Hand">
                                         
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
-                                                   Text="{Binding Name}"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   Margin="0,2,0,0"/>
-                                        
-                                        <TextBlock Grid.Row="2" Grid.Column="0"
-                                                   Text="{Binding CurrentPrice}"
-                                                   FontSize="15"
-                                                   FontWeight="Bold"
-                                                   Margin="0,2,0,0"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="2"
-                                                   Text="{Binding ChangePercentage}"
-                                                   FontSize="13"
-                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
-                                                   Margin="0,2,0,0"/>
-                                        
-                                        <!-- 右侧热度与收藏 -->
-                                        <TextBlock Grid.Row="0" Grid.Column="4"
+                                        <!-- Row 0: Code & Heat Label -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="{Binding Market}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding Code}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
                                                    Text="热度"
-                                                   FontSize="10"
-                                                   HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="4"
-                                                   Text="{Binding HeatIndex}"
-                                                   FontSize="13"
+                                                   FontSize="{StaticResource MiniFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 1: Name & Heat Value -->
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding Name}"
+                                                   FontSize="{StaticResource BodyFontSize}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="{StaticResource TinyVerticalMargin}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                   Text="{Binding HeatIndex, Converter={StaticResource NumberFormatConverter}}"
+                                                   FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="Bold"
-                                                   HorizontalAlignment="Center"
                                                    Foreground="{DynamicResource PrimaryBrush}"
-                                                   Margin="0,2,0,0"/>
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 2: Price & Favorite -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CurrentPrice}"
+                                                       FontSize="{StaticResource MediumFontSize}"
+                                                       FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ChangePercentage}"
+                                                       FontSize="{StaticResource BodyFontSize}"
+                                                       Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                                       VerticalAlignment="Bottom"/>
+                                        </StackPanel>
                                         
-                                        <Button Grid.Row="2" Grid.Column="4"
+                                        <Button Grid.Row="2" Grid.Column="1"
                                                 Classes="favorite-button"
                                                 Background="Transparent"
                                                 Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotStocks.AddToFavoriteCommand}"
                                                 CommandParameter="{Binding .}"
-                                                Width="20"
-                                                Height="20"
+                                                Tapped="OnPreventTapped"
+                                                Width="{StaticResource SmallIconSize}"
+                                                Height="{StaticResource SmallIconSize}"
                                                 Padding="0"
-                                                Margin="0,4,0,0"
-                                                HorizontalAlignment="Center">
+                                                HorizontalAlignment="Right">
                                             <svg:Svg Path="/Assets/Images/tab_favorites.svg"
-                                                     Width="14"
-                                                     Height="14"/>
+                                                     Width="{StaticResource MiniIconSize}"
+                                                     Height="{StaticResource MiniIconSize}"/>
                                         </Button>
                                     </Grid>
                                 </Border>
@@ -269,7 +265,7 @@
                         <ItemsControl ItemsSource="{Binding RecentStocks.RecentStocks}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Spacing="8"/>
+                                    <StackPanel Spacing="{StaticResource SmallSpacing}"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             
@@ -281,14 +277,14 @@
                                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0"
                                                        Text="{Binding Name}"
-                                                       FontSize="14"
+                                                       FontSize="{StaticResource LabelFontSize}"
                                                        FontWeight="Bold"
                                                        VerticalAlignment="Center"/>
                                             <TextBlock Grid.Row="1" Grid.Column="0"
                                                        Text="{Binding Code}"
-                                                       FontSize="12"
+                                                       FontSize="{StaticResource SmallFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       Margin="0,4,0,0"/>
+                                                       Margin="{StaticResource TinyTopMargin}"/>
 
                                             <!-- 收藏按钮 -->
                                             <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
@@ -296,14 +292,15 @@
                                                     Background="Transparent"
                                                     Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentStocks.AddToFavoriteCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    Width="24"
-                                                    Height="24"
+                                                    Tapped="OnPreventTapped"
+                                                    Width="{StaticResource DefaultIconSize}"
+                                                    Height="{StaticResource DefaultIconSize}"
                                                     Padding="0"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center">
                                                 <svg:Svg Path="/Assets/Images/tab_favorites.svg"
-                                                         Width="16"
-                                                         Height="16"/>
+                                                         Width="{StaticResource TinyIconSize}"
+                                                         Height="{StaticResource TinyIconSize}"/>
                                             </Button>
                                         </Grid>
                                     </Border>
@@ -315,16 +312,16 @@
                         <StackPanel IsVisible="{Binding !RecentStocks.RecentStocks.Count}"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
-                                    Spacing="12">
+                                    Spacing="{StaticResource DefaultSpacing}">
                             <svg:Svg Path="/Assets/Images/empty_data.svg"
-                                     Width="64"
-                                     Height="64"
+                                     Width="{StaticResource ExtraLargeIconSize}"
+                                     Height="{StaticResource ExtraLargeIconSize}"
                                      Opacity="0.6"/>
                             <TextBlock Text="暂无查看记录"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"/>
                             <TextBlock Text="搜索或浏览热门股票以添加记录"
-                                       FontSize="12"
+                                       FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"
                                        TextWrapping="Wrap"/>

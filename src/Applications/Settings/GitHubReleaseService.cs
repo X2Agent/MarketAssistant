@@ -11,8 +11,8 @@ public class GitHubReleaseService : IReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GitHubReleaseService> _logger;
-    private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
-    private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
+    private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases";
+    private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases/latest";
 
     private CachedData<List<ReleaseInfo>>? _cachedReleases;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
