@@ -3,207 +3,209 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   release:
     types: [created]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.0.0)'
+        description: "Release version (e.g., 1.0.0)"
         required: false
-        default: '1.0.0'
+        default: "1.0.0"
 
 env:
-  DOTNET_VERSION: '10.0.x'
+  DOTNET_VERSION: "10.0.x"
   APP_NAME: MarketAssistant
-  
+
 jobs:
   # Windows 构建
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Restore dependencies
-      run: dotnet restore MarketAssistant.slnx
-    
-    - name: Build Windows x64
-      run: |
-        dotnet publish src/MarketAssistant.csproj `
-          -c Release `
-          -r win-x64 `
-          --self-contained `
-          -p:PublishReadyToRun=true `
-          -p:PublishSingleFile=false `
-          -p:UseAppHost=true `
-          -p:DebugType=None `
-          -p:DebugSymbols=false `
-          -o ./publish/windows
-    
-    - name: Clean debug files
-      run: |
-        Get-ChildItem -Path ./publish/windows -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
-      shell: pwsh
-    
-    - name: Create ZIP archive
-      run: |
-        Compress-Archive -Path ./publish/windows/* `
-          -DestinationPath ./${{ env.APP_NAME }}-Windows-x64.zip `
-          -CompressionLevel Optimal
-      shell: pwsh
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-x64
-        path: ${{ env.APP_NAME }}-Windows-x64.zip
-  
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore MarketAssistant.slnx
+
+      - name: Build Windows x64
+        run: |
+          dotnet publish src/MarketAssistant.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained `
+            -p:PublishReadyToRun=true `
+            -p:PublishSingleFile=false `
+            -p:UseAppHost=true `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -o ./publish/windows
+
+      - name: Clean debug files
+        run: |
+          Get-ChildItem -Path ./publish/windows -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
+        shell: pwsh
+
+      - name: Create ZIP archive
+        run: |
+          Compress-Archive -Path ./publish/windows/* `
+            -DestinationPath ./${{ env.APP_NAME }}-Windows-x64.zip `
+            -CompressionLevel Optimal
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: ${{ env.APP_NAME }}-Windows-x64.zip
+
   # macOS 构建
   build-macos:
     runs-on: macos-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Restore dependencies
-      run: dotnet restore MarketAssistant.slnx
-    
-    # 如果需要代码签名，可以在这里配置 keychain
-    # - name: Setup Keychain
-    #   if: ${{ secrets.MACOS_CERTIFICATE }}
-    #   run: |
-    #     security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-    #     security default-keychain -s build.keychain
-    #     security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-    #     echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
-    #     security import certificate.p12 -k build.keychain -P "${{ secrets.MACOS_CERTIFICATE_PWD }}" -T /usr/bin/codesign
-    #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
-    #     xcrun notarytool store-credentials "AC_PASSWORD" --apple-id "${{ secrets.APPLE_ID }}" --team-id ${{ secrets.TEAM_ID }} --password "${{ secrets.NOTARY_TOOL_PASSWORD }}"
-    
-    - name: Make build script executable
-      run: chmod +x ./scripts/macos/build-app-bundle.sh
-    
-    - name: Build macOS app
-      run: ./scripts/macos/build-app-bundle.sh
-      env:
-        # 如果配置了签名，取消注释以下行
-        # SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
-        # NOTARYTOOL_PROFILE: "AC_PASSWORD"
-        SIGNING_IDENTITY: ""
-    
-    - name: Upload app bundle
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-app
-        path: Release/macOS/*.app
-        if-no-files-found: ignore
-    
-    - name: Upload DMG
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-dmg
-        path: Release/macOS/*.dmg
-  
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore MarketAssistant.slnx
+
+      # 如果需要代码签名，可以在这里配置 keychain
+      # - name: Setup Keychain
+      #   if: ${{ secrets.MACOS_CERTIFICATE }}
+      #   run: |
+      #     security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+      #     security default-keychain -s build.keychain
+      #     security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+      #     echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
+      #     security import certificate.p12 -k build.keychain -P "${{ secrets.MACOS_CERTIFICATE_PWD }}" -T /usr/bin/codesign
+      #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+      #     xcrun notarytool store-credentials "AC_PASSWORD" --apple-id "${{ secrets.APPLE_ID }}" --team-id ${{ secrets.TEAM_ID }} --password "${{ secrets.NOTARY_TOOL_PASSWORD }}"
+
+      - name: Make build script executable
+        run: chmod +x ./scripts/macos/build-app-bundle.sh
+
+      - name: Build macOS app
+        run: ./scripts/macos/build-app-bundle.sh
+        env:
+          # 如果配置了签名，取消注释以下行
+          # SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          # NOTARYTOOL_PROFILE: "AC_PASSWORD"
+          SIGNING_IDENTITY: ""
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: Release/macOS/*.app
+          if-no-files-found: ignore
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: Release/macOS/*.dmg
+
   # Linux 构建
   build-linux:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y rpm
-    
-    - name: Restore dependencies
-      run: dotnet restore MarketAssistant.slnx
-    
-    - name: Make build scripts executable
-      run: |
-        chmod +x ./scripts/linux/build-deb.sh
-        chmod +x ./scripts/linux/build-rpm.sh
-    
-    - name: Build Debian package
-      run: ./scripts/linux/build-deb.sh
-    
-    - name: Build RPM package
-      run: ./scripts/linux/build-rpm.sh
-      continue-on-error: true
-    
-    - name: Upload .deb package
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-deb
-        path: Release/Linux/*.deb
-    
-    - name: Upload .rpm package
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-rpm
-        path: Release/Linux/*.rpm
-        if-no-files-found: ignore
-    
-    - name: Upload ZIP archive
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-x64
-        path: Release/Linux/*.zip
-  
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Restore dependencies
+        run: dotnet restore MarketAssistant.slnx
+
+      - name: Make build scripts executable
+        run: |
+          chmod +x ./scripts/linux/build-deb.sh
+          chmod +x ./scripts/linux/build-rpm.sh
+
+      - name: Build Debian package
+        run: ./scripts/linux/build-deb.sh
+
+      - name: Build RPM package
+        run: ./scripts/linux/build-rpm.sh
+        continue-on-error: true
+
+      - name: Upload .deb package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: Release/Linux/*.deb
+
+      - name: Upload .rpm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rpm
+          path: Release/Linux/*.rpm
+          if-no-files-found: ignore
+
+      - name: Upload ZIP archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: Release/Linux/*.zip
+
   # 发布 Release
   create-release:
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
-    
+    permissions:
+      contents: write
+
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
-    
-    - name: List artifacts
-      run: ls -R ./artifacts
-    
-    - name: Get release version
-      id: get_version
-      run: |
-        if [ "${{ github.event_name }}" == "release" ]; then
-          echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-        else
-          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Upload release assets
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          ./artifacts/**/*.zip
-          ./artifacts/**/*.dmg
-          ./artifacts/**/*.deb
-          ./artifacts/**/*.rpm
-        tag_name: ${{ steps.get_version.outputs.version }}
-        name: Release ${{ steps.get_version.outputs.version }}
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: List artifacts
+        run: ls -R ./artifacts
+
+      - name: Get release version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/**/*.zip
+            ./artifacts/**/*.dmg
+            ./artifacts/**/*.deb
+            ./artifacts/**/*.rpm
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
