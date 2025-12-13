@@ -195,6 +195,21 @@ jobs:
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Remove existing assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.get_version.outputs.version }}
+        shell: bash
+        run: |
+          # 尝试查找 Release，如果不存在则忽略清理步骤
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG found. Cleaning up existing assets..."
+            gh release view "$TAG" --json assets -q '.assets[].name' | \
+            xargs -r -I{} gh release delete-asset "$TAG" {} -y || true
+          else
+            echo "Release $TAG not found. Skipping asset cleanup."
+          fi
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
