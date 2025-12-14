@@ -274,6 +274,14 @@ namespace MarketAssistant.ViewModels
                 ButtonText = "查看",
                 Command = new RelayCommand(() => OpenUrl(AppInfo.LicenseUrl))
             });
+
+            FeatureItems.Add(new FeatureItem
+            {
+                IconSource = "/Assets/Images/qq.svg",
+                Title = $"官方QQ群: {AppInfo.QQGroupNumber}",
+                ButtonText = "加入",
+                Command = new RelayCommand(() => OpenUrl(AppInfo.QQGroupUrl))
+            });
         }
     }
 
