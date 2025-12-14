@@ -136,5 +136,15 @@ public static class AppInfo
     /// </summary>
     public static string LicenseUrl => $"https://github.com/{Company}/{AppName}/blob/main/LICENSE";
 
+    /// <summary>
+    /// 官方QQ群号码
+    /// </summary>
+    public const string QQGroupNumber = "1012116859";
+
+    /// <summary>
+    /// 加入QQ群链接
+    /// </summary>
+    public const string QQGroupUrl = "https://qm.qq.com/q/lFE1Cc8d5m";
+
     #endregion
 }

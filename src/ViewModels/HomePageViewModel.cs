@@ -8,7 +8,7 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 首页ViewModel
 /// </summary>
-public class HomePageViewModel : ViewModelBase, IDisposable
+public partial class HomePageViewModel : ViewModelBase, IDisposable
 {
     /// <summary>
     /// 搜索功能ViewModel
