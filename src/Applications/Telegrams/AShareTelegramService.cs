@@ -68,7 +68,7 @@ public class AShareTelegramService : ITelegramService
                         Title = title,
                         Content = content,
                         Url = url,
-                        Stocks = stocks,
+                        Symbols = stocks,
                         IsImportant = isImportant
                     });
                 }

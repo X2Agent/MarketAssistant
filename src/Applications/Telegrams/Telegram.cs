@@ -23,9 +23,9 @@ public class Telegram
     public string Url { get; set; } = "";
 
     /// <summary>
-    /// 相关股票
+    /// 相关标的符号（股票代码或加密货币符号）
     /// </summary>
-    public List<string> Stocks { get; set; } = new();
+    public List<string> Symbols { get; set; } = new();
 
     /// <summary>
     /// 是否为重要快讯

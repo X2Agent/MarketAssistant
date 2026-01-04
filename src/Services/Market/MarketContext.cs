@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Settings;
 
 namespace MarketAssistant.Services.Market;
 
@@ -9,7 +10,8 @@ namespace MarketAssistant.Services.Market;
 /// </summary>
 public class MarketContext : INotifyPropertyChanged
 {
-    private MarketType _currentMarket = MarketType.AShare;
+    private readonly IUserSettingService _userSettingService;
+    private MarketType _currentMarket;
 
     /// <summary>
     /// 当前激活的市场类型
@@ -27,6 +29,14 @@ public class MarketContext : INotifyPropertyChanged
         }
     }
 
+    public MarketContext(IUserSettingService userSettingService)
+    {
+        _userSettingService = userSettingService;
+        
+        // 从用户设置中加载市场类型
+        _currentMarket = _userSettingService.CurrentSetting.CurrentMarketType;
+    }
+
     /// <summary>
     /// 切换市场
     /// </summary>
@@ -36,6 +46,10 @@ public class MarketContext : INotifyPropertyChanged
         if (CurrentMarket != newMarket)
         {
             CurrentMarket = newMarket;
+            
+            // 保存到用户设置
+            _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
+            _userSettingService.SaveSettings();
         }
     }
 

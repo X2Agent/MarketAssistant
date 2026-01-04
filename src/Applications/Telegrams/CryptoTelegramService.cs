@@ -52,25 +52,50 @@ public class CryptoTelegramService : ITelegramService
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             var apiResponse = JsonSerializer.Deserialize<PanewsResponse>(json, JsonOptions);
 
-            if (apiResponse?.Data == null || apiResponse.Data.Count == 0)
+            if (apiResponse?.Data == null)
             {
-                _logger.LogWarning("PANews API 返回数据为空");
+                _logger.LogWarning("PANews API 返回数据为空，ErrorNo: {ErrorNo}, Message: {Message}", 
+                    apiResponse?.ErrorNo, apiResponse?.Message);
+                return result;
+            }
+
+            // 从 flashNews 中提取所有 list 集合
+            var allItems = apiResponse.Data.FlashNews
+                .SelectMany(group => group.List)
+                .ToList();
+
+            _logger.LogInformation("PANews API 返回数据：共 {GroupCount} 个日期分组，总计 {ItemCount} 条快讯", 
+                apiResponse.Data.FlashNews.Count, allItems.Count);
+
+            if (allItems.Count == 0)
+            {
+                _logger.LogWarning("PANews API 未返回任何快讯");
                 return result;
             }
 
             // 处理所有返回的快讯（已限制 20 条）
-            foreach (var item in apiResponse.Data)
+            foreach (var item in allItems.Take(20))
             {
                 try
                 {
-                    var timeText = FormatUnixTime(item.PublishTime);
+                    var timestamp = item.PublishTime ?? item.CTime ?? 0;
+                    var timeText = FormatUnixTime(timestamp);
                     var title = item.Title ?? string.Empty;
-                    var content = CleanHtmlContent(item.Content);
-                    var url = !string.IsNullOrEmpty(item.Link) 
-                        ? item.Link 
-                        : $"https://www.panewslab.com/zh/articledetails/{item.Id}.html";
+                    
+                    // 使用 desc 字段作为内容，如果为空则使用 title
+                    var content = !string.IsNullOrWhiteSpace(item.Desc) 
+                        ? item.Desc 
+                        : title;
+                    
+                    var url = $"https://www.panewslab.com/zh/articles/{item.Id}";
+                    
                     var cryptos = ExtractCryptoSymbols(content, title);
-                    var isImportant = item.ImportLevel > 0; // importlevel > 0 表示重要快讯
+                    
+                    // type=2 并且 apppush=1 可能表示重要快讯
+                    var isImportant = item.AppPush == 1;
+
+                    _logger.LogDebug("处理快讯项：Title={Title}, Time={Time}, Author={Author}", 
+                        title, timeText, item.Author?.Name);
 
                     result.Add(new Telegram
                     {
@@ -78,7 +103,7 @@ public class CryptoTelegramService : ITelegramService
                         Title = title,
                         Content = content,
                         Url = url,
-                        Stocks = cryptos,  // 存储相关币种符号
+                        Symbols = cryptos,
                         IsImportant = isImportant
                     });
                 }
@@ -112,14 +137,14 @@ public class CryptoTelegramService : ITelegramService
     /// <summary>
     /// 格式化 Unix 时间戳为本地时间
     /// </summary>
-    private static string FormatUnixTime(long? unixSeconds)
+    private static string FormatUnixTime(long unixSeconds)
     {
-        if (unixSeconds == null || unixSeconds == 0)
+        if (unixSeconds == 0)
             return string.Empty;
 
         try
         {
-            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds.Value).ToLocalTime().ToString("HH:mm:ss");
+            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime().ToString("HH:mm:ss");
         }
         catch
         {
@@ -216,17 +241,47 @@ public class CryptoTelegramService : ITelegramService
     /// </summary>
     private class PanewsResponse
     {
-        [JsonPropertyName("success")]
-        public bool Success { get; set; }
+        [JsonPropertyName("errno")]
+        public int ErrorNo { get; set; }
+
+        [JsonPropertyName("msg")]
+        public string? Message { get; set; }
 
         [JsonPropertyName("data")]
-        public List<PanewsFlashItem> Data { get; set; } = new();
+        public PanewsData? Data { get; set; }
+    }
 
-        [JsonPropertyName("code")]
-        public int Code { get; set; }
+    /// <summary>
+    /// PANews 数据容器
+    /// </summary>
+    private class PanewsData
+    {
+        [JsonPropertyName("flashNews")]
+        public List<FlashNewsGroup> FlashNews { get; set; } = new();
 
-        [JsonPropertyName("message")]
-        public string? Message { get; set; }
+        [JsonPropertyName("tag")]
+        public List<object> Tag { get; set; } = new();
+    }
+
+    /// <summary>
+    /// PANews 快讯分组（按日期）
+    /// </summary>
+    private class FlashNewsGroup
+    {
+        [JsonPropertyName("date")]
+        public string? Date { get; set; }
+
+        [JsonPropertyName("week")]
+        public string? Week { get; set; }
+
+        [JsonPropertyName("month")]
+        public string? Month { get; set; }
+
+        [JsonPropertyName("unix")]
+        public long Unix { get; set; }
+
+        [JsonPropertyName("list")]
+        public List<PanewsFlashItem> List { get; set; } = new();
     }
 
     /// <summary>
@@ -240,32 +295,71 @@ public class CryptoTelegramService : ITelegramService
         [JsonPropertyName("title")]
         public string? Title { get; set; }
 
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
+        [JsonPropertyName("desc")]
+        public string? Desc { get; set; }
 
-        [JsonPropertyName("link")]
-        public string? Link { get; set; }
-
-        [JsonPropertyName("posttime")]
+        [JsonPropertyName("publishTime")]
         public long? PublishTime { get; set; }
 
-        [JsonPropertyName("importlevel")]
-        public int ImportLevel { get; set; }  // 0=普通，>0=重要
+        [JsonPropertyName("type")]
+        public int? Type { get; set; }
 
-        [JsonPropertyName("source")]
-        public string? Source { get; set; }
-
-        [JsonPropertyName("author")]
-        public string? Author { get; set; }
-
-        [JsonPropertyName("icon")]
-        public string? Icon { get; set; }
+        [JsonPropertyName("img")]
+        public string? Img { get; set; }
 
         [JsonPropertyName("readnum")]
         public int? ReadNum { get; set; }
 
-        [JsonPropertyName("isimportant")]
-        public bool? IsImportant { get; set; }
+        [JsonPropertyName("tags")]
+        public object? Tags { get; set; }
+
+        [JsonPropertyName("author")]
+        public PanewsAuthor? Author { get; set; }
+
+        [JsonPropertyName("collection")]
+        public int? Collection { get; set; }
+
+        [JsonPropertyName("like")]
+        public int? Like { get; set; }
+
+        [JsonPropertyName("lovenum")]
+        public int? LoveNum { get; set; }
+
+        [JsonPropertyName("status")]
+        public int? Status { get; set; }
+
+        [JsonPropertyName("topTime")]
+        public long? TopTime { get; set; }
+
+        [JsonPropertyName("apppush")]
+        public int? AppPush { get; set; }
+
+        [JsonPropertyName("ctime")]
+        public long? CTime { get; set; }
+    }
+
+    /// <summary>
+    /// PANews 作者信息
+    /// </summary>
+    private class PanewsAuthor
+    {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("img")]
+        public string? Img { get; set; }
+
+        [JsonPropertyName("tag")]
+        public string? Tag { get; set; }
+
+        [JsonPropertyName("brief")]
+        public string? Brief { get; set; }
+
+        [JsonPropertyName("follow")]
+        public int? Follow { get; set; }
     }
 }
 

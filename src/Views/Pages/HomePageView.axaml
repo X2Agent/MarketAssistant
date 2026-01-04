@@ -121,8 +121,8 @@
                                                        TextWrapping="Wrap"
                                                        MaxLines="3"/>
                                             
-                                            <!-- 关联股票标签 -->
-                                            <ItemsControl ItemsSource="{Binding Stocks}">
+                                            <!-- 关联标的标签 -->
+                                            <ItemsControl ItemsSource="{Binding Symbols}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
                                                         <WrapPanel Orientation="Horizontal"/>
