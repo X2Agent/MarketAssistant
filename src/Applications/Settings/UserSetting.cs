@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.Settings;
 
@@ -37,6 +38,21 @@ public class UserSetting : INotifyPropertyChanged
     public bool Notification { get; set; }
 
     public string ZhiTuApiToken { get; set; } = "";
+
+    /// <summary>
+    /// 当前市场类型
+    /// </summary>
+    public MarketType CurrentMarketType { get; set; } = MarketType.AShare;
+
+    /// <summary>
+    /// 币安API密钥
+    /// </summary>
+    public string BinanceApiKey { get; set; } = "";
+
+    /// <summary>
+    /// 币安Secret密钥
+    /// </summary>
+    public string BinanceSecretKey { get; set; } = "";
 
     /// <summary>
     /// 浏览器路径，如果为空则自动检测

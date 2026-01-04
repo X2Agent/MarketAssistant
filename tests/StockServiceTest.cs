@@ -1,4 +1,4 @@
-using MarketAssistant.Applications.Stocks;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -8,23 +8,23 @@ namespace TestMarketAssistant;
 [TestClass]
 public class StockServiceTest
 {
-    private StockService _stockService;
-    private Mock<ILogger<StockService>> _loggerMock;
+    private AShareAssetInfoService _assetInfoService;
+    private Mock<ILogger<AShareAssetInfoService>> _loggerMock;
     private Mock<PlaywrightService> _playwrightServiceMock;
 
     [TestInitialize]
     public void Initialize()
     {
-        _loggerMock = new Mock<ILogger<StockService>>();
+        _loggerMock = new Mock<ILogger<AShareAssetInfoService>>();
         _playwrightServiceMock = new Mock<PlaywrightService>();
-        _stockService = new StockService(_loggerMock.Object, _playwrightServiceMock.Object);
+        _assetInfoService = new AShareAssetInfoService(_loggerMock.Object, _playwrightServiceMock.Object);
     }
 
     [TestMethod]
     public async Task TestGetHotStocksAsync()
     {
         // Act
-        var result = await _stockService.GetHotStocksAsync();
+        var result = await _assetInfoService.GetHotAssetsAsync();
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count > 0);

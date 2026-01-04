@@ -1,8 +1,8 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.StockScreener;
-using MarketAssistant.Services.StockScreener.Models;
+using MarketAssistant.Applications.AssetScreener;
+using MarketAssistant.Applications.AssetScreener.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -59,7 +59,7 @@ public sealed class StockScreenerServiceTest
         // Arrange
         var criteria = new StockCriteria
         {
-            Market = MarketType.AllAShares,
+            Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 10,
             Criteria = new List<StockScreeningCriteria>()
@@ -82,7 +82,7 @@ public sealed class StockScreenerServiceTest
         // Arrange - 测试单个条件筛选（市值）
         var criteria = new StockCriteria
         {
-            Market = MarketType.AllAShares,
+            Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 15,
             Criteria = new List<StockScreeningCriteria>
@@ -114,7 +114,7 @@ public sealed class StockScreenerServiceTest
         // Arrange - 测试多条件组合筛选
         var criteria = new StockCriteria
         {
-            Market = MarketType.AllAShares,
+            Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 20,
             Criteria = new List<StockScreeningCriteria>

@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
-using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.ViewModels;
 
 namespace MarketAssistant.Views.Pages;
@@ -24,15 +24,15 @@ public partial class FavoritesPageView : UserControl
     }
 
     /// <summary>
-    /// 股票项点击事件
+    /// 资产项点击事件
     /// </summary>
     private void OnStockItemTapped(object? sender, TappedEventArgs e)
     {
         if (sender is Border border &&
-            border.Tag is StockInfo stock &&
+            border.Tag is AssetInfo asset &&
             DataContext is FavoritesPageViewModel viewModel)
         {
-            viewModel.SelectFavoriteStockCommand?.Execute(stock);
+            viewModel.SelectFavoriteAssetCommand?.Execute(asset);
         }
     }
 }

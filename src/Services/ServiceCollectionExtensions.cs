@@ -1,23 +1,33 @@
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
-using MarketAssistant.Agents.StockSelection;
-using MarketAssistant.Agents.StockSelection.Executors;
+using MarketAssistant.Agents.InvestmentSelection;
+using MarketAssistant.Agents.InvestmentSelection.Executors;
+using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Agents.Tools;
+using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.AShare;
+using MarketAssistant.Agents.Tools.Crypto;
+using MarketAssistant.Applications.Assets;
+using MarketAssistant.Applications.Cache;
+using MarketAssistant.Applications.Charts;
+using MarketAssistant.Applications.Favorites;
+using MarketAssistant.Applications.History;
+using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Applications.StockSelection;
+using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.Telegrams;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.StockScreener;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
 using Microsoft.Extensions.Logging;
@@ -42,13 +52,25 @@ public static class ServiceCollectionExtensions
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
-        // 注册 Agent Tool 类
-        services.AddSingleton<StockBasicTools>();
-        services.AddSingleton<StockFinancialTools>();
-        services.AddSingleton<StockTechnicalTools>();
+        // 注册市场上下文服务为单例
+        services.AddSingleton<MarketContext>();
+
+        // 注册通用工具（不依赖市场类型）
         services.AddSingleton<GroundingSearchTools>();
-        services.AddSingleton<StockNewsTools>();
-        services.AddSingleton<MarketSentimentTools>();
+
+        // 注册 Agent Tools - A股实现（Keyed Services）
+        services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IFinancialDataTools, AShareFinancialTools>(MarketType.AShare);
+        services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);
+        services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);
+        services.AddKeyedSingleton<ISentimentDataTools, AShareSentimentTools>(MarketType.AShare);
+
+        // 注册 Agent Tools - 虚拟币实现（Keyed Services）
+        services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFinancialDataTools, CryptoFinancialTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ITechnicalDataTools, CryptoTechnicalTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<INewsDataTools, CryptoNewsTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ISentimentDataTools, CryptoSentimentTools>(MarketType.Crypto);
 
         // 注册 Kernel 和嵌入服务（保留用于 RAG 和提示词模板）
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
@@ -66,31 +88,63 @@ public static class ServiceCollectionExtensions
 
         // 注册 RAG 和分析服务
         services.AddRagServices();
-        services.AddSingleton<TelegramService>();
         services.AddSingleton<GroundingSearchTools>();
+
+        // 注册快讯服务接口的实现（使用 Keyed Services）
+        services.AddKeyedSingleton<ITelegramService, AShareTelegramService>("AShare");
+        services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>("Crypto");
+
+        // 注册新闻更新服务（使用 Keyed Services）
+        services.AddKeyedSingleton<INewsUpdateService>(
+            "AShare",
+            (sp, key) => new NewsUpdateService(
+                sp.GetRequiredKeyedService<ITelegramService>("AShare"),
+                sp.GetRequiredService<ILogger<NewsUpdateService>>()));
+
+        services.AddKeyedSingleton<INewsUpdateService>(
+            "Crypto",
+            (sp, key) => new NewsUpdateService(
+                sp.GetRequiredKeyedService<ITelegramService>("Crypto"),
+                sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         // 注册分析缓存服务
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
 
-        // 注册股票相关服务
-        services.AddSingleton<StockService>();
-        services.AddSingleton<StockKLineService>();
-        services.AddSingleton<StockSearchHistory>();
-        services.AddSingleton<StockFavoriteService>();
-        services.AddSingleton<StockInfoCache>();
+        // 注册浏览器服务
         services.AddSingleton<PlaywrightService>();
         services.AddSingleton<StockScreenerService>();
 
-        // 注册主页相关服务
-        services.AddSingleton<IHomeStockService, HomeStockService>();
-        services.AddSingleton<INewsUpdateService, NewsUpdateService>();
+        // 注册资产服务抽象 - A股实现（Keyed Services）
+        services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);
+        services.AddKeyedSingleton<IHomeAssetService, AShareHomeService>(MarketType.AShare);
+        services.AddKeyedSingleton<IFavoriteService, AShareFavoriteService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetHistoryService, AShareHistoryService>(MarketType.AShare);
+        services.AddKeyedSingleton<IKLineService, AShareKLineService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetCacheService, AShareAssetCacheService>(MarketType.AShare);
+
+        // 注册资产服务抽象 - 虚拟币实现（Keyed Services）
+        services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IHomeAssetService, CryptoHomeService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFavoriteService, CryptoFavoriteService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetHistoryService, CryptoHistoryService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetCacheService, CryptoAssetCacheService>(MarketType.Crypto);
 
         // 注册AI选股相关服务（使用 Agent Framework Workflows）
-        services.AddSingleton<GenerateCriteriaExecutor>();
-        services.AddSingleton<ScreenStocksExecutor>();
+        // 注册筛选服务接口的实现（使用 Keyed Services）
+        services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>("AShare");
+        services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>("Crypto");
+
+        // 注册投资选择工作流的 Executors
+        services.AddSingleton<GenerateStockCriteriaExecutor>();
+        services.AddSingleton<GenerateCryptoCriteriaExecutor>();
+        services.AddSingleton<ScreenInvestmentTargetsExecutor>();
         services.AddSingleton<AnalyzeStocksExecutor>();
-        services.AddSingleton<StockSelectionWorkflow>();
-        services.AddSingleton<StockSelectionService>();
+        services.AddSingleton<AnalyzeCryptoExecutor>();
+
+        // 注册投资选择工作流和服务
+        services.AddSingleton<InvestmentSelectionWorkflow>();
+        services.AddSingleton<InvestmentSelectionService>();
 
         // 注册市场分析相关服务（使用 Agent Framework Workflows - 最佳实践）
         services.AddSingleton<AnalysisDispatcherExecutor>();
@@ -126,16 +180,16 @@ public static class ServiceCollectionExtensions
         // 注册主要页面 ViewModels
         services.AddTransient<HomePageViewModel>();
         services.AddTransient<FavoritesPageViewModel>();
-        services.AddTransient<StockSelectionPageViewModel>();
+        services.AddTransient<AssetSelectionPageViewModel>();
         services.AddTransient<SettingsPageViewModel>();
         services.AddTransient<AboutPageViewModel>();
         services.AddTransient<MCPConfigPageViewModel>();
-        services.AddTransient<StockPageViewModel>();
+        services.AddTransient<AssetPageViewModel>();
 
         // 注册 Home 子 ViewModels
         services.AddTransient<HomeSearchViewModel>();
-        services.AddTransient<HotStocksViewModel>();
-        services.AddTransient<RecentStocksViewModel>();
+        services.AddTransient<HotAssetsViewModel>();
+        services.AddTransient<RecentAssetsViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
 
         // 注册 AI 分析相关 ViewModels

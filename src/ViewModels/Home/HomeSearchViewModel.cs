@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Home;
+using MarketAssistant.Services.Market;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
@@ -12,9 +14,13 @@ namespace MarketAssistant.ViewModels.Home;
 /// </summary>
 public partial class HomeSearchViewModel : ViewModelBase
 {
-    private readonly IHomeStockService _homeStockService;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly MarketContext _marketContext;
     private CancellationTokenSource? _debounceCts;
     private const int DebounceDelayMs = 200;
+
+    private IHomeAssetService HomeAssetService => 
+        _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -28,7 +34,7 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// <summary>
     /// 搜索结果集合
     /// </summary>
-    public ObservableCollection<StockItem> SearchResults { get; } = new();
+    public ObservableCollection<AssetItem> SearchResults { get; } = new();
 
     /// <summary>
     /// 搜索命令
@@ -36,24 +42,26 @@ public partial class HomeSearchViewModel : ViewModelBase
     public IAsyncRelayCommand<string> SearchCommand { get; }
 
     /// <summary>
-    /// 选择股票命令
+    /// 选择资产命令
     /// </summary>
-    public IRelayCommand<StockItem> SelectStockCommand { get; }
+    public IRelayCommand<AssetItem> SelectAssetCommand { get; }
 
     /// <summary>
-    /// 股票选择事件
+    /// 资产选择事件
     /// </summary>
-    public event EventHandler<StockItem>? StockSelected;
+    public event EventHandler<AssetItem>? AssetSelected;
 
     public HomeSearchViewModel(
-        IHomeStockService homeStockService,
+        IServiceProvider serviceProvider,
+        MarketContext marketContext,
         ILogger<HomeSearchViewModel> logger)
         : base(logger)
     {
-        _homeStockService = homeStockService;
+        _serviceProvider = serviceProvider;
+        _marketContext = marketContext;
 
         SearchCommand = new AsyncRelayCommand<string>(OnSearchAsync);
-        SelectStockCommand = new RelayCommand<StockItem>(OnSelectStock);
+        SelectAssetCommand = new RelayCommand<AssetItem>(OnSelectAsset);
     }
 
     /// <summary>
@@ -99,7 +107,7 @@ public partial class HomeSearchViewModel : ViewModelBase
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, "搜索股票时发生错误，查询：{Query}", value);
+                Logger?.LogError(ex, "搜索资产时发生错误，查询：{Query}", value);
             }
         }, cancellationToken);
     }
@@ -118,12 +126,12 @@ public partial class HomeSearchViewModel : ViewModelBase
             return;
         }
 
-        Logger?.LogInformation("开始搜索股票，查询：{Query}", query);
+        Logger?.LogInformation("开始搜索资产，查询：{Query}", query);
         IsSearching = true;
 
         await SafeExecuteAsync(async () =>
         {
-            var results = await _homeStockService.SearchStockAsync(query, CancellationToken.None);
+            var results = await HomeAssetService.SearchAssetAsync(query, CancellationToken.None);
 
             Logger?.LogInformation("搜索完成，找到 {Count} 个结果", results.Count);
 
@@ -131,10 +139,10 @@ public partial class HomeSearchViewModel : ViewModelBase
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 SearchResults.Clear();
-                foreach (var stock in results)
+                foreach (var asset in results)
                 {
-                    SearchResults.Add(stock);
-                    Logger?.LogDebug("添加搜索结果：{Name} ({Code})", stock.Name, stock.Code);
+                    SearchResults.Add(asset);
+                    Logger?.LogDebug("添加搜索结果：{Name} ({Code})", asset.Name, asset.Code);
                 }
 
                 IsSearchResultVisible = SearchResults.Count > 0;
@@ -142,25 +150,25 @@ public partial class HomeSearchViewModel : ViewModelBase
             
             if (results.Count == 0)
             {
-                Logger?.LogWarning("未找到匹配的股票，查询：{Query}", query);
+                Logger?.LogWarning("未找到匹配的资产，查询：{Query}", query);
             }
-        }, "搜索股票");
+        }, "搜索资产");
 
         IsSearching = false;
     }
 
     /// <summary>
-    /// 选择股票
+    /// 选择资产
     /// </summary>
-    private void OnSelectStock(StockItem? stock)
+    private void OnSelectAsset(AssetItem? asset)
     {
-        if (stock == null) return;
+        if (asset == null) return;
 
         // 隐藏搜索结果
         IsSearchResultVisible = false;
 
         // 通知父ViewModel
-        StockSelected?.Invoke(this, stock);
+        AssetSelected?.Invoke(this, asset);
     }
 
     /// <summary>

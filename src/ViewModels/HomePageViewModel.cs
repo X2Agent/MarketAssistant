@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.ViewModels.Home;
 using Microsoft.Extensions.Logging;
 
@@ -16,14 +16,14 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     public HomeSearchViewModel Search { get; }
 
     /// <summary>
-    /// 热门股票ViewModel
+    /// 热门资产ViewModel
     /// </summary>
-    public HotStocksViewModel HotStocks { get; }
+    public HotAssetsViewModel HotAssets { get; }
 
     /// <summary>
     /// 最近查看ViewModel
     /// </summary>
-    public RecentStocksViewModel RecentStocks { get; }
+    public RecentAssetsViewModel RecentAssets { get; }
 
     /// <summary>
     /// 新闻快讯ViewModel
@@ -35,61 +35,82 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public HomePageViewModel(
         HomeSearchViewModel searchViewModel,
-        HotStocksViewModel hotStocksViewModel,
-        RecentStocksViewModel recentStocksViewModel,
+        HotAssetsViewModel hotAssetsViewModel,
+        RecentAssetsViewModel recentAssetsViewModel,
         TelegraphNewsViewModel newsViewModel,
         ILogger<HomePageViewModel> logger) : base(logger)
     {
         Search = searchViewModel;
-        HotStocks = hotStocksViewModel;
-        RecentStocks = recentStocksViewModel;
+        HotAssets = hotAssetsViewModel;
+        RecentAssets = recentAssetsViewModel;
         News = newsViewModel;
 
         // 订阅子ViewModel事件
-        Search.StockSelected += OnStockSelected;
-        HotStocks.HotStockSelected += OnHotStockSelected;
-        RecentStocks.RecentStockSelected += OnRecentStockSelected;
+        Search.AssetSelected += OnAssetSelected;
+        HotAssets.HotAssetSelected += OnHotAssetSelected;
+        RecentAssets.RecentAssetSelected += OnRecentAssetSelected;
     }
 
     /// <summary>
-    /// 处理搜索股票选择事件
+    /// 处理搜索资产选择事件
     /// </summary>
-    private void OnStockSelected(object? sender, StockItem stock)
+    private void OnAssetSelected(object? sender, AssetItem asset)
     {
-        NavigateToStock(stock);
+        NavigateToAsset(asset);
     }
 
     /// <summary>
-    /// 处理热门股票选择事件
+    /// 处理热门资产选择事件
     /// </summary>
-    private void OnHotStockSelected(object? sender, HotStock stock)
+    private void OnHotAssetSelected(object? sender, HotAsset asset)
     {
-        var stockCode = $"{stock.Market}{stock.Code}".ToLower();
-        var stockItem = new StockItem { Name = stock.Name, Code = stockCode };
-        NavigateToStock(stockItem);
+        var assetCode = $"{asset.Market}{asset.Code}".ToLower();
+        
+        // 解析价格信息
+        decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
+        decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;
+        
+        // 传递完整的基本信息，避免详情页等待
+        var parameter = new AssetNavigationParameter(
+            assetCode,
+            asset.Name,
+            currentPrice,
+            changePercent
+        );
+        
+        WeakReferenceMessenger.Default.Send(new NavigationMessage("Asset", parameter));
+        Logger?.LogInformation($"导航到资产详情页: {assetCode}");
+        
+        // 异步添加到最近查看
+        var assetItem = new AssetItem { Name = asset.Name, Code = assetCode };
+        _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
     }
 
     /// <summary>
-    /// 处理最近股票选择事件
+    /// 处理最近资产选择事件
     /// </summary>
-    private void OnRecentStockSelected(object? sender, StockItem stock)
+    private void OnRecentAssetSelected(object? sender, AssetItem asset)
     {
-        NavigateToStock(stock);
+        NavigateToAsset(asset);
     }
 
     /// <summary>
-    /// 导航到股票详情页
+    /// 导航到资产详情页
     /// </summary>
-    private void NavigateToStock(StockItem stockItem)
+    private void NavigateToAsset(AssetItem assetItem, decimal? currentPrice = null, decimal? changePercent = null)
     {
         // 立即发送导航消息，不阻塞UI
         WeakReferenceMessenger.Default.Send(
-            new NavigationMessage("Stock", new StockNavigationParameter(stockItem.Code, stockItem.Name)));
+            new NavigationMessage("Asset", new AssetNavigationParameter(
+                assetItem.Code, 
+                assetItem.Name,
+                currentPrice,
+                changePercent)));
 
-        Logger?.LogInformation($"导航到股票详情页: {stockItem.Code}");
+        Logger?.LogInformation($"导航到资产详情页: {assetItem.Code}");
 
         // 异步添加到最近查看，不阻塞导航
-        _ = Task.Run(() => RecentStocks.AddToRecentStocks(stockItem));
+        _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
     }
 
     /// <summary>
@@ -111,19 +132,19 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 刷新热门股票
+    /// 刷新热门资产
     /// </summary>
-    public async Task RefreshHotStocksAsync()
+    public async Task RefreshHotAssetsAsync()
     {
-        await HotStocks.LoadHotStocksAsync();
+        await HotAssets.LoadHotAssetsAsync();
     }
 
     /// <summary>
-    /// 刷新最近查看股票
+    /// 刷新最近查看资产
     /// </summary>
-    public void RefreshRecentStocks()
+    public void RefreshRecentAssets()
     {
-        RecentStocks.LoadRecentStocks();
+        RecentAssets.LoadRecentAssets();
     }
 
     /// <summary>
@@ -132,9 +153,9 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         // 取消事件订阅
-        Search.StockSelected -= OnStockSelected;
-        HotStocks.HotStockSelected -= OnHotStockSelected;
-        RecentStocks.RecentStockSelected -= OnRecentStockSelected;
+        Search.AssetSelected -= OnAssetSelected;
+        HotAssets.HotAssetSelected -= OnHotAssetSelected;
+        RecentAssets.RecentAssetSelected -= OnRecentAssetSelected;
 
         // 释放子ViewModel资源
         News.Dispose();

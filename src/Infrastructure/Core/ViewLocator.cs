@@ -36,11 +36,11 @@ public class ViewLocator : IDataTemplate
         {
             HomePageViewModel => new HomePageView { DataContext = data },
             FavoritesPageViewModel => new FavoritesPageView { DataContext = data },
-            StockSelectionPageViewModel => new StockSelectionPageView { DataContext = data },
+            AssetSelectionPageViewModel => new AssetSelectionPageView { DataContext = data },
             SettingsPageViewModel => new SettingsPageView { DataContext = data },
             AboutPageViewModel => new AboutPageView { DataContext = data },
             MCPConfigPageViewModel => new MCPConfigPageView { DataContext = data },
-            StockPageViewModel => new StockPageView { DataContext = data },
+            AssetPageViewModel => new AssetPageView { DataContext = data },
             AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
             ChatSidebarDemoViewModel => new ChatSidebarDemoView { DataContext = data },
             _ => new TextBlock { Text = $"未找到视图: {viewModelType.Name}" }

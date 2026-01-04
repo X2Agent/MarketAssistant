@@ -9,7 +9,7 @@ using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.StockScreener;
+using MarketAssistant.Applications.AssetScreener;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

@@ -1,67 +1,78 @@
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Applications.Stocks;
-using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Applications.Assets;
+using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
+using MarketAssistant.Applications.Favorites;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Market;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
-/// 收藏页ViewModel - 对应 FavoritesViewModel
+/// 收藏页ViewModel
 /// </summary>
-public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFavoritesChanged>
+public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>
 {
-    private readonly StockFavoriteService _favoriteService;
-    private readonly StockService _stockService;
-    private readonly StockInfoCache _stockInfoCache;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
 
-    public ObservableCollection<StockInfo> Stocks { get; set; } = new ObservableCollection<StockInfo>();
+    private IFavoriteService FavoriteService => 
+        _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
+
+    private IAssetInfoService AssetInfoService => 
+        _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
+
+    private IAssetCacheService CacheService => 
+        _serviceProvider.GetRequiredKeyedService<IAssetCacheService>(_marketContext.CurrentMarket);
+
+    public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
 
     /// <summary>
     /// 构造函数
     /// </summary>
     public FavoritesPageViewModel(
-        StockFavoriteService favoriteService,
-        StockService stockService,
-        StockInfoCache stockInfoCache,
+        IServiceProvider serviceProvider,
+        MarketContext marketContext,
         IDialogService dialogService,
         ILogger<FavoritesPageViewModel> logger)
         : base(logger)
     {
-        _favoriteService = favoriteService;
-        _stockService = stockService;
-        _stockInfoCache = stockInfoCache;
+        _serviceProvider = serviceProvider;
+        _marketContext = marketContext;
         _dialogService = dialogService;
-        _ = LoadFavoriteStocksAsync();
+        _ = LoadFavoriteAssetsAsync();
         WeakReferenceMessenger.Default.Register(this);
     }
 
     /// <summary>
-    /// 加载收藏股票列表
+    /// 加载收藏资产列表
     /// </summary>
-    private async Task LoadFavoriteStocksAsync()
+    private async Task LoadFavoriteAssetsAsync()
     {
         await SafeExecuteAsync(async () =>
         {
             // 获取收藏列表
-            var favoritesCodes = _favoriteService.GetFavoritesCodes();
+            var favoritesCodes = FavoriteService.GetFavoritesCodes();
 
-            Stocks.Clear();
+            Assets.Clear();
 
-            // 使用并发加载所有股票数据
-            await UpdateStockDataProgressivelyAsync(favoritesCodes);
+            // 使用并发加载所有资产数据
+            await UpdateAssetDataProgressivelyAsync(favoritesCodes);
         }, "加载收藏列表");
     }
 
     /// <summary>
-    /// 渐进式加载股票实时数据（限制并发数，避免同时打开过多浏览器页面）
+    /// 渐进式加载资产实时数据（限制并发数，避免同时打开过多浏览器页面）
     /// </summary>
-    private async Task UpdateStockDataProgressivelyAsync(List<FavoriteStock> favorites)
+    private async Task UpdateAssetDataProgressivelyAsync(List<FavoriteAsset> favorites)
     {
-        const int maxConcurrency = 3; // 最多同时请求3个股票数据
+        const int maxConcurrency = 3; // 最多同时请求3个资产数据
         var semaphore = new SemaphoreSlim(maxConcurrency);
 
         var tasks = favorites.Select(async favorite =>
@@ -70,24 +81,24 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
             try
             {
                 // 先尝试从缓存获取
-                var stockInfo = _stockInfoCache.Get(favorite.Code, favorite.Market);
+                var assetInfo = await CacheService.GetCachedAssetInfoAsync(favorite.Code);
 
                 // 如果缓存中没有,则从网络获取
-                if (stockInfo == null)
+                if (assetInfo == null)
                 {
-                    stockInfo = await _stockService.GetStockInfoAsync(favorite.Code, favorite.Market);
+                    assetInfo = await AssetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market);
                     // 缓存获取到的数据
-                    if (stockInfo != null)
+                    if (assetInfo != null)
                     {
-                        _stockInfoCache.Set(stockInfo);
+                        CacheService.CacheAssetInfo(favorite.Code, assetInfo);
                     }
                 }
 
-                return stockInfo;
+                return assetInfo;
             }
             catch (Exception ex)
             {
-                Logger?.LogError(ex, $"加载股票 {favorite.Code} 数据时出错");
+                Logger?.LogError(ex, $"加载资产 {favorite.Code} 数据时出错");
                 return null;
             }
             finally
@@ -99,39 +110,48 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
         var results = await Task.WhenAll(tasks);
 
         // 在UI线程上批量添加结果
-        foreach (var stockInfo in results)
+        foreach (var assetInfo in results)
         {
-            if (stockInfo != null)
+            if (assetInfo != null)
             {
-                Stocks.Add(stockInfo);
+                Assets.Add(assetInfo);
             }
         }
     }
 
     /// <summary>
-    /// 选择收藏股票
+    /// 选择收藏资产
     /// </summary>
     [RelayCommand]
-    private void SelectFavoriteStock(StockInfo? stock)
+    private void SelectFavoriteAsset(AssetInfo? asset)
     {
-        if (stock == null) return;
+        if (asset == null) return;
 
+        // 解析价格信息
+        decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
+        decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;
+
+        // 传递完整的基本信息，加速详情页显示
         WeakReferenceMessenger.Default.Send(
-            new NavigationMessage("Stock", new StockNavigationParameter(stock.FullCode, stock.Name)));
+            new NavigationMessage("Asset", new AssetNavigationParameter(
+                asset.Code, 
+                asset.Name,
+                currentPrice,
+                changePercent)));
     }
 
     /// <summary>
-    /// 移除收藏股票
+    /// 移除收藏资产
     /// </summary>
     [RelayCommand]
-    private async Task RemoveFavorite(StockInfo? stock)
+    private async Task RemoveFavorite(AssetInfo? asset)
     {
-        if (stock == null) return;
+        if (asset == null) return;
 
         // 显示确认对话框
         var confirmed = await _dialogService.ShowConfirmationAsync(
             "取消收藏",
-            $"确定要取消收藏 {stock.Name}({stock.Code}) 吗？",
+            $"确定要取消收藏 {asset.Name}({asset.Code}) 吗？",
             "确定",
             "取消"
         );
@@ -142,16 +162,16 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
             await SafeExecuteAsync(async () =>
             {
                 // 先从UI集合中移除（避免因消息触发重新加载导致的竞态条件）
-                var stockToRemove = Stocks.FirstOrDefault(s => s.Code == stock.Code && s.Market == stock.Market);
-                if (stockToRemove != null)
+                var assetToRemove = Assets.FirstOrDefault(s => s.Code == asset.Code && s.Market == asset.Market);
+                if (assetToRemove != null)
                 {
-                    Stocks.Remove(stockToRemove);
+                    Assets.Remove(assetToRemove);
                 }
 
                 // 再从持久化存储中移除
-                _favoriteService.RemoveFavorite(stock.Code, stock.Market);
+                FavoriteService.RemoveFavorite(asset.Code, asset.Market);
 
-                Logger?.LogInformation($"已取消收藏股票: {stock.Name}({stock.Code})");
+                Logger?.LogInformation($"已取消收藏资产: {asset.Name}({asset.Code})");
                 await Task.CompletedTask;
             }, "取消收藏");
         }
@@ -160,8 +180,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<StockFav
     /// <summary>
     /// 接收收藏变更消息
     /// </summary>
-    public void Receive(StockFavoritesChanged message)
+    public void Receive(AssetFavoritesChanged message)
     {
-        _ = LoadFavoriteStocksAsync();
+        _ = LoadFavoriteAssetsAsync();
     }
 }

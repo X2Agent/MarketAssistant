@@ -1,5 +1,9 @@
 using MarketAssistant.Agents.Analysts;
+using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure.Factories;
@@ -29,15 +33,18 @@ public class AnalystAgentFactory : IAnalystAgentFactory
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IChatClientFactory _chatClientFactory;
+    private readonly MarketContext _marketContext;
     private readonly ILogger<AnalystAgentFactory> _logger;
 
     public AnalystAgentFactory(
         IServiceProvider serviceProvider,
         IChatClientFactory chatClientFactory,
+        MarketContext marketContext,
         ILogger<AnalystAgentFactory> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+        _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -57,13 +64,19 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             // 创建 ChatClient
             var chatClient = _chatClientFactory.CreateClient();
 
+            // 根据当前市场类型获取对应的工具实现
+            var currentMarket = _marketContext.CurrentMarket;
+
+            // 根据 Analyst 类型获取需要的工具
+            var tools = ResolveToolsForAnalyst(agentType, currentMarket);
+
             // 使用 ActivatorUtilities.CreateInstance
-            // 显式传递 chatClient，其他依赖从 DI 获取
-            var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, chatClient);
+            // 显式传递 chatClient 和工具，其他依赖从 DI 获取
+            var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, chatClient, tools.ToArray());
 
             _logger.LogInformation(
-                "成功创建分析师代理: {AgentType}",
-                agentType.Name);
+                "成功创建分析师代理: {AgentType} (市场: {Market})",
+                agentType.Name, currentMarket);
 
             return agent;
         }
@@ -72,6 +85,45 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             _logger.LogError(ex, "创建分析师代理时发生错误: {AgentType}", agentType.Name);
             throw;
         }
+    }
+
+    /// <summary>
+    /// 根据 Analyst 类型和市场类型解析所需的工具
+    /// </summary>
+    private List<object> ResolveToolsForAnalyst(Type agentType, MarketType marketType)
+    {
+        var tools = new List<object>();
+
+        // 根据不同的 Analyst 类型，解析对应的工具接口
+        switch (agentType.Name)
+        {
+            case nameof(FinancialAnalystAgent):
+                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialDataTools>(marketType));
+                break;
+
+            case nameof(FundamentalAnalystAgent):
+                tools.Add(_serviceProvider.GetRequiredKeyedService<IBasicDataTools>(marketType));
+                break;
+
+            case nameof(MarketSentimentAnalystAgent):
+                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialDataTools>(marketType));
+                tools.Add(_serviceProvider.GetRequiredKeyedService<ISentimentDataTools>(marketType));
+                break;
+
+            case nameof(NewsEventAnalystAgent):
+                tools.Add(_serviceProvider.GetRequiredKeyedService<INewsDataTools>(marketType));
+                break;
+
+            case nameof(TechnicalAnalystAgent):
+                tools.Add(_serviceProvider.GetRequiredKeyedService<ITechnicalDataTools>(marketType));
+                break;
+
+            default:
+                _logger.LogWarning("未知的 Analyst 类型: {AgentType}，不注入任何工具", agentType.Name);
+                break;
+        }
+
+        return tools;
     }
 
     /// <summary>

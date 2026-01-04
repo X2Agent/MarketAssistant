@@ -1,5 +1,5 @@
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Agents.Tools;
+using MarketAssistant.Agents.Tools.Abstractions;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
@@ -23,7 +23,7 @@ public class FinancialAnalystAgent : AnalystAgentBase
 
     public FinancialAnalystAgent(
         IChatClient chatClient,
-        StockFinancialTools financialTools)
+        IFinancialDataTools financialTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

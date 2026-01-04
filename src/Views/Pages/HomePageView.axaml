@@ -6,7 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              xmlns:telegrams="using:MarketAssistant.Applications.Telegrams"
-             xmlns:stocks="using:MarketAssistant.Applications.Stocks.Models"
+             xmlns:assets="using:MarketAssistant.Applications.Assets.Models"
              xmlns:converts="using:MarketAssistant.Converts"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.HomePageView"
@@ -24,7 +24,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <AutoCompleteBox x:Name="StockSearchBox"
                                  Grid.Column="0"
-                                 Watermark="输入股票代码或名称"
+                                 Watermark="输入资产代码或名称"
                                  MinimumPrefixLength="1"
                                  ItemsSource="{Binding Search.SearchResults}"
                                  FilterMode="None"
@@ -36,22 +36,19 @@
                                  FontSize="{StaticResource SectionTitleFontSize}"
                                  Padding="{StaticResource SmallCardPadding}">
                     <AutoCompleteBox.ItemTemplate>
-                        <DataTemplate x:DataType="stocks:StockItem">
-                            <Border Background="Transparent"
-                                    Cursor="Hand"
-                                    PointerPressed="SearchResultItem_PointerPressed"
-                                    Tag="{Binding .}">
-                                <StackPanel Margin="{StaticResource TinyMargin}">
-                                    <TextBlock Text="{Binding Name}" 
-                                               FontWeight="SemiBold"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               IsHitTestVisible="False"/>
-                                    <TextBlock Text="{Binding Code}" 
-                                               FontSize="{StaticResource SmallFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               IsHitTestVisible="False"/>
-                                </StackPanel>
-                            </Border>
+                        <DataTemplate x:DataType="assets:AssetItem">
+                            <StackPanel Margin="{StaticResource TinyMargin}"
+                                       Background="Transparent"
+                                       Cursor="Hand"
+                                       PointerPressed="SearchResultItem_PointerPressed"
+                                       Tag="{Binding .}">
+                                <TextBlock Text="{Binding Name}" 
+                                           FontWeight="SemiBold"
+                                           FontSize="{StaticResource LabelFontSize}"/>
+                                <TextBlock Text="{Binding Code}" 
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
                         </DataTemplate>
                     </AutoCompleteBox.ItemTemplate>
                 </AutoCompleteBox>
@@ -180,14 +177,14 @@
                 </controls:CardView.Header>
                 
                 <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding HotStocks.HotStocks}">
+                    <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="2" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="stocks:HotStock">
+                            <DataTemplate x:DataType="assets:HotAsset">
                                 <Border Classes="hot-stock-card" 
                                         Margin="{StaticResource TinyMargin}" 
                                         Padding="{StaticResource DefaultCardPadding}"
@@ -239,7 +236,7 @@
                                         <Button Grid.Row="2" Grid.Column="1"
                                                 Classes="favorite-button"
                                                 Background="Transparent"
-                                                Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotStocks.AddToFavoriteCommand}"
+                                                Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.AddToFavoriteCommand}"
                                                 CommandParameter="{Binding .}"
                                                 Tapped="OnPreventTapped"
                                                 Width="{StaticResource SmallIconSize}"
@@ -262,7 +259,7 @@
             <controls:CardView Grid.Column="2" Header="最近查看">
                 <ScrollViewer>
                     <Panel>
-                        <ItemsControl ItemsSource="{Binding RecentStocks.RecentStocks}">
+                        <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Spacing="{StaticResource SmallSpacing}"/>
@@ -270,7 +267,7 @@
                             </ItemsControl.ItemsPanel>
                             
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="stocks:StockItem">
+                                <DataTemplate x:DataType="assets:AssetItem">
                                     <Border Classes="recent-stock-card" 
                                             Tapped="RecentStockCard_Tapped"
                                             Tag="{Binding .}">
@@ -290,7 +287,7 @@
                                             <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
                                                     Classes="favorite-button"
                                                     Background="Transparent"
-                                                    Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentStocks.AddToFavoriteCommand}"
+                                                    Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentAssets.AddToFavoriteCommand}"
                                                     CommandParameter="{Binding .}"
                                                     Tapped="OnPreventTapped"
                                                     Width="{StaticResource DefaultIconSize}"
@@ -309,7 +306,7 @@
                         </ItemsControl>
                         
                         <!-- 空视图提示 -->
-                        <StackPanel IsVisible="{Binding !RecentStocks.RecentStocks.Count}"
+                        <StackPanel IsVisible="{Binding !RecentAssets.RecentAssets.Count}"
                                     HorizontalAlignment="Center"
                                     VerticalAlignment="Center"
                                     Spacing="{StaticResource DefaultSpacing}">
@@ -320,7 +317,7 @@
                             <TextBlock Text="暂无查看记录"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"/>
-                            <TextBlock Text="搜索或浏览热门股票以添加记录"
+                            <TextBlock Text="搜索或浏览热门资产以添加记录"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        HorizontalAlignment="Center"

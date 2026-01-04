@@ -23,6 +23,11 @@
         <converts:NavigationIconConverter x:Key="NavigationIconConverter"/>
     </Window.Resources>
 
+    <Window.KeyBindings>
+        <!-- Ctrl+M 快捷键切换市场 -->
+        <KeyBinding Gesture="Ctrl+M" Command="{Binding ToggleMarketCommand}"/>
+    </Window.KeyBindings>
+
     <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,*">
         <!-- 左侧图标导航栏 -->
         <Border Grid.Column="0"
@@ -32,19 +37,33 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource RightBorderThickness}">
             <StackPanel Margin="{StaticResource LogoTopMargin}" Spacing="{StaticResource TinySpacing}">
-                <!-- 应用Logo图标 -->
-                <Border Margin="{StaticResource LogoBottomMargin}" 
+                <!-- 应用Logo图标（点击切换市场） -->
+                <Button Margin="{StaticResource LogoBottomMargin}" 
                         Width="{StaticResource AppLogoSize}"
                         Height="{StaticResource AppLogoSize}"
                         CornerRadius="{StaticResource DefaultCornerRadius}"
                         HorizontalAlignment="Center"
-                        ToolTip.Tip="MarketAssistant"
-                        ClipToBounds="True">
-                    <Image Source="/Assets/logo.png"
-                           Stretch="UniformToFill"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"/>
-                </Border>
+                        Padding="0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Command="{Binding ToggleMarketCommand}">
+                    <ToolTip.Tip>
+                        <StackPanel>
+                            <TextBlock Text="点击切换市场" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding CurrentMarketText}" FontSize="11" Opacity="0.8"/>
+                            <TextBlock Text="快捷键: Ctrl+M" FontSize="10" Opacity="0.6"/>
+                        </StackPanel>
+                    </ToolTip.Tip>
+                    <Border Width="{StaticResource AppLogoSize}"
+                            Height="{StaticResource AppLogoSize}"
+                            CornerRadius="{StaticResource DefaultCornerRadius}"
+                            ClipToBounds="True">
+                        <Image Source="/Assets/logo.png"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                    </Border>
+                </Button>
 
                 <!-- 导航菜单 -->
                 <ListBox ItemsSource="{Binding NavigationItems}"

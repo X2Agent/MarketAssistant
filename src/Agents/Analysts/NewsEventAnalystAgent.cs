@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Agents.Tools;
+using MarketAssistant.Agents.Tools.Abstractions;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
@@ -24,7 +24,7 @@ public class NewsEventAnalystAgent : AnalystAgentBase
 
     public NewsEventAnalystAgent(
         IChatClient chatClient,
-        StockNewsTools newsTools)
+        INewsDataTools newsTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

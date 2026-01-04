@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.StockSelection.Executors;
 using MarketAssistant.Agents.StockSelection.Models;
-using MarketAssistant.Services.StockScreener.Models;
+using MarketAssistant.Applications.AssetScreener.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant;

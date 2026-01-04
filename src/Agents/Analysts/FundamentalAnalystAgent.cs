@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Agents.Tools;
+using MarketAssistant.Agents.Tools.Abstractions;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
@@ -25,7 +25,7 @@ public class FundamentalAnalystAgent : AnalystAgentBase
 
     public FundamentalAnalystAgent(
         IChatClient chatClient,
-        StockBasicTools basicTools)
+        IBasicDataTools basicTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

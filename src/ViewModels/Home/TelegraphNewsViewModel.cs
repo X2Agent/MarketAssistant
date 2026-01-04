@@ -2,8 +2,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
+using MarketAssistant.Services.Market;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace MarketAssistant.ViewModels.Home;
@@ -13,7 +16,9 @@ namespace MarketAssistant.ViewModels.Home;
 /// </summary>
 public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
 {
-    private readonly INewsUpdateService _newsUpdateService;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly MarketContext _marketContext;
+    private INewsUpdateService _newsUpdateService;
     private bool _disposed;
 
     [ObservableProperty]
@@ -44,10 +49,18 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     /// </summary>
     public IRelayCommand StopUpdatesCommand { get; }
 
-    public TelegraphNewsViewModel(INewsUpdateService newsUpdateService, ILogger<TelegraphNewsViewModel> logger)
+    public TelegraphNewsViewModel(
+        IServiceProvider serviceProvider,
+        MarketContext marketContext,
+        ILogger<TelegraphNewsViewModel> logger)
         : base(logger)
     {
-        _newsUpdateService = newsUpdateService;
+        _serviceProvider = serviceProvider;
+        _marketContext = marketContext;
+
+        // 根据当前市场类型获取对应的 NewsUpdateService
+        _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(
+            _marketContext.CurrentMarket.ToString());
 
         OpenNewsCommand = new AsyncRelayCommand<Telegram>(OnOpenNewsAsync);
         RefreshCommand = new RelayCommand(() => _newsUpdateService.StartUpdates());
@@ -58,8 +71,59 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         _newsUpdateService.NewsUpdated += OnNewsUpdated;
         _newsUpdateService.CountdownUpdated += OnCountdownUpdated;
 
+        // 订阅市场切换事件
+        _marketContext.PropertyChanged += OnMarketContextPropertyChanged;
+
         // 自动启动新闻更新
         _newsUpdateService.StartUpdates();
+    }
+
+    /// <summary>
+    /// 处理市场切换事件
+    /// </summary>
+    private void OnMarketContextPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MarketContext.CurrentMarket))
+        {
+            OnMarketChanged(_marketContext.CurrentMarket);
+        }
+    }
+
+    /// <summary>
+    /// 市场切换时更换新闻服务
+    /// </summary>
+    private void OnMarketChanged(MarketType newMarket)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            // 记录旧服务状态
+            var wasRunning = _newsUpdateService.IsRunning;
+
+            // 停止旧服务并取消事件订阅
+            _newsUpdateService.StopUpdates();
+            _newsUpdateService.NewsUpdated -= OnNewsUpdated;
+            _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
+
+            // 获取新市场的服务
+            _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(
+                newMarket.ToString());
+
+            // 订阅新服务事件
+            _newsUpdateService.NewsUpdated += OnNewsUpdated;
+            _newsUpdateService.CountdownUpdated += OnCountdownUpdated;
+
+            // 清空旧新闻
+            Telegraphs.Clear();
+            TelegraphRefreshCountdown = "";
+
+            // 如果之前在运行，重新启动
+            if (wasRunning)
+            {
+                _newsUpdateService.StartUpdates();
+            }
+
+            Logger?.LogInformation("已切换到 {Market} 市场新闻源", newMarket);
+        });
     }
 
     /// <summary>
@@ -141,7 +205,10 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     {
         if (!_disposed)
         {
-            // 取消事件订阅
+            // 取消市场切换事件订阅
+            _marketContext.PropertyChanged -= OnMarketContextPropertyChanged;
+
+            // 取消新闻服务事件订阅
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;
             _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
 

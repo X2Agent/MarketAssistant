@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using MarketAssistant.Applications.Stocks.Models;
+using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.ViewModels;
 
@@ -20,7 +20,7 @@ public partial class HomePageView : UserControl
     private void SearchResultItem_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is Border border &&
-            border.Tag is StockItem selectedStock &&
+            border.Tag is AssetItem selectedAsset &&
             DataContext is HomePageViewModel viewModel)
         {
             // 标记事件已处理，防止AutoCompleteBox处理
@@ -30,7 +30,7 @@ public partial class HomePageView : UserControl
             viewModel.Search.IsSearchResultVisible = false;
 
             // 执行导航
-            viewModel.Search.SelectStockCommand.Execute(selectedStock);
+            viewModel.Search.SelectAssetCommand.Execute(selectedAsset);
         }
     }
 
@@ -43,28 +43,28 @@ public partial class HomePageView : UserControl
     }
 
     /// <summary>
-    /// 热门股票卡片点击事件
+    /// 热门资产卡片点击事件
     /// </summary>
     private void HotStockCard_Tapped(object? sender, RoutedEventArgs e)
     {
         if (sender is Border border &&
-            border.Tag is HotStock hotStock &&
+            border.Tag is HotAsset hotAsset &&
             DataContext is HomePageViewModel viewModel)
         {
-            viewModel.HotStocks.SelectHotStockCommand.Execute(hotStock);
+            viewModel.HotAssets.SelectHotAssetCommand.Execute(hotAsset);
         }
     }
 
     /// <summary>
-    /// 最近查看股票卡片点击事件
+    /// 最近查看资产卡片点击事件
     /// </summary>
     private void RecentStockCard_Tapped(object? sender, RoutedEventArgs e)
     {
         if (sender is Border border &&
-            border.Tag is StockItem stockItem &&
+            border.Tag is AssetItem assetItem &&
             DataContext is HomePageViewModel viewModel)
         {
-            viewModel.RecentStocks.SelectRecentStockCommand.Execute(stockItem);
+            viewModel.RecentAssets.SelectRecentAssetCommand.Execute(assetItem);
         }
     }
 

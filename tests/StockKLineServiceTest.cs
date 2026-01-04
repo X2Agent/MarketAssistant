@@ -1,5 +1,5 @@
+using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Applications.Stocks;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -9,7 +9,7 @@ namespace TestMarketAssistant;
 [TestClass]
 public class StockKLineServiceTest
 {
-    private StockKLineService _stockKLineService = null!;
+    private AShareKLineService _stockKLineService = null!;
     private Mock<IUserSettingService> _mockUserSettingService = null!;
 
     [TestInitialize]
@@ -17,7 +17,7 @@ public class StockKLineServiceTest
     {
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
 
-        // 创建模拟的用户设置服�?
+        // 创建模拟的用户设置服�?
         _mockUserSettingService = new Mock<IUserSettingService>();
         var testUserSetting = new UserSetting
         {
@@ -25,9 +25,9 @@ public class StockKLineServiceTest
         };
         _mockUserSettingService.Setup(x => x.CurrentSetting).Returns(testUserSetting);
 
-        // 使用NullLogger和模拟的用户设置服务创建StockKLineService实例
-        _stockKLineService = new StockKLineService(
-            NullLogger<StockKLineService>.Instance,
+        // 使用NullLogger和模拟的用户设置服务创建AShareKLineService实例
+        _stockKLineService = new AShareKLineService(
+            NullLogger<AShareKLineService>.Instance,
             _mockUserSettingService.Object);
     }
 
@@ -42,9 +42,8 @@ public class StockKLineServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual("daily", result.Interval);
-        Assert.IsTrue(result.Data.Count > 0);
+        Assert.IsTrue(result.Count > 0);
+        Assert.IsTrue(result[0].Timestamp != default);
     }
 
     [TestMethod]
@@ -58,9 +57,8 @@ public class StockKLineServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual("weekly", result.Interval);
-        Assert.IsTrue(result.Data.Count > 0);
+        Assert.IsTrue(result.Count > 0);
+        Assert.IsTrue(result[0].Timestamp != default);
     }
 
     [TestMethod]
@@ -74,25 +72,22 @@ public class StockKLineServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual("monthly", result.Interval);
-        Assert.IsTrue(result.Data.Count > 0);
+        Assert.IsTrue(result.Count > 0);
+        Assert.IsTrue(result[0].Timestamp != default);
     }
 
     [TestMethod]
-    public async Task GetMinuteKLineDataAsync_ValidSymbol_ReturnsCorrectData()
+    public async Task Get5MinuteKLineDataAsync_ValidSymbol_ReturnsCorrectData()
     {
         // Arrange
         string symbol = "600000.SH";
-        string interval = "5";
 
         // Act
-        var result = await _stockKLineService.GetMinuteKLineDataAsync(symbol, interval);
+        var result = await _stockKLineService.Get5MinuteKLineDataAsync(symbol);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(symbol, result.Symbol);
-        Assert.AreEqual("5min", result.Interval);
-        Assert.IsTrue(result.Data.Count > 0);
+        Assert.IsTrue(result.Count > 0);
+        Assert.IsTrue(result[0].Timestamp != default);
     }
 }

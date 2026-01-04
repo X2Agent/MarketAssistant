@@ -5,7 +5,7 @@
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converts"
-             xmlns:stocks="using:MarketAssistant.Applications.Stocks.Models"
+             xmlns:assets="using:MarketAssistant.Applications.Assets.Models"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.FavoritesPageView"
@@ -54,7 +54,7 @@
                 <!-- 内容区域（非加载状态） -->
                 <Grid IsVisible="{Binding !IsBusy}">
                     <!-- 空视图 -->
-                    <StackPanel IsVisible="{Binding !Stocks.Count}"
+                    <StackPanel IsVisible="{Binding !Assets.Count}"
                                 HorizontalAlignment="Center" 
                                 VerticalAlignment="Center" 
                                 Spacing="{StaticResource DefaultSpacing}">
@@ -62,18 +62,18 @@
                                  Width="{StaticResource LargeIconSize}" 
                                  Height="{StaticResource LargeIconSize}" 
                                  HorizontalAlignment="Center"/>
-                        <TextBlock Text="暂无收藏股票" 
+                        <TextBlock Text="暂无收藏资产" 
                                    HorizontalAlignment="Center" 
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="在股票详情页点击收藏按钮添加" 
+                        <TextBlock Text="在资产详情页点击收藏按钮添加" 
                                    HorizontalAlignment="Center" 
                                    Foreground="{DynamicResource TextSecondaryBrush}" 
                                    FontSize="{StaticResource SmallFontSize}" />
                     </StackPanel>
 
-                    <!-- 股票网格 -->
-                    <ItemsControl ItemsSource="{Binding Stocks}"
-                                  IsVisible="{Binding Stocks.Count}">
+                    <!-- 资产网格 -->
+                    <ItemsControl ItemsSource="{Binding Assets}"
+                                  IsVisible="{Binding Assets.Count}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="4" VerticalAlignment="Top"/>
@@ -81,7 +81,7 @@
                         </ItemsControl.ItemsPanel>
                     
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="stocks:StockInfo">
+                        <DataTemplate x:DataType="assets:AssetInfo">
                             <Border Classes="stock-card"
                                     Margin="{StaticResource SmallMargin}"
                                     Tapped="OnStockItemTapped"

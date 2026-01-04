@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
@@ -29,6 +30,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     private readonly IUserSettingService _userSettingService;
     private readonly IEmbeddingFactory _embeddingFactory;
     private readonly VectorStore _vectorStore;
+    private readonly Services.Market.MarketContext _marketContext;
     private IStorageProvider? _storageProvider;
 
     // UserSetting对象，包含所有用户设置
@@ -70,6 +72,41 @@ public partial class SettingsPageViewModel : ViewModelBase
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
+    public string BinanceApiUrl { get; } = "https://www.binance.com/zh-CN/support/faq/360002502072";
+
+    /// <summary>
+    /// 是否为A股市场
+    /// </summary>
+    public bool IsAShareMarket
+    {
+        get => UserSetting.CurrentMarketType == MarketType.AShare;
+        set
+        {
+            if (value)
+            {
+                UserSetting.CurrentMarketType = MarketType.AShare;
+                OnPropertyChanged(nameof(IsAShareMarket));
+                OnPropertyChanged(nameof(IsCryptoMarket));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 是否为虚拟币市场
+    /// </summary>
+    public bool IsCryptoMarket
+    {
+        get => UserSetting.CurrentMarketType == MarketType.Crypto;
+        set
+        {
+            if (value)
+            {
+                UserSetting.CurrentMarketType = MarketType.Crypto;
+                OnPropertyChanged(nameof(IsAShareMarket));
+                OnPropertyChanged(nameof(IsCryptoMarket));
+            }
+        }
+    }
 
     /// <summary>
     /// 构造函数（使用依赖注入）
@@ -80,6 +117,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         IUserSettingService userSettingService,
         IEmbeddingFactory embeddingFactory,
         VectorStore vectorStore,
+        Services.Market.MarketContext marketContext,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
         _ragIngestionService = ragIngestionService;
@@ -87,6 +125,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         _userSettingService = userSettingService;
         _embeddingFactory = embeddingFactory;
         _vectorStore = vectorStore;
+        _marketContext = marketContext;
         _ = InitializeAsync();
     }
 
@@ -104,8 +143,13 @@ public partial class SettingsPageViewModel : ViewModelBase
         await LoadModelsAsync();
         // 加载用户设置
         UserSetting = _userSettingService.CurrentSetting;
+        // 同步市场类型到MarketContext
+        _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         // 加载分析师角色
         LoadAnalystRoles();
+        // 触发属性变更通知
+        OnPropertyChanged(nameof(IsAShareMarket));
+        OnPropertyChanged(nameof(IsCryptoMarket));
     }
 
     private void LoadAnalystRoles()
@@ -153,6 +197,9 @@ public partial class SettingsPageViewModel : ViewModelBase
 
     [RelayCommand]
     private Task OpenZhiTuApiWebsite() => OpenUrlAsync(ZhiTuApiUrl);
+
+    [RelayCommand]
+    private Task OpenBinanceApiWebsite() => OpenUrlAsync(BinanceApiUrl);
 
     /// <summary>
     /// 选择知识库目录
@@ -371,9 +418,12 @@ public partial class SettingsPageViewModel : ViewModelBase
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
             }
 
+            // 同步市场类型到MarketContext
+            _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
+
             _userSettingService.UpdateSettings(UserSetting);
             _notificationService.ShowSuccess("设置已保存");
-            Logger?.LogInformation("保存设置");
+            Logger?.LogInformation("保存设置，市场类型：{MarketType}", UserSetting.CurrentMarketType);
         }, "保存设置");
     }
 

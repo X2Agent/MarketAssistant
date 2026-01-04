@@ -52,7 +52,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
 
         // 注册默认路由映射
         RegisterRoute<MCPConfigPageViewModel>("MCPConfig");
-        RegisterRoute<StockPageViewModel>("Stock");
+        RegisterRoute<AssetPageViewModel>("Asset");
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
 
         // 注册导航消息监听

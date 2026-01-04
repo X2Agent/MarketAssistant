@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Agents.Tools;
+using MarketAssistant.Agents.Tools.Abstractions;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
@@ -24,8 +24,8 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
 
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
-        StockFinancialTools financialTools,
-        MarketSentimentTools marketSentimentTools)
+        IFinancialDataTools financialTools,
+        ISentimentDataTools marketSentimentTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

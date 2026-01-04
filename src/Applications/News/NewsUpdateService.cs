@@ -10,7 +10,7 @@ namespace MarketAssistant.Applications.News;
 /// </summary>
 public class NewsUpdateService : INewsUpdateService
 {
-    private readonly TelegramService _telegramService;
+    private readonly ITelegramService _telegramService;
     private readonly ILogger<NewsUpdateService> _logger;
     private System.Timers.Timer? _updateTimer;
     private bool _disposed;
@@ -20,7 +20,7 @@ public class NewsUpdateService : INewsUpdateService
 
     public bool IsRunning => _updateTimer?.Enabled ?? false;
 
-    public NewsUpdateService(TelegramService telegramService, ILogger<NewsUpdateService> logger)
+    public NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpdateService> logger)
     {
         _telegramService = telegramService;
         _logger = logger;
