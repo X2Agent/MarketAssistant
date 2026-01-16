@@ -45,14 +45,9 @@ public class UserSetting : INotifyPropertyChanged
     public MarketType CurrentMarketType { get; set; } = MarketType.AShare;
 
     /// <summary>
-    /// 币安API密钥
+    /// CoinGecko API密钥（可选，免费版无需填写）
     /// </summary>
-    public string BinanceApiKey { get; set; } = "";
-
-    /// <summary>
-    /// 币安Secret密钥
-    /// </summary>
-    public string BinanceSecretKey { get; set; } = "";
+    public string CoinGeckoApiKey { get; set; } = "";
 
     /// <summary>
     /// 浏览器路径，如果为空则自动检测

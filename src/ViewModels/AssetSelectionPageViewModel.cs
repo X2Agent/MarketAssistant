@@ -291,7 +291,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
 
         await SafeExecuteAsync(async () =>
         {
-            var result = await _investmentSelectionService.QuickSelectAsync(strategy.Strategy);
+            var result = await _investmentSelectionService.QuickSelectAsync(strategy.Strategy, _marketContext.CurrentMarket);
             SelectionResult = result;
             HasResult = result != null && (
                 (result.Recommendations?.Count ?? 0) > 0 ||
@@ -384,7 +384,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
     {
         await SafeExecuteAsync(() =>
         {
-            var strategies = _investmentSelectionService.GetQuickSelectionStrategies();
+            var strategies = _investmentSelectionService.GetQuickSelectionStrategies(_marketContext.CurrentMarket);
             Dispatcher.UIThread.InvokeAsync(() =>
             {
                 QuickStrategies.Clear();

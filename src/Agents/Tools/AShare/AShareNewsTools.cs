@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;

@@ -59,18 +59,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GroundingSearchTools>();
 
         // 注册 Agent Tools - A股实现（Keyed Services）
-        services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IFinancialDataTools, AShareFinancialTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IShareBasicTools, AShareBasicTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare); // 注册为基接口
+        services.AddKeyedSingleton<IShareFinancialTools, AShareFinancialTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IFinancialTools, AShareFinancialTools>(MarketType.AShare); // 注册为基接口
         services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);
         services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ISentimentDataTools, AShareSentimentTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
+        services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
 
         // 注册 Agent Tools - 虚拟币实现（Keyed Services）
-        services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<IFinancialDataTools, CryptoFinancialTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ICryptoBasicTools, CryptoBasicTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto); // 注册为基接口
+        services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFinancialTools, CryptoMetricsTools>(MarketType.Crypto); // 注册为基接口
         services.AddKeyedSingleton<ITechnicalDataTools, CryptoTechnicalTools>(MarketType.Crypto);
         services.AddKeyedSingleton<INewsDataTools, CryptoNewsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ISentimentDataTools, CryptoSentimentTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
 
         // 注册 Kernel 和嵌入服务（保留用于 RAG 和提示词模板）
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();

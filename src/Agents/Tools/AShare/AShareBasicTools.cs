@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -10,7 +10,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股基础数据工具实现
 /// </summary>
-public sealed class AShareBasicTools : IBasicDataTools
+public sealed class AShareBasicTools : IShareBasicTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
@@ -22,7 +22,7 @@ public sealed class AShareBasicTools : IBasicDataTools
     }
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
-    public async Task<AssetQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol)
+    public async Task<StockQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol)
     {
         try
         {
@@ -32,7 +32,7 @@ public sealed class AShareBasicTools : IBasicDataTools
             var response = await httpClient.GetStringAsync(url);
             var jsonDocument = JsonDocument.Parse(response);
 
-            var stockPriceInfo = new AssetQuoteInfo();
+            var stockPriceInfo = new StockQuoteInfo();
             var data = jsonDocument.RootElement.GetProperty("data");
 
             stockPriceInfo.CurrentPrice = data.GetProperty("last_px").GetDecimal();

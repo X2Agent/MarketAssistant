@@ -7,6 +7,7 @@ using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Applications.Favorites;
 
@@ -53,7 +54,7 @@ public class CryptoFavoriteService : IFavoriteService
         favoriteList.Add(new FavoriteAsset { Code = code, Market = market });
         SaveFavorites(favoriteList);
         WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        
+
         _logger.LogInformation("已添加虚拟币到收藏: {Code}", code);
     }
 
@@ -70,7 +71,7 @@ public class CryptoFavoriteService : IFavoriteService
             favoriteList.Remove(itemToRemove);
             SaveFavorites(favoriteList);
             WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-            
+
             _logger.LogInformation("已从收藏中移除虚拟币: {Code}", code);
         }
     }
@@ -131,11 +132,11 @@ public class CryptoFavoriteService : IFavoriteService
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "获取虚拟币 {Code} 最新数据时出错: {Message}", favorite.Code, ex.Message);
-                        return new AssetInfo 
-                        { 
-                            Code = favorite.Code, 
-                            Market = favorite.Market, 
-                            Name = favorite.Code.Replace("USDT", ""),
+                        return new AssetInfo
+                        {
+                            Code = favorite.Code,
+                            Market = favorite.Market,
+                            Name = ExtractBaseCurrency(favorite.Code),
                             MarketType = MarketType.Crypto
                         };
                     }

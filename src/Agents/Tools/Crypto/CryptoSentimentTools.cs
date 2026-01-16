@@ -1,120 +1,255 @@
-using MarketAssistant.Agents.Plugins.Models;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models.Crypto;
+using MarketAssistant.Agents.Tools.Models.Crypto.Binance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Json;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
 /// <summary>
 /// 虚拟币市场情绪工具实现
+/// https://developers.binance.com/docs/zh-CN/derivatives/usds-margined-futures/general-info
 /// </summary>
-public sealed class CryptoSentimentTools : ISentimentDataTools
+public sealed class CryptoSentimentTools : ICryptoSentimentTools
 {
     private readonly ILogger<CryptoSentimentTools> _logger;
+    private readonly HttpClient _httpClient;
+    private const string BinanceFuturesBaseUrl = "https://fapi.binance.com";
 
-    public CryptoSentimentTools(ILogger<CryptoSentimentTools> logger)
+    public CryptoSentimentTools(
+        ILogger<CryptoSentimentTools> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _logger = logger;
+        _httpClient = httpClientFactory.CreateClient();
     }
 
     /// <summary>
-    /// 获取虚拟币市场情绪数据
-    /// 注意：此功能需要币安 Futures API + 第三方情绪 API 组合实现
+    /// 获取资金费率历史数据
     /// </summary>
-    public Task<FundFlow> GetFundFlowAsync(string assetSymbol)
+    public async Task<FundingRateHistory> GetFundingRateAsync(string symbol)
     {
-        // 【可部分实现】结合币安 API 和第三方情绪 API
-        // 
-        // ✅ 币安 Futures API 提供的数据（可实现）：
-        // 
-        // 1. 资金费率（Funding Rate）- 反映多空情绪
-        //    - API: GET https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol}
-        //    - 说明：正值表示多头支付空头（市场看多），负值相反
-        //    - 返回数据：fundingRate（资金费率）, fundingTime（结算时间）
-        // 
-        // 2. 多空持仓人数比
-        //    - API: GET https://fapi.binance.com/futures/data/globalLongShortAccountRatio
-        //    - 参数：symbol={symbol}&period=5m (5m/15m/30m/1h/2h/4h/6h/12h/1d)
-        //    - 返回：longAccount（多头人数比）, shortAccount（空头人数比）
-        // 
-        // 3. 大户多空持仓比
-        //    - API: GET https://fapi.binance.com/futures/data/topLongShortAccountRatio
-        //    - 说明：大户（Top Trader）持仓情况，更有参考价值
-        // 
-        // 4. 多空持仓量比
-        //    - API: GET https://fapi.binance.com/futures/data/globalLongShortAccountRatio
-        //    - 说明：实际持仓量（而非人数）的多空比
-        // 
-        // 5. 合约持仓量（Open Interest）
-        //    - API: GET https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}
-        //    - 说明：未平仓合约总量，反映市场活跃度
-        // 
-        // ⚠️ 第三方 API 提供的数据（需补充）：
-        // 
-        // 1. 恐慌贪婪指数（Fear & Greed Index）
-        //    - API: GET https://api.alternative.me/fng/
-        //    - 免费，无需 API Key
-        //    - 返回：value（0-100，0=极度恐慌，100=极度贪婪）
-        //    - value_classification（文字描述：Extreme Fear, Fear, Neutral, Greed, Extreme Greed）
-        // 
-        // 2. Twitter 情绪分析（需实现 NLP）
-        //    - 方案 A：爬取 Twitter 推文 + 本地情感分析
-        //    - 方案 B：使用第三方情感分析 API（如 Google NLP, Azure Text Analytics）
-        //    - 方案 C：使用 LunarCrush API（提供社交媒体情绪数据）
-        // 
-        // 3. 爆仓数据（Liquidation Data）
-        //    - 币安不直接提供，需要第三方平台如 CoinGlass
-        //    - API: https://open-api.coinglass.com/public/v2/liquidation
-        // 
-        // 📌 实现建议：
-        // 
-        // 阶段 1（仅币安 API，可立即实现）：
-        // - 获取资金费率（fundingRate）
-        // - 获取多空持仓人数比（longShortRatio）
-        // - 获取大户持仓比（topTraderRatio）
-        // - 获取合约持仓量（openInterest）
-        // - 映射到 FundFlow 模型（字段复用或扩展）
-        // 
-        // 阶段 2（补充恐慌贪婪指数）：
-        // - 调用 https://api.alternative.me/fng/ 获取指数
-        // - 将指数值映射到情绪描述
-        // 
-        // 阶段 3（Twitter 情绪分析）：
-        // - 复杂度高，可暂缓或使用第三方 API
-        // 
-        // 🔧 FundFlow 模型适配建议：
-        // - FundFlow 原为 A 股设计（主力/超大单/大单/中单/小单流入流出）
-        // - 虚拟币无此概念，建议扩展模型或创建新模型（如 CryptoSentiment）
-        // - 可复用字段映射：
-        //   * MainNetInflow -> 资金费率
-        //   * SuperLargeNetInflow -> 大户多头比例
-        //   * LargeNetInflow -> 多空持仓人数比
-        //   * MediumNetInflow -> 恐慌贪婪指数
-        //   * SmallNetInflow -> 合约持仓量变化
-        
-        _logger.LogWarning("虚拟币市场情绪数据获取功能尚未实现，建议分阶段实现");
-        throw new NotImplementedException(
-            "虚拟币市场情绪数据获取功能尚未实现。\n" +
-            "\n=== 可使用币安 Futures API 实现（优先级 P0）===\n" +
-            "1. 资金费率: GET /fapi/v1/fundingRate (反映多空情绪)\n" +
-            "2. 多空人数比: GET /futures/data/globalLongShortAccountRatio\n" +
-            "3. 大户持仓比: GET /futures/data/topLongShortAccountRatio\n" +
-            "4. 合约持仓量: GET /fapi/v1/openInterest\n" +
-            "\n=== 需第三方 API 补充（优先级 P1）===\n" +
-            "5. 恐慌贪婪指数: GET https://api.alternative.me/fng/ (免费)\n" +
-            "6. Twitter 情绪分析: 需 NLP 模型或第三方 API\n" +
-            "\n💡 建议先实现 1-4 项，使用币安 API 即可"
+        try
+        {
+            var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+
+            // 1. 获取当前费率和下次结算时间（premiumIndex 包含 nextFundingTime）
+            var premiumUrl = $"{BinanceFuturesBaseUrl}/fapi/v1/premiumIndex?symbol={binanceSymbol}";
+            var premiumResponse = await _httpClient.GetFromJsonAsync<BinancePremiumIndexResponse>(premiumUrl);
+
+            if (premiumResponse == null)
+            {
+                throw new InvalidOperationException($"获取当前资金费率失败: {symbol}");
+            }
+
+            // 2. 获取历史费率（fundingRate 只有历史数据，没有 nextFundingTime）
+            var historyUrl = $"{BinanceFuturesBaseUrl}/fapi/v1/fundingRate?symbol={binanceSymbol}&limit=30";
+            var historyResponse = await _httpClient.GetFromJsonAsync<List<BinanceFundingRateResponse>>(historyUrl);
+
+            if (historyResponse == null || historyResponse.Count == 0)
+            {
+                throw new InvalidOperationException($"获取历史资金费率失败: {symbol}");
+            }
+
+            // 3. 构建历史数据点（倒序排列，最新在前）
+            var historyPoints = historyResponse
+                .OrderByDescending(h => h.FundingTime)
+                .Select(h => new FundingRatePoint
+                {
+                    Rate = decimal.Parse(h.FundingRate) * 100, // 转换为百分比
+                    FundingTime = h.FundingTime
+                })
+                .ToList();
+
+            // 4. 计算统计数据
+            var currentRate = decimal.Parse(premiumResponse.LastFundingRate) * 100;
+            var currentTime = historyPoints[0].FundingTime;
+            var averageRate = historyPoints.Average(p => p.Rate);
+
+            return new FundingRateHistory
+            {
+                Symbol = premiumResponse.Symbol,
+                CurrentRate = currentRate,
+                CurrentFundingTime = currentTime,
+                NextFundingTime = premiumResponse.NextFundingTime,
+                AverageRate = averageRate,
+                History = historyPoints
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取资金费率历史数据时发生错误: {Symbol}", symbol);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 获取全局账户多空比历史数据
+    /// </summary>
+    public async Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30)
+    {
+        return await GetLongShortRatioHistoryAsync(
+            symbol,
+            period,
+            limit,
+            "globalLongShortAccountRatio",
+            "全局账户多空比"
         );
+    }
+
+    /// <summary>
+    /// 获取顶级交易员账户多空比历史数据
+    /// </summary>
+    public async Task<LongShortRatioHistory> GetTopTraderAccountRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30)
+    {
+        return await GetLongShortRatioHistoryAsync(
+            symbol,
+            period,
+            limit,
+            "topLongShortAccountRatio",
+            "顶级交易员账户多空比"
+        );
+    }
+
+    /// <summary>
+    /// 获取顶级交易员持仓多空比历史数据
+    /// </summary>
+    public async Task<LongShortRatioHistory> GetTopTraderPositionRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30)
+    {
+        return await GetLongShortRatioHistoryAsync(
+            symbol,
+            period,
+            limit,
+            "topLongShortPositionRatio",
+            "顶级交易员持仓多空比"
+        );
+    }
+
+    /// <summary>
+    /// 通用多空比历史数据获取方法
+    /// </summary>
+    private async Task<LongShortRatioHistory> GetLongShortRatioHistoryAsync(
+        string symbol,
+        Period period,
+        int limit,
+        string endpoint,
+        string dataType)
+    {
+        try
+        {
+            var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+
+            // 转换枚举为 API 参数
+            var periodParam = period.GetDescription();
+
+            // 获取历史数据
+            var url = $"{BinanceFuturesBaseUrl}/futures/data/{endpoint}?symbol={binanceSymbol}&period={periodParam}&limit={limit}";
+            var response = await _httpClient.GetFromJsonAsync<List<BinanceLongShortRatioResponse>>(url);
+
+            if (response == null || response.Count == 0)
+            {
+                throw new InvalidOperationException($"获取{dataType}失败: {symbol}");
+            }
+
+            // 按时间倒序排列（最新在前）
+            var sortedData = response.OrderByDescending(r => r.Timestamp).ToList();
+
+            // 构建历史数据点
+            var historyPoints = sortedData
+                .Select(h => new LongShortRatioPoint
+                {
+                    LongRatio = decimal.Parse(h.LongAccount),
+                    ShortRatio = decimal.Parse(h.ShortAccount),
+                    Ratio = decimal.Parse(h.LongShortRatio),
+                    Timestamp = h.Timestamp
+                })
+                .ToList();
+
+            // 计算统计数据
+            var current = historyPoints[0];
+            var averageRatio = historyPoints.Average(p => p.Ratio);
+
+            return new LongShortRatioHistory
+            {
+                Symbol = binanceSymbol,
+                CurrentLongRatio = current.LongRatio,
+                CurrentShortRatio = current.ShortRatio,
+                CurrentRatio = current.Ratio,
+                AverageRatio = averageRatio,
+                History = historyPoints
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取{DataType}时发生错误: {Symbol}", dataType, symbol);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 获取合约持仓量
+    /// </summary>
+    public async Task<OpenInterest> GetOpenInterestAsync(string symbol, Period period = Period.OneHour)
+    {
+        try
+        {
+            var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+
+            // 转换枚举为 API 参数
+            var periodParam = period.GetDescription();
+
+            // 获取合约持仓量历史数据（默认获取最近30个数据点）
+            var url = $"{BinanceFuturesBaseUrl}/futures/data/openInterestHist?symbol={binanceSymbol}&period={periodParam}&limit=30";
+            var response = await _httpClient.GetFromJsonAsync<List<BinanceOpenInterestResponse>>(url);
+
+            if (response == null || response.Count == 0)
+            {
+                throw new InvalidOperationException($"获取合约持仓量失败: {symbol}");
+            }
+
+            // 按时间倒序排列（最新在前）
+            var sortedData = response.OrderByDescending(r => r.Timestamp).ToList();
+
+            // 构建历史数据点
+            var historyPoints = sortedData
+                .Select(h => new OpenInterestPoint
+                {
+                    SumOpenInterest = decimal.Parse(h.SumOpenInterest),
+                    SumOpenInterestValue = decimal.Parse(h.SumOpenInterestValue),
+                    Timestamp = h.Timestamp
+                })
+                .ToList();
+
+            // 计算统计数据
+            var current = historyPoints[0];
+            var avgOpenInterest = historyPoints.Average(p => p.SumOpenInterest);
+            var avgOpenInterestValue = historyPoints.Average(p => p.SumOpenInterestValue);
+
+            return new OpenInterest
+            {
+                Symbol = binanceSymbol,
+                CurrentOpenInterest = current.SumOpenInterest,
+                CurrentOpenInterestValue = current.SumOpenInterestValue,
+                CurrentTimestamp = current.Timestamp,
+                AverageOpenInterest = avgOpenInterest,
+                AverageOpenInterestValue = avgOpenInterestValue,
+                History = historyPoints
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取合约持仓量时发生错误: {Symbol}", symbol);
+            throw;
+        }
     }
 
     public IEnumerable<AIFunction> GetFunctions()
     {
-        yield return AIFunctionFactory.Create(GetFundFlowAsync);
+        yield return AIFunctionFactory.Create(GetFundingRateAsync);
+        yield return AIFunctionFactory.Create(GetGlobalLongShortRatioAsync);
+        yield return AIFunctionFactory.Create(GetTopTraderAccountRatioAsync);
+        yield return AIFunctionFactory.Create(GetTopTraderPositionRatioAsync);
+        yield return AIFunctionFactory.Create(GetOpenInterestAsync);
     }
 }
-
-
-
-
-
-

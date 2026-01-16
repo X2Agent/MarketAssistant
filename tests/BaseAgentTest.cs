@@ -1,16 +1,7 @@
-using MarketAssistant.Agents.MarketAnalysis;
-using MarketAssistant.Agents.MarketAnalysis.Executors;
-using MarketAssistant.Agents.StockSelection;
-using MarketAssistant.Agents.StockSelection.Executors;
-using MarketAssistant.Agents.Tools;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Rag.Extensions;
-using MarketAssistant.Services.Browser;
-using MarketAssistant.Services.Mcp;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Applications.AssetScreener;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -19,6 +10,7 @@ namespace TestMarketAssistant;
 
 /// <summary>
 /// Agent Framework 测试基类
+/// 使用 AddApplicationServices 注册所有应用服务
 /// </summary>
 [TestClass]
 public class BaseAgentTest
@@ -66,8 +58,8 @@ public class BaseAgentTest
         var modelId = "deepseek-ai/DeepSeek-V3.2";
         var endpoint = "https://api.siliconflow.cn";
 
-        // 注册依赖服务
-        services.AddSingleton(provider =>
+        // 注册用户设置服务（Mock）
+        services.AddSingleton<IUserSettingService>(provider =>
         {
             var testUserSetting = new UserSetting
             {
@@ -93,51 +85,8 @@ public class BaseAgentTest
             return userSettingServiceMock.Object;
         });
 
-        // 注册核心服务
-        services.AddHttpClient();
-        services.AddSingleton<PlaywrightService>();
-        services.AddSingleton<StockScreenerService>();
-        services.AddSingleton<McpService>();
-
-        // 注册 Agent Tool 类
-        services.AddSingleton<StockBasicTools>();
-        services.AddSingleton<StockFinancialTools>();
-        services.AddSingleton<StockTechnicalTools>();
-        services.AddSingleton<GroundingSearchTools>();
-        services.AddSingleton<StockNewsTools>();
-        services.AddSingleton<MarketSentimentTools>();
-
-        // 注册 Agent Framework 服务
-        services.AddSingleton<IChatClientFactory, ChatClientFactory>();
-        services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
-
-        // 注册 StockSelection Workflow and Executors
-        services.AddSingleton<GenerateCriteriaExecutor>();
-        services.AddSingleton<ScreenStocksExecutor>();
-        services.AddSingleton<AnalyzeStocksExecutor>();
-        services.AddSingleton<StockSelectionWorkflow>();
-
-        // 注册 MarketAnalysis Workflow and Executors
-        services.AddSingleton<AnalysisDispatcherExecutor>();
-        services.AddSingleton<AnalysisAggregatorExecutor>();
-        services.AddSingleton<CoordinatorExecutor>();
-        services.AddSingleton<MarketAnalysisWorkflow>();
-
-        // 注册 RAG 服务
-        services.AddRagServices();
-
-        // 注册 Embedding Generator
-        services.AddSingleton(serviceProvider =>
-        {
-            var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
-            var embeddingGenerator = embeddingFactory.Create();
-            return embeddingGenerator;
-        });
-
-        // 注册 Vector Store
-        var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
-        services.AddSqliteVectorStore(_ => $"Data Source={store}");
+        // 使用 AddApplicationServices 注册所有应用服务
+        services.AddApplicationServices();
 
         return services.BuildServiceProvider();
     }

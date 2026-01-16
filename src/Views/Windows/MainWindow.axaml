@@ -37,33 +37,44 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource RightBorderThickness}">
             <StackPanel Margin="{StaticResource LogoTopMargin}" Spacing="{StaticResource TinySpacing}">
-                <!-- 应用Logo图标（点击切换市场） -->
-                <Button Margin="{StaticResource LogoBottomMargin}" 
-                        Width="{StaticResource AppLogoSize}"
-                        Height="{StaticResource AppLogoSize}"
-                        CornerRadius="{StaticResource DefaultCornerRadius}"
-                        HorizontalAlignment="Center"
-                        Padding="0"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Command="{Binding ToggleMarketCommand}">
-                    <ToolTip.Tip>
-                        <StackPanel>
-                            <TextBlock Text="点击切换市场" FontWeight="SemiBold"/>
-                            <TextBlock Text="{Binding CurrentMarketText}" FontSize="11" Opacity="0.8"/>
-                            <TextBlock Text="快捷键: Ctrl+M" FontSize="10" Opacity="0.6"/>
-                        </StackPanel>
-                    </ToolTip.Tip>
-                    <Border Width="{StaticResource AppLogoSize}"
+                <!-- 应用Logo图标和市场名称 -->
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <!-- Logo按钮（点击切换市场） -->
+                    <Button Width="{StaticResource AppLogoSize}"
                             Height="{StaticResource AppLogoSize}"
                             CornerRadius="{StaticResource DefaultCornerRadius}"
-                            ClipToBounds="True">
-                        <Image Source="/Assets/logo.png"
-                               Stretch="UniformToFill"
+                            HorizontalAlignment="Center"
+                            Padding="0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Command="{Binding ToggleMarketCommand}">
+                        <ToolTip.Tip>
+                            <StackPanel>
+                                <TextBlock Text="点击切换市场" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding CurrentMarketText}" FontSize="11" Opacity="0.8"/>
+                                <TextBlock Text="快捷键: Ctrl+M" FontSize="10" Opacity="0.6"/>
+                            </StackPanel>
+                        </ToolTip.Tip>
+                        <Border Width="{StaticResource AppLogoSize}"
+                                Height="{StaticResource AppLogoSize}"
+                                CornerRadius="{StaticResource DefaultCornerRadius}"
+                                ClipToBounds="True">
+                            <Image Source="/Assets/logo.png"
+                                   Stretch="UniformToFill"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                        </Border>
+                    </Button>
+                    
+                    <!-- 市场名称文字 -->
+                    <TextBlock Text="{Binding CurrentMarketText}" 
+                               FontSize="10"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
                                HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                    </Border>
-                </Button>
+                               TextAlignment="Center"
+                               Margin="0,4,0,8"/>
+                </StackPanel>
 
                 <!-- 导航菜单 -->
                 <ListBox ItemsSource="{Binding NavigationItems}"

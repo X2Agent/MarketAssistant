@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -10,7 +10,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股财务数据工具实现
 /// </summary>
-public sealed class AShareFinancialTools : IFinancialDataTools
+public sealed class AShareFinancialTools : IShareFinancialTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;

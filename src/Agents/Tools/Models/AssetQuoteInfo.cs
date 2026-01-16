@@ -1,4 +1,4 @@
-namespace MarketAssistant.Agents.Plugins.Models;
+namespace MarketAssistant.Agents.Tools.Models;
 
 /// <summary>
 /// 资产行情数据模型

@@ -23,7 +23,7 @@ public class FinancialAnalystAgent : AnalystAgentBase
 
     public FinancialAnalystAgent(
         IChatClient chatClient,
-        IFinancialDataTools financialTools)
+        IFinancialTools financialTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

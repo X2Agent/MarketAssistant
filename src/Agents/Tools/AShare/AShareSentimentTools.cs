@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -10,7 +10,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股市场情绪工具实现（从MarketSentimentTools迁移）
 /// </summary>
-public sealed class AShareSentimentTools : ISentimentDataTools
+public sealed class AShareSentimentTools : IShareSentimentTools
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;

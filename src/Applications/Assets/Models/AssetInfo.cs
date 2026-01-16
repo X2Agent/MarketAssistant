@@ -45,11 +45,6 @@ public class AssetInfo
 
     // 虚拟币特有字段
     /// <summary>
-    /// 区块链网络（虚拟币特有）
-    /// </summary>
-    public string? BlockchainNetwork { get; set; }
-
-    /// <summary>
     /// 市值（虚拟币特有）
     /// </summary>
     public string? MarketCap { get; set; }

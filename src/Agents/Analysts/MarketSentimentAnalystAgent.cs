@@ -24,8 +24,8 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
 
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
-        IFinancialDataTools financialTools,
-        ISentimentDataTools marketSentimentTools)
+        IFinancialTools financialTools,
+        ISentimentTools marketSentimentTools)
         : base(
             chatClient,
             instructions: GetInstructions(),

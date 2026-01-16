@@ -72,7 +72,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
-    public string BinanceApiUrl { get; } = "https://www.binance.com/zh-CN/support/faq/360002502072";
+    public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
 
     /// <summary>
     /// 是否为A股市场
@@ -82,11 +82,13 @@ public partial class SettingsPageViewModel : ViewModelBase
         get => UserSetting.CurrentMarketType == MarketType.AShare;
         set
         {
-            if (value)
+            if (value && UserSetting.CurrentMarketType != MarketType.AShare)
             {
                 UserSetting.CurrentMarketType = MarketType.AShare;
+                _marketContext.SwitchMarket(MarketType.AShare);
                 OnPropertyChanged(nameof(IsAShareMarket));
                 OnPropertyChanged(nameof(IsCryptoMarket));
+                Logger?.LogInformation("市场已切换到: A股");
             }
         }
     }
@@ -99,11 +101,67 @@ public partial class SettingsPageViewModel : ViewModelBase
         get => UserSetting.CurrentMarketType == MarketType.Crypto;
         set
         {
-            if (value)
+            if (value && UserSetting.CurrentMarketType != MarketType.Crypto)
             {
                 UserSetting.CurrentMarketType = MarketType.Crypto;
+                _marketContext.SwitchMarket(MarketType.Crypto);
                 OnPropertyChanged(nameof(IsAShareMarket));
                 OnPropertyChanged(nameof(IsCryptoMarket));
+                Logger?.LogInformation("市场已切换到: 虚拟币");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 是否为Bing搜索平台
+    /// </summary>
+    public bool IsBingProvider
+    {
+        get => UserSetting.WebSearchProvider == "Bing";
+        set
+        {
+            if (value)
+            {
+                UserSetting.WebSearchProvider = "Bing";
+                OnPropertyChanged(nameof(IsBingProvider));
+                OnPropertyChanged(nameof(IsBraveProvider));
+                OnPropertyChanged(nameof(IsTavilyProvider));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 是否为Brave搜索平台
+    /// </summary>
+    public bool IsBraveProvider
+    {
+        get => UserSetting.WebSearchProvider == "Brave";
+        set
+        {
+            if (value)
+            {
+                UserSetting.WebSearchProvider = "Brave";
+                OnPropertyChanged(nameof(IsBingProvider));
+                OnPropertyChanged(nameof(IsBraveProvider));
+                OnPropertyChanged(nameof(IsTavilyProvider));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 是否为Tavily搜索平台
+    /// </summary>
+    public bool IsTavilyProvider
+    {
+        get => UserSetting.WebSearchProvider == "Tavily";
+        set
+        {
+            if (value)
+            {
+                UserSetting.WebSearchProvider = "Tavily";
+                OnPropertyChanged(nameof(IsBingProvider));
+                OnPropertyChanged(nameof(IsBraveProvider));
+                OnPropertyChanged(nameof(IsTavilyProvider));
             }
         }
     }
@@ -150,6 +208,9 @@ public partial class SettingsPageViewModel : ViewModelBase
         // 触发属性变更通知
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
+        OnPropertyChanged(nameof(IsBingProvider));
+        OnPropertyChanged(nameof(IsBraveProvider));
+        OnPropertyChanged(nameof(IsTavilyProvider));
     }
 
     private void LoadAnalystRoles()
@@ -199,7 +260,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     private Task OpenZhiTuApiWebsite() => OpenUrlAsync(ZhiTuApiUrl);
 
     [RelayCommand]
-    private Task OpenBinanceApiWebsite() => OpenUrlAsync(BinanceApiUrl);
+    private Task OpenCoinGeckoApiWebsite() => OpenUrlAsync(CoinGeckoApiUrl);
 
     /// <summary>
     /// 选择知识库目录

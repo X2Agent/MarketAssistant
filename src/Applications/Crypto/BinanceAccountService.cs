@@ -1,0 +1,208 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using MarketAssistant.Infrastructure;
+using Microsoft.Extensions.Logging;
+
+namespace MarketAssistant.Applications.Crypto;
+
+/// <summary>
+/// 币安账户服务（需要鉴权）
+/// 示例：如何使用BinanceAuthService进行鉴权调用
+/// </summary>
+public class BinanceAccountService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<BinanceAccountService> _logger;
+    private readonly BinanceAuthService _authService;
+    private const string BINANCE_API_BASE_URL = "https://api.binance.com";
+
+    public BinanceAccountService(
+        ILogger<BinanceAccountService> logger,
+        BinanceAuthService authService)
+    {
+        _logger = logger;
+        _authService = authService;
+        _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+    }
+
+    /// <summary>
+    /// 获取账户信息（需要USER_DATA权限）
+    /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/account-endpoints#account-information-user_data
+    /// </summary>
+    public async Task<BinanceAccountInfo> GetAccountInfoAsync()
+    {
+        try
+        {
+            // 1. 准备请求参数（本接口无额外参数，只需要签名）
+            var signedQuery = _authService.SignQueryString("");
+
+            // 2. 构建完整URL
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/account?{signedQuery}";
+
+            // 3. 创建HTTP请求并添加鉴权Header
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            _authService.AddAuthHeaders(request);
+
+            // 4. 发送请求
+            _logger.LogInformation("正在获取币安账户信息...");
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            // 5. 解析响应
+            var accountInfo = await response.Content.ReadFromJsonAsync<BinanceAccountInfo>();
+
+            if (accountInfo == null)
+            {
+                throw new FriendlyException("解析账户信息失败");
+            }
+
+            _logger.LogInformation("成功获取账户信息，账户类型: {AccountType}", accountInfo.AccountType);
+            return accountInfo;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "获取账户信息失败 - 网络错误");
+            throw new FriendlyException("获取账户信息失败: 网络连接错误", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取账户信息失败");
+            throw new FriendlyException($"获取账户信息失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 下单示例（需要TRADE权限）
+    /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/market-data-endpoints#place-new-order-trade
+    /// </summary>
+    /// <param name="symbol">交易对，如BTCUSDT</param>
+    /// <param name="side">买卖方向：BUY或SELL</param>
+    /// <param name="type">订单类型：LIMIT、MARKET等</param>
+    /// <param name="quantity">数量</param>
+    /// <param name="price">价格（限价单需要）</param>
+    public async Task<BinanceOrderResponse> PlaceOrderAsync(
+        string symbol,
+        string side,
+        string type,
+        decimal quantity,
+        decimal? price = null)
+    {
+        try
+        {
+            // 1. 构建请求参数
+            var parameters = new Dictionary<string, string>
+            {
+                ["symbol"] = symbol.ToUpper(),
+                ["side"] = side.ToUpper(),
+                ["type"] = type.ToUpper(),
+                ["quantity"] = quantity.ToString("F8")
+            };
+
+            // 限价单需要价格和timeInForce
+            if (type.ToUpper() == "LIMIT")
+            {
+                if (!price.HasValue)
+                {
+                    throw new ArgumentException("限价单必须指定价格");
+                }
+                parameters["price"] = price.Value.ToString("F8");
+                parameters["timeInForce"] = "GTC"; // Good Till Cancel
+            }
+
+            // 2. 将参数转换为query string格式
+            var queryString = string.Join("&",
+                parameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
+
+            // 3. 签名
+            var signedQuery = _authService.SignQueryString(queryString);
+
+            // 4. 构建请求
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/order?{signedQuery}";
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            _authService.AddAuthHeaders(request);
+
+            // 5. 发送请求
+            _logger.LogInformation("正在下单: {Symbol} {Side} {Type} 数量:{Quantity}",
+                symbol, side, type, quantity);
+
+            var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            // 6. 解析响应
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>();
+
+            if (orderResponse == null)
+            {
+                throw new FriendlyException("解析订单响应失败");
+            }
+
+            _logger.LogInformation("下单成功，订单ID: {OrderId}, 状态: {Status}",
+                orderResponse.OrderId, orderResponse.Status);
+
+            return orderResponse;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "下单失败 - 网络错误");
+            throw new FriendlyException("下单失败: 网络连接错误", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "下单失败");
+            throw new FriendlyException($"下单失败: {ex.Message}", ex);
+        }
+    }
+}
+
+#region 响应模型
+
+/// <summary>
+/// 币安账户信息
+/// </summary>
+public class BinanceAccountInfo
+{
+    public int MakerCommission { get; set; }
+    public int TakerCommission { get; set; }
+    public int BuyerCommission { get; set; }
+    public int SellerCommission { get; set; }
+    public bool CanTrade { get; set; }
+    public bool CanWithdraw { get; set; }
+    public bool CanDeposit { get; set; }
+    public long UpdateTime { get; set; }
+    public string AccountType { get; set; } = string.Empty;
+    public List<BinanceBalance> Balances { get; set; } = new();
+}
+
+/// <summary>
+/// 币安账户余额
+/// </summary>
+public class BinanceBalance
+{
+    public string Asset { get; set; } = string.Empty;
+    public string Free { get; set; } = string.Empty;
+    public string Locked { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 币安订单响应
+/// </summary>
+public class BinanceOrderResponse
+{
+    public string Symbol { get; set; } = string.Empty;
+    public long OrderId { get; set; }
+    public string ClientOrderId { get; set; } = string.Empty;
+    public long TransactTime { get; set; }
+    public string Price { get; set; } = string.Empty;
+    public string OrigQty { get; set; } = string.Empty;
+    public string ExecutedQty { get; set; } = string.Empty;
+    public string CummulativeQuoteQty { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string TimeInForce { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public string Side { get; set; } = string.Empty;
+}
+
+#endregion

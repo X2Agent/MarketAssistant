@@ -2,7 +2,7 @@ using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
-
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 namespace MarketAssistant.Applications.Charts;
 
 /// <summary>
@@ -13,7 +13,7 @@ public class CryptoKLineService : IKLineService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CryptoKLineService> _logger;
-    
+
     // 币安公开市场数据API（无需API Key）
     private const string BINANCE_API_BASE_URL = "https://api.binance.com";
     private const int DEFAULT_LIMIT = 500; // 币安API最多返回1000条，默认500条
@@ -65,8 +65,8 @@ public class CryptoKLineService : IKLineService
             }
 
             // 格式化交易对代码（转换为币安格式，如 BTCUSDT）
-            string formattedSymbol = FormatSymbolForBinance(symbol);
-            
+            string formattedSymbol = ToBinanceFormat(symbol);
+
             // 限制请求数量（币安限制最大1000）
             int requestLimit = Math.Min(limit, 1000);
 
@@ -80,7 +80,7 @@ public class CryptoKLineService : IKLineService
             response.EnsureSuccessStatusCode();
 
             var jsonContent = await response.Content.ReadAsStringAsync();
-            
+
             // 币安返回的是数组的数组格式
             var binanceData = JsonSerializer.Deserialize<List<List<JsonElement>>>(jsonContent);
 
@@ -92,7 +92,7 @@ public class CryptoKLineService : IKLineService
 
             // 转换为应用程序数据模型
             var klineDataList = new List<KLineData>();
-            
+
             foreach (var item in binanceData)
             {
                 if (item.Count < 11)
@@ -114,7 +114,7 @@ public class CryptoKLineService : IKLineService
                 // [9] 主动买入成交量
                 // [10] 主动买入成交额
                 // [11] 忽略
-                
+
                 var klineData = new KLineData
                 {
                     Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(item[0].GetInt64()).DateTime,
@@ -154,25 +154,6 @@ public class CryptoKLineService : IKLineService
     }
 
     /// <summary>
-    /// 格式化交易对代码为币安格式
-    /// </summary>
-    private string FormatSymbolForBinance(string symbol)
-    {
-        // 移除可能的前缀（如 crypto.）和空格
-        symbol = symbol.Replace("crypto.", "", StringComparison.OrdinalIgnoreCase)
-                       .Replace(" ", "")
-                       .ToUpperInvariant();
-
-        // 如果没有交易对后缀，默认添加USDT
-        if (!symbol.Contains("USDT") && !symbol.Contains("BTC") && !symbol.Contains("ETH"))
-        {
-            symbol += "USDT";
-        }
-
-        return symbol;
-    }
-
-    /// <summary>
     /// 计算涨跌额和涨跌幅
     /// </summary>
     private void CalculatePriceChanges(List<KLineData> klineDataList)
@@ -191,7 +172,7 @@ public class CryptoKLineService : IKLineService
                 // 使用前一条数据的收盘价作为昨收价
                 var preClose = klineDataList[i - 1].Close;
                 klineDataList[i].PreClose = preClose;
-                
+
                 if (preClose > 0)
                 {
                     klineDataList[i].Change = klineDataList[i].Close - preClose;

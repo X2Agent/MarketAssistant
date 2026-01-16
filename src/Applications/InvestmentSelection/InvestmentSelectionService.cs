@@ -100,13 +100,14 @@ public class InvestmentSelectionService : IDisposable
     /// </summary>
     public async Task<InvestmentSelectionResult> QuickSelectAsync(
         QuickSelectionStrategy strategy,
+        MarketType marketType,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("开始执行快速选择，策略: {Strategy}", strategy);
+            _logger.LogInformation("开始执行快速选择，策略: {Strategy}, 市场: {Market}", strategy, marketType);
 
-            var request = ConvertStrategyToUserRequest(strategy);
+            var request = ConvertStrategyToUserRequest(strategy, marketType);
 
             var result = await RecommendByUserRequirementAsync(request, cancellationToken);
 
@@ -123,9 +124,22 @@ public class InvestmentSelectionService : IDisposable
     }
 
     /// <summary>
-    /// 功能5: 获取快速选择策略列表
+    /// 功能5: 获取快速选择策略列表（根据市场类型返回不同策略）
     /// </summary>
-    public List<QuickSelectionStrategyInfo> GetQuickSelectionStrategies()
+    public List<QuickSelectionStrategyInfo> GetQuickSelectionStrategies(MarketType marketType)
+    {
+        return marketType switch
+        {
+            MarketType.AShare => GetStockStrategies(),
+            MarketType.Crypto => GetCryptoStrategies(),
+            _ => throw new NotSupportedException($"不支持的市场类型: {marketType}")
+        };
+    }
+
+    /// <summary>
+    /// 获取股票市场预设策略
+    /// </summary>
+    private List<QuickSelectionStrategyInfo> GetStockStrategies()
     {
         return new List<QuickSelectionStrategyInfo>
         {
@@ -182,6 +196,70 @@ public class InvestmentSelectionService : IDisposable
                 Description = "筛选股息率/收益率高、分红/收益稳定的标的",
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"
+            }
+        };
+    }
+
+    /// <summary>
+    /// 获取虚拟币市场预设策略
+    /// </summary>
+    private List<QuickSelectionStrategyInfo> GetCryptoStrategies()
+    {
+        return new List<QuickSelectionStrategyInfo>
+        {
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.ValueInvestment,
+                Name = "价值币种",
+                Icon = "💎",
+                Description = "筛选市值大、技术成熟、社区活跃的主流币种",
+                Scenario = "适合稳健型投资者，追求长期持有价值币",
+                RiskLevel = "低风险"
+            },
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.GrowthInvestment,
+                Name = "高成长币",
+                Icon = "🚀",
+                Description = "筛选7日/30日涨幅较高、交易量增长的高成长币种",
+                Scenario = "适合积极型投资者，追求高收益潜力币",
+                RiskLevel = "中高风险"
+            },
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.ActiveTrading,
+                Name = "热门币种",
+                Icon = "🔥",
+                Description = "筛选24h交易量大、价格波动活跃的热门币种",
+                Scenario = "适合短线交易者，追捧市场热点币",
+                RiskLevel = "高风险"
+            },
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.LargeCap,
+                Name = "主流大币",
+                Icon = "🏢",
+                Description = "筛选市值排名前50、流动性充足的蓝筹主流币",
+                Scenario = "适合保守型投资者，追求稳定的主流币",
+                RiskLevel = "低风险"
+            },
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.SmallCap,
+                Name = "潜力小币",
+                Icon = "🌱",
+                Description = "筛选市值排名100-500、具有创新性的潜力币种",
+                Scenario = "适合风险偏好较高的投资者，寻找黑马币",
+                RiskLevel = "高风险"
+            },
+            new QuickSelectionStrategyInfo
+            {
+                Strategy = QuickSelectionStrategy.HighYield,
+                Name = "质押收益币",
+                Icon = "💰",
+                Description = "筛选支持质押、年化收益率稳定的币种",
+                Scenario = "适合追求被动收益的投资者，稳定收益",
+                RiskLevel = "中低风险"
             }
         };
     }
@@ -259,27 +337,44 @@ public class InvestmentSelectionService : IDisposable
         return result;
     }
 
-    private InvestmentRecommendationRequest ConvertStrategyToUserRequest(QuickSelectionStrategy strategy)
+    private InvestmentRecommendationRequest ConvertStrategyToUserRequest(QuickSelectionStrategy strategy, MarketType marketType)
     {
-        var (requirements, riskPreference) = strategy switch
+        var (requirements, riskPreference) = (marketType, strategy) switch
         {
-            QuickSelectionStrategy.ValueInvestment =>
+            // 股票市场策略
+            (MarketType.AShare, QuickSelectionStrategy.ValueInvestment) =>
                 ("请筛选价值型标的：PE低于20，PB低于3，ROE大于10%的优质价值标的", "conservative"),
-            QuickSelectionStrategy.GrowthInvestment =>
+            (MarketType.AShare, QuickSelectionStrategy.GrowthInvestment) =>
                 ("请筛选成长型标的：营收增长率大于20%，净利润增长率大于15%的高成长标的", "aggressive"),
-            QuickSelectionStrategy.ActiveTrading =>
+            (MarketType.AShare, QuickSelectionStrategy.ActiveTrading) =>
                 ("请筛选活跃标的：换手率大于2%，成交额大，量比大于1.5的活跃标的", "moderate"),
-            QuickSelectionStrategy.LargeCap =>
+            (MarketType.AShare, QuickSelectionStrategy.LargeCap) =>
                 ("请筛选大盘标的：市值大，流动性好，业绩稳定的大盘蓝筹标的", "conservative"),
-            QuickSelectionStrategy.SmallCap =>
+            (MarketType.AShare, QuickSelectionStrategy.SmallCap) =>
                 ("请筛选小盘标的：市值较小，具有成长潜力的优质小盘标的", "aggressive"),
-            QuickSelectionStrategy.HighYield =>
-                ("请筛选高收益标的：股息率/收益率大于3%，分红/收益稳定的高收益标的", "conservative"),
-            _ => throw new ArgumentException($"不支持的选择策略: {strategy}")
+            (MarketType.AShare, QuickSelectionStrategy.HighYield) =>
+                ("请筛选高收益标的：股息率大于3%，分红稳定的高股息标的", "conservative"),
+
+            // 虚拟币市场策略
+            (MarketType.Crypto, QuickSelectionStrategy.ValueInvestment) =>
+                ("请筛选主流价值币种：市值排名前30，存在时间超过3年，社区活跃度高，技术成熟的价值币", "conservative"),
+            (MarketType.Crypto, QuickSelectionStrategy.GrowthInvestment) =>
+                ("请筛选高成长币种：7日涨幅大于10%，30日涨幅大于20%，24h交易量增长大于50%的高成长币", "aggressive"),
+            (MarketType.Crypto, QuickSelectionStrategy.ActiveTrading) =>
+                ("请筛选热门活跃币种：24h交易量大于1亿美元，价格波动大于5%，社交媒体讨论度高的热门币", "moderate"),
+            (MarketType.Crypto, QuickSelectionStrategy.LargeCap) =>
+                ("请筛选主流大币：市值排名前50，市值大于100亿美元，流动性充足，风险相对较低的主流币", "conservative"),
+            (MarketType.Crypto, QuickSelectionStrategy.SmallCap) =>
+                ("请筛选潜力小币：市值排名100-500，上市时间1-3年，技术创新性强，具有成长潜力的小市值币", "aggressive"),
+            (MarketType.Crypto, QuickSelectionStrategy.HighYield) =>
+                ("请筛选质押收益币：支持质押功能，年化收益率大于5%，质押安全性高，收益稳定的币种", "conservative"),
+
+            _ => throw new ArgumentException($"不支持的策略或市场类型: {strategy}, {marketType}")
         };
 
         return new InvestmentRecommendationRequest
         {
+            MarketType = marketType,
             UserRequirements = requirements,
             RiskPreference = riskPreference
         };

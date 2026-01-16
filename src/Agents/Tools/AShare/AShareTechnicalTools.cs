@@ -1,4 +1,4 @@
-using MarketAssistant.Agents.Plugins.Models;
+using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;

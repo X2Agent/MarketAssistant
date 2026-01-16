@@ -182,8 +182,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
     {
         StockCode = stockCode;
 
-        // 设置股票代码（不需要异步操作）
-        _chatSession.SetStockCode(stockCode);
+        // 设置股票代码
+        _chatSession.SetCurrentStock(stockCode);
 
         ChatMessages.Clear();
 
@@ -192,7 +192,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
         {
             if (!string.IsNullOrWhiteSpace(message.Text))
             {
-                _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
+                // MAF 版本自动管理历史，无需手动添加
+                // _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
 
                 var displayMessage = new ChatMessageAdapter(message);
                 ChatMessages.Add(displayMessage);
@@ -219,8 +220,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(message.Text))
             return;
 
-        // 添加到会话上下文
-        _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
+        // MAF 版本自动管理历史
+        // _chatSession.AddAssistantMessage($"分析师观点：{message.Text}");
 
         // 添加到 UI 列表
         var displayMessage = new ChatMessageAdapter(message);
@@ -235,7 +236,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
         var systemMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.System, content) { AuthorName = "系统" });
         ChatMessages.Add(systemMessage);
 
-        _chatSession.AddAssistantMessage(content);
+        // MAF 版本自动管理历史
+        // _chatSession.AddAssistantMessage(content);
     }
 
     /// <summary>

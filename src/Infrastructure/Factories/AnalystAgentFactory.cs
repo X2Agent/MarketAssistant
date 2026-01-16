@@ -98,7 +98,7 @@ public class AnalystAgentFactory : IAnalystAgentFactory
         switch (agentType.Name)
         {
             case nameof(FinancialAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialDataTools>(marketType));
+                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialTools>(marketType));
                 break;
 
             case nameof(FundamentalAnalystAgent):
@@ -106,8 +106,8 @@ public class AnalystAgentFactory : IAnalystAgentFactory
                 break;
 
             case nameof(MarketSentimentAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialDataTools>(marketType));
-                tools.Add(_serviceProvider.GetRequiredKeyedService<ISentimentDataTools>(marketType));
+                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialTools>(marketType));
+                tools.Add(_serviceProvider.GetRequiredKeyedService<ISentimentTools>(marketType));
                 break;
 
             case nameof(NewsEventAnalystAgent):

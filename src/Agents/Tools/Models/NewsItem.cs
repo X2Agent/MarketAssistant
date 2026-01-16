@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Plugins.Models;
+namespace MarketAssistant.Agents.Tools.Models;
 
 /// <summary>
 /// 新闻上下文条目

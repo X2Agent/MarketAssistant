@@ -1,8 +1,8 @@
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Infrastructure.Core;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using System.Net.Http.Json;
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Applications.Assets;
 
@@ -14,16 +14,14 @@ public class CryptoAssetInfoService : IAssetInfoService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<CryptoAssetInfoService> _logger;
+    private readonly IMemoryCache _memoryCache;
     private const string BINANCE_API_BASE_URL = "https://api.binance.com";
-    
-    // 缓存交易对信息（避免频繁请求）
-    private List<BinanceSymbolInfo>? _symbolsCache;
-    private DateTime _symbolsCacheTime;
-    private readonly TimeSpan _cacheExpiry = TimeSpan.FromHours(1);
+    private const string SYMBOLS_CACHE_KEY = "BinanceSymbols";
 
-    public CryptoAssetInfoService(ILogger<CryptoAssetInfoService> logger)
+    public CryptoAssetInfoService(ILogger<CryptoAssetInfoService> logger, IMemoryCache memoryCache)
     {
         _logger = logger;
+        _memoryCache = memoryCache;
         _httpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(30)
@@ -44,12 +42,12 @@ public class CryptoAssetInfoService : IAssetInfoService
 
             keyword = keyword.Trim().ToUpperInvariant();
 
-            // 获取所有交易对信息
+            // 获取所有交易对信息（已过滤为 TRADING 状态）
             var symbols = await GetSymbolsAsync(cancellationToken);
 
-            // 搜索匹配的交易对（只返回USDT交易对，最常用）
+            // 搜索匹配的交易对
             var results = symbols
-                .Where(s => s.Symbol.Contains(keyword) && s.QuoteAsset == "USDT" && s.Status == "TRADING")
+                .Where(s => s.BaseAsset.Contains(keyword))
                 .Select(s => (Name: s.BaseAsset, Code: s.Symbol))
                 .Take(20)
                 .ToList();
@@ -72,15 +70,14 @@ public class CryptoAssetInfoService : IAssetInfoService
         try
         {
             // 格式化交易对代码
-            string symbol = FormatSymbol(code);
+            string symbol = ToBinanceFormat(code);
 
             // 调用币安24小时价格统计API
             var url = $"{BINANCE_API_BASE_URL}/api/v3/ticker/24hr?symbol={symbol}";
             var response = await _httpClient.GetAsync(url, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            var ticker = JsonSerializer.Deserialize<BinanceTicker24hr>(jsonContent);
+            var ticker = await response.Content.ReadFromJsonAsync<BinanceTicker24hr>(cancellationToken);
 
             if (ticker == null)
             {
@@ -91,7 +88,7 @@ public class CryptoAssetInfoService : IAssetInfoService
             var assetInfo = new AssetInfo
             {
                 Code = symbol,
-                Name = ticker.Symbol.Replace("USDT", "").Replace("BTC", "").Replace("ETH", ""), // 提取基础币种
+                Name = ExtractBaseCurrency(ticker.Symbol), // 提取基础币种
                 MarketType = MarketType.Crypto,
                 Market = "Binance",
                 CurrentPrice = FormatPrice(ticker.LastPrice),
@@ -122,13 +119,12 @@ public class CryptoAssetInfoService : IAssetInfoService
     {
         try
         {
-            // 获取所有交易对的24小时统计
-            var url = $"{BINANCE_API_BASE_URL}/api/v3/ticker/24hr";
+            // 获取所有交易对的24小时统计（使用MINI类型减少数据量）
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/ticker/24hr?type=MINI";
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
-            var jsonContent = await response.Content.ReadAsStringAsync();
-            var tickers = JsonSerializer.Deserialize<List<BinanceTicker24hr>>(jsonContent);
+            var tickers = await response.Content.ReadFromJsonAsync<List<BinanceTicker24hrMini>>();
 
             if (tickers == null || tickers.Count == 0)
             {
@@ -136,18 +132,36 @@ public class CryptoAssetInfoService : IAssetInfoService
                 return new List<HotAsset>();
             }
 
-            // 筛选USDT交易对，按24小时交易量排序，取前8个
+            // 稳定币列表（用于过滤稳定币互换交易对）
+            var stablecoins = new[] { "USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD", "USDP" };
+
+            // 筛选USDT交易对，排除稳定币互换（需同时满足：基础币种是稳定币 且 价格接近1.0），按24小时交易量排序，取前8个
             var hotAssets = tickers
                 .Where(t => t.Symbol.EndsWith("USDT") && t.Symbol != "USDT")
+                // 过滤稳定币互换交易对（基础币种是稳定币 且 价格接近1.0，同时满足才过滤）
+                .Where(t =>
+                {
+                    var baseCurrency = ExtractBaseCurrency(t.Symbol);
+                    var isStablecoin = stablecoins.Contains(baseCurrency);
+                    var isPriceNearOne = false;
+
+                    if (decimal.TryParse(t.LastPrice, out var price))
+                    {
+                        isPriceNearOne = price >= 0.95m && price <= 1.05m;
+                    }
+
+                    // 只有同时满足"是稳定币"且"价格接近1.0"才过滤掉（返回false）
+                    return !(isStablecoin && isPriceNearOne);
+                })
                 .OrderByDescending(t => decimal.TryParse(t.QuoteVolume, out var vol) ? vol : 0)
                 .Take(8)
                 .Select(t => new HotAsset
                 {
-                    Name = t.Symbol.Replace("USDT", ""),
+                    Name = ExtractBaseCurrency(t.Symbol),
                     Code = t.Symbol,
                     Market = "Binance",
                     CurrentPrice = FormatPrice(t.LastPrice),
-                    ChangePercentage = FormatPercentage(t.PriceChangePercent),
+                    ChangePercentage = FormatOpenClosePercentage(t.OpenPrice, t.LastPrice),
                     MarketType = MarketType.Crypto,
                     HeatIndex = FormatVolume(t.QuoteVolume), // 使用交易量作为热度
                     SectorName = "加密货币" // 虚拟币暂不区分板块
@@ -167,47 +181,33 @@ public class CryptoAssetInfoService : IAssetInfoService
     #region 辅助方法
 
     /// <summary>
-    /// 获取所有交易对信息（带缓存）
+    /// 获取所有交易对信息（使用 IMemoryCache 缓存，只获取 TRADING 状态）
     /// </summary>
     private async Task<List<BinanceSymbolInfo>> GetSymbolsAsync(CancellationToken cancellationToken)
     {
-        // 检查缓存
-        if (_symbolsCache != null && (DateTime.Now - _symbolsCacheTime) < _cacheExpiry)
+        // 尝试从缓存获取
+        if (_memoryCache.TryGetValue(SYMBOLS_CACHE_KEY, out List<BinanceSymbolInfo>? cachedSymbols) && cachedSymbols != null)
         {
-            return _symbolsCache;
+            return cachedSymbols;
         }
 
-        // 请求交易所信息
-        var url = $"{BINANCE_API_BASE_URL}/api/v3/exchangeInfo";
+        // 请求交易所信息（使用 symbolStatus 参数过滤 TRADING 状态）
+        var url = $"{BINANCE_API_BASE_URL}/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false";
         var response = await _httpClient.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
+        var exchangeInfo = await response.Content.ReadFromJsonAsync<BinanceExchangeInfo>(cancellationToken);
 
-        var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
-        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(jsonContent);
+        var tradingSymbols = exchangeInfo?.Symbols ?? new List<BinanceSymbolInfo>();
 
-        _symbolsCache = exchangeInfo?.Symbols ?? new List<BinanceSymbolInfo>();
-        _symbolsCacheTime = DateTime.Now;
-
-        _logger.LogInformation("已缓存 {Count} 个交易对信息", _symbolsCache.Count);
-        return _symbolsCache;
-    }
-
-    /// <summary>
-    /// 格式化交易对代码
-    /// </summary>
-    private string FormatSymbol(string code)
-    {
-        code = code.Replace("crypto.", "", StringComparison.OrdinalIgnoreCase)
-                   .Replace(" ", "")
-                   .ToUpperInvariant();
-
-        // 如果没有交易对后缀，默认添加USDT
-        if (!code.Contains("USDT") && !code.Contains("BTC") && !code.Contains("ETH"))
+        // 设置缓存（1小时过期）
+        var cacheOptions = new MemoryCacheEntryOptions
         {
-            code += "USDT";
-        }
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+        };
+        _memoryCache.Set(SYMBOLS_CACHE_KEY, tradingSymbols, cacheOptions);
 
-        return code;
+        _logger.LogInformation("已缓存 {Count} 个 TRADING 状态的交易对", tradingSymbols.Count);
+        return tradingSymbols;
     }
 
     /// <summary>
@@ -246,6 +246,22 @@ public class CryptoAssetInfoService : IAssetInfoService
         }
 
         return $"{value:F2}%";
+    }
+
+    /// <summary>
+    /// 根据开盘价和收盘价计算涨跌幅（用于MINI数据）
+    /// </summary>
+    private string FormatOpenClosePercentage(string? openPrice, string? lastPrice)
+    {
+        if (string.IsNullOrEmpty(openPrice) || string.IsNullOrEmpty(lastPrice) ||
+            !decimal.TryParse(openPrice, out var open) || !decimal.TryParse(lastPrice, out var last) ||
+            open == 0)
+        {
+            return "0.00%";
+        }
+
+        var changePercent = ((last - open) / open) * 100;
+        return $"{changePercent:F2}%";
     }
 
     /// <summary>
@@ -300,7 +316,7 @@ public class CryptoAssetInfoService : IAssetInfoService
     }
 
     /// <summary>
-    /// 币安24小时价格统计
+    /// 币安24小时价格统计（完整版）
     /// </summary>
     private class BinanceTicker24hr
     {
@@ -312,6 +328,20 @@ public class CryptoAssetInfoService : IAssetInfoService
         public string? QuoteVolume { get; set; }
         public string? HighPrice { get; set; }
         public string? LowPrice { get; set; }
+    }
+
+    /// <summary>
+    /// 币安24小时价格统计（精简版 - 用于GetHotAssets）
+    /// </summary>
+    private class BinanceTicker24hrMini
+    {
+        public string Symbol { get; set; } = string.Empty;
+        public string? OpenPrice { get; set; }
+        public string? HighPrice { get; set; }
+        public string? LowPrice { get; set; }
+        public string? LastPrice { get; set; }
+        public string? Volume { get; set; }
+        public string? QuoteVolume { get; set; }
     }
 
     #endregion

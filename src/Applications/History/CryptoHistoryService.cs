@@ -1,7 +1,5 @@
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace MarketAssistant.Applications.History;
 
@@ -77,22 +75,6 @@ public class CryptoHistoryService : IAssetHistoryService
     {
         SaveHistory(new List<AssetItem>());
         _logger.LogInformation("已清空虚拟币历史记录");
-    }
-
-    /// <summary>
-    /// 获取最近查看的虚拟币（与GetHistory功能相同）
-    /// </summary>
-    public List<AssetItem> GetRecentAssets()
-    {
-        return GetHistory();
-    }
-
-    /// <summary>
-    /// 添加到最近查看（与AddHistory功能相同）
-    /// </summary>
-    public void AddToRecentAssets(AssetItem asset)
-    {
-        AddHistory(asset);
     }
 
     /// <summary>

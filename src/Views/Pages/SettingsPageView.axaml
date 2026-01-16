@@ -91,35 +91,27 @@
                         </StackPanel>
 
                         <!-- 虚拟币市场API配置 -->
-                        <StackPanel Spacing="{StaticResource DefaultSpacing}" 
+                        <StackPanel Spacing="{StaticResource SmallSpacing}" 
                                     IsVisible="{Binding IsCryptoMarket}">
-                            <!-- 币安API密钥 -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="币安API密钥"
-                                           FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBox Grid.Column="0"
-                                             Text="{Binding UserSetting.BinanceApiKey}"
-                                             Watermark="请输入币安API密钥"/>
-                                    <Button Grid.Column="1"
-                                            Content="获取密钥"
-                                            Command="{Binding OpenBinanceApiWebsiteCommand}"
-                                            Background="{DynamicResource InfoBrush}"
-                                            Foreground="White"
-                                            Margin="{StaticResource SmallLeftMargin}"/>
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- 币安Secret密钥 -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="币安Secret密钥"
-                                           FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
-                                         Watermark="请输入币安Secret密钥"
+                            <!-- CoinGecko API密钥 -->
+                            <TextBlock Text="CoinGecko API密钥（可选）"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding UserSetting.CoinGeckoApiKey}"
+                                         Watermark="可选，免费版无需填写"
                                          PasswordChar="●"/>
-                            </StackPanel>
+                                <Button Grid.Column="1"
+                                        Content="获取密钥"
+                                        Command="{Binding OpenCoinGeckoApiWebsiteCommand}"
+                                        Background="{DynamicResource InfoBrush}"
+                                        Foreground="White"
+                                        Margin="{StaticResource SmallLeftMargin}"/>
+                            </Grid>
+                            <TextBlock Text="用于获取代币市值、供应量等数据。免费版有限额但无需API Key"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>
@@ -333,26 +325,32 @@
 
                         <StackPanel Spacing="{StaticResource DefaultSpacing}" 
                                     IsEnabled="{Binding UserSetting.EnableWebSearch}">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <!-- 搜索平台选择 -->
-                                <StackPanel Grid.Column="0" Spacing="{StaticResource SmallSpacing}">
-                                    <TextBlock Text="搜索平台选择"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <ComboBox ItemsSource="{Binding WebSearchProviders}"
-                                              SelectedItem="{Binding UserSetting.WebSearchProvider}"
-                                              Width="{StaticResource SettingsComboBoxWidth}"/>
+                            <!-- 搜索平台选择 -->
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="搜索平台选择"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                    <RadioButton Content="Bing" 
+                                                 GroupName="SearchProvider"
+                                                 IsChecked="{Binding IsBingProvider}"/>
+                                    <RadioButton Content="Brave" 
+                                                 GroupName="SearchProvider"
+                                                 IsChecked="{Binding IsBraveProvider}"/>
+                                    <RadioButton Content="Tavily" 
+                                                 GroupName="SearchProvider"
+                                                 IsChecked="{Binding IsTavilyProvider}"/>
                                 </StackPanel>
-                                
-                                <!-- API Key -->
-                                <StackPanel Grid.Column="1" Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource LeftMargin}">
-                                    <TextBlock Text="Web Search API Key"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                    <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
-                                             Watermark="请输入Web Search API Key"/>
-                                </StackPanel>
-                            </Grid>
+                            </StackPanel>
+                            
+                            <!-- API Key -->
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="Web Search API Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
+                                         Watermark="请输入Web Search API Key"/>
+                            </StackPanel>
                             
                             <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
                                        FontSize="{StaticResource SmallFontSize}"
