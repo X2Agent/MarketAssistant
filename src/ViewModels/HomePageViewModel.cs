@@ -64,7 +64,10 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnHotAssetSelected(object? sender, HotAsset asset)
     {
-        var assetCode = $"{asset.Market}{asset.Code}".ToLower();
+        // 根据市场类型决定是否拼接市场代码
+        var assetCode = asset.MarketType == Infrastructure.Core.MarketType.Crypto
+            ? asset.Code.ToLower()
+            : $"{asset.Market}{asset.Code}".ToLower();
         
         // 解析价格信息
         decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;

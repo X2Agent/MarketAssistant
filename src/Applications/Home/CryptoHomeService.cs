@@ -130,28 +130,52 @@ public class CryptoHomeService : IHomeAssetService
     {
         try
         {
-            if (assetParameter is not ViewModels.AssetNavigationParameter parameter)
+            string assetName = "";
+            string code = "";
+
+            if (assetParameter is HotAsset hotAsset)
+            {
+                assetName = hotAsset.Name;
+                code = hotAsset.Code;
+            }
+            else if (assetParameter is AssetItem assetItem)
+            {
+                assetName = assetItem.Name;
+                code = assetItem.Code;
+            }
+            else
             {
                 _logger?.LogWarning("添加到收藏失败：参数类型不匹配");
+                await _dialogService.ShowMessageAsync("错误", "添加到收藏失败：参数类型不匹配");
                 return false;
             }
 
             // 检查是否已收藏（虚拟币使用空字符串作为market）
-            if (FavoriteService.IsFavorite(parameter.Code, ""))
+            if (FavoriteService.IsFavorite(code, ""))
             {
                 await _dialogService.ShowMessageAsync("提示", "该虚拟币已在收藏列表中");
                 return false;
             }
 
-            // 添加到收藏
-            FavoriteService.AddFavorite(parameter.Code, "");
-            await _dialogService.ShowMessageAsync("成功", "已添加到收藏");
-            return true;
+            bool confirmed = await _dialogService.ShowConfirmationAsync(
+                "添加收藏",
+                $"确定要将 {assetName} 添加到收藏列表吗？",
+                "确认",
+                "取消");
+
+            if (confirmed)
+            {
+                FavoriteService.AddFavorite(code, "");
+                await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
+                return true;
+            }
+
+            return false;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "添加虚拟币到收藏时出错");
-            await _dialogService.ShowMessageAsync("错误", $"添加到收藏失败：{ex.Message}");
+            await _dialogService.ShowMessageAsync("收藏失败", "添加收藏时发生错误，请稍后重试");
             return false;
         }
     }

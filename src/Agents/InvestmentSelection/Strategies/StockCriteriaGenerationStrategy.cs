@@ -1,110 +1,22 @@
 using MarketAssistant.Agents.InvestmentSelection.Models;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Applications.AssetScreener.Models;
-using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
+using MarketAssistant.Infrastructure.Core;
 
-namespace MarketAssistant.Agents.InvestmentSelection.Executors;
+namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 
 /// <summary>
-/// 步骤1: 生成股票筛选条件的 Executor
-/// 将用户需求或新闻内容转换为结构化的股票筛选条件 JSON
+/// 股票筛选条件生成策略
 /// </summary>
-public sealed class GenerateStockCriteriaExecutor : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>
+public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<StockCriteria>
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILogger<GenerateStockCriteriaExecutor> _logger;
-
-    private static readonly JsonSerializerOptions SchemaOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
     private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public GenerateStockCriteriaExecutor(
-        IChatClientFactory chatClientFactory,
-        ILogger<GenerateStockCriteriaExecutor> logger) : base("GenerateStockCriteria")
-    {
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    public MarketType SupportedMarketType => MarketType.AShare;
 
-    public override async ValueTask<CriteriaGenerationResult> HandleAsync(
-        InvestmentSelectionWorkflowRequest input,
-        IWorkflowContext context,
-        CancellationToken cancellationToken = default)
-    {
-        if (input.MarketType != MarketType.AShare)
-        {
-            throw new InvalidOperationException($"GenerateStockCriteriaExecutor 仅支持 AShare 市场，当前市场类型: {input.MarketType}");
-        }
-
-        _logger.LogInformation("[步骤1/3-股票] 将{Type}转换为股票筛选条件",
-            input.IsNewsAnalysis ? "新闻内容" : "用户需求");
-
-        try
-        {
-            string systemPrompt = input.IsNewsAnalysis
-                ? BuildNewsAnalysisSystemPrompt()
-                : BuildUserRequirementSystemPrompt();
-
-            string userPrompt = BuildUserPrompt(input);
-
-            var chatClient = _chatClientFactory.CreateClient();
-
-            var schema = AIJsonUtilities.CreateJsonSchema(typeof(StockCriteria), serializerOptions: SchemaOptions);
-
-            var chatOptions = new ChatOptions
-            {
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(
-                    schema: schema,
-                    schemaName: "StockCriteria",
-                    schemaDescription: "包含筛选条件、市场、行业和数量限制的股票筛选参数"),
-                Temperature = 0.1f,
-                MaxOutputTokens = input.IsNewsAnalysis ? 3500 : 2000
-            };
-
-            var response = await chatClient.GetResponseAsync(
-                [
-                    new ChatMessage(ChatRole.System, systemPrompt),
-                    new ChatMessage(ChatRole.User, userPrompt)
-                ],
-                chatOptions,
-                cancellationToken);
-
-            var criteria = JsonSerializer.Deserialize<StockCriteria>(response.Text, DeserializationOptions);
-            if (criteria == null)
-            {
-                throw new InvalidOperationException("股票筛选条件 JSON 解析失败");
-            }
-
-            _logger.LogInformation("[步骤1/3-股票] 筛选条件生成完成，包含 {Count} 个条件",
-                criteria.Criteria?.Count ?? 0);
-
-            return new CriteriaGenerationResult
-            {
-                Criteria = criteria,
-                OriginalRequest = input
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[步骤1/3-股票] 生成筛选条件失败");
-            if (ex is FriendlyException)
-            {
-                throw;
-            }
-            throw new FriendlyException(ex.Message);
-        }
-    }
-
-    private string BuildUserRequirementSystemPrompt()
+    public string BuildUserRequirementSystemPrompt()
     {
         return """
 ## 主要任务
@@ -222,7 +134,7 @@ public sealed class GenerateStockCriteriaExecutor : Executor<InvestmentSelection
 """;
     }
 
-    private string BuildNewsAnalysisSystemPrompt()
+    public string BuildNewsAnalysisSystemPrompt()
     {
         return """
 ## 任务
@@ -296,15 +208,15 @@ public sealed class GenerateStockCriteriaExecutor : Executor<InvestmentSelection
 """;
     }
 
-    private string BuildUserPrompt(InvestmentSelectionWorkflowRequest input)
+    public string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
     {
-        if (input.IsNewsAnalysis)
+        if (request.IsNewsAnalysis)
         {
             return $"""
                 新闻内容：
-                {input.Content}
+                {request.Content}
 
-                推荐股票数量限制：{input.MaxRecommendations}
+                推荐股票数量限制：{request.MaxRecommendations}
 
                 请根据新闻内容生成股票筛选条件。
                 """;
@@ -313,13 +225,22 @@ public sealed class GenerateStockCriteriaExecutor : Executor<InvestmentSelection
         {
             return $"""
                 用户需求：
-                {input.Content}
+                {request.Content}
 
-                推荐股票数量限制：{input.MaxRecommendations}
+                推荐股票数量限制：{request.MaxRecommendations}
 
                 请根据用户需求生成股票筛选条件。
                 """;
         }
     }
-}
 
+    public StockCriteria DeserializeCriteria(string json)
+    {
+        var criteria = JsonSerializer.Deserialize<StockCriteria>(json, DeserializationOptions);
+        if (criteria == null)
+        {
+            throw new InvalidOperationException("股票筛选条件 JSON 解析失败");
+        }
+        return criteria;
+    }
+}

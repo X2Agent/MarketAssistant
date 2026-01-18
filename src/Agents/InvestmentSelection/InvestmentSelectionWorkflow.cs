@@ -1,8 +1,10 @@
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
+using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection;
@@ -14,27 +16,24 @@ namespace MarketAssistant.Agents.InvestmentSelection;
 /// </summary>
 public class InvestmentSelectionWorkflow : IDisposable
 {
-    private readonly GenerateStockCriteriaExecutor _generateStockCriteriaExecutor;
-    private readonly GenerateCryptoCriteriaExecutor _generateCryptoCriteriaExecutor;
+    private readonly GenerateCriteriaExecutor<StockCriteria> _generateStockCriteriaExecutor;
+    private readonly GenerateCriteriaExecutor<CryptoCriteria> _generateCryptoCriteriaExecutor;
     private readonly ScreenInvestmentTargetsExecutor _screenTargetsExecutor;
-    private readonly AnalyzeStocksExecutor _analyzeStocksExecutor;
-    private readonly AnalyzeCryptoExecutor _analyzeCryptoExecutor;
+    private readonly AnalyzeAssetsExecutor _analyzeAssetsExecutor;
     private readonly ILogger<InvestmentSelectionWorkflow> _logger;
     private bool _disposed = false;
 
     public InvestmentSelectionWorkflow(
-        GenerateStockCriteriaExecutor generateStockCriteriaExecutor,
-        GenerateCryptoCriteriaExecutor generateCryptoCriteriaExecutor,
+        GenerateCriteriaExecutor<StockCriteria> generateStockCriteriaExecutor,
+        GenerateCriteriaExecutor<CryptoCriteria> generateCryptoCriteriaExecutor,
         ScreenInvestmentTargetsExecutor screenTargetsExecutor,
-        AnalyzeStocksExecutor analyzeStocksExecutor,
-        AnalyzeCryptoExecutor analyzeCryptoExecutor,
+        AnalyzeAssetsExecutor analyzeAssetsExecutor,
         ILogger<InvestmentSelectionWorkflow> logger)
     {
         _generateStockCriteriaExecutor = generateStockCriteriaExecutor ?? throw new ArgumentNullException(nameof(generateStockCriteriaExecutor));
         _generateCryptoCriteriaExecutor = generateCryptoCriteriaExecutor ?? throw new ArgumentNullException(nameof(generateCryptoCriteriaExecutor));
         _screenTargetsExecutor = screenTargetsExecutor ?? throw new ArgumentNullException(nameof(screenTargetsExecutor));
-        _analyzeStocksExecutor = analyzeStocksExecutor ?? throw new ArgumentNullException(nameof(analyzeStocksExecutor));
-        _analyzeCryptoExecutor = analyzeCryptoExecutor ?? throw new ArgumentNullException(nameof(analyzeCryptoExecutor));
+        _analyzeAssetsExecutor = analyzeAssetsExecutor ?? throw new ArgumentNullException(nameof(analyzeAssetsExecutor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -91,23 +90,24 @@ public class InvestmentSelectionWorkflow : IDisposable
             request.MarketType,
             request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
-        // 根据市场类型动态构建执行链
-        WorkflowBuilder builder = request.MarketType switch
+        // 根据市场类型选择对应的条件生成 Executor
+        WorkflowBuilder workflowBuilder = request.MarketType switch
         {
             MarketType.AShare => new WorkflowBuilder(_generateStockCriteriaExecutor)
                 .AddEdge(_generateStockCriteriaExecutor, _screenTargetsExecutor)
-                .AddEdge(_screenTargetsExecutor, _analyzeStocksExecutor)
-                .WithOutputFrom(_analyzeStocksExecutor),
+                .AddEdge(_screenTargetsExecutor, _analyzeAssetsExecutor)
+                .WithOutputFrom(_analyzeAssetsExecutor),
 
             MarketType.Crypto => new WorkflowBuilder(_generateCryptoCriteriaExecutor)
                 .AddEdge(_generateCryptoCriteriaExecutor, _screenTargetsExecutor)
-                .AddEdge(_screenTargetsExecutor, _analyzeCryptoExecutor)
-                .WithOutputFrom(_analyzeCryptoExecutor),
+                .AddEdge(_screenTargetsExecutor, _analyzeAssetsExecutor)
+                .WithOutputFrom(_analyzeAssetsExecutor),
 
             _ => throw new NotSupportedException($"不支持的市场类型: {request.MarketType}")
         };
 
-        var workflow = builder.Build();
+        // 构建工作流
+        var workflow = workflowBuilder.Build();
 
         // 执行工作流
         await using Run run = await InProcessExecution.RunAsync(workflow, request, runId: null, cancellationToken);

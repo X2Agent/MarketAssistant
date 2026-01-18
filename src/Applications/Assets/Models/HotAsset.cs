@@ -63,6 +63,59 @@ public class HotAsset
     /// 24小时交易量（虚拟币特有）
     /// </summary>
     public string? Volume24h { get; set; }
+
+    /// <summary>
+    /// 指标标签（根据市场类型动态返回"热度"或"交易量"）
+    /// </summary>
+    public string MetricLabel => MarketType == MarketType.Crypto ? "交易量" : "热度";
+
+    /// <summary>
+    /// 指标数值（根据市场类型动态返回格式化的热度或交易量）
+    /// </summary>
+    public string MetricValue
+    {
+        get
+        {
+            if (MarketType == MarketType.Crypto)
+            {
+                return FormatVolume(Volume24h);
+            }
+            return FormatNumber(HeatIndex);
+        }
+    }
+
+    private static string FormatNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "-";
+
+        if (decimal.TryParse(value, out var number))
+        {
+            return number.ToString("N0");
+        }
+
+        return value;
+    }
+
+    private static string FormatVolume(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "-";
+
+        if (decimal.TryParse(value, out var volume))
+        {
+            if (volume >= 1_000_000_000)
+                return $"{volume / 1_000_000_000:N2}B";
+            if (volume >= 1_000_000)
+                return $"{volume / 1_000_000:N2}M";
+            if (volume >= 1_000)
+                return $"{volume / 1_000:N2}K";
+
+            return volume.ToString("N0");
+        }
+
+        return value;
+    }
 }
 
 

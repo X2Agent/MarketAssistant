@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.AssetScreener.Models;
 
@@ -6,8 +7,12 @@ namespace MarketAssistant.Applications.AssetScreener.Models;
 /// 股票筛选参数
 /// </summary>
 [Description("包含筛选条件、市场、行业和数量限制的股票筛选参数")]
-public class StockCriteria
+public class StockCriteria : IScreeningCriteria
 {
+    /// <summary>
+    /// 市场类型
+    /// </summary>
+    public MarketType MarketType => MarketType.AShare;
     /// <summary>
     /// 筛选条件列表
     /// </summary>

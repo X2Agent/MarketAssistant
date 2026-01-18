@@ -2,7 +2,9 @@ using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
+using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener;
+using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Agents.Tools;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.AShare;
@@ -30,6 +32,7 @@ using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -141,12 +144,17 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>("AShare");
         services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>("Crypto");
 
-        // 注册投资选择工作流的 Executors
-        services.AddSingleton<GenerateStockCriteriaExecutor>();
-        services.AddSingleton<GenerateCryptoCriteriaExecutor>();
+        // 注册投资选择策略
+        services.AddSingleton<ICriteriaGenerationStrategy<StockCriteria>, StockCriteriaGenerationStrategy>();
+        services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();
+        services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>("AShare");
+        services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>("Crypto");
+
+        // 注册投资选择工作流的 Executors（泛型 + 共用）
+        services.AddSingleton<GenerateCriteriaExecutor<StockCriteria>>();
+        services.AddSingleton<GenerateCriteriaExecutor<CryptoCriteria>>();
         services.AddSingleton<ScreenInvestmentTargetsExecutor>();
-        services.AddSingleton<AnalyzeStocksExecutor>();
-        services.AddSingleton<AnalyzeCryptoExecutor>();
+        services.AddSingleton<AnalyzeAssetsExecutor>();
 
         // 注册投资选择工作流和服务
         services.AddSingleton<InvestmentSelectionWorkflow>();

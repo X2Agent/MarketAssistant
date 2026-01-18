@@ -1,10 +1,16 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Applications.AssetScreener.Models;
 
 /// <summary>
 /// 虚拟币筛选条件
 /// </summary>
-public class CryptoCriteria
+public class CryptoCriteria : IScreeningCriteria
 {
+    /// <summary>
+    /// 市场类型
+    /// </summary>
+    public MarketType MarketType => MarketType.Crypto;
     /// <summary>
     /// 筛选条件列表
     /// </summary>

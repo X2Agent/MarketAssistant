@@ -204,19 +204,19 @@
                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </StackPanel>
                                         <TextBlock Grid.Row="0" Grid.Column="1"
-                                                   Text="热度"
+                                                   Text="{Binding MetricLabel}"
                                                    FontSize="{StaticResource MiniFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Right"/>
 
-                                        <!-- Row 1: Name & Heat Value -->
+                                        <!-- Row 1: Name & Heat/Volume Value -->
                                         <TextBlock Grid.Row="1" Grid.Column="0"
                                                    Text="{Binding Name}"
                                                    FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="SemiBold"
                                                    Margin="{StaticResource TinyVerticalMargin}"/>
                                         <TextBlock Grid.Row="1" Grid.Column="1"
-                                                   Text="{Binding HeatIndex, Converter={StaticResource NumberFormatConverter}}"
+                                                   Text="{Binding MetricValue}"
                                                    FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource PrimaryBrush}"

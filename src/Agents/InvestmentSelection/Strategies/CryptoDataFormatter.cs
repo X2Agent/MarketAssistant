@@ -1,0 +1,112 @@
+using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Infrastructure.Core;
+
+namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
+
+/// <summary>
+/// 虚拟币数据格式化器
+/// </summary>
+public class CryptoDataFormatter : IAssetDataFormatter
+{
+    public MarketType SupportedMarketType => MarketType.Crypto;
+
+    public string FormatAssetsForAnalysis(List<ScreenerStockInfo> cryptos)
+    {
+        var simplifiedCryptos = cryptos.Select(c =>
+        {
+            var data = new Dictionary<string, object>
+            {
+                ["名称"] = c.Name,
+                ["代码"] = c.Symbol
+            };
+
+            void AddIfNotZero(string key, decimal value, int decimals = 2, decimal divisor = 1)
+            {
+                if (value != 0)
+                {
+                    var convertedValue = divisor != 1 ? value / divisor : value;
+                    data[key] = Math.Round(convertedValue, decimals);
+                }
+            }
+
+            // 基本信息
+            AddIfNotZero("当前价格_USDT", c.Current);
+            AddIfNotZero("市值_亿美元", c.Mc, 2, 100000000);
+            AddIfNotZero("流通市值_亿美元", c.Fmc, 2, 100000000);
+
+            // 交易数据
+            AddIfNotZero("24h交易量_万", c.Volume, 0);
+            AddIfNotZero("24h成交额_亿美元", c.Amount, 2, 100000000);
+            AddIfNotZero("量比", c.VolumeRatio);
+            AddIfNotZero("换手率_百分比", c.Tr);
+
+            // 涨跌幅数据（虚拟币）
+            AddIfNotZero("24h涨跌幅_百分比", c.Pct);
+            AddIfNotZero("7天涨跌幅_百分比", c.Pct5);
+            AddIfNotZero("30天涨跌幅_百分比", c.Pct20);
+            AddIfNotZero("60天涨跌幅_百分比", c.Pct60);
+            AddIfNotZero("90天涨跌幅_百分比", c.Pct120);
+            AddIfNotZero("1年涨跌幅_百分比", c.Pct250);
+            AddIfNotZero("年初至今涨跌幅_百分比", c.PctCurrentYear);
+
+            // 波动性
+            AddIfNotZero("24h振幅_百分比", c.ChgPct);
+
+            // 估值指标（如适用）
+            AddIfNotZero("市盈率", c.PeTtm);
+            AddIfNotZero("市净率", c.Pb);
+            AddIfNotZero("市销率", c.Psr);
+
+            // 社交热度（如雪球数据适用于虚拟币）
+            AddIfNotZero("关注人数", c.Follow, 0);
+            AddIfNotZero("讨论次数", c.Tweet, 0);
+            AddIfNotZero("一周新增关注", c.Follow7d, 0);
+            AddIfNotZero("一周新增讨论", c.Tweet7d, 0);
+            AddIfNotZero("一周关注增长率_百分比", c.Follow7dPct);
+            AddIfNotZero("一周讨论增长率_百分比", c.Tweet7dPct);
+
+            return data;
+        }).ToList();
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+
+        return JsonSerializer.Serialize(simplifiedCryptos, jsonOptions);
+    }
+
+    public string GetAnalysisInstructions(bool isNewsAnalysis)
+    {
+        return @"
+你是专业的加密货币投资顾问，基于用户需求/新闻热点和虚拟币数据提供投资建议。
+
+## 核心职责
+从筛选出的虚拟币中进行多维度分析，输出结构化推荐报告。
+
+## 评估维度（灵活权重）
+1. **项目基本面**：技术创新、团队背景、生态发展、实际应用
+2. **市场表现**：市值排名、交易量、价格走势、流动性
+3. **链上数据**：活跃地址、交易次数、持币集中度、大户动向
+4. **社区热度**：社交媒体讨论、开发者活跃度、社区支持
+5. **风险评估**：波动性、监管风险、技术风险、市场情绪" + (isNewsAnalysis ? "、新闻关联度" : "") + @"
+
+## 虚拟币特有分析要点
+- 优先考虑市值排名前100的主流币种
+- 关注项目的技术创新和实际应用场景
+- 评估代币经济模型的合理性
+- 注意市场情绪和恐慌贪婪指数
+- 虚拟币市场波动性大，风险提示要充分
+
+## 分析要点
+- 推荐理由必须包含具体数据支撑，避免空泛描述
+- 风险提示应特别强调虚拟币的高波动性
+- 如无合适标的，可返回空推荐列表
+
+## 输出格式
+严格按 JSON Schema 定义的结构输出，所有必填字段不能为空或null。
+Symbol 字段格式为交易对形式，如 BTC/USDT、ETH/USDT。
+";
+    }
+}
