@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Services.Market;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -59,8 +58,7 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
 
         // 根据当前市场类型获取对应的 NewsUpdateService
-        _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(
-            _marketContext.CurrentMarket.ToString());
+        _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(_marketContext.CurrentMarket);
 
         OpenNewsCommand = new AsyncRelayCommand<Telegram>(OnOpenNewsAsync);
         RefreshCommand = new RelayCommand(() => _newsUpdateService.StartUpdates());

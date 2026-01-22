@@ -4,7 +4,6 @@ using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
@@ -57,8 +56,7 @@ public sealed class AnalyzeAssetsExecutor : Executor<AssetScreeningResult, Inves
             }
 
             // 根据市场类型获取对应的数据格式化器
-            var formatter = _serviceProvider.GetRequiredKeyedService<IAssetDataFormatter>(
-                originalRequest.MarketType.ToString());
+            var formatter = _serviceProvider.GetRequiredKeyedService<IAssetDataFormatter>(originalRequest.MarketType);
 
             _logger.LogInformation("[步骤3/3-{MarketType}] 使用格式化器: {FormatterType}",
                 originalRequest.MarketType, formatter.GetType().Name);

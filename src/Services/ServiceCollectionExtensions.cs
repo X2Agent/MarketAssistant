@@ -1,25 +1,24 @@
-using MarketAssistant.Agents.MarketAnalysis;
-using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
-using MarketAssistant.Applications.AssetScreener;
-using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.Tools;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.AShare;
 using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Applications.Assets;
+using MarketAssistant.Applications.AssetScreener;
+using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
+using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
@@ -32,7 +31,6 @@ using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
-using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -100,20 +98,20 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GroundingSearchTools>();
 
         // 注册快讯服务接口的实现（使用 Keyed Services）
-        services.AddKeyedSingleton<ITelegramService, AShareTelegramService>("AShare");
-        services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>("Crypto");
+        services.AddKeyedSingleton<ITelegramService, AShareTelegramService>(MarketType.AShare);
+        services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>(MarketType.Crypto);
 
         // 注册新闻更新服务（使用 Keyed Services）
         services.AddKeyedSingleton<INewsUpdateService>(
-            "AShare",
+            MarketType.AShare,
             (sp, key) => new NewsUpdateService(
-                sp.GetRequiredKeyedService<ITelegramService>("AShare"),
+                sp.GetRequiredKeyedService<ITelegramService>(MarketType.AShare),
                 sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         services.AddKeyedSingleton<INewsUpdateService>(
-            "Crypto",
+            MarketType.Crypto,
             (sp, key) => new NewsUpdateService(
-                sp.GetRequiredKeyedService<ITelegramService>("Crypto"),
+                sp.GetRequiredKeyedService<ITelegramService>(MarketType.Crypto),
                 sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         // 注册分析缓存服务
@@ -141,14 +139,14 @@ public static class ServiceCollectionExtensions
 
         // 注册AI选股相关服务（使用 Agent Framework Workflows）
         // 注册筛选服务接口的实现（使用 Keyed Services）
-        services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>("AShare");
-        services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>("Crypto");
+        services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>(MarketType.Crypto);
 
         // 注册投资选择策略
         services.AddSingleton<ICriteriaGenerationStrategy<StockCriteria>, StockCriteriaGenerationStrategy>();
         services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();
-        services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>("AShare");
-        services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>("Crypto");
+        services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>(MarketType.Crypto);
 
         // 注册投资选择工作流的 Executors（泛型 + 共用）
         services.AddSingleton<GenerateCriteriaExecutor<StockCriteria>>();

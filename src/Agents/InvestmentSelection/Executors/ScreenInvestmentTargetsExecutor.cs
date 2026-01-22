@@ -2,7 +2,6 @@ using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
@@ -45,8 +44,7 @@ public sealed class ScreenInvestmentTargetsExecutor : Executor<CriteriaGeneratio
             }
 
             // 根据市场类型获取对应的筛选服务（使用 Keyed Services）
-            var marketTypeKey = originalRequest.MarketType.ToString();
-            var screenerService = _serviceProvider.GetRequiredKeyedService<IAssetScreenerService>(marketTypeKey);
+            var screenerService = _serviceProvider.GetRequiredKeyedService<IAssetScreenerService>(originalRequest.MarketType);
 
             _logger.LogInformation("[步骤2/3] 使用市场类型: {MarketType}, 筛选服务: {ServiceType}",
                 originalRequest.MarketType, screenerService.GetType().Name);
