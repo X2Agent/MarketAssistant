@@ -92,10 +92,6 @@ public class GitHubReleaseService : IReleaseService
 
             return result;
         }
-        catch (FriendlyException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "检查更新失败");
@@ -198,10 +194,6 @@ public class GitHubReleaseService : IReleaseService
         {
             _logger.LogError(ex, "下载更新失败：无权限访问文件");
             throw new FriendlyException($"无权限保存文件：{ex.Message}", ex);
-        }
-        catch (FriendlyException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

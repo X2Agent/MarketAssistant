@@ -61,108 +61,68 @@ public class AShareHomeService : IHomeAssetService
         if (string.IsNullOrWhiteSpace(query))
             return new List<AssetItem>();
 
-        try
-        {
-            var results = await AssetInfoService.SearchAsync(query, cancellationToken);
-            return results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code }).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "搜索资产时出错，查询：{Query}", query);
-            return new List<AssetItem>();
-        }
+        var results = await AssetInfoService.SearchAsync(query, cancellationToken);
+        return results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code }).ToList();
     }
 
     public async Task<List<HotAsset>> GetHotAssetsAsync()
     {
-        try
-        {
-            return await AssetInfoService.GetHotAssetsAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "获取热门资产时出错");
-            return new List<HotAsset>();
-        }
+        return await AssetInfoService.GetHotAssetsAsync();
     }
 
     public List<AssetItem> GetRecentAssets()
     {
-        try
-        {
-            return HistoryService.GetHistory();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "获取最近查看资产时出错");
-            return new List<AssetItem>();
-        }
+        return HistoryService.GetHistory();
     }
 
     public void AddToRecentAssets(AssetItem asset)
     {
-        try
-        {
-            HistoryService.AddHistory(asset);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "添加到最近查看时出错，资产：{AssetName}", asset?.Name);
-        }
+        HistoryService.AddHistory(asset);
     }
 
     public async Task<bool> AddToFavoriteAsync(object assetParameter)
     {
-        try
+        string assetName = "";
+        string code = "";
+        string market = "";
+
+        if (assetParameter is HotAsset hotAsset)
         {
-            string assetName = "";
-            string code = "";
-            string market = "";
+            assetName = hotAsset.Name;
+            code = hotAsset.Code;
+            market = hotAsset.Market;
+        }
+        else if (assetParameter is AssetItem assetItem)
+        {
+            assetName = assetItem.Name;
+            code = assetItem.Code;
 
-            if (assetParameter is HotAsset hotAsset)
+            // 尝试从资产代码中提取市场代码
+            if (code.StartsWith("sh") || code.StartsWith("sz"))
             {
-                assetName = hotAsset.Name;
-                code = hotAsset.Code;
-                market = hotAsset.Market;
+                market = code.Substring(0, 2).ToUpper();
+                code = code.Substring(2);
             }
-            else if (assetParameter is AssetItem assetItem)
-            {
-                assetName = assetItem.Name;
-                code = assetItem.Code;
-
-                // 尝试从资产代码中提取市场代码
-                if (code.StartsWith("sh") || code.StartsWith("sz"))
-                {
-                    market = code.Substring(0, 2).ToUpper();
-                    code = code.Substring(2);
-                }
-            }
-            else
-            {
-                return false;
-            }
-
-            bool confirmed = await _dialogService.ShowConfirmationAsync(
-                "添加收藏",
-                $"确定要将 {assetName} 添加到收藏列表吗？",
-                "确认",
-                "取消");
-
-            if (confirmed)
-            {
-                FavoriteService.AddFavorite(code, market);
-                await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
-                return true;
-            }
-
+        }
+        else
+        {
             return false;
         }
-        catch (Exception ex)
+
+        bool confirmed = await _dialogService.ShowConfirmationAsync(
+            "添加收藏",
+            $"确定要将 {assetName} 添加到收藏列表吗？",
+            "确认",
+            "取消");
+
+        if (confirmed)
         {
-            _logger?.LogError(ex, "添加收藏时出错");
-            await _dialogService.ShowMessageAsync("收藏失败", "添加收藏时发生错误，请稍后重试");
-            return false;
+            FavoriteService.AddFavorite(code, market);
+            await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
+            return true;
         }
+
+        return false;
     }
 }
 

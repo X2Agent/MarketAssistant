@@ -1,43 +1,34 @@
-using MarketAssistant.Agents.Tools.Models.Crypto;
-using MarketAssistant.Agents.Tools.Models.Crypto.Binance;
-using MarketAssistant.Agents.Tools.Models.Crypto.CoinDesk;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models.Crypto;
+using MarketAssistant.Agents.Tools.Models.Crypto.CoinDesk;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
+using System.ComponentModel;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
 /// <summary>
-/// 虚拟币基础数据工具实现（使用币安 API 获取行情，CoinDesk API 获取项目信息）
+/// 虚拟币基础数据工具实现（使用服务层获取数据）
 /// </summary>
 public sealed class CryptoBasicTools : ICryptoBasicTools
 {
     private readonly ILogger<CryptoBasicTools> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly BinanceMarketDataService _binanceService;
+    private readonly CoinDeskApiService _coinDeskService;
     private readonly IUserSettingService _userSettingService;
-    private const string BINANCE_API_BASE_URL = "https://api.binance.com/api/v3";
-    private const string COINDESK_API_BASE_URL = "https://data-api.coindesk.com";
-
-    /// <summary>
-    /// JSON 序列化选项（统一配置，性能优化）
-    /// </summary>
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
 
     public CryptoBasicTools(
         ILogger<CryptoBasicTools> logger,
-        IHttpClientFactory httpClientFactory,
+        BinanceMarketDataService binanceService,
+        CoinDeskApiService coinDeskService,
         IUserSettingService userSettingService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+        _coinDeskService = coinDeskService ?? throw new ArgumentNullException(nameof(coinDeskService));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
     }
 
@@ -46,29 +37,22 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
     /// </summary>
     /// <param name="assetSymbol">虚拟币代码（如 BTC、ETH、BNB）</param>
     /// <returns>包含价格、涨跌幅、成交量等行情信息的虚拟币报价数据</returns>
-    public async Task<CryptoQuoteInfo> GetAssetInfoAsync(string assetSymbol)
+    [Description("根据虚拟币代码获取基本数据，包括实时行情、价格变动、成交量等信息。symbol格式不区分大小写，如BTC或BTCUSDT。")]
+    public async Task<CryptoQuoteInfo> GetAssetInfoAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
         {
             // 格式化交易对符号（如 "BTC" -> "BTCUSDT"）
             var symbol = ToBinanceFormat(assetSymbol);
-            var url = $"{BINANCE_API_BASE_URL}/ticker/24hr?symbol={symbol}";
 
             _logger.LogInformation("正在获取虚拟币行情数据: {Symbol}", symbol);
 
-            // 使用 HttpClientFactory 创建客户端（避免端口耗尽问题）
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(15);
-
-            var response = await httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-
-            var tickerData = await response.Content.ReadFromJsonAsync<BinanceTicker24hr>(JsonOptions);
+            var tickerData = await _binanceService.Get24hrTickerAsync(symbol);
 
             if (tickerData == null)
             {
-                _logger.LogError("币安API返回数据为空或无法解析: {Symbol}", assetSymbol);
-                throw new InvalidOperationException($"无法解析币安API响应数据: {assetSymbol}");
+                _logger.LogError("币安API返回数据为空: {Symbol}", assetSymbol);
+                throw new FriendlyException($"无法获取虚拟币行情: {assetSymbol}");
             }
 
             // 映射到 CryptoQuoteInfo 模型
@@ -84,13 +68,13 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
                 OpenPrice = tickerData.OpenPrice,
                 HighPrice = tickerData.HighPrice,
                 LowPrice = tickerData.LowPrice,
-                PreviousClosePrice = tickerData.PrevClosePrice,
-                AveragePrice = tickerData.WeightedAvgPrice,
+                PreviousClosePrice = tickerData.PrevClosePrice ?? tickerData.OpenPrice,
+                AveragePrice = tickerData.WeightedAvgPrice ?? tickerData.LastPrice,
 
                 // 涨跌信息
-                PriceChange = tickerData.PriceChange,
-                PercentageChange = tickerData.PriceChangePercent,
-                Amplitude = CalculateAmplitude(tickerData.HighPrice, tickerData.LowPrice, tickerData.PrevClosePrice),
+                PriceChange = tickerData.PriceChange ?? 0m,
+                PercentageChange = tickerData.PriceChangePercent ?? 0m,
+                Amplitude = CalculateAmplitude(tickerData.HighPrice, tickerData.LowPrice, tickerData.PrevClosePrice ?? tickerData.OpenPrice),
 
                 // 交易量（币安单位：BTC 数量和 USDT 金额）
                 Volume = tickerData.Volume / 10000m, // 转换为万手（这里作为万个币）
@@ -105,12 +89,12 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "调用币安API获取行情失败: {Symbol}", assetSymbol);
-            throw new InvalidOperationException($"获取虚拟币行情失败: {assetSymbol}，请检查网络连接或交易对是否正确", ex);
+            throw new FriendlyException($"获取虚拟币行情失败: {assetSymbol}，请检查网络连接或交易对是否正确", ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取虚拟币行情时发生错误: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"获取虚拟币行情时发生错误: {ex.Message}", ex);
         }
     }
 
@@ -132,28 +116,23 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
     /// </summary>
     /// <param name="assetSymbol">虚拟币代码（如 BTC、ETH、BNB）</param>
     /// <returns>包含项目描述、供应量、价格、市值、交易量等完整基本面信息</returns>
-    public async Task<CryptoProjectInfo> GetProjectInfoAsync(string assetSymbol)
+    [Description("根据虚拟币代码获取区块链项目基本面信息，包括项目简介、社区数据、开发者活跃度等。symbol格式不区分大小写，如BTC。")]
+    public async Task<CryptoProjectInfo> GetProjectInfoAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
         {
-            var symbol = assetSymbol.ToUpper();
-            var url = $"{COINDESK_API_BASE_URL}/asset/v2/metadata?assets={symbol}&asset_lookup_priority=SYMBOL&quote_asset=USD&asset_language=en-US";
+            // 提取基础币种 (如 BTCUSDT -> BTC)
+            var baseSymbol = CryptoSymbolConverter.ExtractBaseCurrency(assetSymbol);
+            var symbol = string.IsNullOrWhiteSpace(baseSymbol) ? assetSymbol.ToUpper() : baseSymbol;
 
             _logger.LogInformation("正在获取虚拟币项目信息: {Symbol}", symbol);
 
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(20);
-            httpClient.DefaultRequestHeaders.Add("Content-type", "application/json; charset=UTF-8");
-
-            var response = await httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-
-            var coinDeskResponse = await response.Content.ReadFromJsonAsync<CoinDeskMetadataResponse>(JsonOptions);
+            var coinDeskResponse = await _coinDeskService.GetAssetMetadataAsync(symbol);
 
             if (coinDeskResponse?.Data == null || !coinDeskResponse.Data.ContainsKey(symbol))
             {
-                _logger.LogError("CoinDesk API 返回数据为空或无法解析: {Symbol}", symbol);
-                throw new InvalidOperationException($"无法解析 CoinDesk API 响应数据: {symbol}");
+                _logger.LogError("CoinDesk API 返回数据为空: {Symbol}", symbol);
+                throw new FriendlyException($"无法获取虚拟币项目信息: {symbol}，可能是非主流币种或名称错误");
             }
 
             var assetData = coinDeskResponse.Data[symbol];
@@ -192,12 +171,12 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "调用 CoinDesk API 获取项目信息失败: {Symbol}", assetSymbol);
-            throw new InvalidOperationException($"获取虚拟币项目信息失败: {assetSymbol}，请检查网络连接或币种代码是否正确", ex);
+            throw new FriendlyException($"获取虚拟币项目信息失败: {assetSymbol}，请检查网络连接", ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取虚拟币项目信息时发生错误: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"获取虚拟币项目信息时发生错误: {ex.Message}", ex);
         }
     }
 

@@ -2,12 +2,12 @@ using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
-namespace TestMarketAssistant.MultiMarket;
+namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// IFavoriteService 接口测试（覆盖 A股 和 虚拟币 实现）
@@ -23,10 +23,13 @@ public class FavoriteServiceTest
         var services = new ServiceCollection();
 
         // 注册依赖服务
+        services.AddHttpClient();
+        services.AddMemoryCache();
+        services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
         services.AddSingleton<PlaywrightService>();
-        services.AddLogging();
+        services.AddSingleton<BinanceMarketDataService>();
 
         // 注册 AssetInfoService（FavoriteService 的依赖）
         services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);

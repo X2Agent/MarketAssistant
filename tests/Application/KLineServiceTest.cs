@@ -4,9 +4,8 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
-namespace TestMarketAssistant.MultiMarket;
+namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// IKLineService 接口测试（覆盖 A股 和 虚拟币 实现）

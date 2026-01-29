@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 
 namespace MarketAssistant.Agents.Tools.Abstractions;
@@ -22,7 +23,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 获取历史K线数据（OHLCV）
     /// </summary>
     /// <param name="symbol">交易对符号（如BTCUSDT）</param>
-    /// <param name="interval">时间间隔（1m/5m/15m/30m/1h/4h/1d/1w/1M）</param>
+    /// <param name="interval">时间间隔</param>
     /// <param name="limit">返回数据条数（默认500，最大1000）</param>
     /// <param name="startTime">起始时间（Unix时间戳毫秒，可选）</param>
     /// <param name="endTime">结束时间（Unix时间戳毫秒，可选）</param>
@@ -30,7 +31,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 数据源：币安API - /api/v3/klines
     /// 用于技术分析、回测和趋势判断
     /// </remarks>
-    Task<CryptoOHLCV> GetOHLCVAsync(string symbol, string interval = "1d", int limit = 500, long? startTime = null, long? endTime = null);
+    Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null);
 
     /// <summary>
     /// 获取订单簿深度数据

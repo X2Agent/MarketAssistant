@@ -1,11 +1,12 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace TestMarketAssistant.MultiMarket;
+namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// IAssetInfoService 接口测试（覆盖 A股 和 虚拟币 实现）
@@ -22,12 +23,13 @@ public class AssetInfoServiceTest
         var services = new ServiceCollection();
 
         // 注册依赖服务
+        services.AddHttpClient();
+        services.AddMemoryCache();
+        services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
         services.AddSingleton<PlaywrightService>();
-        services.AddLogging();
-
-        services.AddMemoryCache();
+        services.AddSingleton<BinanceMarketDataService>();
 
         // 注册被测试的服务
         services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);

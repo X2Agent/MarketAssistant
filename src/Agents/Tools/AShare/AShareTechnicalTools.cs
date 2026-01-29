@@ -1,9 +1,8 @@
-using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace MarketAssistant.Agents.Tools.AShare;
 
@@ -23,16 +22,25 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
 
     private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol)
     {
-        var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
-        var url = $"https://api.zhituapi.com/hs/history/{indicator}/{StockSymbolConverter.ToZhiTuFormat(assetSymbol)}/d/n?token={token}&lt=30";
-        using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.GetStringAsync(url);
-        var items = JsonSerializer.Deserialize<List<T>>(response);
+        try
+        {
+            var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
+            var formattedSymbol = StockSymbolConverter.ToZhiTuFormat(assetSymbol);
+            var url = $"https://api.zhituapi.com/hs/history/{indicator}/{formattedSymbol}/d/n?token={token}&lt=30";
 
-        if (items == null || !items.Any())
-            throw new Exception($"获取{indicator.ToUpper()}数据失败: 返回数据为空或无有效数据");
+            using var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetStringAsync(url);
+            var items = JsonSerializer.Deserialize<List<T>>(response);
 
-        return items.Last();
+            if (items == null || !items.Any())
+                throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
+
+            return items.Last();
+        }
+        catch (Exception ex) when (ex is not FriendlyException)
+        {
+            throw new FriendlyException($"获取技术指标 {indicator} 时发生错误: {ex.Message} (代码: {assetSymbol})", ex);
+        }
     }
 
     [Description("获取近30日最新日线KDJ")]

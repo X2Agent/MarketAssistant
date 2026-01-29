@@ -191,9 +191,9 @@ public class InvestmentSelectionService : IDisposable
             new QuickSelectionStrategyInfo
             {
                 Strategy = QuickSelectionStrategy.HighYield,
-                Name = "高收益",
+                Name = "高股息",
                 Icon = "💰",
-                Description = "筛选股息率/收益率高、分红/收益稳定的标的",
+                Description = "筛选股息率高、分红稳定的高股息标的",
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"
             }
@@ -255,11 +255,11 @@ public class InvestmentSelectionService : IDisposable
             new QuickSelectionStrategyInfo
             {
                 Strategy = QuickSelectionStrategy.HighYield,
-                Name = "质押收益币",
-                Icon = "💰",
-                Description = "筛选支持质押、年化收益率稳定的币种",
-                Scenario = "适合追求被动收益的投资者，稳定收益",
-                RiskLevel = "中低风险"
+                Name = "高波动币",
+                Icon = "⚡",
+                Description = "筛选24h价格波动大于±5%的高波动币种",
+                Scenario = "适合激进型交易者，追求短期高波动收益",
+                RiskLevel = "高风险"
             }
         };
     }
@@ -367,7 +367,7 @@ public class InvestmentSelectionService : IDisposable
             (MarketType.Crypto, QuickSelectionStrategy.SmallCap) =>
                 ("请筛选潜力小币：市值排名100-500，上市时间1-3年，技术创新性强，具有成长潜力的小市值币", "aggressive"),
             (MarketType.Crypto, QuickSelectionStrategy.HighYield) =>
-                ("请筛选质押收益币：支持质押功能，年化收益率大于5%，质押安全性高，收益稳定的币种", "conservative"),
+                ("请筛选高波动币种：24小时价格变化绝对值大于5%，波动活跃，适合短线交易的币种", "aggressive"),
 
             _ => throw new ArgumentException($"不支持的策略或市场类型: {strategy}, {marketType}")
         };

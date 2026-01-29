@@ -15,8 +15,8 @@
 
 - 业务与设置：`src/Applications/`
 - 视图与视图模型：`src/Views/`, `src/ViewModels/`
-- 插件能力（基础/财务/新闻/技术/筛选）：`src/Agents/Plugins/`
-- 代理与多分析角色：`src/Agents/` 及 `Agents/Yaml`
+- 智能体分析师角色：`src/Agents/Analysts/` (含多种分析师实现)
+- 代理与会话：`src/Agents/` 
 - 资源与样式：`src/Resources/Styles/`
 - 资产文件：`src/Assets/`
 - 模型配置：`src/config/models.yaml`
@@ -114,10 +114,6 @@ dotnet format
 ## 四、配置与运行时约定
 
 - 模型与供应商配置：`src/config/models.yaml`
-- MCP 相关设置：`src/Applications/Settings/MCPServerConfig*.cs`
-- MCP 配置页面：`src/Views/Pages/MCPServerConfigPageView.axaml`
-- 插件的 YAML 能力描述：`src/Agents/Plugins/Yaml/`
-- 代理 YAML 配置：`src/Agents/Yaml/`
 
 建议：
 
@@ -154,9 +150,9 @@ UI 与样式（Avalonia AXAML）：
 
 ## 六、目录导航（常用）
 
-- 代理与分析角色：`src/Agents/`（含多角色 YAML 配置 `Yaml/`）
-- 业务能力：`src/Applications/`（股票、资讯、收藏、K 线、设置等）
-- 插件能力：`src/Agents/Plugins/`（基础/财务/新闻/技术/筛选；含 YAML 描述文件）
+- 代理与分析角色：`src/Agents/`（具体实现在 `Analysts/` 目录）
+- 业务能力：`src/Applications/`（股票、资讯、收藏、K 线、设置、MCP 等）
+- 插件与工具：`src/Agents/Tools/`（各领域工具实现）
 - 视图与 VM：`src/Views/`, `src/ViewModels/`
 - 资源与样式：`src/Resources/Styles/`（Avalonia 样式资源字典）
 - 资产文件：`src/Assets/`（图片、图标、HTML 等）

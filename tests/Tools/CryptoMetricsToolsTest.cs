@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Crypto;
+using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,7 +63,7 @@ public class CryptoMetricsToolsTest
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
 
-        var result = await service.GetOHLCVAsync("BTCUSDT", interval: "1d", limit: 10);
+        var result = await service.GetOHLCVAsync("BTCUSDT", interval: MarketInterval.OneDay, limit: 10);
 
         Assert.IsNotNull(result);
         Assert.AreEqual("BTCUSDT", result.Symbol);

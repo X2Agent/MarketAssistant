@@ -5,14 +5,14 @@ using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Moq;
 
-namespace TestMarketAssistant.MultiMarket;
+namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// IHomeAssetService 接口测试（覆盖 A股 和 虚拟币 实现）
@@ -28,11 +28,14 @@ public class HomeAssetServiceTest
         var services = new ServiceCollection();
 
         // 注册依赖服务
+        services.AddHttpClient();
+        services.AddMemoryCache();
+        services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
         services.AddSingleton<PlaywrightService>();
         services.AddSingleton(new Mock<IDialogService>().Object);
-        services.AddLogging();
+        services.AddSingleton<BinanceMarketDataService>();
 
         // 注册依赖的服务
         services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);

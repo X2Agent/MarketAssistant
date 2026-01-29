@@ -30,102 +30,90 @@ public class CryptoTelegramService : ITelegramService
     public async Task<List<Telegram>> GetTelegraphsAsync(CancellationToken cancellationToken = default)
     {
         var result = new List<Telegram>();
-        try
+        
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(10);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, ApiUrl);
+        request.Headers.TryAddWithoutValidation("Accept", "*/*");
+        request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,en-GB;q=0.8,en;q=0.7");
+        request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
+        request.Headers.TryAddWithoutValidation("Origin", "https://www.panewslab.com");
+        request.Headers.TryAddWithoutValidation("Referer", "https://www.panewslab.com/");
+
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
         {
-            var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(10);
+            _logger.LogWarning("获取 PANews 快讯失败，状态码: {StatusCode}", (int)response.StatusCode);
+            return result;
+        }
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, ApiUrl);
-            request.Headers.TryAddWithoutValidation("Accept", "*/*");
-            request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,en-GB;q=0.8,en;q=0.7");
-            request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
-            request.Headers.TryAddWithoutValidation("Origin", "https://www.panewslab.com");
-            request.Headers.TryAddWithoutValidation("Referer", "https://www.panewslab.com/");
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var apiResponse = JsonSerializer.Deserialize<PanewsResponse>(json, JsonOptions);
 
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+        if (apiResponse?.Data == null)
+        {
+            _logger.LogWarning("PANews API 返回数据为空，ErrorNo: {ErrorNo}, Message: {Message}", 
+                apiResponse?.ErrorNo, apiResponse?.Message);
+            return result;
+        }
+
+        // 从 flashNews 中提取所有 list 集合
+        var allItems = apiResponse.Data.FlashNews
+            .SelectMany(group => group.List)
+            .ToList();
+
+        _logger.LogInformation("PANews API 返回数据：共 {GroupCount} 个日期分组，总计 {ItemCount} 条快讯", 
+            apiResponse.Data.FlashNews.Count, allItems.Count);
+
+        if (allItems.Count == 0)
+        {
+            _logger.LogWarning("PANews API 未返回任何快讯");
+            return result;
+        }
+
+        // 处理所有返回的快讯（已限制 20 条）
+        foreach (var item in allItems.Take(20))
+        {
+            try
             {
-                _logger.LogWarning("获取 PANews 快讯失败，状态码: {StatusCode}", (int)response.StatusCode);
-                return result;
-            }
+                var timestamp = item.PublishTime ?? item.CTime ?? 0;
+                var timeText = FormatUnixTime(timestamp);
+                var title = item.Title ?? string.Empty;
+                
+                // 使用 desc 字段作为内容，如果为空则使用 title
+                var content = !string.IsNullOrWhiteSpace(item.Desc) 
+                    ? item.Desc 
+                    : title;
+                
+                var url = $"https://www.panewslab.com/zh/articles/{item.Id}";
+                
+                var cryptos = ExtractCryptoSymbols(content, title);
+                
+                // type=2 并且 apppush=1 可能表示重要快讯
+                var isImportant = item.AppPush == 1;
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var apiResponse = JsonSerializer.Deserialize<PanewsResponse>(json, JsonOptions);
+                _logger.LogDebug("处理快讯项：Title={Title}, Time={Time}, Author={Author}", 
+                    title, timeText, item.Author?.Name);
 
-            if (apiResponse?.Data == null)
-            {
-                _logger.LogWarning("PANews API 返回数据为空，ErrorNo: {ErrorNo}, Message: {Message}", 
-                    apiResponse?.ErrorNo, apiResponse?.Message);
-                return result;
-            }
-
-            // 从 flashNews 中提取所有 list 集合
-            var allItems = apiResponse.Data.FlashNews
-                .SelectMany(group => group.List)
-                .ToList();
-
-            _logger.LogInformation("PANews API 返回数据：共 {GroupCount} 个日期分组，总计 {ItemCount} 条快讯", 
-                apiResponse.Data.FlashNews.Count, allItems.Count);
-
-            if (allItems.Count == 0)
-            {
-                _logger.LogWarning("PANews API 未返回任何快讯");
-                return result;
-            }
-
-            // 处理所有返回的快讯（已限制 20 条）
-            foreach (var item in allItems.Take(20))
-            {
-                try
+                result.Add(new Telegram
                 {
-                    var timestamp = item.PublishTime ?? item.CTime ?? 0;
-                    var timeText = FormatUnixTime(timestamp);
-                    var title = item.Title ?? string.Empty;
-                    
-                    // 使用 desc 字段作为内容，如果为空则使用 title
-                    var content = !string.IsNullOrWhiteSpace(item.Desc) 
-                        ? item.Desc 
-                        : title;
-                    
-                    var url = $"https://www.panewslab.com/zh/articles/{item.Id}";
-                    
-                    var cryptos = ExtractCryptoSymbols(content, title);
-                    
-                    // type=2 并且 apppush=1 可能表示重要快讯
-                    var isImportant = item.AppPush == 1;
-
-                    _logger.LogDebug("处理快讯项：Title={Title}, Time={Time}, Author={Author}", 
-                        title, timeText, item.Author?.Name);
-
-                    result.Add(new Telegram
-                    {
-                        Time = timeText,
-                        Title = title,
-                        Content = content,
-                        Url = url,
-                        Symbols = cryptos,
-                        IsImportant = isImportant
-                    });
-                }
-                catch (Exception mapEx)
-                {
-                    _logger.LogWarning(mapEx, "映射 PANews 快讯项失败: {Message}", mapEx.Message);
-                }
+                    Time = timeText,
+                    Title = title,
+                    Content = content,
+                    Url = url,
+                    Symbols = cryptos,
+                    IsImportant = isImportant
+                });
             }
+            catch (Exception mapEx)
+            {
+                _logger.LogWarning(mapEx, "映射 PANews 快讯项失败: {Message}", mapEx.Message);
+            }
+        }
 
-            _logger.LogInformation("成功获取 {Count} 条虚拟币快讯（PANews）", result.Count);
-            return result;
-        }
-        catch (TaskCanceledException)
-        {
-            _logger.LogWarning("获取虚拟币快讯超时");
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GetTelegraphsAsync 调用 PANews API 异常: {Message}", ex.Message);
-            return result;
-        }
+        _logger.LogInformation("成功获取 {Count} 条虚拟币快讯（PANews）", result.Count);
+        return result;
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions

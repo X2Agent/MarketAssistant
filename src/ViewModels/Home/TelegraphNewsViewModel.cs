@@ -103,8 +103,7 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
             _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
 
             // 获取新市场的服务
-            _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(
-                newMarket.ToString());
+            _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(newMarket);
 
             // 订阅新服务事件
             _newsUpdateService.NewsUpdated += OnNewsUpdated;

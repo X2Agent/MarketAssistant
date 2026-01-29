@@ -36,21 +36,10 @@ public class MCPServerConfigService
     /// </summary>
     public void LoadConfigs()
     {
-        try
+        if (File.Exists(_configFilePath))
         {
-            if (File.Exists(_configFilePath))
-            {
-                string json = File.ReadAllText(_configFilePath);
-                _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(json) ?? new List<MCPServerConfig>();
-            }
-        }
-        catch (Exception ex)
-        {
-            // 处理异常
-            System.Diagnostics.Debug.WriteLine($"加载MCP服务器配置时出错: {ex.Message}");
-
-            // 如果加载失败，使用空列表
-            _serverConfigs = new List<MCPServerConfig>();
+            string json = File.ReadAllText(_configFilePath);
+            _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(json) ?? new List<MCPServerConfig>();
         }
     }
 
@@ -59,26 +48,18 @@ public class MCPServerConfigService
     /// </summary>
     public void SaveConfigs()
     {
-        try
+        // 确保目录存在
+        var directory = Path.GetDirectoryName(_configFilePath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
-            // 确保目录存在
-            var directory = Path.GetDirectoryName(_configFilePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            // 序列化配置对象
-            var json = JsonSerializer.Serialize(_serverConfigs, new JsonSerializerOptions { WriteIndented = true });
-
-            // 保存到文件
-            File.WriteAllText(_configFilePath, json);
+            Directory.CreateDirectory(directory);
         }
-        catch (Exception ex)
-        {
-            // 处理异常
-            System.Diagnostics.Debug.WriteLine($"保存MCP服务器配置时出错: {ex.Message}");
-        }
+
+        // 序列化配置对象
+        var json = JsonSerializer.Serialize(_serverConfigs, new JsonSerializerOptions { WriteIndented = true });
+
+        // 保存到文件
+        File.WriteAllText(_configFilePath, json);
     }
 
     /// <summary>

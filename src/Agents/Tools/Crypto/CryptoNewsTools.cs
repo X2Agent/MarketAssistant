@@ -1,10 +1,9 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models;
-using MarketAssistant.Agents.Tools.Models.Crypto.CoinDesk;
+using MarketAssistant.Services.Data;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
-using System.Net.Http.Json;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
@@ -15,13 +14,14 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 public sealed class CryptoNewsTools : INewsDataTools
 {
     private readonly ILogger<CryptoNewsTools> _logger;
-    private readonly HttpClient _httpClient;
-    private const string COINDESK_API_BASE_URL = "https://data-api.coindesk.com/news/v1/search";
+    private readonly CoinDeskApiService _coinDeskService;
 
-    public CryptoNewsTools(ILogger<CryptoNewsTools> logger)
+    public CryptoNewsTools(
+        ILogger<CryptoNewsTools> logger,
+        CoinDeskApiService coinDeskService)
     {
         _logger = logger;
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        _coinDeskService = coinDeskService;
     }
 
     /// <summary>
@@ -37,15 +37,9 @@ public sealed class CryptoNewsTools : INewsDataTools
             // 格式化币种代码
             var searchQuery = ExtractBaseCurrency(assetSymbol);
 
-            // 构建请求 URL
-            var url = $"{COINDESK_API_BASE_URL}?search_string={assetSymbol}&limit={count}&lang=EN&source_key=coindesk";
-
             _logger.LogInformation("正在获取虚拟币新闻（AI Tools用）: {Symbol} (query={Query})", assetSymbol, searchQuery);
 
-            var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-
-            var newsResponse = await response.Content.ReadFromJsonAsync<CoinDeskNewsResponse>();
+            var newsResponse = await _coinDeskService.SearchNewsAsync(assetSymbol, count);
 
             if (newsResponse?.Data == null || newsResponse.Data.Count == 0)
             {

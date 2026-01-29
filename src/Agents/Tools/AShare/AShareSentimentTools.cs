@@ -1,9 +1,8 @@
-using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace MarketAssistant.Agents.Tools.AShare;
 

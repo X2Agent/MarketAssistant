@@ -1,9 +1,8 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
-using MarketAssistant.Agents.Tools.Models.Crypto.Binance;
+using MarketAssistant.Services.Data;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
@@ -14,15 +13,14 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 public sealed class CryptoSentimentTools : ICryptoSentimentTools
 {
     private readonly ILogger<CryptoSentimentTools> _logger;
-    private readonly HttpClient _httpClient;
-    private const string BinanceFuturesBaseUrl = "https://fapi.binance.com";
+    private readonly BinanceMarketDataService _binanceService;
 
     public CryptoSentimentTools(
         ILogger<CryptoSentimentTools> logger,
-        IHttpClientFactory httpClientFactory)
+        BinanceMarketDataService binanceService)
     {
         _logger = logger;
-        _httpClient = httpClientFactory.CreateClient();
+        _binanceService = binanceService;
     }
 
     /// <summary>
@@ -34,18 +32,16 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            // 1. 获取当前费率和下次结算时间（premiumIndex 包含 nextFundingTime）
-            var premiumUrl = $"{BinanceFuturesBaseUrl}/fapi/v1/premiumIndex?symbol={binanceSymbol}";
-            var premiumResponse = await _httpClient.GetFromJsonAsync<BinancePremiumIndexResponse>(premiumUrl);
+            // 1. 获取当前资金费率
+            var premiumResponse = await _binanceService.GetPremiumIndexAsync(binanceSymbol);
 
             if (premiumResponse == null)
             {
                 throw new InvalidOperationException($"获取当前资金费率失败: {symbol}");
             }
 
-            // 2. 获取历史费率（fundingRate 只有历史数据，没有 nextFundingTime）
-            var historyUrl = $"{BinanceFuturesBaseUrl}/fapi/v1/fundingRate?symbol={binanceSymbol}&limit=30";
-            var historyResponse = await _httpClient.GetFromJsonAsync<List<BinanceFundingRateResponse>>(historyUrl);
+            // 2. 获取历史资金费率
+            var historyResponse = await _binanceService.GetFundingRateHistoryAsync(binanceSymbol, 30);
 
             if (historyResponse == null || historyResponse.Count == 0)
             {
@@ -144,8 +140,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             var periodParam = period.GetDescription();
 
             // 获取历史数据
-            var url = $"{BinanceFuturesBaseUrl}/futures/data/{endpoint}?symbol={binanceSymbol}&period={periodParam}&limit={limit}";
-            var response = await _httpClient.GetFromJsonAsync<List<BinanceLongShortRatioResponse>>(url);
+            var response = await _binanceService.GetLongShortRatioAsync(endpoint, binanceSymbol, periodParam, limit);
 
             if (response == null || response.Count == 0)
             {
@@ -200,8 +195,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             var periodParam = period.GetDescription();
 
             // 获取合约持仓量历史数据（默认获取最近30个数据点）
-            var url = $"{BinanceFuturesBaseUrl}/futures/data/openInterestHist?symbol={binanceSymbol}&period={periodParam}&limit=30";
-            var response = await _httpClient.GetFromJsonAsync<List<BinanceOpenInterestResponse>>(url);
+            var response = await _binanceService.GetOpenInterestHistAsync(binanceSymbol, periodParam, 30);
 
             if (response == null || response.Count == 0)
             {

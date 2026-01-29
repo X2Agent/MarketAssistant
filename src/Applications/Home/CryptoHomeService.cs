@@ -64,16 +64,8 @@ public class CryptoHomeService : IHomeAssetService
         if (string.IsNullOrWhiteSpace(query))
             return new List<AssetItem>();
 
-        try
-        {
-            var results = await AssetInfoService.SearchAsync(query, cancellationToken);
-            return results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code }).ToList();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "搜索虚拟币时出错，查询：{Query}", query);
-            return new List<AssetItem>();
-        }
+        var results = await AssetInfoService.SearchAsync(query, cancellationToken);
+        return results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code }).ToList();
     }
 
     /// <summary>
@@ -81,15 +73,8 @@ public class CryptoHomeService : IHomeAssetService
     /// </summary>
     public async Task<List<HotAsset>> GetHotAssetsAsync()
     {
-        try
-        {
-            return await AssetInfoService.GetHotAssetsAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "获取热门虚拟币时出错");
-            return new List<HotAsset>();
-        }
+        // FriendlyException会被UI层捕获并显示，不在此处处理
+        return await AssetInfoService.GetHotAssetsAsync();
     }
 
     /// <summary>
@@ -97,15 +82,7 @@ public class CryptoHomeService : IHomeAssetService
     /// </summary>
     public List<AssetItem> GetRecentAssets()
     {
-        try
-        {
-            return HistoryService.GetHistory();
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "获取最近查看的虚拟币时出错");
-            return new List<AssetItem>();
-        }
+        return HistoryService.GetHistory();
     }
 
     /// <summary>
@@ -113,14 +90,7 @@ public class CryptoHomeService : IHomeAssetService
     /// </summary>
     public void AddToRecentAssets(AssetItem asset)
     {
-        try
-        {
-            HistoryService.AddHistory(asset);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "添加虚拟币到最近查看时出错: {Code}", asset.Code);
-        }
+        HistoryService.AddHistory(asset);
     }
 
     /// <summary>
@@ -128,56 +98,47 @@ public class CryptoHomeService : IHomeAssetService
     /// </summary>
     public async Task<bool> AddToFavoriteAsync(object assetParameter)
     {
-        try
+        string assetName = "";
+        string code = "";
+
+        if (assetParameter is HotAsset hotAsset)
         {
-            string assetName = "";
-            string code = "";
-
-            if (assetParameter is HotAsset hotAsset)
-            {
-                assetName = hotAsset.Name;
-                code = hotAsset.Code;
-            }
-            else if (assetParameter is AssetItem assetItem)
-            {
-                assetName = assetItem.Name;
-                code = assetItem.Code;
-            }
-            else
-            {
-                _logger?.LogWarning("添加到收藏失败：参数类型不匹配");
-                await _dialogService.ShowMessageAsync("错误", "添加到收藏失败：参数类型不匹配");
-                return false;
-            }
-
-            // 检查是否已收藏（虚拟币使用空字符串作为market）
-            if (FavoriteService.IsFavorite(code, ""))
-            {
-                await _dialogService.ShowMessageAsync("提示", "该虚拟币已在收藏列表中");
-                return false;
-            }
-
-            bool confirmed = await _dialogService.ShowConfirmationAsync(
-                "添加收藏",
-                $"确定要将 {assetName} 添加到收藏列表吗？",
-                "确认",
-                "取消");
-
-            if (confirmed)
-            {
-                FavoriteService.AddFavorite(code, "");
-                await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
-                return true;
-            }
-
+            assetName = hotAsset.Name;
+            code = hotAsset.Code;
+        }
+        else if (assetParameter is AssetItem assetItem)
+        {
+            assetName = assetItem.Name;
+            code = assetItem.Code;
+        }
+        else
+        {
+            _logger?.LogWarning("添加到收藏失败：参数类型不匹配");
+            await _dialogService.ShowMessageAsync("错误", "添加到收藏失败：参数类型不匹配");
             return false;
         }
-        catch (Exception ex)
+
+        // 检查是否已收藏（虚拟币使用空字符串作为market）
+        if (FavoriteService.IsFavorite(code, ""))
         {
-            _logger?.LogError(ex, "添加虚拟币到收藏时出错");
-            await _dialogService.ShowMessageAsync("收藏失败", "添加收藏时发生错误，请稍后重试");
+            await _dialogService.ShowMessageAsync("提示", "该虚拟币已在收藏列表中");
             return false;
         }
+
+        bool confirmed = await _dialogService.ShowConfirmationAsync(
+            "添加收藏",
+            $"确定要将 {assetName} 添加到收藏列表吗？",
+            "确认",
+            "取消");
+
+        if (confirmed)
+        {
+            FavoriteService.AddFavorite(code, "");
+            await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
+            return true;
+        }
+
+        return false;
     }
 }
 

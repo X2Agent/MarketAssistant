@@ -11,21 +11,19 @@ namespace MarketAssistant.Applications.Crypto;
 /// </summary>
 public class BinanceAccountService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BinanceAccountService> _logger;
     private readonly BinanceAuthService _authService;
     private const string BINANCE_API_BASE_URL = "https://api.binance.com";
 
     public BinanceAccountService(
+        IHttpClientFactory httpClientFactory,
         ILogger<BinanceAccountService> logger,
         BinanceAuthService authService)
     {
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger;
         _authService = authService;
-        _httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(30)
-        };
     }
 
     /// <summary>
@@ -48,7 +46,9 @@ public class BinanceAccountService
 
             // 4. 发送请求
             _logger.LogInformation("正在获取币安账户信息...");
-            var response = await _httpClient.SendAsync(request);
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             // 5. 解析响应
@@ -128,7 +128,9 @@ public class BinanceAccountService
             _logger.LogInformation("正在下单: {Symbol} {Side} {Type} 数量:{Quantity}",
                 symbol, side, type, quantity);
 
-            var response = await _httpClient.SendAsync(request);
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             // 6. 解析响应

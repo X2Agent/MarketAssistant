@@ -23,6 +23,7 @@ using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Mcp;
@@ -117,7 +118,12 @@ public static class ServiceCollectionExtensions
         // 注册分析缓存服务
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
 
-        // 注册浏览器服务
+        // ========== 虚拟币 API 服务 ==========
+        services.AddSingleton<CoinGeckoApiService>();
+        services.AddSingleton<BinanceMarketDataService>();
+        services.AddSingleton<CoinDeskApiService>();
+
+        // ========== 浏览器自动化服务 ==========
         services.AddSingleton<PlaywrightService>();
         services.AddSingleton<StockScreenerService>();
 

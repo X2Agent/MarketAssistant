@@ -11,20 +11,19 @@ namespace MarketAssistant.Applications.Charts;
 /// </summary>
 public class CryptoKLineService : IKLineService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CryptoKLineService> _logger;
 
     // 币安公开市场数据API（无需API Key）
     private const string BINANCE_API_BASE_URL = "https://api.binance.com";
     private const int DEFAULT_LIMIT = 500; // 币安API最多返回1000条，默认500条
 
-    public CryptoKLineService(ILogger<CryptoKLineService> logger)
+    public CryptoKLineService(
+        IHttpClientFactory httpClientFactory,
+        ILogger<CryptoKLineService> logger)
     {
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger;
-        _httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(30)
-        };
     }
 
     /// <summary>
@@ -76,7 +75,9 @@ public class CryptoKLineService : IKLineService
             _logger.LogInformation("正在获取币安K线数据: {Symbol}, 周期: {Interval}, 数量: {Limit}", formattedSymbol, interval, requestLimit);
 
             // 发送HTTP请求
-            var response = await _httpClient.GetAsync(apiUrl);
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.GetAsync(apiUrl);
             response.EnsureSuccessStatusCode();
 
             var jsonContent = await response.Content.ReadAsStringAsync();

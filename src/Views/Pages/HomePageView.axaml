@@ -216,7 +216,7 @@
                                                    FontWeight="SemiBold"
                                                    Margin="{StaticResource TinyVerticalMargin}"/>
                                         <TextBlock Grid.Row="1" Grid.Column="1"
-                                                   Text="{Binding MetricValue}"
+                                                   Text="{Binding FormattedMetric}"
                                                    FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource PrimaryBrush}"

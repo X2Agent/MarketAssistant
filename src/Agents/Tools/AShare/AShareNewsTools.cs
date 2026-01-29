@@ -1,5 +1,5 @@
-using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.AI;

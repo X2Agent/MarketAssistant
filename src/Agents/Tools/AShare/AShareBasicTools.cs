@@ -1,9 +1,8 @@
-using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
-using System.Text.Json;
 
 namespace MarketAssistant.Agents.Tools.AShare;
 
@@ -26,14 +25,26 @@ public sealed class AShareBasicTools : IShareBasicTools
     {
         try
         {
-            var url = $"https://x-quote.cls.cn/quote/stock/basic?secu_code={assetSymbol}&fields=open_px,av_px,high_px,low_px,change,change_px,down_price,change_3,change_5,qrr,entrust_rate,tr,amp,TotalShares,mc,NetAssetPS,NonRestrictedShares,cmc,business_amount,business_balance,pe,ttm_pe,pb,secu_name,secu_code,trade_status,secu_type,preclose_px,up_price,last_px&app=CailianpressWeb&os=web&sv=8.4.6";
+            // 转换为财联社支持的格式 SHxxxxxx / SZxxxxxx
+            var formattedSymbol = StockSymbolConverter.ToClsFormat(assetSymbol);
+            if (string.IsNullOrEmpty(formattedSymbol))
+            {
+                throw new FriendlyException($"股票代码格式不正确: {assetSymbol}");
+            }
+
+            var url = $"https://x-quote.cls.cn/quote/stock/basic?secu_code={formattedSymbol}&fields=open_px,av_px,high_px,low_px,change,change_px,down_price,change_3,change_5,qrr,entrust_rate,tr,amp,TotalShares,mc,NetAssetPS,NonRestrictedShares,cmc,business_amount,business_balance,pe,ttm_pe,pb,secu_name,secu_code,trade_status,secu_type,preclose_px,up_price,last_px&app=CailianpressWeb&os=web&sv=8.4.6";
 
             using var httpClient = _httpClientFactory.CreateClient();
             var response = await httpClient.GetStringAsync(url);
             var jsonDocument = JsonDocument.Parse(response);
 
+            // 检查API返回状态
+            if (jsonDocument.RootElement.TryGetProperty("data", out var data) == false || data.ValueKind == JsonValueKind.Null)
+            {
+                throw new FriendlyException($"未找到股票 {assetSymbol} ({formattedSymbol}) 的数据，请检查代码是否正确。");
+            }
+
             var stockPriceInfo = new StockQuoteInfo();
-            var data = jsonDocument.RootElement.GetProperty("data");
 
             stockPriceInfo.CurrentPrice = data.GetProperty("last_px").GetDecimal();
             stockPriceInfo.PriceChange = data.GetProperty("change_px").GetDecimal();
@@ -68,9 +79,9 @@ public sealed class AShareBasicTools : IShareBasicTools
 
             return stockPriceInfo;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
-            throw new Exception($"处理股票价格数据时发生错误: {ex.Message}", ex);
+            throw new FriendlyException($"处理股票价格数据时发生错误: {ex.Message}", ex);
         }
     }
 
@@ -88,11 +99,11 @@ public sealed class AShareBasicTools : IShareBasicTools
             var response = await httpClient.GetStringAsync(url);
             var info = JsonSerializer.Deserialize<CompanyInfo>(response);
 
-            return info ?? throw new Exception("GetCompanyInfoAsync返回数据为空");
+            return info ?? throw new FriendlyException("GetCompanyInfoAsync返回数据为空");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
-            throw new Exception($"处理公司基本面数据时发生错误: {ex.Message}", ex);
+            throw new FriendlyException($"处理公司基本面数据时发生错误: {ex.Message}", ex);
         }
     }
 

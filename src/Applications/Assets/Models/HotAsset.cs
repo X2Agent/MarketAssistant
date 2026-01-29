@@ -38,66 +38,31 @@ public class HotAsset
     public MarketType MarketType { get; set; }
 
     /// <summary>
-    /// 排名变化
-    /// </summary>
-    public string RankChange { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 综合热度
-    /// </summary>
-    public string HeatIndex { get; set; } = string.Empty;
-
-    // A股特有字段
-    /// <summary>
-    /// 所属板块名称（A股特有）
+    /// 所属板块或分类（A股为板块名称，加密货币暂不使用）
     /// </summary>
     public string? SectorName { get; set; }
 
-    // 虚拟币特有字段
     /// <summary>
-    /// 市值（虚拟币特有）
+    /// 市值（仅加密货币使用）
     /// </summary>
     public string? MarketCap { get; set; }
 
     /// <summary>
-    /// 24小时交易量（虚拟币特有）
+    /// 核心指标值（股票为热度，加密货币为24小时交易量）
     /// </summary>
-    public string? Volume24h { get; set; }
+    public string? MetricValue { get; set; }
 
     /// <summary>
-    /// 指标标签（根据市场类型动态返回"热度"或"交易量"）
+    /// 指标标签（根据市场类型动态返回）
     /// </summary>
     public string MetricLabel => MarketType == MarketType.Crypto ? "交易量" : "热度";
 
     /// <summary>
-    /// 指标数值（根据市场类型动态返回格式化的热度或交易量）
+    /// 格式化的指标显示值
     /// </summary>
-    public string MetricValue
-    {
-        get
-        {
-            if (MarketType == MarketType.Crypto)
-            {
-                return FormatVolume(Volume24h);
-            }
-            return FormatNumber(HeatIndex);
-        }
-    }
+    public string FormattedMetric => FormatMetric(MetricValue);
 
-    private static string FormatNumber(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return "-";
-
-        if (decimal.TryParse(value, out var number))
-        {
-            return number.ToString("N0");
-        }
-
-        return value;
-    }
-
-    private static string FormatVolume(string? value)
+    private static string FormatMetric(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return "-";

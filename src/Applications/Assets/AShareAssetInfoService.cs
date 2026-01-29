@@ -12,13 +12,16 @@ namespace MarketAssistant.Applications.Assets;
 /// </summary>
 public class AShareAssetInfoService : IAssetInfoService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AShareAssetInfoService> _logger;
     private readonly PlaywrightService _playwrightService;
 
-    public AShareAssetInfoService(ILogger<AShareAssetInfoService> logger, PlaywrightService playwrightService)
+    public AShareAssetInfoService(
+        IHttpClientFactory httpClientFactory,
+        ILogger<AShareAssetInfoService> logger,
+        PlaywrightService playwrightService)
     {
-        _httpClient = new HttpClient();
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger;
         _playwrightService = playwrightService;
     }
@@ -199,7 +202,8 @@ public class AShareAssetInfoService : IAssetInfoService
             string formattedDate = today.ToString("yyyyMMdd");
             var url = $"https://finance.pae.baidu.com/vapi/v1/hotrank?product=stock&day={formattedDate}&pn=0&rn=8&market=ab&type=day&finClientType=pc";
 
-            var response = await _httpClient.GetStringAsync(url);
+            using var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetStringAsync(url);
             var jsonDocument = JsonDocument.Parse(response);
             var root = jsonDocument.RootElement;
 
@@ -243,8 +247,7 @@ public class AShareAssetInfoService : IAssetInfoService
                     Code = stockData[headerIndices["市场代码"]].GetString() ?? string.Empty,
                     CurrentPrice = stockData[headerIndices["现价"]].GetString() ?? string.Empty,
                     Market = stockData[headerIndices["市场缩写"]].GetString() ?? string.Empty,
-                    RankChange = stockData[headerIndices["排名变化"]].GetString() ?? string.Empty,
-                    HeatIndex = stockData[headerIndices["综合热度"]].GetString() ?? string.Empty,
+                    MetricValue = stockData[headerIndices["综合热度"]].GetString() ?? string.Empty,
                     MarketType = MarketType.AShare
                 };
 

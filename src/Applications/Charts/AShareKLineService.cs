@@ -13,14 +13,17 @@ namespace MarketAssistant.Applications.Charts;
 /// </summary>
 public class AShareKLineService : IKLineService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareKLineService> _logger;
     private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
 
-    public AShareKLineService(ILogger<AShareKLineService> logger, IUserSettingService userSettingService)
+    public AShareKLineService(
+        IHttpClientFactory httpClientFactory,
+        ILogger<AShareKLineService> logger,
+        IUserSettingService userSettingService)
     {
-        _httpClient = new HttpClient();
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _userSettingService = userSettingService;
         _logger = logger;
     }
@@ -152,7 +155,8 @@ public class AShareKLineService : IKLineService
 
         try
         {
-            var response = await _httpClient.GetAsync(url);
+            using var httpClient = _httpClientFactory.CreateClient();
+            var response = await httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             var jsonContent = await response.Content.ReadAsStringAsync();

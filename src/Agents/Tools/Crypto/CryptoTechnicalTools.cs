@@ -22,13 +22,15 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         _serviceProvider = serviceProvider;
     }
 
-    [Description("获取近30日最新日线KDJ")]
+    [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
     public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
         {
             var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 30);
+            // KDJ requires at least 9 periods, but using more (250) ensures initial EMA smoothing stability if used internally (though KDJ is simpler).
+            // Increasing limit to consistent 250 for safety and potential history usage.
+            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
 
             if (klineData == null || klineData.Count < 9)
             {
@@ -46,17 +48,18 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         catch (Exception ex)
         {
             _logger.LogError(ex, "计算虚拟币KDJ指标失败: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"计算虚拟币KDJ指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
         }
     }
 
-    [Description("获取近30日最新日线MACD")]
+    [Description("获取近30日最新日线MACD，支持BTC、ETH等币种")]
     public async Task<TechnicalMACD> GetMACDAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
         {
             var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 50);
+            // MACD uses EMA26, needs significantly more than 26 periods for EMA to converge from initial seed. 250 is safer.
+            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
 
             if (klineData == null || klineData.Count < 26)
             {
@@ -74,17 +77,17 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         catch (Exception ex)
         {
             _logger.LogError(ex, "计算虚拟币MACD指标失败: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"计算虚拟币MACD指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
         }
     }
 
-    [Description("获取近30日最新日线BOLL")]
+    [Description("获取近30日最新日线BOLL，支持BTC、ETH等币种")]
     public async Task<TechnicalBoll> GetBOLLAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
         {
             var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 30);
+            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
 
             if (klineData == null || klineData.Count < 20)
             {
@@ -102,11 +105,11 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         catch (Exception ex)
         {
             _logger.LogError(ex, "计算虚拟币BOLL指标失败: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"计算虚拟币BOLL指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
         }
     }
 
-    [Description("获取近30日最新日线MA")]
+    [Description("获取近30日最新日线MA，支持BTC、ETH等币种")]
     public async Task<TechnicalMA> GetMAAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
     {
         try
@@ -130,7 +133,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         catch (Exception ex)
         {
             _logger.LogError(ex, "计算虚拟币MA指标失败: {Symbol}", assetSymbol);
-            throw;
+            throw new FriendlyException($"计算虚拟币MA指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
         }
     }
 

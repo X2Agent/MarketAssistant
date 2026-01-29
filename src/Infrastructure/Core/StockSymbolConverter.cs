@@ -10,7 +10,22 @@ public static class StockSymbolConverter
     /// </summary>
     public static string ToClsFormat(string stockCode)
     {
+        if (string.IsNullOrWhiteSpace(stockCode)) return string.Empty;
+
+        // 预处理：仅规范化大小写，保留数字和字母供后续判断
+        string normalized = stockCode.ToUpperInvariant().Replace("/", "").Replace("-", "").Replace(" ", "");
+
+        // 如果已经是 SHxxxxxx 或 SZxxxxxx 格式（且后续全是数字）
+        if ((normalized.StartsWith("SH") || normalized.StartsWith("SZ")) &&
+             normalized.Length > 2 &&
+             normalized.Skip(2).All(char.IsDigit))
+        {
+            return normalized;
+        }
+
         string digits = ExtractDigits(stockCode);
+        if (string.IsNullOrEmpty(digits)) return stockCode; // 无法提取数字则返回原值
+
         string prefix = GetExchangePrefix(digits);
         return $"{prefix}{digits}";
     }
@@ -20,27 +35,54 @@ public static class StockSymbolConverter
     /// </summary>
     public static string ToZhiTuFormat(string stockCode)
     {
-        if (stockCode.Contains("."))
+        if (string.IsNullOrWhiteSpace(stockCode)) return string.Empty;
+
+        // 移除常见分隔符
+        string cleanCode = stockCode.Replace("/", "").Replace("-", "").Replace(" ", "").ToUpperInvariant();
+
+        // 1. 处理如 600519.SH 的标准格式
+        if (cleanCode.Contains('.'))
         {
-            return stockCode.ToUpper();
+            return cleanCode;
         }
 
-        if (stockCode.StartsWith("sz", StringComparison.OrdinalIgnoreCase) || 
-            stockCode.StartsWith("sh", StringComparison.OrdinalIgnoreCase))
+        // 2. 处理 SH600519 / SZ000001 前缀格式
+        if (cleanCode.StartsWith("SH") || cleanCode.StartsWith("SZ"))
         {
-            string code = stockCode.Substring(2);
-            string market = stockCode.StartsWith("sz", StringComparison.OrdinalIgnoreCase) ? "SZ" : "SH";
-            return $"{code}.{market}";
+            string code = cleanCode.Substring(2);
+            string market = cleanCode.StartsWith("SZ") ? "SZ" : "SH";
+            // 确保剩余部分是纯数字才转换
+            if (code.All(char.IsDigit))
+            {
+                return $"{code}.{market}";
+            }
         }
 
-        if (stockCode.All(char.IsDigit))
+        // 3. 处理 600519SH / 000001SZ 后缀格式
+        if (cleanCode.EndsWith("SH") || cleanCode.EndsWith("SZ"))
         {
-            string digits = stockCode;
+            // 长度检查，避免 SH / SZ 本身
+            if (cleanCode.Length > 2)
+            {
+                string code = cleanCode.Substring(0, cleanCode.Length - 2);
+                string market = cleanCode.EndsWith("SZ") ? "SZ" : "SH";
+                if (code.All(char.IsDigit))
+                {
+                    return $"{code}.{market}";
+                }
+            }
+        }
+
+        // 4. 处理纯数字 600519
+        if (cleanCode.All(char.IsDigit))
+        {
+            string digits = cleanCode;
             string suffix = GetExchangeSuffix(digits);
             return $"{digits}.{suffix}";
         }
 
-        return stockCode.ToUpper();
+        // 5. 无法识别，返回大写原值
+        return cleanCode;
     }
 
     /// <summary>
