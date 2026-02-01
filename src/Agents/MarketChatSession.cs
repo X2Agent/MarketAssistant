@@ -219,9 +219,9 @@ public class MarketChatSession : IDisposable
     #region 提示词构建
 
     /// <summary>
-    /// 构建 Agent 指令（优化版本）
-    /// ✅ 移除手动 ReAct 循环指令（框架自动处理工具调用机制）
-    /// ✅ 保留必要的输出格式约束（ReAct 文本格式需通过提示词引导）
+    /// 构建 Agent 指令（ReAct 模式）
+    /// ✅ 通过提示词引导 Thought-Action-Observation 循环
+    /// ✅ 保留最终输出格式约束
     /// </summary>
     private string BuildAgentInstructions()
     {
@@ -231,6 +231,16 @@ public class MarketChatSession : IDisposable
 你是专业的金融市场分析师，擅长股票、期货、加密货币等资产的多维度分析。
 当前关注标的：{stockInfo}
 </role>
+
+    <react>
+    你必须使用 ReAct 模式完成任务，循环格式如下：
+    Thought: [思考，必须包含：已有信息、缺失信息、工具选择理由、参数准备、逻辑连贯性]
+    Action: [调用工具及参数]
+    Observation: [工具返回结果]
+
+    当信息充足时结束循环并输出：
+    Final Answer: [完整、最终的答案，不允许以问句结尾]
+    </react>
 
 <capabilities>
 你可以调用工具完成分析任务：

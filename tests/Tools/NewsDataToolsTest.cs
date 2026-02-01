@@ -38,7 +38,10 @@ public class NewsDataToolsTest
     [TestCleanup]
     public void Cleanup()
     {
-        _serviceProvider?.Dispose();
+        if (_serviceProvider != null)
+        {
+            _serviceProvider.Dispose();
+        }
     }
 
     #region A股新闻数据测试
