@@ -76,9 +76,9 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
                 PercentageChange = tickerData.PriceChangePercent ?? 0m,
                 Amplitude = CalculateAmplitude(tickerData.HighPrice, tickerData.LowPrice, tickerData.PrevClosePrice ?? tickerData.OpenPrice),
 
-                // 交易量（币安单位：BTC 数量和 USDT 金额）
-                Volume = tickerData.Volume / 10000m, // 转换为万手（这里作为万个币）
-                Amount = tickerData.QuoteVolume / 100000000m // 转换为亿 USDT
+                // 交易量（币安原始单位）
+                Volume = tickerData.Volume, // 24h成交量（币数量）
+                Amount = tickerData.QuoteVolume // 24h成交额（USDT）
             };
 
             _logger.LogInformation("成功获取虚拟币行情: {Symbol}, 当前价: {Price}, 涨跌幅: {Change}%",

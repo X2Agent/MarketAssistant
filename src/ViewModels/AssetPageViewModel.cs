@@ -5,11 +5,13 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
 
@@ -22,6 +24,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
+    private readonly BinanceWebSocketService _wsService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
 
     [ObservableProperty]
@@ -65,10 +68,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
         IServiceProvider serviceProvider,
-        MarketContext marketContext) : base(logger)
+        MarketContext marketContext,
+        BinanceWebSocketService wsService) : base(logger)
     {
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
+        _wsService = wsService;
 
         ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
@@ -249,12 +254,33 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             
             // 4. 在后台线程加载完整数据（不阻塞导航）
             _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
+
+            // 5. 虚拟币市场订阅 WebSocket 实时价格
+            if (_marketContext.CurrentMarket == MarketType.Crypto)
+            {
+                _wsService.PriceUpdated += OnDetailPriceUpdated;
+                _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+            }
         }
+    }
+
+    private void OnDetailPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    {
+        if (!ToBinanceFormat(AssetCode).Equals(symbol, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            CurrentPrice = lastPrice;
+            PriceChangePercent = changePercent;
+            PriceChange = CurrentPrice * PriceChangePercent / 100;
+        });
     }
 
     public void OnNavigatedFrom()
     {
         _loadingCancellationTokenSource?.Cancel();
+        _wsService.PriceUpdated -= OnDetailPriceUpdated;
     }
 }
 

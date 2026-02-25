@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Data;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -37,7 +38,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
 
             if (premiumResponse == null)
             {
-                throw new InvalidOperationException($"获取当前资金费率失败: {symbol}");
+                throw new FriendlyException($"获取当前资金费率失败: {symbol}");
             }
 
             // 2. 获取历史资金费率
@@ -45,7 +46,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
 
             if (historyResponse == null || historyResponse.Count == 0)
             {
-                throw new InvalidOperationException($"获取历史资金费率失败: {symbol}");
+                throw new FriendlyException($"获取历史资金费率失败: {symbol}");
             }
 
             // 3. 构建历史数据点（倒序排列，最新在前）
@@ -57,6 +58,11 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
                     FundingTime = h.FundingTime
                 })
                 .ToList();
+
+            if (historyPoints.Count == 0)
+            {
+                throw new FriendlyException($"解析历史资金费率数据为空: {symbol}");
+            }
 
             // 4. 计算统计数据
             var currentRate = decimal.Parse(premiumResponse.LastFundingRate) * 100;
@@ -144,7 +150,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
 
             if (response == null || response.Count == 0)
             {
-                throw new InvalidOperationException($"获取{dataType}失败: {symbol}");
+                throw new FriendlyException($"获取{dataType}失败: {symbol}");
             }
 
             // 按时间倒序排列（最新在前）
@@ -160,6 +166,11 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
                     Timestamp = h.Timestamp
                 })
                 .ToList();
+
+            if (historyPoints.Count == 0)
+            {
+                throw new FriendlyException($"解析{dataType}数据为空: {symbol}");
+            }
 
             // 计算统计数据
             var current = historyPoints[0];
@@ -199,7 +210,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
 
             if (response == null || response.Count == 0)
             {
-                throw new InvalidOperationException($"获取合约持仓量失败: {symbol}");
+                throw new FriendlyException($"获取合约持仓量失败: {symbol}");
             }
 
             // 按时间倒序排列（最新在前）
@@ -214,6 +225,11 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
                     Timestamp = h.Timestamp
                 })
                 .ToList();
+
+            if (historyPoints.Count == 0)
+            {
+                throw new FriendlyException($"解析合约持仓量数据为空: {symbol}");
+            }
 
             // 计算统计数据
             var current = historyPoints[0];

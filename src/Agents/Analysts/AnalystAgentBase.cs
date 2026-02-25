@@ -73,9 +73,4 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
 
         return chatClient.CreateAIAgent(options);
     }
-
-    protected override Task<AgentRunResponse> RunCoreAsync(IEnumerable<ChatMessage> messages, AgentThread? thread = null, AgentRunOptions? options = null, CancellationToken cancellationToken = default)
-    {
-        return base.RunCoreAsync(messages, thread, options, cancellationToken);
-    }
 }

@@ -1,8 +1,12 @@
+using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
+using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure;
+using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
+using MarketAssistant.Services.Export;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -14,12 +18,13 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 代理分析页面视图模型
 /// </summary>
-public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<StockNavigationParameter>
+public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<StockNavigationParameter>, IDisposable
 {
     public override string Title => "AI股票分析";
 
     private readonly MarketAnalysisWorkflow _marketAnalysisWorkflow;
     private readonly IAnalysisCacheService _analysisCacheService;
+    private readonly ReportArchiveService _reportArchiveService;
 
     [ObservableProperty]
     private string _stockCode = "";
@@ -37,6 +42,25 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
     private bool _isChatSidebarVisible;
 
     public ICommand ToggleChatSidebarCommand { get; private set; }
+
+    private MarketAnalysisReport? _lastReport;
+    private IStorageProvider? _storageProvider;
+
+    /// <summary>
+    /// 供 View 在 AttachedToVisualTree 时注入
+    /// </summary>
+    public void SetStorageProvider(IStorageProvider? storageProvider) => _storageProvider = storageProvider;
+
+    /// <summary>
+    /// 报告是否可导出
+    /// </summary>
+    [ObservableProperty]
+    private bool _canExportReport;
+
+    public ObservableCollection<ReportSummary> ReportHistory { get; } = [];
+
+    [ObservableProperty]
+    private bool _hasReportHistory;
 
     private ChatSidebarViewModel? _chatSidebarViewModel;
     /// <summary>
@@ -87,20 +111,26 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
         MarketAnalysisWorkflow marketAnalysisWorkflow,
         AnalysisReportViewModel analysisReportViewModel,
         IAnalysisCacheService analysisCacheService,
+        ReportArchiveService reportArchiveService,
         ChatSidebarViewModel chatSidebarViewModel,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _marketAnalysisWorkflow = marketAnalysisWorkflow;
         _analysisReportViewModel = analysisReportViewModel;
         _analysisCacheService = analysisCacheService;
+        _reportArchiveService = reportArchiveService;
 
-        // 通过构造函数注入 ChatSidebarViewModel
         ChatSidebarViewModel = chatSidebarViewModel;
         ChatSidebarViewModel.InitializeEmpty();
 
         SubscribeToEvents();
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
+        ExportReportCommand = new AsyncRelayCommand(ExportReportAsync);
+        LoadHistoryReportCommand = new AsyncRelayCommand<ReportSummary>(LoadHistoryReportAsync);
     }
+
+    public ICommand ExportReportCommand { get; }
+    public ICommand LoadHistoryReportCommand { get; }
 
     private void SubscribeToEvents()
     {
@@ -148,13 +178,16 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
                 AnalysisStage = "准备开始...";
             });
 
-            // 1. 尝试从缓存加载
+            await RefreshHistoryAsync(StockCode);
+
             var cachedReport = await _analysisCacheService.GetCachedAnalysisAsync(StockCode);
             if (cachedReport != null)
             {
                 Logger?.LogInformation("从缓存加载分析结果: {StockCode}", StockCode);
 
-                // 更新 UI（结构化报告 + 侧边栏历史）
+                _lastReport = cachedReport;
+                CanExportReport = true;
+
                 await Dispatcher.UIThread.InvokeAsync(async () =>
                 {
                     AnalysisReportViewModel.UpdateWithReport(cachedReport);
@@ -166,16 +199,17 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
                 return;
             }
 
-            // 2. 缓存未命中，执行新分析
             Logger?.LogInformation("开始新的分析: {StockCode}", StockCode);
-
-            // 清空侧边栏（准备接收实时消息）
             await Dispatcher.UIThread.InvokeAsync(() => ChatSidebarViewModel?.InitializeEmpty());
 
-            // 执行工作流（耗时操作，OnAnalysisCompleted 会实时更新侧边栏）
             var report = await _marketAnalysisWorkflow.AnalyzeAsync(StockCode);
 
-            // 3. 分析完成，更新最终报告并缓存
+            _lastReport = report;
+            CanExportReport = true;
+
+            await _reportArchiveService.SaveAsync(report);
+            await RefreshHistoryAsync(StockCode);
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 AnalysisReportViewModel.UpdateWithReport(report);
@@ -183,7 +217,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
                 {
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
                 }
-                // 缓存操作不需要在 UI 线程等待，可以放飞或在后台等待
                 _ = _analysisCacheService.CacheAnalysisAsync(StockCode, report);
             });
 
@@ -196,6 +229,36 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
     private void ToggleChatSidebar()
     {
         IsChatSidebarVisible = !IsChatSidebarVisible;
+    }
+
+    /// <summary>
+    /// 导出分析报告为 Markdown 文件
+    /// </summary>
+    private async Task ExportReportAsync()
+    {
+        if (_lastReport == null || _storageProvider == null)
+            return;
+
+        var suggestedName = $"{_lastReport.StockSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
+        var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出分析报告",
+            SuggestedFileName = suggestedName,
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Markdown") { Patterns = ["*.md"] },
+            ],
+            DefaultExtension = "md"
+        });
+
+        if (file == null) return;
+
+        var markdown = MarkdownReportExporter.Export(_lastReport);
+        await using var stream = await file.OpenWriteAsync();
+        await using var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8);
+        await writer.WriteAsync(markdown);
+
+        Logger?.LogInformation("分析报告已导出: {Path}", file.Name);
     }
 
     public void OnNavigatedTo(StockNavigationParameter parameter)
@@ -215,7 +278,49 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
 
     public void OnNavigatedFrom()
     {
-        // 离开页面时的清理工作
+    }
+
+    private async Task RefreshHistoryAsync(string assetCode)
+    {
+        var summaries = await _reportArchiveService.GetSummariesAsync(assetCode);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            ReportHistory.Clear();
+            foreach (var s in summaries)
+                ReportHistory.Add(s);
+            HasReportHistory = ReportHistory.Count > 0;
+        });
+    }
+
+    private async Task LoadHistoryReportAsync(ReportSummary? summary)
+    {
+        if (summary == null) return;
+
+        await SafeExecuteAsync(async () =>
+        {
+            var report = await _reportArchiveService.LoadAsync(summary.Id);
+            if (report == null) return;
+
+            _lastReport = report;
+            CanExportReport = true;
+
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                AnalysisReportViewModel.UpdateWithReport(report);
+                if (ChatSidebarViewModel != null)
+                    await ChatSidebarViewModel.InitializeWithAnalysisHistory(report.StockSymbol, report.AnalystMessages);
+            });
+        }, "加载历史报告");
+    }
+
+    public void Dispose()
+    {
+        _marketAnalysisWorkflow.ProgressChanged -= OnAnalysisProgressChanged;
+
+        if (_chatSidebarViewModel != null)
+            _chatSidebarViewModel.PropertyChanged -= OnChatSidebarPropertyChanged;
+
+        GC.SuppressFinalize(this);
     }
 }
 

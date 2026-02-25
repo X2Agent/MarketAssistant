@@ -3,17 +3,22 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using MarketAssistant.Agents.Tools.Models.Crypto.CoinGecko;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Services.Data;
 
 /// <summary>
-/// CoinGecko API服务
+/// CoinGecko API服务（含客户端限流，免费版 30 次/分钟）
 /// </summary>
 public sealed class CoinGeckoApiService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinGeckoApiService> _logger;
     private const string BaseUrl = "https://api.coingecko.com/api/v3";
+
+    private static readonly SemaphoreSlim Throttle = new(1, 1);
+    private static DateTime _lastRequestTime = DateTime.MinValue;
+    private const int MinRequestIntervalMs = 2500;
 
     public CoinGeckoApiService(
         IHttpClientFactory httpClientFactory,
@@ -23,15 +28,36 @@ public sealed class CoinGeckoApiService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// 创建配置好的 HttpClient
-    /// </summary>
     private HttpClient CreateHttpClient()
     {
         var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(10);
+        client.Timeout = TimeSpan.FromSeconds(25);
         return client;
+    }
+
+    /// <summary>
+    /// 限流执行：确保请求间隔不低于 MinRequestIntervalMs（约 24 次/分钟）
+    /// </summary>
+    private async Task<T> ThrottledExecuteAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        await Throttle.WaitAsync(cancellationToken);
+        try
+        {
+            var elapsed = (DateTime.UtcNow - _lastRequestTime).TotalMilliseconds;
+            if (elapsed < MinRequestIntervalMs)
+            {
+                await Task.Delay((int)(MinRequestIntervalMs - elapsed), cancellationToken);
+            }
+
+            var result = await HttpRetryHelper.ExecuteWithRetryAsync(action, _logger, maxRetries: 1, cancellationToken: cancellationToken);
+            _lastRequestTime = DateTime.UtcNow;
+            return result;
+        }
+        finally
+        {
+            Throttle.Release();
+        }
     }
 
     /// <summary>
@@ -46,31 +72,25 @@ public sealed class CoinGeckoApiService
         string? priceChangePercentage = null,
         CancellationToken cancellationToken = default)
     {
-        try
+        var queryParams = new List<string>
         {
-            var queryParams = new List<string>
-            {
-                $"vs_currency={vsCurrency}",
-                $"order={order}",
-                $"per_page={perPage}",
-                $"page={page}",
-                "sparkline=false"
-            };
+            $"vs_currency={vsCurrency}",
+            $"order={order}",
+            $"per_page={perPage}",
+            $"page={page}",
+            "sparkline=false"
+        };
 
-            if (!string.IsNullOrWhiteSpace(category))
-            {
-                queryParams.Add($"category={category}");
-            }
+        if (!string.IsNullOrWhiteSpace(category))
+            queryParams.Add($"category={category}");
+        if (!string.IsNullOrWhiteSpace(priceChangePercentage))
+            queryParams.Add($"price_change_percentage={priceChangePercentage}");
 
-            if (!string.IsNullOrWhiteSpace(priceChangePercentage))
-            {
-                queryParams.Add($"price_change_percentage={priceChangePercentage}");
-            }
+        var url = $"/coins/markets?{string.Join("&", queryParams)}";
+        _logger.LogDebug("调用CoinGecko API: {Url}", url);
 
-            var url = $"/coins/markets?{string.Join("&", queryParams)}";
-
-            _logger.LogDebug("调用CoinGecko API: {Url}", url);
-
+        return await ThrottledExecuteAsync(async () =>
+        {
             using var httpClient = CreateHttpClient();
             var response = await httpClient.GetAsync(url, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -80,19 +100,8 @@ public sealed class CoinGeckoApiService
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinGecko市场数据，币种数量: {Count}", markets?.Count ?? 0);
-
             return markets ?? new List<CoinGeckoMarket>();
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinGecko API请求失败: {Message}", ex.Message);
-            return new List<CoinGeckoMarket>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "获取CoinGecko市场数据时发生错误");
-            return new List<CoinGeckoMarket>();
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -104,22 +113,14 @@ public sealed class CoinGeckoApiService
         string priceChangePercentage = "24h,7d,30d",
         CancellationToken cancellationToken = default)
     {
-        try
+        var url = $"/coins/markets?vs_currency={vsCurrency}&ids={coinId}&order=market_cap_desc&sparkline=false&price_change_percentage={priceChangePercentage}";
+        _logger.LogDebug("调用CoinGecko单币种API: {CoinId}", coinId);
+
+        return await ThrottledExecuteAsync(async () =>
         {
-            var url = $"/coins/markets?vs_currency={vsCurrency}&ids={coinId}&order=market_cap_desc&sparkline=false&price_change_percentage={priceChangePercentage}";
-
-            _logger.LogDebug("调用CoinGecko单币种API: {CoinId}", coinId);
-
             using var httpClient = CreateHttpClient();
-            var response = await httpClient.GetFromJsonAsync<JsonArray>(url, cancellationToken);
-
-            return response;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinGecko单币种API请求失败: {CoinId}", coinId);
-            return null;
-        }
+            return await httpClient.GetFromJsonAsync<JsonArray>(url, cancellationToken);
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -129,25 +130,17 @@ public sealed class CoinGeckoApiService
         string coinId,
         CancellationToken cancellationToken = default)
     {
-        try
+        var url = $"/coins/{coinId}/tickers?include_exchange_logo=false";
+        _logger.LogDebug("调用CoinGecko Tickers API: {CoinId}", coinId);
+
+        return await ThrottledExecuteAsync(async () =>
         {
-            var url = $"/coins/{coinId}/tickers?include_exchange_logo=false";
-
-            _logger.LogDebug("调用CoinGecko Tickers API: {CoinId}", coinId);
-
             using var httpClient = CreateHttpClient();
-            var response = await httpClient.GetFromJsonAsync<CoinGeckoTickersResponse>(
+            return await httpClient.GetFromJsonAsync<CoinGeckoTickersResponse>(
                 url,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
                 cancellationToken);
-
-            return response;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinGecko Tickers API请求失败: {CoinId}", coinId);
-            return null;
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -157,12 +150,11 @@ public sealed class CoinGeckoApiService
         string query,
         CancellationToken cancellationToken = default)
     {
-        try
+        var url = $"/search?query={Uri.EscapeDataString(query)}";
+        _logger.LogDebug("调用CoinGecko Search API: {Query}", query);
+
+        return await ThrottledExecuteAsync(async () =>
         {
-            var url = $"/search?query={Uri.EscapeDataString(query)}";
-
-            _logger.LogDebug("调用CoinGecko Search API: {Query}", query);
-
             using var httpClient = CreateHttpClient();
             var response = await httpClient.GetFromJsonAsync<CoinGeckoSearchResponse>(
                 url,
@@ -170,14 +162,8 @@ public sealed class CoinGeckoApiService
                 cancellationToken);
 
             _logger.LogInformation("CoinGecko搜索结果: {Count}个币种", response?.Coins?.Count ?? 0);
-
             return response;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinGecko Search API请求失败: {Query}", query);
-            return null;
-        }
+        }, cancellationToken);
     }
 }
 

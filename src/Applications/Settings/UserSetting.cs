@@ -40,6 +40,11 @@ public class UserSetting : INotifyPropertyChanged
     public string ZhiTuApiToken { get; set; } = "";
 
     /// <summary>
+    /// 主题模式：Default=跟随系统, Light=浅色, Dark=深色
+    /// </summary>
+    public string ThemeMode { get; set; } = "Default";
+
+    /// <summary>
     /// 当前市场类型
     /// </summary>
     public MarketType CurrentMarketType { get; set; } = MarketType.AShare;

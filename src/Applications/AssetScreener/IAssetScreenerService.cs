@@ -12,6 +12,6 @@ public interface IAssetScreenerService
     /// </summary>
     /// <param name="criteria">筛选条件对象（支持 StockCriteria、CryptoCriteria 等）</param>
     /// <returns>筛选结果列表</returns>
-    Task<List<ScreenerStockInfo>> ScreenAsync(object criteria);
+    Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria);
 }
 

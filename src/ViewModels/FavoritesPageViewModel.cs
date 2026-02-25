@@ -4,23 +4,27 @@ using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Favorites;
+using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
 /// 收藏页ViewModel
 /// </summary>
-public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>
+public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
+    private readonly BinanceWebSocketService _wsService;
 
     private IFavoriteService FavoriteService => 
         _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
@@ -40,12 +44,15 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         IServiceProvider serviceProvider,
         MarketContext marketContext,
         IDialogService dialogService,
+        BinanceWebSocketService wsService,
         ILogger<FavoritesPageViewModel> logger)
         : base(logger)
     {
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
         _dialogService = dialogService;
+        _wsService = wsService;
+        _wsService.PriceUpdated += OnWebSocketPriceUpdated;
         _ = LoadFavoriteAssetsAsync();
         WeakReferenceMessenger.Default.Register(this);
     }
@@ -57,13 +64,16 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     {
         await SafeExecuteAsync(async () =>
         {
-            // 获取收藏列表
             var favoritesCodes = FavoriteService.GetFavoritesCodes();
-
             Assets.Clear();
-
-            // 使用并发加载所有资产数据
             await UpdateAssetDataProgressivelyAsync(favoritesCodes);
+
+            // 虚拟币市场启用 WebSocket 实时推送
+            if (_marketContext.CurrentMarket == MarketType.Crypto && Assets.Count > 0)
+            {
+                var symbols = Assets.Select(a => ToBinanceFormat(a.Code)).ToList();
+                _ = _wsService.SubscribeAsync(symbols);
+            }
         }, "加载收藏列表");
     }
 
@@ -178,10 +188,34 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     }
 
     /// <summary>
+    /// WebSocket 实时价格更新回调
+    /// </summary>
+    private void OnWebSocketPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    {
+        Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            var asset = Assets.FirstOrDefault(a =>
+                ToBinanceFormat(a.Code).Equals(symbol, StringComparison.OrdinalIgnoreCase));
+
+            if (asset == null) return;
+
+            asset.CurrentPrice = lastPrice.ToString("G");
+            asset.ChangePercentage = $"{changePercent:F2}%";
+        });
+    }
+
+    /// <summary>
     /// 接收收藏变更消息
     /// </summary>
     public void Receive(AssetFavoritesChanged message)
     {
         _ = LoadFavoriteAssetsAsync();
+    }
+
+    public void Dispose()
+    {
+        _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        GC.SuppressFinalize(this);
     }
 }

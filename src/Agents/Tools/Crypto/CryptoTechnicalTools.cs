@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
@@ -34,7 +35,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             if (klineData == null || klineData.Count < 9)
             {
-                throw new InvalidOperationException($"K线数据不足，无法计算KDJ指标: {assetSymbol}");
+                throw new FriendlyException($"K线数据不足，无法计算KDJ指标: {assetSymbol}");
             }
 
             var kdj = CalculateKDJ(klineData);
@@ -63,7 +64,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             if (klineData == null || klineData.Count < 26)
             {
-                throw new InvalidOperationException($"K线数据不足，无法计算MACD指标: {assetSymbol}");
+                throw new FriendlyException($"K线数据不足，无法计算MACD指标: {assetSymbol}");
             }
 
             var macd = CalculateMACD(klineData);
@@ -91,7 +92,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             if (klineData == null || klineData.Count < 20)
             {
-                throw new InvalidOperationException($"K线数据不足，无法计算BOLL指标: {assetSymbol}");
+                throw new FriendlyException($"K线数据不足，无法计算BOLL指标: {assetSymbol}");
             }
 
             var boll = CalculateBOLL(klineData);
@@ -119,7 +120,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             if (klineData == null || klineData.Count < 3)
             {
-                throw new InvalidOperationException($"K线数据不足，无法计算MA指标: {assetSymbol}");
+                throw new FriendlyException($"K线数据不足，无法计算MA指标: {assetSymbol}");
             }
 
             var ma = CalculateMA(klineData);

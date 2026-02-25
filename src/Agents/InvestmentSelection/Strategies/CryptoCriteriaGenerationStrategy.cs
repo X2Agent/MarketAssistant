@@ -51,27 +51,18 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 - 前50大币 → market_cap_rank <= 50
 - 前100大币 → market_cap_rank <= 100
 
-## 支持的筛选指标
+## 支持的筛选指标（仅使用以下指标，不要生成其他指标）
 
 ### 基本指标
 - market_cap: 市值（美元）
 - volume_24h: 24小时交易量（美元）
 - price: 当前价格（USDT）
 - market_cap_rank: 市值排名
-- circulating_supply: 流通量
-- total_supply: 总供应量
-- max_supply: 最大供应量
 
 ### 市场表现指标
 - price_change_24h: 24小时涨跌幅（%）
 - price_change_7d: 7天涨跌幅（%）
 - price_change_30d: 30天涨跌幅（%）
-- price_change_1y: 1年涨跌幅（%）
-- volume_change_24h: 24小时交易量变化（%）
-
-### 交易对设置
-- 默认使用 USDT 作为基准货币
-- 可指定其他交易对如 BTC、ETH 等
 
 ## 注意事项
 - 虚拟币市场波动性大，筛选条件应合理
@@ -104,11 +95,10 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 - market_cap_rank: 市值排名
 - price: 当前价格（USDT）
 
-### 市场表现指标
+### 市场表现指标（仅使用以下指标）
 - price_change_24h: 24小时涨跌幅（%）
 - price_change_7d: 7天涨跌幅（%）
 - price_change_30d: 30天涨跌幅（%）
-- volume_change_24h: 24小时交易量变化（%）
 
 ## 情感判断与筛选策略
 
@@ -118,7 +108,7 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 - market_cap_rank <= 200
 
 **技术突破 → 创新币策略**
-- volume_change_24h > 50
+- volume_24h > 50000000
 - price_change_24h > -5
 - market_cap_rank <= 100
 

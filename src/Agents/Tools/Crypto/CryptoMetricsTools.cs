@@ -342,7 +342,7 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
             var ohlcv = await GetOHLCVAsync(symbol, MarketInterval.OneDay, days + 1);
             if (ohlcv.Candles.Count < 2)
             {
-                throw new InvalidOperationException($"数据不足，无法计算波动性指标");
+                throw new FriendlyException($"数据不足，无法计算波动性指标");
             }
 
             var candles = ohlcv.Candles;
@@ -375,7 +375,7 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
             var variance = returns.Sum(r => (r - avgReturn) * (r - avgReturn)) / (returns.Count - 1);
             var stdDev = (decimal)Math.Sqrt((double)variance);
             var dailyVol = stdDev * 100;  // 转换为百分比
-            var annualizedVol = dailyVol * (decimal)Math.Sqrt(252);  // 年化（252个交易日）
+            var annualizedVol = dailyVol * (decimal)Math.Sqrt(365);  // 年化（虚拟币市场7x24交易，365天）
             var atr = trueRanges.Average();
 
             // 计算最大回撤
@@ -409,8 +409,8 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
             decimal? sharpeRatio = null;
             if (stdDev > 0)
             {
-                var annualizedReturn = avgReturn * 252;  // 年化收益率
-                sharpeRatio = annualizedReturn / (stdDev * (decimal)Math.Sqrt(252));
+                var annualizedReturn = avgReturn * 365;  // 年化收益率（虚拟币365天）
+                sharpeRatio = annualizedReturn / (stdDev * (decimal)Math.Sqrt(365));
             }
 
             return new CryptoVolatilityMetrics

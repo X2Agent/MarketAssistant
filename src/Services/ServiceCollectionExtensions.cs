@@ -17,10 +17,13 @@ using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.News;
+using MarketAssistant.Applications.Portfolio;
+using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Extensions;
+using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Data;
@@ -56,6 +59,10 @@ public static class ServiceCollectionExtensions
 
         // 注册市场上下文服务为单例
         services.AddSingleton<MarketContext>();
+
+        // 注册市场能力声明
+        services.AddKeyedSingleton<IMarketCapability, AShareMarketCapability>(MarketType.AShare);
+        services.AddKeyedSingleton<IMarketCapability, CryptoMarketCapability>(MarketType.Crypto);
 
         // 注册通用工具（不依赖市场类型）
         services.AddSingleton<GroundingSearchTools>();
@@ -96,7 +103,6 @@ public static class ServiceCollectionExtensions
 
         // 注册 RAG 和分析服务
         services.AddRagServices();
-        services.AddSingleton<GroundingSearchTools>();
 
         // 注册快讯服务接口的实现（使用 Keyed Services）
         services.AddKeyedSingleton<ITelegramService, AShareTelegramService>(MarketType.AShare);
@@ -121,6 +127,10 @@ public static class ServiceCollectionExtensions
         // ========== 虚拟币 API 服务 ==========
         services.AddSingleton<CoinGeckoApiService>();
         services.AddSingleton<BinanceMarketDataService>();
+        services.AddSingleton<BinanceWebSocketService>();
+        services.AddSingleton<PriceAlertService>();
+        services.AddSingleton<PortfolioService>();
+        services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<CoinDeskApiService>();
 
         // ========== 浏览器自动化服务 ==========
@@ -203,6 +213,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AboutPageViewModel>();
         services.AddTransient<MCPConfigPageViewModel>();
         services.AddTransient<AssetPageViewModel>();
+        services.AddTransient<PortfolioPageViewModel>();
 
         // 注册 Home 子 ViewModels
         services.AddTransient<HomeSearchViewModel>();

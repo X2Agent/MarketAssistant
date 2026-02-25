@@ -11,12 +11,22 @@
 - 单元测试工程：`tests/`
 - 构建脚本：根目录 `build-release.ps1`，构建说明见根目录 `BUILD.md`
 
+核心技术栈：
+
+- **UI 框架**：Avalonia 11.x
+- **AI 框架**：Microsoft Agent Framework (MAF)（`Microsoft.Agents.AI` + `Microsoft.Agents.AI.Workflows`）
+- **向量存储**：Semantic Kernel SQLiteVec
+- **日志**：Serilog
+- **多市场架构**：通过 `MarketType` 枚举 + .NET Keyed Services 实现 A 股/虚拟币市场的统一抽象与动态切换
+
 主要功能模块：
 
 - 业务与设置：`src/Applications/`
 - 视图与视图模型：`src/Views/`, `src/ViewModels/`
-- 智能体分析师角色：`src/Agents/Analysts/` (含多种分析师实现)
-- 代理与会话：`src/Agents/` 
+- 智能体分析师角色：`src/Agents/Analysts/`（含多种分析师实现）
+- 市场分析工作流：`src/Agents/MarketAnalysis/`（Fan-Out/Fan-In 并发分析）
+- 投资选择工作流：`src/Agents/InvestmentSelection/`（三步骤确定性工作流）
+- 代理与会话：`src/Agents/`
 - 资源与样式：`src/Resources/Styles/`
 - 资产文件：`src/Assets/`
 - 模型配置：`src/config/models.yaml`
@@ -115,10 +125,24 @@ dotnet format
 
 - 模型与供应商配置：`src/config/models.yaml`
 
+多市场架构：
+
+- 项目支持 **A 股**（`MarketType.AShare`）和 **虚拟币**（`MarketType.Crypto`）两个市场。
+- 使用 .NET **Keyed Services** 模式（`IServiceProvider.GetRequiredKeyedService<T>(MarketType)`）实现同一接口的市场特定实现。
+- `MarketContext` 单例管理当前活跃市场，UI 和业务层通过它获取当前市场类型。
+- 新增市场支持时，需在 `MarketType` 枚举添加值，并为所有 Keyed Service 接口注册新实现。
+
+外部 API 依赖（虚拟币市场）：
+
+- **Binance API**（`api.binance.com` / `fapi.binance.com`）：实时行情、K 线、订单簿、资金费率、多空比等。某些地区受限，需通过 VPN 或代理访问。
+- **CoinGecko API**（`api.coingecko.com`）：市值、排名、多时间段涨跌幅等。免费版有频率限制。
+- **CoinDesk API**（`data-api.coindesk.com`）：项目基本面、新闻数据。
+
 建议：
 
 - 不要在仓库中提交任何密钥或令牌。密钥应通过应用内设置页或安全存储注入。
 - 如引入新外部依赖，需在 README 或本文件中注明安装步骤与运行前置条件。
+- 虚拟币相关 API 可能需要网络代理，请确保开发环境能访问上述域名。
 
 ---
 
@@ -150,15 +174,18 @@ UI 与样式（Avalonia AXAML）：
 
 ## 六、目录导航（常用）
 
-- 代理与分析角色：`src/Agents/`（具体实现在 `Analysts/` 目录）
-- 业务能力：`src/Applications/`（股票、资讯、收藏、K 线、设置、MCP 等）
-- 插件与工具：`src/Agents/Tools/`（各领域工具实现）
+- 代理与分析角色：`src/Agents/Analysts/`（多种分析师实现）
+- 市场分析工作流：`src/Agents/MarketAnalysis/`（Fan-Out/Fan-In 并发分析 Workflow）
+- 投资选择工作流：`src/Agents/InvestmentSelection/`（三步骤确定性 Workflow + 市场特定 Strategy）
+- Agent 工具：`src/Agents/Tools/`（按市场分组：`AShare/`、`Crypto/`，接口在 `Abstractions/`）
+- 业务能力：`src/Applications/`（资产信息、筛选、K 线、收藏、历史、快讯、投资选择等）
+- 外部 API 服务：`src/Services/Data/`（Binance、CoinGecko、CoinDesk API 封装）
 - 视图与 VM：`src/Views/`, `src/ViewModels/`
 - 资源与样式：`src/Resources/Styles/`（Avalonia 样式资源字典）
 - 资产文件：`src/Assets/`（图片、图标、HTML 等）
 - 类型转换器：`src/Converts/`
-- 基础设施：`src/Infrastructure/`（配置、核心、工厂等）
-- 服务层：`src/Services/`（浏览器、缓存、对话框、导航等）
+- 基础设施：`src/Infrastructure/`（配置、核心工具类、工厂、符号转换器等）
+- 服务层：`src/Services/`（浏览器、缓存、市场上下文、对话框、导航、MCP 等）
 - RAG 相关：`src/Rag/`（向量化与检索增强生成）
 - 测试：`tests/`
 

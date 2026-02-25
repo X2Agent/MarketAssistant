@@ -10,9 +10,9 @@ public class StockDataFormatter : IAssetDataFormatter
 {
     public MarketType SupportedMarketType => MarketType.AShare;
 
-    public string FormatAssetsForAnalysis(List<ScreenerStockInfo> assets)
+    public string FormatAssetsForAnalysis(List<ScreenerAssetInfo> assets)
     {
-        var simplifiedStocks = assets.Select(s =>
+        var simplifiedStocks = assets.OfType<ScreenerStockInfo>().Select(s =>
         {
             var data = new Dictionary<string, object>();
 

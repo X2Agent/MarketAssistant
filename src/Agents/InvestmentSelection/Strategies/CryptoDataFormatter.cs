@@ -10,9 +10,9 @@ public class CryptoDataFormatter : IAssetDataFormatter
 {
     public MarketType SupportedMarketType => MarketType.Crypto;
 
-    public string FormatAssetsForAnalysis(List<ScreenerStockInfo> cryptos)
+    public string FormatAssetsForAnalysis(List<ScreenerAssetInfo> assets)
     {
-        var simplifiedCryptos = cryptos.Select(c =>
+        var simplifiedCryptos = assets.OfType<ScreenerCryptoInfo>().Select(c =>
         {
             var data = new Dictionary<string, object>
             {
@@ -29,41 +29,25 @@ public class CryptoDataFormatter : IAssetDataFormatter
                 }
             }
 
-            // 基本信息
             AddIfNotZero("当前价格_USDT", c.Current);
             AddIfNotZero("市值_亿美元", c.Mc, 2, 100000000);
-            AddIfNotZero("流通市值_亿美元", c.Fmc, 2, 100000000);
+            AddIfNotZero("完全稀释市值_亿美元", c.Fmc, 2, 100000000);
 
-            // 交易数据
             AddIfNotZero("24h交易量_万", c.Volume, 0);
             AddIfNotZero("24h成交额_亿美元", c.Amount, 2, 100000000);
-            AddIfNotZero("量比", c.VolumeRatio);
-            AddIfNotZero("换手率_百分比", c.Tr);
 
-            // 涨跌幅数据（虚拟币）
             AddIfNotZero("24h涨跌幅_百分比", c.Pct);
-            AddIfNotZero("7天涨跌幅_百分比", c.Pct5);
-            AddIfNotZero("30天涨跌幅_百分比", c.Pct20);
-            AddIfNotZero("60天涨跌幅_百分比", c.Pct60);
-            AddIfNotZero("90天涨跌幅_百分比", c.Pct120);
-            AddIfNotZero("1年涨跌幅_百分比", c.Pct250);
-            AddIfNotZero("年初至今涨跌幅_百分比", c.PctCurrentYear);
-
-            // 波动性
+            AddIfNotZero("7天涨跌幅_百分比", c.PriceChange7d);
+            AddIfNotZero("30天涨跌幅_百分比", c.PriceChange30d);
             AddIfNotZero("24h振幅_百分比", c.ChgPct);
 
-            // 估值指标（如适用）
-            AddIfNotZero("市盈率", c.PeTtm);
-            AddIfNotZero("市净率", c.Pb);
-            AddIfNotZero("市销率", c.Psr);
+            if (c.MarketCapRank > 0)
+                data["市值排名"] = c.MarketCapRank;
 
-            // 社交热度（如雪球数据适用于虚拟币）
-            AddIfNotZero("关注人数", c.Follow, 0);
-            AddIfNotZero("讨论次数", c.Tweet, 0);
-            AddIfNotZero("一周新增关注", c.Follow7d, 0);
-            AddIfNotZero("一周新增讨论", c.Tweet7d, 0);
-            AddIfNotZero("一周关注增长率_百分比", c.Follow7dPct);
-            AddIfNotZero("一周讨论增长率_百分比", c.Tweet7dPct);
+            AddIfNotZero("流通供应量", c.CirculatingSupply, 0);
+            AddIfNotZero("总供应量", c.TotalSupply, 0);
+            if (c.MaxSupply.HasValue && c.MaxSupply.Value > 0)
+                data["最大供应量"] = Math.Round(c.MaxSupply.Value, 0);
 
             return data;
         }).ToList();

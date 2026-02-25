@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Tools.Models.Crypto.Binance;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;
 using System.Web;
@@ -72,6 +73,18 @@ public sealed class BinanceMarketDataService
     #region 24小时价格统计
 
     /// <summary>
+    /// 带重试的 HTTP GET 执行器
+    /// </summary>
+    private async Task<string> GetWithRetryAsync(HttpClient httpClient, string url, CancellationToken cancellationToken)
+    {
+        return await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
+        {
+            var response = await httpClient.GetAsync(url, cancellationToken);
+            return await CheckAndReadResponseAsync(response, cancellationToken);
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
     /// 获取单个交易对的24小时价格变动统计
     /// </summary>
     public async Task<Binance24hrTicker?> Get24hrTickerAsync(
@@ -82,14 +95,9 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安API: {Url}", url);
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
 
-        var ticker = JsonSerializer.Deserialize<Binance24hrTicker>(
-            content,
-            BinanceJsonSerializerOptions);
-
-        return ticker;
+        return JsonSerializer.Deserialize<Binance24hrTicker>(content, BinanceJsonSerializerOptions);
     }
 
     /// <summary>
@@ -121,15 +129,10 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("批量调用币安API: {Count}个交易对", symbols.Count);
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
 
-        var tickers = JsonSerializer.Deserialize<List<Binance24hrTicker>>(
-            content,
-            BinanceJsonSerializerOptions);
-
+        var tickers = JsonSerializer.Deserialize<List<Binance24hrTicker>>(content, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取币安24h行情数据，交易对数量: {Count}", tickers?.Count ?? 0);
-
         return tickers ?? new List<Binance24hrTicker>();
     }
 
@@ -143,15 +146,10 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安API获取所有交易对24h行情");
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
 
-        var tickers = JsonSerializer.Deserialize<List<Binance24hrTicker>>(
-            content,
-            BinanceJsonSerializerOptions);
-
+        var tickers = JsonSerializer.Deserialize<List<Binance24hrTicker>>(content, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取所有币安24h行情数据，交易对数量: {Count}", tickers?.Count ?? 0);
-
         return tickers ?? new List<Binance24hrTicker>();
     }
 
@@ -169,15 +167,10 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安交易所信息API");
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
 
-        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(
-            content,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
+        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
-
         return exchangeInfo;
     }
 
@@ -206,13 +199,10 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安K线API: {Symbol} {Interval}", symbol, interval);
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
 
         var klines = JsonSerializer.Deserialize<JsonArray>(content);
-
         _logger.LogInformation("成功获取K线数据: {Symbol}, 数量: {Count}", symbol, klines?.Count ?? 0);
-
         return klines;
     }
 
@@ -233,12 +223,8 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安深度API: {Symbol}", symbol);
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
-
-        var depth = JsonSerializer.Deserialize<JsonObject>(content);
-
-        return depth;
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
+        return JsonSerializer.Deserialize<JsonObject>(content);
     }
 
     #endregion
@@ -258,12 +244,8 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安交易记录API: {Symbol}", symbol);
 
         using var httpClient = CreateHttpClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
-
-        var trades = JsonSerializer.Deserialize<JsonArray>(content);
-
-        return trades;
+        var content = await GetWithRetryAsync(httpClient, url, cancellationToken);
+        return JsonSerializer.Deserialize<JsonArray>(content);
     }
 
     #endregion
@@ -282,14 +264,14 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安期货资金费率API: {Symbol}", symbol);
 
         using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        var content = await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
+        {
+            var response = await httpClient.GetAsync(url, cancellationToken);
+            return await CheckAndReadResponseAsync(response, cancellationToken);
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
 
-        var premiumIndex = JsonSerializer.Deserialize<BinancePremiumIndexResponse>(
-            content,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        return premiumIndex;
+        return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
     /// <summary>
@@ -312,14 +294,15 @@ public sealed class BinanceMarketDataService
         _logger.LogDebug("调用币安期货历史资金费率API: {Symbol}", symbol);
 
         using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        var content = await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
+        {
+            var resp = await httpClient.GetAsync(url, cancellationToken);
+            return await CheckAndReadResponseAsync(resp, cancellationToken);
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
 
-        var fundingRates = JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(
-            content,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        return fundingRates ?? new List<BinanceFundingRateResponse>();
+        return JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new List<BinanceFundingRateResponse>();
     }
 
     /// <summary>
@@ -333,18 +316,18 @@ public sealed class BinanceMarketDataService
         CancellationToken cancellationToken = default)
     {
         var url = $"{FuturesBaseUrl}/futures/data/{endpoint}?symbol={symbol.ToUpperInvariant()}&period={period}&limit={limit}";
-
         _logger.LogDebug("调用币安期货多空比API: {Symbol} {Endpoint}", symbol, endpoint);
 
         using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        var content = await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
+        {
+            var resp = await httpClient.GetAsync(url, cancellationToken);
+            return await CheckAndReadResponseAsync(resp, cancellationToken);
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
 
-        var ratios = JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(
-            content,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        return ratios ?? new List<BinanceLongShortRatioResponse>();
+        return JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new List<BinanceLongShortRatioResponse>();
     }
 
     /// <summary>
@@ -357,18 +340,18 @@ public sealed class BinanceMarketDataService
         CancellationToken cancellationToken = default)
     {
         var url = $"{FuturesBaseUrl}/futures/data/openInterestHist?symbol={symbol.ToUpperInvariant()}&period={period}&limit={limit}";
-
         _logger.LogDebug("调用币安期货持仓量API: {Symbol}", symbol);
 
         using var httpClient = _httpClientFactory.CreateClient();
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        var content = await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
+        {
+            var resp = await httpClient.GetAsync(url, cancellationToken);
+            return await CheckAndReadResponseAsync(resp, cancellationToken);
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
 
-        var openInterest = JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(
-            content,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        return openInterest ?? new List<BinanceOpenInterestResponse>();
+        return JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+               ?? new List<BinanceOpenInterestResponse>();
     }
 
     #endregion

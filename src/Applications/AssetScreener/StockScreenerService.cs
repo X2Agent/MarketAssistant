@@ -77,14 +77,15 @@ public sealed class StockScreenerService : IAssetScreenerService
     /// <summary>
     /// 根据筛选条件筛选资产（IAssetScreenerService 接口实现）
     /// </summary>
-    public async Task<List<ScreenerStockInfo>> ScreenAsync(object criteria)
+    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
     {
         if (criteria is not StockCriteria stockCriteria)
         {
             throw new ArgumentException("筛选条件类型错误，期望 StockCriteria", nameof(criteria));
         }
 
-        return await ScreenStocksAsync(stockCriteria);
+        var stocks = await ScreenStocksAsync(stockCriteria);
+        return stocks.Cast<ScreenerAssetInfo>().ToList();
     }
 
     /// <summary>

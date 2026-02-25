@@ -12,6 +12,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 [DisplayName("市场情绪分析师")]
 [Description("整合了行为金融分析师和市场分析师的功能")]
+[RequiresTools(typeof(IFinancialTools))]
+[RequiresTools(typeof(ISentimentTools))]
 public class MarketSentimentAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult));
@@ -34,7 +36,7 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
             temperature: 0.4f,
             topP: 0.7f,
             topK: 10,
-            responseFormat: null,
+            responseFormat: ResponseFormat,
             tools: [.. financialTools.GetFunctions(), .. marketSentimentTools.GetFunctions()])
     {
     }

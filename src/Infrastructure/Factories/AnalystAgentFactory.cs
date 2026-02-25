@@ -1,10 +1,11 @@
 using MarketAssistant.Agents.Analysts;
-using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
@@ -88,39 +89,26 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     }
 
     /// <summary>
-    /// 根据 Analyst 类型和市场类型解析所需的工具
+    /// 根据 Analyst 类上的 RequiresToolsAttribute 和市场类型自动解析所需的工具
     /// </summary>
     private List<object> ResolveToolsForAnalyst(Type agentType, MarketType marketType)
     {
         var tools = new List<object>();
 
-        // 根据不同的 Analyst 类型，解析对应的工具接口
-        switch (agentType.Name)
+        var toolAttributes = agentType.GetCustomAttributes<RequiresToolsAttribute>();
+        foreach (var attr in toolAttributes)
         {
-            case nameof(FinancialAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialTools>(marketType));
-                break;
-
-            case nameof(FundamentalAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<IBasicDataTools>(marketType));
-                break;
-
-            case nameof(MarketSentimentAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<IFinancialTools>(marketType));
-                tools.Add(_serviceProvider.GetRequiredKeyedService<ISentimentTools>(marketType));
-                break;
-
-            case nameof(NewsEventAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<INewsDataTools>(marketType));
-                break;
-
-            case nameof(TechnicalAnalystAgent):
-                tools.Add(_serviceProvider.GetRequiredKeyedService<ITechnicalDataTools>(marketType));
-                break;
-
-            default:
-                _logger.LogWarning("未知的 Analyst 类型: {AgentType}，不注入任何工具", agentType.Name);
-                break;
+            var toolService = _serviceProvider.GetKeyedService(attr.ToolInterfaceType, marketType);
+            if (toolService != null)
+            {
+                tools.Add(toolService);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "未找到 Analyst {AgentType} 所需的工具 {ToolType}（市场: {Market}）",
+                    agentType.Name, attr.ToolInterfaceType.Name, marketType);
+            }
         }
 
         return tools;

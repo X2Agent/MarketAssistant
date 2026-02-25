@@ -7,21 +7,24 @@ using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 namespace MarketAssistant.Applications.Assets;
 
 /// <summary>
-/// 虚拟币资产信息服务实现（基于币安API）
+/// 虚拟币资产信息服务实现（基于币安API + CoinGecko市值数据）
 /// </summary>
 public class CryptoAssetInfoService : IAssetInfoService
 {
     private readonly BinanceMarketDataService _binanceService;
+    private readonly CoinGeckoApiService _coinGeckoService;
     private readonly ILogger<CryptoAssetInfoService> _logger;
     private readonly IMemoryCache _memoryCache;
     private const string SYMBOLS_CACHE_KEY = "BinanceSymbols";
 
     public CryptoAssetInfoService(
         BinanceMarketDataService binanceService,
+        CoinGeckoApiService coinGeckoService,
         ILogger<CryptoAssetInfoService> logger,
         IMemoryCache memoryCache)
     {
         _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
         _logger = logger;
         _memoryCache = memoryCache;
     }
@@ -79,7 +82,7 @@ public class CryptoAssetInfoService : IAssetInfoService
             CurrentPrice = FormatPrice(ticker.LastPrice),
             ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
             Volume24h = FormatVolume(ticker.Volume),
-            MarketCap = FormatVolume(ticker.QuoteVolume) // 使用USDT交易量作为市值参考
+            MarketCap = await FetchMarketCapAsync(ExtractBaseCurrency(ticker.Symbol), cancellationToken)
         };
 
         _logger.LogInformation("成功获取虚拟币详情: {Symbol}", symbol);
@@ -133,6 +136,33 @@ public class CryptoAssetInfoService : IAssetInfoService
 
         _logger.LogInformation("成功获取热门虚拟币: {Count} 个", hotAssets.Count);
         return hotAssets;
+    }
+
+    /// <summary>
+    /// 从CoinGecko获取真实市值数据
+    /// </summary>
+    private async Task<string> FetchMarketCapAsync(string baseCurrency, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var coinId = ToCoinGeckoId(baseCurrency);
+            var marketData = await _coinGeckoService.GetCoinMarketDataAsync(coinId, cancellationToken: cancellationToken);
+
+            if (marketData is { Count: > 0 } && marketData[0] is System.Text.Json.Nodes.JsonObject data)
+            {
+                var marketCap = data["market_cap"]?.GetValue<decimal?>();
+                if (marketCap.HasValue && marketCap.Value > 0)
+                {
+                    return FormatVolume(marketCap.Value);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "从CoinGecko获取市值失败: {BaseCurrency}，将显示为N/A", baseCurrency);
+        }
+
+        return "N/A";
     }
 
     #region 辅助方法

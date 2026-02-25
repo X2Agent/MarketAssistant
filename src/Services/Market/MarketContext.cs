@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MarketAssistant.Services.Market;
 
@@ -11,6 +12,7 @@ namespace MarketAssistant.Services.Market;
 public class MarketContext : INotifyPropertyChanged
 {
     private readonly IUserSettingService _userSettingService;
+    private readonly IServiceProvider _serviceProvider;
     private MarketType _currentMarket;
 
     /// <summary>
@@ -29,13 +31,18 @@ public class MarketContext : INotifyPropertyChanged
         }
     }
 
-    public MarketContext(IUserSettingService userSettingService)
+    public MarketContext(IUserSettingService userSettingService, IServiceProvider serviceProvider)
     {
         _userSettingService = userSettingService;
-        
-        // 从用户设置中加载市场类型
+        _serviceProvider = serviceProvider;
         _currentMarket = _userSettingService.CurrentSetting.CurrentMarketType;
     }
+
+    /// <summary>
+    /// 获取当前市场的能力声明
+    /// </summary>
+    public IMarketCapability CurrentCapability =>
+        _serviceProvider.GetRequiredKeyedService<IMarketCapability>(CurrentMarket);
 
     /// <summary>
     /// 切换市场
@@ -60,9 +67,5 @@ public class MarketContext : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
-
-
-
-
 
 

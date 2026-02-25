@@ -12,6 +12,7 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 [DisplayName("技术分析师")]
 [Description("专注于图表模式和技术指标分析")]
+[RequiresTools(typeof(ITechnicalDataTools))]
 public class TechnicalAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult));
@@ -33,7 +34,7 @@ public class TechnicalAnalystAgent : AnalystAgentBase
             temperature: 0.0f,
             topP: 0.0f,
             topK: 1,
-            responseFormat: null,
+            responseFormat: ResponseFormat,
             tools: [.. technicalTools.GetFunctions()])
     {
     }

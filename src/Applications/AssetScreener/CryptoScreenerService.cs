@@ -30,7 +30,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// <summary>
     /// 根据筛选条件筛选虚拟币
     /// </summary>
-    public async Task<List<ScreenerStockInfo>> ScreenAsync(object criteria)
+    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
     {
         if (criteria is not CryptoCriteria cryptoCriteria)
         {
@@ -51,7 +51,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             // 3. 限制结果数量
             var limited = filtered.Take(cryptoCriteria.Limit).ToList();
 
-            // 4. 转换为ScreenerStockInfo格式
+            // 4. 转换为 ScreenerCryptoInfo 格式
             var results = ConvertToScreenerInfo(limited);
 
             _logger.LogInformation("虚拟币筛选完成，结果数量: {Count}", results.Count);
@@ -128,6 +128,10 @@ public sealed class CryptoScreenerService : IAssetScreenerService
                     (!condition.MinValue.HasValue || m.Price_Change_Percentage_7d_In_Currency >= condition.MinValue) &&
                     (!condition.MaxValue.HasValue || m.Price_Change_Percentage_7d_In_Currency <= condition.MaxValue)),
 
+                "price_change_30d" => filtered.Where(m =>
+                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_30d_In_Currency >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_30d_In_Currency <= condition.MaxValue)),
+
                 "current_price" or "price" => filtered.Where(m =>
                     (!condition.MinValue.HasValue || m.Current_Price >= condition.MinValue) &&
                     (!condition.MaxValue.HasValue || m.Current_Price <= condition.MaxValue)),
@@ -139,12 +143,9 @@ public sealed class CryptoScreenerService : IAssetScreenerService
         return filtered.ToList();
     }
 
-    /// <summary>
-    /// 转换为通用筛选结果格式
-    /// </summary>
-    private List<ScreenerStockInfo> ConvertToScreenerInfo(List<CoinGeckoMarket> markets)
+    private List<ScreenerAssetInfo> ConvertToScreenerInfo(List<CoinGeckoMarket> markets)
     {
-        return markets.Select(m => new ScreenerStockInfo
+        return markets.Select(m => (ScreenerAssetInfo)new ScreenerCryptoInfo
         {
             Name = m.Name,
             Symbol = m.Symbol.ToUpperInvariant(),
@@ -154,42 +155,12 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             Mc = m.Market_Cap ?? 0,
             Fmc = m.Fully_Diluted_Valuation ?? 0,
             Volume = m.Total_Volume ?? 0,
-            VolumeRatio = 0, // CoinGecko不提供量比
-            Tr = 0, // CoinGecko不提供换手率
-
-            // 虚拟币不支持的股票指标，全部填0
-            PeTtm = 0,
-            PeLyr = 0,
-            Pb = 0,
-            Psr = 0,
-            RoeDiluted = 0,
-            Bps = 0,
-            Eps = 0,
-            NetProfit = 0,
-            TotalRevenue = 0,
-            DyL = 0,
-            Npay = 0,
-            Oiy = 0,
-            Niota = 0,
-
-            // 历史涨跌幅
-            Pct5 = m.Price_Change_Percentage_7d_In_Currency ?? 0,
-            Pct10 = 0,
-            Pct20 = m.Price_Change_Percentage_30d_In_Currency ?? 0,
-            Pct60 = 0,
-            Pct120 = 0,
-            Pct250 = 0, // CoinGecko免费API不提供1年数据
-
-            // 关注度数据
-            Follow = 0,
-            Tweet = 0,
-            Deal = 0,
-            Follow7d = 0,
-            Tweet7d = 0,
-            Deal7d = 0,
-            Follow7dPct = 0,
-            Tweet7dPct = 0,
-            Deal7dPct = 0
+            MarketCapRank = m.Market_Cap_Rank ?? 0,
+            PriceChange7d = m.Price_Change_Percentage_7d_In_Currency ?? 0,
+            PriceChange30d = m.Price_Change_Percentage_30d_In_Currency ?? 0,
+            CirculatingSupply = m.Circulating_Supply ?? 0,
+            TotalSupply = m.Total_Supply ?? 0,
+            MaxSupply = m.Max_Supply
         }).ToList();
     }
 

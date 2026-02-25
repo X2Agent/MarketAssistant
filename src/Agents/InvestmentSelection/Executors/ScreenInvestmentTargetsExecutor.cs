@@ -50,7 +50,7 @@ public sealed class ScreenInvestmentTargetsExecutor : Executor<CriteriaGeneratio
                 originalRequest.MarketType, screenerService.GetType().Name);
 
             // 调用筛选服务
-            List<ScreenerStockInfo> assets = await screenerService.ScreenAsync(input.Criteria);
+            List<ScreenerAssetInfo> assets = await screenerService.ScreenAsync(input.Criteria);
 
             _logger.LogInformation("[步骤2/3] 筛选完成，获得 {Count} 个投资标的", assets.Count);
 

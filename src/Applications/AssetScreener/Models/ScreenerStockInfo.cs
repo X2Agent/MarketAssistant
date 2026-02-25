@@ -1,50 +1,10 @@
 namespace MarketAssistant.Applications.AssetScreener.Models;
 
 /// <summary>
-/// 雪球网股票筛选结果实体
+/// A股筛选结果（雪球网数据源）
 /// </summary>
-public class ScreenerStockInfo
+public class ScreenerStockInfo : ScreenerAssetInfo
 {
-    /// <summary>
-    /// 股票名称
-    /// </summary>
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 股票代码（如：SZ300316）
-    /// </summary>
-    public string Symbol { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 当前价
-    /// </summary>
-    public decimal Current { get; set; }
-
-    /// <summary>
-    /// 当日涨跌幅(%)
-    /// </summary>
-    public decimal Pct { get; set; }
-
-    /// <summary>
-    /// 当日成交额
-    /// </summary>
-    public decimal Amount { get; set; }
-
-    /// <summary>
-    /// 总市值（元）
-    /// </summary>
-    public decimal Mc { get; set; }
-
-    /// <summary>
-    /// 流通市值（元）
-    /// </summary>
-    public decimal Fmc { get; set; }
-
-    /// <summary>
-    /// 本日成交量(万)
-    /// </summary>
-    public decimal Volume { get; set; }
-
     /// <summary>
     /// 当日量比
     /// </summary>
@@ -205,4 +165,3 @@ public class ScreenerStockInfo
     /// </summary>
     public decimal ChgPct { get; set; }
 }
-

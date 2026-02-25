@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using MarketAssistant.ViewModels;
 
 namespace MarketAssistant.Views.Pages;
 
@@ -10,6 +11,14 @@ public partial class AgentAnalysisPageView : UserControl
     public AgentAnalysisPageView()
     {
         InitializeComponent();
+
+        AttachedToVisualTree += (_, _) =>
+        {
+            if (DataContext is AgentAnalysisViewModel vm)
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                vm.SetStorageProvider(topLevel?.StorageProvider);
+            }
+        };
     }
 }
-

@@ -75,6 +75,74 @@ public partial class SettingsPageViewModel : ViewModelBase
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
 
     /// <summary>
+    /// 主题：跟随系统
+    /// </summary>
+    public bool IsThemeDefault
+    {
+        get => UserSetting.ThemeMode == "Default";
+        set
+        {
+            if (value)
+            {
+                UserSetting.ThemeMode = "Default";
+                ApplyTheme("Default");
+                OnPropertyChanged(nameof(IsThemeDefault));
+                OnPropertyChanged(nameof(IsThemeLight));
+                OnPropertyChanged(nameof(IsThemeDark));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 主题：浅色
+    /// </summary>
+    public bool IsThemeLight
+    {
+        get => UserSetting.ThemeMode == "Light";
+        set
+        {
+            if (value)
+            {
+                UserSetting.ThemeMode = "Light";
+                ApplyTheme("Light");
+                OnPropertyChanged(nameof(IsThemeDefault));
+                OnPropertyChanged(nameof(IsThemeLight));
+                OnPropertyChanged(nameof(IsThemeDark));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 主题：深色
+    /// </summary>
+    public bool IsThemeDark
+    {
+        get => UserSetting.ThemeMode == "Dark";
+        set
+        {
+            if (value)
+            {
+                UserSetting.ThemeMode = "Dark";
+                ApplyTheme("Dark");
+                OnPropertyChanged(nameof(IsThemeDefault));
+                OnPropertyChanged(nameof(IsThemeLight));
+                OnPropertyChanged(nameof(IsThemeDark));
+            }
+        }
+    }
+
+    private static void ApplyTheme(string mode)
+    {
+        if (Avalonia.Application.Current == null) return;
+        Avalonia.Application.Current.RequestedThemeVariant = mode switch
+        {
+            "Light" => Avalonia.Styling.ThemeVariant.Light,
+            "Dark" => Avalonia.Styling.ThemeVariant.Dark,
+            _ => Avalonia.Styling.ThemeVariant.Default
+        };
+    }
+
+    /// <summary>
     /// 是否为A股市场
     /// </summary>
     public bool IsAShareMarket
@@ -205,7 +273,12 @@ public partial class SettingsPageViewModel : ViewModelBase
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         // 加载分析师角色
         LoadAnalystRoles();
+        // 应用保存的主题
+        ApplyTheme(UserSetting.ThemeMode);
         // 触发属性变更通知
+        OnPropertyChanged(nameof(IsThemeDefault));
+        OnPropertyChanged(nameof(IsThemeLight));
+        OnPropertyChanged(nameof(IsThemeDark));
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
         OnPropertyChanged(nameof(IsBingProvider));

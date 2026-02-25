@@ -52,7 +52,7 @@ public record AssetScreeningResult
     /// <summary>
     /// 筛选得到的资产列表
     /// </summary>
-    public List<ScreenerStockInfo> ScreenedAssets { get; init; } = new();
+    public List<ScreenerAssetInfo> ScreenedAssets { get; init; } = new();
 
     /// <summary>
     /// 使用的筛选条件

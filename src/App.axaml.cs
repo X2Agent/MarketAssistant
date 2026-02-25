@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
+using Avalonia.Styling;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Windows;
 using Serilog;
@@ -29,6 +31,15 @@ public partial class App : Application
 
         // 初始化全局异常处理器
         Infrastructure.Core.GlobalExceptionHandler.Initialize(ServiceProvider);
+
+        // 应用保存的主题
+        var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();
+        RequestedThemeVariant = settingService.CurrentSetting.ThemeMode switch
+        {
+            "Light" => ThemeVariant.Light,
+            "Dark" => ThemeVariant.Dark,
+            _ => ThemeVariant.Default
+        };
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

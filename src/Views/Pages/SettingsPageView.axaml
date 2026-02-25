@@ -22,6 +22,26 @@
         <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource CardBackgroundBrush}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource ImmersivePageMargin}">
 
+                <!-- 外观设置 -->
+                <controls:CardView Header="外观设置">
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="主题"
+                                   FontSize="{StaticResource LabelFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                            <RadioButton Content="跟随系统"
+                                         IsChecked="{Binding IsThemeDefault}"
+                                         GroupName="Theme"/>
+                            <RadioButton Content="浅色"
+                                         IsChecked="{Binding IsThemeLight}"
+                                         GroupName="Theme"/>
+                            <RadioButton Content="深色"
+                                         IsChecked="{Binding IsThemeDark}"
+                                         GroupName="Theme"/>
+                        </StackPanel>
+                    </StackPanel>
+                </controls:CardView>
+
                 <!-- 模型设置区域 -->
                 <controls:CardView Header="模型设置(硅基流动)">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">

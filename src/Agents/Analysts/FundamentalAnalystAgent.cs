@@ -13,6 +13,7 @@ namespace MarketAssistant.Agents.Analysts;
 [DisplayName("基本面分析师")]
 [Description("整合了策略分析师和股票研究分析师的功能")]
 [RequiredAnalyst]
+[RequiresTools(typeof(IBasicDataTools))]
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult));
@@ -34,7 +35,7 @@ public class FundamentalAnalystAgent : AnalystAgentBase
             temperature: 0.2f,
             topP: 0.6f,
             topK: 8,
-            responseFormat: null,
+            responseFormat: ResponseFormat,
             tools: [.. basicTools.GetFunctions()])
     {
     }

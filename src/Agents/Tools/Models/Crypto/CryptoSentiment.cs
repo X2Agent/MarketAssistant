@@ -1,7 +1,7 @@
-namespace MarketAssistant.Agents.Tools.Models.Crypto;
+﻿namespace MarketAssistant.Agents.Tools.Models.Crypto;
 
 /// <summary>
-/// 虚拟币市场情绪综合数�?
+/// 虚拟币市场情绪综合数据
 /// </summary>
 public class CryptoSentiment
 {
@@ -11,51 +11,67 @@ public class CryptoSentiment
     public string Symbol { get; set; } = string.Empty;
 
     /// <summary>
-    /// 恐慌贪婪指数�?-100�?=极度恐慌�?00=极度贪婪�?
+    /// 恐惧贪婪指数（0-100，0=极度恐惧，100=极度贪婪）
     /// </summary>
+    /// <remarks>
+    /// 当前无数据来源：需要集成 alternative.me Fear &amp; Greed Index API
+    /// </remarks>
     public int? FearGreedIndex { get; set; }
 
     /// <summary>
-    /// 恐慌贪婪指数分类描述
+    /// 恐惧贪婪指数分类描述
     /// </summary>
+    /// <remarks>
+    /// 当前无数据来源：需要集成 alternative.me Fear &amp; Greed Index API
+    /// </remarks>
     public string? FearGreedClassification { get; set; }
 
     /// <summary>
-    /// 资金费率�?�?
+    /// 资金费率（%）
     /// </summary>
     /// <remarks>
-    /// 正值表示多头支付空头（市场看多），负值相�?
+    /// 正值表示多头支付空头（市场看多），负值相反。
+    /// 数据来源：币安 premiumIndex API
     /// </remarks>
     public decimal? FundingRate { get; set; }
 
     /// <summary>
-    /// 多空持仓人数�?
+    /// 多空持仓人数比
     /// </summary>
     public decimal? LongShortRatio { get; set; }
 
     /// <summary>
-    /// 大户多空持仓�?
+    /// 大户多空持仓比
     /// </summary>
     public decimal? TopTraderLongShortRatio { get; set; }
 
     /// <summary>
-    /// 合约持仓量（USD�?
+    /// 合约持仓量（USD）
     /// </summary>
     public decimal? OpenInterest { get; set; }
 
     /// <summary>
-    /// 24小时爆仓量（USD�?
+    /// 24小时爆仓金额（USD）
     /// </summary>
+    /// <remarks>
+    /// 当前无数据来源：需要集成 CoinGlass 或类似爆仓数据 API
+    /// </remarks>
     public decimal? Liquidation24h { get; set; }
 
     /// <summary>
-    /// 多头爆仓量（USD�?
+    /// 多头爆仓金额（USD）
     /// </summary>
+    /// <remarks>
+    /// 当前无数据来源：需要集成 CoinGlass 或类似爆仓数据 API
+    /// </remarks>
     public decimal? LongLiquidation { get; set; }
 
     /// <summary>
-    /// 空头爆仓量（USD�?
+    /// 空头爆仓金额（USD）
     /// </summary>
+    /// <remarks>
+    /// 当前无数据来源：需要集成 CoinGlass 或类似爆仓数据 API
+    /// </remarks>
     public decimal? ShortLiquidation { get; set; }
 
     /// <summary>

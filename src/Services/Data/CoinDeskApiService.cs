@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using MarketAssistant.Agents.Tools.Models.Crypto.CoinDesk;
+using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Services.Data;
 
@@ -29,8 +30,9 @@ public sealed class CoinDeskApiService
     {
         var client = _httpClientFactory.CreateClient();
         client.BaseAddress = new Uri(BaseUrl);
-        client.Timeout = TimeSpan.FromSeconds(10);
-        client.DefaultRequestHeaders.Add("Content-type", "application/json; charset=UTF-8");
+        client.Timeout = TimeSpan.FromSeconds(15);
+        client.DefaultRequestHeaders.Accept.Add(
+            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
         return client;
     }
 
@@ -43,13 +45,13 @@ public sealed class CoinDeskApiService
         string language = "en-US",
         CancellationToken cancellationToken = default)
     {
-        try
+        var upperSymbol = symbol.ToUpper();
+        var url = $"/asset/v2/metadata?assets={upperSymbol}&asset_lookup_priority=SYMBOL&quote_asset={quoteAsset}&asset_language={language}";
+
+        _logger.LogDebug("调用CoinDesk Metadata API: {Symbol}", upperSymbol);
+
+        return await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
         {
-            var upperSymbol = symbol.ToUpper();
-            var url = $"/asset/v2/metadata?assets={upperSymbol}&asset_lookup_priority=SYMBOL&quote_asset={quoteAsset}&asset_language={language}";
-
-            _logger.LogDebug("调用CoinDesk Metadata API: {Symbol}", upperSymbol);
-
             using var httpClient = CreateHttpClient();
             var response = await httpClient.GetAsync(url, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -59,19 +61,8 @@ public sealed class CoinDeskApiService
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinDesk元数据: {Symbol}", upperSymbol);
-
             return metadata;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinDesk Metadata API请求失败: {Message}", ex.Message);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "获取CoinDesk元数据时发生错误");
-            return null;
-        }
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -84,12 +75,12 @@ public sealed class CoinDeskApiService
         string sourceKey = "coindesk",
         CancellationToken cancellationToken = default)
     {
-        try
+        var url = $"/news/v1/search?search_string={Uri.EscapeDataString(searchString)}&limit={limit}&lang={lang}&source_key={sourceKey}";
+
+        _logger.LogDebug("调用CoinDesk News API: {SearchString}", searchString);
+
+        return await HttpRetryHelper.ExecuteWithRetryAsync(async () =>
         {
-            var url = $"/news/v1/search?search_string={Uri.EscapeDataString(searchString)}&limit={limit}&lang={lang}&source_key={sourceKey}";
-
-            _logger.LogDebug("调用CoinDesk News API: {SearchString}", searchString);
-
             using var httpClient = CreateHttpClient();
             var response = await httpClient.GetAsync(url, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -99,18 +90,7 @@ public sealed class CoinDeskApiService
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinDesk新闻，结果数: {Count}", newsResponse?.Data?.Count ?? 0);
-
             return newsResponse;
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(ex, "CoinDesk News API请求失败: {Message}", ex.Message);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "获取CoinDesk新闻时发生错误");
-            return null;
-        }
+        }, _logger, maxRetries: 1, cancellationToken: cancellationToken);
     }
 }

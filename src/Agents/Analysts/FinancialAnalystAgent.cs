@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.Tools.Abstractions;
 using Microsoft.Extensions.AI;
@@ -11,6 +12,7 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 [DisplayName("财务分析师")]
 [Description("专注于财务报表和财务健康分析")]
+[RequiresTools(typeof(IFinancialTools))]
 public class FinancialAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult));
@@ -32,7 +34,7 @@ public class FinancialAnalystAgent : AnalystAgentBase
             temperature: 0.1f,
             topP: 0.9f,
             topK: 10,
-            responseFormat: null,
+            responseFormat: ResponseFormat,
             tools: [.. financialTools.GetFunctions()])
     {
     }

@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Data;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -34,12 +35,12 @@ public sealed class CryptoNewsTools : INewsDataTools
     {
         try
         {
-            // 格式化币种代码
+            // 提取基础币种（如 BTCUSDT → BTC）
             var searchQuery = ExtractBaseCurrency(assetSymbol);
 
             _logger.LogInformation("正在获取虚拟币新闻（AI Tools用）: {Symbol} (query={Query})", assetSymbol, searchQuery);
 
-            var newsResponse = await _coinDeskService.SearchNewsAsync(assetSymbol, count);
+            var newsResponse = await _coinDeskService.SearchNewsAsync(searchQuery, count);
 
             if (newsResponse?.Data == null || newsResponse.Data.Count == 0)
             {
@@ -66,7 +67,7 @@ public sealed class CryptoNewsTools : INewsDataTools
         catch (HttpRequestException ex)
         {
             _logger.LogError(ex, "调用 CoinDesk API 获取新闻失败: {Symbol}", assetSymbol);
-            throw new InvalidOperationException($"获取虚拟币新闻失败: {assetSymbol}，请检查网络连接", ex);
+            throw new FriendlyException($"获取虚拟币新闻失败: {assetSymbol}，请检查网络连接", ex);
         }
         catch (Exception ex)
         {

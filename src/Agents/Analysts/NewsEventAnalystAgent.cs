@@ -12,6 +12,7 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 [DisplayName("新闻事件分析师")]
 [Description("专注于新闻事件对股票的影响分析")]
+[RequiresTools(typeof(INewsDataTools))]
 public class NewsEventAnalystAgent : AnalystAgentBase
 {
     private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult));
@@ -33,7 +34,7 @@ public class NewsEventAnalystAgent : AnalystAgentBase
             temperature: 0.2f,
             topP: 0.75f,
             topK: 10,
-            responseFormat: null,
+            responseFormat: ResponseFormat,
             tools: [.. newsTools.GetFunctions()])
     {
     }

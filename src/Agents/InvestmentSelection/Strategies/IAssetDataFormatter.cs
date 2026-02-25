@@ -17,7 +17,7 @@ public interface IAssetDataFormatter
     /// <summary>
     /// 将资产列表格式化为 JSON 字符串，供 AI 分析使用
     /// </summary>
-    string FormatAssetsForAnalysis(List<ScreenerStockInfo> assets);
+    string FormatAssetsForAnalysis(List<ScreenerAssetInfo> assets);
 
     /// <summary>
     /// 获取市场特定的 AI 分析指令
