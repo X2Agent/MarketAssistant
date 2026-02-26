@@ -58,8 +58,8 @@
 	  <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
 	</PackageReference>
     <PackageReference Include="Markdig" Version="1.0.0" />
-    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc1" />
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc1" />
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.0.0-rc2" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.0.0-rc2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
 	<PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
 	<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.3" />

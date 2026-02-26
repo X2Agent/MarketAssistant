@@ -1,6 +1,5 @@
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
-using static Microsoft.Agents.AI.ChatClientAgentOptions;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -17,7 +16,7 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
 ## 数据真实性与反幻觉原则
 1. **严格依赖工具数据**：你的所有分析、评估、评分和决策必须严格基于通过工具调用获取的真实数据。
 2. **严禁编造数据**：绝对禁止编造数值、捏造事实或臆造不存在的市场情况。如果不知道，就说不知道。
-3. **缺失数据处理**：如果工具未能提供所需数据，或者数据不完整，必须在分析结果中明确说明“缺少数据支持”或“数据不可用”，不得进行无依据的猜测或试图掩盖。
+3. **缺失数据处理**：如果工具未能提供所需数据，或者数据不完整，必须在分析结果中明确说明""缺少数据支持""或""数据不可用""，不得进行无依据的猜测或试图掩盖。
 4. **拒绝幻觉**：对于未通过工具验证的信息，保持怀疑态度，不要将其作为分析依据。";
 
     /// <summary>
@@ -34,9 +33,9 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         int? topK,
         ChatResponseFormat? responseFormat,
         IList<AITool>? tools,
-        Func<AIContextProviderFactoryContext, AIContextProvider>? aiContextProviderFactory = null)
+        AIContextProvider[]? aiContextProviders = null)
         : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
-            temperature, topP, topK, responseFormat, tools, aiContextProviderFactory))
+            temperature, topP, topK, responseFormat, tools, aiContextProviders))
     {
     }
 
@@ -53,7 +52,7 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         int? topK,
         ChatResponseFormat? responseFormat,
         IList<AITool>? tools,
-        Func<AIContextProviderFactoryContext, AIContextProvider>? aiContextProviderFactory)
+        AIContextProvider[]? aiContextProviders)
     {
         var options = new ChatClientAgentOptions
         {
@@ -68,9 +67,9 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
                 Tools = tools,
                 ResponseFormat = responseFormat
             },
-            AIContextProviderFactory = aiContextProviderFactory
+            AIContextProviders = aiContextProviders
         };
 
-        return chatClient.CreateAIAgent(options);
+        return new ChatClientAgent(chatClient, options);
     }
 }

@@ -119,10 +119,10 @@ public class MarketAnalysisWorkflow : IDisposable
 
         // 使用流式执行，将股票代码作为输入
         // Dispatcher 会接收股票代码并广播给所有分析师
-        await using StreamingRun run = await InProcessExecution.StreamAsync(
+        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             stockSymbol,
-            runId: null,
+            sessionId: null,
             cancellationToken);
 
         // 发送 TurnToken 触发工作流开始处理
@@ -155,13 +155,6 @@ public class MarketAnalysisWorkflow : IDisposable
 
                 case ExecutorCompletedEvent executorComplete:
                     _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
-                    break;
-
-                case AgentRunUpdateEvent agentUpdate:
-                    // 处理代理的流式更新
-                    _logger.LogDebug("代理更新 [{AgentId}]: {Data}",
-                        agentUpdate.ExecutorId,
-                        agentUpdate.Data);
                     break;
 
                 case WorkflowOutputEvent workflowOutput:
@@ -277,7 +270,7 @@ public class MarketAnalysisWorkflow : IDisposable
 
         // 4. Fan-In: 所有分析师 → Aggregator
         // 框架会自动收集所有源（分析师）的消息，并作为 List<ChatMessage> 一次性传递给 Aggregator
-        builder.AddFanInEdge([.. analystAgents], _aggregatorExecutor);
+        builder.AddFanInBarrierEdge([.. analystAgents], _aggregatorExecutor);
 
         // 5. Aggregator → Coordinator（将聚合结果传递给协调分析师）
         builder.AddEdge(_aggregatorExecutor, _coordinatorExecutor);

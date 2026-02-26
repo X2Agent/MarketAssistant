@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.ContextProviders;
 
-public class InvestmentPreferenceContextProvider : AIContextProvider
+public class InvestmentPreferenceContextProvider : MessageAIContextProvider
 {
     private readonly InvestmentPreference _preference;
     private readonly ILogger? _logger;
@@ -17,7 +17,7 @@ public class InvestmentPreferenceContextProvider : AIContextProvider
         _logger = logger;
     }
 
-    public override ValueTask<AIContext> InvokingAsync(InvokingContext context, CancellationToken cancellationToken = default)
+    protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {
         var sb = new StringBuilder();
         sb.AppendLine("## 用户投资偏好");
@@ -28,9 +28,14 @@ public class InvestmentPreferenceContextProvider : AIContextProvider
 
         _logger?.LogDebug("Injecting investment preferences into context: {Preferences}", content.Replace("\n", ", "));
 
-        return new ValueTask<AIContext>(new AIContext
-        {
-            Messages = [new ChatMessage(ChatRole.System, content) { AdditionalProperties = new AdditionalPropertiesDictionary() { ["IsInvestmentPreferenceProviderOutput"] = true } }]
-        });
+        IEnumerable<ChatMessage> messages =
+        [
+            new ChatMessage(ChatRole.System, content)
+            {
+                AdditionalProperties = new AdditionalPropertiesDictionary() { ["IsInvestmentPreferenceProviderOutput"] = true }
+            }
+        ];
+
+        return new ValueTask<IEnumerable<ChatMessage>>(messages);
     }
 }

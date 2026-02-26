@@ -93,7 +93,7 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
             // 使用带结构化输出的 ChatClientAgent 运行
             var agentResponse = await _coordinatorAgent.RunAsync(
                 messages,
-                thread: null,
+                session: null,
                 options: null,
                 cancellationToken);
 
@@ -106,8 +106,9 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
                 throw new InvalidOperationException("协调分析师未能生成报告");
             }
 
-            // 🎉 直接反序列化为 CoordinatorResult
-            var coordinatorResult = agentResponse.Deserialize<CoordinatorResult>(JsonOptions);
+            // 从协调分析师的回复文本中反序列化结构化结果
+            var coordinatorResult = JsonSerializer.Deserialize<CoordinatorResult>(
+                coordinatorMessage.Text ?? string.Empty, JsonOptions);
 
             if (coordinatorResult == null)
             {

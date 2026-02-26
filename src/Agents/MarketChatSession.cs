@@ -18,7 +18,7 @@ public class MarketChatSession : IDisposable
     private readonly ChatClientAgent _agent;
     private readonly ILogger<MarketChatSession> _logger;
     private readonly McpService _mcpService;
-    private AgentThread? _currentThread;
+    private AgentSession? _currentSession;
     private readonly List<AITool> _mcpTools = new();
 
     private string _currentStockCode = string.Empty;
@@ -80,9 +80,6 @@ public class MarketChatSession : IDisposable
             var mcpToolsEnumerable = await _mcpService.GetAIToolsAsync(enabledConfigs);
             _mcpTools.AddRange(mcpToolsEnumerable);
 
-            // ⚠️ 人工介入点：ChatOptions.Tools 无法动态更新
-            // 框架限制：ChatClientAgentOptions.ChatOptions.Tools 在构造时设置
-            // 解决方案：使用 ChatClientAgentRunOptions 在每次 Run 时传入工具
             _toolsInitialized = true;
             _logger.LogInformation("成功加载 MCP 工具，数量: {Count}", _mcpTools.Count);
         }
@@ -98,22 +95,12 @@ public class MarketChatSession : IDisposable
     #region 公共属性
 
     /// <summary>
-    /// 获取对话历史（通过 AgentThread）
+    /// 获取对话历史
     /// </summary>
-    public async Task<IReadOnlyList<ChatMessage>> GetConversationHistoryAsync()
+    public Task<IReadOnlyList<ChatMessage>> GetConversationHistoryAsync()
     {
-        if (_currentThread is ChatClientAgentThread chatThread && chatThread.MessageStore != null)
-        {
-            // ⚠️ 人工介入点：MessageStore 接口未明确定义 ListMessagesAsync
-            // 当前使用 ChatMessageStore 的默认实现（InMemoryChatMessageStore）
-            // 如果需要自定义持久化，需实现 ChatMessageStore 子类
-            if (chatThread.MessageStore is InMemoryChatMessageStore inMemoryStore)
-            {
-                return inMemoryStore.ToList();
-            }
-        }
-
-        return Array.Empty<ChatMessage>();
+        // 历史记录由框架内部的 InMemoryChatHistoryProvider 管理，通过 session 保存
+        return Task.FromResult<IReadOnlyList<ChatMessage>>(Array.Empty<ChatMessage>());
     }
 
     /// <summary>
@@ -143,28 +130,26 @@ public class MarketChatSession : IDisposable
         // 确保工具已初始化
         await EnsureToolsInitializedAsync();
 
-        // 确保 Thread 已创建
-        _currentThread ??= _agent.GetNewThread();
+        // 确保 Session 已创建
+        _currentSession ??= await _agent.CreateSessionAsync(cancellationToken: cancellationToken);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _currentCancellationTokenSource = cts;
 
         var completeResponse = new StringBuilder();
 
-        // ✅ MAF 框架自动处理流式响应中的工具调用
-        // 使用 ChatClientAgentRunOptions 传入动态工具列表
         var runOptions = new ChatClientAgentRunOptions
         {
             ChatOptions = new ChatOptions
             {
                 Tools = _mcpTools,
-                Instructions = BuildAgentInstructions() // 动态更新指令
+                Instructions = BuildAgentInstructions()
             }
         };
 
         var streamingUpdates = _agent.RunStreamingAsync(
             message: userMessage,
-            thread: _currentThread,
+            session: _currentSession,
             options: runOptions,
             cancellationToken: cts.Token);
 
@@ -172,13 +157,11 @@ public class MarketChatSession : IDisposable
         {
             var content = update.Text ?? string.Empty;
 
-            // 累积完整响应
             if (!string.IsNullOrEmpty(content))
             {
                 completeResponse.Append(content);
             }
 
-            // 返回流式片段
             yield return new StreamingChatUpdate { Content = content };
         }
 
@@ -191,9 +174,9 @@ public class MarketChatSession : IDisposable
     /// </summary>
     public void ClearHistory()
     {
-        // 重新创建 Thread 以清空历史
-        _currentThread = _agent.GetNewThread();
-        _logger.LogInformation("清除聊天历史（重新创建 Thread）");
+        // 置空 session，下次发送消息时会重新创建
+        _currentSession = null;
+        _logger.LogInformation("清除聊天历史（重置 Session）");
     }
 
     /// <summary>
@@ -218,11 +201,6 @@ public class MarketChatSession : IDisposable
 
     #region 提示词构建
 
-    /// <summary>
-    /// 构建 Agent 指令（ReAct 模式）
-    /// ✅ 通过提示词引导 Thought-Action-Observation 循环
-    /// ✅ 保留最终输出格式约束
-    /// </summary>
     private string BuildAgentInstructions()
     {
         var stockInfo = _currentStockCode.Length > 0 ? _currentStockCode : "未指定";

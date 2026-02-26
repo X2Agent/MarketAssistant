@@ -42,12 +42,12 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
             //todo 暂时注释搜索工具，会调用次数限制不住会浪费
             //tools: [AIFunctionFactory.Create(searchTools.SearchAsync)], 
             tools: null,
-            aiContextProviderFactory: ctx =>
-            {
-                return new InvestmentPreferenceContextProvider(
+            aiContextProviders:
+            [
+                new InvestmentPreferenceContextProvider(
                     userSettingService.CurrentSetting.InvestmentPreference,
-                    loggerFactory.CreateLogger<InvestmentPreferenceContextProvider>());
-            })
+                    loggerFactory.CreateLogger<InvestmentPreferenceContextProvider>())
+            ])
     {
     }
 
