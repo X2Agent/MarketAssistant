@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -11,12 +12,18 @@ public class StrategyEngine
 {
     private readonly TradingDataService _dataService;
     private readonly ILogger<StrategyEngine> _logger;
+    private readonly ConcurrentDictionary<string, decimal> _peakPrices = new();
 
     public StrategyEngine(TradingDataService dataService, ILogger<StrategyEngine> logger)
     {
         _dataService = dataService;
         _logger = logger;
     }
+
+    /// <summary>
+    /// 清理指定策略的峰值/谷值追踪数据（策略完成或删除时调用）
+    /// </summary>
+    public void ClearPeakPrice(string strategyId) => _peakPrices.TryRemove(strategyId, out _);
 
     /// <summary>
     /// 评估指定交易对的所有活跃策略，返回触发的策略列表
@@ -106,17 +113,25 @@ public class StrategyEngine
 
             if (strategy.Side == OrderSide.Sell)
             {
-                // Sell trailing: activated when price goes above activation, triggered when it drops by trailing%
-                if (currentPrice < activationPrice)
+                // 未激活且价格未达到激活价：不触发
+                if (!_peakPrices.ContainsKey(strategy.Id) && currentPrice < activationPrice)
                     return false;
-                var trailPrice = activationPrice * (1 - trailingPercent / 100);
+
+                // 追踪最高价，从峰值回撤 trailingPercent% 时触发卖出
+                var peak = _peakPrices.AddOrUpdate(
+                    strategy.Id, currentPrice, (_, existing) => Math.Max(existing, currentPrice));
+                var trailPrice = peak * (1 - trailingPercent / 100);
                 return currentPrice <= trailPrice;
             }
             else
             {
-                if (currentPrice > activationPrice)
+                if (!_peakPrices.ContainsKey(strategy.Id) && currentPrice > activationPrice)
                     return false;
-                var trailPrice = activationPrice * (1 + trailingPercent / 100);
+
+                // 追踪最低价，从谷值反弹 trailingPercent% 时触发买入
+                var trough = _peakPrices.AddOrUpdate(
+                    strategy.Id, currentPrice, (_, existing) => Math.Min(existing, currentPrice));
+                var trailPrice = trough * (1 + trailingPercent / 100);
                 return currentPrice >= trailPrice;
             }
         }

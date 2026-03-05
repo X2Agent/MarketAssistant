@@ -141,10 +141,27 @@ public class OrderStatusInfo
 public class RiskCheckResult
 {
     public bool Passed { get; set; }
+    public bool NeedsConfirmation { get; set; }
     public string? Reason { get; set; }
 
     public static RiskCheckResult Pass() => new() { Passed = true };
     public static RiskCheckResult Reject(string reason) => new() { Passed = false, Reason = reason };
+    public static RiskCheckResult RequireConfirmation(string reason) =>
+        new() { Passed = false, NeedsConfirmation = true, Reason = reason };
+}
+
+/// <summary>
+/// 交易上下文，用于在 Agent 工具调用链中传递当前策略 ID
+/// </summary>
+public static class TradingContext
+{
+    private static readonly AsyncLocal<string?> _strategyId = new();
+
+    public static string? CurrentStrategyId
+    {
+        get => _strategyId.Value;
+        set => _strategyId.Value = value;
+    }
 }
 
 #endregion

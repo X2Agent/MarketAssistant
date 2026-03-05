@@ -10,27 +10,24 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Agents.Tools.Crypto;
 
 /// <summary>
-/// 虚拟币交易执行工具实现，供 TradingAgent 使用
+/// 虚拟币交易执行工具实现，供 TradingAgent 使用。下单委托给 TradeExecutor 统一入口。
 /// </summary>
 public class CryptoTradingExecutionTools : ITradingExecutionTools
 {
     private readonly BinanceAccountService _accountService;
     private readonly BinanceMarketDataService _marketDataService;
-    private readonly RiskManager _riskManager;
-    private readonly TradingDataService _dataService;
+    private readonly TradeExecutor _tradeExecutor;
     private readonly ILogger<CryptoTradingExecutionTools> _logger;
 
     public CryptoTradingExecutionTools(
         BinanceAccountService accountService,
         BinanceMarketDataService marketDataService,
-        RiskManager riskManager,
-        TradingDataService dataService,
+        TradeExecutor tradeExecutor,
         ILogger<CryptoTradingExecutionTools> logger)
     {
         _accountService = accountService;
         _marketDataService = marketDataService;
-        _riskManager = riskManager;
-        _dataService = dataService;
+        _tradeExecutor = tradeExecutor;
         _logger = logger;
     }
 
@@ -137,51 +134,13 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         }
 
         if (effectivePrice <= 0)
-        {
-            return new TradeResult
-            {
-                Success = false,
-                ErrorMessage = $"无法确定 {symbol} 的有效价格，拒绝下单"
-            };
-        }
+            return new TradeResult { Success = false, ErrorMessage = $"无法确定 {symbol} 的有效价格，拒绝下单" };
 
-        var riskCheck = await _riskManager.ValidateOrderAsync(symbol, side, quantity, effectivePrice);
-        if (!riskCheck.Passed)
-        {
-            _logger.LogWarning("风控拒绝: {Reason}", riskCheck.Reason);
-            return new TradeResult { Success = false, ErrorMessage = $"风控拒绝: {riskCheck.Reason}" };
-        }
-
-        try
-        {
-            var response = await _accountService.PlaceOrderAsync(
-                symbol, side.ToString().ToUpper(), type.ToString().ToUpper(), quantity, price);
-
-            var record = new TradeRecord
-            {
-                StrategyId = "manual",
-                Symbol = symbol,
-                Side = side,
-                OrderType = type,
-                RequestedQty = quantity,
-                ExecutedQty = decimal.TryParse(response.ExecutedQty, out var eq) ? eq : 0,
-                RequestedPrice = price,
-                ExecutedPrice = decimal.TryParse(response.Price, out var ep) ? ep : effectivePrice,
-                Status = MapOrderStatus(response.Status),
-                BinanceOrderId = response.OrderId,
-                CompletedAt = response.Status == "FILLED" ? DateTime.UtcNow : null
-            };
-
-            await _dataService.SaveTradeRecordAsync(record);
-            await _dataService.UpdateDailyStatsAsync(0, 0);
-
-            return new TradeResult { Success = true, Record = record };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "下单失败: {Symbol} {Side}", symbol, side);
-            return new TradeResult { Success = false, ErrorMessage = ex.Message };
-        }
+        var strategyId = TradingContext.CurrentStrategyId ?? "manual";
+        return await _tradeExecutor.ExecuteOrderAsync(
+            symbol, side, type, quantity, effectivePrice,
+            type == OrderType.Limit ? price : null,
+            strategyId: strategyId);
     }
 
     [Description("查询指定订单的状态")]
@@ -225,13 +184,4 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         yield return AIFunctionFactory.Create(GetOrderStatusAsync);
         yield return AIFunctionFactory.Create(CancelOrderAsync);
     }
-
-    private static TradeRecordStatus MapOrderStatus(string binanceStatus) => binanceStatus switch
-    {
-        "FILLED" => TradeRecordStatus.Filled,
-        "PARTIALLY_FILLED" => TradeRecordStatus.PartiallyFilled,
-        "CANCELED" or "CANCELLED" => TradeRecordStatus.Cancelled,
-        "REJECTED" or "EXPIRED" => TradeRecordStatus.Failed,
-        _ => TradeRecordStatus.Pending
-    };
 }

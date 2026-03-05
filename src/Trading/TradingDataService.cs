@@ -269,6 +269,31 @@ public class TradingDataService : IDisposable
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
+    /// <summary>
+    /// 计算指定交易对的加权平均买入价（用于 PnL 估算）
+    /// </summary>
+    public async Task<decimal> GetAverageEntryPriceAsync(string symbol, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT CASE WHEN SUM(executed_qty) > 0
+                THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
+                ELSE 0 END
+            FROM trade_records
+            WHERE symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
+            """;
+        cmd.Parameters.AddWithValue("@symbol", symbol);
+        cmd.Parameters.AddWithValue("@side", (int)OrderSide.Buy);
+        cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
+
+        var result = await cmd.ExecuteScalarAsync(ct);
+        if (result is double d)
+            return (decimal)d;
+        return 0;
+    }
+
     #endregion
 
     #region 风控配置持久化
@@ -284,8 +309,9 @@ public class TradingDataService : IDisposable
         {
             return JsonSerializer.Deserialize<RiskConfig>(json) ?? new RiskConfig();
         }
-        catch
+        catch (JsonException ex)
         {
+            _logger.LogWarning(ex, "风控配置反序列化失败，将使用默认配置");
             return new RiskConfig();
         }
     }

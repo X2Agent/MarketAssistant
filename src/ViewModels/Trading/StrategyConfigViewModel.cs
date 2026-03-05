@@ -23,7 +23,9 @@ public partial class StrategyConfigViewModel : ViewModelBase
     [ObservableProperty] private string _newTakeProfitPrice = string.Empty;
     [ObservableProperty] private bool _isCreating;
 
-    public StrategyType[] StrategyTypes => Enum.GetValues<StrategyType>();
+    public StrategyType[] StrategyTypes { get; } = Enum.GetValues<StrategyType>()
+        .Where(t => t is not (StrategyType.GridTrading or StrategyType.DCA))
+        .ToArray();
     public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
 
     // 风控配置

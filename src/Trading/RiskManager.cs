@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Crypto;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -11,15 +12,18 @@ public class RiskManager
 {
     private readonly TradingDataService _dataService;
     private readonly BinanceAccountService _accountService;
+    private readonly BinanceMarketDataService _marketDataService;
     private readonly ILogger<RiskManager> _logger;
 
     public RiskManager(
         TradingDataService dataService,
         BinanceAccountService accountService,
+        BinanceMarketDataService marketDataService,
         ILogger<RiskManager> logger)
     {
         _dataService = dataService;
         _accountService = accountService;
+        _marketDataService = marketDataService;
         _logger = logger;
     }
 
@@ -52,7 +56,7 @@ public class RiskManager
             return RiskCheckResult.Reject("无法获取账户信息，风控拒绝交易");
         }
 
-        var totalUSDT = CalculateTotalUSDT(accountInfo);
+        var totalUSDT = await CalculateTotalValueUSDTAsync(accountInfo);
 
         if (totalUSDT > 0)
         {
@@ -63,11 +67,13 @@ public class RiskManager
 
             if (config.MaxTotalPositionPercent > 0)
             {
-                var nonUSDTValue = totalUSDT - CalculateUSDTBalance(accountInfo);
-                var currentPositionPercent = totalUSDT > 0 ? nonUSDTValue / totalUSDT * 100 : 0;
-                if (currentPositionPercent + (orderValueUSDT / totalUSDT * 100) > config.MaxTotalPositionPercent)
+                var usdtBalance = CalculateUSDTBalance(accountInfo);
+                var nonUSDTValue = totalUSDT - usdtBalance;
+                var currentPositionPercent = nonUSDTValue / totalUSDT * 100;
+                var projectedPercent = currentPositionPercent + (orderValueUSDT / totalUSDT * 100);
+                if (projectedPercent > config.MaxTotalPositionPercent)
                     return RiskCheckResult.Reject(
-                        $"总仓位占比将达 {currentPositionPercent + (orderValueUSDT / totalUSDT * 100):F1}%，超过限额 {config.MaxTotalPositionPercent}%");
+                        $"总仓位占比将达 {projectedPercent:F1}%，超过限额 {config.MaxTotalPositionPercent}%");
             }
 
             var dailyLossPercent = Math.Abs(todayStats.TotalPnl) / totalUSDT * 100;
@@ -77,7 +83,7 @@ public class RiskManager
         }
 
         if (config.RequireConfirmation && orderValueUSDT >= config.ConfirmationThreshold)
-            return RiskCheckResult.Reject(
+            return RiskCheckResult.RequireConfirmation(
                 $"订单金额 {orderValueUSDT:F2} USDT 超过确认阈值 {config.ConfirmationThreshold} USDT，需人工确认");
 
         _logger.LogInformation("风控检查通过: {Symbol} {Side} 数量:{Qty} 价格:{Price}",
@@ -85,16 +91,32 @@ public class RiskManager
         return RiskCheckResult.Pass();
     }
 
-    private static decimal CalculateTotalUSDT(BinanceAccountInfo accountInfo)
+    /// <summary>
+    /// 计算账户总资产的 USDT 等值（包括所有币种）
+    /// </summary>
+    private async Task<decimal> CalculateTotalValueUSDTAsync(BinanceAccountInfo accountInfo)
     {
         decimal total = 0;
         foreach (var balance in accountInfo.Balances)
         {
-            if (decimal.TryParse(balance.Free, out var free) && decimal.TryParse(balance.Locked, out var locked))
+            if (!decimal.TryParse(balance.Free, out var free) || !decimal.TryParse(balance.Locked, out var locked))
+                continue;
+            var amount = free + locked;
+            if (amount <= 0) continue;
+
+            if (balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
             {
-                var amount = free + locked;
-                if (amount > 0 && balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
-                    total += amount;
+                total += amount;
+            }
+            else
+            {
+                try
+                {
+                    var ticker = await _marketDataService.Get24hrTickerAsync($"{balance.Asset}USDT");
+                    if (ticker != null)
+                        total += amount * ticker.LastPrice;
+                }
+                catch { /* 无法交易的币对跳过 */ }
             }
         }
         return total;
