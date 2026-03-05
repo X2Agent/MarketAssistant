@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
@@ -14,10 +15,10 @@ using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
+using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.News;
-using MarketAssistant.Applications.Portfolio;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
@@ -33,8 +34,10 @@ using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Trading;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
+using MarketAssistant.ViewModels.Trading;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -87,6 +90,10 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
 
+        // 注册 Agent Tools - 交易工具（仅虚拟币）
+        services.AddKeyedSingleton<ITradingExecutionTools, CryptoTradingExecutionTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IStrategyTools, CryptoStrategyTools>(MarketType.Crypto);
+
         // 注册 Kernel 和嵌入服务（保留用于 RAG 和提示词模板）
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
 
@@ -129,9 +136,20 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
         services.AddSingleton<PriceAlertService>();
-        services.AddSingleton<PortfolioService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<CoinDeskApiService>();
+
+        // ========== Binance 鉴权与交易服务 ==========
+        services.AddSingleton<BinanceAuthService>();
+        services.AddSingleton<BinanceAccountService>();
+
+        // ========== 自主交易模块 ==========
+        services.AddSingleton<TradingDataService>();
+        services.AddSingleton<RiskManager>();
+        services.AddSingleton<StrategyEngine>();
+        services.AddSingleton<TradeExecutor>();
+        services.AddSingleton<MarketMonitor>();
+        services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
 
         // ========== 浏览器自动化服务 ==========
         services.AddSingleton<PlaywrightService>();
@@ -213,7 +231,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AboutPageViewModel>();
         services.AddTransient<MCPConfigPageViewModel>();
         services.AddTransient<AssetPageViewModel>();
-        services.AddTransient<PortfolioPageViewModel>();
 
         // 注册 Home 子 ViewModels
         services.AddTransient<HomeSearchViewModel>();
@@ -225,6 +242,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<AgentAnalysisViewModel>();
         services.AddTransient<AnalysisReportViewModel>();
         services.AddTransient<ChatSidebarViewModel>();
+
+        // 注册交易模块 ViewModels
+        services.AddTransient<TradingPageViewModel>();
+        services.AddTransient<StrategyConfigViewModel>();
+        services.AddTransient<TradeMonitorViewModel>();
+        services.AddTransient<TradeHistoryViewModel>();
 
         return services;
     }

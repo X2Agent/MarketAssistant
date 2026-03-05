@@ -55,6 +55,16 @@ public class UserSetting : INotifyPropertyChanged
     public string CoinGeckoApiKey { get; set; } = "";
 
     /// <summary>
+    /// Binance API Key（交易功能必须）
+    /// </summary>
+    public string BinanceApiKey { get; set; } = "";
+
+    /// <summary>
+    /// Binance Secret Key（交易功能必须）
+    /// </summary>
+    public string BinanceSecretKey { get; set; } = "";
+
+    /// <summary>
     /// 浏览器路径，如果为空则自动检测
     /// </summary>
     private string _browserPath = "";

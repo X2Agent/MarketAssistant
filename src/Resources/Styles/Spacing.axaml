@@ -8,6 +8,8 @@
     <Thickness x:Key="CardPadding">16</Thickness>
     <Thickness x:Key="DefaultCardPadding">12</Thickness>
     <Thickness x:Key="CompactCardPadding">8</Thickness>
+    <Thickness x:Key="SmallCardPadding">8</Thickness>
+    <Thickness x:Key="TagPadding">4,2</Thickness>
     <Thickness x:Key="TinyPadding">4</Thickness>
     
     <!-- Margin 定义 -->

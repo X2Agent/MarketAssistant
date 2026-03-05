@@ -130,7 +130,7 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="x:String">
-                                                        <Border Background="{DynamicResource SurfaceBrush}"
+                                                        <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                                 BorderBrush="{DynamicResource BorderBrush}"
                                                                 BorderThickness="{StaticResource DefaultBorderThickness}"
                                                                 CornerRadius="{StaticResource TinyCornerRadius}"

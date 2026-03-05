@@ -26,7 +26,8 @@ public partial class ChatSidebarDemoViewModel : ViewModelBase
         NullLogger<ChatSidebarViewModel>.Instance,
         new MockChatClientFactory(),
         NullLoggerFactory.Instance,
-        mcpService
+        mcpService,
+        null!
     );
 
     _jsonOptions = new JsonSerializerOptions

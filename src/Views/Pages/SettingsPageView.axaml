@@ -132,6 +132,25 @@
                             <TextBlock Text="用于获取代币市值、供应量等数据。免费版有限额但无需API Key"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                            <!-- Binance API 配置 -->
+                            <TextBlock Text="Binance API Key（交易功能必须）"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,8,0,0"/>
+                            <TextBox Text="{Binding UserSetting.BinanceApiKey}"
+                                     Watermark="请输入 Binance API Key"
+                                     PasswordChar="●"/>
+
+                            <TextBlock Text="Binance Secret Key"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
+                                     Watermark="请输入 Binance Secret Key"
+                                     PasswordChar="●"/>
+                            <TextBlock Text="用于自主交易功能。请确保 API Key 仅开启现货交易权限，不要开启提现权限"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource WarningBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>

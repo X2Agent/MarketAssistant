@@ -12,8 +12,8 @@ public interface IMarketCapability
     bool SupportsKLine { get; }
     bool SupportsScreener { get; }
     bool SupportsRealtime { get; }
-    bool SupportsPortfolio { get; }
     bool SupportsNews { get; }
+    bool SupportsTrading { get; }
 }
 
 public class AShareMarketCapability : IMarketCapability
@@ -23,8 +23,8 @@ public class AShareMarketCapability : IMarketCapability
     public bool SupportsKLine => true;
     public bool SupportsScreener => true;
     public bool SupportsRealtime => false;
-    public bool SupportsPortfolio => true;
     public bool SupportsNews => true;
+    public bool SupportsTrading => false;
 }
 
 public class CryptoMarketCapability : IMarketCapability
@@ -34,6 +34,6 @@ public class CryptoMarketCapability : IMarketCapability
     public bool SupportsKLine => true;
     public bool SupportsScreener => true;
     public bool SupportsRealtime => true;
-    public bool SupportsPortfolio => true;
     public bool SupportsNews => true;
+    public bool SupportsTrading => true;
 }

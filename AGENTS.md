@@ -165,10 +165,21 @@ UI 与样式（Avalonia AXAML）：
 - **样式管理**：
   - 统一遵循 `src/Resources/Styles/` 中的集中式样式资源。
   - 避免在视图中硬编码颜色与字体。
+- **资源引用规则**：
+  - `Colors.axaml` 中 `Primary`、`PrimaryLight` 等是 **Color** 类型，用于 `Background`/`Foreground` 时必须引用对应的 **Brush**（如 `PrimaryBrush`、`PrimaryLightBrush`）。
+  - 主题感知资源（`PageBackgroundBrush`、`TextPrimaryBrush` 等在 `ThemeDictionaries` 中定义）使用 `{DynamicResource}`。
+  - 固定资源（间距、尺寸、圆角等）使用 `{StaticResource}`。
 - **控件使用**：优先使用 Avalonia 内置控件，必要时参考现有自定义控件。
 - **资产管理**：非必要不改动图片与资产文件；若必须更改，需监控构建体积。
 
-> 说明：以上 UI 间距约束来自项目偏好设置 [[memory:4590929]]。
+ViewModel 编码规范：
+
+- 使用 `CommunityToolkit.Mvvm` 的 `[ObservableProperty]`、`[RelayCommand]` 等源生成器特性。
+- `ICommand` 属性禁止在 getter 中每次创建新实例（如 `=> new RelayCommand(...)`），应在构造函数中初始化或使用静态实例。
+- 订阅外部事件（如 `PropertyChanged`、`CollectionChanged`）的 ViewModel 应实现 `IDisposable`，在 `Dispose` 中取消订阅。
+- `ObservableCollection` 属性应在构造函数中初始化一次，不应在 getter 中每次创建新实例。
+- 异常处理：使用 `SafeExecuteAsync` 或 `ErrorMessageMapper`，**不要吞并异常**（空 `catch` 块）。
+- ViewModel 通过 DI 容器获取依赖，不要使用 `ServiceLocator` 或直接 `new` 服务实例。
 
 ---
 
@@ -191,7 +202,20 @@ UI 与样式（Avalonia AXAML）：
 
 ---
 
-## 七、发布与打包
+## 七、Agent 与工具编码约定
+
+新增或修改 Agent、工具时遵循以下约定：
+
+- **工具注册**：工具接口定义在 `src/Agents/Tools/Abstractions/`，市场特定实现注册为 Keyed Service（key = `MarketType`），通用工具直接注册为 Singleton。
+- **分析师工具声明**：分析师通过 `[RequiresTools(typeof(IXxxTools))]` 属性声明所需工具，`AnalystAgentFactory` 自动按当前市场类型从 DI 容器解析。新增分析师必须遵循此模式。
+- **ChatSession 上下文注入**：分析结果通过 `MarketChatSession.InjectAnalysisContext()` 注入系统指令，不要手动操作 MAF 的 `AgentSession` 内部历史。
+- **ChatSession 工具范围**：`MarketChatSession` 仅持有 `GroundingSearchTools` + MCP 工具，不持有市场数据工具（市场工具在分析 Workflow 阶段由各分析师使用）。
+- **版本号**：定义在 `src/MarketAssistant.csproj` 的 `<Version>` 属性中，运行时通过 `AppInfo.Version` 获取。
+- **设计文档**：功能设计、架构规划等文档放在 `docs/` 目录下，不放入 AGENTS.md。
+
+---
+
+## 八、发布与打包
 
 ### Windows 发布
 
@@ -220,9 +244,7 @@ dotnet publish src/MarketAssistant.csproj -c Release -r linux-x64 --self-contain
 
 ---
 
----
-
-## 八、PR 与提交规范
+## 九、PR 与提交规范
 
 - 提交信息建议格式：`[模块] 变更概要`，例如：`[Plugins] 新增资金流插件与测试`。
 - 所有代码改动需确保构建通过；单元测试为可选，由开发者根据实际情况决定是否执行。
@@ -231,7 +253,7 @@ dotnet publish src/MarketAssistant.csproj -c Release -r linux-x64 --self-contain
 
 ---
 
-## 九、常见问题（FAQ）
+## 十、常见问题（FAQ）
 
 - Q：测试是否为必需？
   - A：不是必需的。智能体默认只确保代码编译通过，测试为可选项，仅在用户明确要求或重大重构时执行。
@@ -241,6 +263,3 @@ dotnet publish src/MarketAssistant.csproj -c Release -r linux-x64 --self-contain
   - A：使用过滤器，例如：`dotnet test --filter FullyQualifiedName~StockServiceTest`
 - Q：是否可为子目录添加更细化的 AGENTS.md？
   - A：可以。若在子项目放置更近的 `AGENTS.md`，就近原则生效。
-
-
-

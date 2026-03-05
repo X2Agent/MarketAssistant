@@ -1,24 +1,16 @@
 using System.Security.Cryptography;
 using System.Text;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Crypto;
 
 /// <summary>
-/// 币安API鉴权配置
-/// 使用HMAC-SHA256签名方式（签名不区分大小写）
-/// 文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/request-security#hmac-keys
+/// 币安API鉴权配置（运行时快照，由 BinanceAuthService 每次从设置动态读取）
 /// </summary>
 public class BinanceAuthConfig
 {
-    /// <summary>
-    /// API Key
-    /// </summary>
     public string ApiKey { get; set; } = string.Empty;
-
-    /// <summary>
-    /// API Secret Key
-    /// </summary>
     public string SecretKey { get; set; } = string.Empty;
 
     /// <summary>
@@ -29,19 +21,38 @@ public class BinanceAuthConfig
 
 /// <summary>
 /// 币安API鉴权服务（HMAC-SHA256签名）
-/// 文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/request-security#hmac-keys
+/// 每次操作时从 IUserSettingService 动态读取密钥，以支持运行时更改
 /// </summary>
 public class BinanceAuthService
 {
     private readonly ILogger<BinanceAuthService> _logger;
-    private readonly BinanceAuthConfig _config;
+    private readonly IUserSettingService _userSettingService;
+    private readonly long _recvWindow;
 
-    public BinanceAuthService(ILogger<BinanceAuthService> logger, BinanceAuthConfig config)
+    public BinanceAuthService(ILogger<BinanceAuthService> logger, IUserSettingService userSettingService)
     {
         _logger = logger;
-        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _userSettingService = userSettingService;
+        _recvWindow = 5000;
+    }
 
-        ValidateConfig();
+    private BinanceAuthConfig CurrentConfig => new()
+    {
+        ApiKey = _userSettingService.CurrentSetting.BinanceApiKey,
+        SecretKey = _userSettingService.CurrentSetting.BinanceSecretKey,
+        RecvWindow = _recvWindow
+    };
+
+    /// <summary>
+    /// API 密钥是否已配置
+    /// </summary>
+    public bool IsConfigured
+    {
+        get
+        {
+            var cfg = CurrentConfig;
+            return !string.IsNullOrEmpty(cfg.ApiKey) && !string.IsNullOrEmpty(cfg.SecretKey);
+        }
     }
 
     /// <summary>
@@ -51,22 +62,20 @@ public class BinanceAuthService
     /// <returns>添加了timestamp和signature的完整查询字符串</returns>
     public string SignQueryString(string queryString)
     {
-        // 1. 添加timestamp
+        var config = CurrentConfig;
+        EnsureConfigured(config);
+
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var payload = string.IsNullOrEmpty(queryString)
             ? $"timestamp={timestamp}"
             : $"{queryString}&timestamp={timestamp}";
 
-        // 2. 添加recvWindow（可选）
-        if (_config.RecvWindow != 5000) // 只在非默认值时添加
+        if (config.RecvWindow != 5000)
         {
-            payload += $"&recvWindow={_config.RecvWindow}";
+            payload += $"&recvWindow={config.RecvWindow}";
         }
 
-        // 3. 计算签名
-        var signature = GenerateSignature(payload);
-
-        // 4. 添加签名参数
+        var signature = GenerateSignature(payload, config.SecretKey);
         var signedPayload = $"{payload}&signature={signature}";
 
         _logger.LogDebug("已签名请求: {Payload}", signedPayload);
@@ -78,47 +87,24 @@ public class BinanceAuthService
     /// </summary>
     public void AddAuthHeaders(HttpRequestMessage request)
     {
-        request.Headers.Add("X-MBX-APIKEY", _config.ApiKey);
+        var config = CurrentConfig;
+        EnsureConfigured(config);
+        request.Headers.Add("X-MBX-APIKEY", config.ApiKey);
     }
 
-    /// <summary>
-    /// 生成HMAC-SHA256签名
-    /// 签名不区分大小写
-    /// </summary>
-    private string GenerateSignature(string payload)
+    private static string GenerateSignature(string payload, string secretKey)
     {
-        if (string.IsNullOrEmpty(_config.SecretKey))
-        {
-            throw new InvalidOperationException("HMAC签名需要配置SecretKey");
-        }
-
-        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_config.SecretKey));
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-
-        // 转换为十六进制字符串（不区分大小写）
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
-    #region 配置验证
-
-    private void ValidateConfig()
+    private static void EnsureConfigured(BinanceAuthConfig config)
     {
-        if (string.IsNullOrEmpty(_config.ApiKey))
-        {
-            throw new ArgumentException("ApiKey不能为空", nameof(_config.ApiKey));
-        }
+        if (string.IsNullOrEmpty(config.ApiKey))
+            throw new InvalidOperationException("Binance API Key 未配置，请在设置页面配置");
 
-        if (string.IsNullOrEmpty(_config.SecretKey))
-        {
-            throw new ArgumentException("SecretKey不能为空", nameof(_config.SecretKey));
-        }
-
-        if (_config.RecvWindow < 0 || _config.RecvWindow > 60000)
-        {
-            throw new ArgumentOutOfRangeException(nameof(_config.RecvWindow),
-                "RecvWindow必须在0-60000毫秒之间");
-        }
+        if (string.IsNullOrEmpty(config.SecretKey))
+            throw new InvalidOperationException("Binance Secret Key 未配置，请在设置页面配置");
     }
-
-    #endregion
 }

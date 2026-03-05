@@ -67,7 +67,7 @@ public class BinanceAccountService
             _logger.LogError(ex, "获取账户信息失败 - 网络错误");
             throw new FriendlyException("获取账户信息失败: 网络连接错误", ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取账户信息失败");
             throw new FriendlyException($"获取账户信息失败: {ex.Message}", ex);
@@ -151,10 +151,118 @@ public class BinanceAccountService
             _logger.LogError(ex, "下单失败 - 网络错误");
             throw new FriendlyException("下单失败: 网络连接错误", ex);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "下单失败");
             throw new FriendlyException($"下单失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 查询订单状态（需要USER_DATA权限）
+    /// </summary>
+    public async Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId)
+    {
+        try
+        {
+            var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
+            var signedQuery = _authService.SignQueryString(queryString);
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/order?{signedQuery}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            _authService.AddAuthHeaders(request);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>()
+                ?? throw new FriendlyException("解析订单信息失败");
+
+            return orderResponse;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "查询订单失败 - 网络错误");
+            throw new FriendlyException("查询订单失败: 网络连接错误", ex);
+        }
+        catch (Exception ex) when (ex is not FriendlyException)
+        {
+            _logger.LogError(ex, "查询订单失败");
+            throw new FriendlyException($"查询订单失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 取消订单（需要TRADE权限）
+    /// </summary>
+    public async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId)
+    {
+        try
+        {
+            var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
+            var signedQuery = _authService.SignQueryString(queryString);
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/order?{signedQuery}";
+
+            var request = new HttpRequestMessage(HttpMethod.Delete, url);
+            _authService.AddAuthHeaders(request);
+
+            _logger.LogInformation("正在取消订单: {Symbol} OrderId:{OrderId}", symbol, orderId);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>()
+                ?? throw new FriendlyException("解析取消订单响应失败");
+
+            _logger.LogInformation("取消订单成功，订单ID: {OrderId}", orderId);
+            return orderResponse;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "取消订单失败 - 网络错误");
+            throw new FriendlyException("取消订单失败: 网络连接错误", ex);
+        }
+        catch (Exception ex) when (ex is not FriendlyException)
+        {
+            _logger.LogError(ex, "取消订单失败");
+            throw new FriendlyException($"取消订单失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 查询当前挂单（需要USER_DATA权限）
+    /// </summary>
+    public async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null)
+    {
+        try
+        {
+            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpper()}";
+            var signedQuery = _authService.SignQueryString(queryString);
+            var url = $"{BINANCE_API_BASE_URL}/api/v3/openOrders?{signedQuery}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            _authService.AddAuthHeaders(request);
+
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            var response = await httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<List<BinanceOrderResponse>>() ?? [];
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "查询挂单失败 - 网络错误");
+            throw new FriendlyException("查询挂单失败: 网络连接错误", ex);
+        }
+        catch (Exception ex) when (ex is not FriendlyException)
+        {
+            _logger.LogError(ex, "查询挂单失败");
+            throw new FriendlyException($"查询挂单失败: {ex.Message}", ex);
         }
     }
 }

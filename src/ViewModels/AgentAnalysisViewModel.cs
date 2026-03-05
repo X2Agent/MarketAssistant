@@ -105,7 +105,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
         }
     }
 
-    public ICommand SendMessageCommand => ChatSidebarViewModel?.SendMessageCommand ?? new RelayCommand(() => { });
+    private static readonly ICommand _noopCommand = new RelayCommand(() => { });
+    public ICommand SendMessageCommand => ChatSidebarViewModel?.SendMessageCommand ?? _noopCommand;
 
     public AgentAnalysisViewModel(
         MarketAnalysisWorkflow marketAnalysisWorkflow,

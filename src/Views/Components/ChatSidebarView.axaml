@@ -73,7 +73,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{StaticResource HeaderPadding}">
                     <PathIcon Data="{StaticResource IconChat}" 
-                              Foreground="{DynamicResource Primary}" 
+                              Foreground="{DynamicResource PrimaryBrush}" 
                               Width="{StaticResource HeaderIconSize}" Height="{StaticResource HeaderIconSize}" 
                               Margin="{StaticResource HeaderIconMargin}"/>
                     <TextBlock Text="智能助手" 
@@ -143,7 +143,7 @@
                         Command="{Binding SendMessageCommand}"
                         Width="{StaticResource IconButtonSize}" Height="{StaticResource IconButtonSize}" 
                         CornerRadius="{StaticResource SendButtonCornerRadius}" 
-                        Background="{DynamicResource Primary}"
+                        Background="{DynamicResource PrimaryBrush}"
                         Margin="{StaticResource SendButtonMargin}"
                         Padding="0"
                         IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}">
@@ -153,10 +153,10 @@
                               Margin="{StaticResource SendIconMargin}"/> <!-- 微调图标位置使其视觉居中 -->
                     <Button.Styles>
                         <Style Selector="Button:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{DynamicResource PrimaryLight}"/>
+                            <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}"/>
                         </Style>
                         <Style Selector="Button:pressed /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{DynamicResource PrimaryDark}"/>
+                            <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
                         </Style>
                         <Style Selector="Button:disabled /template/ ContentPresenter">
                             <Setter Property="Background" Value="{DynamicResource TextDisabledBrush}"/>
@@ -211,7 +211,7 @@
                             <Border Grid.Column="0" 
                                     Width="{StaticResource AvatarSize}" Height="{StaticResource AvatarSize}" 
                                     CornerRadius="{StaticResource AvatarCornerRadius}" 
-                                    Background="{DynamicResource PrimaryLight}"
+                                    Background="{DynamicResource PrimaryLightBrush}"
                                     VerticalAlignment="Top"
                                     Margin="{StaticResource AvatarLeftMargin}"
                                     BoxShadow="{StaticResource SubtleBoxShadow}">
@@ -257,7 +257,7 @@
                                     <TextBlock Text="{Binding Sender}" FontSize="{StaticResource SmallFontSize}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 </StackPanel>
 
-                                <Border Background="{DynamicResource Primary}"
+                                <Border Background="{DynamicResource PrimaryBrush}"
                                         CornerRadius="{StaticResource BubbleRightCornerRadius}"
                                         Padding="{StaticResource DefaultCardPadding}"
                                         BoxShadow="{StaticResource UserBubbleBoxShadow}">
