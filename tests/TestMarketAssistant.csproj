@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -13,7 +13,7 @@
     <PackageReference Include="MSTest" Version="4.1.0" />
   </ItemGroup>
 	<ItemGroup>
-	  <ProjectReference Include="..\src\MarketAssistant.csproj" />
+	  <ProjectReference Include="..\src\MarketAssistant.App\MarketAssistant.App.csproj" />
 	</ItemGroup>
 
   <ItemGroup>

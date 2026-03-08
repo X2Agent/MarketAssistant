@@ -1,0 +1,80 @@
+using MarketAssistant.Trading.Models;
+
+namespace MarketAssistant.Trading.Abstractions;
+
+/// <summary>
+/// 交易所客户端抽象接口
+/// 解耦交易模块与具体交易所实现，支持未来接入 OKX、Bybit 等
+/// </summary>
+public interface IExchangeClient
+{
+    /// <summary>
+    /// 交易所名称标识
+    /// </summary>
+    string ExchangeName { get; }
+
+    /// <summary>
+    /// 获取账户余额
+    /// </summary>
+    Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// 下单
+    /// </summary>
+    Task<ExchangeOrderResult> PlaceOrderAsync(
+        string symbol, OrderSide side, OrderType type,
+        decimal quantity, decimal? price = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询订单状态
+    /// </summary>
+    Task<ExchangeOrderResult> GetOrderAsync(
+        string symbol, string orderId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 取消订单
+    /// </summary>
+    Task<ExchangeOrderResult> CancelOrderAsync(
+        string symbol, string orderId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询当前挂单
+    /// </summary>
+    Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
+        string? symbol = null, CancellationToken ct = default);
+}
+
+/// <summary>
+/// 交易所账户信息（统一模型）
+/// </summary>
+public class ExchangeAccountInfo
+{
+    public bool CanTrade { get; set; }
+    public List<ExchangeBalance> Balances { get; set; } = [];
+}
+
+/// <summary>
+/// 交易所余额（统一模型）
+/// </summary>
+public class ExchangeBalance
+{
+    public string Asset { get; set; } = string.Empty;
+    public decimal Free { get; set; }
+    public decimal Locked { get; set; }
+}
+
+/// <summary>
+/// 交易所订单结果（统一模型）
+/// </summary>
+public class ExchangeOrderResult
+{
+    public string Symbol { get; set; } = string.Empty;
+    public string OrderId { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string Side { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public decimal RequestedQty { get; set; }
+    public decimal ExecutedQty { get; set; }
+    public decimal Price { get; set; }
+}

@@ -41,7 +41,7 @@ function Build-Windows {
     $publishDir = "$outputDir/Windows-x64"
     $buildStart = Get-Date
     
-    dotnet publish src/MarketAssistant.csproj `
+    dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj `
         -c $Configuration `
         -r win-x64 `
         --self-contained `
@@ -127,7 +127,7 @@ function Build-macOS {
         
         $publishDir = "$outputDir/macOS-x64"
         
-        dotnet publish src/MarketAssistant.csproj `
+        dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj `
             -c $Configuration `
             -r osx-x64 `
             --self-contained `
@@ -206,7 +206,7 @@ function Build-Linux {
         
         $publishDir = "$outputDir/Linux-x64"
         
-        dotnet publish src/MarketAssistant.csproj `
+        dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj `
             -c $Configuration `
             -r linux-x64 `
             --self-contained `
