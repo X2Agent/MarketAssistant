@@ -9,14 +9,14 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 参考: https://learn.microsoft.com/zh-cn/agent-framework/tutorials/workflows/simple-concurrent-workflow
 /// 
 /// 职责：
-/// 1. 接收股票代码
+/// 1. 接收标的代码
 /// 2. 保存必要的配置到 workflow state
 /// 3. 广播消息给所有分析师（通过 SendMessageAsync）
 /// 4. 发送 TurnToken 触发分析师开始处理
 /// </summary>
 public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
 {
-    private const string AnalysisPromptTemplate = "请对股票 {0} 进行专业分析，提供投资建议。";
+    private const string AnalysisPromptTemplate = "请对标的 {0} 进行专业分析，提供投资建议。";
 
     private readonly int _expectedAnalystCount;
     private readonly ILogger<AnalysisDispatcherExecutor> _logger;
@@ -31,29 +31,29 @@ public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
     }
 
     /// <summary>
-    /// 处理股票代码，广播分析任务给所有分析师
+    /// 处理标的代码，广播分析任务给所有分析师
     /// </summary>
     public override async ValueTask<ChatMessage> HandleAsync(
-        string stockSymbol,
+        string assetSymbol,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(stockSymbol))
+        if (string.IsNullOrWhiteSpace(assetSymbol))
         {
-            throw new ArgumentException("股票代码不能为空", nameof(stockSymbol));
+            throw new ArgumentException("标的代码不能为空", nameof(assetSymbol));
         }
 
         try
         {
             _logger.LogInformation(
-                "分发器开始处理股票 {StockSymbol} 的分析请求，期望 {Count} 位分析师",
-                stockSymbol, _expectedAnalystCount);
+                "分发器开始处理标的 {AssetSymbol} 的分析请求，期望 {Count} 位分析师",
+                assetSymbol, _expectedAnalystCount);
 
             // https://github.com/microsoft/agent-framework/issues/2162
             // 保存配置到 workflow state（显式指定 scope 确保跨 Executor 可见）
             await context.QueueStateUpdateAsync(
-                WorkflowStateKeys.StockSymbol,
-                stockSymbol,
+                WorkflowStateKeys.AssetSymbol,
+                assetSymbol,
                 WorkflowStateKeys.Scope,
                 cancellationToken);
             await context.QueueStateUpdateAsync(
@@ -63,18 +63,18 @@ public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
                 cancellationToken);
 
             // 通过返回标准 ChatMessage，将分析任务广播给下游分析师。
-            string prompt = string.Format(AnalysisPromptTemplate, stockSymbol);
+            string prompt = string.Format(AnalysisPromptTemplate, assetSymbol);
             var message = new ChatMessage(ChatRole.User, prompt);
 
             _logger.LogInformation(
-                "分发器已将分析任务分发给 {Count} 位分析师，股票: {StockSymbol}",
-                _expectedAnalystCount, stockSymbol);
+                "分发器已将分析任务分发给 {Count} 位分析师，标的: {AssetSymbol}",
+                _expectedAnalystCount, assetSymbol);
 
             return message;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "分发分析请求时发生错误，股票代码: {StockSymbol}", stockSymbol);
+            _logger.LogError(ex, "分发分析请求时发生错误，标的代码: {AssetSymbol}", assetSymbol);
             throw;
         }
     }

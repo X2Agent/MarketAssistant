@@ -27,7 +27,7 @@ public class RiskManager
     /// 校验交易是否通过风控检查
     /// </summary>
     public async Task<RiskCheckResult> ValidateOrderAsync(
-        string symbol, OrderSide side, decimal quantity, decimal price,
+        string instrumentSymbol, OrderSide side, decimal quantity, decimal price,
         CancellationToken ct = default)
     {
         var config = _dataService.LoadRiskConfig();
@@ -66,7 +66,9 @@ public class RiskManager
                 var usdtBalance = CryptoPortfolioService.GetUsdtBalance(portfolioSummary);
                 var nonUSDTValue = totalUSDT - usdtBalance;
                 var currentPositionPercent = nonUSDTValue / totalUSDT * 100;
-                var projectedPercent = currentPositionPercent + (orderValueUSDT / totalUSDT * 100);
+                var projectedPercent = side == OrderSide.Buy
+                    ? currentPositionPercent + orderPercent
+                    : Math.Max(0, currentPositionPercent - orderPercent);
                 if (projectedPercent > config.MaxTotalPositionPercent)
                     return RiskCheckResult.Reject(
                         $"总仓位占比将达 {projectedPercent:F1}%，超过限额 {config.MaxTotalPositionPercent}%");
@@ -82,8 +84,8 @@ public class RiskManager
             return RiskCheckResult.RequireConfirmation(
                 $"订单金额 {orderValueUSDT:F2} USDT 超过确认阈值 {config.ConfirmationThreshold} USDT，需人工确认");
 
-        _logger.LogInformation("风控检查通过: {Symbol} {Side} 数量:{Qty} 价格:{Price}",
-            symbol, side, quantity, price);
+        _logger.LogInformation("风控检查通过: {InstrumentSymbol} {Side} 数量:{Qty} 价格:{Price}",
+            instrumentSymbol, side, quantity, price);
         return RiskCheckResult.Pass();
     }
 

@@ -19,10 +19,10 @@ public interface IExchangeClient
     Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 下单
+    /// 对交易标的下单
     /// </summary>
     Task<ExchangeOrderResult> PlaceOrderAsync(
-        string symbol, OrderSide side, OrderType type,
+        string instrumentSymbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
         CancellationToken ct = default);
 
@@ -30,19 +30,19 @@ public interface IExchangeClient
     /// 查询订单状态
     /// </summary>
     Task<ExchangeOrderResult> GetOrderAsync(
-        string symbol, string orderId, CancellationToken ct = default);
+        string instrumentSymbol, string orderId, CancellationToken ct = default);
 
     /// <summary>
     /// 取消订单
     /// </summary>
     Task<ExchangeOrderResult> CancelOrderAsync(
-        string symbol, string orderId, CancellationToken ct = default);
+        string instrumentSymbol, string orderId, CancellationToken ct = default);
 
     /// <summary>
-    /// 查询当前挂单
+    /// 查询指定交易标的或全部挂单
     /// </summary>
     Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
-        string? symbol = null, CancellationToken ct = default);
+        string? instrumentSymbol = null, CancellationToken ct = default);
 }
 
 /// <summary>

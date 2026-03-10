@@ -27,27 +27,27 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     public async Task AnalyzeAsync_ShouldReturnValidReport()
     {
         // Arrange
-        string stockSymbol = "000001";
+        string assetSymbol = "000001";
 
         // Act
-        var report = await _workflow.AnalyzeAsync(stockSymbol);
+        var report = await _workflow.AnalyzeAsync(assetSymbol);
 
         // Assert
         Assert.IsNotNull(report);
-        Assert.AreEqual(stockSymbol, report.StockSymbol);
+        Assert.AreEqual(assetSymbol, report.AssetSymbol);
         Assert.IsNotNull(report.AnalystMessages);
         Assert.IsTrue(report.AnalystMessages.Count > 0, "应该至少有一位分析师的结果");
         Assert.IsNotNull(report.CoordinatorResult, "协调分析师应该生成结果");
         Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary), "协调分析师应该生成总结报告");
 
-        Console.WriteLine($"股票 {stockSymbol} 分析完成 - 分析师数量: {report.AnalystMessages.Count}, 总结长度: {report.CoordinatorResult.Summary.Length} 字符");
+        Console.WriteLine($"标的 {assetSymbol} 分析完成 - 分析师数量: {report.AnalystMessages.Count}, 总结长度: {report.CoordinatorResult.Summary.Length} 字符");
     }
 
     [TestMethod]
     public async Task AnalyzeAsync_ShouldTriggerProgressEvents()
     {
         // Arrange
-        string stockSymbol = "000001";
+        string assetSymbol = "000001";
         var progressEvents = new List<string>();
 
         _workflow.ProgressChanged += (sender, e) =>
@@ -56,7 +56,7 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
         };
 
         // Act
-        var report = await _workflow.AnalyzeAsync(stockSymbol);
+        var report = await _workflow.AnalyzeAsync(assetSymbol);
 
         // Assert
         Assert.IsNotNull(report);

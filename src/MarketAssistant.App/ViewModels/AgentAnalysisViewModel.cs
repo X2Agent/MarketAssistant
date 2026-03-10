@@ -237,7 +237,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         if (_lastReport == null || _storageProvider == null)
             return;
 
-        var suggestedName = $"{_lastReport.StockSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
+        var suggestedName = $"{_lastReport.AssetSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出分析报告",
@@ -306,7 +306,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             {
                 AnalysisReportViewModel.UpdateWithReport(report);
                 if (ChatSidebarViewModel != null)
-                    await ChatSidebarViewModel.InitializeWithAnalysisHistory(report.StockSymbol, report.AnalystMessages);
+                    await ChatSidebarViewModel.InitializeWithAnalysisHistory(report.AssetSymbol, report.AnalystMessages);
             });
         }, "加载历史报告");
     }

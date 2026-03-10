@@ -39,16 +39,16 @@ public class AnalysisCacheServiceTest
     public async Task CacheAnalysisAsync_ShouldSaveDataSuccessfully()
     {
         // Arrange
-        var stockSymbol = "AAPL";
-        var analysisResult = CreateTestAnalysisReport(stockSymbol);
+        var assetSymbol = "AAPL";
+        var analysisResult = CreateTestAnalysisReport(assetSymbol);
 
         // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
+        await _cacheService.CacheAnalysisAsync(assetSymbol, analysisResult);
 
         // Assert
-        var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
+        var cachedResult = await _cacheService.GetCachedAnalysisAsync(assetSymbol);
         Assert.IsNotNull(cachedResult);
-        Assert.AreEqual(stockSymbol, cachedResult.StockSymbol);
+        Assert.AreEqual(assetSymbol, cachedResult.AssetSymbol);
         Assert.AreEqual(InvestmentRating.Buy, cachedResult.CoordinatorResult.InvestmentRating);
     }
 
@@ -59,16 +59,16 @@ public class AnalysisCacheServiceTest
     public async Task GetCachedAnalysisAsync_ShouldReturnCorrectData()
     {
         // Arrange
-        var stockSymbol = "MSFT";
-        var analysisResult = CreateTestAnalysisReport(stockSymbol);
-        await _cacheService.CacheAnalysisAsync(stockSymbol, analysisResult);
+        var assetSymbol = "MSFT";
+        var analysisResult = CreateTestAnalysisReport(assetSymbol);
+        await _cacheService.CacheAnalysisAsync(assetSymbol, analysisResult);
 
         // Act
-        var result = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
+        var result = await _cacheService.GetCachedAnalysisAsync(assetSymbol);
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(stockSymbol, result.StockSymbol);
+        Assert.AreEqual(assetSymbol, result.AssetSymbol);
         Assert.AreEqual(8.5f, result.CoordinatorResult.OverallScore);
     }
 
@@ -92,27 +92,27 @@ public class AnalysisCacheServiceTest
     public async Task CacheAnalysisAsync_ShouldOverwriteExistingData()
     {
         // Arrange
-        var stockSymbol = "GOOGL";
-        var firstResult = CreateTestAnalysisReport(stockSymbol);
+        var assetSymbol = "GOOGL";
+        var firstResult = CreateTestAnalysisReport(assetSymbol);
         firstResult.CoordinatorResult.InvestmentRating = InvestmentRating.Sell;
-        var secondResult = CreateTestAnalysisReport(stockSymbol);
+        var secondResult = CreateTestAnalysisReport(assetSymbol);
         secondResult.CoordinatorResult.InvestmentRating = InvestmentRating.Buy;
 
         // Act
-        await _cacheService.CacheAnalysisAsync(stockSymbol, firstResult);
-        await _cacheService.CacheAnalysisAsync(stockSymbol, secondResult);
+        await _cacheService.CacheAnalysisAsync(assetSymbol, firstResult);
+        await _cacheService.CacheAnalysisAsync(assetSymbol, secondResult);
 
         // Assert
-        var cachedResult = await _cacheService.GetCachedAnalysisAsync(stockSymbol);
+        var cachedResult = await _cacheService.GetCachedAnalysisAsync(assetSymbol);
         Assert.IsNotNull(cachedResult);
         Assert.AreEqual(InvestmentRating.Buy, cachedResult.CoordinatorResult.InvestmentRating);
     }
 
-    private MarketAnalysisReport CreateTestAnalysisReport(string stockSymbol)
+    private MarketAnalysisReport CreateTestAnalysisReport(string assetSymbol)
     {
         return new MarketAnalysisReport
         {
-            StockSymbol = stockSymbol,
+            AssetSymbol = assetSymbol,
             AnalystMessages = new List<ChatMessage>
             {
                 new(ChatRole.Assistant, "Test content") { AuthorName = "TestAnalyst" }

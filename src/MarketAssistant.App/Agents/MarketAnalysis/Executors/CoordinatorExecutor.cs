@@ -60,17 +60,17 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
             throw new ArgumentException("没有分析师数据", nameof(analystMessages));
         }
 
-        // 从工作流状态读取股票代码
-        var stockSymbol = await context.ReadStateAsync<string>(WorkflowStateKeys.StockSymbol, WorkflowStateKeys.Scope, cancellationToken);
+        // 从工作流状态读取分析标的代码
+        var assetSymbol = await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, WorkflowStateKeys.Scope, cancellationToken);
 
-        if (string.IsNullOrWhiteSpace(stockSymbol))
+        if (string.IsNullOrWhiteSpace(assetSymbol))
         {
-            throw new InvalidOperationException("无法从工作流状态中获取股票代码");
+            throw new InvalidOperationException("无法从工作流状态中获取标的代码");
         }
 
         _logger.LogInformation(
-            "协调分析师开始生成最终报告，股票: {StockSymbol}, 分析师数量: {Count}",
-            stockSymbol,
+            "协调分析师开始生成最终报告，标的: {AssetSymbol}, 分析师数量: {Count}",
+            assetSymbol,
             analystMessages.Count);
 
         try
@@ -87,7 +87,7 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
                 // 添加用户请求：生成综合报告
                 new ChatMessage(
                 ChatRole.User,
-                $"请基于以上所有分析师的专业意见，为股票 {stockSymbol} 生成一份综合分析报告。")
+                $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
             };
 
             // 使用带结构化输出的 ChatClientAgent 运行
@@ -123,7 +123,7 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
             // 创建最终报告
             var finalReport = new MarketAnalysisReport
             {
-                StockSymbol = stockSymbol,
+                AssetSymbol = assetSymbol,
                 AnalystMessages = new List<ChatMessage>(analystMessages)
                 {
                     coordinatorMessage
@@ -132,15 +132,15 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
                 CreatedAt = DateTime.UtcNow
             };
 
-            _logger.LogInformation("协调分析师已完成最终报告生成，股票: {StockSymbol}",
-                stockSymbol);
+            _logger.LogInformation("协调分析师已完成最终报告生成，标的: {AssetSymbol}",
+                assetSymbol);
 
             return finalReport;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "协调分析师生成报告时发生错误，股票: {StockSymbol}",
-                await context.ReadStateAsync<string>(WorkflowStateKeys.StockSymbol, cancellationToken) ?? "未知");
+            _logger.LogError(ex, "协调分析师生成报告时发生错误，标的: {AssetSymbol}",
+                await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, cancellationToken) ?? "未知");
             throw;
         }
     }

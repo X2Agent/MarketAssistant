@@ -12,7 +12,7 @@ namespace MarketAssistant.Trading;
 
 /// <summary>
 /// 后台市场监控器，订阅实时价格并根据策略触发交易。
-/// 使用 Channel 缓冲价格更新，确保不丢弃任何 tick。
+/// 使用 Channel 缓冲价格更新，按顺序处理每个 tick。
 /// </summary>
 public class MarketMonitor : IDisposable
 {
@@ -28,9 +28,8 @@ public class MarketMonitor : IDisposable
     private Task? _consumerTask;
 
     private readonly Channel<(string Symbol, decimal Price)> _priceChannel =
-        Channel.CreateBounded<(string, decimal)>(new BoundedChannelOptions(10000)
+        Channel.CreateUnbounded<(string, decimal)>(new UnboundedChannelOptions
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
             SingleWriter = false
         });
@@ -77,18 +76,18 @@ public class MarketMonitor : IDisposable
         _isRunning = true;
 
         var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
-        var symbols = activeStrategies
+        var instrumentSymbols = activeStrategies
             .Select(s => s.Symbol.ToLowerInvariant())
             .Distinct()
             .ToList();
 
-        if (symbols.Count > 0)
-            await _webSocketService.SubscribeAsync(symbols);
+        if (instrumentSymbols.Count > 0)
+            await _webSocketService.SubscribeAsync(instrumentSymbols);
 
         _webSocketService.PriceUpdated += OnPriceUpdated;
         _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
-        _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易对", symbols.Count);
+        _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
         StatusChanged?.Invoke(true);
     }
 
@@ -117,7 +116,7 @@ public class MarketMonitor : IDisposable
     }
 
     /// <summary>
-    /// 刷新监控的交易对列表（策略增减后调用）
+    /// 刷新监控的交易标的列表（策略增减后调用）
     /// </summary>
     public async Task RefreshSubscriptionsAsync()
     {
@@ -135,7 +134,7 @@ public class MarketMonitor : IDisposable
         if (newSymbols.Count > 0)
             await _webSocketService.SubscribeAsync(newSymbols.ToList());
 
-        _logger.LogInformation("已刷新监控列表: {Count} 个交易对", newSymbols.Count);
+        _logger.LogInformation("已刷新监控列表: {Count} 个交易标的", newSymbols.Count);
     }
 
     private void OnPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
@@ -224,7 +223,7 @@ public class MarketMonitor : IDisposable
 
             var agent = _agentFactory.CreateAgent();
             var prompt = $"""
-                分析交易对 {strategy.Symbol}，当前价格 {currentPrice}。
+                分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
                 策略配置: {strategy.CustomParams ?? "无"}
                 请评估是否应该执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
                 如果决定交易，请调用 PlaceOrder 工具执行。

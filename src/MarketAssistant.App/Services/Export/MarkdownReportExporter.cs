@@ -17,7 +17,7 @@ public static class MarkdownReportExporter
         var cr = report.CoordinatorResult;
         var sb = new StringBuilder();
 
-        sb.AppendLine($"# {report.StockSymbol} 投资分析报告");
+        sb.AppendLine($"# {report.AssetSymbol} 投资分析报告");
         sb.AppendLine();
         sb.AppendLine($"> 生成时间：{report.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}");
         sb.AppendLine();

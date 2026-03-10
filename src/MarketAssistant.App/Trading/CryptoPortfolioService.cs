@@ -113,7 +113,7 @@ public class CryptoPortfolioService
                 }
                 catch (HttpRequestException)
                 {
-                    _logger.LogDebug("跳过无 USDT 交易对的资产估值: {Asset}", balance.Asset);
+                    _logger.LogDebug("跳过无 USDT 标的行情的资产估值: {Asset}", balance.Asset);
                 }
             }
 

@@ -23,39 +23,39 @@ public class AnalysisCacheService : IAnalysisCacheService
     /// <summary>
     /// 获取缓存的市场分析报告
     /// </summary>
-    public Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string stockSymbol)
+    public Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string assetSymbol)
     {
-        if (string.IsNullOrWhiteSpace(stockSymbol))
+        if (string.IsNullOrWhiteSpace(assetSymbol))
         {
-            throw new ArgumentNullException(nameof(stockSymbol));
+            throw new ArgumentNullException(nameof(assetSymbol));
         }
 
-        var cacheKey = GenerateCacheKey(stockSymbol);
+        var cacheKey = GenerateCacheKey(assetSymbol);
 
         if (_memoryCache.TryGetValue(cacheKey, out MarketAnalysisReport? cachedReport))
         {
-            _logger.LogInformation("从缓存获取分析报告: {StockSymbol}, 分析师数量: {Count}",
-                stockSymbol, cachedReport?.AnalystMessages.Count ?? 0);
+            _logger.LogInformation("从缓存获取分析报告: {AssetSymbol}, 分析师数量: {Count}",
+                assetSymbol, cachedReport?.AnalystMessages.Count ?? 0);
             return Task.FromResult(cachedReport);
         }
 
-        _logger.LogInformation("缓存未命中: {StockSymbol}", stockSymbol);
+        _logger.LogInformation("缓存未命中: {AssetSymbol}", assetSymbol);
         return Task.FromResult<MarketAnalysisReport?>(null);
     }
 
     /// <summary>
     /// 缓存市场分析报告
     /// </summary>
-    public Task CacheAnalysisAsync(string stockSymbol, MarketAnalysisReport report)
+    public Task CacheAnalysisAsync(string assetSymbol, MarketAnalysisReport report)
     {
-        if (string.IsNullOrWhiteSpace(stockSymbol))
+        if (string.IsNullOrWhiteSpace(assetSymbol))
         {
-            throw new ArgumentNullException(nameof(stockSymbol));
+            throw new ArgumentNullException(nameof(assetSymbol));
         }
 
         ArgumentNullException.ThrowIfNull(report);
 
-        var cacheKey = GenerateCacheKey(stockSymbol);
+        var cacheKey = GenerateCacheKey(assetSymbol);
 
         _memoryCache.Set(cacheKey, report, new MemoryCacheEntryOptions
         {
@@ -65,8 +65,8 @@ public class AnalysisCacheService : IAnalysisCacheService
         });
 
         _logger.LogInformation(
-            "已缓存分析报告: {StockSymbol}, 分析师数量: {Count}, 过期时间: {Expiration}",
-            stockSymbol,
+            "已缓存分析报告: {AssetSymbol}, 分析师数量: {Count}, 过期时间: {Expiration}",
+            assetSymbol,
             report.AnalystMessages.Count,
             _cacheExpiration);
 
@@ -74,27 +74,27 @@ public class AnalysisCacheService : IAnalysisCacheService
     }
 
     /// <summary>
-    /// 清除指定股票的缓存
+    /// 清除指定标的的缓存
     /// </summary>
-    public Task ClearCacheAsync(string stockSymbol)
+    public Task ClearCacheAsync(string assetSymbol)
     {
-        if (string.IsNullOrWhiteSpace(stockSymbol))
+        if (string.IsNullOrWhiteSpace(assetSymbol))
         {
-            throw new ArgumentNullException(nameof(stockSymbol));
+            throw new ArgumentNullException(nameof(assetSymbol));
         }
 
-        var cacheKey = GenerateCacheKey(stockSymbol);
+        var cacheKey = GenerateCacheKey(assetSymbol);
         _memoryCache.Remove(cacheKey);
-        _logger.LogInformation("已清除缓存: {StockSymbol}", stockSymbol);
+        _logger.LogInformation("已清除缓存: {AssetSymbol}", assetSymbol);
         return Task.CompletedTask;
     }
 
     /// <summary>
     /// 生成缓存键
     /// </summary>
-    private string GenerateCacheKey(string stockSymbol)
+    private string GenerateCacheKey(string assetSymbol)
     {
-        return $"MarketAnalysisReport_{stockSymbol}";
+        return $"MarketAnalysisReport_{assetSymbol}";
     }
 
     public void Dispose()

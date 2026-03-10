@@ -11,20 +11,20 @@ public interface IAnalysisCacheService : IDisposable
     /// <summary>
     /// 获取缓存的市场分析报告
     /// </summary>
-    /// <param name="stockSymbol">股票代码</param>
+    /// <param name="assetSymbol">分析标的代码</param>
     /// <returns>缓存的分析报告，如果没有缓存则返回 null</returns>
-    Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string stockSymbol);
+    Task<MarketAnalysisReport?> GetCachedAnalysisAsync(string assetSymbol);
 
     /// <summary>
     /// 缓存市场分析报告
     /// </summary>
-    /// <param name="stockSymbol">股票代码</param>
+    /// <param name="assetSymbol">分析标的代码</param>
     /// <param name="report">分析报告</param>
-    Task CacheAnalysisAsync(string stockSymbol, MarketAnalysisReport report);
+    Task CacheAnalysisAsync(string assetSymbol, MarketAnalysisReport report);
 
     /// <summary>
-    /// 清除指定股票的缓存
+    /// 清除指定标的的缓存
     /// </summary>
-    /// <param name="stockSymbol">股票代码</param>
-    Task ClearCacheAsync(string stockSymbol);
+    /// <param name="assetSymbol">分析标的代码</param>
+    Task ClearCacheAsync(string assetSymbol);
 }

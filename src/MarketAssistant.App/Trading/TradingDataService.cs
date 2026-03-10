@@ -270,7 +270,7 @@ public class TradingDataService : IDisposable
     }
 
     /// <summary>
-    /// 计算指定交易对的加权平均买入价（用于 PnL 估算）
+    /// 计算指定交易标的的加权平均买入价（用于 PnL 估算）
     /// </summary>
     public async Task<decimal> GetAverageEntryPriceAsync(string symbol, CancellationToken ct = default)
     {

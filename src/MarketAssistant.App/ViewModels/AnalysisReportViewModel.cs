@@ -120,7 +120,7 @@ public partial class AnalysisReportViewModel : ViewModelBase
 
         try
         {
-            StockSymbol = report.StockSymbol;
+            StockSymbol = report.AssetSymbol;
 
             var coordinatorResult = report.CoordinatorResult;
 

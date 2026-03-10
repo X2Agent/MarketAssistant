@@ -51,17 +51,17 @@ public class TradeExecutor
     /// 通用下单方法，所有交易路径（策略触发、AI Agent、手动）的统一入口
     /// </summary>
     public async Task<TradeResult> ExecuteOrderAsync(
-        string symbol, OrderSide side, OrderType type, decimal quantity,
+        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice = null,
         string strategyId = "manual", string? aiReasoning = null,
         CancellationToken ct = default)
     {
-        var riskCheck = await _riskManager.ValidateOrderAsync(symbol, side, quantity, currentPrice, ct);
+        var riskCheck = await _riskManager.ValidateOrderAsync(instrumentSymbol, side, quantity, currentPrice, ct);
 
         if (riskCheck.NeedsConfirmation)
         {
-            _logger.LogWarning("交易需人工确认: {Symbol} {Side} 金额:{Amount}",
-                symbol, side, quantity * currentPrice);
+            _logger.LogWarning("交易需人工确认: {InstrumentSymbol} {Side} 金额:{Amount}",
+                instrumentSymbol, side, quantity * currentPrice);
             return new TradeResult { Success = false, ErrorMessage = $"需人工确认: {riskCheck.Reason}" };
         }
 
@@ -75,12 +75,12 @@ public class TradeExecutor
         {
             var orderTypeStr = type.ToString().ToUpper();
             var response = await _exchangeClient.PlaceOrderAsync(
-                symbol, side, type, quantity, type == OrderType.Limit ? limitPrice : null, ct);
+                instrumentSymbol, side, type, quantity, type == OrderType.Limit ? limitPrice : null, ct);
 
             var record = new TradeRecord
             {
                 StrategyId = strategyId,
-                Symbol = symbol,
+                Symbol = instrumentSymbol,
                 Side = side,
                 OrderType = type,
                 RequestedQty = response.RequestedQty == 0 ? quantity : response.RequestedQty,
@@ -98,7 +98,7 @@ public class TradeExecutor
             decimal pnl = 0;
             if (side == OrderSide.Sell && record.ExecutedQty > 0)
             {
-                var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(symbol, ct);
+                var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
                 if (avgEntryPrice > 0)
                     pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
             }
@@ -111,7 +111,7 @@ public class TradeExecutor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "交易执行失败: {Symbol} {Side}", symbol, side);
+            _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             return new TradeResult { Success = false, ErrorMessage = ex.Message };
         }
     }

@@ -26,7 +26,7 @@ public class StrategyEngine
     public void ClearPeakPrice(string strategyId) => _peakPrices.TryRemove(strategyId, out _);
 
     /// <summary>
-    /// 评估指定交易对的所有活跃策略，返回触发的策略列表
+    /// 评估指定交易标的的所有活跃策略，返回触发的策略列表
     /// </summary>
     public async Task<List<TradingStrategy>> EvaluateStrategiesAsync(
         string symbol, decimal currentPrice, CancellationToken ct = default)

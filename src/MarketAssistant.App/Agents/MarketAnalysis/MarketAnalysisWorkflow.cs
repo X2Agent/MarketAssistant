@@ -52,12 +52,12 @@ public class MarketAnalysisWorkflow : IDisposable
     /// 执行市场分析工作流
     /// </summary>
     public async Task<MarketAnalysisReport> AnalyzeAsync(
-        string stockSymbol,
+        string assetSymbol,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("开始执行市场分析工作流，股票代码: {StockSymbol}", stockSymbol);
+            _logger.LogInformation("开始执行市场分析工作流，标的代码: {AssetSymbol}", assetSymbol);
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
@@ -96,7 +96,7 @@ public class MarketAnalysisWorkflow : IDisposable
             });
 
             // 执行工作流（流式处理）
-            var finalReport = await ExecuteWorkflowAsync(workflow, stockSymbol, cancellationToken);
+            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, cancellationToken);
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
@@ -123,7 +123,7 @@ public class MarketAnalysisWorkflow : IDisposable
     /// </summary>
     private async Task<MarketAnalysisReport> ExecuteWorkflowAsync(
         Workflow workflow,
-        string stockSymbol,
+        string assetSymbol,
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
@@ -133,7 +133,7 @@ public class MarketAnalysisWorkflow : IDisposable
 
         await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
-            stockSymbol,
+            assetSymbol,
             sessionId: null,
             cancellationToken);
 
@@ -171,7 +171,7 @@ public class MarketAnalysisWorkflow : IDisposable
                 case ExecutorCompletedEvent executorComplete:
                     _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
 
-                    if (executorComplete.ExecutorId is not "AnalysisDispatcher" 
+                    if (executorComplete.ExecutorId is not "AnalysisDispatcher"
                         and not "AnalysisAggregator" and not "Coordinator")
                     {
                         completedAnalysts++;
@@ -192,15 +192,16 @@ public class MarketAnalysisWorkflow : IDisposable
                     break;
 
                 case ExecutorFailedEvent executorFailed:
+                    var errorMessage = executorFailed.Data?.Message ?? "未知错误";
                     _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
                         executorFailed.ExecutorId,
-                        executorFailed.Data.Message);
+                        errorMessage);
                     failedSteps.Add(executorFailed.ExecutorId);
 
                     // 关键步骤失败则抛出，非关键步骤记录并继续
                     if (executorFailed.ExecutorId is "Coordinator" or "AnalysisAggregator" or "AnalysisDispatcher")
                     {
-                        throw new FriendlyException(executorFailed.Data.Message);
+                        throw new FriendlyException(errorMessage);
                     }
 
                     OnProgressChanged(new AnalysisProgressEventArgs
@@ -293,7 +294,7 @@ public class MarketAnalysisWorkflow : IDisposable
     {
         // 构建标准 Fan-Out/Fan-In 工作流：
         // 
-        // [Dispatcher] string (stockSymbol) → broadcast ChatMessage
+        // [Dispatcher] string (assetSymbol) → broadcast ChatMessage
         //      ↓ (Fan-Out)
         // [Analyst1] [Analyst2] [Analyst3] ... (并发执行，每个返回 ChatMessage)
         //      ↓ ↓ ↓ ↓ (Fan-In: 框架逐个传递给 Aggregator)

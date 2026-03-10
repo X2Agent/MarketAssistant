@@ -12,9 +12,15 @@ internal static class WorkflowStateKeys
     public const string Scope = "MarketAnalysisWorkflow";
 
     /// <summary>
-    /// 股票代码的状态键
+    /// 分析标的代码的状态键
     /// </summary>
-    public const string StockSymbol = nameof(StockSymbol);
+    public const string AssetSymbol = nameof(AssetSymbol);
+
+    /// <summary>
+    /// 兼容旧状态键名，内部统一使用 AssetSymbol。
+    /// </summary>
+    [Obsolete("Use AssetSymbol instead.")]
+    public const string StockSymbol = AssetSymbol;
 
     /// <summary>
     /// 预期分析师数量的状态键

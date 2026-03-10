@@ -45,7 +45,7 @@ public class ReportArchiveService : IDisposable
                 INSERT INTO reports (asset_code, score, created_at, report_json)
                 VALUES (@code, @score, @time, @json)
                 """;
-            cmd.Parameters.AddWithValue("@code", report.StockSymbol);
+            cmd.Parameters.AddWithValue("@code", report.AssetSymbol);
             cmd.Parameters.AddWithValue("@score", report.CoordinatorResult.OverallScore);
             cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
             cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
@@ -53,7 +53,7 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存分析报告失败: {Asset}", report.StockSymbol);
+            _logger.LogWarning(ex, "保存分析报告失败: {Asset}", report.AssetSymbol);
         }
     }
 
