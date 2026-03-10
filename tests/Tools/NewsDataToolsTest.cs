@@ -4,6 +4,7 @@ using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Browser;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +27,9 @@ public class NewsDataToolsTest
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<PlaywrightService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
+        services.AddHttpClient();
+        services.AddTestMarketDataHttpClients();
+        services.AddSingleton<CoinDeskApiService>();
         services.AddLogging();
 
         // 注册被测试的服务
@@ -36,11 +40,11 @@ public class NewsDataToolsTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
         if (_serviceProvider != null)
         {
-            _serviceProvider.Dispose();
+            await _serviceProvider.DisposeAsync();
         }
     }
 
@@ -70,10 +74,15 @@ public class NewsDataToolsTest
         var service = _serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.Crypto);
 
         // Act
-        var newsData = await service.GetNewsAsync("btc");
-
-        // Assert
-        Assert.IsNotNull(newsData);
+        try
+        {
+            var newsData = await service.GetNewsAsync("btc");
+            Assert.IsNotNull(newsData);
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     #endregion

@@ -73,7 +73,10 @@ public class AnalystAgentFactory : IAnalystAgentFactory
 
             // 使用 ActivatorUtilities.CreateInstance
             // 显式传递 chatClient 和工具，其他依赖从 DI 获取
-            var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, chatClient, tools.ToArray());
+            var parameters = new List<object> { chatClient };
+            parameters.AddRange(tools);
+
+            var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, parameters.ToArray());
 
             _logger.LogInformation(
                 "成功创建分析师代理: {AgentType} (市场: {Market})",

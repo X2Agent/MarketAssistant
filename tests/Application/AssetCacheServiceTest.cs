@@ -27,7 +27,7 @@ public class AssetCacheServiceTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
         // 清理缓存
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.AShare);
@@ -36,7 +36,7 @@ public class AssetCacheServiceTest
         aShareService.Clear();
         cryptoService.Clear();
 
-        _serviceProvider.Dispose();
+        await _serviceProvider.DisposeAsync();
     }
 
     [TestMethod]

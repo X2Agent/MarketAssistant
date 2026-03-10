@@ -289,9 +289,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     private void LoadAnalystRoles()
     {
         AnalystRoles.Clear();
-        var agentTypes = AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a => a.GetTypes())
-            .Where(t => t.IsSubclassOf(typeof(AnalystAgentBase)) && !t.IsAbstract);
+        var agentTypes = AnalystTypeRegistry.GetConcreteAnalystTypes();
 
         foreach (var type in agentTypes)
         {

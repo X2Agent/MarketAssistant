@@ -41,9 +41,6 @@ namespace MarketAssistant
                 services.AddLogging(builder => builder.ConfigureLogging(userSettingService));
             }
 
-            // 注册基础服务（RAG、向量化等）
-            services.AddRagServices();
-
             // 注册应用程序业务服务
             services.AddApplicationServices();
 

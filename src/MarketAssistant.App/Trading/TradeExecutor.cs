@@ -1,4 +1,4 @@
-using MarketAssistant.Applications.Crypto;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -9,18 +9,18 @@ namespace MarketAssistant.Trading;
 /// </summary>
 public class TradeExecutor
 {
-    private readonly BinanceAccountService _accountService;
+    private readonly IExchangeClient _exchangeClient;
     private readonly RiskManager _riskManager;
     private readonly TradingDataService _dataService;
     private readonly ILogger<TradeExecutor> _logger;
 
     public TradeExecutor(
-        BinanceAccountService accountService,
+        IExchangeClient exchangeClient,
         RiskManager riskManager,
         TradingDataService dataService,
         ILogger<TradeExecutor> logger)
     {
-        _accountService = accountService;
+        _exchangeClient = exchangeClient;
         _riskManager = riskManager;
         _dataService = dataService;
         _logger = logger;
@@ -74,9 +74,8 @@ public class TradeExecutor
         try
         {
             var orderTypeStr = type.ToString().ToUpper();
-            var response = await _accountService.PlaceOrderAsync(
-                symbol, side.ToString().ToUpper(), orderTypeStr, quantity,
-                type == OrderType.Limit ? limitPrice : null);
+            var response = await _exchangeClient.PlaceOrderAsync(
+                symbol, side, type, quantity, type == OrderType.Limit ? limitPrice : null, ct);
 
             var record = new TradeRecord
             {
@@ -84,12 +83,12 @@ public class TradeExecutor
                 Symbol = symbol,
                 Side = side,
                 OrderType = type,
-                RequestedQty = quantity,
-                ExecutedQty = decimal.TryParse(response.ExecutedQty, out var eq) ? eq : 0,
+                RequestedQty = response.RequestedQty == 0 ? quantity : response.RequestedQty,
+                ExecutedQty = response.ExecutedQty,
                 RequestedPrice = limitPrice,
-                ExecutedPrice = decimal.TryParse(response.Price, out var ep) ? ep : currentPrice,
+                ExecutedPrice = response.Price == 0 ? currentPrice : response.Price,
                 Status = MapStatus(response.Status),
-                BinanceOrderId = response.OrderId,
+                BinanceOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
                 AIReasoning = aiReasoning,
                 CompletedAt = response.Status == "FILLED" ? DateTime.UtcNow : null
             };

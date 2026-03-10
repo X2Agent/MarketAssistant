@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -10,17 +11,22 @@ namespace MarketAssistant.Applications.Settings;
 public class GitHubReleaseService : IReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IMemoryCache _memoryCache;
     private readonly ILogger<GitHubReleaseService> _logger;
     private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases";
     private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases/latest";
 
-    private CachedData<List<ReleaseInfo>>? _cachedReleases;
-    private readonly TimeSpan _cacheExpiration = TimeSpan.FromMinutes(10);
+    private const string ReleasesCacheKey = "github.releases";
+    private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(10);
     private RateLimitInfo? _rateLimitInfo;
 
-    public GitHubReleaseService(IHttpClientFactory httpClientFactory, ILogger<GitHubReleaseService> logger)
+    public GitHubReleaseService(
+        IHttpClientFactory httpClientFactory,
+        IMemoryCache memoryCache,
+        ILogger<GitHubReleaseService> logger)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -122,8 +128,7 @@ public class GitHubReleaseService : IReleaseService
 
             _logger.LogInformation("开始下载更新文件：{Url} -> {SavePath}", downloadUrl, savePath);
 
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
+            using var httpClient = CreateGitHubClient();
             httpClient.Timeout = TimeSpan.FromMinutes(10);
 
             var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -207,7 +212,7 @@ public class GitHubReleaseService : IReleaseService
     /// </summary>
     public void ClearCache()
     {
-        _cachedReleases = null;
+        _memoryCache.Remove(ReleasesCacheKey);
         _logger.LogInformation("已清除版本信息缓存");
     }
 
@@ -217,17 +222,16 @@ public class GitHubReleaseService : IReleaseService
     private async Task<List<ReleaseInfo>> GetAllReleasesInternalAsync()
     {
         // 检查缓存
-        if (_cachedReleases != null && !_cachedReleases.IsExpired(_cacheExpiration))
+        if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedReleases) &&
+            cachedReleases is not null)
         {
             _logger.LogDebug("从缓存返回所有版本信息");
-            return _cachedReleases.Data;
+            return cachedReleases;
         }
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            using var httpClient = CreateGitHubClient();
 
             var response = await httpClient.GetAsync(_githubApiBaseUrl);
             UpdateRateLimitInfo(response);
@@ -236,9 +240,10 @@ public class GitHubReleaseService : IReleaseService
             {
                 _logger.LogWarning("GitHub API 速率限制已达上限");
                 // 如果有缓存数据，返回缓存
-                if (_cachedReleases != null)
+                if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? fallbackReleases) &&
+                    fallbackReleases is not null)
                 {
-                    return _cachedReleases.Data;
+                    return fallbackReleases;
                 }
                 throw new FriendlyException("GitHub API 速率限制已达上限");
             }
@@ -251,7 +256,7 @@ public class GitHubReleaseService : IReleaseService
                 throw new FriendlyException("获取版本信息失败：响应数据为空");
             }
 
-            _cachedReleases = new CachedData<List<ReleaseInfo>>(releases);
+            _memoryCache.Set(ReleasesCacheKey, releases, CacheExpiration);
             _logger.LogInformation("成功获取 {Count} 个版本信息", releases.Count);
             return releases;
         }
@@ -259,19 +264,21 @@ public class GitHubReleaseService : IReleaseService
         {
             _logger.LogError(ex, "获取版本信息失败：HTTP 请求异常");
             // 如果有缓存，返回缓存数据作为降级方案
-            if (_cachedReleases != null)
+            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+                cachedFallback is not null)
             {
                 _logger.LogInformation("返回缓存的版本信息作为降级方案");
-                return _cachedReleases.Data;
+                return cachedFallback;
             }
             throw new FriendlyException($"网络请求失败：{ex.Message}", ex);
         }
         catch (TaskCanceledException ex)
         {
             _logger.LogError(ex, "获取版本信息失败：请求超时");
-            if (_cachedReleases != null)
+            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+                cachedFallback is not null)
             {
-                return _cachedReleases.Data;
+                return cachedFallback;
             }
             throw new FriendlyException("请求超时", ex);
         }
@@ -282,9 +289,10 @@ public class GitHubReleaseService : IReleaseService
         catch (Exception ex)
         {
             _logger.LogError(ex, "获取版本信息失败：未知异常");
-            if (_cachedReleases != null)
+            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+                cachedFallback is not null)
             {
-                return _cachedReleases.Data;
+                return cachedFallback;
             }
             throw new FriendlyException($"获取版本信息失败：{ex.Message}", ex);
         }
@@ -297,9 +305,7 @@ public class GitHubReleaseService : IReleaseService
     {
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.DefaultRequestHeaders.Add("User-Agent", AppInfo.UserAgent);
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            using var httpClient = CreateGitHubClient();
 
             var response = await httpClient.GetAsync(_githubApiLatestUrl);
             UpdateRateLimitInfo(response);
@@ -391,6 +397,11 @@ public class GitHubReleaseService : IReleaseService
         {
             _logger.LogWarning(ex, "解析 GitHub API 速率限制信息失败");
         }
+    }
+
+    private HttpClient CreateGitHubClient()
+    {
+        return _httpClientFactory.CreateClient("GitHub");
     }
 
     /// <summary>
@@ -503,26 +514,6 @@ public class GitHubReleaseService : IReleaseService
         }
 
         return 0;
-    }
-}
-
-/// <summary>
-/// 缓存数据包装类
-/// </summary>
-internal class CachedData<T>
-{
-    public T Data { get; }
-    public DateTime Timestamp { get; }
-
-    public CachedData(T data)
-    {
-        Data = data;
-        Timestamp = DateTime.UtcNow;
-    }
-
-    public bool IsExpired(TimeSpan expiration)
-    {
-        return DateTime.UtcNow - Timestamp > expiration;
     }
 }
 

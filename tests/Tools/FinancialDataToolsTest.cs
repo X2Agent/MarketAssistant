@@ -33,9 +33,12 @@ public class FinancialDataToolsTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
-        _serviceProvider?.Dispose();
+        if (_serviceProvider != null)
+        {
+            await _serviceProvider.DisposeAsync();
+        }
     }
 
     #region A股财务数据测试

@@ -27,7 +27,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
         // 清理历史记录
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
@@ -36,7 +36,7 @@ public class AssetHistoryServiceTest
         aShareService.ClearHistory();
         cryptoService.ClearHistory();
 
-        _serviceProvider.Dispose();
+        await _serviceProvider.DisposeAsync();
     }
 
     [TestMethod]

@@ -227,8 +227,7 @@ public class MarketAnalysisWorkflow : IDisposable
         var enabledAnalystRoles = _userSettingService.CurrentSetting.EnabledAnalystRoles;
 
         // 获取所有 AnalystAgentBase 的非抽象子类
-        var agentTypes = typeof(AnalystAgentBase).Assembly.GetTypes()
-            .Where(t => t.IsSubclassOf(typeof(AnalystAgentBase)) && !t.IsAbstract);
+        var agentTypes = AnalystTypeRegistry.GetConcreteAnalystTypes();
 
         foreach (var agentType in agentTypes)
         {

@@ -85,7 +85,7 @@ public class MarketChatSession : IDisposable
 
             try
             {
-                var enabledConfigs = McpService.GetEnabledConfigs();
+                var enabledConfigs = _mcpService.GetEnabledConfigs();
                 var mcpTools = await _mcpService.GetAIToolsAsync(enabledConfigs);
                 _allTools.AddRange(mcpTools);
                 _logger.LogInformation("加载 MCP 工具，数量: {Count}", mcpTools.Count);

@@ -43,7 +43,7 @@ public class FavoriteServiceTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
         // 清理收藏
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
@@ -52,7 +52,7 @@ public class FavoriteServiceTest
         aShareService.ClearFavorites();
         cryptoService.ClearFavorites();
 
-        _serviceProvider.Dispose();
+        await _serviceProvider.DisposeAsync();
     }
 
     [TestMethod]

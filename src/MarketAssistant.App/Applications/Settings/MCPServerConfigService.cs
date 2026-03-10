@@ -5,13 +5,6 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public class MCPServerConfigService
 {
-    private static readonly Lazy<MCPServerConfigService> _instance = new(() => new MCPServerConfigService());
-
-    /// <summary>
-    /// 获取MCPServerConfigService的单例实例
-    /// </summary>
-    public static MCPServerConfigService Instance => _instance.Value;
-
     private List<MCPServerConfig> _serverConfigs = new();
 
     /// <summary>
@@ -23,7 +16,7 @@ public class MCPServerConfigService
     private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName);
 
     /// <summary>
-    /// 构造函数（支持依赖注入，也支持单例模式）
+    /// 构造函数
     /// </summary>
     public MCPServerConfigService()
     {

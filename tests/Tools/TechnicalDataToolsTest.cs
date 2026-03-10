@@ -42,9 +42,12 @@ public class TechnicalDataToolsTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
-        _serviceProvider?.Dispose();
+        if (_serviceProvider != null)
+        {
+            await _serviceProvider.DisposeAsync();
+        }
     }
 
     #region A股技术数据测试

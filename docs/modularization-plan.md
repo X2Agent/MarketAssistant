@@ -62,7 +62,7 @@ DataProviders → Agents, Core
 - [x] 提取 MarketType, FriendlyException 等基础类型
 - [x] 提取 ErrorMessageMapper, HttpRetryHelper 等工具类
 - [x] 提取 CryptoSymbolConverter, StockSymbolConverter
-- [x] 提取 EnumExtensions, NavigationParameters
+- [x] 提取 EnumExtensions
 - [x] 提取 Trading Models（枚举和数据模型）
 
 ### Phase 3: Agents 项目提取（已完成）
@@ -75,6 +75,7 @@ DataProviders → Agents, Core
 
 ### Phase 4: Trading 项目提取（已完成）
 - [x] 提取 IExchangeClient 接口到独立项目
+- [x] 让交易主链优先通过 `IExchangeClient` 消费交易所能力，减少对 Binance 具体服务的多头依赖
 
 ### Phase 5: DataProviders 项目提取（已完成）
 - [x] 提取 BinanceMarketDataService
@@ -96,6 +97,13 @@ DataProviders → Agents, Core
 2. 将 IUserSettingService、IChatClientFactory 等接口移入 Contracts
 3. 将工作流编排和工具实现从 App 迁移到各自模块
 4. 消除 Agents 对 Services/Applications 的直接依赖
+
+## 近期清理结果
+
+- 分析师发现逻辑已统一为扫描当前应用中实际加载的实现类型，避免 UI 与工作流各自维护一套发现规则。
+- 分析页导航已统一改为 `AssetNavigationParameter`，旧的 `StockNavigationParameter` 已移除。
+- RAG 注册入口已收敛，避免重复调用 `AddRagServices()` 带来的重复依赖注册。
+- 交易账户与订单查询的主链已进一步收敛到 `IExchangeClient` 与统一的资产快照服务，减少重复包装。
 
 ## 注意事项
 

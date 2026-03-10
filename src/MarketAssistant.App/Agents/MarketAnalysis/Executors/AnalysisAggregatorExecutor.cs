@@ -18,8 +18,6 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// </summary>
 public sealed class AnalysisAggregatorExecutor : Executor<List<ChatMessage>, List<ChatMessage>>
 {
-    private readonly List<ChatMessage> _collectedMessages = [];
-    private int _receivedCount = 0;
     private readonly ILogger<AnalysisAggregatorExecutor> _logger;
 
     public AnalysisAggregatorExecutor(
@@ -40,35 +38,16 @@ public sealed class AnalysisAggregatorExecutor : Executor<List<ChatMessage>, Lis
     {
         ArgumentNullException.ThrowIfNull(messages);
 
-        // 每次调用表示收到一个分析师的结果
-        _receivedCount++;
-
-        _logger.LogDebug(
-            "收到分析师消息 {Received} 个，消息数: {MessageCount}",
-            _receivedCount, messages.Count);
-
-        // 收集消息
-        _collectedMessages.AddRange(messages);
-
-        // 从 state 读取期望的分析师数量
+        // AddFanInBarrierEdge 会在上游全部完成后，将聚合后的消息列表一次性传入。
         var expectedCount = await context.ReadStateAsync<int>(
             WorkflowStateKeys.ExpectedAnalystCount,
             WorkflowStateKeys.Scope,
             cancellationToken);
 
         _logger.LogInformation(
-            "已收集 {Current}/{Expected} 位分析师的结果，共 {TotalMessages} 条消息（Context Hash: {ContextHash}）",
-            _receivedCount, expectedCount, _collectedMessages.Count, context.GetHashCode());
+            "已收集 {Expected} 位分析师的结果，共 {TotalMessages} 条消息（Context Hash: {ContextHash}）",
+            expectedCount, messages.Count, context.GetHashCode());
 
-        // 判断是否收齐了所有分析师的消息（通过调用次数判断）
-        if (_receivedCount >= expectedCount)
-        {
-            _logger.LogInformation(
-                "所有 {Count} 位分析师的结果已收集完成（共 {Total} 条消息），准备传递给 Coordinator",
-                _receivedCount, _collectedMessages.Count);
-
-            return _collectedMessages;
-        }
-        return null;
+        return messages;
     }
 }

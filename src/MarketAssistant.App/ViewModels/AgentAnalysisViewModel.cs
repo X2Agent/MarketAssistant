@@ -18,7 +18,7 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 代理分析页面视图模型
 /// </summary>
-public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<StockNavigationParameter>, IDisposable
+public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
     public override string Title => "AI股票分析";
 
@@ -259,11 +259,11 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<St
         Logger?.LogInformation("分析报告已导出: {Path}", file.Name);
     }
 
-    public void OnNavigatedTo(StockNavigationParameter parameter)
+    public void OnNavigatedTo(AssetNavigationParameter parameter)
     {
-        if (!string.IsNullOrEmpty(parameter.StockCode))
+        if (!string.IsNullOrEmpty(parameter.Code))
         {
-            StockCode = parameter.StockCode;
+            StockCode = parameter.Code;
             Logger?.LogInformation("导航到 AI 股票分析页面，股票代码: {Code}", StockCode);
             // 异步加载数据
             _ = LoadAnalysisDataAsync();

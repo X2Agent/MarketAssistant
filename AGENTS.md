@@ -70,6 +70,16 @@ dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 
 ---
 
+## 避免重复造轮子
+
+- 新增基础能力前，先检索项目内现有抽象、服务和已引入 NuGet 依赖，优先复用，不要在业务层重新实现一套。
+- 对 HTTP、缓存、配置、消息分发、技术指标、文档解析等通用能力，优先使用成熟开源库或项目内统一组件。
+- 禁止在 ViewModel 或业务服务中直接手写新的 retry、timeout、限流、缓存、配置加载框架；优先复用 `HttpClient`、resilience pipeline、`IMemoryCache`、统一设置服务。
+- 技术指标优先复用统一指标组件或成熟库，不要在多个服务重复实现 `MA`、`EMA`、`MACD`、`BOLL`、`KDJ` 等公式。
+- 引入新三方库时，优先选择社区成熟、维护活跃、与当前技术栈兼容的方案，并在代码或文档中说明替换理由与迁移风险。
+
+---
+
 ## 安全与配置
 
 - API 密钥（Binance、AI 模型等）通过应用内设置界面输入，持久化在用户本地目录，**禁止提交到仓库**。

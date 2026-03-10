@@ -35,6 +35,7 @@
 - 策略配置：止损/止盈/追踪止损/AI 信号策略
 - 实时监控：Binance WebSocket 实时价格监控
 - 风控管理：多维度风控（仓位限制、单日亏损限制等）
+- 当前交易执行链以 `IExchangeClient` 统一抽象接入 Binance 现货能力，合约支持仍在规划中
 
 ### 文档向量化（RAG）
 
@@ -141,6 +142,7 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 - **向量存储**：Semantic Kernel SQLiteVec
 - **日志**：Serilog
 - **MVVM**：CommunityToolkit.Mvvm
+- **技术指标**：Skender.Stock.Indicators
   
 ## 🙏 鸣谢
 

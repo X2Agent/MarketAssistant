@@ -90,4 +90,18 @@ public class BaseAgentTest
 
         return services.BuildServiceProvider();
     }
+
+    [TestCleanup]
+    public async Task BaseCleanupAsync()
+    {
+        switch (_serviceProvider)
+        {
+            case IAsyncDisposable asyncDisposable:
+                await asyncDisposable.DisposeAsync();
+                break;
+            case IDisposable disposable:
+                disposable.Dispose();
+                break;
+        }
+    }
 }

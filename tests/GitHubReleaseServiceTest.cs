@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using Moq.Protected;
 using System.Net;
@@ -25,7 +26,8 @@ public class GitHubReleaseServiceTest
         httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
         _loggerMock = new Mock<ILogger<GitHubReleaseService>>();
-        _service = new GitHubReleaseService(httpClientFactoryMock.Object, _loggerMock.Object);
+        var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        _service = new GitHubReleaseService(httpClientFactoryMock.Object, memoryCache, _loggerMock.Object);
     }
 
     [TestMethod]

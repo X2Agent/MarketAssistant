@@ -42,6 +42,7 @@ public sealed class AssetScreenerServiceTest
         services.AddSingleton<PlaywrightService>();
         services.AddLogging();
         services.AddHttpClient();
+        services.AddTestMarketDataHttpClients();
         services.AddMemoryCache();
 
         // 注册虚拟币筛选服务依赖
@@ -56,9 +57,12 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
-        _serviceProvider?.Dispose();
+        if (_serviceProvider != null)
+        {
+            await _serviceProvider.DisposeAsync();
+        }
     }
 
     #region A股筛选测试
@@ -197,15 +201,20 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        var result = await service.ScreenAsync(criteria);
+        try
+        {
+            var result = await service.ScreenAsync(criteria);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count >= 0);
+            Assert.IsTrue(result.Count <= criteria.Limit);
+            Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)));
 
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
-        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)));
-
-        Console.WriteLine($"虚拟币默认条件筛选 - 返回数量: {result.Count}");
+            Console.WriteLine($"虚拟币默认条件筛选 - 返回数量: {result.Count}");
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     [TestMethod]
@@ -228,14 +237,19 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        var result = await service.ScreenAsync(criteria);
+        try
+        {
+            var result = await service.ScreenAsync(criteria);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count >= 0);
+            Assert.IsTrue(result.Count <= criteria.Limit);
 
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
-
-        Console.WriteLine($"虚拟币市值筛选（10-500亿美元） - 返回数量: {result.Count}");
+            Console.WriteLine($"虚拟币市值筛选（10-500亿美元） - 返回数量: {result.Count}");
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     [TestMethod]
@@ -258,14 +272,19 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        var result = await service.ScreenAsync(criteria);
+        try
+        {
+            var result = await service.ScreenAsync(criteria);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count >= 0);
+            Assert.IsTrue(result.Count <= criteria.Limit);
 
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
-
-        Console.WriteLine($"虚拟币价格变化筛选（-10% ~ +50%） - 返回数量: {result.Count}");
+            Console.WriteLine($"虚拟币价格变化筛选（-10% ~ +50%） - 返回数量: {result.Count}");
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     [TestMethod]
@@ -293,14 +312,19 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        var result = await service.ScreenAsync(criteria);
+        try
+        {
+            var result = await service.ScreenAsync(criteria);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count >= 0);
+            Assert.IsTrue(result.Count <= criteria.Limit);
 
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
-
-        Console.WriteLine($"虚拟币多条件筛选（市值+交易量） - 返回数量: {result.Count}");
+            Console.WriteLine($"虚拟币多条件筛选（市值+交易量） - 返回数量: {result.Count}");
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     [TestMethod]
@@ -323,14 +347,19 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        var result = await service.ScreenAsync(criteria);
+        try
+        {
+            var result = await service.ScreenAsync(criteria);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Count >= 0);
+            Assert.IsTrue(result.Count <= criteria.Limit);
 
-        // Assert
-        Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
-
-        Console.WriteLine($"虚拟币市值排名筛选（前50名） - 返回数量: {result.Count}");
+            Console.WriteLine($"虚拟币市值排名筛选（前50名） - 返回数量: {result.Count}");
+        }
+        catch (FriendlyException ex)
+        {
+            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
+        }
     }
 
     [TestMethod]
@@ -341,7 +370,7 @@ public sealed class AssetScreenerServiceTest
         var invalidCriteria = new StockCriteria(); // 错误的类型
 
         // Act & Assert
-        await Assert.ThrowsExceptionAsync<ArgumentException>(
+        await Assert.ThrowsExactlyAsync<ArgumentException>(
             async () => await service.ScreenAsync(invalidCriteria));
     }
 

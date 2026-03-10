@@ -62,13 +62,14 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private MCPServerConfig? _editingConfig;
 
     public MCPConfigPageViewModel(
+        MCPServerConfigService configService,
         INotificationService notificationService,
         IDialogService dialogService,
         McpService mcpService,
         ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
-        _configService = MCPServerConfigService.Instance;
+        _configService = configService;
         _notificationService = notificationService;
         _dialogService = dialogService;
         _mcpService = mcpService;
@@ -134,7 +135,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             Command = SelectedConfig.Command,
             Arguments = SelectedConfig.Arguments,
             IsEnabled = SelectedConfig.IsEnabled,
-            EnvironmentVariables = SelectedConfig.EnvironmentVariables
+            EnvironmentVariables = new Dictionary<string, string?>(SelectedConfig.EnvironmentVariables),
+            Category = SelectedConfig.Category,
+            AllowedTools = [.. SelectedConfig.AllowedTools]
         };
         LoadConfigToUI(_editingConfig);
         IsEditing = true;
@@ -231,26 +234,17 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
                 Command = Command,
                 Arguments = Arguments,
                 IsEnabled = true,
-                EnvironmentVariables = ParseEnvironmentVariables()
+                EnvironmentVariables = ParseEnvironmentVariables(),
+                Category = _editingConfig.Category,
+                AllowedTools = [.. _editingConfig.AllowedTools]
             };
 
             // 设置超时
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-            // 尝试连接并获取工具列表
-            // 使用注入的服务或创建临时实例（仅用于测试）
-            var service = _mcpService;
-            var shouldDispose = false;
-
-            if (service == null)
-            {
-                service = new McpService();
-                shouldDispose = true;
-            }
-
             try
             {
-                var tools = await service.GetAIToolsAsync([testConfig]);
+                var tools = await _mcpService.GetAIToolsAsync([testConfig]).WaitAsync(cts.Token);
                 var toolCount = tools.Count;
 
                 if (toolCount > 0)
@@ -277,14 +271,6 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
                 TestStatus = $"连接失败: {ex.Message}";
                 _notificationService?.ShowError($"连接失败: {ex.Message}");
                 Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
-            }
-            finally
-            {
-                // 如果是临时创建的服务，需要释放
-                if (shouldDispose && service != null)
-                {
-                    await service.DisposeAsync();
-                }
             }
         }
         finally

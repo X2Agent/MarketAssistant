@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Trading;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -14,18 +14,21 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// </summary>
 public class CryptoTradingExecutionTools : ITradingExecutionTools
 {
-    private readonly BinanceAccountService _accountService;
+    private readonly CryptoPortfolioService _portfolioService;
+    private readonly IExchangeClient _exchangeClient;
     private readonly BinanceMarketDataService _marketDataService;
     private readonly TradeExecutor _tradeExecutor;
     private readonly ILogger<CryptoTradingExecutionTools> _logger;
 
     public CryptoTradingExecutionTools(
-        BinanceAccountService accountService,
+        CryptoPortfolioService portfolioService,
+        IExchangeClient exchangeClient,
         BinanceMarketDataService marketDataService,
         TradeExecutor tradeExecutor,
         ILogger<CryptoTradingExecutionTools> logger)
     {
-        _accountService = accountService;
+        _portfolioService = portfolioService;
+        _exchangeClient = exchangeClient;
         _marketDataService = marketDataService;
         _tradeExecutor = tradeExecutor;
         _logger = logger;
@@ -34,86 +37,13 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
     public async Task<AccountBalanceSummary> GetAccountBalanceAsync()
     {
-        var accountInfo = await _accountService.GetAccountInfoAsync();
-        var summary = new AccountBalanceSummary();
-
-        foreach (var balance in accountInfo.Balances)
-        {
-            if (!decimal.TryParse(balance.Free, out var free) || !decimal.TryParse(balance.Locked, out var locked))
-                continue;
-            if (free == 0 && locked == 0)
-                continue;
-
-            var assetBalance = new AssetBalance
-            {
-                Asset = balance.Asset,
-                Free = free,
-                Locked = locked
-            };
-
-            if (balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
-            {
-                assetBalance.ValueUSDT = free + locked;
-            }
-            else
-            {
-                try
-                {
-                    var ticker = await _marketDataService.Get24hrTickerAsync($"{balance.Asset}USDT");
-                    if (ticker != null)
-                        assetBalance.ValueUSDT = (free + locked) * ticker.LastPrice;
-                }
-                catch (HttpRequestException)
-                {
-                    _logger.LogDebug("跳过无USDT交易对的资产估值: {Asset}", balance.Asset);
-                }
-            }
-
-            summary.TotalValueUSDT += assetBalance.ValueUSDT;
-            summary.Assets.Add(assetBalance);
-        }
-
-        return summary;
+        return await _portfolioService.GetAccountBalanceSummaryAsync();
     }
 
     [Description("查询当前持仓列表，显示每个币种的数量、入场均价、当前价和未实现盈亏")]
     public async Task<List<PositionInfo>> GetCurrentPositionsAsync()
     {
-        var accountInfo = await _accountService.GetAccountInfoAsync();
-        var positions = new List<PositionInfo>();
-
-        foreach (var balance in accountInfo.Balances)
-        {
-            if (!decimal.TryParse(balance.Free, out var free) || !decimal.TryParse(balance.Locked, out var locked))
-                continue;
-            var quantity = free + locked;
-            if (quantity <= 0 || balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var position = new PositionInfo
-            {
-                Symbol = $"{balance.Asset}USDT",
-                Quantity = quantity
-            };
-
-            try
-            {
-                var ticker = await _marketDataService.Get24hrTickerAsync(position.Symbol);
-                if (ticker != null)
-                {
-                    position.CurrentPrice = ticker.LastPrice;
-                    position.EntryPrice = ticker.LastPrice;
-                }
-            }
-            catch (HttpRequestException)
-            {
-                _logger.LogDebug("获取持仓价格失败，跳过: {Symbol}", position.Symbol);
-            }
-
-            positions.Add(position);
-        }
-
-        return positions;
+        return await _portfolioService.GetCurrentPositionsAsync();
     }
 
     [Description("下单交易。所有订单会先经过风控检查。symbol格式如BTCUSDT，side为Buy或Sell，type为Market或Limit")]
@@ -154,14 +84,14 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         [Description("交易对")] string symbol,
         [Description("Binance订单ID")] long orderId)
     {
-        var order = await _accountService.GetOrderAsync(symbol, orderId);
+        var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString());
         return new OrderStatusInfo
         {
-            OrderId = order.OrderId,
+            OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
             Symbol = order.Symbol,
             Status = order.Status,
-            ExecutedQty = decimal.TryParse(order.ExecutedQty, out var eq) ? eq : 0,
-            ExecutedPrice = decimal.TryParse(order.Price, out var ep) ? ep : 0
+            ExecutedQty = order.ExecutedQty,
+            ExecutedPrice = order.Price
         };
     }
 
@@ -172,7 +102,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     {
         try
         {
-            await _accountService.CancelOrderAsync(symbol, orderId);
+            await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString());
             return true;
         }
         catch (Exception ex)

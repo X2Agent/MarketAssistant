@@ -100,6 +100,15 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
+        services.AddHttpClient("GitHub", client =>
+        {
+            client.BaseAddress = new Uri(AppInfo.GitHubApiBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+            client.DefaultRequestHeaders.Accept.Add(
+                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+        }).AddStandardResilienceHandler();
+
         // 注册用户设置服务为单例
         services.AddSingleton<IUserSettingService, UserSettingService>();
 
@@ -146,6 +155,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AnalystPromptLoader>();
 
         // 注册 MCP 服务（Model Context Protocol）
+        services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();
         services.AddSingleton<McpService>();
 
@@ -194,6 +204,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<StrategyEngine>();
         services.AddSingleton<TradeExecutor>();
         services.AddSingleton<MarketMonitor>();
+        services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
         services.AddSingleton<IExchangeClient, BinanceExchangeClient>();
 

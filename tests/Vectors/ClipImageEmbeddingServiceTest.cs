@@ -123,7 +123,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
         var result = await _service.CaptionAsync(_testImageBytes);
 
         // Assert
-        Assert.AreEqual("(图像内容待解析)", result);
+        Assert.AreEqual("(图像内容生成失败)", result);
     }
 
     #endregion
@@ -159,7 +159,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
         Assert.IsNotNull(embedding, "并发嵌入生成应成功");
         Assert.IsNotNull(caption, "并发描述生成应成功");
         // 默认无Chat服务，返回占位符
-        Assert.AreEqual("(图像内容待解析)", caption);
+        Assert.AreEqual("(图像内容生成失败)", caption);
     }
 
     #endregion

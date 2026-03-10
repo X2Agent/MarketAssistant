@@ -14,7 +14,7 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 3. 广播消息给所有分析师（通过 SendMessageAsync）
 /// 4. 发送 TurnToken 触发分析师开始处理
 /// </summary>
-public sealed class AnalysisDispatcherExecutor : Executor<string>
+public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
 {
     private const string AnalysisPromptTemplate = "请对股票 {0} 进行专业分析，提供投资建议。";
 
@@ -33,7 +33,7 @@ public sealed class AnalysisDispatcherExecutor : Executor<string>
     /// <summary>
     /// 处理股票代码，广播分析任务给所有分析师
     /// </summary>
-    public override async ValueTask HandleAsync(
+    public override async ValueTask<ChatMessage> HandleAsync(
         string stockSymbol,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
@@ -62,17 +62,15 @@ public sealed class AnalysisDispatcherExecutor : Executor<string>
                 WorkflowStateKeys.Scope,
                 cancellationToken);
 
-            // 构建分析提示词并广播给所有分析师（Fan-Out）
-            // 注意：接收的 Agent 会排队消息，但不会立即处理，直到收到 TurnToken
+            // 通过返回标准 ChatMessage，将分析任务广播给下游分析师。
             string prompt = string.Format(AnalysisPromptTemplate, stockSymbol);
-            await context.SendMessageAsync(new ChatMessage(ChatRole.User, prompt), cancellationToken);
-
-            // 发送 TurnToken 触发所有分析师开始处理
-            await context.SendMessageAsync(new TurnToken(emitEvents: true), cancellationToken);
+            var message = new ChatMessage(ChatRole.User, prompt);
 
             _logger.LogInformation(
                 "分发器已将分析任务分发给 {Count} 位分析师，股票: {StockSymbol}",
                 _expectedAnalystCount, stockSymbol);
+
+            return message;
         }
         catch (Exception ex)
         {

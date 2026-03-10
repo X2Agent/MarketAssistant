@@ -30,9 +30,12 @@ public class CryptoMetricsToolsTest
     }
 
     [TestCleanup]
-    public void Cleanup()
+    public async Task Cleanup()
     {
-        _serviceProvider?.Dispose();
+        if (_serviceProvider != null)
+        {
+            await _serviceProvider.DisposeAsync();
+        }
     }
 
     [TestMethod]

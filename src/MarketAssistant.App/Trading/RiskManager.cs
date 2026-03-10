@@ -1,4 +1,3 @@
-using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -11,19 +10,16 @@ namespace MarketAssistant.Trading;
 public class RiskManager
 {
     private readonly TradingDataService _dataService;
-    private readonly BinanceAccountService _accountService;
-    private readonly BinanceMarketDataService _marketDataService;
+    private readonly CryptoPortfolioService _portfolioService;
     private readonly ILogger<RiskManager> _logger;
 
     public RiskManager(
         TradingDataService dataService,
-        BinanceAccountService accountService,
-        BinanceMarketDataService marketDataService,
+        CryptoPortfolioService portfolioService,
         ILogger<RiskManager> logger)
     {
         _dataService = dataService;
-        _accountService = accountService;
-        _marketDataService = marketDataService;
+        _portfolioService = portfolioService;
         _logger = logger;
     }
 
@@ -45,10 +41,10 @@ public class RiskManager
         if (todayStats.TradeCount >= config.MaxDailyTrades)
             return RiskCheckResult.Reject($"今日交易次数 {todayStats.TradeCount} 已达上限 {config.MaxDailyTrades}");
 
-        BinanceAccountInfo accountInfo;
+        AccountBalanceSummary portfolioSummary;
         try
         {
-            accountInfo = await _accountService.GetAccountInfoAsync();
+            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct);
         }
         catch (Exception ex)
         {
@@ -56,7 +52,7 @@ public class RiskManager
             return RiskCheckResult.Reject("无法获取账户信息，风控拒绝交易");
         }
 
-        var totalUSDT = await CalculateTotalValueUSDTAsync(accountInfo);
+        var totalUSDT = portfolioSummary.TotalValueUSDT;
 
         if (totalUSDT > 0)
         {
@@ -67,7 +63,7 @@ public class RiskManager
 
             if (config.MaxTotalPositionPercent > 0)
             {
-                var usdtBalance = CalculateUSDTBalance(accountInfo);
+                var usdtBalance = CryptoPortfolioService.GetUsdtBalance(portfolioSummary);
                 var nonUSDTValue = totalUSDT - usdtBalance;
                 var currentPositionPercent = nonUSDTValue / totalUSDT * 100;
                 var projectedPercent = currentPositionPercent + (orderValueUSDT / totalUSDT * 100);
@@ -91,45 +87,4 @@ public class RiskManager
         return RiskCheckResult.Pass();
     }
 
-    /// <summary>
-    /// 计算账户总资产的 USDT 等值（包括所有币种）
-    /// </summary>
-    private async Task<decimal> CalculateTotalValueUSDTAsync(BinanceAccountInfo accountInfo)
-    {
-        decimal total = 0;
-        foreach (var balance in accountInfo.Balances)
-        {
-            if (!decimal.TryParse(balance.Free, out var free) || !decimal.TryParse(balance.Locked, out var locked))
-                continue;
-            var amount = free + locked;
-            if (amount <= 0) continue;
-
-            if (balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
-            {
-                total += amount;
-            }
-            else
-            {
-                try
-                {
-                    var ticker = await _marketDataService.Get24hrTickerAsync($"{balance.Asset}USDT");
-                    if (ticker != null)
-                        total += amount * ticker.LastPrice;
-                }
-                catch { /* 无法交易的币对跳过 */ }
-            }
-        }
-        return total;
-    }
-
-    private static decimal CalculateUSDTBalance(BinanceAccountInfo accountInfo)
-    {
-        foreach (var balance in accountInfo.Balances)
-        {
-            if (balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase) &&
-                decimal.TryParse(balance.Free, out var free) && decimal.TryParse(balance.Locked, out var locked))
-                return free + locked;
-        }
-        return 0;
-    }
 }

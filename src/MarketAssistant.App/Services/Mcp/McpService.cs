@@ -13,16 +13,21 @@ public class McpService : IAsyncDisposable
 {
     private readonly ILogger<McpService>? _logger;
     private readonly McpToolAuditLogger? _auditLogger;
+    private readonly MCPServerConfigService _configService;
     private readonly List<McpClient> _mcpClients = new();
     private bool _disposed;
 
     /// <summary>
     /// 创建 MCP 服务
     /// </summary>
-    public McpService(ILogger<McpService>? logger = null, McpToolAuditLogger? auditLogger = null)
+    public McpService(
+        ILogger<McpService>? logger = null,
+        McpToolAuditLogger? auditLogger = null,
+        MCPServerConfigService? configService = null)
     {
         _logger = logger;
         _auditLogger = auditLogger;
+        _configService = configService ?? new MCPServerConfigService();
     }
 
     /// <summary>
@@ -84,10 +89,9 @@ public class McpService : IAsyncDisposable
     /// 获取所有启用的 MCP 服务器配置
     /// </summary>
     /// <returns>启用的配置列表</returns>
-    public static List<MCPServerConfig> GetEnabledConfigs()
+    public List<MCPServerConfig> GetEnabledConfigs()
     {
-        var configService = MCPServerConfigService.Instance;
-        return configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
+        return _configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
     }
 
     /// <summary>

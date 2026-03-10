@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Trading;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -11,11 +11,12 @@ namespace MarketAssistant.ViewModels.Trading;
 public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 {
     private readonly MarketMonitor _marketMonitor;
-    private readonly BinanceAccountService _accountService;
+    private readonly CryptoPortfolioService _portfolioService;
+    private readonly IExchangeClient _exchangeClient;
     private readonly TradingDataService _dataService;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
-    public ObservableCollection<BinanceOrderResponse> OpenOrders { get; } = [];
+    public ObservableCollection<ExchangeOrderResult> OpenOrders { get; } = [];
 
     [ObservableProperty] private decimal _totalValueUSDT;
     [ObservableProperty] private bool _isMonitorRunning;
@@ -23,13 +24,15 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
     public TradeMonitorViewModel(
         MarketMonitor marketMonitor,
-        BinanceAccountService accountService,
+        CryptoPortfolioService portfolioService,
+        IExchangeClient exchangeClient,
         TradingDataService dataService,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
     {
         _marketMonitor = marketMonitor;
-        _accountService = accountService;
+        _portfolioService = portfolioService;
+        _exchangeClient = exchangeClient;
         _dataService = dataService;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
@@ -45,31 +48,16 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
             try
             {
-                var accountInfo = await _accountService.GetAccountInfoAsync();
+                var summary = await _portfolioService.GetAccountBalanceSummaryAsync();
                 Balances.Clear();
-                decimal total = 0;
-
-                foreach (var balance in accountInfo.Balances)
+                foreach (var balance in summary.Assets)
                 {
-                    if (!decimal.TryParse(balance.Free, out var free) || !decimal.TryParse(balance.Locked, out var locked))
-                        continue;
-                    if (free == 0 && locked == 0)
-                        continue;
-
-                    var ab = new AssetBalance
-                    {
-                        Asset = balance.Asset,
-                        Free = free,
-                        Locked = locked,
-                        ValueUSDT = balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase) ? free + locked : 0
-                    };
-                    total += ab.ValueUSDT;
-                    Balances.Add(ab);
+                    Balances.Add(balance);
                 }
 
-                TotalValueUSDT = total;
+                TotalValueUSDT = summary.TotalValueUSDT;
 
-                var orders = await _accountService.GetOpenOrdersAsync();
+                var orders = await _exchangeClient.GetOpenOrdersAsync();
                 OpenOrders.Clear();
                 foreach (var o in orders)
                     OpenOrders.Add(o);

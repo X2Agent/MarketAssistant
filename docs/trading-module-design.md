@@ -1,6 +1,6 @@
 # 虚拟币自主交易模块设计
 
-> 状态：核心功能已实现（现货交易），持续迭代中。
+> 状态：现货交易主链已实现，并已优先通过 `IExchangeClient` 抽象接入；合约支持和部分策略类型仍在规划中。
 
 ## 一、设计目标
 
@@ -8,7 +8,7 @@
 
 - **混合运行模式**：后台持续监控 + 价格触发分析 + 策略自动执行
 - **策略自动化**：用户设置止损/止盈/仓位等参数，助手在限制内自动执行
-- **交易平台**：Binance（现货 + 合约）
+- **交易平台**：Binance（当前为现货，合约待补充）
 
 ---
 
@@ -16,13 +16,13 @@
 
 ### 核心组件
 
-计划放置于 `src/Trading/`，包含以下核心组件：
+当前核心实现主要位于 `src/MarketAssistant.App/Trading/`，包含以下核心组件：
 
 - **MarketMonitor**：后台市场监控，基于 `BinanceWebSocketService` 实时价格流 + `PriceAlertService` 触发条件。
 - **TradingAgent**：MAF `ChatClientAgent`，持有交易专用工具集，接收 Monitor 信号后自主分析并决策。
 - **StrategyEngine**：用户定义的策略管理（止损/止盈/网格/追踪等），解析策略规则为可执行条件。
 - **RiskManager**：风控网关，所有交易指令必须经过风控检查（单笔限额、日限额、最大持仓比例等）。
-- **TradeExecutor**：封装 `BinanceAccountService`，执行实际下单并记录交易日志。
+- **TradeExecutor**：通过 `IExchangeClient` 执行下单并记录交易日志。
 
 ### 数据流
 
@@ -46,8 +46,8 @@ BinanceWebSocket → MarketMonitor → [触发条件匹配]
 |------|------|------|
 | **复用** | `BinanceMarketDataService` | 现货+合约行情数据 |
 | **复用** | `BinanceWebSocketService` | 实时价格流（`PriceUpdated` 事件） |
-| **复用** | `BinanceAccountService` | 现货下单、查余额（需注册到 DI 并补充 API） |
-| **复用** | `BinanceAuthService` | HMAC-SHA256 签名（需注册到 DI） |
+| **复用** | `BinanceAccountService` | Binance 现货 API 底层实现，由 `BinanceExchangeClient` 适配为统一抽象 |
+| **复用** | `BinanceAuthService` | HMAC-SHA256 签名，已通过设置服务动态读取密钥 |
 | **复用** | `PriceAlertService` | 价格触发逻辑参考 |
 | **新建** | `MarketMonitor` | 后台监控 + 策略触发 |
 | **新建** | `TradingAgent` | AI 自主决策 |
@@ -274,10 +274,10 @@ TradingAgent 不继承 `AnalystAgentBase`（它不是分析师），由专用的
 
 | 接口 | 实现类 | 位置 | 依赖 |
 |------|--------|------|------|
-| `ITradingExecutionTools` | `CryptoTradingExecutionTools` | `src/Agents/Tools/Crypto/` | `BinanceAccountService`, `RiskManager` |
-| `IStrategyTools` | `CryptoStrategyTools` | `src/Agents/Tools/Crypto/` | `StrategyEngine` |
-| `IBasicDataTools` | `CryptoBasicTools`（已有） | `src/Agents/Tools/Crypto/` | `BinanceMarketDataService` |
-| `ITechnicalDataTools` | `CryptoTechnicalTools`（已有） | `src/Agents/Tools/Crypto/` | `BinanceMarketDataService` |
+| `ITradingExecutionTools` | `CryptoTradingExecutionTools` | `src/MarketAssistant.App/Agents/Tools/Crypto/` | `TradeExecutor`, `IExchangeClient` |
+| `IStrategyTools` | `CryptoStrategyTools` | `src/MarketAssistant.App/Agents/Tools/Crypto/` | `StrategyEngine` |
+| `IBasicDataTools` | `CryptoBasicTools`（已有） | `src/MarketAssistant.App/Agents/Tools/Crypto/` | `BinanceMarketDataService` |
+| `ITechnicalDataTools` | `CryptoTechnicalTools`（已有） | `src/MarketAssistant.App/Agents/Tools/Crypto/` | `IKLineService`, `Skender.Stock.Indicators` |
 
 ---
 
@@ -381,8 +381,8 @@ public class TradingDataService
 
 | 服务 | 现状 | 需要补充 |
 |------|------|---------|
-| `BinanceAccountService` | 有 `PlaceOrderAsync`（现货）、`GetAccountInfoAsync` | 注册到 DI；补充 `CancelOrderAsync`、`GetOrderAsync`；考虑合约 API |
-| `BinanceAuthService` | 完整可用 | 注册到 DI（`ServiceCollectionExtensions.cs`） |
+| `BinanceAccountService` | 已覆盖现货账户、下单、查单、撤单、挂单查询 | 继续评估合约 API 和更细粒度错误映射 |
+| `BinanceAuthService` | 完整可用 | 维持通过 `IUserSettingService` 动态读取密钥 |
 | `BinanceWebSocketService` | `PriceUpdated` 事件可用 | 无需修改 |
 | `PriceAlertService` | 价格触发逻辑可参考 | MarketMonitor 独立实现，但复用相同模式 |
 
@@ -398,9 +398,8 @@ public class TradingDataService
 
 ## 八、实施步骤（按优先级）
 
-1. **基础层**：定义模型（枚举 + 实体类）→ SQLite 持久化（`TradingDataService`）→ 注册 `BinanceAccountService`/`BinanceAuthService` 到 DI 并补充缺失 API
-2. **风控层**：`RiskManager` 实现 → `RiskConfig` 持久化
-3. **工具层**：`ITradingExecutionTools`/`IStrategyTools` 接口定义 → `CryptoTradingExecutionTools`/`CryptoStrategyTools` 实现
-4. **Agent 层**：`TradingAgent` + `TradingAgentFactory` + 系统提示词
-5. **引擎层**：`StrategyEngine`（策略条件匹配）→ `MarketMonitor`（后台监控 + 触发）→ `TradeExecutor`（下单执行）
-6. **UI 层**：策略配置页 → 交易监控页 → 交易历史页
+1. **继续收敛抽象**：保持 `RiskManager`、`TradeExecutor`、Agent 工具与监控链优先依赖 `IExchangeClient`，避免重复封装 Binance 账户逻辑。
+2. **扩展交易能力**：补充合约 API、完善订单错误映射与可观测性。
+3. **补齐策略类型**：逐步实现 `GridTrading`、`DCA` 等仍未完成的策略类型。
+4. **Agent 层增强**：完善 `TradingAgent` 的策略上下文、提示词和人工确认边界。
+5. **UI 层完善**：持续增强策略配置页、监控页和交易历史页的联动能力。

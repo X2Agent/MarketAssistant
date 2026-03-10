@@ -54,8 +54,18 @@ public class McpServiceTest
     [TestMethod]
     public void GetEnabledConfigs_ReturnsOnlyEnabled()
     {
+        var configService = new MCPServerConfigService();
+        configService.ServerConfigs.Clear();
+        configService.ServerConfigs.AddRange(
+        [
+            new MCPServerConfig { Name = "enabled", Command = "test", IsEnabled = true },
+            new MCPServerConfig { Name = "disabled", Command = "test", IsEnabled = false }
+        ]);
+
+        var service = new McpService(NullLogger<McpService>.Instance, null, configService);
+
         // Act
-        var configs = McpService.GetEnabledConfigs();
+        var configs = service.GetEnabledConfigs();
 
         // Assert
         Assert.IsNotNull(configs);
