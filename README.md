@@ -6,6 +6,17 @@
 
 本项目仅供学习研究，投资有风险，入市需谨慎。
 
+## 🧱 架构概览
+
+- `MarketAssistant.App`：Avalonia UI 宿主，只负责视图、ViewModel、导航、通知、样式和内容文件输出。
+- `MarketAssistant.App.Services`：应用运行时与业务编排层，承载 Agent 实现、Workflow、Tool 实现、RAG、MCP、交易引擎和业务服务。
+- `MarketAssistant.Agents`：Agent 契约层，定义分析师基类、工具抽象、分析模型和提示词配置加载。
+- `MarketAssistant.DataProviders`：外部行情与资讯数据接入层。
+- `MarketAssistant.Trading`：交易抽象与共享交易模型。
+- `MarketAssistant.Core`：基础模型、异常、转换器和市场枚举等通用能力。
+
+当前依赖关系为：`Core <- Trading/DataProviders <- Agents/App.Services <- App`，其中 `Agents` 额外依赖 `Trading` 中的共享交易抽象，`App` 作为 UI 宿主还直接引用部分共享模型与服务。
+
 ## 📊 主要功能
 
 ### 多市场支持

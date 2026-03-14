@@ -42,6 +42,7 @@
     <ProjectReference Include="..\MarketAssistant.Agents\MarketAssistant.Agents.csproj" />
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
     <ProjectReference Include="..\MarketAssistant.DataProviders\MarketAssistant.DataProviders.csproj" />
+    <ProjectReference Include="..\MarketAssistant.App.Services\MarketAssistant.App.Services.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +55,10 @@
     </Content>
     <Content Include="config\prompts\analysts.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="skills\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>skills\%(RecursiveDir)%(Filename)%(Extension)</Link>
     </Content>
   </ItemGroup>
 

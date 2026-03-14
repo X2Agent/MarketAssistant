@@ -1,6 +1,6 @@
 # MarketAssistant.App — AGENTS.md
 
-主应用入口项目（Avalonia 桌面应用），引用所有其他子项目。包含 UI、业务逻辑、Agent 实现、交易引擎、RAG 等全部运行时代码。
+主应用入口项目（Avalonia 桌面应用）。**职责限定为 UI 宿主**：包含 View、ViewModel、导航、通知、对话框、样式资源和内容文件输出；业务逻辑、Agent 实现、Workflow、Tool、RAG、交易引擎统一收敛在 `MarketAssistant.App.Services`。
 
 ---
 
@@ -8,70 +8,23 @@
 
 ```
 MarketAssistant.App/
-├── Agents/                        ← AI Agent 实现
-│   ├── MarketChatSession.cs       ← 聊天会话管理
-│   ├── Analysts/                  ← 分析师实现（Technical/Fundamental/Financial/Sentiment/News/Coordinator）
-│   ├── ContextProviders/          ← 上下文提供者
-│   ├── InvestmentSelection/       ← 投资选择工作流（三步骤确定性 Workflow）
-│   │   ├── Executors/             ← 步骤执行器
-│   │   ├── Models/                ← 工作流模型
-│   │   └── Strategies/            ← 市场特定策略（A 股 / Crypto）
-│   ├── MarketAnalysis/            ← 市场分析工作流（Fan-Out/Fan-In 并发分析）
-│   │   └── Executors/             ← 分发/聚合/协调执行器
-│   ├── Tools/                     ← Agent 工具实现
-│   │   ├── AShare/                ← A 股工具
-│   │   ├── Crypto/                ← 加密货币工具
-│   │   └── GroundingSearchTools.cs
-│   └── Trading/                   ← 交易 Agent
-├── Applications/                  ← 业务服务层
-│   ├── Analysis/                  ← 分析编排服务
-│   ├── AssetScreener/             ← 资产筛选
-│   ├── Assets/                    ← 资产信息
-│   ├── Cache/                     ← 资产缓存
-│   ├── Charts/                    ← K 线数据
-│   ├── Crypto/                    ← Binance 认证/账户
-│   ├── Favorites/                 ← 收藏管理
-│   ├── History/                   ← 浏览历史
-│   ├── Home/                      ← 首页数据
-│   ├── InvestmentSelection/       ← 投资选择业务
-│   ├── News/                      ← 新闻快讯
-│   ├── PriceAlert/                ← 价格提醒
-│   ├── Settings/                  ← 设置与版本
-│   └── Telegrams/                 ← 电报快讯
 ├── config/
 │   ├── models.yaml                ← AI 模型与供应商配置
 │   └── prompts/analysts.yaml      ← 分析师提示词配置
 ├── Converts/                      ← AXAML 值转换器
-├── Infrastructure/
-│   ├── Abstractions/              ← 服务接口
-│   ├── AdaptiveCards/             ← 自适应卡片转换与解析
-│   ├── Configuration/             ← 偏好设置
-│   ├── Core/                      ← 文件系统、全局异常、ViewLocator
-│   └── Factories/                 ← AnalystAgent/ChatClient/Embedding/TradingAgent 工厂
-├── Rag/                           ← RAG（向量化、检索、重排、文档解析）
+├── Infrastructure/                ← ViewLocator 等 UI 宿主基础设施
 ├── Resources/Styles/              ← Avalonia 样式资源字典
-├── Services/                      ← 横切关注点服务
-│   ├── Archive/                   ← 报告归档
-│   ├── Browser/                   ← 浏览器 / Playwright
-│   ├── Cache/                     ← 分析缓存
-│   ├── Dialog/                    ← 对话框
-│   ├── Export/                    ← Markdown 报告导出
-│   ├── Market/                    ← MarketContext 与市场能力
-│   ├── Mcp/                       ← MCP Server 集成
+├── Services/                      ← UI 适配服务
+│   ├── Dialog/                    ← Avalonia 对话框实现
 │   ├── Navigation/                ← 页面导航
-│   ├── Notification/              ← 通知
-│   └── Settings/                  ← 用户设置持久化
-├── Trading/                       ← 交易引擎
-│   ├── Exchanges/BinanceExchangeClient.cs
-│   ├── TradeExecutor.cs, RiskManager.cs
-│   ├── StrategyEngine.cs, MarketMonitor.cs
-│   └── TradingDataService.cs
+│   └── Notification/              ← UI 通知
 ├── ViewModels/                    ← MVVM ViewModel
 ├── Views/                         ← Avalonia AXAML 视图
 │   ├── Controls/                  ← 自定义控件
 │   ├── Components/                ← 复合组件
 │   ├── Pages/                     ← 页面视图
 │   └── Windows/                   ← 窗口
+├── skills/                        ← 输出到运行目录的 Skill/参考资源
 └── Assets/                        ← 图片、图标
 ```
 
@@ -100,23 +53,25 @@ MarketAssistant.App/
 - `ObservableCollection` 在构造函数中初始化一次。
 - 异常处理：使用 `SafeExecuteAsync` 或 `ErrorMessageMapper`，**不要吞并异常**。
 - 通过 DI 容器获取依赖，不使用 `ServiceLocator`。
+- ViewModel 可以消费 `MarketAssistant.App.Services` 暴露的业务服务，但不要在 UI 层新增 Agent、Tool、Workflow 实现。
 
 ---
 
-## Agent 与工具约定
+## 边界约定
 
-- **工具注册**：市场特定实现注册为 Keyed Service（key = `MarketType`），通用工具注册为 Singleton。
-- **分析师工具声明**：通过 `[RequiresTools(typeof(IXxxTools))]` 声明，`AnalystAgentFactory` 自动解析。
-- **ChatSession 上下文注入**：通过 `MarketChatSession.InjectAnalysisContext()` 注入，不手动操作 MAF `AgentSession` 内部历史。
-- **ChatSession 工具范围**：仅持有 `GroundingSearchTools` + MCP 工具，市场数据工具在 Workflow 阶段由分析师使用。
-- **版本号**：定义在 `.csproj` 的 `<Version>` 属性中，运行时通过 `AppInfo.Version` 获取。
+- `MarketAssistant.App` 不再承载 Agent Tool、Workflow、RAG、交易引擎等运行时代码。
+- 新增 Agent/Tool/Workflow/业务服务时，放到 `MarketAssistant.App.Services`；本项目只保留 UI 相关适配。
+- `skills/` 作为内容文件随 App 输出，由运行时从输出目录加载；不要在 UI 层复制第二套 Skill 加载逻辑。
+- 版本号定义在 `.csproj` 的 `<Version>` 属性中，运行时通过 `AppInfo.Version` 获取。
 
 ---
 
 ## DI 注册
 
-- 入口：`Program.ConfigureServices()` → 调用 `services.AddApplicationServices()`（`Services/ServiceCollectionExtensions.cs`）和 `services.AddRagServices()`（`Rag/Extensions/ServiceCollectionExtensions.cs`）。
-- 新增服务在对应的 `ServiceCollectionExtensions` 中注册；市场特定实现使用 `AddKeyedSingleton<T>(MarketType)`。
+- 入口：`Program.ConfigureServices()`。
+- UI 注册入口：`Services/ServiceCollectionExtensions.cs` 中的 `AddApplicationServices()` 和 `AddViewModels()`。
+- `AddApplicationServices()` 会先调用 `AddBusinessServices()`，后者定义在 `MarketAssistant.App.Services/Services/ServiceCollectionExtensions.cs`。
+- 新增 UI 服务在本项目注册；新增业务/运行时服务在 `MarketAssistant.App.Services` 注册。
 
 ---
 
@@ -144,7 +99,7 @@ dotnet build src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 ```
 
-可选：安装 Playwright CLI（用于首次拉起浏览器依赖，`Services/Browser/` 使用）：
+可选：安装 Playwright CLI（业务运行时中的浏览器自动化依赖会使用）：
 
 ```bash
 dotnet tool update --global Microsoft.Playwright.CLI

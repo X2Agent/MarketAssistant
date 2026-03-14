@@ -9,6 +9,7 @@
   <Project Path="src/MarketAssistant.Agents/MarketAssistant.Agents.csproj" />
   <Project Path="src/MarketAssistant.Trading/MarketAssistant.Trading.csproj" />
   <Project Path="src/MarketAssistant.DataProviders/MarketAssistant.DataProviders.csproj" />
+  <Project Path="src/MarketAssistant.App.Services/MarketAssistant.App.Services.csproj" />
   <Project Path="src/MarketAssistant.App/MarketAssistant.App.csproj" />
   <Project Path="tests/TestMarketAssistant.csproj" />
 </Solution>

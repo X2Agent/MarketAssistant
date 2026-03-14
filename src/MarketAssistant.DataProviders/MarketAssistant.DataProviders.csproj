@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
-    <ProjectReference Include="..\MarketAssistant.Agents\MarketAssistant.Agents.csproj" />
   </ItemGroup>
 
   <ItemGroup>

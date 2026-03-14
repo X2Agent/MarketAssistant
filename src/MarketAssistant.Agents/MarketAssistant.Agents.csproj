@@ -4,10 +4,12 @@
     <Nullable>enable</Nullable>
     <RootNamespace>MarketAssistant</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);MAAI001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
   </ItemGroup>
 
   <ItemGroup>

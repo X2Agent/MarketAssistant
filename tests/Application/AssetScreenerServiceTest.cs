@@ -6,7 +6,7 @@ using MarketAssistant.Services;
 using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Agents.Tools.Models.Crypto.CoinGecko;
+using MarketAssistant.Services.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;

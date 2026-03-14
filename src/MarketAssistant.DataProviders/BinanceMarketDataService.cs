@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.Tools.Models.Crypto.Binance;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;

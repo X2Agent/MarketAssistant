@@ -8,9 +8,10 @@
 
 ```
 MarketAssistant.slnx
-├── src/MarketAssistant.App/            ← UI 应用入口（Avalonia）        → 有独立 AGENTS.md
+├── src/MarketAssistant.App/            ← UI 宿主（Avalonia）            → 有独立 AGENTS.md
+├── src/MarketAssistant.App.Services/   ← 应用运行时/业务编排层         → 有独立 AGENTS.md
 ├── src/MarketAssistant.Core/           ← 核心抽象层（MarketType 等）    → 有独立 AGENTS.md
-├── src/MarketAssistant.Agents/         ← AI Agent 抽象层（MAF）         → 有独立 AGENTS.md
+├── src/MarketAssistant.Agents/         ← Agent 契约层（MAF）            → 有独立 AGENTS.md
 ├── src/MarketAssistant.Trading/        ← 交易抽象层（IExchangeClient） → 有独立 AGENTS.md
 ├── src/MarketAssistant.DataProviders/  ← 数据提供者（Binance 等）      → 有独立 AGENTS.md
 ├── tests/                              ← 单元测试工程
@@ -23,10 +24,11 @@ MarketAssistant.slnx
 ```
 Core（无依赖）
  ↑
- ├── Agents → Core
  ├── Trading → Core
- ├── DataProviders → Core, Agents
- └── App → Core, Agents, Trading, DataProviders
+ ├── DataProviders → Core
+ ├── Agents → Core, Trading
+ ├── App.Services → Core, Agents, Trading, DataProviders
+ └── App → Core, Agents, Trading, DataProviders, App.Services
 ```
 
 核心技术栈：.NET 10 / C# 13 · Avalonia 11.x · Microsoft Agent Framework (MAF) · Semantic Kernel SQLiteVec · Serilog
@@ -84,7 +86,8 @@ dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 
 - API 密钥（Binance、AI 模型等）通过应用内设置界面输入，持久化在用户本地目录，**禁止提交到仓库**。
 - 不要提交 `.env`、`appsettings.*.json`、用户偏好文件等包含密钥的文件。
-- DI 注册入口：`Program.ConfigureServices()` → `Services/ServiceCollectionExtensions.cs`，市场特定实现使用 `AddKeyedSingleton<T>(MarketType)`。
+- DI 注册入口：`Program.ConfigureServices()` → `src/MarketAssistant.App/Services/ServiceCollectionExtensions.cs`。
+- 业务服务注册入口：`AddApplicationServices()` 内部调用 `AddBusinessServices()`，后者定义在 `src/MarketAssistant.App.Services/Services/ServiceCollectionExtensions.cs`。
 
 ---
 
