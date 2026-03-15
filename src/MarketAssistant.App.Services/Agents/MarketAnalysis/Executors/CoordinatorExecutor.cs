@@ -14,7 +14,7 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 负责汇总各分析师的分析并生成最终报告
 /// 使用 AIAgent 支持工具调用 + 结构化输出
 /// </summary>
-public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnalysisReport>
+public sealed partial class CoordinatorExecutor : Executor
 {
     private readonly AIAgent _coordinatorAgent;
     private readonly ILogger<CoordinatorExecutor> _logger;
@@ -43,10 +43,8 @@ public sealed class CoordinatorExecutor : Executor<List<ChatMessage>, MarketAnal
         _logger.LogInformation("协调分析师 Agent 已创建（支持工具调用 + 结构化输出）");
     }
 
-    /// <summary>
-    /// 处理聚合的分析师消息，生成并返回最终分析报告
-    /// </summary>
-    public override async ValueTask<MarketAnalysisReport> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<MarketAnalysisReport> HandleAsync(
         List<ChatMessage> analystMessages,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)

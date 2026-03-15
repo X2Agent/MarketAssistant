@@ -14,7 +14,7 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 3. 广播消息给所有分析师（通过 SendMessageAsync）
 /// 4. 发送 TurnToken 触发分析师开始处理
 /// </summary>
-public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
+public sealed partial class AnalysisDispatcherExecutor : Executor
 {
     private const string AnalysisPromptTemplate = "请对标的 {0} 进行专业分析，提供投资建议。";
 
@@ -30,10 +30,8 @@ public sealed class AnalysisDispatcherExecutor : Executor<string, ChatMessage>
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// 处理标的代码，广播分析任务给所有分析师
-    /// </summary>
-    public override async ValueTask<ChatMessage> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<ChatMessage> HandleAsync(
         string assetSymbol,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)

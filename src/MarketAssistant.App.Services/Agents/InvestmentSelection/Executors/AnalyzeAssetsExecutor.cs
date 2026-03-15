@@ -12,7 +12,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 统一的资产分析 Executor
 /// 对筛选出的资产进行深度分析并生成推荐报告
 /// </summary>
-public sealed class AnalyzeAssetsExecutor : Executor<AssetScreeningResult, InvestmentSelectionResult>
+public sealed partial class AnalyzeAssetsExecutor : Executor
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -33,7 +33,8 @@ public sealed class AnalyzeAssetsExecutor : Executor<AssetScreeningResult, Inves
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public override async ValueTask<InvestmentSelectionResult> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<InvestmentSelectionResult> HandleAsync(
         AssetScreeningResult input,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)

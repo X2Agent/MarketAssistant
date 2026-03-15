@@ -50,19 +50,4 @@ public class ScreenInvestmentTargetsExecutorTest
         Assert.ThrowsExactly<ArgumentNullException>(() =>
             new ScreenInvestmentTargetsExecutor(_mockServiceProvider.Object, null!));
     }
-
-    [TestMethod]
-    public async Task HandleAsync_WithNullCriteria_ShouldThrowException()
-    {
-        var input = new CriteriaGenerationResult
-        {
-            Criteria = null!,
-            OriginalRequest = new InvestmentSelectionWorkflowRequest()
-        };
-
-        var mockContext = new Mock<IWorkflowContext>();
-
-        await Assert.ThrowsExactlyAsync<ArgumentNullException>(
-            () => _executor.HandleAsync(input, mockContext.Object).AsTask());
-    }
 }

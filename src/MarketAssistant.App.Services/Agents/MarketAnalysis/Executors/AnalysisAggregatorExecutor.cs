@@ -14,9 +14,8 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 3. 内部维护列表收集所有消息
 /// 4. 收齐后使用 context.YieldOutputAsync 输出给下游
 /// 
-/// 注意：使用 Executor<TInput> 而不是 Executor<TInput, TOutput>
 /// </summary>
-public sealed class AnalysisAggregatorExecutor : Executor<List<ChatMessage>, List<ChatMessage>>
+public sealed partial class AnalysisAggregatorExecutor : Executor
 {
     private readonly ILogger<AnalysisAggregatorExecutor> _logger;
 
@@ -27,11 +26,8 @@ public sealed class AnalysisAggregatorExecutor : Executor<List<ChatMessage>, Lis
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// 接收单个分析师的消息列表（会被调用多次）
-    /// 收集完所有分析师消息后，使用 YieldOutputAsync 传递给 Coordinator
-    /// </summary>
-    public override async ValueTask<List<ChatMessage>> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<List<ChatMessage>> HandleAsync(
         List<ChatMessage> messages,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
