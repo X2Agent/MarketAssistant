@@ -5,11 +5,6 @@ using System.ClientModel;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
-public interface IEmbeddingFactory
-{
-    IEmbeddingGenerator<string, Embedding<float>> Create();
-}
-
 public class EmbeddingFactory : IEmbeddingFactory
 {
     private readonly IUserSettingService _userSettingService;

@@ -29,17 +29,10 @@ namespace MarketAssistant
         {
             var services = new ServiceCollection();
 
-            // 注册用户设置服务为单例（需要先注册以便获取日志路径）
-            services.AddSingleton<IUserSettingService, UserSettingService>();
-
-            // 构建一个临时 ServiceProvider 以便在配置日志之前获取用户设置
-            using (var tempProvider = services.BuildServiceProvider())
-            {
-                var userSettingService = tempProvider.GetRequiredService<IUserSettingService>();
-
-                // 配置日志
-                services.AddLogging(builder => builder.ConfigureLogging(userSettingService));
-            }
+            // ConfigureLogging 只需要在启动时读取一次日志路径，直接实例化即可，
+            // 避免构建临时容器（捕获依赖问题）。
+            // IUserSettingService 的正式 Singleton 由 AddAgentTools() 内部负责注册。
+            services.AddLogging(builder => builder.ConfigureLogging(new UserSettingService()));
 
             // 注册应用程序业务服务
             services.AddApplicationServices();

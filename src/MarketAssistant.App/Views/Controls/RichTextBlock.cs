@@ -5,7 +5,6 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Markdown.Avalonia;
 using System.Text.RegularExpressions;
-using WebViewControl;
 
 namespace MarketAssistant.Views.Controls;
 
@@ -57,7 +56,7 @@ public class RichTextBlock : UserControl
 
     private ContentControl? _contentContainer;
     private MarkdownScrollViewer? _markdownViewer;
-    private WebView? _webView;
+    private NativeWebView? _webView;
     private TextBlock? _textBlock;
     private ContentFormat _currentFormat = ContentFormat.PlainText;
 
@@ -226,7 +225,7 @@ public class RichTextBlock : UserControl
     {
         if (_webView == null)
         {
-            _webView = new WebView
+            _webView = new NativeWebView
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch
@@ -271,7 +270,7 @@ public class RichTextBlock : UserControl
 </html>";
         }
 
-        _webView.LoadHtml(fullHtml);
+        _webView.NavigateToString(fullHtml);
     }
 
     /// <summary>
@@ -312,12 +311,7 @@ public class RichTextBlock : UserControl
     /// </summary>
     private void CleanupCurrentViewer()
     {
-        if (_webView != null)
-        {
-            _webView.Dispose();
-            _webView = null;
-        }
-
+        _webView = null;
         _markdownViewer = null;
         _textBlock = null;
     }

@@ -6,11 +6,6 @@ using Microsoft.SemanticKernel.Data;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
-public interface IWebTextSearchFactory
-{
-    ITextSearch? Create();
-}
-
 public class WebTextSearchFactory(IUserSettingService userSettingService) : IWebTextSearchFactory
 {
     public ITextSearch? Create()

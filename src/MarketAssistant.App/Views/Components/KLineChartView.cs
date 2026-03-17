@@ -4,18 +4,17 @@ using Avalonia.Layout;
 using Avalonia.Platform;
 using MarketAssistant.Applications.Charts.Models;
 using System.Text.Json;
-using WebViewControl;
 
 namespace MarketAssistant.Views.Components;
 
 /// <summary>
 /// K线图表视图组件 (Avalonia版本)
-/// 使用 WebView.Avalonia.Desktop 库提供 WebView 支持
+/// 使用 Avalonia.Controls.WebView 官方库提供 WebView 支持
 /// </summary>
 public class KLineChartView : UserControl
 {
     private bool _isInitialized = false;
-    private WebView? _webView;
+    private NativeWebView? _webView;
     private StackPanel? _loadingPanel;
     private StackPanel? _errorPanel;
     private TextBlock? _errorText;
@@ -58,7 +57,7 @@ public class KLineChartView : UserControl
         var grid = new Grid();
 
         // 创建 WebView
-        _webView = new WebView
+        _webView = new NativeWebView
         {
             IsVisible = false,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -124,7 +123,7 @@ public class KLineChartView : UserControl
     /// <summary>
     /// WebView 导航完成事件处理器
     /// </summary>
-    private void OnWebViewNavigated(string url, string? title)
+    private void OnWebViewNavigated(object? sender, WebViewNavigationCompletedEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
         {
@@ -157,11 +156,11 @@ public class KLineChartView : UserControl
                 return;
             }
 
-            // 监听 WebView 加载完成事件（必须在 LoadHtml 之前注册）
-            _webView.Navigated += OnWebViewNavigated;
+            // 监听 WebView 加载完成事件（必须在 NavigateToString 之前注册）
+            _webView.NavigationCompleted += OnWebViewNavigated;
 
-            // 使用 WebView 的 LoadHtml 方法加载 HTML 内容
-            _webView.LoadHtml(htmlContent);
+            // 使用 NativeWebView 的 NavigateToString 方法加载 HTML 内容
+            _webView.NavigateToString(htmlContent);
         }
         catch (Exception ex)
         {
@@ -358,12 +357,12 @@ public class KLineChartView : UserControl
 
             await WaitForInitializationAsync();
 
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 try
                 {
                     // 设置加载状态
-                    _webView.ExecuteScript("window.stockChartInterface.setLoading(true);");
+                    await _webView!.InvokeScript("window.stockChartInterface.setLoading(true);");
 
                     // 序列化数据
                     var options = new JsonSerializerOptions
@@ -375,10 +374,10 @@ public class KLineChartView : UserControl
 
                     // 调用JavaScript更新图表数据
                     string script = $"window.stockChartInterface.loadData({jsonData});";
-                    _webView.ExecuteScript(script);
+                    await _webView.InvokeScript(script);
 
                     // 取消加载状态
-                    _webView.ExecuteScript("window.stockChartInterface.setLoading(false);");
+                    await _webView.InvokeScript("window.stockChartInterface.setLoading(false);");
                 }
                 catch (Exception jsEx)
                 {

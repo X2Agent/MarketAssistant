@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Rag.Services;
 
@@ -47,7 +46,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
 
         services.AddSingleton<IRetrievalOrchestrator, RetrievalOrchestrator>();
-        services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
 
         services.AddSingleton<IRagIngestionService, RagIngestionService>();
 

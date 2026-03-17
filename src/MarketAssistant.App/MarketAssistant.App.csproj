@@ -43,6 +43,7 @@
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
     <ProjectReference Include="..\MarketAssistant.DataProviders\MarketAssistant.DataProviders.csproj" />
     <ProjectReference Include="..\MarketAssistant.App.Services\MarketAssistant.App.Services.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Rag\MarketAssistant.Rag.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -97,8 +98,8 @@
 	<PackageReference Include="Svg.Skia" Version="3.4.1" />
 	<!-- Added for CLIP ONNX embedding support -->
 	<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.2" />
-	<!-- 添加用于Preferences和FileSystem替代的包 -->
-	<PackageReference Include="WebViewControl-Avalonia" Version="3.120.11" />
+	<!-- Avalonia 官方 WebView（MIT 开源，无需许可证） -->
+	<PackageReference Include="Avalonia.Controls.WebView" Version="12.0.0-preview2" />
 	<PackageReference Include="Markdown.Avalonia" Version="11.0.3-a1" />
 	<PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
