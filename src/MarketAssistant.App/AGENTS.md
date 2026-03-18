@@ -1,6 +1,6 @@
 # MarketAssistant.App — AGENTS.md
 
-主应用入口项目（Avalonia 桌面应用）。**职责限定为 UI 宿主**：包含 View、ViewModel、导航、通知、对话框、样式资源和内容文件输出；业务逻辑、Agent 实现、Workflow、Tool、RAG、交易引擎统一收敛在 `MarketAssistant.App.Services`。
+主应用入口项目（Avalonia 桌面应用）。**职责限定为 UI 宿主**：包含 View、ViewModel、导航、通知、对话框、样式资源和内容文件输出；业务逻辑、Agent 实现、Workflow、Tool、MCP、交易引擎收敛在 `MarketAssistant.App.Services`，RAG 基础能力收敛在 `MarketAssistant.Rag`。
 
 ---
 
@@ -60,7 +60,7 @@ MarketAssistant.App/
 ## 边界约定
 
 - `MarketAssistant.App` 不再承载 Agent Tool、Workflow、RAG、交易引擎等运行时代码。
-- 新增 Agent/Tool/Workflow/业务服务时，放到 `MarketAssistant.App.Services`；本项目只保留 UI 相关适配。
+- 新增 Agent/Tool/Workflow/业务服务时，放到 `MarketAssistant.App.Services`；新增文档解析、向量化、检索、重排等 RAG 基础能力时，放到 `MarketAssistant.Rag`；本项目只保留 UI 相关适配。
 - `skills/` 作为内容文件随 App 输出，由运行时从输出目录加载；不要在 UI 层复制第二套 Skill 加载逻辑。
 - 版本号定义在 `.csproj` 的 `<Version>` 属性中，运行时通过 `AppInfo.Version` 获取。
 
@@ -78,7 +78,7 @@ MarketAssistant.App/
 ## 安全
 
 - API 密钥（Binance、AI 模型）通过 `IUserSettingService` 管理，持久化在用户本地目录，**禁止提交到仓库**。
-- `Trading/Exchanges/BinanceExchangeClient.cs` 中的签名逻辑涉及 HMAC 密钥，修改时需确保密钥不被日志记录。
+- 涉及 Binance 等交易所签名逻辑的代码修改时，需确保 HMAC 密钥不被日志记录。
 
 ---
 

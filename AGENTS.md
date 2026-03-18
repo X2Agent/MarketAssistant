@@ -12,7 +12,7 @@ MarketAssistant.slnx
 ├── src/MarketAssistant.App.Services/   ← 应用运行时/业务编排层         → 有独立 AGENTS.md
 ├── src/MarketAssistant.Core/           ← 核心抽象层（MarketType 等）    → 有独立 AGENTS.md
 ├── src/MarketAssistant.Agents/         ← Agent 契约层（MAF）            → 有独立 AGENTS.md
-├── src/MarketAssistant.Trading/        ← 交易抽象层（IExchangeClient） → 有独立 AGENTS.md
+├── src/MarketAssistant.Rag/            ← RAG 基础能力层                → 有独立 AGENTS.md
 ├── src/MarketAssistant.DataProviders/  ← 数据提供者（Binance 等）      → 有独立 AGENTS.md
 ├── tests/                              ← 单元测试工程
 ├── scripts/                            ← 构建脚本
@@ -24,11 +24,11 @@ MarketAssistant.slnx
 ```
 Core（无依赖）
  ↑
- ├── Trading → Core
+ ├── Rag → Core
  ├── DataProviders → Core
- ├── Agents → Core, Trading
- ├── App.Services → Core, Agents, Trading, DataProviders
- └── App → Core, Agents, Trading, DataProviders, App.Services
+ ├── Agents → Core
+ ├── App.Services → Core, Agents, DataProviders, Rag
+ └── App → Core, Agents, DataProviders, App.Services, Rag
 ```
 
 核心技术栈：.NET 10 / C# 13 · Avalonia 11.x · Microsoft Agent Framework (MAF) · Semantic Kernel SQLiteVec · Serilog
@@ -88,6 +88,7 @@ dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 - 不要提交 `.env`、`appsettings.*.json`、用户偏好文件等包含密钥的文件。
 - DI 注册入口：`Program.ConfigureServices()` → `src/MarketAssistant.App/Services/ServiceCollectionExtensions.cs`。
 - 业务服务注册入口：`AddApplicationServices()` 内部调用 `AddBusinessServices()`，后者定义在 `src/MarketAssistant.App.Services/Services/ServiceCollectionExtensions.cs`。
+- RAG 注册入口：`src/MarketAssistant.Rag/Extensions/ServiceCollectionExtensions.cs` 中的 `AddRagServices()`。
 
 ---
 

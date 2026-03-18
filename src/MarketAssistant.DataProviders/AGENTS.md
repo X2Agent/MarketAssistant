@@ -1,6 +1,6 @@
 # MarketAssistant.DataProviders — AGENTS.md
 
-数据提供者层，封装所有加密货币外部 API 调用。依赖 `MarketAssistant.Core`（HTTP 重试、异常）和 `MarketAssistant.Agents`（API 响应模型）。
+数据提供者层，封装所有加密货币外部 API 调用。当前仅依赖 `MarketAssistant.Core`；不直接依赖 `MarketAssistant.Agents`。
 
 ---
 
@@ -35,7 +35,7 @@ MarketAssistant.DataProviders/
 - 网络/API 错误应包装为 `FriendlyException` 抛出，消息面向用户可读。
 - API 响应的反序列化模型：
   - 本地模型（如 `Binance24hrTicker`）定义在本项目。
-  - 与工具接口耦合的模型（如 `BinanceFundingRateResponse`）定义在 `MarketAssistant.Agents/Tools/Models/`。
+  - 若某个响应模型仅服务于数据提供者内部调用，继续保留在本项目；若它已成为跨模块工具契约的一部分，再评估是否上移到契约层。
 - 不要在代码中硬编码 API 密钥。密钥通过 App 项目的设置服务注入。
 - WebSocket 服务需处理断线重连。
 - Binance API 在部分地区需配置 HTTP 代理，代理设置通过 `IUserSettingService` 管理，由 `HttpClient` 构造时注入。

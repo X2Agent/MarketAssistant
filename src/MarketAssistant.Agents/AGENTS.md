@@ -1,6 +1,6 @@
 # MarketAssistant.Agents — AGENTS.md
 
-AI Agent 抽象层，定义分析师基类、工具接口、分析模型、Token 管理和提示词配置。依赖 `MarketAssistant.Core`，使用 Microsoft Agent Framework (MAF)。
+AI Agent 契约层，定义分析师基类、工具接口、分析模型、Token 管理和提示词配置。依赖 `MarketAssistant.Core`，使用 Microsoft Agent Framework (MAF)。
 
 ---
 
@@ -62,14 +62,14 @@ MarketAssistant.Agents/
 1. 继承 `AnalystAgentBase`。
 2. 使用 `[RequiresTools(typeof(IXxxTools))]` 声明所需工具——`AnalystAgentFactory` 会自动按当前 `MarketType` 从 DI 解析。
 3. 可选使用 `[RequiredAnalyst]` 标记为必需分析师。
-4. 分析师的具体实现位于 `MarketAssistant.App/Agents/Analysts/`，本项目只提供基类和属性。
+4. 分析师的具体实现位于 `MarketAssistant.App.Services/Agents/Analysts/`，本项目只提供基类、属性和结果模型。
 
 ### 工具接口扩展
 
 1. 接口定义在 `Tools/Abstractions/`，市场特定接口继承基类接口（如 `IShareBasicTools : IBasicDataTools`）。
 2. 每个工具接口需暴露 `GetFunctions()` 方法，返回 MAF 可调用的函数列表。
 3. 返回值模型放在 `Tools/Models/` 对应市场子目录。
-4. 具体实现位于 `MarketAssistant.App/Agents/Tools/`，注册为 Keyed Service。
+4. 具体实现位于 `MarketAssistant.App.Services/Agents/Tools/`，注册为 Keyed Service。
 
 ### 分析模型扩展
 

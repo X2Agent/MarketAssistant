@@ -1,6 +1,6 @@
 # MarketAssistant.App.Services — AGENTS.md
 
-桌面应用的运行时与业务编排层。负责 Agent 实现、Workflow、Tool 实现、RAG、MCP、交易编排、业务服务与运行时基础设施；**不承载 Avalonia 视图、导航控件或页面样式**。
+桌面应用的运行时与业务编排层。负责 Agent 实现、Workflow、Tool 实现、MCP、交易编排、业务服务与运行时基础设施；**不承载 Avalonia 视图、导航控件或页面样式**。
 
 ---
 
@@ -11,7 +11,6 @@ MarketAssistant.App.Services/
 ├── Agents/                        ← Agent 实现、工作流、执行器、工具实现
 ├── Applications/                  ← 面向 UI 的业务服务（Assets/Home/Favorites/Analysis 等）
 ├── Infrastructure/                ← 工厂、配置、通用运行时适配
-├── Rag/                           ← 文档解析、向量化、检索与重排
 ├── Services/                      ← 横切服务（Archive/Browser/Cache/Market/Mcp/Settings 等）
 └── Trading/                       ← 交易引擎、风控、持久化与监控
 ```
@@ -20,8 +19,9 @@ MarketAssistant.App.Services/
 
 ## 边界约定
 
-- 本项目承载所有非 UI 运行时代码；新增 Agent、Tool、Workflow、RAG、MCP、交易服务时，优先放在这里。
+- 本项目承载除 UI 和独立基础模块外的大部分运行时代码；新增 Agent、Tool、Workflow、MCP、交易服务时，优先放在这里。
 - Avalonia 视图、窗口、导航、通知、对话框实现属于 `MarketAssistant.App`，不要回流到本项目。
+- 文档解析、清洗、分块、嵌入、检索、重排等 RAG 基础能力属于 `MarketAssistant.Rag`，不要在本项目再复制一套实现。
 - 市场特定能力通过 `MarketType` Keyed Services 注册，不在业务逻辑中堆叠 `if/else` 区分市场。
 - Tool 接口定义保留在 `MarketAssistant.Agents/Tools/Abstractions/`，本项目只放实现。
 - 对外部 HTTP/API 的直接调用优先收敛到 `MarketAssistant.DataProviders` 或已存在的统一服务中，不在多个 Tool/Service 内重复实现。
