@@ -19,9 +19,6 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-#if DEBUG
-        this.AttachDeveloperTools();
-#endif
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -30,7 +27,7 @@ public partial class App : Application
         ServiceProvider = Program.ConfigureServices();
 
         // 初始化全局异常处理器
-        Infrastructure.Core.GlobalExceptionHandler.Initialize(ServiceProvider);
+        GlobalExceptionHandler.Initialize(ServiceProvider);
 
         // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();
