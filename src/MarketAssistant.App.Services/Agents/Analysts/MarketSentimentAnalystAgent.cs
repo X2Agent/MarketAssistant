@@ -29,7 +29,7 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
         IChatClient chatClient,
         IFinancialTools financialTools,
         ISentimentTools marketSentimentTools,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
             instructions: GetInstructions(),

@@ -34,7 +34,7 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         ChatResponseFormat? responseFormat,
         IList<AITool>? tools,
         AIContextProvider[]? aiContextProviders = null,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
             temperature, topP, topK, responseFormat, tools,
             skillsProvider != null ? [skillsProvider, .. (aiContextProviders ?? [])] : aiContextProviders))

@@ -176,9 +176,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AnalystPromptLoader>();
 
         services.AddSingleton(sp =>
-            new FileAgentSkillsProvider(
-                Path.Combine(AppContext.BaseDirectory, "skills"),
-                loggerFactory: sp.GetService<ILoggerFactory>()));
+            new AgentSkillsProvider(
+                skillPath: Path.Combine(AppContext.BaseDirectory, "skills")));
 
         services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();

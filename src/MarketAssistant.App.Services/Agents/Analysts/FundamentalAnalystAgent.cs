@@ -28,7 +28,7 @@ public class FundamentalAnalystAgent : AnalystAgentBase
     public FundamentalAnalystAgent(
         IChatClient chatClient,
         IBasicDataTools basicTools,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
             instructions: GetInstructions(),

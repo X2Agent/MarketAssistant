@@ -31,7 +31,7 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
         GroundingSearchTools searchTools,
         IUserSettingService userSettingService,
         ILoggerFactory loggerFactory,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
             instructions: GetInstructions(),

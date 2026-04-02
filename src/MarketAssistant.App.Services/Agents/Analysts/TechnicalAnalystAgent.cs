@@ -27,7 +27,7 @@ public class TechnicalAnalystAgent : AnalystAgentBase
     public TechnicalAnalystAgent(
         IChatClient chatClient,
         ITechnicalDataTools technicalTools,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
             instructions: GetInstructions(),

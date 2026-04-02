@@ -43,7 +43,7 @@ public class MarketChatSession : IDisposable
         ILogger<MarketChatSession> logger,
         McpService mcpService,
         GroundingSearchTools? searchTools = null,
-        FileAgentSkillsProvider? skillsProvider = null,
+        AgentSkillsProvider? skillsProvider = null,
         string? initialStockCode = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

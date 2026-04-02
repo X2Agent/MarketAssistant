@@ -27,7 +27,7 @@ public class NewsEventAnalystAgent : AnalystAgentBase
     public NewsEventAnalystAgent(
         IChatClient chatClient,
         INewsDataTools newsTools,
-        FileAgentSkillsProvider? skillsProvider = null)
+        AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
             instructions: GetInstructions(),
