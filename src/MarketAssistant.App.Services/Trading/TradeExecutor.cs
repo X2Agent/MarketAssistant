@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Trading;
 
 /// <summary>
-/// 交易执行器，统一的下单入口：风控 → 下单 → 记录 → PnL 计算
+/// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算
 /// </summary>
 public class TradeExecutor
 {
@@ -14,8 +14,16 @@ public class TradeExecutor
     private readonly TradingDataService _dataService;
     private readonly ILogger<TradeExecutor> _logger;
 
+    /// <summary>
+    /// Human-in-the-Loop 确认回调。
+    /// 当风控返回 NeedsConfirmation 时，调用此回调等待用户确认。
+    /// 参数: (symbol, side, quantity, price, reason) → true=放行 false=拒绝。
+    /// 未设置时保持现有行为（直接拒绝）。
+    /// </summary>
+    public Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationCallback { get; set; }
+
     public TradeExecutor(
-        IExchangeClient exchangeClient,
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         RiskManager riskManager,
         TradingDataService dataService,
         ILogger<TradeExecutor> logger)
@@ -62,7 +70,21 @@ public class TradeExecutor
         {
             _logger.LogWarning("交易需人工确认: {InstrumentSymbol} {Side} 金额:{Amount}",
                 instrumentSymbol, side, quantity * currentPrice);
-            return new TradeResult { Success = false, ErrorMessage = $"需人工确认: {riskCheck.Reason}" };
+
+            if (ConfirmationCallback != null)
+            {
+                var approved = await ConfirmationCallback(
+                    instrumentSymbol, side, quantity, currentPrice, riskCheck.Reason ?? "需人工确认");
+                if (!approved)
+                {
+                    return new TradeResult { Success = false, ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}" };
+                }
+                _logger.LogInformation("用户已确认交易: {InstrumentSymbol} {Side}", instrumentSymbol, side);
+            }
+            else
+            {
+                return new TradeResult { Success = false, ErrorMessage = $"需人工确认: {riskCheck.Reason}" };
+            }
         }
 
         if (!riskCheck.Passed)
@@ -96,11 +118,22 @@ public class TradeExecutor
             await _dataService.SaveTradeRecordAsync(record, ct);
 
             decimal pnl = 0;
-            if (side == OrderSide.Sell && record.ExecutedQty > 0)
+            if (record.ExecutedQty > 0)
             {
-                var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
-                if (avgEntryPrice > 0)
-                    pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
+                if (side == OrderSide.Sell)
+                {
+                    // 多头平仓：卖出价 - 平均买入价
+                    var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
+                    if (avgEntryPrice > 0)
+                        pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
+                }
+                else
+                {
+                    // 空头平仓：平均卖出价 - 买入价
+                    var avgSellPrice = await _dataService.GetAverageSellPriceAsync(instrumentSymbol, ct);
+                    if (avgSellPrice > 0)
+                        pnl = (avgSellPrice - record.ExecutedPrice) * record.ExecutedQty;
+                }
             }
             await _dataService.UpdateDailyStatsAsync(pnl, record.Commission, ct);
 

@@ -14,6 +14,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
     private readonly TradingDataService _dataService;
+    private readonly TradeExecutor _tradeExecutor;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
     public ObservableCollection<ExchangeOrderResult> OpenOrders { get; } = [];
@@ -22,11 +23,22 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isMonitorRunning;
     [ObservableProperty] private DailyStats _todayStats = new();
 
+    // Human-in-the-Loop 确认
+    [ObservableProperty] private bool _hasPendingConfirmation;
+    [ObservableProperty] private string _confirmationSymbol = string.Empty;
+    [ObservableProperty] private string _confirmationSide = string.Empty;
+    [ObservableProperty] private string _confirmationPrice = string.Empty;
+    [ObservableProperty] private string _confirmationQuantity = string.Empty;
+    [ObservableProperty] private string _confirmationReason = string.Empty;
+
+    private TaskCompletionSource<bool>? _confirmationTcs;
+
     public TradeMonitorViewModel(
         MarketMonitor marketMonitor,
         CryptoPortfolioService portfolioService,
         IExchangeClient exchangeClient,
         TradingDataService dataService,
+        TradeExecutor tradeExecutor,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
     {
@@ -34,9 +46,13 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _portfolioService = portfolioService;
         _exchangeClient = exchangeClient;
         _dataService = dataService;
+        _tradeExecutor = tradeExecutor;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
+
+        // 接管 TradeExecutor 的确认回调
+        _tradeExecutor.ConfirmationCallback = OnTradeConfirmationRequestedAsync;
     }
 
     [RelayCommand]
@@ -84,6 +100,34 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private void OnMonitorStatusChanged(bool isRunning)
     {
         IsMonitorRunning = isRunning;
+    }
+
+    private Task<bool> OnTradeConfirmationRequestedAsync(
+        string symbol, OrderSide side, decimal price, decimal quantity, string reason)
+    {
+        ConfirmationSymbol = symbol;
+        ConfirmationSide = side.ToString();
+        ConfirmationPrice = price.ToString("F2");
+        ConfirmationQuantity = quantity.ToString("F6");
+        ConfirmationReason = reason;
+        HasPendingConfirmation = true;
+
+        _confirmationTcs = new TaskCompletionSource<bool>();
+        return _confirmationTcs.Task;
+    }
+
+    [RelayCommand]
+    private void ApproveConfirmation()
+    {
+        HasPendingConfirmation = false;
+        _confirmationTcs?.TrySetResult(true);
+    }
+
+    [RelayCommand]
+    private void RejectConfirmation()
+    {
+        HasPendingConfirmation = false;
+        _confirmationTcs?.TrySetResult(false);
     }
 
     public void Dispose()

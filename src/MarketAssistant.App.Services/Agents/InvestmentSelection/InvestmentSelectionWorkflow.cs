@@ -131,10 +131,22 @@ public class InvestmentSelectionWorkflow : IDisposable
                         finalResult?.Recommendations?.Count ?? 0);
                     break;
                 case ExecutorFailedEvent executorFailed:
-                    _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
+                    var failedMsg = executorFailed.Data?.Message ?? "未知错误";
+                    _logger.LogError(executorFailed.Data,
+                        "步骤失败: {ExecutorId}, 错误: {Error}",
                         executorFailed.ExecutorId,
-                        executorFailed.Data.Message);
-                    throw new FriendlyException(executorFailed.Data.Message);
+                        failedMsg);
+                    throw new FriendlyException(failedMsg);
+
+                case WorkflowErrorEvent workflowError:
+                    var wfErrorMsg = workflowError.Exception?.Message ?? "工作流内部发生未知错误";
+                    _logger.LogError(workflowError.Exception,
+                        "投资选择工作流发生严重错误: {Message}", wfErrorMsg);
+                    throw new FriendlyException(wfErrorMsg);
+
+                case WorkflowWarningEvent workflowWarning:
+                    _logger.LogWarning("投资选择工作流警告: {Warning}", workflowWarning.Data);
+                    break;
             }
         }
 

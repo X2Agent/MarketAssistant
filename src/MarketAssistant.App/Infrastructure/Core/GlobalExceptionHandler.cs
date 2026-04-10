@@ -4,7 +4,8 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Infrastructure.Core;
 
 /// <summary>
-/// 全局异常处理器，提供应用级异常捕获和处理
+/// 全局异常处理器，提供应用级异常捕获和处理。
+/// 通过 DI 注册为 Singleton，由 <see cref="Initialize"/> 激活事件钩子。
 /// </summary>
 public sealed class GlobalExceptionHandler
 {
@@ -13,25 +14,23 @@ public sealed class GlobalExceptionHandler
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
 
-    private GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
+    // 直接注入具体服务，消除 IServiceProvider 服务定位器引用
+    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         _logger = logger;
         _dialogService = dialogService;
     }
 
     /// <summary>
-    /// 初始化全局异常处理
+    /// 注册全局异常处理钩子。应在 DI 容器构建完毕后调用一次。
     /// </summary>
-    public static void Initialize(IServiceProvider serviceProvider)
+    public static void Initialize(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         if (_instance != null) return;
 
         lock (_lock)
         {
             if (_instance != null) return;
-
-            var logger = serviceProvider.GetRequiredService<ILogger<GlobalExceptionHandler>>();
-            var dialogService = serviceProvider.GetRequiredService<IDialogService>();
             _instance = new GlobalExceptionHandler(logger, dialogService);
             _instance.RegisterHandlers();
         }
@@ -95,6 +94,14 @@ public sealed class GlobalExceptionHandler
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, Avalonia.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
+        // OutOfMemoryException / StackOverflowException 之类的致命错误不应被吞并，让进程终止并写入崩溃日志
+        if (IsFatalException(e.Exception))
+        {
+            _logger.LogCritical(e.Exception, "UI 线程发生致命异常，不处理，允许进程终止");
+            WriteCrashLog(e.Exception);
+            return; // e.Handled 保持默认 false，进程终止
+        }
+
         _logger.LogError(e.Exception, "UI 线程发生未处理的异常");
 
         var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception);
@@ -108,6 +115,15 @@ public sealed class GlobalExceptionHandler
             await ShowErrorAsync("操作失败", message);
         });
     }
+
+    /// <summary>
+    /// 判断是否是不可恢复的致命异常
+    /// </summary>
+    private static bool IsFatalException(Exception ex) =>
+        ex is OutOfMemoryException
+            or StackOverflowException
+            or AccessViolationException
+            or AppDomainUnloadedException;
 
     /// <summary>
     /// 写入崩溃日志
@@ -171,11 +187,6 @@ public sealed class GlobalExceptionHandler
         string? operationName = null,
         ILogger? logger = null)
     {
-        if (_instance == null)
-        {
-            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
-        }
-
         setBusy?.Invoke(true);
 
         try
@@ -184,13 +195,22 @@ public sealed class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
-            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
-
-            await Dispatcher.UIThread.InvokeAsync(async () =>
+            if (_instance != null)
             {
-                await _instance.ShowErrorAsync("操作失败", message);
-            });
+                var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+                (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
+
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await _instance.ShowErrorAsync("操作失败", message);
+                });
+            }
+            else
+            {
+                // 处理器尚未初始化（应用启动早期）：将异常传递给链上扫调程序
+                logger?.LogError(ex, "执行 '{Operation}' 时发生错误（全局处理器未就绪）", operationName ?? "未知操作");
+                throw;
+            }
         }
         finally
         {
@@ -207,11 +227,6 @@ public sealed class GlobalExceptionHandler
         string? operationName = null,
         ILogger? logger = null)
     {
-        if (_instance == null)
-        {
-            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
-        }
-
         setBusy?.Invoke(true);
 
         try
@@ -220,15 +235,23 @@ public sealed class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
-            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
-
-            await Dispatcher.UIThread.InvokeAsync(async () =>
+            if (_instance != null)
             {
-                await _instance.ShowErrorAsync("操作失败", message);
-            });
+                var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+                (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
 
-            return default;
+                await Dispatcher.UIThread.InvokeAsync(async () =>
+                {
+                    await _instance.ShowErrorAsync("操作失败", message);
+                });
+
+                return default;
+            }
+            else
+            {
+                logger?.LogError(ex, "执行 '{Operation}' 时发生错误（全局处理器未就绪）", operationName ?? "未知操作");
+                throw;
+            }
         }
         finally
         {
@@ -245,11 +268,6 @@ public sealed class GlobalExceptionHandler
         string? operationName = null,
         ILogger? logger = null)
     {
-        if (_instance == null)
-        {
-            throw new InvalidOperationException("GlobalExceptionHandler 未初始化");
-        }
-
         setBusy?.Invoke(true);
 
         try
@@ -258,14 +276,22 @@ public sealed class GlobalExceptionHandler
         }
         catch (Exception ex)
         {
-            var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
-            (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
-
-            // 使用 Post 而不是 InvokeAsync，避免阻塞当前线程
-            Dispatcher.UIThread.Post(async () =>
+            if (_instance != null)
             {
-                await _instance.ShowErrorAsync("操作失败", message);
-            });
+                var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
+                (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
+
+                // 使用 Post 而不是 InvokeAsync，避免阻塞当前线程
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await _instance.ShowErrorAsync("操作失败", message);
+                });
+            }
+            else
+            {
+                logger?.LogError(ex, "执行 '{Operation}' 时发生错误（全局处理器未就绪）", operationName ?? "未知操作");
+                throw;
+            }
         }
         finally
         {

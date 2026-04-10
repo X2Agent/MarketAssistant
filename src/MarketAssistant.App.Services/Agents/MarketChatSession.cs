@@ -1,5 +1,8 @@
+using MarketAssistant.Agents.ContextProviders;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Agents.Tools;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Mcp;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -14,45 +17,70 @@ namespace MarketAssistant.Agents;
 /// 基于分析上下文的对话助手：分析结果由 MarketAnalysis Workflow 产出并注入为上下文，
 /// ChatSession 负责基于上下文回答追问，可通过搜索工具补充最新信息。
 /// MAF ChatClientAgent 通过 Function Calling 自动处理工具调用循环。
+/// 通过 MAF Middleware 实现 Token 追踪与自动会话压缩。
 /// </summary>
 public class MarketChatSession : IDisposable
 {
-    private readonly ChatClientAgent _agent;
+    private readonly AIAgent _agent;
     private readonly ILogger<MarketChatSession> _logger;
-    private readonly McpService _mcpService;
     private readonly GroundingSearchTools? _searchTools;
-    private readonly ConversationCompressor _compressor;
+    private readonly ChatSessionPersistenceService? _sessionPersistence;
     private AgentSession? _currentSession;
-    private readonly List<AITool> _allTools = [];
+    private readonly List<AITool> _searchToolCache = [];
     private readonly List<ChatMessage> _conversationHistory = [];
 
+    private string _sessionId = Guid.NewGuid().ToString("N");
     private string _currentStockCode = string.Empty;
     private string _analysisContext = string.Empty;
     private CancellationTokenSource? _currentCancellationTokenSource;
     private bool _disposed;
-    private bool _toolsInitialized;
-    private readonly SemaphoreSlim _toolsInitLock = new(1, 1);
+    private bool _searchToolsInitialized;
 
     /// <summary>
-    /// 当前会话估算的 Token 数
+    /// 当前会话 ID（用于持久化标识）
     /// </summary>
-    public int EstimatedTokenCount => TokenEstimator.EstimateTotalTokens(_conversationHistory);
+    public string SessionId => _sessionId;
+
+    /// <summary>
+    /// 当前会话估算的 Token 数（优先从 Session StateBag 中间件数据读取，回退到本地估算）
+    /// </summary>
+    public int EstimatedTokenCount
+    {
+        get
+        {
+            var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(_currentSession);
+            return input + output > 0
+                ? input + output
+                : TokenEstimator.EstimateTotalTokens(_conversationHistory);
+        }
+    }
 
     public MarketChatSession(
         IChatClient chatClient,
         ILogger<MarketChatSession> logger,
-        McpService mcpService,
+        McpToolContextProvider? mcpToolProvider = null,
         GroundingSearchTools? searchTools = null,
         AgentSkillsProvider? skillsProvider = null,
+        TokenTrackingMiddleware? tokenTracking = null,
+        ConversationCompressionMiddleware? compressionMiddleware = null,
+        UserMemoryContextProvider? memoryProvider = null,
+        RagContextProvider? ragProvider = null,
+        ChatSessionPersistenceService? sessionPersistence = null,
         string? initialStockCode = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
         _searchTools = searchTools;
+        _sessionPersistence = sessionPersistence;
         _currentStockCode = initialStockCode ?? string.Empty;
-        _compressor = new ConversationCompressor(chatClient, logger);
 
-        _agent = new ChatClientAgent(
+        // 收集所有 AIContextProvider：Skills + MCP 工具 + Memory + RAG
+        var contextProviders = new List<AIContextProvider>();
+        if (skillsProvider != null) contextProviders.Add(skillsProvider);
+        if (mcpToolProvider != null) contextProviders.Add(mcpToolProvider);
+        if (memoryProvider != null) contextProviders.Add(memoryProvider);
+        if (ragProvider != null) contextProviders.Add(ragProvider);
+
+        var baseAgent = new ChatClientAgent(
             chatClient,
             new ChatClientAgentOptions
             {
@@ -62,48 +90,60 @@ public class MarketChatSession : IDisposable
                     Instructions = BuildAgentInstructions(),
                     Temperature = 0.7f
                 },
-                AIContextProviders = skillsProvider != null ? [skillsProvider] : null
+                AIContextProviders = contextProviders.Count > 0 ? [.. contextProviders] : null
             });
 
-        _logger.LogInformation("MarketChatSession 初始化完成（工具待异步加载）");
+        // 通过 MAF Builder 模式链式附加中间件
+        _agent = BuildAgentWithMiddleware(baseAgent, tokenTracking, compressionMiddleware);
+
+        _logger.LogInformation("MarketChatSession 初始化完成（工具待异步加载，已附加中间件）");
+    }
+
+    /// <summary>
+    /// 使用 MAF AsBuilder 模式为 Agent 附加中间件链
+    /// 中间件执行顺序：压缩（外层）→ Token 追踪（内层）→ 原始 Agent
+    /// </summary>
+    private static AIAgent BuildAgentWithMiddleware(
+        AIAgent baseAgent,
+        TokenTrackingMiddleware? tokenTracking,
+        ConversationCompressionMiddleware? compression)
+    {
+        var builder = baseAgent.AsBuilder();
+        var hasMiddleware = false;
+
+        if (tokenTracking != null)
+        {
+            builder = builder.Use(
+                runFunc: tokenTracking.InvokeAsync,
+                runStreamingFunc: tokenTracking.InvokeStreamingAsync);
+            hasMiddleware = true;
+        }
+
+        if (compression != null)
+        {
+            builder = builder.Use(
+                runFunc: compression.InvokeAsync,
+                runStreamingFunc: compression.InvokeStreamingAsync);
+            hasMiddleware = true;
+        }
+
+        return hasMiddleware ? builder.Build() : baseAgent;
     }
 
     #region 工具初始化
 
-    private async Task EnsureToolsInitializedAsync()
+    private void EnsureSearchToolsInitialized()
     {
-        if (_toolsInitialized) return;
+        if (_searchToolsInitialized) return;
 
-        await _toolsInitLock.WaitAsync();
-        try
+        if (_searchTools != null)
         {
-            if (_toolsInitialized) return;
-
-            if (_searchTools != null)
-            {
-                _allTools.AddRange(_searchTools.GetFunctions().Select(f => (AITool)f));
-                _logger.LogInformation("加载搜索工具，数量: {Count}", _allTools.Count);
-            }
-
-            try
-            {
-                var enabledConfigs = _mcpService.GetEnabledConfigs();
-                var mcpTools = await _mcpService.GetAIToolsAsync(enabledConfigs);
-                _allTools.AddRange(mcpTools);
-                _logger.LogInformation("加载 MCP 工具，数量: {Count}", mcpTools.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "初始化 MCP 工具失败");
-            }
-
-            _toolsInitialized = true;
-            _logger.LogInformation("工具初始化完成，总数: {Count}", _allTools.Count);
+            _searchToolCache.AddRange(_searchTools.GetFunctions().Select(f => (AITool)f));
+            _logger.LogInformation("加载搜索工具，数量: {Count}", _searchToolCache.Count);
         }
-        finally
-        {
-            _toolsInitLock.Release();
-        }
+
+        // MCP 工具通过 McpToolContextProvider（AIContextProvider）自动注入，无需手动加载
+        _searchToolsInitialized = true;
     }
 
     #endregion
@@ -179,17 +219,9 @@ public class MarketChatSession : IDisposable
     {
         _logger.LogInformation("开始流式处理用户消息: {Message}", userMessage);
 
-        await EnsureToolsInitializedAsync();
+        EnsureSearchToolsInitialized();
 
-        if (_compressor.NeedsCompression(_conversationHistory))
-        {
-            _logger.LogInformation("会话 Token 超过阈值，触发自动压缩");
-            var compressed = await _compressor.CompressAsync(
-                _conversationHistory, _analysisContext, cancellationToken);
-            _conversationHistory.Clear();
-            _conversationHistory.AddRange(compressed);
-            _currentSession = null;
-        }
+        // 压缩逻辑已由 ConversationCompressionMiddleware 自动处理
 
         _currentSession ??= await _agent.CreateSessionAsync(cancellationToken: cancellationToken);
 
@@ -204,7 +236,7 @@ public class MarketChatSession : IDisposable
         {
             ChatOptions = new ChatOptions
             {
-                Tools = _allTools,
+                Tools = _searchToolCache.Count > 0 ? _searchToolCache : null,
                 Instructions = BuildAgentInstructions()
             }
         };
@@ -229,6 +261,70 @@ public class MarketChatSession : IDisposable
 
         _logger.LogInformation("流式 AI 回复完成，长度: {Length}", completeResponse.Length);
         _currentCancellationTokenSource = null;
+
+        // 自动持久化当前会话
+        await AutoSaveSessionAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// 从持久化存储恢复会话
+    /// </summary>
+    public async Task<bool> RestoreSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        if (_sessionPersistence is null) return false;
+
+        var snapshot = await _sessionPersistence.LoadSessionAsync(sessionId, cancellationToken);
+        if (snapshot is null) return false;
+
+        _sessionId = snapshot.Id;
+        _currentStockCode = snapshot.StockCode;
+        _analysisContext = snapshot.AnalysisContext ?? string.Empty;
+        _conversationHistory.Clear();
+        foreach (var dto in snapshot.Messages)
+        {
+            _conversationHistory.Add(new ChatMessage(new ChatRole(dto.Role), dto.Content)
+            {
+                AuthorName = dto.AuthorName
+            });
+        }
+        _currentSession = null; // 强制创建新 AgentSession
+
+        _logger.LogInformation("恢复会话 {SessionId}，消息数: {Count}", sessionId, _conversationHistory.Count);
+        return true;
+    }
+
+    private async Task AutoSaveSessionAsync(CancellationToken cancellationToken)
+    {
+        if (_sessionPersistence is null) return;
+
+        try
+        {
+            var snapshot = new ChatSessionSnapshot
+            {
+                Id = _sessionId,
+                StockCode = _currentStockCode,
+                Title = BuildSessionTitle(),
+                AnalysisContext = _analysisContext,
+                Messages = _conversationHistory.Select(m => new ChatMessageDto
+                {
+                    Role = m.Role.Value,
+                    Content = m.Text ?? string.Empty,
+                    AuthorName = m.AuthorName
+                }).ToList()
+            };
+            await _sessionPersistence.SaveSessionAsync(snapshot, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "自动保存会话失败");
+        }
+    }
+
+    private string BuildSessionTitle()
+    {
+        var firstUserMsg = _conversationHistory.FirstOrDefault(m => m.Role == ChatRole.User);
+        var title = firstUserMsg?.Text ?? _currentStockCode;
+        return title.Length > 50 ? title[..50] + "…" : title;
     }
 
     public void ClearHistory()
@@ -313,7 +409,6 @@ public class MarketChatSession : IDisposable
             {
                 _currentCancellationTokenSource?.Cancel();
                 _currentCancellationTokenSource?.Dispose();
-                _toolsInitLock.Dispose();
             }
             _disposed = true;
         }

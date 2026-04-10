@@ -28,6 +28,16 @@ public class MarketAnalysisWorkflow : IDisposable
     private bool _disposed = false;
 
     /// <summary>
+    /// 最近一次工作流检查点（可用于崩溃恢复）
+    /// </summary>
+    private CheckpointInfo? _lastCheckpoint;
+
+    /// <summary>
+    /// 用于在分析师之间共享市场快照数据
+    /// </summary>
+    private readonly MarketSnapshotContextProvider _marketSnapshot = new();
+
+    /// <summary>
     /// 分析进度事件
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
@@ -73,6 +83,11 @@ public class MarketAnalysisWorkflow : IDisposable
             }
 
             // 创建分析师代理（记录失败的分析师用于降级提示）
+            // 传递共享市场快照提供者给所有分析师
+            _marketSnapshot.Clear();
+            _marketSnapshot.SetData("分析标的", assetSymbol);
+            _marketSnapshot.SetData("分析时间", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"));
+
             var analystAgents = CreateAnalystAgents(enabledAnalysts);
             var failedAnalystNames = enabledAnalysts
                 .Where(t => !analystAgents.Any(a => a.GetType() == t || a.Name == t.Name.Replace("Agent", "")))
@@ -131,9 +146,13 @@ public class MarketAnalysisWorkflow : IDisposable
         int totalAnalysts = 0;
         var failedSteps = new List<string>();
 
+        // 启用检查点管理器，工作流在每个 SuperStep 结束时自动保存状态
+        var checkpointManager = CheckpointManager.Default;
+
         await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             assetSymbol,
+            checkpointManager,
             sessionId: null,
             cancellationToken);
 
@@ -193,7 +212,8 @@ public class MarketAnalysisWorkflow : IDisposable
 
                 case ExecutorFailedEvent executorFailed:
                     var errorMessage = executorFailed.Data?.Message ?? "未知错误";
-                    _logger.LogError("步骤失败: {ExecutorId}, 错误: {Error}",
+                    _logger.LogError(executorFailed.Data,
+                        "步骤失败: {ExecutorId}, 错误: {Error}",
                         executorFailed.ExecutorId,
                         errorMessage);
                     failedSteps.Add(executorFailed.ExecutorId);
@@ -212,6 +232,25 @@ public class MarketAnalysisWorkflow : IDisposable
                         CompletedAnalysts = completedAnalysts,
                         FailedAnalysts = failedSteps
                     });
+                    break;
+
+                case WorkflowErrorEvent workflowError:
+                    var wfErrorMsg = workflowError.Exception?.Message ?? "市场分析工作流内部发生未知错误";
+                    _logger.LogError(workflowError.Exception,
+                        "市场分析工作流发生严重错误: {Message}", wfErrorMsg);
+                    throw new FriendlyException(wfErrorMsg);
+
+                case SuperStepCompletedEvent superStepCompleted:
+                    if (superStepCompleted.CompletionInfo?.Checkpoint is { } checkpoint)
+                    {
+                        _lastCheckpoint = checkpoint;
+                        _logger.LogInformation(
+                            "工作流检查点已保存（SuperStep 完成），可用于崩溃恢复");
+                    }
+                    break;
+
+                case WorkflowWarningEvent workflowWarning:
+                    _logger.LogWarning("市场分析工作流警告: {Warning}", workflowWarning.Data);
                     break;
             }
         }
@@ -265,12 +304,13 @@ public class MarketAnalysisWorkflow : IDisposable
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
 
+        var sharedProviders = new AIContextProvider[] { _marketSnapshot };
         var createdAgents = new List<AIAgent>();
         foreach (var type in analystTypes)
         {
             try
             {
-                var agent = _analystAgentFactory.CreateAnalyst(type);
+                var agent = _analystAgentFactory.CreateAnalyst(type, sharedProviders);
                 createdAgents.Add(agent);
             }
             catch (Exception ex)

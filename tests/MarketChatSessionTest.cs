@@ -1,7 +1,5 @@
 using MarketAssistant.Agents;
-using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,10 +21,7 @@ public class MarketChatSessionTest : BaseAgentTest
         var chatClientFactory = _serviceProvider.GetRequiredService<IChatClientFactory>();
         var chatClient = chatClientFactory.CreateClient();
 
-        // 从 DI 容器中获取 McpService  
-        var mcpService = _serviceProvider.GetRequiredService<McpService>();
-
-        _chatSession = new MarketChatSession(chatClient, logger, mcpService);
+        _chatSession = new MarketChatSession(chatClient, logger);
     }
 
     [TestCleanup]

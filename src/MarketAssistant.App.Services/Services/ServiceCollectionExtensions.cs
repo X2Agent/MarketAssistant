@@ -1,3 +1,5 @@
+using MarketAssistant.Agents.ContextProviders;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
@@ -62,6 +64,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTradingServices();
         services.AddMarketSpecificServices();
         services.AddWorkflowServices();
+        services.AddMarketModules();
         services.AddSingleton<IReleaseService, GitHubReleaseService>();
         return services;
     }
@@ -130,35 +133,9 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
-        services.AddKeyedSingleton<IMarketCapability, AShareMarketCapability>(MarketType.AShare);
-        services.AddKeyedSingleton<IMarketCapability, CryptoMarketCapability>(MarketType.Crypto);
 
         // 通用工具
         services.AddSingleton<GroundingSearchTools>();
-
-        // A股
-        services.AddKeyedSingleton<IShareBasicTools, AShareBasicTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IShareFinancialTools, AShareFinancialTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IFinancialTools, AShareFinancialTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);
-        services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
-
-        // 虚拟币
-        services.AddKeyedSingleton<ICryptoBasicTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<IFinancialTools, CryptoMetricsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ITechnicalDataTools, CryptoTechnicalTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<INewsDataTools, CryptoNewsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
-
-        // 交易工具（仅虚拟币）
-        services.AddKeyedSingleton<ITradingExecutionTools, CryptoTradingExecutionTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<IStrategyTools, CryptoStrategyTools>(MarketType.Crypto);
 
         return services;
     }
@@ -175,6 +152,13 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
 
+        // MAF 中间件
+        services.AddSingleton<TokenTrackingMiddleware>();
+        services.AddSingleton<ConversationCompressionMiddleware>(sp =>
+            new ConversationCompressionMiddleware(
+                sp.GetRequiredService<IChatClientFactory>().CreateClient(),
+                sp.GetRequiredService<ILogger<ConversationCompressionMiddleware>>()));
+
         services.AddSingleton(sp =>
             new AgentSkillsProvider(
                 skillPath: Path.Combine(AppContext.BaseDirectory, "skills")));
@@ -182,6 +166,14 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();
         services.AddSingleton<McpService>();
+        services.AddSingleton<McpToolContextProvider>();
+
+        // AI Context Providers（Memory / RAG）
+        services.AddSingleton<UserMemoryService>();
+        services.AddSingleton<UserMemoryContextProvider>();
+        services.AddSingleton<RagContextProvider>();
+        services.AddSingleton<ChatSessionPersistenceService>();
+        services.AddSingleton<WorkflowVisualizationService>();
 
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
         services.AddSqliteVectorStore(_ => $"Data Source={store}");
@@ -221,7 +213,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
-        services.AddSingleton<IExchangeClient, BinanceExchangeClient>();
 
         return services;
     }
@@ -232,45 +223,9 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddMarketSpecificServices(this IServiceCollection services)
     {
-        // 快讯
-        services.AddKeyedSingleton<ITelegramService, AShareTelegramService>(MarketType.AShare);
-        services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>(MarketType.Crypto);
-
-        // 新闻更新
-        services.AddKeyedSingleton<INewsUpdateService>(
-            MarketType.AShare,
-            (sp, key) => new NewsUpdateService(
-                sp.GetRequiredKeyedService<ITelegramService>(MarketType.AShare),
-                sp.GetRequiredService<ILogger<NewsUpdateService>>()));
-        services.AddKeyedSingleton<INewsUpdateService>(
-            MarketType.Crypto,
-            (sp, key) => new NewsUpdateService(
-                sp.GetRequiredKeyedService<ITelegramService>(MarketType.Crypto),
-                sp.GetRequiredService<ILogger<NewsUpdateService>>()));
-
         // 浏览器自动化
         services.AddSingleton<PlaywrightService>();
         services.AddSingleton<IBrowserService, BrowserService>();
-
-        // A股资产服务
-        services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);
-        services.AddKeyedSingleton<IHomeAssetService, AShareHomeService>(MarketType.AShare);
-        services.AddKeyedSingleton<IFavoriteService, AShareFavoriteService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetHistoryService, AShareHistoryService>(MarketType.AShare);
-        services.AddKeyedSingleton<IKLineService, AShareKLineService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetCacheService, AShareAssetCacheService>(MarketType.AShare);
-
-        // 虚拟币资产服务
-        services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IHomeAssetService, CryptoHomeService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IFavoriteService, CryptoFavoriteService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IAssetHistoryService, CryptoHistoryService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IAssetCacheService, CryptoAssetCacheService>(MarketType.Crypto);
-
-        // 资产筛选（AI 选股）
-        services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>(MarketType.Crypto);
 
         return services;
     }
@@ -281,15 +236,7 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddWorkflowServices(this IServiceCollection services)
     {
-        // 投资选择策略
-        services.AddSingleton<ICriteriaGenerationStrategy<StockCriteria>, StockCriteriaGenerationStrategy>();
-        services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();
-        services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>(MarketType.Crypto);
-
         // 投资选择工作流
-        services.AddSingleton<GenerateCriteriaExecutor<StockCriteria>>();
-        services.AddSingleton<GenerateCriteriaExecutor<CryptoCriteria>>();
         services.AddSingleton<ScreenInvestmentTargetsExecutor>();
         services.AddSingleton<AnalyzeAssetsExecutor>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
@@ -302,6 +249,23 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<MarketAnalysisWorkflow>();
         services.AddSingleton<AnalysisOrchestrationService>();
 
+        return services;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 市场模块——每个市场一个模块类，新增市场只需实现 IMarketModule 并加入列表
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static readonly IMarketModule[] _marketModules =
+    [
+        new AShareMarketModule(),
+        new CryptoMarketModule(),
+    ];
+
+    private static IServiceCollection AddMarketModules(this IServiceCollection services)
+    {
+        foreach (var module in _marketModules)
+            module.Register(services);
         return services;
     }
 

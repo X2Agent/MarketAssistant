@@ -21,12 +21,18 @@ public partial class ChatSidebarDemoViewModel : ViewModelBase
   {
     // 初始化 TargetViewModel
     var mcpService = new McpService(NullLogger<McpService>.Instance);
+    var mcpToolProvider = new McpToolContextProvider(mcpService, NullLogger<McpToolContextProvider>.Instance);
 
     TargetViewModel = new ChatSidebarViewModel(
         NullLogger<ChatSidebarViewModel>.Instance,
         new MockChatClientFactory(),
         NullLoggerFactory.Instance,
-        mcpService,
+        mcpToolProvider,
+        null!,
+        null!,
+        null!,
+        null!,
+        null!,
         null!
     );
 

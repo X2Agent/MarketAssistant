@@ -26,7 +26,7 @@ public class TextParagraph
     public required string Text { get; init; }
 
     /// <summary>The embedding generated from the Text.</summary>
-    [VectorStoreVector(1024, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
+    [VectorStoreVector(RagConstants.EmbeddingDimension, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
     public Embedding<float> TextEmbedding { get; set; } = default!;
 
     /// <summary>
@@ -38,7 +38,7 @@ public class TextParagraph
     /// <summary>
     /// Optional image embedding for cross-modal search (same dimension as text for late fusion use-cases).
     /// </summary>
-    [VectorStoreVector(1024, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
+    [VectorStoreVector(RagConstants.EmbeddingDimension, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
     public Embedding<float>? ImageEmbedding { get; set; }
 
     /// <summary>

@@ -76,10 +76,7 @@ public class BinanceAuthService
         }
 
         var signature = GenerateSignature(payload, config.SecretKey);
-        var signedPayload = $"{payload}&signature={signature}";
-
-        _logger.LogDebug("已签名请求: {Payload}", signedPayload);
-        return signedPayload;
+        return $"{payload}&signature={signature}";
     }
 
     /// <summary>

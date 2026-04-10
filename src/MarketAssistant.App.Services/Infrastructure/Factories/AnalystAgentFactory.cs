@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
@@ -20,6 +21,11 @@ public interface IAnalystAgentFactory
     AIAgent CreateAnalyst(Type agentType);
 
     /// <summary>
+    /// 根据类型创建代理，附加额外的 AIContextProvider（如共享市场快照）
+    /// </summary>
+    AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders);
+
+    /// <summary>
     /// 创建指定类型的分析师代理（泛型版本，提供编译时类型检查）
     /// </summary>
     /// <typeparam name="TAgent">代理类型，必须继承自 AnalystAgentBase</typeparam>
@@ -35,24 +41,32 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     private readonly IServiceProvider _serviceProvider;
     private readonly IChatClientFactory _chatClientFactory;
     private readonly MarketContext _marketContext;
+    private readonly TokenTrackingMiddleware _tokenTracking;
     private readonly ILogger<AnalystAgentFactory> _logger;
 
     public AnalystAgentFactory(
         IServiceProvider serviceProvider,
         IChatClientFactory chatClientFactory,
         MarketContext marketContext,
+        TokenTrackingMiddleware tokenTracking,
         ILogger<AnalystAgentFactory> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
+        _tokenTracking = tokenTracking ?? throw new ArgumentNullException(nameof(tokenTracking));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
     /// 根据类型创建对应的代理
     /// </summary>
-    public AIAgent CreateAnalyst(Type agentType)
+    public AIAgent CreateAnalyst(Type agentType) => CreateAnalyst(agentType, additionalProviders: null);
+
+    /// <summary>
+    /// 根据类型创建对应的代理，支持附加额外的 AIContextProvider
+    /// </summary>
+    public AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders)
     {
         try
         {
@@ -76,13 +90,25 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             var parameters = new List<object> { chatClient };
             parameters.AddRange(tools);
 
+            // 如果有额外的 AIContextProvider（如共享市场快照），追加到参数列表
+            if (additionalProviders is { Length: > 0 })
+                parameters.Add(additionalProviders);
+
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(_serviceProvider, agentType, parameters.ToArray());
 
+            // 通过 MAF Builder 模式附加 Token 追踪中间件
+            var middlewareAgent = agent
+                .AsBuilder()
+                .Use(
+                    runFunc: _tokenTracking.InvokeAsync,
+                    runStreamingFunc: _tokenTracking.InvokeStreamingAsync)
+                .Build();
+
             _logger.LogInformation(
-                "成功创建分析师代理: {AgentType} (市场: {Market})",
+                "成功创建分析师代理: {AgentType} (市场: {Market}，已附加中间件)",
                 agentType.Name, currentMarket);
 
-            return agent;
+            return middlewareAgent;
         }
         catch (Exception ex)
         {

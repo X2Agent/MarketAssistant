@@ -23,15 +23,17 @@ public class MarketMonitor : IDisposable
     private readonly TradingDataService _dataService;
     private readonly ILogger<MarketMonitor> _logger;
 
+    private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private CancellationTokenSource? _cts;
     private bool _isRunning;
     private Task? _consumerTask;
 
     private readonly Channel<(string Symbol, decimal Price)> _priceChannel =
-        Channel.CreateUnbounded<(string, decimal)>(new UnboundedChannelOptions
+        Channel.CreateBounded<(string, decimal)>(new BoundedChannelOptions(1000)
         {
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropOldest
         });
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _strategyLocks = new();
@@ -69,26 +71,34 @@ public class MarketMonitor : IDisposable
     /// </summary>
     public async Task StartAsync()
     {
-        if (_isRunning)
-            return;
+        await _lifecycleLock.WaitAsync();
+        try
+        {
+            if (_isRunning)
+                return;
 
-        _cts = new CancellationTokenSource();
-        _isRunning = true;
+            _cts = new CancellationTokenSource();
+            _isRunning = true;
 
-        var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
-        var instrumentSymbols = activeStrategies
-            .Select(s => s.Symbol.ToLowerInvariant())
-            .Distinct()
-            .ToList();
+            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            var instrumentSymbols = activeStrategies
+                .Select(s => s.Symbol.ToLowerInvariant())
+                .Distinct()
+                .ToList();
 
-        if (instrumentSymbols.Count > 0)
-            await _webSocketService.SubscribeAsync(instrumentSymbols);
+            if (instrumentSymbols.Count > 0)
+                await _webSocketService.SubscribeAsync(instrumentSymbols);
 
-        _webSocketService.PriceUpdated += OnPriceUpdated;
-        _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
+            _webSocketService.PriceUpdated += OnPriceUpdated;
+            _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
-        _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
-        StatusChanged?.Invoke(true);
+            _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
+            StatusChanged?.Invoke(true);
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+        }
     }
 
     /// <summary>
@@ -96,23 +106,31 @@ public class MarketMonitor : IDisposable
     /// </summary>
     public async Task StopAsync()
     {
-        if (!_isRunning)
-            return;
-
-        _webSocketService.PriceUpdated -= OnPriceUpdated;
-        _cts?.Cancel();
-
-        if (_consumerTask != null)
+        await _lifecycleLock.WaitAsync();
+        try
         {
-            try { await _consumerTask; }
-            catch (OperationCanceledException) { }
+            if (!_isRunning)
+                return;
+
+            _webSocketService.PriceUpdated -= OnPriceUpdated;
+            _cts?.Cancel();
+
+            if (_consumerTask != null)
+            {
+                try { await _consumerTask; }
+                catch (OperationCanceledException) { }
+            }
+
+            await _webSocketService.UnsubscribeAllAsync();
+
+            _isRunning = false;
+            _logger.LogInformation("MarketMonitor 已停止");
+            StatusChanged?.Invoke(false);
         }
-
-        await _webSocketService.UnsubscribeAllAsync();
-
-        _isRunning = false;
-        _logger.LogInformation("MarketMonitor 已停止");
-        StatusChanged?.Invoke(false);
+        finally
+        {
+            _lifecycleLock.Release();
+        }
     }
 
     /// <summary>
@@ -282,6 +300,7 @@ public class MarketMonitor : IDisposable
         foreach (var kvp in _strategyLocks)
             kvp.Value.Dispose();
         _strategyLocks.Clear();
+        _lifecycleLock.Dispose();
         GC.SuppressFinalize(this);
     }
 }

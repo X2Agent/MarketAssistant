@@ -1,0 +1,136 @@
+using MarketAssistant.Applications.Settings;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+
+namespace MarketAssistant.Services;
+
+/// <summary>
+/// 用户长期记忆持久化服务（SQLite）。
+/// 存储用户的投资偏好、历史分析结论、自定义标签等，供 AI 上下文使用。
+/// </summary>
+public class UserMemoryService : IDisposable
+{
+    private readonly string _connectionString;
+    private readonly ILogger<UserMemoryService> _logger;
+    private readonly Task _initializeTask;
+
+    public UserMemoryService(ILogger<UserMemoryService> logger)
+    {
+        _logger = logger;
+
+        var appDataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            AppInfo.AppName);
+        Directory.CreateDirectory(appDataDir);
+
+        var dbPath = Path.Combine(appDataDir, "user_memory.db");
+        _connectionString = $"Data Source={dbPath}";
+        _initializeTask = InitializeDatabaseAsync();
+    }
+
+    /// <summary>
+    /// 保存一条记忆条目
+    /// </summary>
+    public async Task SaveMemoryAsync(string category, string key, string value, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT OR REPLACE INTO user_memories (category, key, value, updated_at)
+            VALUES (@category, @key, @value, @updatedAt)
+            """;
+        cmd.Parameters.AddWithValue("@category", category);
+        cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@value", value);
+        cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>
+    /// 获取指定类别的所有记忆条目
+    /// </summary>
+    public async Task<Dictionary<string, string>> GetMemoriesAsync(string category, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT key, value FROM user_memories WHERE category = @category ORDER BY updated_at DESC";
+        cmd.Parameters.AddWithValue("@category", category);
+
+        var result = new Dictionary<string, string>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            result[reader.GetString(0)] = reader.GetString(1);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 获取所有记忆条目（用于注入 AI 上下文）
+    /// </summary>
+    public async Task<List<(string Category, string Key, string Value)>> GetAllMemoriesAsync(CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT category, key, value FROM user_memories ORDER BY category, updated_at DESC";
+
+        var result = new List<(string, string, string)>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            result.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 删除一条记忆条目
+    /// </summary>
+    public async Task DeleteMemoryAsync(string category, string key, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM user_memories WHERE category = @category AND key = @key";
+        cmd.Parameters.AddWithValue("@category", category);
+        cmd.Parameters.AddWithValue("@key", key);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct = default)
+    {
+        var conn = new SqliteConnection(_connectionString);
+        await conn.OpenAsync(ct);
+        return conn;
+    }
+
+    private async Task InitializeDatabaseAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS user_memories (
+                    category TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (category, key)
+                );
+                CREATE INDEX IF NOT EXISTS idx_memories_category ON user_memories(category);
+                """;
+            await cmd.ExecuteNonQueryAsync();
+            _logger.LogInformation("用户记忆数据库初始化完成");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "初始化用户记忆数据库失败");
+        }
+    }
+
+    public void Dispose() => GC.SuppressFinalize(this);
+}

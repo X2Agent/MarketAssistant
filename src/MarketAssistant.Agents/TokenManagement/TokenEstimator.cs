@@ -1,15 +1,29 @@
 using Microsoft.Extensions.AI;
+using Microsoft.ML.Tokenizers;
 
 namespace MarketAssistant.Agents.TokenManagement;
 
 /// <summary>
-/// Token 估算器，基于字符统计估算消息的 Token 数
-/// 中文约 1.5 字/token，英文约 4 字符/token，混合场景取加权平均
+/// Token 估算器，基于 tiktoken（cl100k_base）精确计算 Token 数。
+/// 默认使用 GPT-4o 的分词模型；若初始化失败则回退到字符启发式估算。
 /// </summary>
 public static class TokenEstimator
 {
-    private const double ChineseCharsPerToken = 1.5;
-    private const double EnglishCharsPerToken = 4.0;
+    private static readonly Tokenizer? _tokenizer;
+
+    static TokenEstimator()
+    {
+        try
+        {
+            // 使用 cl100k_base 编码而非绑定特定模型名，与具体 LLM 提供商无关
+            _tokenizer = TiktokenTokenizer.CreateForEncoding("cl100k_base");
+        }
+        catch
+        {
+            // 离线环境或编码数据不可用时回退到启发式估算
+            _tokenizer = null;
+        }
+    }
 
     /// <summary>
     /// 估算单条消息的 Token 数
@@ -27,16 +41,34 @@ public static class TokenEstimator
     {
         if (string.IsNullOrEmpty(text)) return 0;
 
+        if (_tokenizer != null)
+            return _tokenizer.CountTokens(text);
+
+        return FallbackEstimate(text);
+    }
+
+    /// <summary>
+    /// 估算对话历史的总 Token 数
+    /// </summary>
+    public static int EstimateTotalTokens(IEnumerable<ChatMessage> messages)
+    {
+        return messages.Sum(EstimateTokens);
+    }
+
+    /// <summary>
+    /// 回退启发式估算（tiktoken 不可用时）
+    /// </summary>
+    private static int FallbackEstimate(string text)
+    {
         int chineseCount = 0;
         int otherCount = 0;
 
         foreach (var ch in text)
         {
-            if (ch >= 0x4E00 && ch <= 0x9FFF ||
-                ch >= 0x3400 && ch <= 0x4DBF ||
-                ch >= 0x20000 && ch <= 0x2A6DF ||
-                ch >= 0x3000 && ch <= 0x303F ||
-                ch >= 0xFF00 && ch <= 0xFFEF)
+            if (ch is >= '\u4E00' and <= '\u9FFF' or
+                >= '\u3400' and <= '\u4DBF' or
+                >= '\u3000' and <= '\u303F' or
+                >= '\uFF00' and <= '\uFFEF')
             {
                 chineseCount++;
             }
@@ -46,15 +78,7 @@ public static class TokenEstimator
             }
         }
 
-        var tokens = (int)(chineseCount / ChineseCharsPerToken + otherCount / EnglishCharsPerToken);
+        var tokens = (int)(chineseCount / 1.5 + otherCount / 4.0);
         return Math.Max(tokens, 1);
-    }
-
-    /// <summary>
-    /// 估算对话历史的总 Token 数
-    /// </summary>
-    public static int EstimateTotalTokens(IEnumerable<ChatMessage> messages)
-    {
-        return messages.Sum(EstimateTokens);
     }
 }

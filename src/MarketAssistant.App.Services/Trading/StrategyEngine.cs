@@ -65,31 +65,28 @@ public class StrategyEngine
             StrategyType.TakeProfit => EvaluateTakeProfit(strategy, currentPrice),
             StrategyType.TrailingStop => EvaluateTrailingStop(strategy, currentPrice),
             StrategyType.AISignal => EvaluateAISignal(strategy),
-            StrategyType.GridTrading or StrategyType.DCA =>
-                LogUnsupported(strategy.Type, strategy.Id),
+            StrategyType.GridTrading => EvaluateGridTrading(strategy, currentPrice),
+            StrategyType.DCA => EvaluateDCA(strategy, currentPrice),
             _ => false
         };
     }
 
-    private bool LogUnsupported(StrategyType type, string strategyId)
-    {
-        _logger.LogWarning("策略类型 {Type} 尚未实现评估逻辑，策略 {StrategyId} 被跳过", type, strategyId);
-        return false;
-    }
-
     private static bool EvaluateStopLoss(TradingStrategy strategy, decimal currentPrice)
     {
-        // Buy side stop loss: price drops below trigger
+        // Side 表示触发时要执行的操作方向
+        // Sell 侧止损：持有多头仓位，价格跌破触发价时卖出止损
         if (strategy.Side == OrderSide.Sell)
             return currentPrice <= strategy.TriggerPrice;
-        // Sell side stop loss (short scenario): price rises above trigger
+        // Buy 侧止损：持有空头仓位，价格涨破触发价时买入止损
         return currentPrice >= strategy.TriggerPrice;
     }
 
     private static bool EvaluateTakeProfit(TradingStrategy strategy, decimal currentPrice)
     {
+        // Sell 侧止盈：持有多头仓位，价格涨至触发价时卖出止盈
         if (strategy.Side == OrderSide.Sell)
             return currentPrice >= strategy.TriggerPrice;
+        // Buy 侧止盈：等待买入机会，价格跌至触发价时买入
         return currentPrice <= strategy.TriggerPrice;
     }
 
@@ -168,6 +165,117 @@ public class StrategyEngine
         {
             _logger.LogWarning(ex, "解析 AISignal 参数失败: {StrategyId}", strategy.Id);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// 网格交易评估：价格穿越网格线时触发交易。
+    /// 网格在 LowerPrice 和 UpperPrice 之间均匀分布。
+    /// 价格下穿网格线时买入，上穿时卖出。
+    /// </summary>
+    private bool EvaluateGridTrading(TradingStrategy strategy, decimal currentPrice)
+    {
+        if (string.IsNullOrEmpty(strategy.CustomParams))
+            return false;
+
+        try
+        {
+            var gridParams = JsonSerializer.Deserialize<GridTradingParams>(strategy.CustomParams);
+            if (gridParams == null || gridParams.GridCount <= 1 || gridParams.UpperPrice <= gridParams.LowerPrice)
+                return false;
+
+            // 价格超出网格范围不触发
+            if (currentPrice < gridParams.LowerPrice || currentPrice > gridParams.UpperPrice)
+                return false;
+
+            // 计算当前价格落在哪一格
+            var spacing = gridParams.GridSpacing;
+            var currentIndex = (int)((currentPrice - gridParams.LowerPrice) / spacing);
+            currentIndex = Math.Clamp(currentIndex, 0, gridParams.GridCount);
+
+            // 与上次触发的网格索引比较，只有穿越才触发
+            if (gridParams.LastTriggeredIndex < 0)
+            {
+                // 首次运行，记录当前位置但不触发
+                gridParams.LastTriggeredIndex = currentIndex;
+                strategy.CustomParams = JsonSerializer.Serialize(gridParams);
+                return false;
+            }
+
+            if (currentIndex == gridParams.LastTriggeredIndex)
+                return false;
+
+            // 价格穿越了网格线：下穿（index 减小）买入，上穿（index 增大）卖出
+            strategy.Side = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
+            strategy.Quantity = gridParams.QuantityPerGrid;
+
+            gridParams.LastTriggeredIndex = currentIndex;
+            strategy.CustomParams = JsonSerializer.Serialize(gridParams);
+
+            _logger.LogInformation(
+                "网格交易触发: {StrategyId} 网格 {Index} → {Side}，价格: {Price}",
+                strategy.Id, currentIndex, strategy.Side, currentPrice);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析 GridTrading 参数失败: {StrategyId}", strategy.Id);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// DCA（定投）评估：按时间间隔定期买入。
+    /// 支持价格上限过滤和低价加倍买入。
+    /// </summary>
+    private bool EvaluateDCA(TradingStrategy strategy, decimal currentPrice)
+    {
+        if (string.IsNullOrEmpty(strategy.CustomParams))
+            return false;
+
+        try
+        {
+            var dcaParams = JsonSerializer.Deserialize<DCAParams>(strategy.CustomParams);
+            if (dcaParams == null || dcaParams.AmountPerInterval <= 0)
+                return false;
+
+            // 检查时间间隔
+            if (strategy.LastTriggeredAt.HasValue)
+            {
+                var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
+                if (elapsed < dcaParams.IntervalSeconds)
+                    return false;
+            }
+
+            // 价格上限过滤
+            if (dcaParams.MaxBuyPrice > 0 && currentPrice > dcaParams.MaxBuyPrice)
+            {
+                _logger.LogDebug("DCA 跳过: {StrategyId} 当前价 {Price} 超过上限 {MaxPrice}",
+                    strategy.Id, currentPrice, dcaParams.MaxBuyPrice);
+                return false;
+            }
+
+            // DCA 始终买入方向
+            strategy.Side = OrderSide.Buy;
+
+            // 低价加倍买入
+            var amount = dcaParams.AmountPerInterval;
+            if (dcaParams.DoubleBuyBelowPrice > 0 && currentPrice < dcaParams.DoubleBuyBelowPrice)
+            {
+                amount *= 2;
+                _logger.LogInformation("DCA 低价加倍: {StrategyId} 价格 {Price} < {Threshold}，加倍买入",
+                    strategy.Id, currentPrice, dcaParams.DoubleBuyBelowPrice);
+            }
+
+            // 将金额转换为数量
+            strategy.Quantity = currentPrice > 0 ? amount / currentPrice : 0;
+
+            return strategy.Quantity > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "解析 DCA 参数失败: {StrategyId}", strategy.Id);
+            return false;
         }
     }
 }

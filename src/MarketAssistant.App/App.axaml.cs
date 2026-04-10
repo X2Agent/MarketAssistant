@@ -3,9 +3,11 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
 using MarketAssistant.Views.Windows;
+using Microsoft.Extensions.Logging;
 using Serilog;
 
 namespace MarketAssistant;
@@ -25,8 +27,10 @@ public partial class App : Application
         // 配置依赖注入
         ServiceProvider = Program.ConfigureServices();
 
-        // 初始化全局异常处理器
-        GlobalExceptionHandler.Initialize(ServiceProvider);
+        // 初始化全局异常处理器（直接传入所需服务，避免服务定位器）
+        GlobalExceptionHandler.Initialize(
+            ServiceProvider.GetRequiredService<ILogger<GlobalExceptionHandler>>(),
+            ServiceProvider.GetRequiredService<IDialogService>());
 
         // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();

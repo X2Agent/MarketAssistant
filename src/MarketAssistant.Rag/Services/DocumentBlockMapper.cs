@@ -34,11 +34,11 @@ public class DocumentBlockMapper
     /// <param name="currentSection">当前章节</param>
     /// <param name="imageMetadata">图片元数据（用于图片块）</param>
     /// <returns>转换后的段落集合和下一个序号</returns>
-    public (IEnumerable<TextParagraph> Paragraphs, int NextOrder, string? UpdatedSection) 
+    public (IEnumerable<TextParagraph> Paragraphs, int NextOrder, string? UpdatedSection)
         MapBlock(
-            DocumentBlock block, 
-            string filePath, 
-            int baseOrder, 
+            DocumentBlock block,
+            string filePath,
+            int baseOrder,
             string? currentSection,
             ImageMetadata? imageMetadata = null)
     {
@@ -64,7 +64,7 @@ public class DocumentBlockMapper
                         Text = chunk.Text,
                         TextEmbedding = chunk.TextEmbedding,
                         ImageUri = chunk.ImageUri,
-                        ImageEmbedding = chunk.ImageEmbedding ?? new Embedding<float>(new float[1024]), // 确保不为null
+                        ImageEmbedding = chunk.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]), // 确保不为null
                         Order = nextOrder++,
                         Section = currentSection,
                         SourceType = chunk.SourceType,
@@ -96,9 +96,9 @@ public class DocumentBlockMapper
                         PublishedAt = null,
                         BlockKind = 1, // Heading
                         HeadingLevel = headingBlock.Level,
-                        ImageEmbedding = new Embedding<float>(new float[1024]) // 空的图像嵌入
+                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
                     });
-                    
+
                     // 更新当前章节：高级别标题会重置章节上下文
                     if (headingBlock.Level <= 3) // H1-H3 作为主要章节分割
                     {
@@ -126,7 +126,7 @@ public class DocumentBlockMapper
                         PublishedAt = null,
                         BlockKind = 2, // List
                         ListType = (int)listBlock.ListType,
-                        ImageEmbedding = new Embedding<float>(new float[1024]) // 空的图像嵌入
+                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
                     });
                 }
                 break;
@@ -145,7 +145,7 @@ public class DocumentBlockMapper
                     ContentHash = tableBlock.Hash,
                     PublishedAt = null,
                     BlockKind = 3, // Table
-                    ImageEmbedding = new Embedding<float>(new float[1024]) // 空的图像嵌入
+                    ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
                 });
                 break;
 
@@ -164,7 +164,7 @@ public class DocumentBlockMapper
                     PublishedAt = null,
                     BlockKind = 4, // Image
                     ImageUri = imageMetadata?.StoredPath,
-                    ImageEmbedding = imageMetadata?.ImageEmbedding ?? new Embedding<float>(new float[1024]) // 确保不为null
+                    ImageEmbedding = imageMetadata?.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 确保不为null
                 };
                 paragraphs.Add(imageParagraph);
                 break;

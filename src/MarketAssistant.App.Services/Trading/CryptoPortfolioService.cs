@@ -12,15 +12,18 @@ public class CryptoPortfolioService
 {
     private readonly IExchangeClient _exchangeClient;
     private readonly BinanceMarketDataService _marketDataService;
+    private readonly TradingDataService _tradingDataService;
     private readonly ILogger<CryptoPortfolioService> _logger;
 
     public CryptoPortfolioService(
-        IExchangeClient exchangeClient,
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         BinanceMarketDataService marketDataService,
+        TradingDataService tradingDataService,
         ILogger<CryptoPortfolioService> logger)
     {
         _exchangeClient = exchangeClient;
         _marketDataService = marketDataService;
+        _tradingDataService = tradingDataService;
         _logger = logger;
     }
 
@@ -55,7 +58,15 @@ public class CryptoPortfolioService
                 if (ticker != null)
                 {
                     position.CurrentPrice = ticker.LastPrice;
-                    position.EntryPrice = ticker.LastPrice;
+
+                    var avgEntry = await _tradingDataService.GetAverageEntryPriceAsync(position.Symbol, ct);
+                    position.EntryPrice = avgEntry > 0 ? avgEntry : ticker.LastPrice;
+
+                    if (position.EntryPrice > 0)
+                    {
+                        position.UnrealizedPnl = (position.CurrentPrice - position.EntryPrice) * position.Quantity;
+                        position.UnrealizedPnlPercent = (position.CurrentPrice - position.EntryPrice) / position.EntryPrice * 100;
+                    }
                 }
             }
             catch (HttpRequestException)

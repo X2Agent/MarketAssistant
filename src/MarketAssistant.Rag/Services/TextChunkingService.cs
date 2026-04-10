@@ -1,4 +1,5 @@
 using MarketAssistant.Rag.Interfaces;
+using Microsoft.ML.Tokenizers;
 using System.Security.Cryptography;
 
 namespace MarketAssistant.Rag.Services;
@@ -294,10 +295,45 @@ public class TextChunkingService : ITextChunkingService
             return processedParagraphs;
         }
 
+        private static readonly Tokenizer? s_tokenizer;
+
+        static TextChunkerHelper()
+        {
+            try
+            {
+                // 使用 cl100k_base 编码而非绑定特定模型名。
+                // cl100k_base 对中文分词偏保守（token 数更多），用于分块更安全；
+                // 且与具体 LLM 提供商无关，适用于 DeepSeek/Qwen 等非 OpenAI 模型。
+                s_tokenizer = TiktokenTokenizer.CreateForEncoding("cl100k_base");
+            }
+            catch
+            {
+                // 离线环境或编码数据不可用时回退到启发式估算
+                s_tokenizer = null;
+            }
+        }
+
         private static int GetTokenCount(string input)
         {
-            // Default approximation: length / 4
-            return input.Length / 4;
+            if (string.IsNullOrEmpty(input)) return 0;
+
+            if (s_tokenizer != null)
+                return s_tokenizer.CountTokens(input);
+
+            // 回退：区分中文与其他字符
+            int chineseCount = 0;
+            int otherCount = 0;
+            foreach (var ch in input)
+            {
+                if (ch is >= '\u4E00' and <= '\u9FFF' or
+                    >= '\u3400' and <= '\u4DBF' or
+                    >= '\u3000' and <= '\u303F' or
+                    >= '\uFF00' and <= '\uFFEF')
+                    chineseCount++;
+                else
+                    otherCount++;
+            }
+            return Math.Max((int)(chineseCount / 1.5 + otherCount / 4.0), 1);
         }
     }
 }

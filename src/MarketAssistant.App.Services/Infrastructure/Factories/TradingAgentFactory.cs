@@ -1,8 +1,10 @@
 using System.Reflection;
 using MarketAssistant.Agents.Analysts.Attributes;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +15,7 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// </summary>
 public interface ITradingAgentFactory
 {
-    TradingAgent CreateAgent();
+    AIAgent CreateAgent();
 }
 
 /// <summary>
@@ -23,19 +25,32 @@ public class TradingAgentFactory : ITradingAgentFactory
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly IChatClientFactory _chatClientFactory;
+    private readonly TokenTrackingMiddleware _tokenTracking;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TradingAgentFactory> _logger;
+
+    /// <summary>
+    /// Human-in-the-Loop 确认回调。
+    /// 参数: (functionName, argsDescription) → true=放行 false=拒绝。
+    /// UI 层可在创建工厂后设置此属性以接入用户确认对话框。
+    /// </summary>
+    public Func<string, string, Task<bool>>? TradeConfirmationCallback { get; set; }
 
     public TradingAgentFactory(
         IServiceProvider serviceProvider,
         IChatClientFactory chatClientFactory,
+        TokenTrackingMiddleware tokenTracking,
+        ILoggerFactory loggerFactory,
         ILogger<TradingAgentFactory> logger)
     {
         _serviceProvider = serviceProvider;
         _chatClientFactory = chatClientFactory;
+        _tokenTracking = tokenTracking;
+        _loggerFactory = loggerFactory;
         _logger = logger;
     }
 
-    public TradingAgent CreateAgent()
+    public AIAgent CreateAgent()
     {
         try
         {
@@ -46,11 +61,25 @@ public class TradingAgentFactory : ITradingAgentFactory
             allParams[0] = chatClient;
             toolParams.CopyTo(allParams, 1);
 
-            var agent = (TradingAgent)ActivatorUtilities.CreateInstance(
+            var agent = (AIAgent)ActivatorUtilities.CreateInstance(
                 _serviceProvider, typeof(TradingAgent), allParams);
 
-            _logger.LogInformation("成功创建 TradingAgent");
-            return agent;
+            // 创建 Function Calling 守卫中间件（每次 CreateAgent 新建实例以重置调用计数）
+            var guardMiddleware = new TradingFunctionGuardMiddleware(
+                _loggerFactory.CreateLogger<TradingFunctionGuardMiddleware>());
+            guardMiddleware.ConfirmationCallback = TradeConfirmationCallback;
+
+            // 通过 MAF Builder 模式附加中间件链：Token 追踪 + Function Calling 守卫
+            var middlewareAgent = agent
+                .AsBuilder()
+                .Use(
+                    runFunc: _tokenTracking.InvokeAsync,
+                    runStreamingFunc: _tokenTracking.InvokeStreamingAsync)
+                .Use(guardMiddleware.InvokeAsync)
+                .Build();
+
+            _logger.LogInformation("成功创建 TradingAgent（已附加 Token 追踪 + 交易守卫中间件）");
+            return middlewareAgent;
         }
         catch (Exception ex)
         {

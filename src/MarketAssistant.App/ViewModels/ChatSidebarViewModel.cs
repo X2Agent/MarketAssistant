@@ -1,8 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Agents.ContextProviders;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Tools;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -16,8 +19,10 @@ namespace MarketAssistant.ViewModels;
 public partial class ChatSidebarViewModel : ViewModelBase
 {
     private readonly MarketChatSession _chatSession;
+    private readonly ChatSessionPersistenceService _sessionPersistence;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
+    public ObservableCollection<ChatSessionSummary> SessionHistory { get; } = [];
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
@@ -41,15 +46,29 @@ public partial class ChatSidebarViewModel : ViewModelBase
         ILogger<ChatSidebarViewModel> logger,
         IChatClientFactory chatClientFactory,
         ILoggerFactory loggerFactory,
-        McpService mcpService,
-        GroundingSearchTools searchTools)
+        McpToolContextProvider mcpToolProvider,
+        GroundingSearchTools searchTools,
+        TokenTrackingMiddleware tokenTracking,
+        ConversationCompressionMiddleware compressionMiddleware,
+        UserMemoryContextProvider memoryProvider,
+        RagContextProvider ragProvider,
+        ChatSessionPersistenceService sessionPersistence)
         : base(logger)
     {
+        _sessionPersistence = sessionPersistence;
+
         var chatClient = chatClientFactory.CreateClient();
         var sessionLogger = loggerFactory.CreateLogger<MarketChatSession>();
-        _chatSession = new MarketChatSession(chatClient, sessionLogger, mcpService, searchTools);
+        _chatSession = new MarketChatSession(
+            chatClient, sessionLogger, mcpToolProvider, searchTools,
+            tokenTracking: tokenTracking,
+            compressionMiddleware: compressionMiddleware,
+            memoryProvider: memoryProvider,
+            ragProvider: ragProvider,
+            sessionPersistence: sessionPersistence);
 
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
+        _ = LoadSessionHistoryAsync();
     }
 
     /// <summary>
@@ -231,6 +250,61 @@ public partial class ChatSidebarViewModel : ViewModelBase
         ChatMessages.Clear();
         _chatSession.ClearHistory();
         AddWelcomeMessage();
+    }
+
+    /// <summary>
+    /// 加载历史会话列表
+    /// </summary>
+    private async Task LoadSessionHistoryAsync()
+    {
+        try
+        {
+            var summaries = await _sessionPersistence.GetSessionSummariesAsync();
+            SessionHistory.Clear();
+            foreach (var s in summaries)
+                SessionHistory.Add(s);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "加载会话历史失败");
+        }
+    }
+
+    /// <summary>
+    /// 恢复历史会话
+    /// </summary>
+    [RelayCommand]
+    private async Task RestoreSessionAsync(ChatSessionSummary summary)
+    {
+        if (summary is null) return;
+
+        var restored = await _chatSession.RestoreSessionAsync(summary.Id);
+        if (!restored)
+        {
+            Logger?.LogWarning("恢复会话失败: {SessionId}", summary.Id);
+            return;
+        }
+
+        ChatMessages.Clear();
+        var history = await _chatSession.GetConversationHistoryAsync();
+        foreach (var msg in history)
+        {
+            ChatMessages.Add(new ChatMessageAdapter(msg));
+        }
+
+        StockCode = _chatSession.CurrentStockCode;
+    }
+
+    /// <summary>
+    /// 删除历史会话
+    /// </summary>
+    [RelayCommand]
+    private async Task DeleteSessionAsync(ChatSessionSummary summary)
+    {
+        if (summary is null) return;
+
+        await _sessionPersistence.DeleteSessionAsync(summary.Id);
+        SessionHistory.Remove(summary);
     }
 }
 

@@ -5,6 +5,8 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Executors;
@@ -18,6 +20,20 @@ public sealed partial class CoordinatorExecutor : Executor
 {
     private readonly AIAgent _coordinatorAgent;
     private readonly ILogger<CoordinatorExecutor> _logger;
+
+    // 针对瞬态 LLM 故障的重试管道：最多重试 2 次，指数退避 + 抖动
+    private static readonly ResiliencePipeline _llmRetryPipeline = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
+        {
+            MaxRetryAttempts = 2,
+            BackoffType = DelayBackoffType.Exponential,
+            UseJitter = true,
+            Delay = TimeSpan.FromSeconds(2),
+            ShouldHandle = new PredicateBuilder()
+                .Handle<HttpRequestException>()
+                .Handle<TaskCanceledException>(ex => ex.InnerException is TimeoutException)
+        })
+        .Build();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
@@ -88,11 +104,13 @@ public sealed partial class CoordinatorExecutor : Executor
                 $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
             };
 
-            // 使用带结构化输出的 ChatClientAgent 运行
-            var agentResponse = await _coordinatorAgent.RunAsync(
-                messages,
-                session: null,
-                options: null,
+            // 使用带结构化输出的 ChatClientAgent 运行（包含重试）
+            var agentResponse = await _llmRetryPipeline.ExecuteAsync(
+                async ct => await _coordinatorAgent.RunAsync(
+                    messages,
+                    session: null,
+                    options: null,
+                    ct),
                 cancellationToken);
 
             // 提取协调分析师的回复（最后一条 Assistant 消息）

@@ -270,7 +270,7 @@ public class TradingDataService : IDisposable
     }
 
     /// <summary>
-    /// 计算指定交易标的的加权平均买入价（用于 PnL 估算）
+    /// 计算指定交易标的的加权平均买入价（用于多头 PnL 估算）
     /// </summary>
     public async Task<decimal> GetAverageEntryPriceAsync(string symbol, CancellationToken ct = default)
     {
@@ -286,6 +286,31 @@ public class TradingDataService : IDisposable
             """;
         cmd.Parameters.AddWithValue("@symbol", symbol);
         cmd.Parameters.AddWithValue("@side", (int)OrderSide.Buy);
+        cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
+
+        var result = await cmd.ExecuteScalarAsync(ct);
+        if (result is double d)
+            return (decimal)d;
+        return 0;
+    }
+
+    /// <summary>
+    /// 计算指定交易标的的加权平均卖出价（用于空头平仓 PnL 估算）
+    /// </summary>
+    public async Task<decimal> GetAverageSellPriceAsync(string symbol, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT CASE WHEN SUM(executed_qty) > 0
+                THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
+                ELSE 0 END
+            FROM trade_records
+            WHERE symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
+            """;
+        cmd.Parameters.AddWithValue("@symbol", symbol);
+        cmd.Parameters.AddWithValue("@side", (int)OrderSide.Sell);
         cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
 
         var result = await cmd.ExecuteScalarAsync(ct);

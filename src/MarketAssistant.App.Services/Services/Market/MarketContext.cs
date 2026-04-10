@@ -13,23 +13,13 @@ public class MarketContext : INotifyPropertyChanged
 {
     private readonly IUserSettingService _userSettingService;
     private readonly IServiceProvider _serviceProvider;
-    private MarketType _currentMarket;
+    private readonly object _marketLock = new();
+    private volatile MarketType _currentMarket;
 
     /// <summary>
     /// 当前激活的市场类型
     /// </summary>
-    public MarketType CurrentMarket
-    {
-        get => _currentMarket;
-        private set
-        {
-            if (_currentMarket != value)
-            {
-                _currentMarket = value;
-                OnPropertyChanged();
-            }
-        }
-    }
+    public MarketType CurrentMarket => _currentMarket;
 
     public MarketContext(IUserSettingService userSettingService, IServiceProvider serviceProvider)
     {
@@ -50,14 +40,16 @@ public class MarketContext : INotifyPropertyChanged
     /// <param name="newMarket">新的市场类型</param>
     public void SwitchMarket(MarketType newMarket)
     {
-        if (CurrentMarket != newMarket)
+        lock (_marketLock)
         {
-            CurrentMarket = newMarket;
-            
-            // 保存到用户设置
-            _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
-            _userSettingService.SaveSettings();
+            if (_currentMarket == newMarket)
+                return;
+            _currentMarket = newMarket;
         }
+
+        _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
+        _userSettingService.SaveSettings();
+        OnPropertyChanged(nameof(CurrentMarket));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

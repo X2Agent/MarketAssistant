@@ -5,6 +5,8 @@ using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Polly;
+using Polly.Retry;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
@@ -17,6 +19,20 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
     private readonly IChatClientFactory _chatClientFactory;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<AnalyzeAssetsExecutor> _logger;
+
+    // 针对瞬态 LLM 故障的重试管道：最多重试 2 次，指数退避 + 抖动
+    private static readonly ResiliencePipeline _llmRetryPipeline = new ResiliencePipelineBuilder()
+        .AddRetry(new RetryStrategyOptions
+        {
+            MaxRetryAttempts = 2,
+            BackoffType = DelayBackoffType.Exponential,
+            UseJitter = true,
+            Delay = TimeSpan.FromSeconds(2),
+            ShouldHandle = new PredicateBuilder()
+                .Handle<HttpRequestException>()
+                .Handle<TaskCanceledException>(ex => ex.InnerException is TimeoutException)
+        })
+        .Build();
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
     {
@@ -76,12 +92,15 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
                 MaxOutputTokens = 8000
             };
 
-            var response = await _chatClientFactory.CreateClient().GetResponseAsync(
-                [
-                    new ChatMessage(ChatRole.System, systemPrompt),
-                    new ChatMessage(ChatRole.User, userPrompt)
-                ],
-                options,
+            var chatClient = _chatClientFactory.CreateClient();
+            var response = await _llmRetryPipeline.ExecuteAsync(
+                async ct => await chatClient.GetResponseAsync(
+                    [
+                        new ChatMessage(ChatRole.System, systemPrompt),
+                        new ChatMessage(ChatRole.User, userPrompt)
+                    ],
+                    options,
+                    ct),
                 cancellationToken);
 
             _logger.LogDebug("[步骤3/3-{MarketType}] AI原始响应: {Response}", originalRequest.MarketType, response.Text);

@@ -33,8 +33,8 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 {
-    // 目标嵌入向量维度（文本嵌入保持一致以便比较）
-    private const int TargetDim = 1024;
+    // 目标嵌入向量维度，引用统一常量
+    private const int TargetDim = RagConstants.EmbeddingDimension;
 
     // 【依赖注入】：服务的依赖项
     private readonly ILogger<ClipImageEmbeddingService> _logger;          // 结构化日志记录

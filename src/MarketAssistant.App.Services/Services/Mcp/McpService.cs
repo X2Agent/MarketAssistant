@@ -15,7 +15,16 @@ public class McpService : IAsyncDisposable
     private readonly McpToolAuditLogger? _auditLogger;
     private readonly MCPServerConfigService _configService;
     private readonly List<McpClient> _mcpClients = new();
+    private readonly object _clientsLock = new();
     private bool _disposed;
+
+    /// <summary>
+    /// 已连接的 MCP 服务器数量
+    /// </summary>
+    public int ActiveConnectionCount
+    {
+        get { lock (_clientsLock) return _mcpClients.Count; }
+    }
 
     /// <summary>
     /// 创建 MCP 服务
@@ -52,7 +61,10 @@ public class McpService : IAsyncDisposable
 
                 var mcpClient = await McpClient.CreateAsync(clientTransport, options);
 
-                _mcpClients.Add(mcpClient);
+                lock (_clientsLock)
+                {
+                    _mcpClients.Add(mcpClient);
+                }
 
                 var mcpTools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
 
@@ -156,6 +168,34 @@ public class McpService : IAsyncDisposable
     }
 
     /// <summary>
+    /// 断开所有现有 MCP 连接，释放资源。
+    /// 用于配置变更后重建连接。
+    /// </summary>
+    public async Task ResetConnectionsAsync()
+    {
+        List<McpClient> clientsToDispose;
+        lock (_clientsLock)
+        {
+            clientsToDispose = [.. _mcpClients];
+            _mcpClients.Clear();
+        }
+
+        foreach (var client in clientsToDispose)
+        {
+            try
+            {
+                await client.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "重置 MCP 连接时释放客户端出错");
+            }
+        }
+
+        _logger?.LogInformation("已重置 {Count} 个 MCP 连接", clientsToDispose.Count);
+    }
+
+    /// <summary>
     /// 释放资源
     /// </summary>
     public async ValueTask DisposeAsync()
@@ -163,7 +203,14 @@ public class McpService : IAsyncDisposable
         if (_disposed)
             return;
 
-        foreach (var mcpClient in _mcpClients)
+        List<McpClient> clientsToDispose;
+        lock (_clientsLock)
+        {
+            clientsToDispose = [.. _mcpClients];
+            _mcpClients.Clear();
+        }
+
+        foreach (var mcpClient in clientsToDispose)
         {
             try
             {
@@ -175,7 +222,6 @@ public class McpService : IAsyncDisposable
             }
         }
 
-        _mcpClients.Clear();
         _disposed = true;
         GC.SuppressFinalize(this);
     }

@@ -21,6 +21,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private readonly INotificationService _notificationService;
     private readonly IDialogService _dialogService;
     private readonly McpService _mcpService;
+    private readonly McpToolContextProvider _mcpToolProvider;
 
     [ObservableProperty]
     private ObservableCollection<MCPServerConfig> _serverConfigs = new();
@@ -66,6 +67,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         INotificationService notificationService,
         IDialogService dialogService,
         McpService mcpService,
+        McpToolContextProvider mcpToolProvider,
         ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
@@ -73,6 +75,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         _notificationService = notificationService;
         _dialogService = dialogService;
         _mcpService = mcpService;
+        _mcpToolProvider = mcpToolProvider;
         LoadServerConfigs();
     }
 
@@ -172,8 +175,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             // 保存到服务
             _configService.AddOrUpdateConfig(_editingConfig);
 
-            // 刷新列表
+            // 刷新列表并使工具缓存失效
             LoadServerConfigs();
+            _mcpToolProvider.Invalidate();
             IsEditing = false;
             _editingConfig = null;
 
@@ -300,6 +304,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             _configService.DeleteConfig(SelectedConfig.Id);
             LoadServerConfigs();
+            _mcpToolProvider.Invalidate();
             IsEditing = false;
             _notificationService?.ShowSuccess("删除成功");
         }
