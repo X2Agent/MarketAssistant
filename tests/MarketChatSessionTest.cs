@@ -38,7 +38,7 @@ public class MarketChatSessionTest : BaseAgentTest
 
         await foreach (var update in _chatSession.SendMessageStreamAsync("你好，请介绍股票投资的基础知识"))
         {
-            responseBuilder.Append(update.Content);
+            responseBuilder.Append(update);
         }
 
         var responseText = responseBuilder.ToString();
@@ -58,7 +58,7 @@ public class MarketChatSessionTest : BaseAgentTest
         var responseBuilder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这只股票的基本面如何？"))
         {
-            responseBuilder.Append(update.Content);
+            responseBuilder.Append(update);
         }
 
         var responseText = responseBuilder.ToString();
@@ -78,7 +78,7 @@ public class MarketChatSessionTest : BaseAgentTest
         var responseBuilder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这两个指标有什么区别"))
         {
-            responseBuilder.Append(update.Content);
+            responseBuilder.Append(update);
         }
 
         var responseText = responseBuilder.ToString();
@@ -141,7 +141,7 @@ public class MarketChatSessionTest : BaseAgentTest
         var responseBuilder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("今天的天气怎么样"))
         {
-            responseBuilder.Append(update.Content);
+            responseBuilder.Append(update);
         }
 
         var responseText = responseBuilder.ToString();
@@ -162,9 +162,9 @@ public class MarketChatSessionTest : BaseAgentTest
         var allContent = new List<string>();
         await foreach (var update in _chatSession.SendMessageStreamAsync("分析sz000001的技术指标"))
         {
-            if (!string.IsNullOrEmpty(update.Content))
+            if (!string.IsNullOrEmpty(update))
             {
-                allContent.Add(update.Content);
+                allContent.Add(update);
             }
         }
 
@@ -197,21 +197,21 @@ public class MarketChatSessionTest : BaseAgentTest
         var response1Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("分析MACD和RSI指标"))
         {
-            response1Builder.Append(update.Content);
+            response1Builder.Append(update);
         }
         Assert.IsFalse(string.IsNullOrEmpty(response1Builder.ToString()));
 
         var response2Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这家公司的ROE和净利润如何？"))
         {
-            response2Builder.Append(update.Content);
+            response2Builder.Append(update);
         }
         Assert.IsFalse(string.IsNullOrEmpty(response2Builder.ToString()));
 
         var response3Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("投资这只股票有什么风险？"))
         {
-            response3Builder.Append(update.Content);
+            response3Builder.Append(update);
         }
         Assert.IsFalse(string.IsNullOrEmpty(response3Builder.ToString()));
 

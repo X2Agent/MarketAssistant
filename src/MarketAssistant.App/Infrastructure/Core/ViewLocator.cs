@@ -19,21 +19,6 @@ public class ViewLocator : IDataTemplate
         if (data is null)
             return null;
 
-        var viewModelType = data.GetType();
-        var viewTypeName = viewModelType.FullName!.Replace("ViewModel", "View");
-        var viewType = Type.GetType(viewTypeName);
-
-        if (viewType != null)
-        {
-            var control = (Control?)Activator.CreateInstance(viewType);
-            if (control != null)
-            {
-                control.DataContext = data;
-                return control;
-            }
-        }
-
-        // 如果找不到对应的View，使用具体的映射
         return data switch
         {
             HomePageViewModel => new HomePageView { DataContext = data },
@@ -46,7 +31,7 @@ public class ViewLocator : IDataTemplate
             AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
             TradingPageViewModel => new TradingPageView { DataContext = data },
             ChatSidebarDemoViewModel => new ChatSidebarDemoView { DataContext = data },
-            _ => new TextBlock { Text = $"未找到视图: {viewModelType.Name}" }
+            _ => new TextBlock { Text = $"未找到视图: {data.GetType().Name}" }
         };
     }
 

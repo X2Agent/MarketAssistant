@@ -3,7 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Controls.Shapes;
+
 using Avalonia.Markup.Xaml.MarkupExtensions;
 
 namespace MarketAssistant.Views.Components;
@@ -148,8 +148,7 @@ public partial class AdaptiveCardView : UserControl
         }
         else if (container.Style == AdaptiveContainerStyle.Attention)
         {
-             // Light red background for attention
-             border.Background = new SolidColorBrush(Color.Parse("#20FF0000")); 
+             border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerBackgroundBrush");
              border.Padding = new Thickness(8);
              border.CornerRadius = new CornerRadius(4);
         }
@@ -258,20 +257,22 @@ public partial class AdaptiveCardView : UserControl
 
     private Control RenderImage(AdaptiveImage image)
     {
-        // Placeholder for image rendering
+        var textBlock = new TextBlock
+        {
+            Text = "Image: " + image.Url,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            FontSize = 10
+        };
+        textBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseMediumBrush");
+
         var border = new Border
         {
-            Background = Brushes.LightGray,
             Height = 100,
             CornerRadius = new CornerRadius(4),
-            Child = new TextBlock
-            {
-                Text = "Image: " + image.Url,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontSize = 10
-            }
+            Child = textBlock
         };
+        border[!Border.BackgroundProperty] = new DynamicResourceExtension("SurfaceVariantBrush");
 
         if (image.PixelHeight > 0) border.Height = image.PixelHeight;
 

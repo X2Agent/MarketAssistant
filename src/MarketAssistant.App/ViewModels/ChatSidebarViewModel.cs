@@ -1,12 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
-using MarketAssistant.Agents.ContextProviders;
-using MarketAssistant.Agents.Middleware;
-using MarketAssistant.Agents.Tools;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services;
-using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -44,36 +40,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        IChatClientFactory chatClientFactory,
-        ILoggerFactory loggerFactory,
-        McpToolContextProvider mcpToolProvider,
-        GroundingSearchTools searchTools,
-        MemoryManagementTools memoryTools,
-        SessionSearchTools sessionSearchTools,
-        KnowledgeGraphTools knowledgeGraphTools,
-        TokenTrackingMiddleware tokenTracking,
-        ConversationCompressionMiddleware compressionMiddleware,
-        LayeredMemoryContextProvider layeredMemoryProvider,
-        RagContextProvider ragProvider,
-        ChatSessionPersistenceService sessionPersistence,
-        MemoryExtractionService memoryExtraction)
+        IMarketChatSessionFactory chatSessionFactory,
+        ChatSessionPersistenceService sessionPersistence)
         : base(logger)
     {
         _sessionPersistence = sessionPersistence;
-
-        var chatClient = chatClientFactory.CreateClient();
-        var sessionLogger = loggerFactory.CreateLogger<MarketChatSession>();
-        _chatSession = new MarketChatSession(
-            chatClient, sessionLogger, mcpToolProvider, searchTools,
-            memoryTools: memoryTools,
-            sessionSearchTools: sessionSearchTools,
-            knowledgeGraphTools: knowledgeGraphTools,
-            tokenTracking: tokenTracking,
-            compressionMiddleware: compressionMiddleware,
-            layeredMemoryProvider: layeredMemoryProvider,
-            ragProvider: ragProvider,
-            sessionPersistence: sessionPersistence,
-            memoryExtraction: memoryExtraction);
+        _chatSession = chatSessionFactory.Create();
 
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
         _ = LoadSessionHistoryAsync();
@@ -124,15 +96,15 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
             await foreach (var chunk in _chatSession.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
-                if (!string.IsNullOrEmpty(chunk.Content))
+                if (!string.IsNullOrEmpty(chunk))
                 {
-                    contentBuilder.Append(chunk.Content);
+                    contentBuilder.Append(chunk);
 
                     if (!hasReceivedContent)
                     {
                         hasReceivedContent = true;
                         aiMessage.Status = MessageStatus.Streaming;
-                        aiMessage.Content = chunk.Content;
+                        aiMessage.Content = chunk;
                     }
                     else
                     {

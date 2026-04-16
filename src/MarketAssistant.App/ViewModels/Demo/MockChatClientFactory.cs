@@ -1,5 +1,7 @@
+using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -12,6 +14,20 @@ public class MockChatClientFactory : IChatClientFactory
     public IChatClient CreateClient()
     {
         return new MockChatClient();
+    }
+}
+
+/// <summary>
+/// Demo 用 MarketChatSession 工厂，使用 Mock ChatClient
+/// </summary>
+public class MockMarketChatSessionFactory : IMarketChatSessionFactory
+{
+    public MarketChatSession Create(string? initialStockCode = null)
+    {
+        return new MarketChatSession(
+            new MockChatClient(),
+            NullLogger<MarketChatSession>.Instance,
+            initialStockCode: initialStockCode);
     }
 }
 

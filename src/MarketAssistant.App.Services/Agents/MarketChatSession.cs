@@ -246,12 +246,10 @@ public class MarketChatSession : IDisposable
     /// <summary>
     /// 发送消息并获取流式回复（MAF 通过 Function Calling 自动处理工具调用）
     /// </summary>
-    public async IAsyncEnumerable<StreamingChatUpdate> SendMessageStreamAsync(
+    public async IAsyncEnumerable<string> SendMessageStreamAsync(
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("开始流式处理用户消息: {Message}", userMessage);
-
         EnsureSearchToolsInitialized();
 
         // 压缩逻辑已由 ConversationCompressionMiddleware 自动处理
@@ -287,7 +285,7 @@ public class MarketChatSession : IDisposable
             {
                 completeResponse.Append(content);
             }
-            yield return new StreamingChatUpdate { Content = content };
+            yield return content;
         }
 
         _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, completeResponse.ToString()));
@@ -498,10 +496,3 @@ public class MarketChatSession : IDisposable
     #endregion
 }
 
-/// <summary>
-/// 流式聊天更新
-/// </summary>
-public class StreamingChatUpdate
-{
-    public string Content { get; set; } = string.Empty;
-}

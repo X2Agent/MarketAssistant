@@ -1,7 +1,8 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Agents;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Services.Mcp;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json.Serialization;
@@ -19,24 +20,9 @@ public partial class ChatSidebarDemoViewModel : ViewModelBase
 
   public ChatSidebarDemoViewModel() : base(NullLogger.Instance)
   {
-    // 初始化 TargetViewModel
-    var mcpService = new McpService(NullLogger<McpService>.Instance);
-    var mcpToolProvider = new McpToolContextProvider(mcpService, NullLogger<McpToolContextProvider>.Instance);
-
     TargetViewModel = new ChatSidebarViewModel(
         NullLogger<ChatSidebarViewModel>.Instance,
-        new MockChatClientFactory(),
-        NullLoggerFactory.Instance,
-        mcpToolProvider,
-        null!,
-        null!,
-        null!,
-        null!,
-        null!,
-        null!,
-        null!,
-        null!,
-        null!,
+        new MockMarketChatSessionFactory(),
         null!
     );
 

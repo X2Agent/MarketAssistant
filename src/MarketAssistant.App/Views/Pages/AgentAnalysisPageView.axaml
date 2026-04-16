@@ -16,7 +16,7 @@
         <x:Double x:Key="HistoryFlyoutMaxHeight">300</x:Double>
     </UserControl.Resources>
 
-    <Grid ColumnDefinitions="*,Auto">
+    <Grid ColumnDefinitions="*,Auto,Auto">
         <!-- 主内容区域 -->
         <Grid Grid.Column="0" ClipToBounds="True">
             <!-- 进度显示区域 - 仅在分析时显示 -->
@@ -126,10 +126,20 @@
             </Grid>
         </Grid>
 
+        <!-- 侧边栏拖拽分隔线 -->
+        <GridSplitter Grid.Column="1"
+                      IsVisible="{Binding IsChatSidebarVisible}"
+                      Width="4"
+                      Background="Transparent"
+                      ResizeDirection="Columns"
+                      ResizeBehavior="PreviousAndNext"/>
+
         <!-- 聊天侧边栏 -->
-        <Border Grid.Column="1" 
+        <Border Grid.Column="2" 
                 IsVisible="{Binding IsChatSidebarVisible}"
-                Width="{StaticResource SidebarWidth}"
+                Width="{StaticResource SidebarDefaultWidth}"
+                MinWidth="{StaticResource SidebarMinWidth}"
+                MaxWidth="{StaticResource SidebarMaxWidth}"
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource LeftBorderThickness}">

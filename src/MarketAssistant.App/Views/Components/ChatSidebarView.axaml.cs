@@ -24,34 +24,58 @@ public partial class ChatSidebarView : UserControl
         set => SetValue(CloseCommandProperty, value);
     }
 
+    private ChatSidebarViewModel? _subscribedViewModel;
+
     public ChatSidebarView()
     {
         InitializeComponent();
 
-        // 监听 DataContext 变化以订阅集合变更事件
         DataContextChanged += OnDataContextChanged;
-
-        // 监听输入框按键
         MessageEntry.KeyDown += MessageEntry_KeyDown;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        SubscribeToViewModel(DataContext as ChatSidebarViewModel);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        UnsubscribeFromViewModel();
+        base.OnDetachedFromVisualTree(e);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
-        if (DataContext is ChatSidebarViewModel vm)
-        {
-            // 订阅新 ViewModel 的事件
-            vm.ChatMessages.CollectionChanged += ChatMessages_CollectionChanged;
-        }
+        UnsubscribeFromViewModel();
+        SubscribeToViewModel(DataContext as ChatSidebarViewModel);
+    }
+
+    private void SubscribeToViewModel(ChatSidebarViewModel? vm)
+    {
+        if (vm == null || vm == _subscribedViewModel)
+            return;
+
+        _subscribedViewModel = vm;
+        vm.ChatMessages.CollectionChanged += ChatMessages_CollectionChanged;
+    }
+
+    private void UnsubscribeFromViewModel()
+    {
+        if (_subscribedViewModel == null)
+            return;
+
+        _subscribedViewModel.ChatMessages.CollectionChanged -= ChatMessages_CollectionChanged;
+        _subscribedViewModel = null;
     }
 
     private void ChatMessages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        // 仅当有新消息添加时滚动到底部
         if (e.Action == NotifyCollectionChangedAction.Add)
         {
             Dispatcher.UIThread.Post(() =>
             {
-                // 滚动到最后一项
                 if (ChatListBox.ItemCount > 0)
                 {
                     ChatListBox.ScrollIntoView(ChatListBox.ItemCount - 1);
@@ -62,7 +86,6 @@ public partial class ChatSidebarView : UserControl
 
     private void MessageEntry_KeyDown(object? sender, KeyEventArgs e)
     {
-        // Enter 发送，Shift+Enter 换行
         if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.None)
         {
             if (DataContext is ChatSidebarViewModel vm && !string.IsNullOrWhiteSpace(vm.UserInput))

@@ -5,6 +5,7 @@
     <RootNamespace>MarketAssistant</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);MAAI001</NoWarn>
+    <InternalsVisibleTo>TestMarketAssistant</InternalsVisibleTo>
   </PropertyGroup>
 
   <ItemGroup>

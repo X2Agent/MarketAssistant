@@ -70,10 +70,10 @@ public static class BusinessServiceCollectionExtensions
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 命名 HttpClient（内部）
+    // 命名 HttpClient（内部，测试项目可通过 InternalsVisibleTo 复用）
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static IServiceCollection AddHttpClients(this IServiceCollection services)
+    internal static IServiceCollection AddHttpClients(this IServiceCollection services)
     {
         services.AddHttpClient("Binance", client =>
         {
@@ -179,6 +179,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<RagContextProvider>();
         services.AddSingleton<ChatSessionPersistenceService>();
         services.AddSingleton<WorkflowVisualizationService>();
+        services.AddSingleton<IMarketChatSessionFactory, MarketChatSessionFactory>();
 
         var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
         services.AddSqliteVectorStore(_ => $"Data Source={store}");

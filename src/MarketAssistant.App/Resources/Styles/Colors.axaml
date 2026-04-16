@@ -48,6 +48,9 @@
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#40000000</SolidColorBrush>
+            
+            <!-- 语义化容器背景 -->
+            <SolidColorBrush x:Key='DangerBackgroundBrush'>#FEF2F2</SolidColorBrush>
         </ResourceDictionary>
         
         <ResourceDictionary x:Key='Dark'>
@@ -74,6 +77,9 @@
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#80000000</SolidColorBrush>
+            
+            <!-- 语义化容器背景 -->
+            <SolidColorBrush x:Key='DangerBackgroundBrush'>#2D1B1B</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 

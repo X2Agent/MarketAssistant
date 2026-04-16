@@ -47,24 +47,25 @@ public class ChatClientFactory : IChatClientFactory
             var apiKey = userSetting.ApiKey;
             var endpoint = userSetting.Endpoint;
 
-            // 检查配置是否变更，如果未变更且有缓存，则返回缓存
-            if (_cachedClient != null &&
-                _cachedModelId == modelId &&
-                _cachedEndpoint == endpoint &&
-                _cachedApiKey == apiKey)
+            bool configUnchanged = _cachedModelId == modelId
+                                && _cachedEndpoint == endpoint
+                                && _cachedApiKey == apiKey;
+
+            // 配置未变且有成功缓存 → 直接返回
+            if (configUnchanged && _cachedClient != null)
             {
                 return _cachedClient;
             }
 
-            // 如果配置变更，重置错误状态
-            _lastError = null;
-
-            // 如果之前创建失败且配置未变，返回缓存的错误
-            if (!string.IsNullOrEmpty(_lastError) &&
-                _cachedModelId == modelId &&
-                _cachedEndpoint == endpoint &&
-                _cachedApiKey == apiKey)
+            // 配置未变但上次创建失败 → 快速失败，避免重复尝试
+            if (configUnchanged && !string.IsNullOrEmpty(_lastError))
+            {
                 throw new FriendlyException(_lastError);
+            }
+
+            // 配置已变更，重置错误状态
+            _lastError = null;
+            _cachedClient = null;
 
             try
             {
@@ -84,8 +85,6 @@ public class ChatClientFactory : IChatClientFactory
                 );
 
                 _cachedClient = openAIClient.GetChatClient(modelId).AsIChatClient();
-
-                // 更新缓存的配置
                 _cachedModelId = modelId;
                 _cachedEndpoint = endpoint;
                 _cachedApiKey = apiKey;
@@ -95,7 +94,7 @@ public class ChatClientFactory : IChatClientFactory
             catch (Exception ex)
             {
                 _lastError = ex.Message;
-                // 即使失败也记录当前配置，避免重复尝试相同配置
+                _cachedClient = null;
                 _cachedModelId = modelId;
                 _cachedEndpoint = endpoint;
                 _cachedApiKey = apiKey;

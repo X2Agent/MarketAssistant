@@ -7,7 +7,7 @@
     
     <!-- 基础骨架屏元素 -->
     <Style Selector="Border.skeleton">
-        <Setter Property="Background" Value="#E0E0E0"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Transitions">
             <Transitions>
@@ -35,7 +35,7 @@
     
     <!-- 骨架屏图表区域 -->
     <Style Selector="Border.skeleton-chart">
-        <Setter Property="Background" Value="#F5F5F5"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="MinHeight" Value="400"/>
     </Style>

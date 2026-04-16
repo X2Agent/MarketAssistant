@@ -111,7 +111,7 @@ public class MarketAnalysisWorkflow : IDisposable
             });
 
             // 执行工作流（流式处理）
-            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, cancellationToken);
+            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, analystAgents.Count, cancellationToken);
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
@@ -139,11 +139,12 @@ public class MarketAnalysisWorkflow : IDisposable
     private async Task<MarketAnalysisReport> ExecuteWorkflowAsync(
         Workflow workflow,
         string assetSymbol,
+        int analystCount,
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
         int completedAnalysts = 0;
-        int totalAnalysts = 0;
+        int totalAnalysts = analystCount;
         var failedSteps = new List<string>();
 
         // 启用检查点管理器，工作流在每个 SuperStep 结束时自动保存状态
