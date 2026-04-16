@@ -27,6 +27,11 @@ public sealed class ConversationCompressionMiddleware
     private readonly IChatClient _chatClient;
 
     /// <summary>
+    /// 压缩前回调钩子。在丢弃旧消息前调用，允许外部提取关键信息（紧急保存）。
+    /// </summary>
+    public Func<IList<ChatMessage>, CancellationToken, Task>? PreCompressHook { get; set; }
+
+    /// <summary>
     /// 触发压缩的 Token 阈值
     /// </summary>
     public int MaxTokens { get; set; } = 8000;
@@ -102,6 +107,19 @@ public sealed class ConversationCompressionMiddleware
         _logger.LogInformation(
             "消息 Token ({Tokens}) 超过阈值 ({Max})，触发压缩，消息数: {Count}",
             totalTokens, MaxTokens, messageList.Count);
+
+        // 压缩前紧急保存钩子：让外部提取关键信息后再丢弃旧消息
+        if (PreCompressHook != null)
+        {
+            try
+            {
+                await PreCompressHook(messageList, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "压缩前紧急保存钩子执行失败");
+            }
+        }
 
         var messagesToSummarize = messageList.Take(messageList.Count - ReserveRecentCount).ToList();
         var recentMessages = messageList.Skip(messageList.Count - ReserveRecentCount).ToList();

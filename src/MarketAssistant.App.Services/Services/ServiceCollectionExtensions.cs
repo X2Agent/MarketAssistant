@@ -136,6 +136,9 @@ public static class BusinessServiceCollectionExtensions
 
         // 通用工具
         services.AddSingleton<GroundingSearchTools>();
+        services.AddSingleton<MemoryManagementTools>();
+        services.AddSingleton<SessionSearchTools>();
+        services.AddSingleton<KnowledgeGraphTools>();
 
         return services;
     }
@@ -170,7 +173,9 @@ public static class BusinessServiceCollectionExtensions
 
         // AI Context Providers（Memory / RAG）
         services.AddSingleton<UserMemoryService>();
-        services.AddSingleton<UserMemoryContextProvider>();
+        services.AddSingleton<LayeredMemoryContextProvider>();
+        services.AddSingleton<UserKnowledgeGraphService>();
+        services.AddSingleton<MemoryExtractionService>();
         services.AddSingleton<RagContextProvider>();
         services.AddSingleton<ChatSessionPersistenceService>();
         services.AddSingleton<WorkflowVisualizationService>();

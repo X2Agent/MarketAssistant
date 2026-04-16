@@ -24,7 +24,12 @@ public class MarketChatSession : IDisposable
     private readonly AIAgent _agent;
     private readonly ILogger<MarketChatSession> _logger;
     private readonly GroundingSearchTools? _searchTools;
+    private readonly MemoryManagementTools? _memoryTools;
+    private readonly SessionSearchTools? _sessionSearchTools;
+    private readonly KnowledgeGraphTools? _knowledgeGraphTools;
     private readonly ChatSessionPersistenceService? _sessionPersistence;
+    private readonly MemoryExtractionService? _memoryExtraction;
+    private int _turnsSinceLastExtraction;
     private AgentSession? _currentSession;
     private readonly List<AITool> _searchToolCache = [];
     private readonly List<ChatMessage> _conversationHistory = [];
@@ -60,24 +65,33 @@ public class MarketChatSession : IDisposable
         ILogger<MarketChatSession> logger,
         McpToolContextProvider? mcpToolProvider = null,
         GroundingSearchTools? searchTools = null,
+        MemoryManagementTools? memoryTools = null,
+        SessionSearchTools? sessionSearchTools = null,
+        KnowledgeGraphTools? knowledgeGraphTools = null,
         AgentSkillsProvider? skillsProvider = null,
         TokenTrackingMiddleware? tokenTracking = null,
         ConversationCompressionMiddleware? compressionMiddleware = null,
-        UserMemoryContextProvider? memoryProvider = null,
+        LayeredMemoryContextProvider? layeredMemoryProvider = null,
         RagContextProvider? ragProvider = null,
         ChatSessionPersistenceService? sessionPersistence = null,
+        MemoryExtractionService? memoryExtraction = null,
         string? initialStockCode = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _searchTools = searchTools;
+        _memoryTools = memoryTools;
+        _sessionSearchTools = sessionSearchTools;
+        _knowledgeGraphTools = knowledgeGraphTools;
         _sessionPersistence = sessionPersistence;
+        _memoryExtraction = memoryExtraction;
         _currentStockCode = initialStockCode ?? string.Empty;
 
-        // 收集所有 AIContextProvider：Skills + MCP 工具 + Memory + RAG
+        // 收集所有 AIContextProvider：Skills + MCP 工具 + LayeredMemory (优先) / Memory + RAG
         var contextProviders = new List<AIContextProvider>();
         if (skillsProvider != null) contextProviders.Add(skillsProvider);
         if (mcpToolProvider != null) contextProviders.Add(mcpToolProvider);
-        if (memoryProvider != null) contextProviders.Add(memoryProvider);
+        if (layeredMemoryProvider != null)
+            contextProviders.Add(layeredMemoryProvider);
         if (ragProvider != null) contextProviders.Add(ragProvider);
 
         var baseAgent = new ChatClientAgent(
@@ -92,6 +106,17 @@ public class MarketChatSession : IDisposable
                 },
                 AIContextProviders = contextProviders.Count > 0 ? [.. contextProviders] : null
             });
+
+        // 挂接压缩前紧急保存钩子
+        if (compressionMiddleware != null && _memoryExtraction != null)
+        {
+            compressionMiddleware.PreCompressHook = async (messages, ct) =>
+            {
+                await _memoryExtraction.ExtractAndSaveAsync(
+                    messages as IReadOnlyList<ChatMessage> ?? messages.ToList(),
+                    isEmergency: true, ct: ct);
+            };
+        }
 
         // 通过 MAF Builder 模式链式附加中间件
         _agent = BuildAgentWithMiddleware(baseAgent, tokenTracking, compressionMiddleware);
@@ -137,10 +162,18 @@ public class MarketChatSession : IDisposable
         if (_searchToolsInitialized) return;
 
         if (_searchTools != null)
-        {
             _searchToolCache.AddRange(_searchTools.GetFunctions().Select(f => (AITool)f));
-            _logger.LogInformation("加载搜索工具，数量: {Count}", _searchToolCache.Count);
-        }
+
+        if (_memoryTools != null)
+            _searchToolCache.AddRange(_memoryTools.GetFunctions().Select(f => (AITool)f));
+
+        if (_sessionSearchTools != null)
+            _searchToolCache.AddRange(_sessionSearchTools.GetFunctions().Select(f => (AITool)f));
+
+        if (_knowledgeGraphTools != null)
+            _searchToolCache.AddRange(_knowledgeGraphTools.GetFunctions().Select(f => (AITool)f));
+
+        _logger.LogInformation("加载工具完成，数量: {Count}", _searchToolCache.Count);
 
         // MCP 工具通过 McpToolContextProvider（AIContextProvider）自动注入，无需手动加载
         _searchToolsInitialized = true;
@@ -318,6 +351,26 @@ public class MarketChatSession : IDisposable
         {
             _logger.LogWarning(ex, "自动保存会话失败");
         }
+
+        // 每 N 轮对话触发一次自动记忆提取（后台执行，不阻塞用户）
+        _turnsSinceLastExtraction++;
+        if (_memoryExtraction != null &&
+            _turnsSinceLastExtraction >= _memoryExtraction.ExtractionInterval)
+        {
+            _turnsSinceLastExtraction = 0;
+            var snapshot = _conversationHistory.ToList();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _memoryExtraction.ExtractAndSaveAsync(snapshot, ct: CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "后台记忆提取失败");
+                }
+            }, CancellationToken.None);
+        }
     }
 
     private string BuildSessionTitle()
@@ -378,7 +431,29 @@ public class MarketChatSession : IDisposable
             2. 当需要最新信息（实时新闻、市场动态、政策变化）时，使用搜索工具补充
             3. 综合已有分析和搜索结果给出完整、有理有据的回答
             4. 如果分析上下文中没有相关信息且工具也无法获取，坦诚说明
+            5. 当用户提到过去讨论过的内容时，使用 SearchPastSessionsAsync 搜索历史对话来回忆
             </instructions>
+
+            <memory_protocol>
+            你有一个持久化记忆系统，可以跨会话记住用户信息。请在以下情况主动保存记忆：
+            - 用户明确表达投资偏好或风格时（category=preference，如"我偏好价值投资"、"我不做短线"）
+            - 用户纠正你的分析或认知时（category=correction，如"不对，我更看重现金流"）
+            - 得出重要分析结论时（category=conclusion，如某标的的关键发现）
+            - 了解到用户身份信息时（category=profile，如职业、经验水平、资金规模）
+            保存时 key 要简短唯一，value 要简洁信息密集。不要保存显而易见的信息或临时性内容。
+            重要的记忆使用后不要反复保存，先查询确认是否已存在。
+            对于特别重要的用户信息（如核心投资偏好、职业背景），保存后使用 SetMemoryPriorityAsync 将其设为高优先级(1)，
+            高优先级记忆会始终加载到上下文中，确保每次对话都能参考。
+            </memory_protocol>
+
+            <knowledge_graph_protocol>
+            你有一个知识图谱系统，用于记录实体之间的结构化关系。请在以下情况记录关系：
+            - 用户表示关注或持有某标的时（如 用户 --[持有]--> 贵州茅台）
+            - 完成标的分析后（如 用户 --[分析过]--> 比特币）
+            - 发现重要的行业/事件关联时（如 降息 --[影响]--> 银行板块）
+            - 用户提到不再持有某标的时，使用 InvalidateRelationAsync 标记过期
+            查询用户关注的标的时使用 QueryEntityAsync，回顾投资历史使用 GetTimelineAsync。
+            </knowledge_graph_protocol>
 
             <quality_standards>
             1. 数值精确：价格保留2位小数，百分比保留1位小数

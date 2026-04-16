@@ -33,6 +33,10 @@ public partial class ChatSidebarDemoViewModel : ViewModelBase
         null!,
         null!,
         null!,
+        null!,
+        null!,
+        null!,
+        null!,
         null!
     );
 

@@ -48,11 +48,15 @@ public partial class ChatSidebarViewModel : ViewModelBase
         ILoggerFactory loggerFactory,
         McpToolContextProvider mcpToolProvider,
         GroundingSearchTools searchTools,
+        MemoryManagementTools memoryTools,
+        SessionSearchTools sessionSearchTools,
+        KnowledgeGraphTools knowledgeGraphTools,
         TokenTrackingMiddleware tokenTracking,
         ConversationCompressionMiddleware compressionMiddleware,
-        UserMemoryContextProvider memoryProvider,
+        LayeredMemoryContextProvider layeredMemoryProvider,
         RagContextProvider ragProvider,
-        ChatSessionPersistenceService sessionPersistence)
+        ChatSessionPersistenceService sessionPersistence,
+        MemoryExtractionService memoryExtraction)
         : base(logger)
     {
         _sessionPersistence = sessionPersistence;
@@ -61,11 +65,15 @@ public partial class ChatSidebarViewModel : ViewModelBase
         var sessionLogger = loggerFactory.CreateLogger<MarketChatSession>();
         _chatSession = new MarketChatSession(
             chatClient, sessionLogger, mcpToolProvider, searchTools,
+            memoryTools: memoryTools,
+            sessionSearchTools: sessionSearchTools,
+            knowledgeGraphTools: knowledgeGraphTools,
             tokenTracking: tokenTracking,
             compressionMiddleware: compressionMiddleware,
-            memoryProvider: memoryProvider,
+            layeredMemoryProvider: layeredMemoryProvider,
             ragProvider: ragProvider,
-            sessionPersistence: sessionPersistence);
+            sessionPersistence: sessionPersistence,
+            memoryExtraction: memoryExtraction);
 
         SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
         _ = LoadSessionHistoryAsync();

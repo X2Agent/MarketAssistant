@@ -48,6 +48,8 @@ public class ChatSessionPersistenceService : IDisposable
         cmd.Parameters.AddWithValue("@createdAt", snapshot.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
+
+        await UpdateFtsIndexAsync(conn, snapshot);
     }
 
     /// <summary>
@@ -106,6 +108,12 @@ public class ChatSessionPersistenceService : IDisposable
     {
         await _initializeTask;
         await using var conn = await OpenConnectionAsync(ct);
+
+        await using var ftsCmd = conn.CreateCommand();
+        ftsCmd.CommandText = "DELETE FROM chat_messages_fts WHERE session_id = @id";
+        ftsCmd.Parameters.AddWithValue("@id", sessionId);
+        await ftsCmd.ExecuteNonQueryAsync(ct);
+
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM chat_sessions WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", sessionId);
@@ -138,6 +146,87 @@ public class ChatSessionPersistenceService : IDisposable
         return conn;
     }
 
+    /// <summary>
+    /// 全文搜索历史对话消息
+    /// </summary>
+    public async Task<List<SessionSearchResult>> SearchSessionsAsync(
+        string query, int limit = 10, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT f.session_id, f.role, f.content, f.author_name, f.message_index,
+                   s.stock_code, s.title, s.updated_at
+            FROM chat_messages_fts f
+            JOIN chat_sessions s ON s.id = f.session_id
+            WHERE chat_messages_fts MATCH @query
+            ORDER BY rank
+            LIMIT @limit
+            """;
+        cmd.Parameters.AddWithValue("@query", query);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var results = new List<SessionSearchResult>();
+        try
+        {
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                results.Add(new SessionSearchResult
+                {
+                    SessionId = reader.GetString(0),
+                    Role = reader.GetString(1),
+                    Content = reader.GetString(2),
+                    AuthorName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    StockCode = reader.GetString(5),
+                    SessionTitle = reader.GetString(6),
+                    UpdatedAt = DateTime.Parse(reader.GetString(7))
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "FTS5 搜索失败，查询: {Query}", query);
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// 保存会话时同步更新 FTS5 索引
+    /// </summary>
+    private async Task UpdateFtsIndexAsync(SqliteConnection conn, ChatSessionSnapshot snapshot)
+    {
+        // 先删除旧索引
+        await using (var delCmd = conn.CreateCommand())
+        {
+            delCmd.CommandText = "DELETE FROM chat_messages_fts WHERE session_id = @id";
+            delCmd.Parameters.AddWithValue("@id", snapshot.Id);
+            await delCmd.ExecuteNonQueryAsync();
+        }
+
+        // 逐条插入消息到 FTS 索引
+        for (int i = 0; i < snapshot.Messages.Count; i++)
+        {
+            var msg = snapshot.Messages[i];
+            if (string.IsNullOrWhiteSpace(msg.Content)) continue;
+
+            await using var insCmd = conn.CreateCommand();
+            insCmd.CommandText = """
+                INSERT INTO chat_messages_fts (session_id, role, content, author_name, message_index)
+                VALUES (@sid, @role, @content, @author, @idx)
+                """;
+            insCmd.Parameters.AddWithValue("@sid", snapshot.Id);
+            insCmd.Parameters.AddWithValue("@role", msg.Role);
+            insCmd.Parameters.AddWithValue("@content", msg.Content);
+            insCmd.Parameters.AddWithValue("@author", (object?)msg.AuthorName ?? DBNull.Value);
+            insCmd.Parameters.AddWithValue("@idx", i);
+            await insCmd.ExecuteNonQueryAsync();
+        }
+    }
+
     private async Task InitializeDatabaseAsync()
     {
         try
@@ -156,9 +245,18 @@ public class ChatSessionPersistenceService : IDisposable
                 );
                 CREATE INDEX IF NOT EXISTS idx_sessions_stock ON chat_sessions(stock_code);
                 CREATE INDEX IF NOT EXISTS idx_sessions_updated ON chat_sessions(updated_at);
+
+                CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
+                    session_id UNINDEXED,
+                    role UNINDEXED,
+                    content,
+                    author_name UNINDEXED,
+                    message_index UNINDEXED,
+                    tokenize='unicode61'
+                );
                 """;
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("聊天会话数据库初始化完成");
+            _logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引）");
         }
         catch (Exception ex)
         {
@@ -202,5 +300,19 @@ public class ChatSessionSummary
     public string StockCode { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>
+/// 全文搜索结果条目
+/// </summary>
+public class SessionSearchResult
+{
+    public string SessionId { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string? AuthorName { get; set; }
+    public string StockCode { get; set; } = string.Empty;
+    public string SessionTitle { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; }
 }
