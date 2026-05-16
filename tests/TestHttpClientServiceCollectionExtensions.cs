@@ -10,6 +10,6 @@ internal static class TestHttpClientServiceCollectionExtensions
 {
     public static IServiceCollection AddTestMarketDataHttpClients(this IServiceCollection services)
     {
-        return BusinessServiceCollectionExtensions.AddHttpClients(services);
+        return services.AddNamedMarketHttpClients();
     }
 }

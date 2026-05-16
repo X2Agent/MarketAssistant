@@ -73,6 +73,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
+    public string JinaApiUrl { get; } = "https://jina.ai/api-dashboard/key-manager";
 
     /// <summary>
     /// 主题：跟随系统
@@ -332,6 +333,9 @@ public partial class SettingsPageViewModel : ViewModelBase
 
     [RelayCommand]
     private Task OpenCoinGeckoApiWebsite() => OpenUrlAsync(CoinGeckoApiUrl);
+
+    [RelayCommand]
+    private Task OpenEmbeddingApiWebsite() => OpenUrlAsync(JinaApiUrl);
 
     /// <summary>
     /// 选择知识库目录

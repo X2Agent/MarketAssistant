@@ -56,7 +56,7 @@ public static class BusinessServiceCollectionExtensions
     public static IServiceCollection AddBusinessServices(this IServiceCollection services)
     {
         services.AddMemoryCache();
-        services.AddHttpClients();
+        services.AddNamedMarketHttpClients();
         services.AddAgentTools();
         services.AddAgentInfrastructure();
         services.AddRagServices();
@@ -70,10 +70,19 @@ public static class BusinessServiceCollectionExtensions
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 命名 HttpClient（内部，测试项目可通过 InternalsVisibleTo 复用）
+    // 命名 HttpClient（公开别名便于单元测试与外部宿主复用）
     // ─────────────────────────────────────────────────────────────────────────
 
-    internal static IServiceCollection AddHttpClients(this IServiceCollection services)
+    /// <summary>
+    /// 注册 Binance / CoinGecko / Cls 等命名 HttpClient，含标准弹性策略。
+    /// </summary>
+    public static IServiceCollection AddNamedMarketHttpClients(this IServiceCollection services) =>
+        AddHttpClientsCore(services);
+
+    internal static IServiceCollection AddHttpClients(this IServiceCollection services) =>
+        AddHttpClientsCore(services);
+
+    private static IServiceCollection AddHttpClientsCore(IServiceCollection services)
     {
         services.AddHttpClient("Binance", client =>
         {
@@ -176,7 +185,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<LayeredMemoryContextProvider>();
         services.AddSingleton<UserKnowledgeGraphService>();
         services.AddSingleton<MemoryExtractionService>();
-        services.AddSingleton<RagContextProvider>();
         services.AddSingleton<ChatSessionPersistenceService>();
         services.AddSingleton<WorkflowVisualizationService>();
         services.AddSingleton<IMarketChatSessionFactory, MarketChatSessionFactory>();

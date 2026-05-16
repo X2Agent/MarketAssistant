@@ -178,6 +178,23 @@ public sealed class BinanceWebSocketService : IDisposable
 
     public void Dispose()
     {
-        DisconnectAsync().GetAwaiter().GetResult();
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+
+        if (_ws != null)
+        {
+            try
+            {
+                if (_ws.State == WebSocketState.Open || _ws.State == WebSocketState.CloseReceived)
+                    _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None)
+                        .Wait(TimeSpan.FromSeconds(3));
+            }
+            catch { }
+            _ws.Dispose();
+            _ws = null;
+        }
+
+        GC.SuppressFinalize(this);
     }
 }

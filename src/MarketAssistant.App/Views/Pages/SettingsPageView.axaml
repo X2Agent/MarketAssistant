@@ -73,6 +73,48 @@
                     </StackPanel>
                 </controls:CardView>
 
+                <!-- 嵌入模型设置 -->
+                <controls:CardView Header="嵌入模型设置">
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <!-- API端点 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="API端点"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding UserSetting.EmbeddingEndpoint}"
+                                     Watermark="嵌入服务API端点"/>
+                        </StackPanel>
+
+                        <!-- API密鑰 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="API密鑰"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding UserSetting.EmbeddingApiKey}"
+                                         Watermark="请输入嵌入服务API密鑰"
+                                         PasswordChar="&#9679;"/>
+                                <Button Grid.Column="1"
+                                        Content="获取密鑰"
+                                        Command="{Binding OpenEmbeddingApiWebsiteCommand}"
+                                        Background="{DynamicResource InfoBrush}"
+                                        Foreground="White"
+                                        Margin="{StaticResource SmallLeftMargin}"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 嵌入模型ID -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="嵌入模型"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding UserSetting.EmbeddingModelId}"
+                                     Watermark="嵌入模型ID"/>
+                        </StackPanel>
+                    </StackPanel>
+                </controls:CardView>
+
                 <!-- 市场设置区域 -->
                 <controls:CardView Header="市场设置">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">

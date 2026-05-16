@@ -19,7 +19,8 @@ public interface ITradingAgentFactory
 }
 
 /// <summary>
-/// 交易 Agent 工厂实现，固定使用 Crypto 市场类型
+/// 交易 Agent 工厂实现。<see cref="MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
+/// 自主交易与工具解析<strong>始终</strong>使用 <see cref="MarketType.Crypto"/> 的 Keyed 注册（现货 Binance），与当前所选市场无关。
 /// </summary>
 public class TradingAgentFactory : ITradingAgentFactory
 {
@@ -50,6 +51,9 @@ public class TradingAgentFactory : ITradingAgentFactory
         _logger = logger;
     }
 
+    /// <summary>
+    /// 创建包装中间件后的 <see cref="TradingAgent"/>；工具一律从 <see cref="MarketType.Crypto"/> 解析。
+    /// </summary>
     public AIAgent CreateAgent()
     {
         try

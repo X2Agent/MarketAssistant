@@ -14,7 +14,7 @@ public class MarketContext : INotifyPropertyChanged
     private readonly IUserSettingService _userSettingService;
     private readonly IServiceProvider _serviceProvider;
     private readonly object _marketLock = new();
-    private volatile MarketType _currentMarket;
+    private MarketType _currentMarket;
 
     /// <summary>
     /// 当前激活的市场类型

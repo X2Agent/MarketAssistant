@@ -14,6 +14,10 @@ public class UserSetting : INotifyPropertyChanged
 
     public string EmbeddingModelId { get; set; } = "BAAI/bge-m3";
 
+    public string EmbeddingEndpoint { get; set; } = "https://api.jina.ai";
+
+    public string EmbeddingApiKey { get; set; } = "";
+
     public string Endpoint { get; set; } = "https://api.siliconflow.cn";
 
     public string ApiKey { get; set; } = "";

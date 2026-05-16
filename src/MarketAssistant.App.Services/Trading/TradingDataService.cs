@@ -63,7 +63,7 @@ public class TradingDataService : IDisposable
         cmd.Parameters.AddWithValue("@lastTriggered", strategy.LastTriggeredAt.HasValue ? (object)strategy.LastTriggeredAt.Value.ToString("O") : DBNull.Value);
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<TradingStrategy?> GetStrategyAsync(string id, CancellationToken ct = default)
@@ -104,7 +104,7 @@ public class TradingDataService : IDisposable
         cmd.CommandText = "UPDATE strategies SET status = @status WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@status", (int)status);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public async Task DeleteStrategyAsync(string id, CancellationToken ct = default)
@@ -114,7 +114,7 @@ public class TradingDataService : IDisposable
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM strategies WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public async Task UpdateStrategyTriggeredAsync(string id, CancellationToken ct = default)
@@ -129,7 +129,7 @@ public class TradingDataService : IDisposable
             """;
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@time", DateTime.UtcNow.ToString("O"));
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     #endregion
@@ -167,7 +167,7 @@ public class TradingDataService : IDisposable
         cmd.Parameters.AddWithValue("@aiReasoning", (object?)record.AIReasoning ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", record.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     public async Task<List<TradeRecord>> GetTradeRecordsAsync(
@@ -266,7 +266,7 @@ public class TradingDataService : IDisposable
         cmd.Parameters.AddWithValue("@date", today);
         cmd.Parameters.AddWithValue("@pnl", (double)pnl);
         cmd.Parameters.AddWithValue("@comm", (double)commission);
-        await cmd.ExecuteNonQueryAsync(ct);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -288,7 +288,7 @@ public class TradingDataService : IDisposable
         cmd.Parameters.AddWithValue("@side", (int)OrderSide.Buy);
         cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
 
-        var result = await cmd.ExecuteScalarAsync(ct);
+        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
         if (result is double d)
             return (decimal)d;
         return 0;
@@ -421,6 +421,7 @@ public class TradingDataService : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "初始化交易数据库失败");
+            throw new InvalidOperationException("交易数据库初始化失败，应用无法继续运行", ex);
         }
     }
 

@@ -36,7 +36,6 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
     private readonly TokenTrackingMiddleware _tokenTracking;
     private readonly ConversationCompressionMiddleware _compressionMiddleware;
     private readonly LayeredMemoryContextProvider _layeredMemoryProvider;
-    private readonly RagContextProvider _ragProvider;
     private readonly ChatSessionPersistenceService _sessionPersistence;
     private readonly MemoryExtractionService _memoryExtraction;
 
@@ -51,7 +50,6 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
         TokenTrackingMiddleware tokenTracking,
         ConversationCompressionMiddleware compressionMiddleware,
         LayeredMemoryContextProvider layeredMemoryProvider,
-        RagContextProvider ragProvider,
         ChatSessionPersistenceService sessionPersistence,
         MemoryExtractionService memoryExtraction,
         AgentSkillsProvider? skillsProvider = null)
@@ -67,7 +65,6 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
         _tokenTracking = tokenTracking;
         _compressionMiddleware = compressionMiddleware;
         _layeredMemoryProvider = layeredMemoryProvider;
-        _ragProvider = ragProvider;
         _sessionPersistence = sessionPersistence;
         _memoryExtraction = memoryExtraction;
     }
@@ -89,7 +86,6 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
             tokenTracking: _tokenTracking,
             compressionMiddleware: _compressionMiddleware,
             layeredMemoryProvider: _layeredMemoryProvider,
-            ragProvider: _ragProvider,
             sessionPersistence: _sessionPersistence,
             memoryExtraction: _memoryExtraction,
             initialStockCode: initialStockCode);

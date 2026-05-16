@@ -45,8 +45,10 @@ public class StrategyEngine
                 continue;
             }
 
-            if (IsTriggered(strategy, currentPrice))
+            if (IsTriggered(strategy, currentPrice, out var effectiveSide, out var effectiveQty))
             {
+                strategy.Side = effectiveSide;
+                strategy.Quantity = effectiveQty;
                 _logger.LogInformation(
                     "策略触发: {StrategyId} {Type} {Symbol} 触发价:{TriggerPrice} 当前价:{CurrentPrice}",
                     strategy.Id, strategy.Type, symbol, strategy.TriggerPrice, currentPrice);
@@ -57,16 +59,20 @@ public class StrategyEngine
         return triggered;
     }
 
-    private bool IsTriggered(TradingStrategy strategy, decimal currentPrice)
+    private bool IsTriggered(TradingStrategy strategy, decimal currentPrice,
+        out OrderSide effectiveSide, out decimal effectiveQty)
     {
+        effectiveSide = strategy.Side;
+        effectiveQty = strategy.Quantity;
+
         return strategy.Type switch
         {
             StrategyType.StopLoss => EvaluateStopLoss(strategy, currentPrice),
             StrategyType.TakeProfit => EvaluateTakeProfit(strategy, currentPrice),
             StrategyType.TrailingStop => EvaluateTrailingStop(strategy, currentPrice),
             StrategyType.AISignal => EvaluateAISignal(strategy),
-            StrategyType.GridTrading => EvaluateGridTrading(strategy, currentPrice),
-            StrategyType.DCA => EvaluateDCA(strategy, currentPrice),
+            StrategyType.GridTrading => EvaluateGridTrading(strategy, currentPrice, out effectiveSide, out effectiveQty),
+            StrategyType.DCA => EvaluateDCA(strategy, currentPrice, out effectiveSide, out effectiveQty),
             _ => false
         };
     }
@@ -173,8 +179,12 @@ public class StrategyEngine
     /// 网格在 LowerPrice 和 UpperPrice 之间均匀分布。
     /// 价格下穿网格线时买入，上穿时卖出。
     /// </summary>
-    private bool EvaluateGridTrading(TradingStrategy strategy, decimal currentPrice)
+    private bool EvaluateGridTrading(TradingStrategy strategy, decimal currentPrice,
+        out OrderSide effectiveSide, out decimal effectiveQty)
     {
+        effectiveSide = strategy.Side;
+        effectiveQty = strategy.Quantity;
+
         if (string.IsNullOrEmpty(strategy.CustomParams))
             return false;
 
@@ -184,19 +194,15 @@ public class StrategyEngine
             if (gridParams == null || gridParams.GridCount <= 1 || gridParams.UpperPrice <= gridParams.LowerPrice)
                 return false;
 
-            // 价格超出网格范围不触发
             if (currentPrice < gridParams.LowerPrice || currentPrice > gridParams.UpperPrice)
                 return false;
 
-            // 计算当前价格落在哪一格
             var spacing = gridParams.GridSpacing;
             var currentIndex = (int)((currentPrice - gridParams.LowerPrice) / spacing);
             currentIndex = Math.Clamp(currentIndex, 0, gridParams.GridCount);
 
-            // 与上次触发的网格索引比较，只有穿越才触发
             if (gridParams.LastTriggeredIndex < 0)
             {
-                // 首次运行，记录当前位置但不触发
                 gridParams.LastTriggeredIndex = currentIndex;
                 strategy.CustomParams = JsonSerializer.Serialize(gridParams);
                 return false;
@@ -205,16 +211,15 @@ public class StrategyEngine
             if (currentIndex == gridParams.LastTriggeredIndex)
                 return false;
 
-            // 价格穿越了网格线：下穿（index 减小）买入，上穿（index 增大）卖出
-            strategy.Side = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
-            strategy.Quantity = gridParams.QuantityPerGrid;
+            effectiveSide = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
+            effectiveQty = gridParams.QuantityPerGrid;
 
             gridParams.LastTriggeredIndex = currentIndex;
             strategy.CustomParams = JsonSerializer.Serialize(gridParams);
 
             _logger.LogInformation(
                 "网格交易触发: {StrategyId} 网格 {Index} → {Side}，价格: {Price}",
-                strategy.Id, currentIndex, strategy.Side, currentPrice);
+                strategy.Id, currentIndex, effectiveSide, currentPrice);
             return true;
         }
         catch (Exception ex)
@@ -228,8 +233,12 @@ public class StrategyEngine
     /// DCA（定投）评估：按时间间隔定期买入。
     /// 支持价格上限过滤和低价加倍买入。
     /// </summary>
-    private bool EvaluateDCA(TradingStrategy strategy, decimal currentPrice)
+    private bool EvaluateDCA(TradingStrategy strategy, decimal currentPrice,
+        out OrderSide effectiveSide, out decimal effectiveQty)
     {
+        effectiveSide = strategy.Side;
+        effectiveQty = strategy.Quantity;
+
         if (string.IsNullOrEmpty(strategy.CustomParams))
             return false;
 
@@ -239,7 +248,6 @@ public class StrategyEngine
             if (dcaParams == null || dcaParams.AmountPerInterval <= 0)
                 return false;
 
-            // 检查时间间隔
             if (strategy.LastTriggeredAt.HasValue)
             {
                 var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
@@ -247,7 +255,6 @@ public class StrategyEngine
                     return false;
             }
 
-            // 价格上限过滤
             if (dcaParams.MaxBuyPrice > 0 && currentPrice > dcaParams.MaxBuyPrice)
             {
                 _logger.LogDebug("DCA 跳过: {StrategyId} 当前价 {Price} 超过上限 {MaxPrice}",
@@ -255,10 +262,6 @@ public class StrategyEngine
                 return false;
             }
 
-            // DCA 始终买入方向
-            strategy.Side = OrderSide.Buy;
-
-            // 低价加倍买入
             var amount = dcaParams.AmountPerInterval;
             if (dcaParams.DoubleBuyBelowPrice > 0 && currentPrice < dcaParams.DoubleBuyBelowPrice)
             {
@@ -267,10 +270,10 @@ public class StrategyEngine
                     strategy.Id, currentPrice, dcaParams.DoubleBuyBelowPrice);
             }
 
-            // 将金额转换为数量
-            strategy.Quantity = currentPrice > 0 ? amount / currentPrice : 0;
+            effectiveSide = OrderSide.Buy;
+            effectiveQty = currentPrice > 0 ? amount / currentPrice : 0;
 
-            return strategy.Quantity > 0;
+            return effectiveQty > 0;
         }
         catch (Exception ex)
         {

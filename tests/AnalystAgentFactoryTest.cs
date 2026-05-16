@@ -44,7 +44,6 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("分析结果:");
             Console.WriteLine(result);
 
-            // 检查是否有工具调用的痕迹（通过日志中间件记录）
             var functionCalls = response.Messages
                 .Where(m => m.Contents.Any(c => c is FunctionCallContent))
                 .ToList();
@@ -54,10 +53,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
                 Console.WriteLine($"\n检测到 {functionCalls.Count} 次工具调用");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not AssertFailedException)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
-            // 即使工具调用失败，我们也可以验证 agent 配置是否正确
+            Assert.Fail($"Agent 调用失败: {ex.Message}");
         }
     }
 
@@ -85,7 +84,6 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("基本面分析结果:");
             Console.WriteLine(result);
 
-            // 检查是否有工具调用的痕迹（通过日志中间件记录）
             var functionCalls = response.Messages
                 .Where(m => m.Contents.Any(c => c is FunctionCallContent))
                 .ToList();
@@ -103,10 +101,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not AssertFailedException)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
-            // 即使工具调用失败，我们也可以验证 agent 配置是否正确
+            Assert.Fail($"FundamentalAnalyst 调用失败: {ex.Message}");
         }
     }
 
@@ -210,9 +208,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("财务分析结果:");
             Console.WriteLine(result);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not AssertFailedException)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
+            Assert.Fail($"FinancialAnalyst 调用失败: {ex.Message}");
         }
     }
 
@@ -239,9 +238,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("市场情绪分析结果:");
             Console.WriteLine(result);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not AssertFailedException)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
+            Assert.Fail($"MarketSentimentAnalyst 调用失败: {ex.Message}");
         }
     }
 
@@ -268,9 +268,10 @@ public class AnalystAgentFactoryTest : BaseAgentTest
             Console.WriteLine("技术分析结果:");
             Console.WriteLine(result);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not AssertFailedException)
         {
             Console.WriteLine($"测试执行异常: {ex.Message}");
+            Assert.Fail($"TechnicalAnalyst 调用失败: {ex.Message}");
         }
     }
 }

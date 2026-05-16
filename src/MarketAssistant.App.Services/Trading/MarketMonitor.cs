@@ -239,10 +239,19 @@ public class MarketMonitor : IDisposable
         {
             TradingContext.CurrentStrategyId = strategy.Id;
 
+            var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, _cts?.Token ?? default)
+                .ConfigureAwait(false);
+            var recentSummary = priorRecords.Count == 0
+                ? "（该策略尚无成交记录）"
+                : string.Join("\n", priorRecords.Take(5).Select(r =>
+                    $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
+
             var agent = _agentFactory.CreateAgent();
             var prompt = $"""
                 分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
                 策略配置: {strategy.CustomParams ?? "无"}
+                近期该策略成交摘要（最多 5 笔，按时间倒序）:
+                {recentSummary}
                 请评估是否应该执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
                 如果决定交易，请调用 PlaceOrder 工具执行。
                 如果决定不交易，请说明理由。
@@ -301,6 +310,11 @@ public class MarketMonitor : IDisposable
             kvp.Value.Dispose();
         _strategyLocks.Clear();
         _lifecycleLock.Dispose();
+
+        TradeExecuted = null;
+        StatusChanged = null;
+        _webSocketService.PriceUpdated -= OnPriceUpdated;
+
         GC.SuppressFinalize(this);
     }
 }

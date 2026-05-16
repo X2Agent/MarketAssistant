@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -5,10 +6,14 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Trading;
 
 /// <summary>
-/// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算
+/// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算。
+/// 同一交易对在任意时刻仅允许一条下单路径进入交易所调用，避免并发重复下单。
 /// </summary>
 public class TradeExecutor
 {
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _symbolExecutionLocks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly IExchangeClient _exchangeClient;
     private readonly RiskManager _riskManager;
     private readonly TradingDataService _dataService;
@@ -64,6 +69,27 @@ public class TradeExecutor
         string strategyId = "manual", string? aiReasoning = null,
         CancellationToken ct = default)
     {
+        var gate = _symbolExecutionLocks.GetOrAdd(
+            instrumentSymbol.Trim(), static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await ExecuteOrderCoreAsync(
+                instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
+                strategyId, aiReasoning, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<TradeResult> ExecuteOrderCoreAsync(
+        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
+        decimal currentPrice, decimal? limitPrice,
+        string strategyId, string? aiReasoning,
+        CancellationToken ct)
+    {
         var riskCheck = await _riskManager.ValidateOrderAsync(instrumentSymbol, side, quantity, currentPrice, ct);
 
         if (riskCheck.NeedsConfirmation)
@@ -95,7 +121,6 @@ public class TradeExecutor
 
         try
         {
-            var orderTypeStr = type.ToString().ToUpper();
             var response = await _exchangeClient.PlaceOrderAsync(
                 instrumentSymbol, side, type, quantity, type == OrderType.Limit ? limitPrice : null, ct);
 

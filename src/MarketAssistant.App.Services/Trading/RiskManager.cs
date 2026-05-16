@@ -36,7 +36,7 @@ public class RiskManager
         if (orderValueUSDT < config.MinOrderAmount)
             return RiskCheckResult.Reject($"订单金额 {orderValueUSDT:F2} USDT 低于最小限额 {config.MinOrderAmount} USDT");
 
-        var todayStats = await _dataService.GetTodayStatsAsync(ct);
+        var todayStats = await _dataService.GetTodayStatsAsync(ct).ConfigureAwait(false);
 
         if (todayStats.TradeCount >= config.MaxDailyTrades)
             return RiskCheckResult.Reject($"今日交易次数 {todayStats.TradeCount} 已达上限 {config.MaxDailyTrades}");
@@ -44,7 +44,7 @@ public class RiskManager
         AccountBalanceSummary portfolioSummary;
         try
         {
-            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct);
+            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

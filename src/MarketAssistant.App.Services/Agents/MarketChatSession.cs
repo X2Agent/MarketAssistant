@@ -72,7 +72,6 @@ public class MarketChatSession : IDisposable
         TokenTrackingMiddleware? tokenTracking = null,
         ConversationCompressionMiddleware? compressionMiddleware = null,
         LayeredMemoryContextProvider? layeredMemoryProvider = null,
-        RagContextProvider? ragProvider = null,
         ChatSessionPersistenceService? sessionPersistence = null,
         MemoryExtractionService? memoryExtraction = null,
         string? initialStockCode = null)
@@ -92,7 +91,6 @@ public class MarketChatSession : IDisposable
         if (mcpToolProvider != null) contextProviders.Add(mcpToolProvider);
         if (layeredMemoryProvider != null)
             contextProviders.Add(layeredMemoryProvider);
-        if (ragProvider != null) contextProviders.Add(ragProvider);
 
         var baseAgent = new ChatClientAgent(
             chatClient,
