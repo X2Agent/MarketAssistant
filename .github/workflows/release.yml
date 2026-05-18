@@ -36,7 +36,7 @@ jobs:
 
       - name: Build Windows x64
         run: |
-          dotnet publish src/MarketAssistant.csproj `
+          dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj `
             -c Release `
             -r win-x64 `
             --self-contained `
