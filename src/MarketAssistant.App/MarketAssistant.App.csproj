@@ -64,16 +64,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AdaptiveCards" />
-    <PackageReference Include="Avalonia" />
-    <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
-    <PackageReference Include="Avalonia.Fonts.Inter" />
-    <PackageReference Include="Markdig" />
+	<PackageReference Include="AdaptiveCards" />
+	<PackageReference Include="Avalonia" />
+	<PackageReference Include="Avalonia.Desktop" />
+	<PackageReference Include="Avalonia.Themes.Fluent" />
+	<PackageReference Include="Avalonia.Fonts.Inter" />
+	<PackageReference Include="Markdig" />
 	<PackageReference Include="CommunityToolkit.Mvvm" />
 	<PackageReference Include="Svg.Controls.Skia.Avalonia" />
 	<PackageReference Include="Svg.Skia" />
-	<!-- Avalonia 官方 WebView（MIT 开源，无需许可证） -->
+	<!-- Avalonia 官方 WebView（MIT 开源,无需许可证） -->
 	<PackageReference Include="Avalonia.Controls.WebView" />
 	<PackageReference Include="Markdown.Avalonia" />
 	<PackageReference Include="YamlDotNet" />
