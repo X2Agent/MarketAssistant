@@ -7,7 +7,12 @@ namespace MarketAssistant.Agents.Analysts;
 /// </summary>
 public static class AnalystTypeRegistry
 {
-    public static IReadOnlyList<Type> GetConcreteAnalystTypes()
+    private static readonly Lazy<IReadOnlyList<Type>> _cachedTypes =
+        new(DiscoverConcreteAnalystTypes, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    public static IReadOnlyList<Type> GetConcreteAnalystTypes() => _cachedTypes.Value;
+
+    private static IReadOnlyList<Type> DiscoverConcreteAnalystTypes()
     {
         return AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(GetLoadableTypes)

@@ -187,6 +187,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         yield return AIFunctionFactory.Create(GetMACDAsync);
         yield return AIFunctionFactory.Create(GetBOLLAsync);
         yield return AIFunctionFactory.Create(GetMAAsync);
+        yield return AIFunctionFactory.Create(GetKLinesAsync);
     }
 
     private static List<IndicatorQuote> ToIndicatorQuotes(IEnumerable<KLineData> klineData)
@@ -213,6 +214,51 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     private static decimal? Round(double? value)
     {
         return value.HasValue ? Math.Round((decimal)value.Value, 2) : null;
+    }
+
+    [Description("获取K线历史序列（OHLCV），interval支持5m/15m/daily/weekly，用于判断趋势方向及多周期确认")]
+    public async Task<List<OhlcvBar>> GetKLinesAsync(
+        [Description("虚拟币代码（如BTC、ETH）")] string assetSymbol,
+        [Description("K线周期：5m/15m/daily/weekly")] string interval = "daily",
+        [Description("返回根数，最大500")] int count = 30)
+    {
+        try
+        {
+            var klineType = interval.ToLowerInvariant() switch
+            {
+                "5m" => KLineType.Minute5,
+                "15m" => KLineType.Minute15,
+                "weekly" => KLineType.Weekly,
+                _ => KLineType.Daily
+            };
+
+            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
+            var klineData = await klineService.GetKLineDataAsync(assetSymbol, klineType, Math.Clamp(count, 1, 500));
+
+            if (klineData == null || klineData.Count == 0)
+                throw new FriendlyException($"K线数据为空: {assetSymbol}");
+
+            var timeFormat = klineType is KLineType.Minute5 or KLineType.Minute15
+                ? "yyyy-MM-dd HH:mm" : "yyyy-MM-dd";
+
+            return klineData
+                .OrderBy(k => k.Timestamp)
+                .Select(k => new OhlcvBar
+                {
+                    T = k.Timestamp.ToString(timeFormat),
+                    O = k.Open,
+                    H = k.High,
+                    L = k.Low,
+                    C = k.Close,
+                    V = k.Volume
+                })
+                .ToList();
+        }
+        catch (Exception ex) when (ex is not FriendlyException)
+        {
+            _logger.LogError(ex, "获取K线序列失败: {Symbol} {Interval}", assetSymbol, interval);
+            throw new FriendlyException($"获取K线序列失败: {ex.Message}", ex);
+        }
     }
 
     private sealed class IndicatorQuote : IQuote

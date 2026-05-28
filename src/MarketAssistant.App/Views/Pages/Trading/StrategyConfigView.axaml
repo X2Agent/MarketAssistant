@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -49,6 +49,12 @@
                                 <ComboBox ItemsSource="{Binding OrderSides}"
                                           SelectedItem="{Binding NewSide}"
                                           HorizontalAlignment="Stretch"/>
+                                <!-- 止损/止盈方向语义提示：买入方向用于空头对冲，现货多头应选卖出 -->
+                                <TextBlock Text="{Binding SideHintText}"
+                                           IsVisible="{Binding SideHintText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
                                 <TextBlock Text="触发价格" FontSize="{StaticResource LabelFontSize}"
@@ -56,17 +62,96 @@
                                 <TextBox Text="{Binding NewTriggerPrice}" Watermark="触发价格"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}"
+                                        IsVisible="{Binding IsBasicStrategy}">
                                 <TextBlock Text="数量" FontSize="{StaticResource LabelFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding NewQuantity}" Watermark="交易数量"/>
                             </StackPanel>
-                            <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}"
+                                        IsVisible="{Binding IsBasicStrategy}">
                                 <TextBlock Text="止损价（可选）" FontSize="{StaticResource LabelFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding NewStopLossPrice}" Watermark="止损价格"/>
                             </StackPanel>
                         </Grid>
+
+                        <!-- 基础策略止盈价 -->
+                        <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding IsBasicStrategy}">
+                            <TextBlock Text="止盈价（可选）" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding NewTakeProfitPrice}" Watermark="止盈价格"
+                                     HorizontalAlignment="Left" MinWidth="200"/>
+                        </StackPanel>
+
+                        <!-- 网格交易参数 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsGridTrading}">
+                            <TextBlock Text="网格交易参数" FontWeight="SemiBold"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}"
+                                  RowSpacing="{StaticResource SmallSpacing}">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="上界价格" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridUpperPrice}" Watermark="价格上限"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="下界价格" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridLowerPrice}" Watermark="价格下限"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="网格数量" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridCount}" Watermark="如 10"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="每格数量" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridQuantityPerGrid}" Watermark="代币数量"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- DCA 定投参数 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsDCA}">
+                            <TextBlock Text="定投参数" FontWeight="SemiBold"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}"
+                                  RowSpacing="{StaticResource SmallSpacing}">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="每次定投金额 (USDT)" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaAmountPerInterval}" Watermark="如 100"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="定投间隔 (秒)" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaIntervalSeconds}" Watermark="86400 = 每天"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="最高买入价（可选）" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaMaxBuyPrice}" Watermark="超过此价不买"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="低于此价双倍定投（可选）" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaDoubleBuyBelowPrice}" Watermark="低于此价双倍"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 校验错误提示 -->
+                        <TextBlock Text="{Binding ValidationError}"
+                                   IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Foreground="{DynamicResource ErrorBrush}"
+                                   FontSize="{StaticResource LabelFontSize}"
+                                   TextWrapping="Wrap"/>
 
                         <Button Content="创建策略"
                                 Command="{Binding CreateStrategyCommand}"
@@ -118,10 +203,10 @@
                                                 <TextBlock FontSize="{StaticResource SmallFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}">
                                                     <TextBlock.Text>
-                                                        <MultiBinding StringFormat="方向: {0} | 触发价: {1:F4} | 数量: {2:F6}">
+                                                        <MultiBinding StringFormat="方向: {0} | 触发价: {1:F4} | {2}">
                                                             <Binding Path="Side"/>
                                                             <Binding Path="TriggerPrice"/>
-                                                            <Binding Path="Quantity"/>
+                                                            <Binding Path="QuantityLabel"/>
                                                         </MultiBinding>
                                                     </TextBlock.Text>
                                                 </TextBlock>

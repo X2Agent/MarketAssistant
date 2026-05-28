@@ -29,6 +29,11 @@ public interface ITechnicalDataTools
     Task<TechnicalMA> GetMAAsync(string assetSymbol);
 
     /// <summary>
+    /// 获取 K 线历史序列（OHLCV），用于判断趋势方向及多周期一致性
+    /// </summary>
+    Task<List<OhlcvBar>> GetKLinesAsync(string assetSymbol, string interval = "daily", int count = 30);
+
+    /// <summary>
     /// 获取AI工具函数列表
     /// </summary>
     IEnumerable<AIFunction> GetFunctions();

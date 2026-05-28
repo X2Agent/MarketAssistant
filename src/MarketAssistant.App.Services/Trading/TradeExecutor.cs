@@ -44,6 +44,7 @@ public class TradeExecutor
     /// </summary>
     public async Task<TradeResult> ExecuteTradeAsync(
         TradingStrategy strategy, decimal currentPrice, string? aiReasoning = null,
+        string? pendingCustomParams = null,
         CancellationToken ct = default)
     {
         _logger.LogInformation("开始执行交易: {StrategyId} {Symbol} {Side} 数量:{Qty}",
@@ -55,13 +56,19 @@ public class TradeExecutor
             aiReasoning: aiReasoning, ct: ct);
 
         if (result.Success)
-            await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct);
+        {
+            if (pendingCustomParams != null)
+                await _dataService.UpdateStrategyTriggeredWithParamsAsync(strategy.Id, pendingCustomParams, ct);
+            else
+                await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct);
+        }
 
         return result;
     }
 
     /// <summary>
-    /// 通用下单方法，所有交易路径（策略触发、AI Agent、手动）的统一入口
+    /// 通用下单方法，所有交易路径（策略触发、AI Agent、手动）的统一入口。
+    /// 风控检查和人工确认在 symbol 锁之外执行，避免等待用户输入时锁死后续交易。
     /// </summary>
     public async Task<TradeResult> ExecuteOrderAsync(
         string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
@@ -69,28 +76,9 @@ public class TradeExecutor
         string strategyId = "manual", string? aiReasoning = null,
         CancellationToken ct = default)
     {
-        var gate = _symbolExecutionLocks.GetOrAdd(
-            instrumentSymbol.Trim(), static _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            return await ExecuteOrderCoreAsync(
-                instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
-                strategyId, aiReasoning, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    private async Task<TradeResult> ExecuteOrderCoreAsync(
-        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
-        decimal currentPrice, decimal? limitPrice,
-        string strategyId, string? aiReasoning,
-        CancellationToken ct)
-    {
-        var riskCheck = await _riskManager.ValidateOrderAsync(instrumentSymbol, side, quantity, currentPrice, ct);
+        // 风控校验和人工确认在 symbol 锁外完成，防止 ConfirmationCallback 等待期间
+        // 持有 SemaphoreSlim，导致同一标的后续所有交易永久阻塞。
+        var riskCheck = await _riskManager.ValidateOrderAsync(instrumentSymbol, side, quantity, currentPrice, type, ct);
 
         if (riskCheck.NeedsConfirmation)
         {
@@ -102,9 +90,8 @@ public class TradeExecutor
                 var approved = await ConfirmationCallback(
                     instrumentSymbol, side, quantity, currentPrice, riskCheck.Reason ?? "需人工确认");
                 if (!approved)
-                {
                     return new TradeResult { Success = false, ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}" };
-                }
+
                 _logger.LogInformation("用户已确认交易: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             }
             else
@@ -112,13 +99,34 @@ public class TradeExecutor
                 return new TradeResult { Success = false, ErrorMessage = $"需人工确认: {riskCheck.Reason}" };
             }
         }
-
-        if (!riskCheck.Passed)
+        else if (!riskCheck.Passed)
         {
             _logger.LogWarning("风控拒绝: {Reason}", riskCheck.Reason);
             return new TradeResult { Success = false, ErrorMessage = $"风控拒绝: {riskCheck.Reason}" };
         }
 
+        // 仅在实际调用交易所 API 时持有 symbol 锁，防止同一标的并发重复下单
+        var gate = _symbolExecutionLocks.GetOrAdd(
+            instrumentSymbol.Trim(), static _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await ExecuteApprovedOrderAsync(
+                instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
+                strategyId, aiReasoning, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<TradeResult> ExecuteApprovedOrderAsync(
+        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
+        decimal currentPrice, decimal? limitPrice,
+        string strategyId, string? aiReasoning,
+        CancellationToken ct)
+    {
         try
         {
             var response = await _exchangeClient.PlaceOrderAsync(
@@ -143,23 +151,14 @@ public class TradeExecutor
             await _dataService.SaveTradeRecordAsync(record, ct);
 
             decimal pnl = 0;
-            if (record.ExecutedQty > 0)
+            if (record.ExecutedQty > 0 && side == OrderSide.Sell)
             {
-                if (side == OrderSide.Sell)
-                {
-                    // 多头平仓：卖出价 - 平均买入价
-                    var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
-                    if (avgEntryPrice > 0)
-                        pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
-                }
-                else
-                {
-                    // 空头平仓：平均卖出价 - 买入价
-                    var avgSellPrice = await _dataService.GetAverageSellPriceAsync(instrumentSymbol, ct);
-                    if (avgSellPrice > 0)
-                        pnl = (avgSellPrice - record.ExecutedPrice) * record.ExecutedQty;
-                }
+                // 现货多头平仓：卖出价 - 加权平均买入价
+                var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
+                if (avgEntryPrice > 0)
+                    pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
             }
+            // 现货买入为开多仓，无已实现盈亏
             await _dataService.UpdateDailyStatsAsync(pnl, record.Commission, ct);
 
             _logger.LogInformation("交易执行成功: {StrategyId} 订单ID:{OrderId} 状态:{Status} PnL:{Pnl}",

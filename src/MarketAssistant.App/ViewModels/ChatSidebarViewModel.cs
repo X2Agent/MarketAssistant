@@ -36,7 +36,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     private CancellationTokenSource? _currentCancellationTokenSource;
 
-    public IRelayCommand SendMessageCommand { get; }
+    public IAsyncRelayCommand SendMessageCommand { get; }
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
@@ -47,7 +47,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         _sessionPersistence = sessionPersistence;
         _chatSession = chatSessionFactory.Create();
 
-        SendMessageCommand = new RelayCommand(SendMessage, CanSendMessage);
+        SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
         _ = LoadSessionHistoryAsync();
     }
 
@@ -62,7 +62,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// <summary>
     /// 发送消息
     /// </summary>
-    private async void SendMessage()
+    private async Task SendMessageAsync()
     {
         if (IsProcessing)
         {

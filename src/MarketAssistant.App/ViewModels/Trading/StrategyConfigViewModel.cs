@@ -23,14 +23,26 @@ public partial class StrategyConfigViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsGridTrading));
         OnPropertyChanged(nameof(IsDCA));
         OnPropertyChanged(nameof(IsBasicStrategy));
+        OnPropertyChanged(nameof(SideHintText));
     }
 
     [ObservableProperty] private OrderSide _newSide = OrderSide.Buy;
+
+    partial void OnNewSideChanged(OrderSide value)
+    {
+        OnPropertyChanged(nameof(SideHintText));
+    }
+
     [ObservableProperty] private string _newTriggerPrice = string.Empty;
     [ObservableProperty] private string _newQuantity = string.Empty;
     [ObservableProperty] private string _newStopLossPrice = string.Empty;
     [ObservableProperty] private string _newTakeProfitPrice = string.Empty;
     [ObservableProperty] private bool _isCreating;
+
+    /// <summary>
+    /// 表单校验错误信息。非空时显示在创建按钮旁。
+    /// </summary>
+    [ObservableProperty] private string _validationError = string.Empty;
 
     public StrategyType[] StrategyTypes { get; } = Enum.GetValues<StrategyType>();
     public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
@@ -61,6 +73,15 @@ public partial class StrategyConfigViewModel : ViewModelBase
     /// 当前选择的策略类型是否为基础策略（非 Grid/DCA）
     /// </summary>
     public bool IsBasicStrategy => !IsGridTrading && !IsDCA;
+
+    /// <summary>
+    /// 针对现货交易者的方向提示：买入止损/止盈通常用于空头对冲，现货做多应选卖出。
+    /// </summary>
+    public string SideHintText =>
+        NewSide == OrderSide.Buy &&
+        (NewStrategyType == StrategyType.StopLoss || NewStrategyType == StrategyType.TakeProfit)
+            ? "⚠️ 买入方向的止损/止盈通常用于空头对冲（期货）；现货多头持仓请选「卖出」方向"
+            : string.Empty;
 
     // 风控配置
     [ObservableProperty] private RiskConfig _riskConfig = new();
@@ -104,10 +125,15 @@ public partial class StrategyConfigViewModel : ViewModelBase
     private async Task CreateStrategyAsync()
     {
         if (string.IsNullOrWhiteSpace(NewSymbol))
+        {
+            ValidationError = "请填写交易对（如 BTCUSDT）";
             return;
+        }
 
         await SafeExecuteAsync(async () =>
         {
+            ValidationError = string.Empty;
+
             var strategy = new TradingStrategy
             {
                 Symbol = NewSymbol.ToUpper().Trim(),
@@ -123,7 +149,10 @@ public partial class StrategyConfigViewModel : ViewModelBase
                         !decimal.TryParse(GridLowerPrice, out var lower) ||
                         !int.TryParse(GridCount, out var gridCount) ||
                         !decimal.TryParse(GridQuantityPerGrid, out var qtyPerGrid))
+                    {
+                        ValidationError = "请填写完整的网格交易参数（上界价格、下界价格、网格数量、每格数量）";
                         return;
+                    }
 
                     var gridParams = new GridTradingParams
                     {
@@ -139,7 +168,10 @@ public partial class StrategyConfigViewModel : ViewModelBase
 
                 case StrategyType.DCA:
                     if (!decimal.TryParse(DcaAmountPerInterval, out var amount))
+                    {
+                        ValidationError = "请填写有效的定投金额（USDT）";
                         return;
+                    }
 
                     var dcaParams = new DCAParams { AmountPerInterval = amount };
                     if (int.TryParse(DcaIntervalSeconds, out var interval))
@@ -151,13 +183,17 @@ public partial class StrategyConfigViewModel : ViewModelBase
 
                     strategy.CustomParams = JsonSerializer.Serialize(dcaParams);
                     strategy.TriggerPrice = maxPrice > 0 ? maxPrice : 0;
+                    // DCA 的 Quantity 存储每次定投的 USDT 金额（代币数量在执行时按实时价格换算）
                     strategy.Quantity = amount;
                     break;
 
                 default:
                     if (!decimal.TryParse(NewTriggerPrice, out var triggerPrice) ||
                         !decimal.TryParse(NewQuantity, out var quantity))
+                    {
+                        ValidationError = "请填写有效的触发价格和交易数量";
                         return;
+                    }
 
                     strategy.TriggerPrice = triggerPrice;
                     strategy.Quantity = quantity;
@@ -239,6 +275,7 @@ public partial class StrategyConfigViewModel : ViewModelBase
         DcaAmountPerInterval = string.Empty;
         DcaMaxBuyPrice = string.Empty;
         DcaDoubleBuyBelowPrice = string.Empty;
+        ValidationError = string.Empty;
         IsCreating = false;
     }
 }

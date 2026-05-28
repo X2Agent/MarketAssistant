@@ -253,7 +253,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         _embeddingFactory = embeddingFactory;
         _vectorStore = vectorStore;
         _marketContext = marketContext;
-        _ = InitializeAsync();
+        _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
     }
 
     /// <summary>

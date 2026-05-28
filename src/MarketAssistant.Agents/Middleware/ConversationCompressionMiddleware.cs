@@ -24,7 +24,7 @@ public sealed class ConversationCompressionMiddleware
     public const string CompressionSummaryKey = "middleware:compressionSummary";
 
     private readonly ILogger _logger;
-    private readonly IChatClient _chatClient;
+    private readonly Func<IChatClient> _chatClientFactory;
 
     /// <summary>
     /// 压缩前回调钩子。在丢弃旧消息前调用，允许外部提取关键信息（紧急保存）。
@@ -41,9 +41,9 @@ public sealed class ConversationCompressionMiddleware
     /// </summary>
     public int ReserveRecentCount { get; set; } = 4;
 
-    public ConversationCompressionMiddleware(IChatClient chatClient, ILogger<ConversationCompressionMiddleware> logger)
+    public ConversationCompressionMiddleware(Func<IChatClient> chatClientFactory, ILogger<ConversationCompressionMiddleware> logger)
     {
-        _chatClient = chatClient;
+        _chatClientFactory = chatClientFactory;
         _logger = logger;
     }
 
@@ -175,7 +175,7 @@ public sealed class ConversationCompressionMiddleware
                 sb.AppendLine($"【{role}】{text}");
             }
 
-            var response = await _chatClient.GetResponseAsync(
+            var response = await _chatClientFactory().GetResponseAsync(
                 [new ChatMessage(ChatRole.User, sb.ToString())],
                 new ChatOptions { Temperature = 0.1f, MaxOutputTokens = 500 },
                 cancellationToken);

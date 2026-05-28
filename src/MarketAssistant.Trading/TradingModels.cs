@@ -35,6 +35,13 @@ public class TradingStrategy
     public decimal? StopLossPrice { get; set; }
     public decimal? TakeProfitPrice { get; set; }
     public decimal Quantity { get; set; }
+
+    /// <summary>
+    /// 显示用标签：DCA 策略以 USDT 定投金额计，其他策略为代币数量。
+    /// </summary>
+    public string QuantityLabel => Type == StrategyType.DCA
+        ? $"定投: {Quantity:F2} USDT"
+        : $"数量: {Quantity:F6}";
     public decimal? MaxPositionPercent { get; set; }
     public string? CustomParams { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

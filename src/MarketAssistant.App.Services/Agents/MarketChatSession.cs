@@ -37,6 +37,7 @@ public class MarketChatSession : IDisposable
     private string _sessionId = Guid.NewGuid().ToString("N");
     private string _currentStockCode = string.Empty;
     private string _analysisContext = string.Empty;
+    private string? _cachedInstructions;
     private CancellationTokenSource? _currentCancellationTokenSource;
     private bool _disposed;
     private bool _searchToolsInitialized;
@@ -206,6 +207,7 @@ public class MarketChatSession : IDisposable
     {
         _currentStockCode = stockCode;
         _analysisContext = BuildAnalysisSummary(analysisMessages);
+        _cachedInstructions = null;
         _currentSession = null;
         _conversationHistory.Clear();
 
@@ -387,6 +389,7 @@ public class MarketChatSession : IDisposable
     public void SetCurrentStock(string stockCode)
     {
         _currentStockCode = stockCode;
+        _cachedInstructions = null;
         _logger.LogInformation("设置当前标的: {StockCode}", stockCode);
     }
 
@@ -402,6 +405,9 @@ public class MarketChatSession : IDisposable
 
     private string BuildAgentInstructions()
     {
+        if (_cachedInstructions != null)
+            return _cachedInstructions;
+
         var sb = new StringBuilder();
 
         sb.AppendLine("<role>");
@@ -465,7 +471,8 @@ public class MarketChatSession : IDisposable
             </forbidden>
             """);
 
-        return sb.ToString();
+        _cachedInstructions = sb.ToString();
+        return _cachedInstructions;
     }
 
     #endregion

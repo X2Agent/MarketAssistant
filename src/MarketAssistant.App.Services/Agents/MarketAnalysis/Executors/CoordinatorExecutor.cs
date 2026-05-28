@@ -65,7 +65,7 @@ public sealed partial class CoordinatorExecutor : Executor
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogWarning("🔍 [DEBUG] CoordinatorExecutor.HandleAsync 被调用，收到 {Count} 条消息", analystMessages?.Count ?? 0);
+        _logger.LogDebug("CoordinatorExecutor.HandleAsync 被调用，收到 {Count} 条消息", analystMessages?.Count ?? 0);
 
         ArgumentNullException.ThrowIfNull(analystMessages);
 
@@ -156,7 +156,7 @@ public sealed partial class CoordinatorExecutor : Executor
         catch (Exception ex)
         {
             _logger.LogError(ex, "协调分析师生成报告时发生错误，标的: {AssetSymbol}",
-                await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, cancellationToken) ?? "未知");
+                await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, WorkflowStateKeys.Scope, cancellationToken) ?? "未知");
             throw;
         }
     }

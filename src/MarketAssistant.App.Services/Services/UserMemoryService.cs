@@ -9,7 +9,7 @@ namespace MarketAssistant.Services;
 /// 存储用户的投资偏好、历史分析结论、自定义标签等，供 AI 上下文使用。
 /// 采用有界设计：条目数上限 <see cref="MaxEntryCount"/>，总字符上限 <see cref="MaxTotalChars"/>。
 /// </summary>
-public class UserMemoryService : IDisposable
+public class UserMemoryService
 {
     public const int MaxEntryCount = 50;
     public const int MaxTotalChars = 5000;
@@ -226,8 +226,6 @@ public class UserMemoryService : IDisposable
             _logger.LogError(ex, "初始化用户记忆数据库失败");
         }
     }
-
-    public void Dispose() => GC.SuppressFinalize(this);
 }
 
 /// <summary>

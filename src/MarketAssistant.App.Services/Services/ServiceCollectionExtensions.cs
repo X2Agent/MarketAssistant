@@ -168,7 +168,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<TokenTrackingMiddleware>();
         services.AddSingleton<ConversationCompressionMiddleware>(sp =>
             new ConversationCompressionMiddleware(
-                sp.GetRequiredService<IChatClientFactory>().CreateClient(),
+                () => sp.GetRequiredService<IChatClientFactory>().CreateClient(),
                 sp.GetRequiredService<ILogger<ConversationCompressionMiddleware>>()));
 
         services.AddSingleton(sp =>
@@ -189,7 +189,10 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<WorkflowVisualizationService>();
         services.AddSingleton<IMarketChatSessionFactory, MarketChatSessionFactory>();
 
-        var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
+        var store = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            AppInfo.AppName,
+            "vector.sqlite");
         services.AddSqliteVectorStore(_ => $"Data Source={store}");
 
         return services;
@@ -220,6 +223,7 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddTradingServices(this IServiceCollection services)
     {
+        services.AddSingleton<AnalysisReportCache>();
         services.AddSingleton<TradingDataService>();
         services.AddSingleton<RiskManager>();
         services.AddSingleton<StrategyEngine>();
@@ -257,7 +261,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<InvestmentSelectionService>();
 
         // 市场分析工作流
-        services.AddSingleton<AnalysisDispatcherExecutor>();
         services.AddSingleton<AnalysisAggregatorExecutor>();
         services.AddSingleton<CoordinatorExecutor>();
         services.AddSingleton<MarketAnalysisWorkflow>();

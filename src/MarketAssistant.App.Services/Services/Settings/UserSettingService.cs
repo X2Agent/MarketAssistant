@@ -1,4 +1,6 @@
 using MarketAssistant.Applications.Settings;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MarketAssistant.Services.Browser;
 
 namespace MarketAssistant.Services.Settings;
@@ -10,6 +12,7 @@ public class UserSettingService : IUserSettingService
 {
     private const string PreferenceKey = "UserSettings";
     private readonly IBrowserService? _browserService;
+    private readonly ILogger<UserSettingService> _logger;
 
     private UserSetting _currentSetting = new();
 
@@ -18,9 +21,9 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public UserSetting CurrentSetting => _currentSetting;
 
-    public UserSettingService(IBrowserService? browserService = null)
+    public UserSettingService(ILogger<UserSettingService>? logger = null, IBrowserService? browserService = null)
     {
-        // 从存储中加载设置
+        _logger = logger ?? NullLogger<UserSettingService>.Instance;
         _browserService = browserService;
         LoadSettings();
     }
@@ -61,8 +64,7 @@ public class UserSettingService : IUserSettingService
         }
         catch (Exception ex)
         {
-            // 处理异常
-            System.Diagnostics.Debug.WriteLine($"加载设置时出错: {ex.Message}");
+            _logger.LogError(ex, "加载设置时出错");
             Preferences.Default.Remove(PreferenceKey);
 
             // 如果加载失败，使用默认值
@@ -85,8 +87,7 @@ public class UserSettingService : IUserSettingService
         }
         catch (Exception ex)
         {
-            // 处理异常
-            System.Diagnostics.Debug.WriteLine($"保存设置时出错: {ex.Message}");
+            _logger.LogError(ex, "保存设置时出错");
         }
     }
 

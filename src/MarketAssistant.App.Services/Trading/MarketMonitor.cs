@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using System.Threading.Channels;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Infrastructure.Factories;
@@ -21,6 +22,8 @@ public class MarketMonitor : IDisposable
     private readonly TradeExecutor _tradeExecutor;
     private readonly ITradingAgentFactory _agentFactory;
     private readonly TradingDataService _dataService;
+    private readonly CryptoPortfolioService _portfolioService;
+    private readonly AnalysisReportCache _reportCache;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -56,6 +59,8 @@ public class MarketMonitor : IDisposable
         TradeExecutor tradeExecutor,
         ITradingAgentFactory agentFactory,
         TradingDataService dataService,
+        CryptoPortfolioService portfolioService,
+        AnalysisReportCache reportCache,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -63,6 +68,8 @@ public class MarketMonitor : IDisposable
         _tradeExecutor = tradeExecutor;
         _agentFactory = agentFactory;
         _dataService = dataService;
+        _portfolioService = portfolioService;
+        _reportCache = reportCache;
         _logger = logger;
     }
 
@@ -219,18 +226,67 @@ public class MarketMonitor : IDisposable
     {
         if (strategy.Type == StrategyType.AISignal)
         {
+            // 硬性止损/止盈边界检查：存在持仓时无需 AI 决策，直接强制平仓
+            if (TryHandleHardBoundary(strategy, currentPrice, out var boundaryReasoning))
+            {
+                strategy.Side = strategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
+                var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
+                    strategy, currentPrice, boundaryReasoning, ct: _cts?.Token ?? default);
+                if (boundaryResult.Success && boundaryResult.Record != null)
+                    TradeExecuted?.Invoke(boundaryResult.Record);
+                await CheckStrategyCompletionAsync(strategy);
+                return;
+            }
+
             await HandleAISignalAsync(strategy, currentPrice);
         }
         else
         {
+            // 网格交易：交易成功后原子地持久化更新后的网格参数，防止计数和参数不一致
+            var pendingCustomParams = strategy.Type == StrategyType.GridTrading ? strategy.CustomParams : null;
             var result = await _tradeExecutor.ExecuteTradeAsync(
-                strategy, currentPrice, ct: _cts?.Token ?? default);
+                strategy, currentPrice, pendingCustomParams: pendingCustomParams, ct: _cts?.Token ?? default);
 
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
             await CheckStrategyCompletionAsync(strategy);
         }
+    }
+
+    private static bool TryHandleHardBoundary(TradingStrategy strategy, decimal currentPrice, out string reasoning)
+    {
+        reasoning = string.Empty;
+
+        // 仅在已有成交（存在持仓）时执行硬性边界保护
+        if (strategy.ExecutionCount == 0)
+            return false;
+
+        if (strategy.StopLossPrice.HasValue)
+        {
+            bool stopTriggered = strategy.Side == OrderSide.Buy
+                ? currentPrice <= strategy.StopLossPrice.Value
+                : currentPrice >= strategy.StopLossPrice.Value;
+            if (stopTriggered)
+            {
+                reasoning = $"AISignal 硬性止损触发：当前价 {currentPrice} 已达止损位 {strategy.StopLossPrice.Value}，系统强制平仓";
+                return true;
+            }
+        }
+
+        if (strategy.TakeProfitPrice.HasValue)
+        {
+            bool tpTriggered = strategy.Side == OrderSide.Buy
+                ? currentPrice >= strategy.TakeProfitPrice.Value
+                : currentPrice <= strategy.TakeProfitPrice.Value;
+            if (tpTriggered)
+            {
+                reasoning = $"AISignal 硬性止盈触发：当前价 {currentPrice} 已达止盈位 {strategy.TakeProfitPrice.Value}，系统自动止盈";
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task HandleAISignalAsync(TradingStrategy strategy, decimal currentPrice)
@@ -246,10 +302,27 @@ public class MarketMonitor : IDisposable
                 : string.Join("\n", priorRecords.Take(5).Select(r =>
                     $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
 
+            var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol);
+            var analysisContext = BuildAnalysisContext(strategy.Symbol);
+
             var agent = _agentFactory.CreateAgent();
+            var stopLossInfo = strategy.StopLossPrice.HasValue
+                ? $"止损价: {strategy.StopLossPrice.Value}"
+                : "未设置止损";
+            var takeProfitInfo = strategy.TakeProfitPrice.HasValue
+                ? $"止盈价: {strategy.TakeProfitPrice.Value}"
+                : "未设置止盈";
             var prompt = $"""
                 分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
                 策略配置: {strategy.CustomParams ?? "无"}
+                风险边界: {stopLossInfo} | {takeProfitInfo}
+
+                ## 当前仓位状态
+                {positionSummary}
+
+                ## 最新市场分析报告
+                {analysisContext}
+
                 近期该策略成交摘要（最多 5 笔，按时间倒序）:
                 {recentSummary}
                 请评估是否应该执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
@@ -285,6 +358,62 @@ public class MarketMonitor : IDisposable
         {
             TradingContext.CurrentStrategyId = null;
         }
+    }
+
+    private async Task<string> BuildPositionSummaryAsync(string symbol)
+    {
+        try
+        {
+            var positions = await _portfolioService.GetCurrentPositionsAsync(_cts?.Token ?? default);
+            var symbolPosition = positions.FirstOrDefault(p =>
+                p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
+            var positionLine = symbolPosition != null
+                ? $"持仓: 数量 {symbolPosition.Quantity} | 入场均价 {symbolPosition.EntryPrice} | 未实现盈亏 {symbolPosition.UnrealizedPnl:F2} USDT ({symbolPosition.UnrealizedPnlPercent:F1}%)"
+                : "当前无持仓";
+
+            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, _cts?.Token ?? default);
+            var siblings = activeStrategies
+                .Where(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))
+                .Select(s => $"{s.Type}(触发价:{s.TriggerPrice})")
+                .ToList();
+            var siblingsLine = siblings.Count > 0 ? string.Join(", ", siblings) : "无";
+
+            return $"{positionLine}\n同标的活跃策略: {siblingsLine}";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "获取持仓信息失败，略过仓位上下文: {Symbol}", symbol);
+            return "（获取持仓信息失败）";
+        }
+    }
+
+    private string BuildAnalysisContext(string symbol)
+    {
+        var cached = _reportCache.Get(symbol);
+        if (cached == null)
+            return "（暂无分析报告，建议先运行市场分析工作流）";
+
+        var ageMinutes = (int)(DateTime.UtcNow - cached.CachedAt).TotalMinutes;
+        var result = cached.Report.CoordinatorResult;
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"报告时间: {ageMinutes} 分钟前");
+        sb.AppendLine($"综合评级: {result.InvestmentRating} | 综合评分: {result.OverallScore:F1}/10 | 置信度: {result.ConfidencePercentage:F0}%");
+        sb.AppendLine($"目标价区间: {result.TargetPrice} | 预期: {result.PriceChangeExpectation}");
+        sb.AppendLine($"技术面: {result.DimensionScores.Technical:F1} | 情绪面: {result.DimensionScores.Sentiment:F1} | 风险等级: {result.RiskLevel}");
+        sb.AppendLine($"结论: {result.Summary}");
+
+        if (result.OperationSuggestions.Count > 0)
+        {
+            sb.AppendLine("操作建议:");
+            foreach (var suggestion in result.OperationSuggestions.Take(3))
+                sb.AppendLine($"  - {suggestion}");
+        }
+
+        if (result.RiskFactors.Count > 0)
+            sb.AppendLine($"主要风险: {string.Join("; ", result.RiskFactors.Take(2))}");
+
+        return sb.ToString().TrimEnd();
     }
 
     private async Task CheckStrategyCompletionAsync(TradingStrategy strategy)

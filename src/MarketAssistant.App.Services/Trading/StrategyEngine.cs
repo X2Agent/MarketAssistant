@@ -52,6 +52,7 @@ public class StrategyEngine
                 _logger.LogInformation(
                     "策略触发: {StrategyId} {Type} {Symbol} 触发价:{TriggerPrice} 当前价:{CurrentPrice}",
                     strategy.Id, strategy.Type, symbol, strategy.TriggerPrice, currentPrice);
+
                 triggered.Add(strategy);
             }
         }
@@ -145,33 +146,36 @@ public class StrategyEngine
         }
     }
 
+    // 未配置时的安全默认值，防止每个价格 tick 都触发 AI 调用
+    private const int DefaultAISignalIntervalSeconds = 60;
+
     private bool EvaluateAISignal(TradingStrategy strategy)
     {
-        if (string.IsNullOrEmpty(strategy.CustomParams))
-            return true; // No interval configured, always eligible
+        var intervalSeconds = DefaultAISignalIntervalSeconds;
 
-        try
+        if (!string.IsNullOrEmpty(strategy.CustomParams))
         {
-            using var doc = JsonDocument.Parse(strategy.CustomParams);
-            var root = doc.RootElement;
-
-            if (root.TryGetProperty("analysisInterval", out var intervalEl))
+            try
             {
-                var intervalSeconds = intervalEl.GetInt32();
-                if (strategy.LastTriggeredAt.HasValue)
-                {
-                    var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
-                    return elapsed >= intervalSeconds;
-                }
+                using var doc = JsonDocument.Parse(strategy.CustomParams);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("analysisInterval", out var intervalEl))
+                    intervalSeconds = intervalEl.GetInt32();
             }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "解析 AISignal 参数失败，使用默认间隔 {DefaultInterval}s: {StrategyId}",
+                    DefaultAISignalIntervalSeconds, strategy.Id);
+            }
+        }
 
-            return true;
-        }
-        catch (Exception ex)
+        if (strategy.LastTriggeredAt.HasValue)
         {
-            _logger.LogWarning(ex, "解析 AISignal 参数失败: {StrategyId}", strategy.Id);
-            return true;
+            var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
+            return elapsed >= intervalSeconds;
         }
+
+        return true;
     }
 
     /// <summary>

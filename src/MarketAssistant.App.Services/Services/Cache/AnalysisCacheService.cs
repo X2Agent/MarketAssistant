@@ -1,4 +1,6 @@
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -12,12 +14,17 @@ public class AnalysisCacheService : IAnalysisCacheService
 {
     private readonly ILogger<AnalysisCacheService> _logger;
     private readonly IMemoryCache _memoryCache;
+    private readonly MarketContext _marketContext;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(2);
 
-    public AnalysisCacheService(ILogger<AnalysisCacheService> logger, IMemoryCache memoryCache)
+    public AnalysisCacheService(
+        ILogger<AnalysisCacheService> logger,
+        IMemoryCache memoryCache,
+        MarketContext marketContext)
     {
         _logger = logger;
         _memoryCache = memoryCache;
+        _marketContext = marketContext;
     }
 
     /// <summary>
@@ -90,11 +97,11 @@ public class AnalysisCacheService : IAnalysisCacheService
     }
 
     /// <summary>
-    /// 生成缓存键
+    /// 生成缓存键（含市场类型，避免跨市场碰撞）
     /// </summary>
     private string GenerateCacheKey(string assetSymbol)
     {
-        return $"MarketAnalysisReport_{assetSymbol}";
+        return $"MarketAnalysisReport_{_marketContext.CurrentMarket}_{assetSymbol}";
     }
 
     public void Dispose()

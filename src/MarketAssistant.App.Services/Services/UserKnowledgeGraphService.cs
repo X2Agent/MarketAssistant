@@ -9,7 +9,7 @@ namespace MarketAssistant.Services;
 /// 存储实体-关系三元组（subject, predicate, object），每个三元组有有效时间窗口。
 /// 参考 MemPalace 的时序知识图谱设计，适配金融投资领域。
 /// </summary>
-public class UserKnowledgeGraphService : IDisposable
+public class UserKnowledgeGraphService
 {
     private readonly string _connectionString;
     private readonly ILogger<UserKnowledgeGraphService> _logger;
@@ -182,8 +182,6 @@ public class UserKnowledgeGraphService : IDisposable
             _logger.LogError(ex, "初始化知识图谱数据库失败");
         }
     }
-
-    public void Dispose() => GC.SuppressFinalize(this);
 }
 
 /// <summary>

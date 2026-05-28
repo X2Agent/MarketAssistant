@@ -1,5 +1,8 @@
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Cache;
+using MarketAssistant.Services.Market;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -16,13 +19,20 @@ public class AnalysisCacheServiceTest
     private Mock<ILogger<AnalysisCacheService>> _mockLogger;
     private IMemoryCache _memoryCache;
     private AnalysisCacheService _cacheService;
+    private MarketContext _marketContext;
 
     [TestInitialize]
     public void Setup()
     {
         _mockLogger = new Mock<ILogger<AnalysisCacheService>>();
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
-        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache);
+
+        var mockSettingService = new Mock<IUserSettingService>();
+        mockSettingService.Setup(s => s.CurrentSetting).Returns(new UserSetting());
+        var mockServiceProvider = new Mock<IServiceProvider>();
+        _marketContext = new MarketContext(mockSettingService.Object, mockServiceProvider.Object);
+
+        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache, _marketContext);
     }
 
     [TestCleanup]

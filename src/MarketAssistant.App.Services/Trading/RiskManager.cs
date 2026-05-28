@@ -28,10 +28,19 @@ public class RiskManager
     /// </summary>
     public async Task<RiskCheckResult> ValidateOrderAsync(
         string instrumentSymbol, OrderSide side, decimal quantity, decimal price,
+        OrderType orderType = OrderType.Market,
         CancellationToken ct = default)
     {
+        const decimal MarketOrderSlippageBuffer = 0.015m; // 市价单预留 1.5% 滑点缓冲
+
         var config = _dataService.LoadRiskConfig();
-        var orderValueUSDT = quantity * price;
+
+        // 市价单使用保守的滑点缓冲价格进行风控计算，防止实际成交额超限
+        var effectivePrice = orderType == OrderType.Market
+            ? price * (1 + MarketOrderSlippageBuffer)
+            : price;
+
+        var orderValueUSDT = quantity * effectivePrice;
 
         if (orderValueUSDT < config.MinOrderAmount)
             return RiskCheckResult.Reject($"订单金额 {orderValueUSDT:F2} USDT 低于最小限额 {config.MinOrderAmount} USDT");

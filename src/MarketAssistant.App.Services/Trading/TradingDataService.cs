@@ -132,6 +132,49 @@ public class TradingDataService : IDisposable
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 原子地更新策略触发计数和自定义参数（用于网格交易，防止计数已更新但交易未执行的状态不一致）
+    /// </summary>
+    public async Task UpdateStrategyTriggeredWithParamsAsync(string id, string? customParams, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)tx;
+            cmd.CommandText = """
+                UPDATE strategies
+                SET last_triggered_at = @time,
+                    execution_count = execution_count + 1,
+                    custom_params = @customParams
+                WHERE id = @id
+                """;
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@time", DateTime.UtcNow.ToString("O"));
+            cmd.Parameters.AddWithValue("@customParams", (object?)customParams ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE strategies SET custom_params = @customParams WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@customParams", (object?)customParams ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     #endregion
 
     #region 交易记录

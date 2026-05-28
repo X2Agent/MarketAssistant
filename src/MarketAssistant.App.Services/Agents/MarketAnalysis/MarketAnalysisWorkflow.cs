@@ -4,6 +4,7 @@ using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Trading;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -24,6 +25,7 @@ public class MarketAnalysisWorkflow : IDisposable
     private readonly IAnalystAgentFactory _analystAgentFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MarketAnalysisWorkflow> _logger;
+    private readonly AnalysisReportCache _reportCache;
 
     private bool _disposed = false;
 
@@ -31,11 +33,6 @@ public class MarketAnalysisWorkflow : IDisposable
     /// 最近一次工作流检查点（可用于崩溃恢复）
     /// </summary>
     private CheckpointInfo? _lastCheckpoint;
-
-    /// <summary>
-    /// 用于在分析师之间共享市场快照数据
-    /// </summary>
-    private readonly MarketSnapshotContextProvider _marketSnapshot = new();
 
     /// <summary>
     /// 分析进度事件
@@ -48,6 +45,7 @@ public class MarketAnalysisWorkflow : IDisposable
         IUserSettingService userSettingService,
         IAnalystAgentFactory analystAgentFactory,
         ILoggerFactory loggerFactory,
+        AnalysisReportCache reportCache,
         ILogger<MarketAnalysisWorkflow> logger)
     {
         _aggregatorExecutor = aggregatorExecutor ?? throw new ArgumentNullException(nameof(aggregatorExecutor));
@@ -55,6 +53,7 @@ public class MarketAnalysisWorkflow : IDisposable
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -83,35 +82,38 @@ public class MarketAnalysisWorkflow : IDisposable
             }
 
             // 创建分析师代理（记录失败的分析师用于降级提示）
-            // 传递共享市场快照提供者给所有分析师
-            _marketSnapshot.Clear();
-            _marketSnapshot.SetData("分析标的", assetSymbol);
-            _marketSnapshot.SetData("分析时间", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"));
+            // 每次分析创建独立的市场快照实例，避免 Singleton 共享可变状态导致并发数据竞争
+            var marketSnapshot = new MarketSnapshotContextProvider();
+            marketSnapshot.SetData("分析标的", assetSymbol);
+            marketSnapshot.SetData("分析时间", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"));
 
-            var analystAgents = CreateAnalystAgents(enabledAnalysts);
-            var failedAnalystNames = enabledAnalysts
-                .Where(t => !analystAgents.Any(a => a.GetType() == t || a.Name == t.Name.Replace("Agent", "")))
+            var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot);
+            var failedAnalystNames = analystAgents.FailedTypes
                 .Select(t => t.GetCustomAttribute<System.ComponentModel.DisplayNameAttribute>()?.DisplayName ?? t.Name)
                 .ToList();
+            var createdAgents = analystAgents.Agents;
 
-            if (analystAgents.Count == 0)
+            if (createdAgents.Count == 0)
             {
                 throw new InvalidOperationException("所有分析师创建失败，无法执行分析");
             }
 
             // 构建工作流（传入分析师数量）
-            var workflow = BuildWorkflow(analystAgents.Count, analystAgents);
+            var workflow = BuildWorkflow(createdAgents.Count, createdAgents);
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
-                StageDescription = $"{analystAgents.Count} 位分析师正在并发分析",
+                StageDescription = $"{createdAgents.Count} 位分析师正在并发分析",
                 IsInProgress = true,
-                TotalAnalysts = analystAgents.Count,
+                TotalAnalysts = createdAgents.Count,
                 FailedAnalysts = failedAnalystNames
             });
 
             // 执行工作流（流式处理）
-            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, analystAgents.Count, cancellationToken);
+            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, createdAgents.Count, cancellationToken);
+
+            // 缓存分析结果，供交易决策模块使用
+            _reportCache.Set(assetSymbol, finalReport);
 
             OnProgressChanged(new AnalysisProgressEventArgs
             {
@@ -299,14 +301,18 @@ public class MarketAnalysisWorkflow : IDisposable
     }
 
     /// <summary>
-    /// 创建分析师代理（使用 Factory 模式）
+    /// 创建分析师代理（使用 Factory 模式），返回成功创建的 Agent 列表及失败的类型列表
     /// </summary>
-    private List<AIAgent> CreateAnalystAgents(List<Type> analystTypes)
+    private (List<AIAgent> Agents, List<Type> FailedTypes) CreateAnalystAgents(
+        List<Type> analystTypes,
+        MarketSnapshotContextProvider marketSnapshot)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
 
-        var sharedProviders = new AIContextProvider[] { _marketSnapshot };
+        var sharedProviders = new AIContextProvider[] { marketSnapshot };
         var createdAgents = new List<AIAgent>();
+        var failedTypes = new List<Type>();
+
         foreach (var type in analystTypes)
         {
             try
@@ -317,11 +323,12 @@ public class MarketAnalysisWorkflow : IDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "跳过创建分析师代理: {AgentType}", type.Name);
+                failedTypes.Add(type);
             }
         }
 
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
-        return createdAgents;
+        return (createdAgents, failedTypes);
     }
 
     /// <summary>

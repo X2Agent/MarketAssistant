@@ -23,10 +23,16 @@ public interface IChatClientFactory
 /// </summary>
 public class ChatClientFactory : IChatClientFactory
 {
+    /// <summary>
+    /// 瞬态错误冷却时间：冷却期内同一配置不重试，冷却后允许再次尝试
+    /// </summary>
+    private static readonly TimeSpan ErrorCooldown = TimeSpan.FromSeconds(30);
+
     private readonly IUserSettingService _userSettingService;
     private readonly object _lock = new();
     private IChatClient? _cachedClient;
     private string? _lastError;
+    private DateTime _lastErrorTime;
 
     // 缓存用于创建客户端的配置，以便检测变更
     private string? _cachedModelId;
@@ -57,13 +63,15 @@ public class ChatClientFactory : IChatClientFactory
                 return _cachedClient;
             }
 
-            // 配置未变但上次创建失败 → 快速失败，避免重复尝试
-            if (configUnchanged && !string.IsNullOrEmpty(_lastError))
+            // 配置未变且上次失败仍在冷却期内 → 快速失败，避免频繁重试
+            if (configUnchanged
+                && !string.IsNullOrEmpty(_lastError)
+                && DateTime.UtcNow - _lastErrorTime < ErrorCooldown)
             {
                 throw new FriendlyException(_lastError);
             }
 
-            // 配置已变更，重置错误状态
+            // 配置已变更或冷却期已过，重置错误状态
             _lastError = null;
             _cachedClient = null;
 
@@ -94,6 +102,7 @@ public class ChatClientFactory : IChatClientFactory
             catch (Exception ex)
             {
                 _lastError = ex.Message;
+                _lastErrorTime = DateTime.UtcNow;
                 _cachedClient = null;
                 _cachedModelId = modelId;
                 _cachedEndpoint = endpoint;
