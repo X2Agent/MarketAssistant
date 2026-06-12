@@ -11,6 +11,7 @@ namespace TestMarketAssistant.Tools;
 public class CryptoTechnicalToolsTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task TechnicalIndicators_ShouldReturnStructuredValues()
     {
         var services = new ServiceCollection();

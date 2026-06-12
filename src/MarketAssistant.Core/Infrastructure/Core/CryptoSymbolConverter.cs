@@ -18,8 +18,8 @@ public static class CryptoSymbolConverter
             throw new ArgumentException("币种代码不能为空", nameof(symbol));
         }
 
-        // 标准化格式：移除分隔符和空格，转大写
-        symbol = symbol.Replace("/", "")
+        symbol = symbol.Replace("crypto.", "", StringComparison.OrdinalIgnoreCase)
+                       .Replace("/", "")
                        .Replace("-", "")
                        .Replace(" ", "")
                        .ToUpperInvariant();

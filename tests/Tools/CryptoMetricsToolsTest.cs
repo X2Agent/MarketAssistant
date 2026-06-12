@@ -39,6 +39,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetVolumeDistributionAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -51,6 +52,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void GetFunctions_ShouldReturnValidAIFunctions()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -62,6 +64,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetOHLCVAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -76,6 +79,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetOrderBookDepthAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -92,6 +96,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetRecentTradesAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -106,6 +111,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetMarketMetricsAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
@@ -121,6 +127,7 @@ public class CryptoMetricsToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetVolatilityMetricsAsync_ShouldReturnValidData()
     {
         var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);

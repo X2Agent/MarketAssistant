@@ -30,6 +30,7 @@ public class BinanceAuthServiceTest
     /// 文档示例：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/request-security#hmac-keys
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public void TestHmacSignature_WithBinanceExample()
     {
         // Arrange - 使用币安文档中的示例密钥（仅用于测试）
@@ -69,6 +70,7 @@ public class BinanceAuthServiceTest
     /// 测试签名查询字符串生成（实际使用场景）
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public void TestSignQueryString_ShouldAddTimestampAndSignature()
     {
         // Arrange
@@ -93,6 +95,7 @@ public class BinanceAuthServiceTest
     /// 测试配置验证 - 需要SecretKey
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public void TestConfigValidation_RequiresSecretKey()
     {
         // Arrange
@@ -110,6 +113,7 @@ public class BinanceAuthServiceTest
     /// 测试添加鉴权 Header
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public void TestAddAuthHeaders_ShouldSetApiKeyHeader()
     {
         var authService = new BinanceAuthService(

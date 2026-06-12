@@ -31,6 +31,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_HasNewVersion_ReturnsTrue()
     {
         // Arrange
@@ -69,6 +70,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_NoNewVersion_ReturnsFalse()
     {
         // Arrange
@@ -94,6 +96,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_WithFourPartVersion_WorksCorrectly()
     {
         // Arrange
@@ -120,6 +123,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_ExcludePrerelease_OnlyStableVersions()
     {
         // Arrange
@@ -143,6 +147,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_NetworkError_ThrowsException()
     {
         // Arrange
@@ -160,6 +165,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_RateLimitExceeded_ThrowsException()
     {
         // Arrange
@@ -171,6 +177,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_EmptyVersion_ThrowsException()
     {
         // Act & Assert
@@ -179,6 +186,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_Success_ReturnsFilePath()
     {
         // Arrange
@@ -217,6 +225,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_WithProgress_ReportsProgress()
     {
         // Arrange
@@ -268,6 +277,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_InvalidUrl_ThrowsException()
     {
         // Act & Assert
@@ -276,6 +286,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_HttpError_ThrowsException()
     {
         // Arrange
@@ -295,6 +306,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ClearCache_ClearsSuccessfully()
     {
         // Act & Assert - 不抛出异常即可

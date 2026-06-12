@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Core;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace TestMarketAssistant.Application;
@@ -18,8 +19,8 @@ public class AssetCacheServiceTest
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddMemoryCache();
 
-        // 注册被测试的服务
         services.AddKeyedSingleton<IAssetCacheService, AShareAssetCacheService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetCacheService, CryptoAssetCacheService>(MarketType.Crypto);
 
@@ -40,6 +41,7 @@ public class AssetCacheServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CacheAssetInfo_AShare_ShouldStore()
     {
         // Arrange
@@ -62,6 +64,7 @@ public class AssetCacheServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetCachedAssetInfoAsync_AShare_NotExist_ShouldReturnNull()
     {
         // Arrange
@@ -75,6 +78,7 @@ public class AssetCacheServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task Clear_AShare_ShouldRemoveAllCache()
     {
         // Arrange
@@ -91,6 +95,7 @@ public class AssetCacheServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CacheAssetInfo_Crypto_ShouldStore()
     {
         // Arrange
@@ -113,6 +118,7 @@ public class AssetCacheServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task AShareAndCrypto_ShouldHaveSeparateCache()
     {
         // Arrange

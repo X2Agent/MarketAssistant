@@ -57,6 +57,7 @@ public class PdfFileTest : BaseAgentTest
     #region Converter Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void PdfMarkdownConverter_ShouldHandlePdfFiles()
     {
         // Arrange & Act & Assert
@@ -66,6 +67,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldConvertRealPdfFile()
     {
         // Act
@@ -84,6 +86,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldHandleDocumentStructure()
     {
         // Act
@@ -107,6 +110,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldPreserveTextFormatting()
     {
         // Act
@@ -129,6 +133,7 @@ public class PdfFileTest : BaseAgentTest
     #region Reader Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void PdfBlockReader_ShouldHandlePdfFiles()
     {
         // Arrange & Act & Assert
@@ -138,6 +143,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldReadDocumentBlocks()
     {
         // Act
@@ -165,6 +171,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldPreserveBlockOrder()
     {
         // Act
@@ -183,6 +190,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldExtractTextContent()
     {
         // Act
@@ -207,6 +215,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldHandleEmptyOrCorruptFile()
     {
         // Arrange
@@ -241,6 +250,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldHandleNonExistentFile()
     {
         // Arrange

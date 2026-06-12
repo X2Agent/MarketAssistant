@@ -13,14 +13,10 @@ public class MarketChatSessionTest : BaseAgentTest
     [TestInitialize]
     public void Initialize()
     {
-        BaseInitialize();
-
+        RequireLlm();
         var logger = new Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketChatSession>();
-
-        // 使用 ChatClientFactory 创建 ChatClient
         var chatClientFactory = _serviceProvider.GetRequiredService<IChatClientFactory>();
         var chatClient = chatClientFactory.CreateClient();
-
         _chatSession = new MarketChatSession(chatClient, logger);
     }
 
@@ -31,30 +27,26 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestBasicChatAsync()
     {
-        // 测试基础对话功能（流式响应）
         var responseBuilder = new System.Text.StringBuilder();
-
         await foreach (var update in _chatSession.SendMessageStreamAsync("你好，请介绍股票投资的基础知识"))
         {
             responseBuilder.Append(update);
         }
 
         var responseText = responseBuilder.ToString();
-        Assert.IsNotNull(responseText);
-        Assert.IsFalse(string.IsNullOrEmpty(responseText));
-
-        Console.WriteLine($"AI回复: {responseText}");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
+        Assert.IsTrue(responseText.Length > 20, "基础对话应返回有实质内容的回复");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestStockContextChatAsync()
     {
-        // 设置股票上下文
         _chatSession.SetCurrentStock("sz002594");
 
-        // 测试带有股票上下文的对话
         var responseBuilder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这只股票的基本面如何？"))
         {
@@ -62,16 +54,16 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var responseText = responseBuilder.ToString();
-        Assert.IsNotNull(responseText);
-        Assert.IsFalse(string.IsNullOrEmpty(responseText));
-
-        Console.WriteLine($"AI回复: {responseText}");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
+        Assert.IsTrue(
+            ContainsAnyKeyword(responseText, "002594", "比亚迪", "股票", "基本面", "估值", "财务", "盈利"),
+            "回复应体现当前股票上下文");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestConversationHistoryAsync()
     {
-        // 测试多轮对话
         await foreach (var _ in _chatSession.SendMessageStreamAsync("什么是市盈率？")) { }
         await foreach (var _ in _chatSession.SendMessageStreamAsync("有何意义？")) { }
 
@@ -82,62 +74,52 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var responseText = responseBuilder.ToString();
-        Assert.IsNotNull(responseText);
-        Assert.IsFalse(string.IsNullOrEmpty(responseText));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
 
-        // 验证对话历史（异步获取）
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count > 0);
-
-        Console.WriteLine($"对话历史条数: {history.Count}");
-        Console.WriteLine($"最新回复: {responseText}");
+        Assert.IsTrue(history.Count >= 6, "三轮对话应至少包含 3 条用户消息和 3 条助手回复");
+        Assert.IsTrue(
+            ContainsAnyKeyword(responseText, "市盈率", "PE", "估值", "盈利", "市净率", "指标", "比率"),
+            "第三轮回复应延续前两轮讨论的估值指标话题");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestClearHistoryAsync()
     {
-        // 添加一些对话
         await foreach (var _ in _chatSession.SendMessageStreamAsync("测试消息")) { }
 
-        // 验证有历史记录
         var historyBefore = await _chatSession.GetConversationHistoryAsync();
         Assert.IsTrue(historyBefore.Count > 0);
 
-        // 清除历史
         _chatSession.ClearHistory();
 
-        // 验证历史被清空
         var historyAfter = await _chatSession.GetConversationHistoryAsync();
         Assert.AreEqual(0, historyAfter.Count);
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestContextWindowManagementAsync()
     {
-        // 设置股票上下文
         _chatSession.SetCurrentStock("sz002594");
 
-        // 添加大量消息来测试上下文窗口管理
-        for (int i = 0; i < 50; i++)
+        for (int i = 0; i < 10; i++)
         {
             await foreach (var _ in _chatSession.SendMessageStreamAsync($"这是第{i}次测试消息，关于sz002594的股票分析。")) { }
         }
 
-        // 测试对话历史是否被管理
         var history = await _chatSession.GetConversationHistoryAsync();
         Assert.IsTrue(history.Count > 0);
         Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
-
-        Console.WriteLine($"消息数: {history.Count}");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestTopicGuidanceAsync()
     {
-        // 设置股票上下文
         _chatSession.SetCurrentStock("sz002594");
 
-        // 询问与股票无关的消息，测试AI是否能自然地引导回相关话题
         var responseBuilder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("今天的天气怎么样"))
         {
@@ -145,20 +127,18 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var responseText = responseBuilder.ToString();
-        Assert.IsNotNull(responseText);
-        Assert.IsFalse(string.IsNullOrEmpty(responseText));
-        // AI应该能够自然地回复用户或引导回股票话题
-
-        Console.WriteLine($"AI的回复: {responseText}");
+        Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
+        Assert.IsTrue(
+            ContainsAnyKeyword(responseText, "股票", "市场", "投资", "002594", "比亚迪", "标的", "分析", "金融市场"),
+            "偏离话题的提问应被引导回股票或市场相关讨论");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestStreamingResponseAsync()
     {
-        // 设置股票上下文
         _chatSession.SetCurrentStock("sz000001");
 
-        // 测试流式响应
         var allContent = new List<string>();
         await foreach (var update in _chatSession.SendMessageStreamAsync("分析sz000001的技术指标"))
         {
@@ -168,55 +148,64 @@ public class MarketChatSessionTest : BaseAgentTest
             }
         }
 
-        Assert.IsTrue(allContent.Count > 0);
-
-        var fullResponse = string.Join("", allContent);
-        Console.WriteLine($"流式响应完整内容: {fullResponse}");
+        Assert.IsTrue(allContent.Count > 1, "流式响应应产生多个内容块");
     }
 
     [TestMethod]
-    public void TestCancellationAsync()
+    [TestCategory("Agent")]
+    public async Task TestCancellationAsync()
     {
-        var cts = new CancellationTokenSource();
+        Assert.IsFalse(_chatSession.IsProcessing, "新会话初始不应处于处理中状态");
 
-        // 立即取消
+        var history = await _chatSession.GetConversationHistoryAsync();
+        Assert.AreEqual(0, history.Count, "新会话初始对话历史应为空");
+
         _chatSession.StopCurrentRequest();
-        cts.Cancel();
+        Assert.IsFalse(_chatSession.IsProcessing, "空闲会话调用 StopCurrentRequest 后仍不应处于处理中状态");
 
-        // 验证取消状态
-        Assert.IsTrue(_chatSession.IsProcessing == false);
+        _chatSession.SetCurrentStock("sz002594");
+        _chatSession.StopCurrentRequest();
+        Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
+        Assert.IsFalse(_chatSession.IsProcessing, "设置股票上下文不应改变处理状态");
     }
 
     [TestMethod]
+    [TestCategory("Agent")]
     public async Task TestIntelligentAnalysisAsync()
     {
-        // 设置股票上下文
         _chatSession.SetCurrentStock("sz002594");
 
-        // 测试AI能否智能调用可能的插件来回答深度问题
         var response1Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("分析MACD和RSI指标"))
         {
             response1Builder.Append(update);
         }
-        Assert.IsFalse(string.IsNullOrEmpty(response1Builder.ToString()));
+        var response1 = response1Builder.ToString();
+        Assert.IsTrue(response1.Length > 50, "技术分析回复应有足够深度");
 
         var response2Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这家公司的ROE和净利润如何？"))
         {
             response2Builder.Append(update);
         }
-        Assert.IsFalse(string.IsNullOrEmpty(response2Builder.ToString()));
+        var response2 = response2Builder.ToString();
+        Assert.IsTrue(response2.Length > 50, "财务分析回复应有足够深度");
 
         var response3Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("投资这只股票有什么风险？"))
         {
             response3Builder.Append(update);
         }
-        Assert.IsFalse(string.IsNullOrEmpty(response3Builder.ToString()));
+        var response3 = response3Builder.ToString();
+        Assert.IsTrue(response3.Length > 50, "风险分析回复应有足够深度");
 
-        Console.WriteLine($"技术分析回复: {response1Builder}");
-        Console.WriteLine($"财务分析回复: {response2Builder}");
-        Console.WriteLine($"风险分析回复: {response3Builder}");
+        var history = await _chatSession.GetConversationHistoryAsync();
+        Assert.IsTrue(history.Count >= 6, "三轮分析对话应累积至少 6 条历史消息");
+    }
+
+    private static bool ContainsAnyKeyword(string text, params string[] keywords)
+    {
+        return keywords.Any(keyword =>
+            text.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 }

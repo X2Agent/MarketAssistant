@@ -1,5 +1,6 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.History;
+using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,7 @@ namespace TestMarketAssistant.Application;
 /// IAssetHistoryService 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
 [TestClass]
+[DoNotParallelize]
 public class AssetHistoryServiceTest
 {
     private ServiceProvider? _serviceProvider;
@@ -16,10 +18,12 @@ public class AssetHistoryServiceTest
     [TestInitialize]
     public void Setup()
     {
+        Preferences.Default.Clear("RecentAssets_AShare");
+        Preferences.Default.Clear("RecentAssets_Crypto");
+
         var services = new ServiceCollection();
         services.AddLogging();
 
-        // 注册被测试的服务
         services.AddKeyedSingleton<IAssetHistoryService, AShareHistoryService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetHistoryService, CryptoHistoryService>(MarketType.Crypto);
 
@@ -29,7 +33,6 @@ public class AssetHistoryServiceTest
     [TestCleanup]
     public async Task Cleanup()
     {
-        // 清理历史记录
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
         var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
@@ -40,6 +43,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void AddHistory_AShare_ShouldStoreAsset()
     {
         // Arrange
@@ -57,6 +61,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void GetHistory_AShare_ShouldReturnRecentAssets()
     {
         // Arrange
@@ -74,6 +79,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ClearHistory_AShare_ShouldRemoveAllRecords()
     {
         // Arrange
@@ -90,6 +96,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void AddHistory_Crypto_ShouldStoreAsset()
     {
         // Arrange
@@ -107,6 +114,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void GetHistory_Crypto_ShouldReturnRecentAssets()
     {
         // Arrange
@@ -124,6 +132,7 @@ public class AssetHistoryServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange

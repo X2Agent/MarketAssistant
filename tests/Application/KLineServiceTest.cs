@@ -71,6 +71,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_AShare_Minute15_ShouldReturnData()
     {
         // Arrange
@@ -81,6 +82,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_AShare_Daily_ShouldReturnData()
     {
         // Arrange
@@ -91,6 +93,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_AShare_Weekly_ShouldReturnData()
     {
         // Arrange
@@ -101,6 +104,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_Crypto_Minute15_ShouldReturnData()
     {
         // Arrange
@@ -111,6 +115,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_Crypto_Daily_ShouldReturnData()
     {
         // Arrange
@@ -121,6 +126,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_Crypto_Weekly_ShouldReturnData()
     {
         // Arrange
@@ -131,6 +137,7 @@ public class KLineServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKLineDataAsync_Crypto_Monthly_ShouldReturnData()
     {
         // Arrange

@@ -68,6 +68,7 @@ public sealed class AssetScreenerServiceTest
     #region A股筛选测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void Constructor_AShare_ShouldCreateInstance()
     {
         // Arrange & Act
@@ -79,6 +80,7 @@ public sealed class AssetScreenerServiceTest
 
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_AShare_WithDefaultCriteria_ShouldReturnStocks()
     {
         // Arrange
@@ -103,6 +105,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_AShare_WithSingleCriteria_ShouldReturnFilteredStocks()
     {
         // Arrange - 测试单个条件筛选（市值）
@@ -136,6 +139,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_AShare_WithMultipleCriteria_ShouldReturnFilteredStocks()
     {
         // Arrange - 测试多条件组合筛选
@@ -180,6 +184,7 @@ public sealed class AssetScreenerServiceTest
     #region 虚拟币筛选测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void Constructor_Crypto_ShouldCreateInstance()
     {
         // Arrange & Act
@@ -190,6 +195,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithDefaultCriteria_ShouldReturnCryptos()
     {
         // Arrange
@@ -218,6 +224,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithMarketCapFilter_ShouldReturnFilteredCryptos()
     {
         // Arrange - 测试市值筛选
@@ -253,6 +260,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithPriceChangeFilter_ShouldReturnFilteredCryptos()
     {
         // Arrange - 测试价格变化筛选
@@ -288,6 +296,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithMultipleCriteria_ShouldReturnFilteredCryptos()
     {
         // Arrange - 测试多条件组合筛选
@@ -328,6 +337,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithMarketCapRankFilter_ShouldReturnTopCryptos()
     {
         // Arrange - 测试市值排名筛选
@@ -363,6 +373,7 @@ public sealed class AssetScreenerServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ScreenAsync_Crypto_WithInvalidCriteriaType_ShouldThrowArgumentException()
     {
         // Arrange

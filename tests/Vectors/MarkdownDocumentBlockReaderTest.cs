@@ -86,6 +86,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldExtractImageBlocks()
     {
         // Arrange & Act
@@ -124,6 +125,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldExtractHeadingBlocks()
     {
         // Arrange & Act
@@ -141,6 +143,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldExtractTableBlocks()
     {
         // Arrange & Act
@@ -157,6 +160,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldExtractListBlocks()
     {
         // Arrange & Act
@@ -174,6 +178,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldExtractTextBlocks()
     {
         // Arrange & Act
@@ -190,6 +195,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task ReadBlocksAsync_ShouldMaintainCorrectOrder()
     {
         // Arrange & Act

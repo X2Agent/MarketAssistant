@@ -18,6 +18,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     #region Service Resolution Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Service_ShouldBeResolvedFromContainer()
     {
         // Assert
@@ -30,6 +31,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithWhitespaceQuery_ShouldReturnEmptyList()
     {
         // Act
@@ -41,6 +43,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithZeroMaxCandidates_ShouldReturnEmptyList()
     {
         // Act
@@ -52,6 +55,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithNegativeMaxCandidates_ShouldReturnEmptyList()
     {
         // Act
@@ -67,6 +71,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     #region Functional Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithValidQuery_ShouldReturnRewrittenQueries()
     {
         // Arrange
@@ -90,6 +95,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithDefaultMaxCandidates_ShouldReturnLimitedResults()
     {
         // Arrange
@@ -110,6 +116,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithSynonymExpansion_ShouldGenerateVariants()
     {
         // Arrange - 使用包含同义词的查询
@@ -133,6 +140,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithFinancialTerms_ShouldGenerateAnalysisDimensions()
     {
         // Arrange
@@ -156,6 +164,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithTimeFrameTerms_ShouldGenerateTimeVariants()
     {
         // Arrange
@@ -177,6 +186,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_ShouldReturnUniqueResults()
     {
         // Arrange
@@ -201,6 +211,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rewrite_WithLargeMaxCandidates_ShouldReturnReasonableAmount()
     {
         // Arrange

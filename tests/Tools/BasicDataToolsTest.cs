@@ -47,6 +47,7 @@ public class BasicDataToolsTest
     #region A股基础数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAssetInfoAsync_AShare_ShouldReturnValidQuoteInfo()
     {
         // Arrange
@@ -63,6 +64,7 @@ public class BasicDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetCompanyInfoAsync_AShare_ShouldReturnValidCompanyInfo()
     {
         // Arrange
@@ -80,6 +82,7 @@ public class BasicDataToolsTest
     #region 虚拟币基础数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAssetInfoAsync_Crypto_ShouldReturnValidQuoteInfo()
     {
         // Arrange
@@ -95,6 +98,7 @@ public class BasicDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetProjectInfoAsync_Crypto_ShouldReturnValidInfo()
     {
         // Arrange

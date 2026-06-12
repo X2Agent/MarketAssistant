@@ -19,6 +19,7 @@ public class RerankerServiceTest : BaseAgentTest
     #region Service Resolution Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Service_ShouldBeResolvedFromContainer()
     {
         // Assert
@@ -30,6 +31,7 @@ public class RerankerServiceTest : BaseAgentTest
     #region Core Functionality Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithEmptyItems_ShouldReturnEmptyList()
     {
         // Arrange
@@ -45,6 +47,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithSingleItem_ShouldReturnSameItem()
     {
         // Arrange
@@ -64,6 +67,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithMultipleItems_ShouldReturnReorderedResults()
     {
         // Arrange
@@ -91,6 +95,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithRelevantQuery_ShouldPrioritizeRelevantContent()
     {
         // Arrange
@@ -119,6 +124,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithLargeDataset_ShouldHandleEfficiently()
     {
         // Arrange
@@ -150,6 +156,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithNullQuery_ShouldNotThrowException()
     {
         // Arrange
@@ -166,6 +173,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_WithEmptyQuery_ShouldReturnOriginalOrder()
     {
         // Arrange
@@ -184,6 +192,7 @@ public class RerankerServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Rerank_ShouldPreserveAllResults()
     {
         // Arrange

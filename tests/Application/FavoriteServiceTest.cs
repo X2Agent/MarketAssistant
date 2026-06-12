@@ -56,6 +56,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void AddFavorite_AShare_ShouldStoreAsset()
     {
         // Arrange
@@ -69,6 +70,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void RemoveFavorite_AShare_ShouldRemoveAsset()
     {
         // Arrange
@@ -83,6 +85,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void GetFavoritesCodes_AShare_ShouldReturnList()
     {
         // Arrange
@@ -99,6 +102,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetFavoritesWithLatestDataAsync_AShare_ShouldReturnAssetInfo()
     {
         // Arrange
@@ -115,6 +119,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void ClearFavorites_AShare_ShouldRemoveAll()
     {
         // Arrange
@@ -132,6 +137,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void AddFavorite_Crypto_ShouldStoreAsset()
     {
         // Arrange
@@ -145,6 +151,7 @@ public class FavoriteServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange

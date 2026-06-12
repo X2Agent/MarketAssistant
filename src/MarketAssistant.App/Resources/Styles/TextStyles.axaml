@@ -1,7 +1,174 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- 功能标题样式 -->
+    <!-- ================================================================== -->
+    <!-- 排版系统 (Typography System)                                       -->
+    <!-- 金融终端设计 — 数据优先、层次分明、一致性强                           -->
+    <!-- ================================================================== -->
+
+    <!-- ===== 标题层级 (Headings) ===== -->
+
+    <!-- H1 — 页面主标题（如 K线图上方标的名称） -->
+    <Style Selector="TextBlock.h1">
+        <Setter Property="FontSize" Value="{StaticResource ExtraLargeFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="34"/>
+    </Style>
+
+    <!-- H2 — 区块大标题（如 "热门标的"、"7x24快讯"） -->
+    <Style Selector="TextBlock.h2">
+        <Setter Property="FontSize" Value="{StaticResource TitleFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="30"/>
+    </Style>
+
+    <!-- H3 — 面板标题 -->
+    <Style Selector="TextBlock.h3">
+        <Setter Property="FontSize" Value="{StaticResource LargeFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="26"/>
+    </Style>
+
+    <!-- H4 — 卡片标题 -->
+    <Style Selector="TextBlock.h4">
+        <Setter Property="FontSize" Value="{StaticResource SubTitleFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="24"/>
+    </Style>
+
+    <!-- H5 — 子标题 -->
+    <Style Selector="TextBlock.h5">
+        <Setter Property="FontSize" Value="{StaticResource SectionTitleFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="22"/>
+    </Style>
+
+    <!-- H6 — 小标题 -->
+    <Style Selector="TextBlock.h6">
+        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="20"/>
+    </Style>
+
+    <!-- ===== 正文层级 (Body) ===== -->
+
+    <!-- Body — 默认正文 -->
+    <Style Selector="TextBlock.body">
+        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="20"/>
+    </Style>
+
+    <!-- Body-Small — 小号正文 -->
+    <Style Selector="TextBlock.body-sm">
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="18"/>
+    </Style>
+
+    <!-- ===== 辅助文本 (Caption / Label) ===== -->
+
+    <!-- Caption — 辅助说明文字 -->
+    <Style Selector="TextBlock.caption">
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="LineHeight" Value="18"/>
+    </Style>
+
+    <!-- Caption-Small — 极小辅助文字 -->
+    <Style Selector="TextBlock.caption-sm">
+        <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="LineHeight" Value="16"/>
+    </Style>
+
+    <!-- Label — 表单标签 -->
+    <Style Selector="TextBlock.label">
+        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="LineHeight" Value="20"/>
+    </Style>
+
+    <!-- Overline — 分类标签（大写、极小） -->
+    <Style Selector="TextBlock.overline">
+        <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="LineHeight" Value="16"/>
+    </Style>
+
+    <!-- ===== 金融数据文本 (Monospace / Data) ===== -->
+
+    <!-- Data — 等宽数字（价格、百分比、成交量） -->
+    <Style Selector="TextBlock.data">
+        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
+    </Style>
+
+    <!-- Data-Large — 大号数据（如当前价） -->
+    <Style Selector="TextBlock.data-lg">
+        <Setter Property="FontSize" Value="{StaticResource ExtraLargeFontSize}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
+    </Style>
+
+    <!-- Data-Small — 小号数据（表格数值） -->
+    <Style Selector="TextBlock.data-sm">
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
+    </Style>
+
+    <!-- ===== 语义化文本 ===== -->
+
+    <!-- Text-Bullish — 上涨文本 -->
+    <Style Selector="TextBlock.text-bullish">
+        <Setter Property="Foreground" Value="{StaticResource BullishBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+
+    <!-- Text-Bearish — 下跌文本 -->
+    <Style Selector="TextBlock.text-bearish">
+        <Setter Property="Foreground" Value="{StaticResource BearishBrush}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+    </Style>
+
+    <!-- Text-Muted — 次级/禁用文本 -->
+    <Style Selector="TextBlock.text-muted">
+        <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
+    </Style>
+
+    <!-- Text-Error — 错误文本 -->
+    <Style Selector="TextBlock.text-error">
+        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+    </Style>
+
+    <!-- Text-Code — 代码/标的代码 -->
+    <Style Selector="TextBlock.text-code">
+        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- ===== 兼容旧样式（逐步迁移） ===== -->
+
+    <!-- featureTitle — 功能标题（保持兼容） -->
     <Style Selector="TextBlock.featureTitle">
         <Setter Property="FontSize" Value="16"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -9,5 +176,10 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-</Styles>
+    <!-- feature-title — 卡片内功能标题 -->
+    <Style Selector="TextBlock.feature-title">
+        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
 
+</Styles>

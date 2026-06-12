@@ -53,6 +53,7 @@ public class TechnicalDataToolsTest
     #region A股技术数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKDJAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -66,6 +67,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetMACDAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -79,6 +81,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetBOLLAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -92,6 +95,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetMAAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -109,6 +113,7 @@ public class TechnicalDataToolsTest
     #region 虚拟币技术数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetKDJAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -122,6 +127,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetMACDAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -135,6 +141,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetBOLLAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -148,6 +155,7 @@ public class TechnicalDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetMAAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange

@@ -45,6 +45,10 @@ public class CryptoAssetCacheService : IAssetCacheService
 
     public void Clear()
     {
+        if (_cache is MemoryCache mc)
+        {
+            mc.Clear();
+        }
         _logger.LogInformation("清除虚拟币资产缓存");
     }
 

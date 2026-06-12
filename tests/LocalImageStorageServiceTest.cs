@@ -27,6 +27,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithValidImageAndHint_ShouldSaveSuccessfully()
     {
         // Arrange
@@ -44,6 +45,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithEmptyHint_ShouldGenerateGuidName()
     {
         // Arrange
@@ -59,6 +61,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithNullHint_ShouldGenerateGuidName()
     {
         // Arrange
@@ -74,6 +77,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithDuplicateFileName_ShouldOverwriteExistingFile()
     {
         // Arrange
@@ -98,6 +102,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithUnsafeFileName_ShouldCleanFileName()
     {
         // Arrange
@@ -120,6 +125,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithUnsupportedExtension_ShouldUsePngExtension()
     {
         // Arrange
@@ -136,6 +142,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithLongFileName_ShouldTruncate()
     {
         // Arrange
@@ -153,6 +160,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithNullImageBytes_ShouldThrowArgumentException()
     {
         // Act & Assert
@@ -161,6 +169,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithEmptyImageBytes_ShouldThrowArgumentException()
     {
         // Act & Assert
@@ -169,6 +178,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithTooLargeImage_ShouldThrowArgumentException()
     {
         // Arrange
@@ -180,6 +190,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithNullDocumentPath_ShouldThrowArgumentException()
     {
         // Arrange
@@ -191,6 +202,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithEmptyDocumentPath_ShouldThrowArgumentException()
     {
         // Arrange
@@ -202,6 +214,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithWhitespaceDocumentPath_ShouldThrowArgumentException()
     {
         // Arrange
@@ -213,6 +226,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_CreatesDirectoryStructure()
     {
         // Arrange
@@ -233,6 +247,7 @@ public class LocalImageStorageServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task SaveImageAsync_WithCancellationToken_ShouldRespectCancellation()
     {
         // Arrange

@@ -57,6 +57,7 @@ public class DocxFileTest : BaseAgentTest
     #region Converter Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void DocxMarkdownConverter_ShouldHandleDocxFiles()
     {
         // Arrange & Act & Assert
@@ -66,6 +67,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxMarkdownConverter_ShouldConvertRealDocxFile()
     {
         // Act
@@ -84,6 +86,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxMarkdownConverter_ShouldHandleDocumentStructure()
     {
         // Act
@@ -111,6 +114,7 @@ public class DocxFileTest : BaseAgentTest
     #region Reader Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void DocxBlockReader_ShouldHandleDocxFiles()
     {
         // Arrange & Act & Assert
@@ -120,6 +124,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldReadDocumentBlocks()
     {
         // Act
@@ -147,6 +152,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldPreserveBlockOrder()
     {
         // Act
@@ -165,6 +171,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldExtractTextContent()
     {
         // Act
@@ -189,6 +196,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldHandleDifferentBlockTypes()
     {
         // Act
@@ -213,6 +221,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldHandleEmptyOrCorruptFile()
     {
         // Arrange
@@ -247,6 +256,7 @@ public class DocxFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DocxBlockReader_ShouldHandleNonExistentFile()
     {
         // Arrange

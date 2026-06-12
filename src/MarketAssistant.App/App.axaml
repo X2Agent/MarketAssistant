@@ -26,6 +26,7 @@
         <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/SkeletonStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/FormStyles.axaml"/>
         <StyleInclude Source="/Views/Controls/CardView.axaml"/>
     </Application.Styles>
 

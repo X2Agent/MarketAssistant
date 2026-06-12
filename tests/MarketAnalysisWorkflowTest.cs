@@ -4,7 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace TestMarketAssistant;
 
 /// <summary>
-/// 市场分析工作流测试（最小原则：验证核心工作流功能）
+/// 市场分析工作流测试
+/// 验证核心工作流功能、报告结构完整性和质量指标
 /// </summary>
 [TestClass]
 public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
@@ -14,6 +15,7 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     [TestInitialize]
     public void Initialize()
     {
+        RequireLlm();
         _workflow = _serviceProvider.GetRequiredService<MarketAnalysisWorkflow>();
     }
 
@@ -24,29 +26,31 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("E2E")]
     public async Task AnalyzeAsync_ShouldReturnValidReport()
     {
-        // Arrange
         string assetSymbol = "000001";
 
-        // Act
         var report = await _workflow.AnalyzeAsync(assetSymbol);
 
-        // Assert
         Assert.IsNotNull(report);
         Assert.AreEqual(assetSymbol, report.AssetSymbol);
         Assert.IsNotNull(report.AnalystMessages);
         Assert.IsTrue(report.AnalystMessages.Count > 0, "应该至少有一位分析师的结果");
+
         Assert.IsNotNull(report.CoordinatorResult, "协调分析师应该生成结果");
         Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary), "协调分析师应该生成总结报告");
+        Assert.IsTrue(report.CoordinatorResult.Summary.Length >= 50, "总结报告应有足够的深度");
 
-        Console.WriteLine($"标的 {assetSymbol} 分析完成 - 分析师数量: {report.AnalystMessages.Count}, 总结长度: {report.CoordinatorResult.Summary.Length} 字符");
+        Assert.IsTrue(
+            report.CoordinatorResult.OverallScore is >= 1 and <= 10,
+            $"投资评分应在 1-10 范围内，实际值: {report.CoordinatorResult.OverallScore}");
     }
 
     [TestMethod]
+    [TestCategory("E2E")]
     public async Task AnalyzeAsync_ShouldTriggerProgressEvents()
     {
-        // Arrange
         string assetSymbol = "000001";
         var progressEvents = new List<string>();
 
@@ -55,19 +59,34 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
             progressEvents.Add(e.StageDescription);
         };
 
-        // Act
         var report = await _workflow.AnalyzeAsync(assetSymbol);
 
-        // Assert
         Assert.IsNotNull(report);
         Assert.IsTrue(progressEvents.Count > 0, "应该触发进度事件");
+        Assert.IsTrue(progressEvents.Count >= 3, "至少应有分派、聚合、协调三个阶段的进度事件");
 
-        // 验证进度事件内容合理性
         foreach (var evt in progressEvents)
         {
             Assert.IsFalse(string.IsNullOrWhiteSpace(evt), "阶段描述不应为空");
         }
+    }
 
-        Console.WriteLine($"进度事件触发 {progressEvents.Count} 次 - 所有事件内容有效");
+    [TestMethod]
+    [TestCategory("E2E")]
+    public async Task AnalyzeAsync_ReportShouldHaveQualityMetrics()
+    {
+        string assetSymbol = "000001";
+
+        var report = await _workflow.AnalyzeAsync(assetSymbol);
+
+        Assert.IsNotNull(report);
+        Assert.IsNotNull(report.CoordinatorResult);
+
+        Assert.IsTrue(report.CoordinatorResult.RiskFactors.Count > 0, "完整报告应包含风险评估");
+
+        Assert.IsTrue(report.CoordinatorResult.KeyIndicators.Count > 0, "完整报告应包含关键指标");
+
+        Assert.IsTrue(report.AnalystMessages.Count >= 2,
+            "应至少包含财务分析师和新闻事件分析师两位的结果（基于默认启用配置）");
     }
 }

@@ -1,13 +1,141 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    
-    <!-- 全局按钮默认样式 -->
+
+    <!-- ================================================================== -->
+    <!-- 按钮组件体系 (Button System)                                        -->
+    <!-- 变体: Primary / Secondary / Ghost / Danger / Icon                   -->
+    <!-- 尺寸: Small (28) / Medium (32) / Large (40)                          -->
+    <!-- ================================================================== -->
+
+    <!-- ===== 全局按钮默认 ===== -->
     <Style Selector="Button">
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
     </Style>
 
-    <!-- 时间周期按钮样式 -->
+    <!-- ===== Primary 按钮 — 主要操作 ===== -->
+    <Style Selector="Button.btn-primary">
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.btn-primary:pointerover">
+        <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-primary:pressed">
+        <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-primary:disabled">
+        <Setter Property="Opacity" Value="0.5"/>
+    </Style>
+
+    <!-- ===== Secondary 按钮 — 次要操作 ===== -->
+    <Style Selector="Button.btn-secondary">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-secondary:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-secondary:pressed">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
+
+    <!-- ===== Ghost 按钮 — 低优先级操作 ===== -->
+    <Style Selector="Button.btn-ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.btn-ghost:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- ===== Danger 按钮 — 危险/删除操作 ===== -->
+    <Style Selector="Button.btn-danger">
+        <Setter Property="Background" Value="{StaticResource DangerBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource DangerTextBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.btn-danger:pointerover">
+        <Setter Property="Background" Value="{StaticResource DangerLightBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-danger:pressed">
+        <Setter Property="Background" Value="{StaticResource DangerTextBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- ===== 按钮尺寸变体 ===== -->
+
+    <!-- Small 按钮 (28px) -->
+    <Style Selector="Button.btn-sm">
+        <Setter Property="Height" Value="{StaticResource SmallButtonHeight}"/>
+        <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+        <Setter Property="Padding" Value="10,0"/>
+    </Style>
+
+    <!-- Large 按钮 (40px) -->
+    <Style Selector="Button.btn-lg">
+        <Setter Property="Height" Value="{StaticResource LargeButtonHeight}"/>
+        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="Padding" Value="24,0"/>
+    </Style>
+
+    <!-- ===== Icon 按钮 — 纯图标按钮 (44px 点击区域) ===== -->
+    <Style Selector="Button.btn-icon">
+        <Setter Property="Width" Value="{StaticResource IconButtonSize}"/>
+        <Setter Property="Height" Value="{StaticResource IconButtonSize}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.btn-icon:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-icon:disabled">
+        <Setter Property="Opacity" Value="0.35"/>
+    </Style>
+
+    <!-- Small Icon 按钮 (36px) -->
+    <Style Selector="Button.btn-icon-sm">
+        <Setter Property="Width" Value="{StaticResource SmallIconButtonSize}"/>
+        <Setter Property="Height" Value="{StaticResource SmallIconButtonSize}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.btn-icon-sm:pointerover">
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- ===== 特定场景按钮（保持向后兼容） ===== -->
+
+    <!-- 时间周期按钮 -->
     <Style Selector="Button.period-button">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -16,24 +144,17 @@
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                <BrushTransition Property="Foreground" Duration="0:0:0.2"/>
-            </Transitions>
-        </Setter>
     </Style>
     <Style Selector="Button.period-button:pointerover">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="Button.period-button.selected">
-        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
-    <!-- 操作按钮样式 -->
+    <!-- 操作按钮 -->
     <Style Selector="Button.action-button">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -42,18 +163,28 @@
         <Setter Property="Height" Value="{StaticResource ButtonHeight}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-            </Transitions>
-        </Setter>
     </Style>
     <Style Selector="Button.action-button:pointerover">
         <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
     </Style>
 
-    <!-- 功能按钮样式 -->
+    <!-- 成功按钮 -->
+    <Style Selector="Button.success">
+        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+
+    <!-- 警告按钮 -->
+    <Style Selector="Button.warning">
+        <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+
+    <!-- 功能按钮 -->
     <Style Selector="Button.feature-button">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         <Setter Property="Foreground" Value="White"/>
@@ -65,27 +196,7 @@
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
 
-    <!-- 成功按钮样式 -->
-    <Style Selector="Button.success">
-        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-    </Style>
-
-    <!-- 警告按钮样式 -->
-    <Style Selector="Button.warning">
-        <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
-    </Style>
-
-    <!-- 悬停显示按钮基础样式 (删除/收藏) -->
+    <!-- 悬停显示按钮 (删除/收藏) -->
     <Style Selector="Button.delete-button, Button.favorite-button">
         <Setter Property="Opacity" Value="0"/>
         <Setter Property="IsHitTestVisible" Value="False"/>
@@ -96,10 +207,9 @@
         </Setter>
     </Style>
 
-    <!-- 收藏按钮特定样式 -->
+    <!-- 收藏按钮 -->
     <Style Selector="Button.favorite-button">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
 </Styles>

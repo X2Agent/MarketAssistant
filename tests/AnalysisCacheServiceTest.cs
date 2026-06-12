@@ -46,6 +46,7 @@ public class AnalysisCacheServiceTest
     /// 测试缓存分析数据的写入功能
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CacheAnalysisAsync_ShouldSaveDataSuccessfully()
     {
         // Arrange
@@ -66,6 +67,7 @@ public class AnalysisCacheServiceTest
     /// 测试缓存分析数据的读取功能
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetCachedAnalysisAsync_ShouldReturnCorrectData()
     {
         // Arrange
@@ -86,6 +88,7 @@ public class AnalysisCacheServiceTest
     /// 测试读取不存在的缓存数据
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetCachedAnalysisAsync_WithNonExistentStock_ShouldReturnNull()
     {
         // Act
@@ -99,6 +102,7 @@ public class AnalysisCacheServiceTest
     /// 测试缓存数据的覆盖写入功能
     /// </summary>
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CacheAnalysisAsync_ShouldOverwriteExistingData()
     {
         // Arrange

@@ -49,6 +49,7 @@ public class SentimentToolsTest
     #region A股情绪数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetFundFlowAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -66,6 +67,7 @@ public class SentimentToolsTest
     #region 虚拟币情绪数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetFundingRateAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -93,6 +95,7 @@ public class SentimentToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetGlobalLongShortRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -108,6 +111,7 @@ public class SentimentToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetTopTraderAccountRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -123,6 +127,7 @@ public class SentimentToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetTopTraderPositionRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
@@ -138,6 +143,7 @@ public class SentimentToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetOpenInterestAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange

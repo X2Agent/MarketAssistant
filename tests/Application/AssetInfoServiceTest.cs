@@ -51,6 +51,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SearchAsync_AShare_ShouldReturnResults()
     {
         // Arrange
@@ -66,6 +67,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAssetInfoAsync_AShare_ShouldReturnAssetDetails()
     {
         // Arrange
@@ -82,6 +84,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetHotAssetsAsync_AShare_ShouldReturnHotList()
     {
         // Arrange
@@ -103,6 +106,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SearchAsync_Crypto_ShouldReturnResults()
     {
         // Arrange
@@ -123,6 +127,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAssetInfoAsync_Crypto_ShouldReturnAssetDetails()
     {
         // Arrange
@@ -144,6 +149,7 @@ public class AssetInfoServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetHotAssetsAsync_Crypto_ShouldReturnHotList()
     {
         // Arrange

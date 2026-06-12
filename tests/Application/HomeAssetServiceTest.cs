@@ -69,6 +69,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SearchAssetAsync_AShare_ShouldReturnResults()
     {
         // Arrange
@@ -84,6 +85,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetHotAssetsAsync_AShare_ShouldReturnHotList()
     {
         // Arrange
@@ -104,6 +106,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void AddToRecentAssets_AShare_ShouldStoreInHistory()
     {
         // Arrange
@@ -121,6 +124,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void GetRecentAssets_AShare_ShouldReturnHistory()
     {
         // Arrange
@@ -140,6 +144,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SearchAssetAsync_Crypto_ShouldReturnResults()
     {
         // Arrange
@@ -160,6 +165,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetHotAssetsAsync_Crypto_ShouldReturnHotList()
     {
         // Arrange
@@ -180,6 +186,7 @@ public class HomeAssetServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void AddToRecentAssets_Crypto_ShouldStoreInHistory()
     {
         // Arrange

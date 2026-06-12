@@ -59,6 +59,7 @@ public class RagIngestionServiceIntegrationTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task TestIngestFileAsync()
     {
         // 验证IngestFileAsync能否正确执行

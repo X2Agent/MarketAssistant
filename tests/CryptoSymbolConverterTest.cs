@@ -10,6 +10,7 @@ namespace TestMarketAssistant;
 public class CryptoSymbolConverterTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_SimpleCoin_ShouldAddUSDT()
     {
         // Arrange & Act
@@ -20,6 +21,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_WithCryptoPrefix_ShouldRemovePrefix()
     {
         // Arrange & Act
@@ -30,6 +32,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_AlreadyHasUSDT_ShouldReturnAsIs()
     {
         // Arrange & Act
@@ -40,6 +43,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_WithSlash_ShouldRemoveSlash()
     {
         // Arrange & Act
@@ -50,6 +54,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_WithCustomQuote_ShouldUseCustomQuote()
     {
         // Arrange & Act
@@ -60,6 +65,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ExtractBaseCurrency_FromBTCUSDT_ShouldReturnBTC()
     {
         // Arrange & Act
@@ -70,6 +76,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ExtractBaseCurrency_FromETHBTC_ShouldReturnETH()
     {
         // Arrange & Act
@@ -80,6 +87,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ExtractBaseCurrency_FromBNBBUSD_ShouldReturnBNB()
     {
         // Arrange & Act
@@ -90,6 +98,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToCoinGeckoId_BTC_ShouldReturnBitcoin()
     {
         // Arrange & Act
@@ -100,6 +109,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToCoinGeckoId_BTCUSDT_ShouldReturnBitcoin()
     {
         // Arrange & Act
@@ -110,6 +120,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToCoinGeckoId_ETH_ShouldReturnEthereum()
     {
         // Arrange & Act
@@ -120,6 +131,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToCoinGeckoId_UnknownCoin_ShouldReturnLowercase()
     {
         // Arrange & Act
@@ -130,6 +142,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_EmptyString_ShouldThrowException()
     {
         // Arrange & Act & Assert
@@ -137,6 +150,7 @@ public class CryptoSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ToBinanceFormat_NullString_ShouldThrowException()
     {
         // Arrange & Act & Assert

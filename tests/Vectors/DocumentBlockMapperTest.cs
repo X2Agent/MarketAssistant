@@ -22,6 +22,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MapBlock_TextBlock_ShouldCreateCorrectParagraphsWithConsistentIds()
     {
         // Arrange
@@ -52,6 +53,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MapBlock_HeadingBlock_ShouldCreateCorrectParagraph()
     {
         // Arrange
@@ -77,6 +79,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MapBlock_ListBlock_ShouldCreateCorrectParagraph()
     {
         // Arrange
@@ -101,6 +104,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MapBlock_TableBlock_ShouldCreateCorrectParagraph()
     {
         // Arrange
@@ -130,6 +134,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MapBlock_ImageBlock_ShouldCreateCorrectParagraph()
     {
         // Arrange

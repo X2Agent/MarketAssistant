@@ -51,6 +51,7 @@ public class NewsDataToolsTest
     #region A股新闻数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetNewsAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -68,6 +69,7 @@ public class NewsDataToolsTest
     #region 虚拟币新闻数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetNewsAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange

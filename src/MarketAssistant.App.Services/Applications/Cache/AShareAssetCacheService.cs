@@ -45,8 +45,10 @@ public class AShareAssetCacheService : IAssetCacheService
 
     public void Clear()
     {
-        // MemoryCache 不支持清除所有条目
-        // 这里只是记录日志
+        if (_cache is MemoryCache mc)
+        {
+            mc.Clear();
+        }
         _logger.LogInformation("清除A股资产缓存");
     }
 

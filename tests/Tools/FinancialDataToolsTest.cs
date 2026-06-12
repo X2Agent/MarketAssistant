@@ -44,6 +44,7 @@ public class FinancialDataToolsTest
     #region A股财务数据测试
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetBalanceSheetAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -58,6 +59,7 @@ public class FinancialDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetIncomeStatementAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -72,6 +74,7 @@ public class FinancialDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetCashFlowStatementAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -86,6 +89,7 @@ public class FinancialDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetFinancialRatiosAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
@@ -100,6 +104,7 @@ public class FinancialDataToolsTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetCapitalStructureAsync_AShare_ShouldReturnValidData()
     {
         // Arrange

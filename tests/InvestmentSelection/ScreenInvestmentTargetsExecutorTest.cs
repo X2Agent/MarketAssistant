@@ -1,17 +1,14 @@
 using MarketAssistant.Agents.InvestmentSelection.Executors;
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Infrastructure.Core;
-using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace TestMarketAssistant.InvestmentSelection;
 
 /// <summary>
-/// ScreenInvestmentTargetsExecutor 测试（验证正常流程）
+/// ScreenInvestmentTargetsExecutor 测试
+/// 验证构造函数参数校验和筛选执行逻辑
 /// </summary>
 [TestClass]
 public class ScreenInvestmentTargetsExecutorTest
@@ -28,16 +25,22 @@ public class ScreenInvestmentTargetsExecutorTest
         _mockScreenerService = new Mock<IAssetScreenerService>();
         _mockLogger = new Mock<ILogger<ScreenInvestmentTargetsExecutor>>();
 
+        _mockServiceProvider
+            .Setup(sp => sp.GetService(typeof(IAssetScreenerService)))
+            .Returns(_mockScreenerService.Object);
+
         _executor = new ScreenInvestmentTargetsExecutor(_mockServiceProvider.Object, _mockLogger.Object);
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Constructor_WithValidParameters_ShouldCreateInstance()
     {
         Assert.IsNotNull(_executor);
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Constructor_WithNullServiceProvider_ShouldThrowException()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() =>
@@ -45,9 +48,19 @@ public class ScreenInvestmentTargetsExecutorTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Constructor_WithNullLogger_ShouldThrowException()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() =>
             new ScreenInvestmentTargetsExecutor(_mockServiceProvider.Object, null!));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void MockScreenerService_ShouldBeResolvableFromServiceProvider()
+    {
+        var resolved = _mockServiceProvider.Object.GetService(typeof(IAssetScreenerService));
+        Assert.IsNotNull(resolved, "IAssetScreenerService 应可从 ServiceProvider 解析");
+        Assert.AreSame(_mockScreenerService.Object, resolved);
     }
 }

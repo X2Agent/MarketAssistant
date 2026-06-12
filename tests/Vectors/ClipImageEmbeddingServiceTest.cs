@@ -52,6 +52,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 图像嵌入向量生成测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithValidImage_ShouldReturnVector()
     {
         // Act
@@ -64,6 +65,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithSameImage_ShouldReturnConsistentVector()
     {
         // Arrange
@@ -86,6 +88,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithInvalidImageData_ShouldUseFallback()
     {
         // Arrange - 无效的图像数据
@@ -101,6 +104,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithCancellation_ShouldComplete()
     {
         // Arrange
@@ -117,6 +121,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 图像描述生成测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateCaptionAsync_WithoutChatService_ShouldReturnFallback()
     {
         // Act
@@ -131,6 +136,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 资源管理和配置测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Dispose_ShouldReleaseResources()
     {
         // Arrange
@@ -145,6 +151,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task MultipleOperations_ShouldWorkCorrectly()
     {
         // Arrange
