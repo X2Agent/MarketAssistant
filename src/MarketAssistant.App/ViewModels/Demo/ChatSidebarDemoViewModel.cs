@@ -22,9 +22,7 @@ public partial class ChatSidebarDemoViewModel : ViewModelBase
   {
     TargetViewModel = new ChatSidebarViewModel(
         NullLogger<ChatSidebarViewModel>.Instance,
-        new MockMarketChatSessionFactory(),
-        null!
-    );
+        new MockMarketChatSessionFactory());
 
     _jsonOptions = new JsonSerializerOptions
     {

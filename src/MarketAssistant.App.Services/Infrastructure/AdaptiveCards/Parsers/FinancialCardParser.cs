@@ -24,7 +24,7 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
             FallbackText = $"财务分析报告：偿债评分 {summaryScore}，观点：{summaryInsight}，请查看完整报告。",
             Speak = "财务分析报告已生成。"
         };
-        AddHeader(card.Body, "💰 财务分析报告", AdaptiveTextColor.Good);
+        AddHeader(card.Body, "💰 财务分析报告", AdaptiveTextColor.Accent);
 
         // 使用两列布局展示核心指标
         var metricsCols = new AdaptiveColumnSet();
@@ -110,28 +110,19 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
             var warning = model.RiskWarning.FraudRiskRationale;
             if (!string.IsNullOrEmpty(warning))
             {
-                var container = new AdaptiveContainer { Style = AdaptiveContainerStyle.Attention, Spacing = AdaptiveSpacing.Medium };
-                container.Items.Add(new AdaptiveTextBlock { Text = "⚠️ 风险预警", Weight = AdaptiveTextWeight.Bolder, Color = AdaptiveTextColor.Attention });
-                container.Items.Add(new AdaptiveTextBlock { Text = warning, Wrap = true });
-
-                if (model.RiskWarning.KeyRiskIndicators != null && model.RiskWarning.KeyRiskIndicators.Count > 0)
+                // 合并关键风险指标与建议关注点为统一风险看板
+                var riskPoints = new List<string>();
+                if (model.RiskWarning.KeyRiskIndicators != null)
                 {
-                    foreach (var indicator in model.RiskWarning.KeyRiskIndicators)
-                    {
-                        container.Items.Add(new AdaptiveTextBlock { Text = $"• {indicator}", Wrap = true, Size = AdaptiveTextSize.Small });
-                    }
+                    riskPoints.AddRange(model.RiskWarning.KeyRiskIndicators);
                 }
-
                 if (model.RiskWarning.MonitoringPoints != null && model.RiskWarning.MonitoringPoints.Count > 0)
                 {
-                    container.Items.Add(new AdaptiveTextBlock { Text = "建议关注:", Weight = AdaptiveTextWeight.Bolder, Size = AdaptiveTextSize.Small });
-                    foreach (var point in model.RiskWarning.MonitoringPoints)
-                    {
-                        container.Items.Add(new AdaptiveTextBlock { Text = $"• {point}", Wrap = true, Size = AdaptiveTextSize.Small });
-                    }
+                    riskPoints.Add("建议关注:");
+                    riskPoints.AddRange(model.RiskWarning.MonitoringPoints);
                 }
 
-                card.Body.Add(container);
+                AddRiskBox(card.Body, "风险预警", warning, riskPoints);
             }
         }
 

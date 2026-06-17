@@ -106,26 +106,8 @@ public class TechnicalCardParser : BaseAdaptiveCardParser<TechnicalAnalysisResul
 
         if (model.Strategy != null)
         {
-            AddSectionHeader(card.Body, "交易策略");
             var direction = GetEnumDescription(model.Strategy.OperationDirection);
             var color = direction.Contains("买入") || direction.Contains("做多") ? AdaptiveTextColor.Good : (direction.Contains("卖出") || direction.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
-
-            // 策略看板：方向 + 目标价
-            var strategyContainer = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Small };
-            strategyContainer.Items.Add(new AdaptiveTextBlock
-            {
-                Text = $"建议: {direction}",
-                Weight = AdaptiveTextWeight.Bolder,
-                Size = AdaptiveTextSize.Large,
-                Color = color
-            });
-
-            strategyContainer.Items.Add(new AdaptiveTextBlock
-            {
-                Text = $"评级: {GetEnumDescription(model.Strategy.TechnicalRating)}",
-                Weight = AdaptiveTextWeight.Bolder,
-                Size = AdaptiveTextSize.Medium
-            });
 
             var facts = new AdaptiveFactSet();
             if (model.Strategy.TargetPriceLow.HasValue && model.Strategy.TargetPriceHigh.HasValue)
@@ -141,8 +123,13 @@ public class TechnicalCardParser : BaseAdaptiveCardParser<TechnicalAnalysisResul
             facts.Facts.Add(new AdaptiveFact("持仓周期", GetEnumDescription(model.Strategy.HoldingPeriod)));
             facts.Facts.Add(new AdaptiveFact("风险等级", GetEnumDescription(model.Strategy.RiskLevel)));
 
-            strategyContainer.Items.Add(facts);
-            card.Body.Add(strategyContainer);
+            // 统一策略看板：方向标题 + 评级内容 + 指标
+            AddStrategyBox(
+                card.Body,
+                $"建议: {direction}",
+                color,
+                content: $"评级: {GetEnumDescription(model.Strategy.TechnicalRating)}",
+                facts: facts);
         }
 
         return card;

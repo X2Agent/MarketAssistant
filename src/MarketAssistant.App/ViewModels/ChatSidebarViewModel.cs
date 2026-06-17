@@ -15,7 +15,7 @@ namespace MarketAssistant.ViewModels;
 public partial class ChatSidebarViewModel : ViewModelBase
 {
     private readonly MarketChatSession _chatSession;
-    private readonly ChatSessionPersistenceService _sessionPersistence;
+    private readonly ChatSessionPersistenceService? _sessionPersistence;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
     public ObservableCollection<ChatSessionSummary> SessionHistory { get; } = [];
@@ -41,14 +41,15 @@ public partial class ChatSidebarViewModel : ViewModelBase
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
         IMarketChatSessionFactory chatSessionFactory,
-        ChatSessionPersistenceService sessionPersistence)
+        ChatSessionPersistenceService? sessionPersistence = null)
         : base(logger)
     {
         _sessionPersistence = sessionPersistence;
         _chatSession = chatSessionFactory.Create();
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
-        _ = LoadSessionHistoryAsync();
+        if (_sessionPersistence is not null)
+            _ = LoadSessionHistoryAsync();
     }
 
     /// <summary>
@@ -237,6 +238,8 @@ public partial class ChatSidebarViewModel : ViewModelBase
     /// </summary>
     private async Task LoadSessionHistoryAsync()
     {
+        if (_sessionPersistence is null) return;
+
         try
         {
             var summaries = await _sessionPersistence.GetSessionSummariesAsync();
@@ -282,6 +285,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
     private async Task DeleteSessionAsync(ChatSessionSummary summary)
     {
         if (summary is null) return;
+        if (_sessionPersistence is null) return;
 
         await _sessionPersistence.DeleteSessionAsync(summary.Id);
         SessionHistory.Remove(summary);

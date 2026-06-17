@@ -109,30 +109,8 @@ public class SentimentCardParser : BaseAdaptiveCardParser<MarketSentimentAnalysi
 
         if (model.ShortTermStrategy != null)
         {
-            AddSectionHeader(card.Body, "短期策略");
             var recommendation = GetEnumDescription(model.ShortTermStrategy.OperationRecommendation);
             var color = recommendation.Contains("买入") || recommendation.Contains("做多") ? AdaptiveTextColor.Good : (recommendation.Contains("卖出") || recommendation.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
-
-            var container = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Small };
-
-            // 策略看板
-            container.Items.Add(new AdaptiveTextBlock
-            {
-                Text = $"建议: {recommendation}",
-                Weight = AdaptiveTextWeight.Bolder,
-                Size = AdaptiveTextSize.Large,
-                Color = color
-            });
-
-            if (!string.IsNullOrEmpty(model.ShortTermStrategy.ShortTermOpportunities))
-            {
-                container.Items.Add(new AdaptiveTextBlock { Text = model.ShortTermStrategy.ShortTermOpportunities, Wrap = true });
-            }
-
-            if (!string.IsNullOrEmpty(model.ShortTermStrategy.PsychologicalTrapToAvoid))
-            {
-                container.Items.Add(new AdaptiveTextBlock { Text = $"⚠️ 心理陷阱: {model.ShortTermStrategy.PsychologicalTrapToAvoid}", Wrap = true, Color = AdaptiveTextColor.Attention, Size = AdaptiveTextSize.Small });
-            }
 
             var facts = new AdaptiveFactSet();
             if (!string.IsNullOrEmpty(model.ShortTermStrategy.TargetPriceRange))
@@ -143,12 +121,20 @@ public class SentimentCardParser : BaseAdaptiveCardParser<MarketSentimentAnalysi
             {
                 facts.Facts.Add(new AdaptiveFact("止损位置", model.ShortTermStrategy.StopLossPosition));
             }
-            if (facts.Facts.Count > 0)
-            {
-                container.Items.Add(facts);
-            }
 
-            card.Body.Add(container);
+            // 统一策略看板：建议标题 + 短期机会正文 + 目标/止损指标
+            AddStrategyBox(
+                card.Body,
+                $"建议: {recommendation}",
+                color,
+                content: model.ShortTermStrategy.ShortTermOpportunities,
+                facts: facts.Facts.Count > 0 ? facts : null);
+
+            // 心理陷阱独立为统一风险看板
+            if (!string.IsNullOrEmpty(model.ShortTermStrategy.PsychologicalTrapToAvoid))
+            {
+                AddRiskBox(card.Body, "心理陷阱", model.ShortTermStrategy.PsychologicalTrapToAvoid);
+            }
         }
 
         return card;

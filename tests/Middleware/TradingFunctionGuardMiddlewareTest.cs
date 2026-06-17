@@ -34,19 +34,14 @@ public class TradingFunctionGuardMiddlewareTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void ResetCallCount_ShouldResetToZero()
+    public void ToolCallCount_ShouldStartAtZero()
     {
         var middleware = new TradingFunctionGuardMiddleware(
             NullLogger<TradingFunctionGuardMiddleware>.Instance);
 
-        var countField = typeof(TradingFunctionGuardMiddleware).GetField(
-            "_toolCallCount",
-            BindingFlags.NonPublic | BindingFlags.Instance)!;
-        countField.SetValue(middleware, 12);
+        var count = GetPrivateField<int>(middleware, "_toolCallCount");
 
-        middleware.ResetCallCount();
-
-        Assert.AreEqual(0, countField.GetValue(middleware));
+        Assert.AreEqual(0, count);
     }
 
     [TestMethod]

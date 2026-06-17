@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,13 @@ public sealed class AShareFinancialTools : IShareFinancialTools
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareFinancialTools> _logger;
+
+    // 支持 API 返回的字符串数值自动转换为 decimal/decimal?
+    private static readonly JsonSerializerOptions FinancialJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
 
     public AShareFinancialTools(
         IHttpClientFactory httpClientFactory,
@@ -43,7 +51,7 @@ public sealed class AShareFinancialTools : IShareFinancialTools
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetStringAsync(url);
-            return JsonSerializer.Deserialize<List<T>>(response) ?? new List<T>();
+            return JsonSerializer.Deserialize<List<T>>(response, FinancialJsonOptions) ?? new List<T>();
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

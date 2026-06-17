@@ -30,11 +30,6 @@ public class MarketAnalysisWorkflow : IDisposable
     private bool _disposed = false;
 
     /// <summary>
-    /// 最近一次工作流检查点（可用于崩溃恢复）
-    /// </summary>
-    private CheckpointInfo? _lastCheckpoint;
-
-    /// <summary>
     /// 分析进度事件
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
@@ -149,13 +144,11 @@ public class MarketAnalysisWorkflow : IDisposable
         int totalAnalysts = analystCount;
         var failedSteps = new List<string>();
 
-        // 启用检查点管理器，工作流在每个 SuperStep 结束时自动保存状态
-        var checkpointManager = CheckpointManager.Default;
-
+        // 执行工作流（流式处理）
         await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             assetSymbol,
-            checkpointManager,
+            checkpointManager: null,
             sessionId: null,
             cancellationToken);
 
@@ -244,12 +237,7 @@ public class MarketAnalysisWorkflow : IDisposable
                     throw new FriendlyException(wfErrorMsg);
 
                 case SuperStepCompletedEvent superStepCompleted:
-                    if (superStepCompleted.CompletionInfo?.Checkpoint is { } checkpoint)
-                    {
-                        _lastCheckpoint = checkpoint;
-                        _logger.LogInformation(
-                            "工作流检查点已保存（SuperStep 完成），可用于崩溃恢复");
-                    }
+                    _logger.LogDebug("工作流 SuperStep 完成");
                     break;
 
                 case WorkflowWarningEvent workflowWarning:
@@ -436,7 +424,17 @@ public sealed class AnalysisProgressEventArgs : EventArgs
     /// <summary>
     /// 进度百分比（0-100）
     /// </summary>
-    public int ProgressPercent => TotalAnalysts > 0
-        ? (int)((double)CompletedAnalysts / TotalAnalysts * 80) + (IsInProgress ? 0 : 20)
-        : 0;
+    public int ProgressPercent
+    {
+        get
+        {
+            // 分析已完成或失败
+            if (!IsInProgress) return 100;
+            // 正在进行分析
+            if (TotalAnalysts > 0)
+                return (int)((double)CompletedAnalysts / TotalAnalysts * 100);
+            // 准备阶段（未开始分析）
+            return 0;
+        }
+    }
 }

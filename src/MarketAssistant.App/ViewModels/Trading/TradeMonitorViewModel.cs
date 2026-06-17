@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;
@@ -36,7 +38,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     public TradeMonitorViewModel(
         MarketMonitor marketMonitor,
         CryptoPortfolioService portfolioService,
-        IExchangeClient exchangeClient,
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         TradingDataService dataService,
         TradeExecutor tradeExecutor,
         ILogger<TradeMonitorViewModel> logger)

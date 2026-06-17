@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,6 @@ public sealed class TradingFunctionGuardMiddleware
 
     private readonly ILogger _logger;
     private readonly int _maxToolCalls;
-
     private int _toolCallCount;
 
     /// <param name="maxToolCalls">单次 Agent 运行最大工具调用次数，防止无限循环（默认 20）</param>
@@ -90,11 +90,6 @@ public sealed class TradingFunctionGuardMiddleware
         return result;
     }
 
-    /// <summary>
-    /// 重置调用计数（每次新的 Agent Run 前调用）
-    /// </summary>
-    public void ResetCallCount() => Interlocked.Exchange(ref _toolCallCount, 0);
-
     private static bool IsSensitiveOperation(string functionName)
     {
         return functionName is "PlaceOrderAsync" or "CancelOrderAsync";
@@ -104,8 +99,10 @@ public sealed class TradingFunctionGuardMiddleware
     {
         try
         {
-            var args = context.Function.JsonSchema;
-            return args.ToString() ?? "N/A";
+            // 记录实际传入参数（而非函数 Schema），用于审计追踪
+            return context.Arguments != null
+                ? JsonSerializer.Serialize(context.Arguments)
+                : "N/A";
         }
         catch
         {

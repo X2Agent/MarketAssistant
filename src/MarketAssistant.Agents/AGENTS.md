@@ -29,8 +29,7 @@ MarketAssistant.Agents/
 │   ├── AnalystPromptConfig.cs         ← 分析师提示词配置模型
 │   └── AnalystPromptLoader.cs         ← 从 YAML 加载提示词（支持热重载）
 ├── TokenManagement/
-│   ├── TokenEstimator.cs              ← Token 估算（中文 ~1.5 字/token）
-│   └── ConversationCompressor.cs      ← 超限时压缩历史对话
+│   └── TokenEstimator.cs              ← Token 估算（中文 ~1.5 字/token）
 └── Tools/
     ├── Abstractions/                  ← 工具接口定义（市场无关）
     │   ├── IBasicDataTools.cs         ← 基础数据（基类）
@@ -80,14 +79,14 @@ MarketAssistant.Agents/
 ### Token 管理
 
 - `TokenEstimator` 用于估算消息 Token 数。
-- `ConversationCompressor` 在对话超限时自动压缩——保留最近消息，LLM 摘要旧消息。
+- 会话压缩由 `MarketAssistant.App.Services` 中的 `ConversationCompressionMiddleware`（MAF 中间件）负责。
 
 ---
 
 ## 测试
 
 - 本项目的类型多为抽象基类和模型，测试集中在 `tests/TestMarketAssistant.csproj`。
-- `TokenEstimator` 和 `ConversationCompressor` 可独立单元测试；分析师行为通过集成测试验证。
+- `TokenEstimator` 可独立单元测试；会话压缩中间件和分析师行为通过集成测试验证。
 
 ---
 

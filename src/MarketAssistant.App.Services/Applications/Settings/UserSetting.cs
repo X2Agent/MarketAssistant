@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
-using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.Settings;
 

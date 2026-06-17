@@ -35,14 +35,16 @@ public sealed class TokenTrackingMiddleware
         AIAgent innerAgent,
         CancellationToken cancellationToken)
     {
-        var inputTokens = TokenEstimator.EstimateTotalTokens(messages);
-
         var response = await innerAgent.RunAsync(messages, session, options, cancellationToken)
             .ConfigureAwait(false);
 
-        var outputTokens = TokenEstimator.EstimateTotalTokens(response.Messages);
+        // 优先使用 MAF 原生 UsageContent（由 LLM 提供商返回的精确值）
+        var usage = ExtractUsage(response.Messages);
+        var inputTokens = usage?.InputTokenCount ?? TokenEstimator.EstimateTotalTokens(messages);
+        var outputTokens = usage?.OutputTokenCount ?? TokenEstimator.EstimateTotalTokens(response.Messages);
 
-        LogAndAccumulate(session, inputTokens, outputTokens, innerAgent.Name);
+        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, innerAgent.Name,
+            isPrecise: usage != null);
 
         return response;
     }
@@ -57,13 +59,18 @@ public sealed class TokenTrackingMiddleware
         AIAgent innerAgent,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var inputTokens = TokenEstimator.EstimateTotalTokens(messages);
-
         int outputCharCount = 0;
+        UsageDetails? streamingUsage = null;
 
         await foreach (var update in innerAgent.RunStreamingAsync(messages, session, options, cancellationToken)
                            .ConfigureAwait(false))
         {
+            // 尝试从流式更新中提取精确 Usage
+            if (update.Contents?.OfType<UsageContent>().FirstOrDefault() is { } usageContent)
+            {
+                streamingUsage = usageContent.Details;
+            }
+
             if (update.Text is { Length: > 0 } text)
             {
                 outputCharCount += text.Length;
@@ -72,17 +79,21 @@ public sealed class TokenTrackingMiddleware
             yield return update;
         }
 
-        // 流式模式下根据累计字符数估算输出 Token
-        var outputTokens = TokenEstimator.EstimateTokens(new string(' ', outputCharCount));
+        // 优先使用精确值，回退到字符估算
+        var inputTokens = streamingUsage?.InputTokenCount ?? TokenEstimator.EstimateTotalTokens(messages);
+        var outputTokens = streamingUsage?.OutputTokenCount ?? TokenEstimator.EstimateTokens(new string(' ', outputCharCount));
 
-        LogAndAccumulate(session, inputTokens, outputTokens, innerAgent.Name);
+        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, innerAgent.Name,
+            isPrecise: streamingUsage != null);
     }
 
-    private void LogAndAccumulate(AgentSession? session, int inputTokens, int outputTokens, string? agentName)
+    private void LogAndAccumulate(AgentSession? session, int inputTokens, int outputTokens, string? agentName,
+        bool isPrecise = false)
     {
         _logger.LogDebug(
-            "Token 追踪 [{Agent}] - 输入: {InputTokens}, 输出: {OutputTokens}",
-            agentName ?? "Unknown", inputTokens, outputTokens);
+            "Token 追踪 [{Agent}] - 输入: {InputTokens}, 输出: {OutputTokens} ({Source})",
+            agentName ?? "Unknown", inputTokens, outputTokens,
+            isPrecise ? "提供商精确值" : "估算值");
 
         if (session == null) return;
 
@@ -109,5 +120,23 @@ public sealed class TokenTrackingMiddleware
         var input = session.StateBag.TryGetValue<string>(InputTokensKey, out var i) && int.TryParse(i, out var iv) ? iv : 0;
         var output = session.StateBag.TryGetValue<string>(OutputTokensKey, out var o) && int.TryParse(o, out var ov) ? ov : 0;
         return (input, output);
+    }
+
+    /// <summary>
+    /// 从响应消息中提取 UsageDetails（优先使用 LLM 提供商返回的精确 Token 用量）
+    /// </summary>
+    private static UsageDetails? ExtractUsage(IEnumerable<ChatMessage>? messages)
+    {
+        if (messages == null) return null;
+
+        foreach (var message in messages)
+        {
+            if (message.Contents?.OfType<UsageContent>().FirstOrDefault() is { } usageContent)
+            {
+                return usageContent.Details;
+            }
+        }
+
+        return null;
     }
 }

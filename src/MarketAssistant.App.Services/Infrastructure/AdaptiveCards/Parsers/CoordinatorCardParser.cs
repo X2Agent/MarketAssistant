@@ -66,19 +66,18 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         facts.Facts.Add(new AdaptiveFact("投资周期", model.TimeHorizonDescription));
         facts.Facts.Add(new AdaptiveFact("置信度", model.ConfidencePercentage.ToString("F0") + "%"));
         facts.Facts.Add(new AdaptiveFact("风险等级", GetEnumDescription(model.RiskLevel)));
-        card.Body.Add(facts);
+        AddFactSection(card.Body, "关键参数", facts);
 
         // Dimension Scores
         if (model.DimensionScores != null)
         {
-            AddSectionHeader(card.Body, "维度评分");
             var scoreFacts = new AdaptiveFactSet();
             scoreFacts.Facts.Add(new AdaptiveFact("基本面", model.DimensionScores.Fundamental.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("技术面", model.DimensionScores.Technical.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("财务面", model.DimensionScores.Financial.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("市场情绪", model.DimensionScores.Sentiment.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("新闻事件", model.DimensionScores.News.ToString("F1")));
-            card.Body.Add(scoreFacts);
+            AddFactSection(card.Body, "维度评分", scoreFacts);
         }
 
         // Highlights & Risks in 2 columns
@@ -103,16 +102,10 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         if (hasRight) listCols.Columns.Add(rightCol);
         if (listCols.Columns.Count > 0) card.Body.Add(listCols);
 
-        // Operation Suggestions
+        // Operation Suggestions —— 统一策略看板
         if (model.OperationSuggestions != null && model.OperationSuggestions.Count > 0)
         {
-            AddSectionHeader(card.Body, "操作建议");
-            var suggestionContainer = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Small };
-            foreach (var item in model.OperationSuggestions)
-            {
-                suggestionContainer.Items.Add(new AdaptiveTextBlock { Text = "• " + item, Wrap = true, Weight = AdaptiveTextWeight.Bolder });
-            }
-            card.Body.Add(suggestionContainer);
+            AddStrategyBox(card.Body, "操作建议", AdaptiveTextColor.Accent, bulletPoints: model.OperationSuggestions);
         }
 
         // Consensus & Disagreement
@@ -131,13 +124,12 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         // Key Indicators
         if (model.KeyIndicators != null && model.KeyIndicators.Count > 0)
         {
-            AddSectionHeader(card.Body, "关键指标");
             var indicatorFacts = new AdaptiveFactSet();
             foreach (var indicator in model.KeyIndicators.Take(5)) // Limit to top 5 to avoid too long card
             {
                 indicatorFacts.Facts.Add(new AdaptiveFact(indicator.Name, $"{indicator.Value} ({indicator.Signal})"));
             }
-            card.Body.Add(indicatorFacts);
+            AddFactSection(card.Body, "关键指标", indicatorFacts);
         }
 
         return card;

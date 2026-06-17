@@ -252,8 +252,6 @@ public class MarketChatSession : IDisposable
     {
         EnsureSearchToolsInitialized();
 
-        // 压缩逻辑已由 ConversationCompressionMiddleware 自动处理
-
         _currentSession ??= await _agent.CreateSessionAsync(cancellationToken: cancellationToken);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -273,27 +271,43 @@ public class MarketChatSession : IDisposable
         };
 
         var streamingUpdates = _agent.RunStreamingAsync(
-            message: userMessage,
+            messages: _conversationHistory,
             session: _currentSession,
             options: runOptions,
             cancellationToken: cts.Token);
 
-        await foreach (var update in streamingUpdates.ConfigureAwait(false))
+        var completed = false;
+        try
         {
-            var content = update.Text ?? string.Empty;
-            if (!string.IsNullOrEmpty(content))
+            await foreach (var update in streamingUpdates.ConfigureAwait(false))
             {
-                completeResponse.Append(content);
+                var content = update.Text ?? string.Empty;
+                if (!string.IsNullOrEmpty(content))
+                {
+                    completeResponse.Append(content);
+                }
+                yield return content;
             }
-            yield return content;
+            completed = true;
+        }
+        finally
+        {
+            if (completed)
+            {
+                _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, completeResponse.ToString()));
+            }
+            else
+            {
+                var partial = completeResponse.ToString();
+                _conversationHistory.Add(new ChatMessage(ChatRole.Assistant,
+                    partial.Length > 0 ? partial + "\n\n[回复被中断]" : "[回复被中断]"));
+            }
+
+            _currentCancellationTokenSource = null;
         }
 
-        _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, completeResponse.ToString()));
-
         _logger.LogInformation("流式 AI 回复完成，长度: {Length}", completeResponse.Length);
-        _currentCancellationTokenSource = null;
 
-        // 自动持久化当前会话
         await AutoSaveSessionAsync(cancellationToken);
     }
 

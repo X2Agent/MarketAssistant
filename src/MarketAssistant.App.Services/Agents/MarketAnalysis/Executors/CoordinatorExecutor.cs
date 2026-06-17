@@ -105,6 +105,7 @@ public sealed partial class CoordinatorExecutor : Executor
             };
 
             // 使用带结构化输出的 ChatClientAgent 运行（包含重试）
+            // session: null — 无状态一次性调用，无需会话累积
             var agentResponse = await _llmRetryPipeline.ExecuteAsync(
                 async ct => await _coordinatorAgent.RunAsync(
                     messages,
@@ -123,8 +124,22 @@ public sealed partial class CoordinatorExecutor : Executor
             }
 
             // 从协调分析师的回复文本中反序列化结构化结果
-            var coordinatorResult = JsonSerializer.Deserialize<CoordinatorResult>(
-                coordinatorMessage.Text ?? string.Empty, JsonOptions);
+            // ChatResponseFormat.ForJsonSchema 保证输出为纯 JSON，无需正则剥离 markdown 代码块
+            var rawText = coordinatorMessage.Text ?? string.Empty;
+
+            CoordinatorResult? coordinatorResult;
+            try
+            {
+                coordinatorResult = JsonSerializer.Deserialize<CoordinatorResult>(rawText, JsonOptions);
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(jsonEx,
+                    "协调分析师 JSON 解析失败，原始文本前 500 字符: {Preview}",
+                    rawText.Length > 500 ? rawText[..500] : rawText);
+                throw new InvalidOperationException(
+                    $"协调分析师返回的数据无法解析为结构化结果: {jsonEx.Message}", jsonEx);
+            }
 
             if (coordinatorResult == null)
             {
@@ -160,4 +175,5 @@ public sealed partial class CoordinatorExecutor : Executor
             throw;
         }
     }
+
 }

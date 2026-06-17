@@ -99,45 +99,35 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
 
         if (model.InvestmentGuidance != null)
         {
-            AddSectionHeader(card.Body, "投资启示");
             var strategy = GetEnumDescription(model.InvestmentGuidance.ResponseStrategy);
             var color = strategy.Contains("买入") || strategy.Contains("做多") ? AdaptiveTextColor.Good : (strategy.Contains("卖出") || strategy.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
 
-            var container = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Small };
-
-            // 策略看板
-            container.Items.Add(new AdaptiveTextBlock
-            {
-                Text = $"策略: {strategy}",
-                Weight = AdaptiveTextWeight.Bolder,
-                Size = AdaptiveTextSize.Large,
-                Color = color
-            });
-
+            // 核心逻辑 + 具体建议合并为策略看板正文
+            var contentParts = new List<string>();
             if (!string.IsNullOrEmpty(model.InvestmentGuidance.CoreInvestmentLogic))
             {
-                container.Items.Add(new AdaptiveTextBlock { Text = model.InvestmentGuidance.CoreInvestmentLogic, Wrap = true });
+                contentParts.Add(model.InvestmentGuidance.CoreInvestmentLogic);
             }
-
             if (!string.IsNullOrEmpty(model.InvestmentGuidance.SpecificActionAdvice))
             {
-                container.Items.Add(new AdaptiveTextBlock { Text = $"建议: {model.InvestmentGuidance.SpecificActionAdvice}", Wrap = true });
+                contentParts.Add($"建议: {model.InvestmentGuidance.SpecificActionAdvice}");
             }
 
+            // 统一策略看板：策略标题 + 核心逻辑/建议 + 关注重点
+            AddStrategyBox(
+                card.Body,
+                $"策略: {strategy}",
+                color,
+                content: contentParts.Count > 0 ? string.Join("\n", contentParts) : null,
+                bulletPoints: model.InvestmentGuidance.FocusPoints?.Count > 0
+                    ? new List<string> { "关注重点:" }.Concat(model.InvestmentGuidance.FocusPoints).ToList()
+                    : null);
+
+            // 风险告警独立为统一风险看板
             if (!string.IsNullOrEmpty(model.InvestmentGuidance.KeyRiskAlert))
             {
-                container.Items.Add(new AdaptiveTextBlock { Text = $"⚠️ {model.InvestmentGuidance.KeyRiskAlert}", Wrap = true, Color = AdaptiveTextColor.Attention, Weight = AdaptiveTextWeight.Bolder });
+                AddRiskBox(card.Body, "风险提示", model.InvestmentGuidance.KeyRiskAlert);
             }
-
-            if (model.InvestmentGuidance.FocusPoints != null && model.InvestmentGuidance.FocusPoints.Count > 0)
-            {
-                container.Items.Add(new AdaptiveTextBlock { Text = "关注重点:", Weight = AdaptiveTextWeight.Bolder, Size = AdaptiveTextSize.Small });
-                foreach (var point in model.InvestmentGuidance.FocusPoints)
-                {
-                    container.Items.Add(new AdaptiveTextBlock { Text = $"• {point}", Wrap = true, Size = AdaptiveTextSize.Small });
-                }
-            }
-            card.Body.Add(container);
         }
 
         return card;

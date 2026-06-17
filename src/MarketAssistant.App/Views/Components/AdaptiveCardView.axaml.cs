@@ -89,21 +89,17 @@ public partial class AdaptiveCardView : UserControl
             _ => FontWeight.Normal
         };
 
-        // Color with Theme Support
-        if (textBlock.Color == AdaptiveTextColor.Accent)
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundAccentBrush");
-        else if (textBlock.Color == AdaptiveTextColor.Good)
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundSuccessBrush"); // Or a custom resource
-        else if (textBlock.Color == AdaptiveTextColor.Warning)
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundCautionBrush"); // Or a custom resource
-        else if (textBlock.Color == AdaptiveTextColor.Attention)
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlErrorTextForegroundBrush");
-        else if (textBlock.IsSubtle)
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseMediumBrush");
-        else
-            tb[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseHighBrush");
-
-        // Fallback for custom brushes if system ones aren't perfect, but for now system ones are safer for light/dark
+        // Color — 对齐到项目真实主题资源（不再依赖幽灵 SystemControl* 画刷）
+        tb[!TextBlock.ForegroundProperty] = textBlock.Color switch
+        {
+            AdaptiveTextColor.Accent => new DynamicResourceExtension("AccentBrush"),
+            AdaptiveTextColor.Good => new DynamicResourceExtension("SuccessDeepTextBrush"),
+            AdaptiveTextColor.Warning => new DynamicResourceExtension("WarningDarkTextBrush"),
+            AdaptiveTextColor.Attention => new DynamicResourceExtension("ErrorDarkTextBrush"),
+            _ => textBlock.IsSubtle
+                ? new DynamicResourceExtension("TextSecondaryBrush")
+                : new DynamicResourceExtension("TextPrimaryBrush")
+        };
 
         // Alignment
         tb.TextAlignment = textBlock.HorizontalAlignment switch
@@ -135,22 +131,22 @@ public partial class AdaptiveCardView : UserControl
 
         var border = new Border
         {
-            Child = stackPanel
+            Child = stackPanel,
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(6)
         };
 
-        // Style based on container style
+        // Style based on container style —— 两种容器风格一致，仅靠颜色区分语义
         if (container.Style == AdaptiveContainerStyle.Emphasis)
         {
-            // Use a dynamic resource for background to support dark mode
-            border[!Border.BackgroundProperty] = new DynamicResourceExtension("SystemControlBackgroundChromeMediumLowBrush");
-            border.Padding = new Thickness(8);
-            border.CornerRadius = new CornerRadius(4);
+            border[!Border.BackgroundProperty] = new DynamicResourceExtension("SurfaceVariantBrush");
         }
         else if (container.Style == AdaptiveContainerStyle.Attention)
         {
-             border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerBackgroundBrush");
-             border.Padding = new Thickness(8);
-             border.CornerRadius = new CornerRadius(4);
+            border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerBackgroundBrush");
+            border[!Border.BorderBrushProperty] = new DynamicResourceExtension("ErrorDarkTextBrush");
+            border.BorderThickness = new Thickness(3, 0, 0, 0);
+            border.CornerRadius = new CornerRadius(6, 0, 0, 6);
         }
 
         return border;
@@ -213,10 +209,10 @@ public partial class AdaptiveCardView : UserControl
 
     private Control RenderFactSet(AdaptiveFactSet factSet)
     {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Auto)); // Title
-        grid.ColumnDefinitions.Add(new ColumnDefinition(16, GridUnitType.Pixel)); // Spacing
-        grid.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star)); // Value
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto, 20, *")
+        };
 
         for (int i = 0; i < factSet.Facts.Count; i++)
         {
@@ -227,12 +223,11 @@ public partial class AdaptiveCardView : UserControl
             var title = new TextBlock
             {
                 Text = fact.Title,
-                FontWeight = FontWeight.Bold,
-                Margin = new Thickness(0, 0, 0, 4)
+                FontWeight = FontWeight.Medium,
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            // Use dynamic resource for text color
-            title[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseHighBrush");
-            
+            title[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
+
             Grid.SetRow(title, i);
             Grid.SetColumn(title, 0);
 
@@ -240,10 +235,9 @@ public partial class AdaptiveCardView : UserControl
             {
                 Text = fact.Value,
                 TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 4)
+                Margin = new Thickness(0, 0, 0, 6)
             };
-            // Use dynamic resource for text color (slightly subtler if desired, or same)
-            value[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseMediumBrush");
+            value[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextPrimaryBrush");
 
             Grid.SetRow(value, i);
             Grid.SetColumn(value, 2);
@@ -264,7 +258,7 @@ public partial class AdaptiveCardView : UserControl
             HorizontalAlignment = HorizontalAlignment.Center,
             FontSize = 10
         };
-        textBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("SystemControlForegroundBaseMediumBrush");
+        textBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
 
         var border = new Border
         {

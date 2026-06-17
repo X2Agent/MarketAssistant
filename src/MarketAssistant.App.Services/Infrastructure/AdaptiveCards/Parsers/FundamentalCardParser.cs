@@ -95,31 +95,29 @@ public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisR
 
         if (model.GrowthValue != null)
         {
-            AddSectionHeader(card.Body, "投资评级");
             var rating = GetEnumDescription(model.GrowthValue.InvestmentRating);
             var color = rating.Contains("买入") ? AdaptiveTextColor.Good : AdaptiveTextColor.Default;
 
-            card.Body.Add(new AdaptiveTextBlock
-            {
-                Text = rating,
-                Weight = AdaptiveTextWeight.Bolder,
-                Size = AdaptiveTextSize.Medium,
-                Color = color
-            });
-
             var facts = new AdaptiveFactSet();
             facts.Facts.Add(new AdaptiveFact("增长持续性", model.GrowthValue.GrowthSustainabilityScore.ToString("F1")));
-            card.Body.Add(facts);
 
+            // 统一评级看板：评级标题 + 估值/目标内容 + 指标
+            var valuationParts = new List<string>();
             if (!string.IsNullOrEmpty(model.GrowthValue.ValuationDescription))
             {
-                card.Body.Add(new AdaptiveTextBlock { Text = $"估值评估: {model.GrowthValue.ValuationDescription}", Wrap = true });
+                valuationParts.Add($"估值评估: {model.GrowthValue.ValuationDescription}");
             }
-
             if (!string.IsNullOrEmpty(model.GrowthValue.ValuationTarget))
             {
-                card.Body.Add(new AdaptiveTextBlock { Text = $"目标: {model.GrowthValue.ValuationTarget}", Wrap = true });
+                valuationParts.Add($"目标: {model.GrowthValue.ValuationTarget}");
             }
+
+            AddStrategyBox(
+                card.Body,
+                rating,
+                color,
+                content: valuationParts.Count > 0 ? string.Join("  |  ", valuationParts) : null,
+                facts: facts);
 
             if (!string.IsNullOrEmpty(model.GrowthValue.GrowthDrivers))
             {
@@ -129,21 +127,10 @@ public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisR
 
             if (!string.IsNullOrEmpty(model.GrowthValue.KeyRisk))
             {
-                var container = new AdaptiveContainer { Style = AdaptiveContainerStyle.Attention, Spacing = AdaptiveSpacing.Small };
-                container.Items.Add(new AdaptiveTextBlock { Text = "⚠️ 关键风险", Weight = AdaptiveTextWeight.Bolder, Color = AdaptiveTextColor.Attention });
-                container.Items.Add(new AdaptiveTextBlock { Text = model.GrowthValue.KeyRisk, Wrap = true, Size = AdaptiveTextSize.Small });
-                card.Body.Add(container);
+                AddRiskBox(card.Body, "关键风险", model.GrowthValue.KeyRisk);
             }
         }
 
         return card;
-    }
-
-    private void AddKeyValueRow(IList<AdaptiveElement> container, string key, string value, bool isBold = false)
-    {
-        var row = new AdaptiveColumnSet { Spacing = AdaptiveSpacing.Small };
-        row.Columns.Add(new AdaptiveColumn { Width = "auto", Items = { new AdaptiveTextBlock { Text = key, IsSubtle = true } } });
-        row.Columns.Add(new AdaptiveColumn { Width = "stretch", Items = { new AdaptiveTextBlock { Text = value, Weight = isBold ? AdaptiveTextWeight.Bolder : AdaptiveTextWeight.Default, Wrap = true } } });
-        container.Add(row);
     }
 }

@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,13 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareTechnicalTools> _logger;
+
+    // 支持 API 返回的字符串数值自动转换为 decimal/decimal?
+    private static readonly JsonSerializerOptions TechnicalJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
 
     public AShareTechnicalTools(
         IHttpClientFactory httpClientFactory,
@@ -38,7 +46,7 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetStringAsync(url);
-            var items = JsonSerializer.Deserialize<List<T>>(response);
+            var items = JsonSerializer.Deserialize<List<T>>(response, TechnicalJsonOptions);
 
             if (items == null || !items.Any())
                 throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
@@ -100,7 +108,7 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetStringAsync(url);
-            var items = JsonSerializer.Deserialize<List<ZhiTuKLineBar>>(response);
+            var items = JsonSerializer.Deserialize<List<ZhiTuKLineBar>>(response, TechnicalJsonOptions);
 
             if (items == null || items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");
