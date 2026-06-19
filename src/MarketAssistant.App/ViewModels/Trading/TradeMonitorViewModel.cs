@@ -20,10 +20,24 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
     public ObservableCollection<ExchangeOrderResult> OpenOrders { get; } = [];
+    public ObservableCollection<Position> Positions { get; } = [];
+    public ObservableCollection<TradingStrategy> ActiveStrategies { get; } = [];
 
     [ObservableProperty] private decimal _totalValueUSDT;
     [ObservableProperty] private bool _isMonitorRunning;
     [ObservableProperty] private DailyStats _todayStats = new();
+
+    // 风控指标
+    [ObservableProperty] private decimal _dailyLossPercent;
+    [ObservableProperty] private decimal _totalPositionPercent;
+    [ObservableProperty] private int _remainingDailyTrades;
+    [ObservableProperty] private RiskConfig _riskConfig = new();
+
+    // 派生展示属性（由 RefreshAsync 计算）
+    [ObservableProperty] private decimal _todayPnlPercent;
+    [ObservableProperty] private bool _isTodayProfitable;
+    [ObservableProperty] private bool _isDailyLossHigh;
+    [ObservableProperty] private bool _isPositionHigh;
 
     // Human-in-the-Loop 确认
     [ObservableProperty] private bool _hasPendingConfirmation;
@@ -34,6 +48,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _confirmationReason = string.Empty;
 
     private TaskCompletionSource<bool>? _confirmationTcs;
+    private CancellationTokenSource? _confirmationCts;
 
     public TradeMonitorViewModel(
         MarketMonitor marketMonitor,
@@ -63,6 +78,10 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             TodayStats = await _dataService.GetTodayStatsAsync();
+            RiskConfig = _dataService.LoadRiskConfig();
+
+            // 计算风控指标
+            RemainingDailyTrades = Math.Max(0, RiskConfig.MaxDailyTrades - TodayStats.TradeCount);
 
             try
             {
@@ -75,6 +94,41 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
                 TotalValueUSDT = summary.TotalValueUSDT;
 
+                // 计算风控百分比指标
+                if (TotalValueUSDT > 0)
+                {
+                    DailyLossPercent = TodayStats.TotalPnl < 0
+                        ? Math.Abs(TodayStats.TotalPnl) / TotalValueUSDT * 100
+                        : 0;
+
+                    var usdtBalance = CryptoPortfolioService.GetUsdtBalance(summary);
+                    var nonUsdtValue = TotalValueUSDT - usdtBalance;
+                    TotalPositionPercent = nonUsdtValue / TotalValueUSDT * 100;
+
+                    // 派生展示属性
+                    TodayPnlPercent = TodayStats.TotalPnl / TotalValueUSDT * 100;
+                    IsTodayProfitable = TodayStats.TotalPnl >= 0;
+                }
+                else
+                {
+                    TodayPnlPercent = 0;
+                    IsTodayProfitable = true;
+                }
+
+                // 风控阈值预警（达到限额 80% 视为高位）
+                IsDailyLossHigh = RiskConfig.MaxDailyLossPercent > 0
+                                  && DailyLossPercent / RiskConfig.MaxDailyLossPercent >= 0.8m;
+                IsPositionHigh = RiskConfig.MaxTotalPositionPercent > 0
+                                 && TotalPositionPercent / RiskConfig.MaxTotalPositionPercent >= 0.8m;
+
+                // 加载 FIFO 持仓
+                var positions = await _dataService.GetOpenPositionsAsync();
+                Positions.Clear();
+                foreach (var p in positions)
+                {
+                    Positions.Add(p);
+                }
+
                 var orders = await _exchangeClient.GetOpenOrdersAsync();
                 OpenOrders.Clear();
                 foreach (var o in orders)
@@ -83,6 +137,14 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
             catch (InvalidOperationException)
             {
                 Logger?.LogWarning("Binance API 未配置，跳过账户数据加载");
+            }
+
+            // 加载活跃策略
+            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            ActiveStrategies.Clear();
+            foreach (var s in activeStrategies)
+            {
+                ActiveStrategies.Add(s);
             }
         }, "刷新交易监控");
     }
@@ -115,6 +177,12 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         HasPendingConfirmation = true;
 
         _confirmationTcs = new TaskCompletionSource<bool>();
+
+        // 60 秒超时自动拒绝，避免用户离开后交易长时间挂起
+        _confirmationCts?.Dispose();
+        _confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        _confirmationCts.Token.Register(() => _confirmationTcs.TrySetResult(false));
+
         return _confirmationTcs.Task;
     }
 
@@ -122,6 +190,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private void ApproveConfirmation()
     {
         HasPendingConfirmation = false;
+        _confirmationCts?.Cancel();
         _confirmationTcs?.TrySetResult(true);
     }
 
@@ -129,12 +198,14 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private void RejectConfirmation()
     {
         HasPendingConfirmation = false;
+        _confirmationCts?.Cancel();
         _confirmationTcs?.TrySetResult(false);
     }
 
     public void Dispose()
     {
         _marketMonitor.StatusChanged -= OnMonitorStatusChanged;
+        _confirmationCts?.Dispose();
         GC.SuppressFinalize(this);
     }
 }
