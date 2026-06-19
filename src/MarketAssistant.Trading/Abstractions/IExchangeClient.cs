@@ -77,4 +77,15 @@ public class ExchangeOrderResult
     public decimal RequestedQty { get; set; }
     public decimal ExecutedQty { get; set; }
     public decimal Price { get; set; }
+
+    /// <summary>
+    /// 成交手续费（以 <see cref="CommissionAsset"/> 计价）。
+    /// 交易所未返回时为 0。
+    /// </summary>
+    public decimal FillCommission { get; set; }
+
+    /// <summary>
+    /// 手续费币种（如 BNB、USDT、BTC）。交易所未返回时为空。
+    /// </summary>
+    public string? CommissionAsset { get; set; }
 }

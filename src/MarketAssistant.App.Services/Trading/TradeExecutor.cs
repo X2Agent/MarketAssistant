@@ -22,7 +22,7 @@ public class TradeExecutor
     /// <summary>
     /// Human-in-the-Loop 确认回调。
     /// 当风控返回 NeedsConfirmation 时，调用此回调等待用户确认。
-    /// 参数: (symbol, side, quantity, price, reason) → true=放行 false=拒绝。
+    /// 参数: (symbol, side, price, quantity, reason) → true=放行 false=拒绝。
     /// 未设置时保持现有行为（直接拒绝）。
     /// </summary>
     public Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationCallback { get; set; }
@@ -50,9 +50,20 @@ public class TradeExecutor
         _logger.LogInformation("开始执行交易: {StrategyId} {Symbol} {Side} 数量:{Qty}",
             strategy.Id, strategy.Symbol, strategy.Side, strategy.Quantity);
 
+        // 限价单基于当前价计算滑点保护价
+        decimal? limitPrice = null;
+        var orderType = strategy.OrderType;
+        if (orderType == OrderType.Limit)
+        {
+            var slippage = strategy.SlippageTolerance > 0 ? strategy.SlippageTolerance : 0.003m;
+            limitPrice = strategy.Side == OrderSide.Buy
+                ? currentPrice * (1 + slippage)
+                : currentPrice * (1 - slippage);
+        }
+
         var result = await ExecuteOrderAsync(
-            strategy.Symbol, strategy.Side, OrderType.Market, strategy.Quantity,
-            currentPrice, limitPrice: null, strategyId: strategy.Id,
+            strategy.Symbol, strategy.Side, orderType, strategy.Quantity,
+            currentPrice, limitPrice: limitPrice, strategyId: strategy.Id,
             aiReasoning: aiReasoning, ct: ct);
 
         if (result.Success)
@@ -88,7 +99,7 @@ public class TradeExecutor
             if (ConfirmationCallback != null)
             {
                 var approved = await ConfirmationCallback(
-                    instrumentSymbol, side, quantity, currentPrice, riskCheck.Reason ?? "需人工确认");
+                    instrumentSymbol, side, currentPrice, quantity, riskCheck.Reason ?? "需人工确认");
                 if (!approved)
                     return new TradeResult { Success = false, ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}" };
 
@@ -129,8 +140,31 @@ public class TradeExecutor
     {
         try
         {
-            var response = await _exchangeClient.PlaceOrderAsync(
-                instrumentSymbol, side, type, quantity, type == OrderType.Limit ? limitPrice : null, ct);
+            // 网络异常重试：最多 3 次，指数退避 1s/2s/4s。
+            // 业务错误（如余额不足、风控拒绝）不重试，直接抛出。
+            ExchangeOrderResult? response = null;
+            const int maxRetries = 3;
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    response = await _exchangeClient.PlaceOrderAsync(
+                        instrumentSymbol, side, type, quantity,
+                        type == OrderType.Limit ? limitPrice : null, ct);
+                    break;
+                }
+                catch (HttpRequestException ex) when (attempt < maxRetries)
+                {
+                    var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
+                    _logger.LogWarning(ex,
+                        "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试: {Symbol} {Side}",
+                        attempt, maxRetries, delayMs, instrumentSymbol, side);
+                    await Task.Delay(delayMs, ct);
+                }
+            }
+
+            if (response == null)
+                throw new InvalidOperationException("交易所下单响应为空");
 
             var record = new TradeRecord
             {
@@ -142,6 +176,8 @@ public class TradeExecutor
                 ExecutedQty = response.ExecutedQty,
                 RequestedPrice = limitPrice,
                 ExecutedPrice = response.Price == 0 ? currentPrice : response.Price,
+                Commission = response.FillCommission,
+                CommissionAsset = response.CommissionAsset ?? string.Empty,
                 Status = MapStatus(response.Status),
                 BinanceOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
                 AIReasoning = aiReasoning,
@@ -150,15 +186,30 @@ public class TradeExecutor
 
             await _dataService.SaveTradeRecordAsync(record, ct);
 
+            // FIFO 持仓追踪：买入开仓，卖出按 FIFO 平仓计算已实现盈亏
             decimal pnl = 0;
-            if (record.ExecutedQty > 0 && side == OrderSide.Sell)
+            if (record.ExecutedQty > 0)
             {
-                // 现货多头平仓：卖出价 - 加权平均买入价
-                var avgEntryPrice = await _dataService.GetAverageEntryPriceAsync(instrumentSymbol, ct);
-                if (avgEntryPrice > 0)
-                    pnl = (record.ExecutedPrice - avgEntryPrice) * record.ExecutedQty;
+                if (side == OrderSide.Buy)
+                {
+                    // 现货买入为开多仓，无已实现盈亏
+                    await _dataService.OpenPositionAsync(new Position
+                    {
+                        Symbol = instrumentSymbol,
+                        Side = PositionSide.Long,
+                        Quantity = record.ExecutedQty,
+                        EntryPrice = record.ExecutedPrice,
+                        StrategyId = strategyId,
+                        OpenedAt = record.CreatedAt
+                    }, ct);
+                }
+                else
+                {
+                    // 卖出按 FIFO 匹配未平仓多头，计算已实现盈亏
+                    pnl = await _dataService.ClosePositionFifoAsync(
+                        instrumentSymbol, record.ExecutedQty, record.ExecutedPrice, ct);
+                }
             }
-            // 现货买入为开多仓，无已实现盈亏
             await _dataService.UpdateDailyStatsAsync(pnl, record.Commission, ct);
 
             _logger.LogInformation("交易执行成功: {StrategyId} 订单ID:{OrderId} 状态:{Status} PnL:{Pnl}",

@@ -312,9 +312,20 @@ public class MarketMonitor : IDisposable
             var takeProfitInfo = strategy.TakeProfitPrice.HasValue
                 ? $"止盈价: {strategy.TakeProfitPrice.Value}"
                 : "未设置止盈";
+            var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
+            var todayStats = await _dataService.GetTodayStatsAsync(_cts?.Token ?? default);
+            var maxDailyTrades = _dataService.LoadRiskConfig().MaxDailyTrades;
+            var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
             var prompt = $"""
                 分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
-                策略配置: {strategy.CustomParams ?? "无"}
+
+                ## 风险预算（必须严格遵守）
+                - 本次交易后该 symbol 总仓位不得超过账户总值的 {maxPositionPercent:F1}%
+                - 今日已实现盈亏: {todayStats.TotalPnl:F2} USDT
+                - 今日剩余交易次数: {remainingTrades}
+
+                ## 策略配置
+                {strategy.CustomParams ?? "无"}
                 风险边界: {stopLossInfo} | {takeProfitInfo}
 
                 ## 当前仓位状态
@@ -325,8 +336,17 @@ public class MarketMonitor : IDisposable
 
                 近期该策略成交摘要（最多 5 笔，按时间倒序）:
                 {recentSummary}
-                请评估是否应该执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
-                如果决定交易，请调用 PlaceOrder 工具执行。
+
+                ## 决策要求
+                请输出结构化决策：
+                1. 决策: BUY / SELL / HOLD
+                2. 置信度: 0-100
+                3. 入场逻辑
+                4. 退出计划（止损/止盈具体价位）
+                5. 主要风险因素
+
+                如果置信度低于 60，建议 HOLD。
+                如果决定交易，请调用 PlaceOrder 工具执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
                 如果决定不交易，请说明理由。
                 """;
 
@@ -425,7 +445,7 @@ public class MarketMonitor : IDisposable
         if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
         {
             await _dataService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
-            _strategyEngine.ClearPeakPrice(strategy.Id);
+            await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
         }
     }

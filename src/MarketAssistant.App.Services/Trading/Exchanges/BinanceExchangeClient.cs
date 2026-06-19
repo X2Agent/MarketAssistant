@@ -68,6 +68,19 @@ public class BinanceExchangeClient : IExchangeClient
 
     private static ExchangeOrderResult MapOrderResponse(BinanceOrderResponse response)
     {
+        // 汇总所有 fills 的手续费（仅下单响应包含 fills，查询/撤单响应不包含）
+        decimal totalCommission = 0;
+        string? commissionAsset = null;
+        if (response.Fills.Count > 0)
+        {
+            foreach (var fill in response.Fills)
+            {
+                if (decimal.TryParse(fill.Commission, out var c))
+                    totalCommission += c;
+                commissionAsset ??= fill.CommissionAsset;
+            }
+        }
+
         return new ExchangeOrderResult
         {
             Symbol = response.Symbol,
@@ -77,7 +90,9 @@ public class BinanceExchangeClient : IExchangeClient
             Type = response.Type,
             RequestedQty = decimal.TryParse(response.OrigQty, out var rq) ? rq : 0,
             ExecutedQty = decimal.TryParse(response.ExecutedQty, out var eq) ? eq : 0,
-            Price = decimal.TryParse(response.Price, out var p) ? p : 0
+            Price = decimal.TryParse(response.Price, out var p) ? p : 0,
+            FillCommission = totalCommission,
+            CommissionAsset = commissionAsset
         };
     }
 }

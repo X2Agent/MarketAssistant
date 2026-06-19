@@ -20,6 +20,11 @@ public enum OrderType { Market, Limit }
 
 public enum TradeRecordStatus { Pending, Filled, PartiallyFilled, Cancelled, Failed }
 
+/// <summary>
+/// 持仓方向（与 OrderSide 区分，用于 positions 表）
+/// </summary>
+public enum PositionSide { Long, Short }
+
 #endregion
 
 #region 交易策略
@@ -37,6 +42,16 @@ public class TradingStrategy
     public decimal Quantity { get; set; }
 
     /// <summary>
+    /// 下单类型（默认市价）。设为 Limit 时按滑点保护价下限价单。
+    /// </summary>
+    public OrderType OrderType { get; set; } = OrderType.Market;
+
+    /// <summary>
+    /// 滑点容忍度（0-1，默认 0.3%）。仅 OrderType=Limit 时生效。
+    /// </summary>
+    public decimal SlippageTolerance { get; set; } = 0.003m;
+
+    /// <summary>
     /// 显示用标签：DCA 策略以 USDT 定投金额计，其他策略为代币数量。
     /// </summary>
     public string QuantityLabel => Type == StrategyType.DCA
@@ -48,6 +63,12 @@ public class TradingStrategy
     public DateTime? LastTriggeredAt { get; set; }
     public int ExecutionCount { get; set; }
     public int? MaxExecutions { get; set; }
+
+    /// <summary>
+    /// 追踪止损的峰值/谷值价格（持久化，重启不丢失）。
+    /// Sell 侧记录最高价，Buy 侧记录最低价。
+    /// </summary>
+    public decimal? TrailingPeakPrice { get; set; }
 }
 
 #endregion
@@ -80,13 +101,23 @@ public class TradeRecord
 
 public class RiskConfig
 {
-    public decimal MaxSingleOrderPercent { get; set; } = 5;
-    public decimal MaxDailyLossPercent { get; set; } = 10;
-    public decimal MaxTotalPositionPercent { get; set; } = 80;
-    public int MaxDailyTrades { get; set; } = 20;
+    public decimal MaxSingleOrderPercent { get; set; } = 3;
+    public decimal MaxDailyLossPercent { get; set; } = 5;
+    public decimal MaxTotalPositionPercent { get; set; } = 70;
+    public int MaxDailyTrades { get; set; } = 15;
     public decimal MinOrderAmount { get; set; } = 10;
-    public bool RequireConfirmation { get; set; }
-    public decimal ConfirmationThreshold { get; set; } = 1000;
+    public bool RequireConfirmation { get; set; } = true;
+    public decimal ConfirmationThreshold { get; set; } = 500;
+
+    /// <summary>
+    /// 最大回撤熔断。累计回撤超过此百分比时停止所有交易。
+    /// </summary>
+    public decimal MaxDrawdownPercent { get; set; } = 20;
+
+    /// <summary>
+    /// 单 symbol 最大仓位占比（0 表示不限制）。
+    /// </summary>
+    public decimal MaxSinglePositionPercent { get; set; } = 30;
 }
 
 #endregion
@@ -134,6 +165,35 @@ public class TradeResult
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
     public TradeRecord? Record { get; set; }
+}
+
+/// <summary>
+/// 持仓记录（FIFO 匹配追踪）。每笔开仓对应一行，平仓时按时间顺序消耗。
+/// </summary>
+public class Position
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Symbol { get; set; } = string.Empty;
+    public PositionSide Side { get; set; }
+    /// <summary>
+    /// 原始开仓数量
+    /// </summary>
+    public decimal Quantity { get; set; }
+    /// <summary>
+    /// 开仓价
+    /// </summary>
+    public decimal EntryPrice { get; set; }
+    /// <summary>
+    /// 已平仓数量
+    /// </summary>
+    public decimal ClosedQuantity { get; set; }
+    public string? StrategyId { get; set; }
+    public DateTime OpenedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// 剩余未平仓数量
+    /// </summary>
+    public decimal RemainingQuantity => Quantity - ClosedQuantity;
 }
 
 public class OrderStatusInfo
@@ -206,6 +266,16 @@ public class GridTradingParams
     public int LastTriggeredIndex { get; set; } = -1;
 
     /// <summary>
+    /// 破网止损价（可选）。价格跌破此值时清仓所有网格多头仓位。
+    /// </summary>
+    public decimal? StopLossPrice { get; set; }
+
+    /// <summary>
+    /// 破网止盈价（可选）。价格涨破此值时清仓所有网格空头仓位。
+    /// </summary>
+    public decimal? TakeProfitPrice { get; set; }
+
+    /// <summary>
     /// 计算网格间距
     /// </summary>
     public decimal GridSpacing => GridCount > 1 ? (UpperPrice - LowerPrice) / GridCount : 0;
@@ -240,6 +310,27 @@ public class DCAParams
     /// 价格下限触发加倍（低于此价双倍买入，0 表示不启用）
     /// </summary>
     public decimal DoubleBuyBelowPrice { get; set; }
+
+    /// <summary>
+    /// 加倍冷却期（秒）。两次加倍之间至少间隔此时间，默认 24 小时。
+    /// 防止瀑布式下跌中连续加倍耗尽资金。
+    /// </summary>
+    public int DoubleBuyCooldownSeconds { get; set; } = 86400;
+
+    /// <summary>
+    /// 加倍次数上限（0 表示不限制）。防止无限制加倍。
+    /// </summary>
+    public int MaxDoubleBuyCount { get; set; } = 3;
+
+    /// <summary>
+    /// 上次加倍时间（ISO 8601）。用于冷却期判断，持久化在 CustomParams 中。
+    /// </summary>
+    public string? LastDoubleBuyAt { get; set; }
+
+    /// <summary>
+    /// 已加倍次数。用于上限判断，持久化在 CustomParams 中。
+    /// </summary>
+    public int DoubleBuyCount { get; set; }
 }
 
 #endregion

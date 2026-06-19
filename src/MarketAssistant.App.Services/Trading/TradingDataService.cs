@@ -42,11 +42,11 @@ public class TradingDataService : IDisposable
             INSERT OR REPLACE INTO strategies
                 (id, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
-                 execution_count, max_executions)
+                 execution_count, max_executions, trailing_peak_price)
             VALUES
                 (@id, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
-                 @execCount, @maxExec)
+                 @execCount, @maxExec, @trailingPeak)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
         cmd.Parameters.AddWithValue("@symbol", strategy.Symbol);
@@ -63,6 +63,7 @@ public class TradingDataService : IDisposable
         cmd.Parameters.AddWithValue("@lastTriggered", strategy.LastTriggeredAt.HasValue ? (object)strategy.LastTriggeredAt.Value.ToString("O") : DBNull.Value);
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("@trailingPeak", strategy.TrailingPeakPrice.HasValue ? (object)(double)strategy.TrailingPeakPrice.Value : DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -175,6 +176,20 @@ public class TradingDataService : IDisposable
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 更新追踪止损的峰值/谷值价格（持久化，防止重启丢失）
+    /// </summary>
+    public async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE strategies SET trailing_peak_price = @peak WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@peak", trailingPeakPrice.HasValue ? (object)(double)trailingPeakPrice.Value : DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     #endregion
 
     #region 交易记录
@@ -268,10 +283,16 @@ public class TradingDataService : IDisposable
 
     #region 日统计
 
+    /// <summary>
+    /// 获取今日日期字符串（本地时区，与用户交易日一致）。
+    /// 原实现按 UTC 切分，亚洲用户 UTC 16:00 后实际是次日，导致日统计错位。
+    /// </summary>
+    private static string GetTodayDateString() => DateTime.Now.ToString("yyyy-MM-dd");
+
     public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
         await _initializeTask;
-        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM daily_stats WHERE date = @date";
@@ -295,7 +316,7 @@ public class TradingDataService : IDisposable
     public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, CancellationToken ct = default)
     {
         await _initializeTask;
-        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -364,9 +385,225 @@ public class TradingDataService : IDisposable
 
     #endregion
 
+    #region 持仓 FIFO 追踪
+
+    /// <summary>
+    /// 开仓：插入一条新的持仓记录
+    /// </summary>
+    public async Task OpenPositionAsync(Position position, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO positions (id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
+            VALUES (@id, @symbol, @side, @qty, @entry, 0, @stratId, @openedAt)
+            """;
+        cmd.Parameters.AddWithValue("@id", position.Id);
+        cmd.Parameters.AddWithValue("@symbol", position.Symbol);
+        cmd.Parameters.AddWithValue("@side", (int)position.Side);
+        cmd.Parameters.AddWithValue("@qty", (double)position.Quantity);
+        cmd.Parameters.AddWithValue("@entry", (double)position.EntryPrice);
+        cmd.Parameters.AddWithValue("@stratId", (object?)position.StrategyId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@openedAt", position.OpenedAt.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 平仓：按 FIFO 顺序匹配持仓，更新 closed_quantity，返回已实现盈亏。
+    /// </summary>
+    public async Task<decimal> ClosePositionFifoAsync(
+        string symbol, decimal closeQty, decimal closePrice, CancellationToken ct = default)
+    {
+        if (closeQty <= 0)
+            return 0;
+
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)tx;
+            cmd.CommandText = """
+                SELECT id, quantity, entry_price, closed_quantity
+                FROM positions
+                WHERE symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+                ORDER BY opened_at ASC
+                """;
+            cmd.Parameters.AddWithValue("@symbol", symbol);
+            cmd.Parameters.AddWithValue("@side", (int)PositionSide.Long);
+
+            var toClose = new List<(string id, decimal available, decimal entryPrice)>();
+            await using (var reader = await cmd.ExecuteReaderAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    var id = reader.GetString(0);
+                    var qty = (decimal)reader.GetDouble(1);
+                    var closed = (decimal)reader.GetDouble(2);
+                    var entry = (decimal)reader.GetDouble(3);
+                    toClose.Add((id, qty - closed, entry));
+                }
+            }
+
+            decimal realizedPnl = 0;
+            var remaining = closeQty;
+
+            foreach (var (id, available, entry) in toClose)
+            {
+                if (remaining <= 0)
+                    break;
+
+                var closeThis = Math.Min(remaining, available);
+                realizedPnl += (closePrice - entry) * closeThis;
+
+                await using var updateCmd = conn.CreateCommand();
+                updateCmd.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)tx;
+                updateCmd.CommandText = """
+                    UPDATE positions SET closed_quantity = closed_quantity + @close
+                    WHERE id = @id
+                    """;
+                updateCmd.Parameters.AddWithValue("@close", (double)closeThis);
+                updateCmd.Parameters.AddWithValue("@id", id);
+                await updateCmd.ExecuteNonQueryAsync(ct);
+
+                remaining -= closeThis;
+            }
+
+            await tx.CommitAsync(ct);
+            return realizedPnl;
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 获取指定 symbol 的当前未平仓多头持仓（用于 UI 展示与风控）
+    /// </summary>
+    public async Task<List<Position>> GetOpenPositionsAsync(string? symbol = null, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+
+        if (string.IsNullOrEmpty(symbol))
+        {
+            cmd.CommandText = """
+                SELECT id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at
+                FROM positions
+                WHERE (quantity - closed_quantity) > 0
+                ORDER BY opened_at ASC
+                """;
+        }
+        else
+        {
+            cmd.CommandText = """
+                SELECT id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at
+                FROM positions
+                WHERE symbol = @symbol AND (quantity - closed_quantity) > 0
+                ORDER BY opened_at ASC
+                """;
+            cmd.Parameters.AddWithValue("@symbol", symbol);
+        }
+
+        var positions = new List<Position>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            positions.Add(ReadPosition(reader));
+        return positions;
+    }
+
+    /// <summary>
+    /// 计算指定 symbol 的加权平均开仓价（仅未平仓部分，用于风控与 UI）
+    /// </summary>
+    public async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT CASE WHEN SUM(quantity - closed_quantity) > 0
+                THEN SUM((quantity - closed_quantity) * entry_price) / SUM(quantity - closed_quantity)
+                ELSE 0 END
+            FROM positions
+            WHERE symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+            """;
+        cmd.Parameters.AddWithValue("@symbol", symbol);
+        cmd.Parameters.AddWithValue("@side", (int)PositionSide.Long);
+
+        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        if (result is double d)
+            return (decimal)d;
+        return 0;
+    }
+
+    private static Position ReadPosition(SqliteDataReader reader)
+    {
+        var position = new Position
+        {
+            Id = reader.GetString(reader.GetOrdinal("id")),
+            Symbol = reader.GetString(reader.GetOrdinal("symbol")),
+            Side = (PositionSide)reader.GetInt32(reader.GetOrdinal("side")),
+            Quantity = (decimal)reader.GetDouble(reader.GetOrdinal("quantity")),
+            EntryPrice = (decimal)reader.GetDouble(reader.GetOrdinal("entry_price")),
+            ClosedQuantity = (decimal)reader.GetDouble(reader.GetOrdinal("closed_quantity")),
+            OpenedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("opened_at")), CultureInfo.InvariantCulture)
+        };
+
+        var sidOrd = reader.GetOrdinal("strategy_id");
+        if (!reader.IsDBNull(sidOrd))
+            position.StrategyId = reader.GetString(sidOrd);
+
+        return position;
+    }
+
+    #endregion
+
     #region 风控配置持久化
 
     private const string RiskConfigKey = "TradingRiskConfig";
+
+    /// <summary>
+    /// 保存每日账户快照（用于计算最大回撤）
+    /// </summary>
+    public async Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
+    {
+        await _initializeTask;
+        var today = GetTodayDateString();
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO account_snapshots (date, total_value_usdt, snapshot_at)
+            VALUES (@date, @value, @snapshotAt)
+            ON CONFLICT(date) DO UPDATE SET
+                total_value_usdt = @value,
+                snapshot_at = @snapshotAt
+            """;
+        cmd.Parameters.AddWithValue("@date", today);
+        cmd.Parameters.AddWithValue("@value", (double)totalValueUsdt);
+        cmd.Parameters.AddWithValue("@snapshotAt", DateTime.UtcNow.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 获取历史最高账户价值（用于计算回撤）
+    /// </summary>
+    public async Task<decimal> GetPeakAccountValueAsync(CancellationToken ct = default)
+    {
+        await _initializeTask;
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT MAX(total_value_usdt) FROM account_snapshots";
+        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        if (result is double d)
+            return (decimal)d;
+        return 0;
+    }
 
     public RiskConfig LoadRiskConfig()
     {
@@ -423,7 +660,8 @@ public class TradingDataService : IDisposable
                     created_at TEXT NOT NULL,
                     last_triggered_at TEXT,
                     execution_count INTEGER DEFAULT 0,
-                    max_executions INTEGER
+                    max_executions INTEGER,
+                    trailing_peak_price REAL
                 );
                 CREATE INDEX IF NOT EXISTS idx_strategies_symbol ON strategies(symbol);
                 CREATE INDEX IF NOT EXISTS idx_strategies_status ON strategies(status);
@@ -456,6 +694,25 @@ public class TradingDataService : IDisposable
                     trade_count INTEGER DEFAULT 0,
                     total_pnl REAL DEFAULT 0,
                     total_commission REAL DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS positions (
+                    id TEXT PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    side INTEGER NOT NULL,
+                    quantity REAL NOT NULL,
+                    entry_price REAL NOT NULL,
+                    closed_quantity REAL DEFAULT 0,
+                    strategy_id TEXT,
+                    opened_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
+                CREATE INDEX IF NOT EXISTS idx_positions_side ON positions(symbol, side);
+
+                CREATE TABLE IF NOT EXISTS account_snapshots (
+                    date TEXT PRIMARY KEY,
+                    total_value_usdt REAL NOT NULL,
+                    snapshot_at TEXT NOT NULL
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();
@@ -500,6 +757,9 @@ public class TradingDataService : IDisposable
 
         var meOrd = reader.GetOrdinal("max_executions");
         if (!reader.IsDBNull(meOrd)) strategy.MaxExecutions = reader.GetInt32(meOrd);
+
+        var trailingOrd = reader.GetOrdinal("trailing_peak_price");
+        if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = (decimal)reader.GetDouble(trailingOrd);
 
         return strategy;
     }

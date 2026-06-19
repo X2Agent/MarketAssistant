@@ -304,6 +304,23 @@ public class BinanceOrderResponse
     public string TimeInForce { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string Side { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 成交流水（仅 POST /api/v3/order 响应包含，查询接口不返回）。
+    /// 用于汇总手续费。
+    /// </summary>
+    public List<BinanceFill> Fills { get; set; } = [];
+}
+
+/// <summary>
+/// Binance 单笔成交流水
+/// </summary>
+public class BinanceFill
+{
+    public string Price { get; set; } = string.Empty;
+    public string Qty { get; set; } = string.Empty;
+    public string Commission { get; set; } = string.Empty;
+    public string CommissionAsset { get; set; } = string.Empty;
 }
 
 #endregion

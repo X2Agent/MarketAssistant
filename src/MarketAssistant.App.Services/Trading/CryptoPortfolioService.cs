@@ -59,7 +59,8 @@ public class CryptoPortfolioService
                 {
                     position.CurrentPrice = ticker.LastPrice;
 
-                    var avgEntry = await _tradingDataService.GetAverageEntryPriceAsync(position.Symbol, ct);
+                    // 只按未平仓的 FIFO 持仓计算均价，避免已平仓记录污染浮盈显示
+                    var avgEntry = await _tradingDataService.GetOpenPositionAvgEntryPriceAsync(position.Symbol, ct);
                     position.EntryPrice = avgEntry > 0 ? avgEntry : ticker.LastPrice;
 
                     if (position.EntryPrice > 0)
