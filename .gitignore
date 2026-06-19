@@ -3,6 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Windows 保留设备名（误生成时 git 会反复列出，磁盘上实际不存在）
+nul
+
 # User-specific files
 *.rsuser
 *.suo
