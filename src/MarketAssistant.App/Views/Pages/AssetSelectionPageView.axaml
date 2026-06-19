@@ -186,7 +186,7 @@
                     
                     <!-- 统一输入框 -->
                     <TextBox Text="{Binding CurrentInputContent}"
-                             Watermark="{Binding CurrentPlaceholder}"
+                             PlaceholderText="{Binding CurrentPlaceholder}"
                              Height="{StaticResource CompactTextAreaHeight}"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"

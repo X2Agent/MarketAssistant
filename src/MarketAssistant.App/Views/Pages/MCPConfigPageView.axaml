@@ -131,7 +131,7 @@
                                     <Run Text="名称"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Name}" 
-                                         Watermark="请输入服务器名称"
+                                         PlaceholderText="请输入服务器名称"
                                          Classes="clearButton"/>
                             </StackPanel>
 
@@ -139,7 +139,7 @@
                             <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <TextBlock Text="描述" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding Description}" 
-                                         Watermark="请输入服务器描述"
+                                         PlaceholderText="请输入服务器描述"
                                          Height="{StaticResource TextAreaHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"
@@ -171,7 +171,7 @@
                                     <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="命令"/>
                                 </TextBlock>
-                                <TextBox Text="{Binding Command}" Watermark="请输入命令，如 npx"/>
+                                <TextBox Text="{Binding Command}" PlaceholderText="请输入命令，如 npx"/>
                             </StackPanel>
 
                             <!-- 命令/URL配置 (sse) -->
@@ -180,7 +180,7 @@
                                     <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
-                                <TextBox Text="{Binding Command}" Watermark="请输入 URL，如 http://localhost:3000/sse"/>
+                                <TextBox Text="{Binding Command}" PlaceholderText="请输入 URL，如 http://localhost:3000/sse"/>
                                 <TextBlock Text="提示：URL示例 http://localhost:3000/sse" 
                                            FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -192,7 +192,7 @@
                                     <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
-                                <TextBox Text="{Binding Command}" Watermark="请输入 URL，如 http://localhost:3000/mcp"/>
+                                <TextBox Text="{Binding Command}" PlaceholderText="请输入 URL，如 http://localhost:3000/mcp"/>
                                 <TextBlock Text="提示：URL示例 http://localhost:3000/mcp" 
                                            FontSize="{StaticResource SmallFontSize}" 
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -202,7 +202,7 @@
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
                                 <TextBlock Text="参数" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding Arguments}" 
-                                         Watermark="请输入命令参数，如-y @modelcontextprotocol/server-github"
+                                         PlaceholderText="请输入命令参数，如-y @modelcontextprotocol/server-github"
                                          Height="{StaticResource ModeSelectionHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>
@@ -215,7 +215,7 @@
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
                                 <TextBlock Text="环境变量" FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding EnvironmentVariablesText}"
-                                         Watermark="KEY1=value1&#10;KEY2=value2"
+                                         PlaceholderText="KEY1=value1&#10;KEY2=value2"
                                          Height="{StaticResource CompactTextAreaHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"/>

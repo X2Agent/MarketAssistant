@@ -187,7 +187,7 @@ public class DialogService : IDialogService
         {
             Text = defaultValue ?? string.Empty,
             Width = 300,
-            Watermark = "请输入...",
+            PlaceholderText = "请输入...",
             Margin = new Thickness(0, 8, 0, 0)
         };
 

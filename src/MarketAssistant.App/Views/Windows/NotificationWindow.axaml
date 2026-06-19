@@ -7,7 +7,7 @@
         Height="{StaticResource NotificationHeight}"
         CanResize="False"
         ShowInTaskbar="False"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         Topmost="True"

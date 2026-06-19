@@ -60,7 +60,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.ApiKey}"
-                                         Watermark="请输入API密钥"
+                                         PlaceholderText="请输入API密钥"
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
                                         Content="获取密钥"
@@ -82,7 +82,7 @@
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBox Text="{Binding UserSetting.EmbeddingEndpoint}"
-                                     Watermark="嵌入服务API端点"/>
+                                     PlaceholderText="嵌入服务API端点"/>
                         </StackPanel>
 
                         <!-- API密鑰 -->
@@ -93,7 +93,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.EmbeddingApiKey}"
-                                         Watermark="请输入嵌入服务API密鑰"
+                                         PlaceholderText="请输入嵌入服务API密鑰"
                                          PasswordChar="&#9679;"/>
                                 <Button Grid.Column="1"
                                         Content="获取密鑰"
@@ -110,7 +110,7 @@
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBox Text="{Binding UserSetting.EmbeddingModelId}"
-                                     Watermark="嵌入模型ID"/>
+                                     PlaceholderText="嵌入模型ID"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>
@@ -142,7 +142,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.ZhiTuApiToken}"
-                                         Watermark="请输入ZhiTu API令牌"/>
+                                         PlaceholderText="请输入ZhiTu API令牌"/>
                                 <Button Grid.Column="1"
                                         Content="获取令牌"
                                         Command="{Binding OpenZhiTuApiWebsiteCommand}"
@@ -162,7 +162,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.CoinGeckoApiKey}"
-                                         Watermark="可选，免费版无需填写"
+                                         PlaceholderText="可选，免费版无需填写"
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
                                         Content="获取密钥"
@@ -181,14 +181,14 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="0,8,0,0"/>
                             <TextBox Text="{Binding UserSetting.BinanceApiKey}"
-                                     Watermark="请输入 Binance API Key"
+                                     PlaceholderText="请输入 Binance API Key"
                                      PasswordChar="●"/>
 
                             <TextBlock Text="Binance Secret Key"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
-                                     Watermark="请输入 Binance Secret Key"
+                                     PlaceholderText="请输入 Binance Secret Key"
                                      PasswordChar="●"/>
                             <TextBlock Text="用于自主交易功能。请确保 API Key 仅开启现货交易权限，不要开启提现权限"
                                        FontSize="{StaticResource SmallFontSize}"
@@ -251,7 +251,7 @@
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBox Grid.Column="0"
                                              Text="{Binding UserSetting.KnowledgeFileDirectory}"
-                                             Watermark="请选择知识库目录"
+                                             PlaceholderText="请选择知识库目录"
                                              IsReadOnly="True"/>
                                     <Button Grid.Column="1"
                                             Content="浏览"
@@ -362,7 +362,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBox Grid.Column="0"
                                      Text="{Binding UserSetting.BrowserPath}"
-                                     Watermark="请选择浏览器路径（留空则自动检测）"
+                                     PlaceholderText="请选择浏览器路径（留空则自动检测）"
                                      IsReadOnly="True"/>
                             <Button Grid.Column="1"
                                     Content="浏览"
@@ -386,7 +386,7 @@
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBox Grid.Column="0"
                                      Text="{Binding UserSetting.LogPath}"
-                                     Watermark="请输入日志文件路径"/>
+                                     PlaceholderText="请输入日志文件路径"/>
                             <Button Grid.Column="1"
                                     Content="浏览"
                                     Command="{Binding SelectLogPathCommand}"
@@ -430,7 +430,7 @@
                                            FontSize="{StaticResource LabelFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
-                                         Watermark="请输入Web Search API Key"/>
+                                         PlaceholderText="请输入Web Search API Key"/>
                             </StackPanel>
                             
                             <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"

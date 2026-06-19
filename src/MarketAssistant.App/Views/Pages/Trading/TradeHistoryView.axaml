@@ -14,7 +14,7 @@
         <controls:CardView Grid.Row="0" Header="筛选" Margin="{StaticResource SmallBottomMargin}">
             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                 <TextBox Text="{Binding FilterSymbol}"
-                         Watermark="按交易对筛选（如 BTCUSDT）"
+                         PlaceholderText="按交易对筛选（如 BTCUSDT）"
                          Width="250"/>
                 <Button Content="筛选" Command="{Binding FilterCommand}"
                         Background="{DynamicResource PrimaryBrush}"

@@ -24,7 +24,7 @@
             <Grid ColumnDefinitions="*,Auto">
                 <AutoCompleteBox x:Name="StockSearchBox"
                                  Grid.Column="0"
-                                 Watermark="输入资产代码或名称"
+                                 PlaceholderText="输入资产代码或名称"
                                  MinimumPrefixLength="1"
                                  ItemsSource="{Binding Search.SearchResults}"
                                  FilterMode="None"

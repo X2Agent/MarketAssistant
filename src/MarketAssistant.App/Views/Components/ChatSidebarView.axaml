@@ -117,7 +117,7 @@
                         MinHeight="{StaticResource InputAreaMinHeight}">
                     <TextBox x:Name="MessageEntry"
                              Text="{Binding UserInput}" 
-                             Watermark="输入您的问题..." 
+                             PlaceholderText="输入您的问题..."
                              BorderThickness="{StaticResource NoBorderThickness}" 
                              Background="Transparent"
                              Margin="{StaticResource InputBoxMargin}"
