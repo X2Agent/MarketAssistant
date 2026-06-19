@@ -13,6 +13,13 @@ public sealed class CoinDeskApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinDeskApiService> _logger;
 
+    // 支持 API 返回的字符串数值/null 自动容错转换为 decimal?
+    private static readonly JsonSerializerOptions CoinDeskJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
+
     public CoinDeskApiService(
         IHttpClientFactory httpClientFactory,
         ILogger<CoinDeskApiService> logger)
@@ -40,7 +47,7 @@ public sealed class CoinDeskApiService
         response.EnsureSuccessStatusCode();
 
         var metadata = await response.Content.ReadFromJsonAsync<CoinDeskMetadataResponse>(
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+            CoinDeskJsonOptions,
             cancellationToken);
 
         _logger.LogInformation("成功获取CoinDesk元数据: {Symbol}", upperSymbol);
@@ -66,7 +73,7 @@ public sealed class CoinDeskApiService
         response.EnsureSuccessStatusCode();
 
         var newsResponse = await response.Content.ReadFromJsonAsync<CoinDeskNewsResponse>(
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+            CoinDeskJsonOptions,
             cancellationToken);
 
         _logger.LogInformation("成功获取CoinDesk新闻，结果数: {Count}", newsResponse?.Data?.Count ?? 0);

@@ -1,10 +1,12 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.AShare;
 
@@ -16,6 +18,13 @@ public sealed class AShareBasicTools : IShareBasicTools
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareBasicTools> _logger;
+
+    // 支持 API 返回的字符串数值/null/--占位自动容错转换为 decimal/decimal?
+    private static readonly JsonSerializerOptions ClsJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
 
     public AShareBasicTools(
         IHttpClientFactory httpClientFactory,
@@ -40,45 +49,48 @@ public sealed class AShareBasicTools : IShareBasicTools
 
             using var httpClient = _httpClientFactory.CreateClient("Cls");
             var response = await httpClient.GetStringAsync(url);
-            var jsonDocument = JsonDocument.Parse(response);
+            using var jsonDocument = JsonDocument.Parse(response);
 
             if (jsonDocument.RootElement.TryGetProperty("data", out var data) == false || data.ValueKind == JsonValueKind.Null)
                 throw new FriendlyException($"未找到股票 {assetSymbol} ({formattedSymbol}) 的数据，请检查代码是否正确。");
 
-            var stockPriceInfo = new StockQuoteInfo();
+            // 通过 StringToDecimalConverter 容错反序列化：字符串数值/null/--占位均安全降级，不再抛出转换异常
+            var raw = JsonSerializer.Deserialize<ClsStockQuoteData>(data.GetRawText(), ClsJsonOptions)
+                ?? throw new FriendlyException($"解析股票 {assetSymbol} 行情数据失败。");
 
-            stockPriceInfo.CurrentPrice = data.GetProperty("last_px").GetDecimal();
-            stockPriceInfo.PriceChange = data.GetProperty("change_px").GetDecimal();
-            stockPriceInfo.PercentageChange = data.GetProperty("change").GetDecimal();
-            stockPriceInfo.HighPrice = data.GetProperty("high_px").GetDecimal();
-            stockPriceInfo.LowPrice = data.GetProperty("low_px").GetDecimal();
-            stockPriceInfo.Volume = data.GetProperty("business_amount").GetDecimal() / 10000;
-            stockPriceInfo.Amount = data.GetProperty("business_balance").GetDecimal() / 100000000;
-            stockPriceInfo.TurnoverRate = data.GetProperty("tr").GetDecimal();
-            stockPriceInfo.PercentageChange3Day = data.GetProperty("change_3").GetDecimal();
-            stockPriceInfo.PercentageChange5Day = data.GetProperty("change_5").GetDecimal();
-            stockPriceInfo.TotalShares = data.GetProperty("TotalShares").GetDecimal();
-            stockPriceInfo.MarketCapitalization = data.GetProperty("mc").GetDecimal() / 100000000;
-            stockPriceInfo.SecurityName = data.GetProperty("secu_name").GetString() ?? string.Empty;
-            stockPriceInfo.SecurityCode = data.GetProperty("secu_code").GetString() ?? string.Empty;
-            stockPriceInfo.TradeStatus = data.GetProperty("trade_status").GetString() ?? string.Empty;
-            stockPriceInfo.SecurityType = data.GetProperty("secu_type").GetString() ?? string.Empty;
-            stockPriceInfo.OpenPrice = data.GetProperty("open_px").GetDecimal();
-            stockPriceInfo.PreviousClosePrice = data.GetProperty("preclose_px").GetDecimal();
-            stockPriceInfo.UpLimitPrice = data.GetProperty("up_price").GetDecimal();
-            stockPriceInfo.DownLimitPrice = data.GetProperty("down_price").GetDecimal();
-            stockPriceInfo.Amplitude = data.GetProperty("amp").GetDecimal();
-            stockPriceInfo.PERatio = data.GetProperty("pe").GetDecimal();
-            stockPriceInfo.TTMPERatio = data.GetProperty("ttm_pe").GetDecimal();
-            stockPriceInfo.PBRatio = data.GetProperty("pb").GetDecimal();
-            stockPriceInfo.CirculationMarketCap = data.GetProperty("cmc").GetDecimal() / 100000000;
-            stockPriceInfo.NonRestrictedShares = data.GetProperty("NonRestrictedShares").GetDecimal();
-            stockPriceInfo.NetAssetPerShare = data.GetProperty("NetAssetPS").GetDecimal();
-            stockPriceInfo.AveragePrice = data.GetProperty("av_px").GetDecimal();
-            stockPriceInfo.VolumeRatio = data.GetProperty("qrr").GetDecimal();
-            stockPriceInfo.EntrustRatio = data.GetProperty("entrust_rate").GetDecimal();
-
-            return stockPriceInfo;
+            return new StockQuoteInfo
+            {
+                CurrentPrice = raw.LastPrice,
+                PriceChange = raw.ChangePx,
+                PercentageChange = raw.Change,
+                HighPrice = raw.HighPx,
+                LowPrice = raw.LowPx,
+                Volume = raw.BusinessAmount / 10000m,
+                Amount = raw.BusinessBalance / 100000000m,
+                TurnoverRate = raw.TurnoverRate,
+                PercentageChange3Day = raw.Change3,
+                PercentageChange5Day = raw.Change5,
+                TotalShares = raw.TotalShares,
+                MarketCapitalization = raw.MarketCap / 100000000m,
+                SecurityName = raw.SecurityName ?? string.Empty,
+                SecurityCode = raw.SecurityCode ?? string.Empty,
+                TradeStatus = raw.TradeStatus ?? string.Empty,
+                SecurityType = raw.SecurityType ?? string.Empty,
+                OpenPrice = raw.OpenPx,
+                PreviousClosePrice = raw.PreClosePx,
+                UpLimitPrice = raw.UpPrice,
+                DownLimitPrice = raw.DownPrice,
+                Amplitude = raw.Amplitude,
+                PERatio = raw.PERatio,
+                TTMPERatio = raw.TTMPERatio,
+                PBRatio = raw.PBRatio,
+                CirculationMarketCap = raw.CirculationMarketCap / 100000000m,
+                NonRestrictedShares = raw.NonRestrictedShares,
+                NetAssetPerShare = raw.NetAssetPS,
+                AveragePrice = raw.AveragePx,
+                VolumeRatio = raw.VolumeRatio,
+                EntrustRatio = raw.EntrustRate
+            };
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -99,7 +111,7 @@ public sealed class AShareBasicTools : IShareBasicTools
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<CompanyInfo>(response);
+            var info = JsonSerializer.Deserialize<CompanyInfo>(response, ClsJsonOptions);
 
             return info ?? throw new FriendlyException("GetCompanyInfoAsync返回数据为空");
         }
@@ -114,5 +126,43 @@ public sealed class AShareBasicTools : IShareBasicTools
     {
         yield return AIFunctionFactory.Create(GetAssetInfoAsync);
         yield return AIFunctionFactory.Create(GetCompanyInfoAsync);
+    }
+
+    /// <summary>
+    /// 财联社（cls.cn）行情接口返回字段映射，统一以 decimal 接收数值，
+    /// 配合 StringToDecimalConverter 容错字符串/null/--占位。
+    /// </summary>
+    private sealed class ClsStockQuoteData
+    {
+        [JsonPropertyName("last_px")] public decimal LastPrice { get; set; }
+        [JsonPropertyName("change_px")] public decimal ChangePx { get; set; }
+        [JsonPropertyName("change")] public decimal Change { get; set; }
+        [JsonPropertyName("high_px")] public decimal HighPx { get; set; }
+        [JsonPropertyName("low_px")] public decimal LowPx { get; set; }
+        [JsonPropertyName("business_amount")] public decimal BusinessAmount { get; set; }
+        [JsonPropertyName("business_balance")] public decimal BusinessBalance { get; set; }
+        [JsonPropertyName("tr")] public decimal TurnoverRate { get; set; }
+        [JsonPropertyName("change_3")] public decimal Change3 { get; set; }
+        [JsonPropertyName("change_5")] public decimal Change5 { get; set; }
+        [JsonPropertyName("TotalShares")] public decimal TotalShares { get; set; }
+        [JsonPropertyName("mc")] public decimal MarketCap { get; set; }
+        [JsonPropertyName("cmc")] public decimal CirculationMarketCap { get; set; }
+        [JsonPropertyName("NonRestrictedShares")] public decimal NonRestrictedShares { get; set; }
+        [JsonPropertyName("NetAssetPS")] public decimal NetAssetPS { get; set; }
+        [JsonPropertyName("open_px")] public decimal OpenPx { get; set; }
+        [JsonPropertyName("preclose_px")] public decimal PreClosePx { get; set; }
+        [JsonPropertyName("up_price")] public decimal UpPrice { get; set; }
+        [JsonPropertyName("down_price")] public decimal DownPrice { get; set; }
+        [JsonPropertyName("amp")] public decimal Amplitude { get; set; }
+        [JsonPropertyName("pe")] public decimal PERatio { get; set; }
+        [JsonPropertyName("ttm_pe")] public decimal TTMPERatio { get; set; }
+        [JsonPropertyName("pb")] public decimal PBRatio { get; set; }
+        [JsonPropertyName("av_px")] public decimal AveragePx { get; set; }
+        [JsonPropertyName("qrr")] public decimal VolumeRatio { get; set; }
+        [JsonPropertyName("entrust_rate")] public decimal EntrustRate { get; set; }
+        [JsonPropertyName("secu_name")] public string? SecurityName { get; set; }
+        [JsonPropertyName("secu_code")] public string? SecurityCode { get; set; }
+        [JsonPropertyName("trade_status")] public string? TradeStatus { get; set; }
+        [JsonPropertyName("secu_type")] public string? SecurityType { get; set; }
     }
 }

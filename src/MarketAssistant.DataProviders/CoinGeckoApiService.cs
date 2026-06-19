@@ -18,6 +18,13 @@ public sealed class CoinGeckoApiService
     private static DateTime _lastRequestTime = DateTime.MinValue;
     private const int MinRequestIntervalMs = 2500;
 
+    // 支持 API 返回的字符串数值/null 自动容错转换为 decimal?（CoinGeckoMarket 全为 decimal?）
+    private static readonly JsonSerializerOptions CoinGeckoJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
+
     public CoinGeckoApiService(
         IHttpClientFactory httpClientFactory,
         ILogger<CoinGeckoApiService> logger)
@@ -84,7 +91,7 @@ public sealed class CoinGeckoApiService
             response.EnsureSuccessStatusCode();
 
             var markets = await response.Content.ReadFromJsonAsync<List<CoinGeckoMarket>>(
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                CoinGeckoJsonOptions,
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinGecko市场数据，币种数量: {Count}", markets?.Count ?? 0);
