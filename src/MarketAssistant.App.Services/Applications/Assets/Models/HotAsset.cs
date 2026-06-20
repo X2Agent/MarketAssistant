@@ -55,7 +55,7 @@ public class HotAsset
     /// <summary>
     /// 指标标签（根据市场类型动态返回）
     /// </summary>
-    public string MetricLabel => MarketType == MarketType.Crypto ? "交易量" : "热度";
+    public string MetricLabel { get; set; } = "热度";
 
     /// <summary>
     /// 格式化的指标显示值

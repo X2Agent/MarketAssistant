@@ -24,12 +24,6 @@ public interface IAnalystAgentFactory
     /// 根据类型创建代理，附加额外的 AIContextProvider（如共享市场快照）
     /// </summary>
     AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders);
-
-    /// <summary>
-    /// 创建指定类型的分析师代理（泛型版本，提供编译时类型检查）
-    /// </summary>
-    /// <typeparam name="TAgent">代理类型，必须继承自 AnalystAgentBase</typeparam>
-    TAgent CreateAnalyst<TAgent>() where TAgent : AnalystAgentBase;
 }
 
 /// <summary>
@@ -86,7 +80,7 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             var tools = ResolveToolsForAnalyst(agentType, currentMarket);
 
             // 使用 ActivatorUtilities.CreateInstance
-            // 显式传递 chatClient 和工具，其他依赖从 DI 获取
+            // 显式传递 chatClient、工具和 AIContextProvider[]，AgentSkillsProvider 由 DI 自动解析
             var parameters = new List<object> { chatClient };
             parameters.AddRange(tools);
 
@@ -141,14 +135,6 @@ public class AnalystAgentFactory : IAnalystAgentFactory
         }
 
         return tools;
-    }
-
-    /// <summary>
-    /// 创建指定类型的分析师代理（泛型版本）
-    /// </summary>
-    public TAgent CreateAnalyst<TAgent>() where TAgent : AnalystAgentBase
-    {
-        return (TAgent)CreateAnalyst(typeof(TAgent));
     }
 }
 

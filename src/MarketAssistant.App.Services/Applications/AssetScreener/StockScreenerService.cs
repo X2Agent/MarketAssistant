@@ -105,13 +105,16 @@ public sealed class StockScreenerService : IAssetScreenerService
                 // 访问雪球选股器
                 await page.GotoAsync(XUEQIU_SCREENER_URL, new PageGotoOptions
                 {
-                    WaitUntil = WaitUntilState.NetworkIdle,
+                    WaitUntil = WaitUntilState.Load,
                     Timeout = 30000
                 });
 
-                // 等待页面加载完成
-                await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
-                await Task.Delay(1000);
+                // 等待页面动态内容渲染完成
+                await page.WaitForSelectorAsync(".stockScreener-range-market select", new PageWaitForSelectorOptions
+                {
+                    State = WaitForSelectorState.Attached,
+                    Timeout = 15000
+                });
 
                 // 设置市场和行业
                 await SetMarketType(page, criteria.Market);

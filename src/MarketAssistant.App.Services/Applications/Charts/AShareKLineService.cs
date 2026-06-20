@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -17,6 +18,13 @@ public class AShareKLineService : IKLineService
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareKLineService> _logger;
     private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
+
+    // 支持 API 返回的字符串数值自动转换为 decimal
+    private static readonly JsonSerializerOptions KLineJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
 
     public AShareKLineService(
         IHttpClientFactory httpClientFactory,
@@ -160,7 +168,7 @@ public class AShareKLineService : IKLineService
             response.EnsureSuccessStatusCode();
 
             var jsonContent = await response.Content.ReadAsStringAsync();
-            var zhiTuData = JsonSerializer.Deserialize<List<ZhiTuKLineData>>(jsonContent);
+            var zhiTuData = JsonSerializer.Deserialize<List<ZhiTuKLineData>>(jsonContent, KLineJsonOptions);
 
             if (zhiTuData == null || !zhiTuData.Any())
             {

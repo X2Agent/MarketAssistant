@@ -22,7 +22,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst<FinancialAnalystAgent>();
+        var agent = agentFactory.CreateAnalyst(typeof(FinancialAnalystAgent));
 
         Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
     }
@@ -33,7 +33,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<NewsEventAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(NewsEventAnalystAgent));
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -53,7 +53,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<FundamentalAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(FundamentalAnalystAgent));
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -73,7 +73,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<CoordinatorAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(CoordinatorAnalystAgent));
         Assert.IsNotNull(agent);
 
         var fundamentalJson = """
@@ -131,7 +131,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<FinancialAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(FinancialAnalystAgent));
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -157,7 +157,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<MarketSentimentAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(MarketSentimentAnalystAgent));
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -182,7 +182,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst<TechnicalAnalystAgent>();
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(TechnicalAnalystAgent));
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(

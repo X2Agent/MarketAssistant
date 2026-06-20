@@ -14,6 +14,8 @@ public class AssetItem
     /// 资产代码
     /// </summary>
     public string Code { get; set; } = string.Empty;
+
+    public override string ToString() => string.IsNullOrEmpty(Name) ? Code : $"{Name} ({Code})";
 }
 
 

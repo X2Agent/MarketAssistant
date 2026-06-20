@@ -19,8 +19,8 @@ public partial class HomePageView : UserControl
     /// </summary>
     private void SearchResultItem_PointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is Border border &&
-            border.Tag is AssetItem selectedAsset &&
+        if (sender is Control control &&
+            control.Tag is AssetItem selectedAsset &&
             DataContext is HomePageViewModel viewModel)
         {
             // 标记事件已处理，防止AutoCompleteBox处理

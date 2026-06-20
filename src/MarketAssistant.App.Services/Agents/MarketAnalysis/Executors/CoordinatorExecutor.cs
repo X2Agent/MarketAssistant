@@ -54,7 +54,8 @@ public sealed partial class CoordinatorExecutor : Executor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // 在构造函数中创建 Agent（确保 tools 配置正确）
-        _coordinatorAgent = analystAgentFactory.CreateAnalyst<CoordinatorAnalystAgent>();
+        // 使用非泛型方法：CreateAnalyst 返回的是中间件包装后的 AIAgent，无法强制转换为具体类型
+        _coordinatorAgent = analystAgentFactory.CreateAnalyst(typeof(CoordinatorAnalystAgent));
 
         _logger.LogInformation("协调分析师 Agent 已创建（支持工具调用 + 结构化输出）");
     }

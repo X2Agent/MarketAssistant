@@ -2,10 +2,8 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Microsoft.Playwright;
 using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Tools.AShare;
@@ -15,16 +13,16 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// </summary>
 public sealed class AShareNewsTools : INewsDataTools
 {
-    private readonly PlaywrightService _playwrightService;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ILogger<AShareNewsTools> _logger;
 
     public AShareNewsTools(
-        PlaywrightService playwrightService,
+        IHttpClientFactory httpClientFactory,
         IChatClientFactory chatClientFactory,
         ILogger<AShareNewsTools> logger)
     {
-        _playwrightService = playwrightService ?? throw new ArgumentNullException(nameof(playwrightService));
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _logger = logger;
     }
@@ -97,49 +95,66 @@ public sealed class AShareNewsTools : INewsDataTools
         {
             assetSymbol = StockSymbolConverter.ToClsFormat(assetSymbol).ToLower();
 
-            var url = $"https://www.cls.cn/stock?code={assetSymbol}";
+            var url = $"https://www.cls.cn/es/quotes/articles?app=CailianpressWeb&keyword={assetSymbol}&lastTime={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}&os=web&rn=10&sv=8.7.9&sign=fbb8361109191781631a4dd08d934207";
 
-            // 使用PlaywrightService获取Browser实例
-            return await _playwrightService.ExecuteWithPageAsync(async page =>
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(15);
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("Referer", "https://www.cls.cn/");
+            request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+            var response = await httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+
+            var newsList = new List<NewsItem>();
+
+            if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+                return newsList;
+
+            foreach (var item in data.EnumerateArray())
             {
-                await page.GotoAsync(url);
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                var title = item.TryGetProperty("title", out var titleEl) ? titleEl.GetString()?.Trim() ?? "" : "";
+                if (string.IsNullOrEmpty(title))
+                    continue;
 
-                var newsElements = await page.QuerySelectorAllAsync("div.p-t-20.p-b-20.b-b-w-1.b-b-s-s.b-c-e6e7ea");
+                var source = item.TryGetProperty("source", out var sourceEl) ? sourceEl.GetString()?.Trim() ?? "" : "";
 
-                var newsList = new List<NewsItem>();
-
-                foreach (var newsElement in newsElements)
+                // 构建链接：外部文章用 external_link，站内文章拼接
+                var link = "";
+                var isExternal = item.TryGetProperty("is_external", out var extEl) && extEl.GetInt32() == 1;
+                if (isExternal && item.TryGetProperty("external_link", out var linkEl))
                 {
-                    var titleElement = await newsElement.QuerySelectorAsync("a.c-222.line3");
-                    if (titleElement != null)
-                    {
-                        var title = await titleElement.InnerTextAsync();
-                        var link = await titleElement.GetAttributeAsync("href");
-                        if (!string.IsNullOrEmpty(link) && !link.StartsWith("http"))
-                        {
-                            link = $"https://www.cls.cn{link}";
-                        }
-
-                        // 获取新闻来源
-                        string source = "";
-                        var sourceElement = await newsElement.QuerySelectorAsync("div.f-r");
-                        if (sourceElement != null)
-                        {
-                            source = await sourceElement.InnerTextAsync();
-                        }
-
-                        newsList.Add(new NewsItem()
-                        {
-                            Title = title,
-                            Link = link ?? "",
-                            Source = source
-                        });
-                    }
+                    link = linkEl.GetString() ?? "";
+                }
+                else if (item.TryGetProperty("id", out var idEl))
+                {
+                    var id = idEl.GetString() ?? "";
+                    if (!string.IsNullOrEmpty(id))
+                        link = $"https://www.cls.cn/detail/xk/{id}";
                 }
 
-                return newsList;
-            });
+                // 发布时间
+                var publishTime = "";
+                if (item.TryGetProperty("ctime", out var ctimeEl) && ctimeEl.ValueKind == JsonValueKind.Number)
+                {
+                    var timestamp = ctimeEl.GetInt64();
+                    publishTime = DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime.ToString("yyyy-MM-dd HH:mm");
+                }
+
+                newsList.Add(new NewsItem
+                {
+                    Title = title,
+                    Link = link,
+                    Source = source,
+                    PublishTime = publishTime
+                });
+            }
+
+            return newsList;
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

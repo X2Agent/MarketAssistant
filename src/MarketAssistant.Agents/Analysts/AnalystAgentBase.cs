@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.PromptConfiguration;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -38,6 +39,22 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
             temperature, topP, topK, responseFormat, tools,
             skillsProvider != null ? [skillsProvider, .. (aiContextProviders ?? [])] : aiContextProviders))
+    {
+    }
+
+    /// <summary>
+    /// 初始化分析师代理基类（从 YAML 配置读取 name、description、temperature、topP、topK、instructions）
+    /// </summary>
+    protected AnalystAgentBase(
+        IChatClient chatClient,
+        AnalystPromptConfig config,
+        ChatResponseFormat? responseFormat,
+        IList<AITool>? tools,
+        AIContextProvider[]? aiContextProviders = null,
+        AgentSkillsProvider? skillsProvider = null)
+        : this(chatClient, config.Instructions, config.Name, config.Description,
+              config.Temperature, config.TopP, config.TopK,
+              responseFormat, tools, aiContextProviders, skillsProvider)
     {
     }
 

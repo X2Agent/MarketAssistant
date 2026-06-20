@@ -129,6 +129,7 @@ public class CryptoAssetInfoService : IAssetInfoService
                 CurrentPrice = FormatPrice(t.LastPrice),
                 ChangePercentage = FormatOpenClosePercentage(t.OpenPrice, t.LastPrice),
                 MarketType = MarketType.Crypto,
+                MetricLabel = "交易量",
                 MetricValue = FormatVolume(t.QuoteVolume),
                 SectorName = "加密货币"
             })

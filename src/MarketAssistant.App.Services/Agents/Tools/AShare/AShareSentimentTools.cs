@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,13 @@ public sealed class AShareSentimentTools : IShareSentimentTools
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareSentimentTools> _logger;
+
+    // 支持 API 返回的字符串数值自动转换为 float
+    private static readonly JsonSerializerOptions SentimentJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new StringToDecimalConverter() }
+    };
 
     public AShareSentimentTools(
         IHttpClientFactory httpClientFactory,
@@ -38,7 +46,7 @@ public sealed class AShareSentimentTools : IShareSentimentTools
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetStringAsync(url);
-            var fundFlow = JsonSerializer.Deserialize<FundFlow>(response);
+            var fundFlow = JsonSerializer.Deserialize<FundFlow>(response, SentimentJsonOptions);
 
             return fundFlow ?? throw new FriendlyException($"获取资金流向数据为空: {assetSymbol}");
         }

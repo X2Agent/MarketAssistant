@@ -1,8 +1,7 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Browser;
 using Microsoft.Extensions.Logging;
-using Microsoft.Playwright;
+using System.Text;
 using System.Text.Json;
 
 namespace MarketAssistant.Applications.Assets;
@@ -14,58 +13,77 @@ public class AShareAssetInfoService : IAssetInfoService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AShareAssetInfoService> _logger;
-    private readonly PlaywrightService _playwrightService;
 
     public AShareAssetInfoService(
         IHttpClientFactory httpClientFactory,
-        ILogger<AShareAssetInfoService> logger,
-        PlaywrightService playwrightService)
+        ILogger<AShareAssetInfoService> logger)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger;
-        _playwrightService = playwrightService;
     }
 
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
-        var url = $"https://www.cls.cn/searchPage?keyword={keyword.Trim()}&type=stock";
+        // cls.cn 搜索 JSON API，直接 POST 即可，无需 Playwright
+        const string apiUrl = "https://www.cls.cn/api/sw?app=CailianpressWeb&os=web&sv=8.7.9&sign=b02d8f7bc4c45eeb3e86904203597da2";
 
-        return await _playwrightService.ExecuteWithPageAsync(async page =>
+        var body = new
         {
+            type = "stock",
+            keyword = keyword.Trim(),
+            rn = 20,
+            page = 0,
+            os = "web",
+            sv = "8.7.9",
+            app = "CailianpressWeb"
+        };
+
+        try
+        {
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+            using var content = new StringContent(
+                JsonSerializer.Serialize(body),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await httpClient.PostAsync(apiUrl, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var doc = JsonDocument.Parse(json);
+
             var stockList = new List<(string Name, string Code)>();
 
-            try
+            if (doc.RootElement.TryGetProperty("data", out var data) &&
+                data.TryGetProperty("stock", out var stock) &&
+                stock.TryGetProperty("data", out var items))
             {
-                await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
-                await page.WaitForSelectorAsync(".search-stock-list", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "搜索页打开失败或超时，返回空结果");
-                return stockList;
-            }
-            var stockElements = await page.QuerySelectorAllAsync(".search-stock-list");
-
-            foreach (var stockElement in stockElements)
-            {
-                var nameElement = await stockElement.QuerySelectorAsync("a.search-content");
-                var codeElement = await stockElement.QuerySelectorAsync("a.search-content + a.search-content");
-
-                if (nameElement != null && codeElement != null)
+                foreach (var item in items.EnumerateArray())
                 {
-                    var name = await nameElement.InnerTextAsync();
-                    var code = (await codeElement.InnerHTMLAsync()).Replace("<em>", "").Replace("</em>", "").Trim();
-                    stockList.Add((name, code));
+                    var title = item.GetProperty("title").GetString() ?? "";
+                    var stockId = item.GetProperty("stock_id").GetString() ?? "";
+
+                    // 去除 <em> 高亮标签
+                    title = title.Replace("<em>", "").Replace("</em>", "").Trim();
+
+                    if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(stockId))
+                        stockList.Add((title, stockId));
                 }
             }
 
             return stockList;
-        }, cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "搜索股票失败，返回空结果");
+            return [];
+        }
     }
 
     public async Task<AssetInfo> GetAssetInfoAsync(string code, string market = "", CancellationToken cancellationToken = default)
     {
-        // 创建资产信息对象
         var assetInfo = new AssetInfo
         {
             Code = code,
@@ -76,109 +94,59 @@ public class AShareAssetInfoService : IAssetInfoService
 
         try
         {
-            // 构建股票详情页URL
-            var fullCode = string.IsNullOrEmpty(market) ? code : $"{market}{code}".ToLower();
-            var url = $"https://www.cls.cn/stock?code={fullCode}";
-
-            assetInfo = await _playwrightService.ExecuteWithPageAsync(async page =>
-            {
-                try
-                {
-                    await page.GotoAsync(url, new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle });
-                    await page.WaitForSelectorAsync(".stock-detail", new PageWaitForSelectorOptions { State = WaitForSelectorState.Attached, Timeout = 15000 });
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "股票详情页打开失败或超时，降级返回已有字段");
-                    return assetInfo;
-                }
-
-                var stockDetailElement = await page.QuerySelectorAsync(".stock-detail");
-                if (stockDetailElement != null)
-                {
-                    var nameElement = await stockDetailElement.QuerySelectorAsync(".f-s-25.f-w-b");
-                    if (nameElement != null)
-                    {
-                        assetInfo.Name = (await nameElement.InnerTextAsync()).Trim();
-                    }
-
-                    var codeElement = await stockDetailElement.QuerySelectorAsync(".f-s-20.f-w-b");
-                    if (codeElement != null)
-                    {
-                        var fullCodeText = (await codeElement.InnerTextAsync()).Trim();
-                        if (!string.IsNullOrEmpty(fullCodeText))
-                        {
-                            if (fullCodeText.StartsWith("sh", StringComparison.OrdinalIgnoreCase))
-                            {
-                                assetInfo.Market = "SH";
-                                assetInfo.Code = fullCodeText.Substring(2);
-                            }
-                            else if (fullCodeText.StartsWith("sz", StringComparison.OrdinalIgnoreCase))
-                            {
-                                assetInfo.Market = "SZ";
-                                assetInfo.Code = fullCodeText.Substring(2);
-                            }
-                            else
-                            {
-                                assetInfo.Code = fullCodeText;
-                            }
-                        }
-                    }
-                }
-
-                var quoteChangeBox = await page.QuerySelectorAsync(".quote-change-box");
-                if (quoteChangeBox != null)
-                {
-                    var priceElement = await quoteChangeBox.QuerySelectorAsync(".quote-price");
-                    if (priceElement != null)
-                    {
-                        assetInfo.CurrentPrice = (await priceElement.InnerTextAsync()).Trim();
-                    }
-
-                    var changeElement = await quoteChangeBox.QuerySelectorAsync(".quote-change");
-                    if (changeElement != null)
-                    {
-                        var changeText = (await changeElement.InnerTextAsync()).Trim();
-                        if (changeText.Contains("%"))
-                        {
-                            var startIndex = changeText.IndexOf("(") + 1;
-                            var endIndex = changeText.IndexOf("%") + 1;
-                            if (startIndex > 0 && endIndex > startIndex)
-                            {
-                                assetInfo.ChangePercentage = changeText.Substring(startIndex, endIndex - startIndex);
-                            }
-                            else
-                            {
-                                assetInfo.ChangePercentage = changeText;
-                            }
-                        }
-                        else
-                        {
-                            assetInfo.ChangePercentage = changeText;
-                        }
-                    }
-                }
-
-                var stockRelatedBox = await page.QuerySelectorAsync(".stock-related-box");
-                if (stockRelatedBox != null)
-                {
-                    var stockPlage = await stockRelatedBox.QuerySelectorAsync(".stock-related-plate");
-                    if (stockPlage != null)
-                    {
-                        var sectorElement = await stockPlage.QuerySelectorAsync(".m-r-10.f-s-20.c-222.f-w-b");
-                        if (sectorElement != null)
-                        {
-                            assetInfo.SectorName = (await sectorElement.InnerTextAsync()).Trim();
-                        }
-                    }
-                }
-
+            var fullCode = string.IsNullOrEmpty(market) ? code : $"{market}{code}";
+            var clsCode = StockSymbolConverter.ToClsFormat(fullCode);
+            if (string.IsNullOrEmpty(clsCode))
                 return assetInfo;
-            }, cancellationToken: cancellationToken);
+
+            var url = $"/quote/stock/basic?secu_code={clsCode}&fields=secu_name,secu_code,last_px,change&app=CailianpressWeb&os=web&sv=8.4.6";
+
+            using var httpClient = _httpClientFactory.CreateClient("Cls");
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            using var jsonDocument = JsonDocument.Parse(response);
+
+            if (!jsonDocument.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
+                return assetInfo;
+
+            // 股票名称
+            if (data.TryGetProperty("secu_name", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                assetInfo.Name = nameEl.GetString()?.Trim() ?? "未知股票";
+
+            // 股票代码 & 市场
+            if (data.TryGetProperty("secu_code", out var codeEl) && codeEl.ValueKind == JsonValueKind.String)
+            {
+                var rawCode = codeEl.GetString()?.Trim() ?? "";
+                if (rawCode.StartsWith("SH", StringComparison.OrdinalIgnoreCase))
+                {
+                    assetInfo.Market = "SH";
+                    assetInfo.Code = rawCode[2..];
+                }
+                else if (rawCode.StartsWith("SZ", StringComparison.OrdinalIgnoreCase))
+                {
+                    assetInfo.Market = "SZ";
+                    assetInfo.Code = rawCode[2..];
+                }
+                else
+                {
+                    assetInfo.Code = rawCode;
+                }
+            }
+
+            // 当前价格
+            if (data.TryGetProperty("last_px", out var priceEl))
+                assetInfo.CurrentPrice = priceEl.ToString();
+
+            // 涨跌幅
+            if (data.TryGetProperty("change", out var changeEl))
+            {
+                var changeText = changeEl.ToString();
+                if (!string.IsNullOrEmpty(changeText))
+                    assetInfo.ChangePercentage = changeText.Contains('%') ? changeText : $"{changeText}%";
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning($"获取股票详细数据异常: {ex.Message}");
+            _logger.LogWarning(ex, "获取股票详细数据异常: {Code}", code);
         }
 
         return assetInfo;
@@ -188,70 +156,52 @@ public class AShareAssetInfoService : IAssetInfoService
     {
         try
         {
-            DateTime today = DateTime.Now;
-
-            if (today.DayOfWeek == DayOfWeek.Saturday)
-            {
-                today = today.AddDays(-1);
-            }
-            else if (today.DayOfWeek == DayOfWeek.Sunday)
-            {
-                today = today.AddDays(-2);
-            }
-
-            string formattedDate = today.ToString("yyyyMMdd");
-            var url = $"https://finance.pae.baidu.com/vapi/v1/hotrank?product=stock&day={formattedDate}&pn=0&rn=8&market=ab&type=day&finClientType=pc";
+            // 东方财富主力资金排行 API：GET 请求、无需认证、包含名称/价格/涨跌幅/资金流入
+            var url = "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=8&po=1&np=1&fltt=2&invt=2&fid=f62" +
+                      "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
+                      "&fields=f2,f3,f12,f13,f14,f62";
 
             using var httpClient = _httpClientFactory.CreateClient();
-            var response = await httpClient.GetStringAsync(url);
-            var jsonDocument = JsonDocument.Parse(response);
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+
+            using var response = await httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var jsonDocument = JsonDocument.Parse(json);
             var root = jsonDocument.RootElement;
 
-            if (!root.TryGetProperty("Result", out var resultElement))
+            if (!root.TryGetProperty("data", out var data) ||
+                !data.TryGetProperty("diff", out var diff) ||
+                diff.ValueKind != JsonValueKind.Array)
             {
-                _logger.LogError("GetHotAssetsAsync: API返回数据格式不正确，缺少Result字段");
-                return new List<HotAsset>();
-            }
-
-            if (!resultElement.TryGetProperty("header", out var headerElement) ||
-                !resultElement.TryGetProperty("body", out var bodyElement))
-            {
-                _logger.LogError("GetHotAssetsAsync: API返回数据格式不正确，缺少header或body字段");
-                return new List<HotAsset>();
-            }
-
-            var headerIndices = new Dictionary<string, int>();
-            int index = 0;
-            foreach (var header in headerElement.EnumerateArray())
-            {
-                headerIndices[header.GetString() ?? string.Empty] = index++;
+                _logger.LogError("GetHotAssetsAsync: 东方财富API返回数据格式异常");
+                return [];
             }
 
             var hotAssets = new List<HotAsset>();
 
-            foreach (var stockArray in bodyElement.EnumerateArray())
+            foreach (var item in diff.EnumerateArray())
             {
-                if (stockArray.GetArrayLength() != headerIndices.Count)
-                {
-                    _logger.LogError("GetHotAssetsAsync: 股票数据数组长度与header不匹配");
-                    continue;
-                }
+                var code = item.TryGetProperty("f12", out var codeEl) ? codeEl.GetString() ?? "" : "";
+                var marketId = item.TryGetProperty("f13", out var mktEl) ? mktEl.GetInt32() : 0;
+                var market = marketId == 1 ? "SH" : "SZ";
 
-                var stockData = stockArray.EnumerateArray().ToArray();
+                var changeRaw = item.TryGetProperty("f3", out var changeEl) ? changeEl.GetDouble() : 0;
+                var flowRaw = item.TryGetProperty("f62", out var flowEl) ? flowEl.GetDouble() : 0;
 
-                var hotAsset = new HotAsset
+                hotAssets.Add(new HotAsset
                 {
-                    Name = stockData[headerIndices["股票名称"]].GetString() ?? string.Empty,
-                    ChangePercentage = stockData[headerIndices["涨跌幅"]].GetString() ?? string.Empty,
-                    SectorName = stockData[headerIndices["所属板块名称"]].GetString() ?? string.Empty,
-                    Code = stockData[headerIndices["市场代码"]].GetString() ?? string.Empty,
-                    CurrentPrice = stockData[headerIndices["现价"]].GetString() ?? string.Empty,
-                    Market = stockData[headerIndices["市场缩写"]].GetString() ?? string.Empty,
-                    MetricValue = stockData[headerIndices["综合热度"]].GetString() ?? string.Empty,
+                    Name = item.TryGetProperty("f14", out var nameEl) ? nameEl.GetString() ?? "" : "",
+                    Code = code,
+                    Market = market,
+                    CurrentPrice = item.TryGetProperty("f2", out var priceEl) ? priceEl.GetDouble().ToString("F2") : "",
+                    ChangePercentage = $"{changeRaw:+0.00;-0.00;0.00}%",
+                    MetricLabel = "净流入",
+                    MetricValue = flowRaw.ToString("F0"),
                     MarketType = MarketType.AShare
-                };
-
-                hotAssets.Add(hotAsset);
+                });
             }
 
             return hotAssets;
