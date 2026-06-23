@@ -43,9 +43,22 @@ public class ChatClientFactory : IChatClientFactory
             Delay = TimeSpan.FromSeconds(2),
             ShouldHandle = new PredicateBuilder()
                 .Handle<HttpRequestException>()
-                .Handle<TaskCanceledException>(ex => ex.InnerException is TimeoutException)
+                .Handle<TaskCanceledException>(ex => IsNetworkTimeout(ex))
         })
         .Build();
+
+    /// <summary>
+    /// 判断 TaskCanceledException 是否由网络超时引起（而非用户主动取消）。
+    /// System.ClientModel 超时时抛出的异常链为：
+    /// TaskCanceledException → TaskCanceledException → IOException → SocketException
+    /// </summary>
+    private static bool IsNetworkTimeout(TaskCanceledException ex)
+    {
+        if (ex.InnerException is TimeoutException) return true;
+        if (ex.CancellationToken.IsCancellationRequested) return false;
+        // System.ClientModel 的超时消息包含 "exceeded the configured timeout"
+        return ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase);
+    }
 
     private readonly IUserSettingService _userSettingService;
     private readonly object _lock = new();
@@ -120,7 +133,11 @@ public class ChatClientFactory : IChatClientFactory
                         new ApiKeyCredential(apiKey),
                         new OpenAIClientOptions
                         {
-                            Endpoint = new Uri(normalizedEndpoint)
+                            Endpoint = new Uri(normalizedEndpoint),
+                            // 分析工作流中 Agent 使用流式调用，Tool-Call 链路在等待外部 API
+                            // 返回期间不产生 token，默认 100s 超时过于激进。
+                            // 设为 3 分钟兼顾长链路 Tool-Call 和异常检测。
+                            NetworkTimeout = TimeSpan.FromMinutes(3)
                         }
                     );
 

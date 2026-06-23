@@ -61,6 +61,9 @@ public sealed class TokenTrackingMiddleware
     {
         int outputCharCount = 0;
         UsageDetails? streamingUsage = null;
+        var agentName = innerAgent.Name ?? "Unknown";
+
+        _logger.LogInformation("[{Agent}] 开始流式 LLM 调用", agentName);
 
         await foreach (var update in innerAgent.RunStreamingAsync(messages, session, options, cancellationToken)
                            .ConfigureAwait(false))
@@ -83,7 +86,7 @@ public sealed class TokenTrackingMiddleware
         var inputTokens = streamingUsage?.InputTokenCount ?? TokenEstimator.EstimateTotalTokens(messages);
         var outputTokens = streamingUsage?.OutputTokenCount ?? TokenEstimator.EstimateTokens(new string(' ', outputCharCount));
 
-        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, innerAgent.Name,
+        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, agentName,
             isPrecise: streamingUsage != null);
     }
 

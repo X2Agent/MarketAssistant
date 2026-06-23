@@ -37,7 +37,7 @@ ArchitecturesInstallIn64BitMode=x64
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Installer
-VersionInfoCopyright=Copyright (C) 2025 {#MyAppPublisher}
+VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
 

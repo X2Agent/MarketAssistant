@@ -24,6 +24,8 @@
                         <!-- 视图标题 -->
                         <ContentPresenter x:Name="PART_ViewHeaderContentPresenter"
                                           Grid.Row="1"
+                                          HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Stretch"
                                           IsVisible="False"/>
 
                         <!-- 分隔线 -->

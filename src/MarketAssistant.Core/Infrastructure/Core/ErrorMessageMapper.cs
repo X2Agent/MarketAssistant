@@ -18,7 +18,11 @@ public static class ErrorMessageMapper
             // 友好异常直接返回消息
             FriendlyException => exception.Message,
 
-            // 取消相关异常
+            // 取消相关异常：区分网络超时与用户主动取消
+            TaskCanceledException tce when tce.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+                => "AI 模型响应超时，可能是模型服务繁忙或网络不稳定，请稍后重试",
+            TaskCanceledException tce when !tce.CancellationToken.IsCancellationRequested
+                => "AI 模型响应超时，可能是模型服务繁忙或网络不稳定，请稍后重试",
             TaskCanceledException => "请求超时，请稍后重试",
             OperationCanceledException => "操作已取消",
 

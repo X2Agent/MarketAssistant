@@ -5,11 +5,13 @@ set -e
 # 适用于 Fedora、RHEL、CentOS
 
 APP_NAME="marketassistant"
-VERSION="1.0.0"
+# 优先使用 CI 注入的版本号，否则回退到默认值
+VERSION="${APP_VERSION:-1.0.0}"
 RELEASE="1"
 ARCH="x86_64"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/Linux"
 PUBLISH_DIR="$BUILD_DIR/publish"
 RPM_DIR="$BUILD_DIR/rpm"
@@ -46,7 +48,7 @@ Version:        $VERSION
 Release:        $RELEASE%{?dist}
 Summary:        AI 智能市场分析助手
 License:        Proprietary
-URL:            https://github.com/yourusername/MarketAssistant
+URL:            https://github.com/X2Agent/MarketAssistant
 BuildArch:      $ARCH
 
 Requires:       libicu >= 60, openssl-libs >= 1.1
@@ -76,8 +78,8 @@ cp -r $PUBLISH_DIR/* %{buildroot}/opt/MarketAssistant/
 cp $SCRIPT_DIR/marketassistant.desktop %{buildroot}/usr/share/applications/
 
 # 复制图标
-if [ -f $PROJECT_ROOT/src/Assets/logo.png ]; then
-    cp $PROJECT_ROOT/src/Assets/logo.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/marketassistant.png
+if [ -f "$APP_ASSETS_DIR/logo.png" ]; then
+    cp "$APP_ASSETS_DIR/logo.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/marketassistant.png
 fi
 
 # 创建符号链接

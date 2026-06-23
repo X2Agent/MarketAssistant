@@ -31,6 +31,22 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          # 去掉前缀 v
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Resolved version: $VERSION"
+
       - name: Restore dependencies
         run: dotnet restore MarketAssistant.slnx
 
@@ -45,7 +61,10 @@ jobs:
             -p:UseAppHost=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
+            -p:Version=${{ steps.version.outputs.version }} `
+            -p:InformationalVersion=${{ steps.version.outputs.version }} `
             -o ./publish/windows
+        shell: pwsh
 
       - name: Clean debug files
         run: |
@@ -57,9 +76,10 @@ jobs:
 
       - name: Build installer
         shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag.TrimStart('v')
+          $version = $env:APP_VERSION
           $issFile = "scripts\windows\MarketAssistant.iss"
           $content = Get-Content $issFile -Raw
           $content = $content -replace '#define MyAppVersion ".*?"', "#define MyAppVersion `"$version`""
@@ -94,6 +114,21 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Resolved version: $VERSION"
+
       - name: Restore dependencies
         run: dotnet restore MarketAssistant.slnx
 
@@ -115,6 +150,7 @@ jobs:
       - name: Build macOS app
         run: ./scripts/macos/build-app-bundle.sh
         env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
           # 如果配置了签名，取消注释以下行
           # SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           # NOTARYTOOL_PROFILE: "AC_PASSWORD"
@@ -146,6 +182,21 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Resolved version: $VERSION"
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -161,9 +212,13 @@ jobs:
 
       - name: Build Debian package
         run: ./scripts/linux/build-deb.sh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
 
       - name: Build RPM package
         run: ./scripts/linux/build-rpm.sh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
         continue-on-error: true
 
       - name: Upload .deb package
@@ -194,6 +249,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -205,7 +263,7 @@ jobs:
       - name: Get release version
         id: get_version
         run: |
-          if [ "${{ github.event_name }}" == "release" ]; then
+          if [ "${{ github.event_name }}" = "release" ]; then
             echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -226,6 +284,12 @@ jobs:
             echo "Release $TAG not found. Skipping asset cleanup."
           fi
 
+      - name: Generate SHA256 checksums
+        working-directory: ./artifacts
+        run: |
+          find . -type f \( -name "*.zip" -o -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" \) -exec sha256sum {} \; > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
@@ -235,9 +299,19 @@ jobs:
             ./artifacts/**/*.dmg
             ./artifacts/**/*.deb
             ./artifacts/**/*.rpm
+            ./SHA256SUMS.txt
           tag_name: ${{ steps.get_version.outputs.version }}
           name: ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
+          body: |
+            ## 下载说明
+
+            请根据操作系统选择对应安装包：
+            - **Windows**: `MarketAssistant-Windows-x64.zip`（便携版）或 `MarketAssistant-Setup-<version>.exe`（安装版）
+            - **macOS**: `MarketAssistant-<version>.dmg`
+            - **Linux**: `MarketAssistant-<version>-amd64.deb`（Debian/Ubuntu）或 `MarketAssistant-<version>-x86_64.rpm`（Fedora/RHEL）
+
+            完整性校验请参考 `SHA256SUMS.txt`。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

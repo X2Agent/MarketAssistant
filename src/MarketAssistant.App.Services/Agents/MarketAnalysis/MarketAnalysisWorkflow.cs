@@ -132,6 +132,10 @@ public class MarketAnalysisWorkflow
 
             return finalReport;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "执行市场分析工作流时发生错误");
@@ -157,7 +161,10 @@ public class MarketAnalysisWorkflow
         bool reportReceived = false;
         int completedAnalysts = 0;
         int totalAnalysts = analystCount;
-        var failedSteps = new List<string>();
+        var failedSteps = new List<(string DisplayName, string ErrorMessage)>();
+        string? lastCompletedStep = null;
+        // 追踪当前正在运行的 Executor，超时时用于定位卡住的分析师
+        var activeExecutors = new HashSet<string>();
 
         // 执行工作流（流式处理）
         // 初始输入 assetSymbol 会触发 Dispatcher，Dispatcher 再通过 context.SendMessageAsync
@@ -169,97 +176,200 @@ public class MarketAnalysisWorkflow
             sessionId: null,
             cancellationToken);
 
-        await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
+        try
         {
-            switch (evt)
+            await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
             {
-                case ExecutorInvokedEvent executorInvoked:
-                    _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                switch (evt)
+                {
+                    case ExecutorInvokedEvent executorInvoked:
+                        activeExecutors.Add(executorInvoked.ExecutorId);
+                        _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
 
-                    string stageName = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
-                    {
-                        "AnalysisDispatcher" => "正在分发分析任务",
-                        "AnalysisAggregator" => "正在聚合分析结果",
-                        "Coordinator" => "正在生成综合报告",
-                        _ => $"{GetDisplayNameForExecutorId(executorInvoked.ExecutorId)} 正在分析"
-                    };
+                        string stageName = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
+                        {
+                            "AnalysisDispatcher" => "正在分发分析任务",
+                            "AnalysisAggregator" => "正在聚合分析结果",
+                            "Coordinator" => "正在生成综合报告",
+                            _ => $"{GetDisplayNameForExecutorId(executorInvoked.ExecutorId)} 正在分析"
+                        };
 
-                    OnProgressChanged(new AnalysisProgressEventArgs
-                    {
-                        StageDescription = stageName,
-                        IsInProgress = true,
-                        TotalAnalysts = totalAnalysts,
-                        CompletedAnalysts = completedAnalysts
-                    });
-                    break;
-
-                case ExecutorCompletedEvent executorComplete:
-                    _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
-
-                    if (IsAnalystExecutor(executorComplete.ExecutorId))
-                    {
-                        completedAnalysts++;
                         OnProgressChanged(new AnalysisProgressEventArgs
                         {
-                            StageDescription = $"{GetDisplayNameForExecutorId(executorComplete.ExecutorId)} 分析完成",
+                            StageDescription = stageName,
+                            IsInProgress = true,
+                            TotalAnalysts = totalAnalysts,
+                            CompletedAnalysts = completedAnalysts
+                        });
+                        break;
+
+                    case ExecutorCompletedEvent executorComplete:
+                        activeExecutors.Remove(executorComplete.ExecutorId);
+                        lastCompletedStep = GetDisplayNameForExecutorId(executorComplete.ExecutorId);
+                        _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
+
+                        if (IsAnalystExecutor(executorComplete.ExecutorId))
+                        {
+                            completedAnalysts++;
+                            OnProgressChanged(new AnalysisProgressEventArgs
+                            {
+                                StageDescription = $"{lastCompletedStep} 分析完成",
+                                IsInProgress = true,
+                                TotalAnalysts = totalAnalysts,
+                                CompletedAnalysts = completedAnalysts,
+                                CompletedAnalystName = executorComplete.ExecutorId
+                            });
+                        }
+                        break;
+
+                    case WorkflowOutputEvent workflowOutput:
+                        if (!reportReceived)
+                        {
+                            finalReport = workflowOutput.Data as MarketAnalysisReport;
+                            if (finalReport != null)
+                            {
+                                reportReceived = true;
+                                _logger.LogInformation("工作流完成，生成最终报告");
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "收到 WorkflowOutputEvent 但数据类型不匹配，期望 MarketAnalysisReport，实际: {ActualType}",
+                                    workflowOutput.Data?.GetType().FullName ?? "null");
+                            }
+                        }
+                        break;
+
+                    case ExecutorFailedEvent executorFailed:
+                        activeExecutors.Remove(executorFailed.ExecutorId);
+                        var failedDisplayName = GetDisplayNameForExecutorId(executorFailed.ExecutorId);
+                        var errorDetail = executorFailed.Data?.Message ?? "未知错误";
+                        _logger.LogError(executorFailed.Data,
+                            "步骤失败: {ExecutorId} ({DisplayName}), 错误: {Error}",
+                            executorFailed.ExecutorId, failedDisplayName, errorDetail);
+                        failedSteps.Add((failedDisplayName, errorDetail));
+
+                        if (IsSystemExecutor(executorFailed.ExecutorId))
+                        {
+                            throw new FriendlyException(
+                                $"分析流程关键环节「{failedDisplayName}」执行失败: {errorDetail}");
+                        }
+
+                        OnProgressChanged(new AnalysisProgressEventArgs
+                        {
+                            StageDescription = $"{failedDisplayName} 分析失败，继续其他分析",
                             IsInProgress = true,
                             TotalAnalysts = totalAnalysts,
                             CompletedAnalysts = completedAnalysts,
-                            CompletedAnalystName = executorComplete.ExecutorId
+                            FailedAnalysts = failedSteps.Select(f => f.DisplayName).ToList()
                         });
-                    }
-                    break;
+                        break;
 
-                case WorkflowOutputEvent workflowOutput:
-                    if (!reportReceived)
-                    {
-                        finalReport = workflowOutput.Data as MarketAnalysisReport;
-                        reportReceived = true;
-                        _logger.LogInformation("工作流完成，生成最终报告");
-                    }
-                    break;
+                    case WorkflowErrorEvent workflowError:
+                        var wfErrorMsg = workflowError.Exception?.Message ?? "市场分析工作流内部发生未知错误";
+                        _logger.LogError(workflowError.Exception,
+                            "市场分析工作流发生严重错误: {Message}", wfErrorMsg);
+                        throw new FriendlyException(
+                            BuildWorkflowErrorMessage(wfErrorMsg, failedSteps));
 
-                case ExecutorFailedEvent executorFailed:
-                    var errorMessage = executorFailed.Data?.Message ?? "未知错误";
-                    _logger.LogError(executorFailed.Data,
-                        "步骤失败: {ExecutorId}, 错误: {Error}",
-                        executorFailed.ExecutorId,
-                        errorMessage);
-                    failedSteps.Add(GetDisplayNameForExecutorId(executorFailed.ExecutorId));
+                    case SuperStepCompletedEvent superStepCompleted:
+                        _logger.LogDebug("工作流 SuperStep 完成");
+                        break;
 
-                    // 关键步骤失败则抛出，非关键步骤记录并继续
-                    if (IsSystemExecutor(executorFailed.ExecutorId))
-                    {
-                        throw new FriendlyException(errorMessage);
-                    }
+                    case WorkflowWarningEvent workflowWarning:
+                        _logger.LogWarning("市场分析工作流警告: {Warning}", workflowWarning.Data);
+                        break;
 
-                    OnProgressChanged(new AnalysisProgressEventArgs
-                    {
-                        StageDescription = $"{GetDisplayNameForExecutorId(executorFailed.ExecutorId)} 分析失败，继续其他分析",
-                        IsInProgress = true,
-                        TotalAnalysts = totalAnalysts,
-                        CompletedAnalysts = completedAnalysts,
-                        FailedAnalysts = failedSteps
-                    });
-                    break;
-
-                case WorkflowErrorEvent workflowError:
-                    var wfErrorMsg = workflowError.Exception?.Message ?? "市场分析工作流内部发生未知错误";
-                    _logger.LogError(workflowError.Exception,
-                        "市场分析工作流发生严重错误: {Message}", wfErrorMsg);
-                    throw new FriendlyException(wfErrorMsg);
-
-                case SuperStepCompletedEvent superStepCompleted:
-                    _logger.LogDebug("工作流 SuperStep 完成");
-                    break;
-
-                case WorkflowWarningEvent workflowWarning:
-                    _logger.LogWarning("市场分析工作流警告: {Warning}", workflowWarning.Data);
-                    break;
+                    default:
+                        _logger.LogDebug("收到未处理的工作流事件: {EventType}", evt.GetType().Name);
+                        break;
+                }
             }
         }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // AI 模型 API 响应超时（NetworkTimeout），精确定位卡住的分析师
+            var stuckAnalysts = activeExecutors
+                .Where(id => IsAnalystExecutor(id))
+                .Select(GetDisplayNameForExecutorId)
+                .ToList();
+            var stuckSystem = activeExecutors
+                .Where(id => IsSystemExecutor(id))
+                .Select(GetDisplayNameForExecutorId)
+                .ToList();
 
-        return finalReport ?? throw new FriendlyException("工作流未返回分析报告");
+            var allStuck = stuckAnalysts.Concat(stuckSystem).ToList();
+            var stuckDescription = allStuck.Count > 0
+                ? string.Join("、", allStuck)
+                : "未知环节";
+
+            _logger.LogError(ex,
+                "AI 模型响应超时，卡在: [{StuckExecutors}]，标的: {AssetSymbol}，已完成: {Completed}/{Total}",
+                stuckDescription, assetSymbol, completedAnalysts, totalAnalysts);
+
+            throw new FriendlyException(
+                $"「{stuckDescription}」调用 AI 模型时超时无响应，请检查模型服务是否正常或尝试更换模型");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+
+        if (finalReport != null)
+        {
+            return finalReport;
+        }
+
+        // 工作流正常结束但未收到 WorkflowOutputEvent，构建详细诊断信息
+        _logger.LogError(
+            "工作流事件流已结束但未收到 WorkflowOutputEvent，标的: {AssetSymbol}，已完成分析师: {Completed}/{Total}，失败步骤: [{FailedSteps}]，最后完成步骤: {LastStep}",
+            assetSymbol, completedAnalysts, totalAnalysts,
+            string.Join(", ", failedSteps.Select(f => f.DisplayName)),
+            lastCompletedStep ?? "无");
+
+        throw new FriendlyException(
+            BuildOutputMissingErrorMessage(assetSymbol, failedSteps, completedAnalysts, totalAnalysts));
+    }
+
+    /// <summary>
+    /// 构建工作流错误的用户可读消息
+    /// </summary>
+    private static string BuildWorkflowErrorMessage(
+        string baseMessage,
+        List<(string DisplayName, string ErrorMessage)> failedSteps)
+    {
+        if (failedSteps.Count == 0)
+        {
+            return $"分析过程发生内部错误: {baseMessage}";
+        }
+
+        var failedDetails = string.Join("；",
+            failedSteps.Select(f => $"「{f.DisplayName}」({f.ErrorMessage})"));
+        return $"分析过程中以下环节出现问题: {failedDetails}。错误详情: {baseMessage}";
+    }
+
+    /// <summary>
+    /// 构建工作流未输出报告时的用户可读消息
+    /// </summary>
+    private static string BuildOutputMissingErrorMessage(
+        string assetSymbol,
+        List<(string DisplayName, string ErrorMessage)> failedSteps,
+        int completedAnalysts,
+        int totalAnalysts)
+    {
+        if (failedSteps.Count > 0)
+        {
+            var failedDetails = string.Join("；",
+                failedSteps.Select(f => $"「{f.DisplayName}」({f.ErrorMessage})"));
+            return $"分析 {assetSymbol} 时部分环节失败导致无法生成报告: {failedDetails}";
+        }
+
+        if (completedAnalysts < totalAnalysts)
+        {
+            return $"分析 {assetSymbol} 未能完成: 仅 {completedAnalysts}/{totalAnalysts} 位分析师完成了分析，报告生成被中断";
+        }
+
+        return $"分析 {assetSymbol} 的所有分析师已完成，但综合报告生成环节异常，请重试。如果问题持续，请检查 AI 模型配置是否正确";
     }
 
     /// <summary>

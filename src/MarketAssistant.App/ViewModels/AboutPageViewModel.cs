@@ -81,8 +81,9 @@ public partial class AboutPageViewModel : ViewModelBase
             {
                 Logger?.LogInformation("开始检查更新，当前版本: {Version}", AppInfo.Version);
 
-                // 调用 IReleaseService 检查更新
-                var result = await _releaseService.CheckForUpdateAsync(AppInfo.Version, includePrerelease: true);
+                // 当前版本为正式版时，不检查预发布版本，避免正式版用户被提示升级到 beta
+                var includePrerelease = IsPrerelease(AppInfo.Version);
+                var result = await _releaseService.CheckForUpdateAsync(AppInfo.Version, includePrerelease: includePrerelease);
 
                 if (result.HasNewVersion && result.LatestRelease != null)
                 {
@@ -135,10 +136,8 @@ public partial class AboutPageViewModel : ViewModelBase
 
             try
             {
-                // 获取下载URL（优先 Windows 安装包）
-                var asset = _latestRelease.Assets
-                    ?.FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
-                                        a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+                // 获取下载URL（优先匹配当前操作系统的安装包）
+                var asset = SelectAssetForCurrentOs(_latestRelease)
                     ?? _latestRelease.Assets?.FirstOrDefault();
 
                 if (asset == null || string.IsNullOrEmpty(asset.DownloadUrl))
@@ -226,6 +225,60 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             // 处理异常
         }
+    }
+
+    /// <summary>
+    /// 根据当前操作系统选择合适的下载资产，避免向 macOS/Linux 用户推荐 Windows 安装包。
+    /// 命名约定见 release.yml：Windows 优先 .exe/.msi，macOS 优先 .dmg，Linux 优先 .deb/.rpm。
+    /// </summary>
+    private static ReleaseAsset? SelectAssetForCurrentOs(ReleaseInfo release)
+    {
+        var assets = release.Assets;
+        if (assets == null || assets.Count == 0)
+        {
+            return null;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return assets.FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.Contains("Windows", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return assets.FirstOrDefault(a => a.Name.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.Contains("macOS", StringComparison.OrdinalIgnoreCase)
+                                          || a.Name.Contains("macos", StringComparison.OrdinalIgnoreCase)
+                                          || a.Name.Contains("osx", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return assets.FirstOrDefault(a => a.Name.EndsWith(".deb", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.EndsWith(".rpm", StringComparison.OrdinalIgnoreCase))
+                ?? assets.FirstOrDefault(a => a.Name.Contains("Linux", StringComparison.OrdinalIgnoreCase)
+                                          || a.Name.Contains("linux", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 判断版本号是否为预发布版本（包含 '-' 分隔符，如 1.0.0-beta1）。
+    /// 正式版（如 1.0.0）不检查预发布更新，避免被提示升级到 beta。
+    /// </summary>
+    private static bool IsPrerelease(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return false;
+        }
+
+        var trimmed = version.TrimStart('v');
+        return trimmed.Contains('-');
     }
 
     private void OpenUrl(string url)

@@ -27,8 +27,9 @@
     <CFBundleName>MarketAssistant</CFBundleName>
     <CFBundleDisplayName>Market Assistant</CFBundleDisplayName>
     <CFBundleIdentifier>xyz.haoai.market</CFBundleIdentifier>
-    <CFBundleVersion>1.0.0</CFBundleVersion>
-    <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
+    <!-- CFBundle 版本号跟随 <Version> 自动同步，发版时通过 -p:Version 注入 -->
+    <CFBundleVersion>$(Version)</CFBundleVersion>
+    <CFBundleShortVersionString>$(Version)</CFBundleShortVersionString>
     <CFBundlePackageType>APPL</CFBundlePackageType>
     <CFBundleSignature>MKAS</CFBundleSignature>
     <CFBundleExecutable>MarketAssistant</CFBundleExecutable>

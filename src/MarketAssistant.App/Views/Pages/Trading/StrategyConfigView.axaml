@@ -12,19 +12,29 @@
     <ScrollViewer>
         <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- 新建策略区域 -->
-            <controls:CardView Header="新建策略">
+            <!-- 策略列表 -->
+            <controls:CardView>
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                        <TextBlock Text="策略列表"
+                                   FontSize="{StaticResource SectionTitleFontSize}"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Command="{Binding ToggleCreateFormCommand}"
+                                Background="{DynamicResource PrimaryBrush}"
+                                Foreground="White"
+                                VerticalAlignment="Center"
+                                Padding="12,4">
+                            <Panel>
+                                <TextBlock Text="+ 新建策略" IsVisible="{Binding !IsCreating}"/>
+                                <TextBlock Text="取消" IsVisible="{Binding IsCreating}"/>
+                            </Panel>
+                        </Button>
+                    </Grid>
+                </controls:CardView.Header>
                 <StackPanel Spacing="{StaticResource SmallSpacing}">
-                    <Button Command="{Binding ToggleCreateFormCommand}"
-                            HorizontalAlignment="Left"
-                            Background="{DynamicResource PrimaryBrush}"
-                            Foreground="White">
-                        <Panel>
-                            <TextBlock Text="+ 新建策略" IsVisible="{Binding !IsCreating}"/>
-                            <TextBlock Text="取消" IsVisible="{Binding IsCreating}"/>
-                        </Panel>
-                    </Button>
-
                     <!-- 新建表单 -->
                     <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsCreating}">
                         <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
@@ -49,7 +59,6 @@
                                 <ComboBox ItemsSource="{Binding OrderSides}"
                                           SelectedItem="{Binding NewSide}"
                                           HorizontalAlignment="Stretch"/>
-                                <!-- 止损/止盈方向语义提示：买入方向用于空头对冲，现货多头应选卖出 -->
                                 <TextBlock Text="{Binding SideHintText}"
                                            IsVisible="{Binding SideHintText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                            Foreground="{DynamicResource WarningBrush}"
@@ -160,12 +169,7 @@
                                 HorizontalAlignment="Left"
                                 Margin="{StaticResource TinyTopMargin}"/>
                     </StackPanel>
-                </StackPanel>
-            </controls:CardView>
 
-            <!-- 策略列表 -->
-            <controls:CardView Header="策略列表">
-                <StackPanel Spacing="{StaticResource SmallSpacing}">
                     <TextBlock Text="暂无策略"
                                IsVisible="{Binding !Strategies.Count}"
                                Foreground="{DynamicResource TextSecondaryBrush}"

@@ -160,6 +160,13 @@ public sealed partial class CoordinatorExecutor : Executor
             _logger.LogInformation("协调分析师已完成最终报告生成，标的: {AssetSymbol}",
                 assetSymbol);
 
+            // 显式将报告推入工作流输出队列。
+            // WithOutputFrom 的 auto-yield 在 RunStreamingAsync（流式执行）路径下
+            // 存在时序缺陷：WatchStreamAsync 的 IAsyncEnumerable 在 auto-yield 入队前
+            // 已结束迭代，导致 WorkflowOutputEvent 丢失。显式调用 YieldOutputAsync
+            // 确保事件在 Executor 返回前入队，对非流式路径无副作用。
+            await context.YieldOutputAsync(finalReport, cancellationToken);
+
             return finalReport;
         }
         catch (Exception ex)

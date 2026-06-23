@@ -5,10 +5,13 @@ set -e
 # 遵循 Avalonia 官方 macOS 部署规范
 
 APP_NAME="MarketAssistant"
-VERSION="1.0.0"
-BUNDLE_ID="com.marketassistant.app"
+# 优先使用 CI 注入的版本号，否则回退到默认值
+VERSION="${APP_VERSION:-1.0.0}"
+BUNDLE_ID="xyz.haoai.market"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APP_CSProj="$PROJECT_ROOT/src/MarketAssistant.App/MarketAssistant.App.csproj"
+APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/macOS"
 PUBLISH_DIR="$BUILD_DIR/publish"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
@@ -33,7 +36,7 @@ mkdir -p "$BUILD_DIR"
 echo -e "${YELLOW}📦 Publishing app...${NC}"
 cd "$PROJECT_ROOT"
 
-dotnet publish src/MarketAssistant.csproj \
+dotnet publish "$APP_CSProj" \
     -c Release \
     -r osx-x64 \
     --self-contained \
@@ -43,6 +46,8 @@ dotnet publish src/MarketAssistant.csproj \
     -p:DebugType=None \
     -p:DebugSymbols=false \
     -p:ErrorOnDuplicatePublishOutputFiles=false \
+    -p:Version="$VERSION" \
+    -p:InformationalVersion="$VERSION" \
     -o "$PUBLISH_DIR"
 
 if [ $? -ne 0 ]; then
@@ -64,27 +69,30 @@ chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 # 4. 创建 Info.plist
 echo -e "${YELLOW}📝 Creating Info.plist...${NC}"
-cp "$SCRIPT_DIR/Info.plist.template" "$APP_BUNDLE/Contents/Info.plist"
+# 基于 tag 版本号注入到 Info.plist
+sed -e "s|__APP_VERSION__|$VERSION|g" \
+    -e "s|__BUNDLE_ID__|$BUNDLE_ID|g" \
+    "$SCRIPT_DIR/Info.plist.template" > "$APP_BUNDLE/Contents/Info.plist"
 
 # 5. 复制图标（如果存在）
-if [ -f "$PROJECT_ROOT/src/Assets/MarketAssistant.icns" ]; then
+if [ -f "$APP_ASSETS_DIR/MarketAssistant.icns" ]; then
     echo -e "${YELLOW}🎨 Copying icon...${NC}"
-    cp "$PROJECT_ROOT/src/Assets/MarketAssistant.icns" "$APP_BUNDLE/Contents/Resources/"
-elif [ -f "$PROJECT_ROOT/src/Assets/logo.png" ]; then
+    cp "$APP_ASSETS_DIR/MarketAssistant.icns" "$APP_BUNDLE/Contents/Resources/"
+elif [ -f "$APP_ASSETS_DIR/logo.png" ]; then
     echo -e "${YELLOW}🎨 Converting PNG to ICNS...${NC}"
     # 如果只有 PNG，尝试转换（需要 imagemagick 或 sips）
     if command -v sips &> /dev/null; then
         mkdir -p /tmp/iconset.iconset
-        sips -z 16 16 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_16x16.png
-        sips -z 32 32 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
-        sips -z 32 32 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_32x32.png
-        sips -z 64 64 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
-        sips -z 128 128 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_128x128.png
-        sips -z 256 256 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
-        sips -z 256 256 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_256x256.png
-        sips -z 512 512 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
-        sips -z 512 512 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_512x512.png
-        sips -z 1024 1024 "$PROJECT_ROOT/src/Assets/logo.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
+        sips -z 16 16 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32.png
+        sips -z 64 64 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
+        sips -z 128 128 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512.png
+        sips -z 1024 1024 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
         iconutil -c icns /tmp/iconset.iconset -o "$APP_BUNDLE/Contents/Resources/MarketAssistant.icns"
         rm -rf /tmp/iconset.iconset
     fi
