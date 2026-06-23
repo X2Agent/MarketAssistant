@@ -12,12 +12,14 @@ public record TokenInfo(string Token, double Bonus, int Frequency = 1);
 
 /// <summary>
 /// 评分权重配置
+/// 向量分数占主导（语义检索的核心信号），启发式特征作为辅助补充。
 /// </summary>
 public record ScoringWeights
 {
-    public double Relevance { get; init; } = 0.55;
-    public double Freshness { get; init; } = 0.25;
-    public double Length { get; init; } = 0.20;
+    public double Vector { get; init; } = 0.6;
+    public double Relevance { get; init; } = 0.2;
+    public double Freshness { get; init; } = 0.1;
+    public double Length { get; init; } = 0.1;
 }
 
 /// <summary>
@@ -39,21 +41,22 @@ public record ScoringConstants
 /// </summary>
 public class ScoredResult
 {
-    public TextSearchResult Item { get; init; } = null!;
+    public ScoredSearchResult Item { get; init; } = null!;
+    public double NormalizedVectorScore { get; init; }
     public double RelevanceScore { get; init; }
     public double FreshnessScore { get; init; }
     public double LengthScore { get; init; }
     public double TotalScore { get; set; }
 
-    public ScoredResult(TextSearchResult item)
+    public ScoredResult(ScoredSearchResult item)
     {
         Item = item;
     }
 }
 
 /// <summary>
-/// 重排序服务 - 基于启发式算法，专为金融场景优化
-/// 多维度评分：文本相关性 + 时效性 + 长度优化 + 多样性
+/// 重排序服务 - 融合向量相似度分数与启发式评分
+/// 多维度评分：向量相似度（主导） + 文本相关性 + 时效性 + 长度优化 + 多样性
 /// </summary>
 public class RerankerService : IRerankerService
 {
@@ -68,7 +71,7 @@ public class RerankerService : IRerankerService
 
     public IReadOnlyList<TextSearchResult> Rerank(
         string query,
-        IEnumerable<TextSearchResult> items)
+        IEnumerable<ScoredSearchResult> items)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -76,19 +79,30 @@ public class RerankerService : IRerankerService
         if (itemList.Count == 0)
         {
             _logger.LogDebug("重排序输入为空，直接返回");
-            return itemList;
+            return new List<TextSearchResult>();
         }
 
         var safeQuery = query?.Trim() ?? string.Empty;
-        _logger.LogDebug("开始启发式重排序，结果数量: {Count}, 查询: '{Query}'", itemList.Count, safeQuery);
+        _logger.LogDebug("开始重排序，结果数量: {Count}, 查询: '{Query}'", itemList.Count, safeQuery);
 
         try
         {
+            // 向量分数归一化（min-max），消除不同查询间分数尺度差异
+            var vectorScores = itemList.Select(i => (double)i.VectorScore).ToList();
+            var minScore = vectorScores.Min();
+            var maxScore = vectorScores.Max();
+            var range = maxScore - minScore;
+
             // 预处理查询词元
             var queryTokens = TokenizeWithBonus(safeQuery);
 
             // 计算各项评分
-            var scoredResults = CalculateScores(itemList, queryTokens, safeQuery);
+            var scoredResults = itemList.Select(item =>
+            {
+                // 所有分数相同时给满分，避免单一维度失效
+                var normalizedVector = range < 1e-9 ? 1.0 : (item.VectorScore - minScore) / range;
+                return CalculateItemScore(item, queryTokens, safeQuery, normalizedVector);
+            }).ToList();
 
             // 应用多样性优化
             ApplyDiversityOptimization(scoredResults);
@@ -96,7 +110,7 @@ public class RerankerService : IRerankerService
             // 排序并返回结果
             var rankedResults = scoredResults
                 .OrderByDescending(r => r.TotalScore)
-                .Select(r => r.Item)
+                .Select(r => r.Item.Item)
                 .ToList();
 
             LogTopResults(scoredResults);
@@ -105,36 +119,37 @@ public class RerankerService : IRerankerService
         catch (Exception ex)
         {
             _logger.LogError(ex, "重排序过程中发生错误，查询: '{Query}'", safeQuery);
-            // 发生错误时返回原始排序
-            return itemList;
+            // 发生错误时返回原始排序（按向量分数降序）
+            return itemList
+                .OrderByDescending(x => x.VectorScore)
+                .Select(x => x.Item)
+                .ToList();
         }
     }
 
     #region 评分计算核心方法
 
-    private List<ScoredResult> CalculateScores(List<TextSearchResult> items, IReadOnlyList<TokenInfo> queryTokens, string query)
+    private ScoredResult CalculateItemScore(ScoredSearchResult item, IReadOnlyList<TokenInfo> queryTokens, string query, double normalizedVectorScore)
     {
-        return items.Select(item => CalculateItemScore(item, queryTokens, query)).ToList();
-    }
-
-    private ScoredResult CalculateItemScore(TextSearchResult item, IReadOnlyList<TokenInfo> queryTokens, string query)
-    {
-        var text = GetFullText(item);
+        var text = GetFullText(item.Item);
         var itemTokens = TokenizeWithBonus(text);
 
         var scores = new
         {
+            Vector = normalizedVectorScore,
             Relevance = CalculateRelevanceScore(queryTokens, itemTokens, query, text),
-            Freshness = CalculateFreshnessScore(item),
+            Freshness = CalculateFreshnessScore(item.Item),
             Length = CalculateLengthScore(text)
         };
 
-        var totalScore = Weights.Relevance * scores.Relevance +
+        var totalScore = Weights.Vector * scores.Vector +
+                        Weights.Relevance * scores.Relevance +
                         Weights.Freshness * scores.Freshness +
                         Weights.Length * scores.Length;
 
         return new ScoredResult(item)
         {
+            NormalizedVectorScore = scores.Vector,
             RelevanceScore = scores.Relevance,
             FreshnessScore = scores.Freshness,
             LengthScore = scores.Length,
@@ -147,7 +162,7 @@ public class RerankerService : IRerankerService
     #region 评分算法实现
 
     /// <summary>
-    /// 计算相关性评分
+    /// 计算相关性评分（关键词匹配，作为向量分数的补充信号）
     /// </summary>
     private static double CalculateRelevanceScore(IReadOnlyList<TokenInfo> queryTokens, IReadOnlyList<TokenInfo> itemTokens, string query, string text)
     {
@@ -222,7 +237,7 @@ public class RerankerService : IRerankerService
         var tokenSetCache = new Dictionary<ScoredResult, HashSet<string>>();
         foreach (var result in results)
         {
-            var text = GetFullText(result.Item);
+            var text = GetFullText(result.Item.Item);
             var tokens = TokenizeWithBonus(text)
                 .Select(t => t.Token)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -409,17 +424,17 @@ public class RerankerService : IRerankerService
     /// </summary>
     private void LogTopResults(List<ScoredResult> scoredResults)
     {
-        _logger.LogDebug("启发式重排序完成，前3个结果得分情况:");
+        _logger.LogDebug("重排序完成，前3个结果得分情况:");
         var topResults = scoredResults.OrderByDescending(r => r.TotalScore).Take(3);
 
         int index = 1;
         foreach (var scored in topResults)
         {
-            var snippet = GetFullText(scored.Item);
+            var snippet = GetFullText(scored.Item.Item);
             if (snippet.Length > 50) snippet = snippet[..50] + "...";
 
-            _logger.LogDebug("  {Index}. 总分: {Score:F2} (相关: {Rel:F2}, 时效: {Fresh:F2}, 长度: {Len:F2}) - {Title}",
-                index++, scored.TotalScore, scored.RelevanceScore, scored.FreshnessScore, scored.LengthScore, snippet);
+            _logger.LogDebug("  {Index}. 总分: {Score:F2} (向量: {Vec:F2}, 相关: {Rel:F2}, 时效: {Fresh:F2}, 长度: {Len:F2}) - {Title}",
+                index++, scored.TotalScore, scored.NormalizedVectorScore, scored.RelevanceScore, scored.FreshnessScore, scored.LengthScore, snippet);
         }
     }
 

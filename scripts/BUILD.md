@@ -442,14 +442,7 @@ dotnet clean MarketAssistant.slnx
 dotnet restore src/MarketAssistant.csproj
 ```
 
-#### 2. Playwright 浏览器未安装
-
-```bash
-dotnet tool update --global Microsoft.Playwright.CLI
-playwright install
-```
-
-#### 3. macOS: "App is damaged and can't be opened"
+#### 2. macOS: "App is damaged and can't be opened"
 
 这通常是因为 Gatekeeper 阻止了未签名的应用。解决方法：
 

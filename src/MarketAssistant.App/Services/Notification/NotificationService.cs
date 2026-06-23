@@ -42,9 +42,9 @@ public class NotificationService : INotificationService
                 notification.SetMessage(message, type);
                 await notification.ShowNotificationAsync(durationMs);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // 忽略通知显示错误
+                System.Diagnostics.Debug.WriteLine($"显示通知失败: {ex.Message}");
             }
         });
     }

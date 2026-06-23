@@ -22,7 +22,7 @@ public sealed class MarketAnalysisWorkflowTest : BaseAgentTest
     [TestCleanup]
     public void Cleanup()
     {
-        _workflow?.Dispose();
+        // MarketAnalysisWorkflow 为 DI 单例，无需手动 Dispose
     }
 
     [TestMethod]

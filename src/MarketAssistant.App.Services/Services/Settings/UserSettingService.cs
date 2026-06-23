@@ -1,7 +1,7 @@
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using MarketAssistant.Services.Browser;
 
 namespace MarketAssistant.Services.Settings;
 
@@ -10,9 +10,9 @@ namespace MarketAssistant.Services.Settings;
 /// </summary>
 public class UserSettingService : IUserSettingService
 {
-    private const string PreferenceKey = "UserSettings";
-    private readonly IBrowserService? _browserService;
+    private const string PreferenceKey = PreferenceKeys.UserSettings;
     private readonly ILogger<UserSettingService> _logger;
+    private readonly object _fileLock = new();
 
     private UserSetting _currentSetting = new();
 
@@ -21,10 +21,9 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public UserSetting CurrentSetting => _currentSetting;
 
-    public UserSettingService(ILogger<UserSettingService>? logger = null, IBrowserService? browserService = null)
+    public UserSettingService(ILogger<UserSettingService>? logger = null)
     {
         _logger = logger ?? NullLogger<UserSettingService>.Instance;
-        _browserService = browserService;
         LoadSettings();
     }
 
@@ -33,42 +32,35 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void LoadSettings()
     {
-        try
+        lock (_fileLock)
         {
-            // 从Preferences加载设置
-            string settingsJson = Preferences.Default.Get(PreferenceKey, string.Empty);
-            if (!string.IsNullOrEmpty(settingsJson))
+            try
             {
-                _currentSetting = JsonSerializer.Deserialize<UserSetting>(settingsJson) ?? new UserSetting();
-            }
-            else
-            {
-                _currentSetting = new UserSetting();
-            }
-
-            // 如果日志路径为空，设置为默认日志目录（与启动阶段保持一致）
-            if (string.IsNullOrWhiteSpace(_currentSetting.LogPath))
-            {
-                _currentSetting.LogPath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.LogsDirectoryName);
-            }
-
-            // 如果浏览器路径为空，则使用IBrowserService自动检测
-            if (string.IsNullOrEmpty(_currentSetting.BrowserPath) && _browserService != null)
-            {
-                var browserPath = _browserService.CheckBrowser();
-                if (!string.IsNullOrEmpty(browserPath))
+                // 从Preferences加载设置
+                string settingsJson = Preferences.Default.Get(PreferenceKey, string.Empty);
+                if (!string.IsNullOrEmpty(settingsJson))
                 {
-                    _currentSetting.BrowserPath = browserPath;
+                    _currentSetting = JsonSerializer.Deserialize<UserSetting>(settingsJson) ?? new UserSetting();
+                }
+                else
+                {
+                    _currentSetting = new UserSetting();
+                }
+
+                // 如果日志路径为空，设置为默认日志目录（与启动阶段保持一致）
+                if (string.IsNullOrWhiteSpace(_currentSetting.LogPath))
+                {
+                    _currentSetting.LogPath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.LogsDirectoryName);
                 }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "加载设置时出错");
-            Preferences.Default.Remove(PreferenceKey);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "加载设置时出错");
+                Preferences.Default.Remove(PreferenceKey);
 
-            // 如果加载失败，使用默认值
-            _currentSetting = new UserSetting();
+                // 如果加载失败，使用默认值
+                _currentSetting = new UserSetting();
+            }
         }
     }
 
@@ -77,17 +69,20 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void SaveSettings()
     {
-        try
+        lock (_fileLock)
         {
-            // 序列化设置对象
-            string json = JsonSerializer.Serialize(_currentSetting);
+            try
+            {
+                // 序列化设置对象
+                string json = JsonSerializer.Serialize(_currentSetting);
 
-            // 保存到Preferences
-            Preferences.Default.Set(PreferenceKey, json);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "保存设置时出错");
+                // 保存到Preferences
+                Preferences.Default.Set(PreferenceKey, json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "保存设置时出错");
+            }
         }
     }
 

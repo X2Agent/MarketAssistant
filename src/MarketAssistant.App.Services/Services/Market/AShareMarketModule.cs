@@ -12,6 +12,7 @@ using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Market;
@@ -48,11 +49,11 @@ public sealed class AShareMarketModule : IMarketModule
 
         // 资产服务
         services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);
-        services.AddKeyedSingleton<IHomeAssetService, AShareHomeService>(MarketType.AShare);
-        services.AddKeyedSingleton<IFavoriteService, AShareFavoriteService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetHistoryService, AShareHistoryService>(MarketType.AShare);
+        services.AddKeyedSingleton<IHomeAssetService, HomeAssetService>(MarketType.AShare);
+        services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetHistoryService, AssetHistoryService>(MarketType.AShare);
         services.AddKeyedSingleton<IKLineService, AShareKLineService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetCacheService, AShareAssetCacheService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>(MarketType.AShare);
 
         // 工作流

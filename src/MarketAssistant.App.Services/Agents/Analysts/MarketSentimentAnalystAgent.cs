@@ -28,8 +28,7 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
 
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
-        IFinancialTools financialTools,
-        ISentimentTools marketSentimentTools,
+        IList<AITool> tools,
         AnalystPromptLoader promptLoader,
         AIContextProvider[]? aiContextProviders = null,
         AgentSkillsProvider? skillsProvider = null)
@@ -37,7 +36,7 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("MarketSentimentAnalyst"),
             ResponseFormat,
-            [.. financialTools.GetFunctions(), .. marketSentimentTools.GetFunctions()],
+            tools,
             aiContextProviders,
             skillsProvider)
     {

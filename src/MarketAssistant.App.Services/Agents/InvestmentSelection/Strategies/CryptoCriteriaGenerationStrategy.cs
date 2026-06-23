@@ -157,7 +157,7 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 
     public CryptoCriteria DeserializeCriteria(string json)
     {
-        var criteria = JsonSerializer.Deserialize<CryptoCriteria>(json, DeserializationOptions);
+        var criteria = LlmJsonExtractor.Deserialize<CryptoCriteria>(json, DeserializationOptions);
         if (criteria == null)
         {
             throw new InvalidOperationException("虚拟币筛选条件 JSON 解析失败");

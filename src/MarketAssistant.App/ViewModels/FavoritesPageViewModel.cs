@@ -12,6 +12,7 @@ using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
@@ -26,13 +27,13 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private readonly IDialogService _dialogService;
     private readonly BinanceWebSocketService _wsService;
 
-    private IFavoriteService FavoriteService => 
+    private IFavoriteService FavoriteService =>
         _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
 
-    private IAssetInfoService AssetInfoService => 
+    private IAssetInfoService AssetInfoService =>
         _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
 
-    private IAssetCacheService CacheService => 
+    private IAssetCacheService CacheService =>
         _serviceProvider.GetRequiredKeyedService<IAssetCacheService>(_marketContext.CurrentMarket);
 
     public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
@@ -53,8 +54,18 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _dialogService = dialogService;
         _wsService = wsService;
         _wsService.PriceUpdated += OnWebSocketPriceUpdated;
+        SubscribeToMarketChanges(_marketContext);
         _ = LoadFavoriteAssetsAsync();
         WeakReferenceMessenger.Default.Register(this);
+    }
+
+    /// <summary>
+    /// 市场切换时重新加载收藏列表
+    /// </summary>
+    protected override void OnMarketChanged(MarketType newMarket)
+    {
+        _ = _wsService.UnsubscribeAllAsync();
+        _ = LoadFavoriteAssetsAsync();
     }
 
     /// <summary>
@@ -144,7 +155,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         // 传递完整的基本信息，加速详情页显示
         WeakReferenceMessenger.Default.Send(
             new NavigationMessage("Asset", new AssetNavigationParameter(
-                asset.Code, 
+                asset.Code,
                 asset.Name,
                 currentPrice,
                 changePercent)));
@@ -214,7 +225,9 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
     public void Dispose()
     {
+        UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
+        _ = _wsService.UnsubscribeAllAsync();
         WeakReferenceMessenger.Default.UnregisterAll(this);
         GC.SuppressFinalize(this);
     }

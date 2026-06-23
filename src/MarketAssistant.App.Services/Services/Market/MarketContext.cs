@@ -17,6 +17,11 @@ public class MarketContext : INotifyPropertyChanged
     private MarketType _currentMarket;
 
     /// <summary>
+    /// 当前激活的市场类型（静态快照，供 UI Converter 等无法直接依赖注入的场景读取）
+    /// </summary>
+    public static MarketType CurrentMarketType { get; private set; }
+
+    /// <summary>
     /// 当前激活的市场类型
     /// </summary>
     public MarketType CurrentMarket => _currentMarket;
@@ -26,6 +31,7 @@ public class MarketContext : INotifyPropertyChanged
         _userSettingService = userSettingService;
         _serviceProvider = serviceProvider;
         _currentMarket = _userSettingService.CurrentSetting.CurrentMarketType;
+        CurrentMarketType = _currentMarket;
     }
 
     /// <summary>
@@ -45,6 +51,7 @@ public class MarketContext : INotifyPropertyChanged
             if (_currentMarket == newMarket)
                 return;
             _currentMarket = newMarket;
+            CurrentMarketType = newMarket;
         }
 
         _userSettingService.CurrentSetting.CurrentMarketType = newMarket;

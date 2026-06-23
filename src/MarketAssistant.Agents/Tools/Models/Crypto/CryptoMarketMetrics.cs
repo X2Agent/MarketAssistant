@@ -6,22 +6,22 @@ namespace MarketAssistant.Agents.Tools.Models.Crypto;
 public class CryptoMarketMetrics
 {
     /// <summary>
-    /// 交易对符�?
+    /// 交易对符号
     /// </summary>
     public string Symbol { get; set; } = string.Empty;
 
     /// <summary>
-    /// 当前价格（USD�?
+    /// 当前价格（USD）
     /// </summary>
     public decimal CurrentPriceUsd { get; set; }
 
     /// <summary>
-    /// 市值（USD�?
+    /// 市值（USD）
     /// </summary>
     public decimal MarketCapUsd { get; set; }
 
     /// <summary>
-    /// 完全稀释估值（USD�?
+    /// 完全稀释估值（USD）
     /// </summary>
     public decimal? FullyDilutedValuationUsd { get; set; }
 
@@ -41,60 +41,60 @@ public class CryptoMarketMetrics
     public decimal? MaxSupply { get; set; }
 
     /// <summary>
-    /// 24小时交易量（USD�?
+    /// 24小时交易量（USD）
     /// </summary>
     public decimal Volume24hUsd { get; set; }
 
     /// <summary>
-    /// 交易�?市值比�?
+    /// 交易量/市值比率
     /// </summary>
     public decimal VolumeToMarketCapRatio => MarketCapUsd > 0 ? Volume24hUsd / MarketCapUsd : 0;
 
     /// <summary>
-    /// 24小时价格变动�?�?
+    /// 24小时价格变动（%）
     /// </summary>
     public decimal PriceChange24hPercent { get; set; }
 
     /// <summary>
-    /// 7天价格变动（%�?
+    /// 7天价格变动（%）
     /// </summary>
     public decimal? PriceChange7dPercent { get; set; }
 
     /// <summary>
-    /// 30天价格变动（%�?
+    /// 30天价格变动（%）
     /// </summary>
     public decimal? PriceChange30dPercent { get; set; }
 
     /// <summary>
-    /// 市值排�?
+    /// 市值排名
     /// </summary>
     public int? MarketCapRank { get; set; }
 
     /// <summary>
-    /// 历史最高价（USD�?
+    /// 历史最高价（USD）
     /// </summary>
     public decimal? AllTimeHighUsd { get; set; }
 
     /// <summary>
-    /// 距离历史最高价跌幅�?�?
+    /// 距离历史最高价跌幅（%）
     /// </summary>
     public decimal? AthChangePercent { get; set; }
 
     /// <summary>
-    /// 历史最低价（USD�?
+    /// 历史最低价（USD）
     /// </summary>
     public decimal? AllTimeLowUsd { get; set; }
 
     /// <summary>
-    /// 距离历史最低价涨幅�?�?
+    /// 距离历史最低价涨幅（%）
     /// </summary>
     public decimal? AtlChangePercent { get; set; }
 
     /// <summary>
-    /// 流通率（流通供�?最大供应，%�?
+    /// 流通率（流通量/最大供应，%）
     /// </summary>
-    public decimal? CirculationRate => MaxSupply.HasValue && MaxSupply > 0 
-        ? CirculatingSupply / MaxSupply.Value * 100 
+    public decimal? CirculationRate => MaxSupply.HasValue && MaxSupply > 0
+        ? CirculatingSupply / MaxSupply.Value * 100
         : null;
 
     /// <summary>

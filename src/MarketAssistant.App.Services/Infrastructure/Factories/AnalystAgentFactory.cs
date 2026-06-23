@@ -1,9 +1,11 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.Middleware;
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Reflection;
@@ -76,15 +78,12 @@ public class AnalystAgentFactory : IAnalystAgentFactory
             // 根据当前市场类型获取对应的工具实现
             var currentMarket = _marketContext.CurrentMarket;
 
-            // 根据 Analyst 类型获取需要的工具
+            // 根据 Analyst 类型解析工具并合并为 AITool 列表
             var tools = ResolveToolsForAnalyst(agentType, currentMarket);
 
-            // 使用 ActivatorUtilities.CreateInstance
-            // 显式传递 chatClient、工具和 AIContextProvider[]，AgentSkillsProvider 由 DI 自动解析
-            var parameters = new List<object> { chatClient };
-            parameters.AddRange(tools);
+            // 显式传递 chatClient、合并后的工具列表和 AIContextProvider[]，其余由 DI 自动解析
+            var parameters = new List<object> { chatClient, tools };
 
-            // 如果有额外的 AIContextProvider（如共享市场快照），追加到参数列表
             if (additionalProviders is { Length: > 0 })
                 parameters.Add(additionalProviders);
 
@@ -112,26 +111,36 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     }
 
     /// <summary>
-    /// 根据 Analyst 类上的 RequiresToolsAttribute 和市场类型自动解析所需的工具
+    /// 根据 Analyst 类上的 RequiresToolsAttribute 和市场类型解析工具，
+    /// 调用 <see cref="IToolsProvider.GetFunctions"/> 合并为统一的 AITool 列表
     /// </summary>
-    private List<object> ResolveToolsForAnalyst(Type agentType, MarketType marketType)
+    private IList<AITool> ResolveToolsForAnalyst(Type agentType, MarketType marketType)
     {
-        var tools = new List<object>();
+        var tools = new List<AITool>();
+        var resolvedCount = 0;
 
-        var toolAttributes = agentType.GetCustomAttributes<RequiresToolsAttribute>();
+        var toolAttributes = agentType.GetCustomAttributes<RequiresToolsAttribute>().ToList();
         foreach (var attr in toolAttributes)
         {
             var toolService = _serviceProvider.GetKeyedService(attr.ToolInterfaceType, marketType);
-            if (toolService != null)
+            if (toolService is IToolsProvider provider)
             {
-                tools.Add(toolService);
+                tools.AddRange(provider.GetFunctions());
+                resolvedCount++;
             }
             else
             {
-                _logger.LogWarning(
-                    "未找到 Analyst {AgentType} 所需的工具 {ToolType}（市场: {Market}）",
+                _logger.LogError(
+                    "未找到 Analyst {AgentType} 所需的工具 {ToolType}（市场: {Market}），分析能力可能受限",
                     agentType.Name, attr.ToolInterfaceType.Name, marketType);
             }
+        }
+
+        if (resolvedCount != toolAttributes.Count)
+        {
+            _logger.LogError(
+                "Analyst {AgentType} 缺少 {Missing}/{Total} 个工具（市场: {Market}）",
+                agentType.Name, toolAttributes.Count - resolvedCount, toolAttributes.Count, marketType);
         }
 
         return tools;

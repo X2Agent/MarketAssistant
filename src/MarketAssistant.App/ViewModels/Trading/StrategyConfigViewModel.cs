@@ -110,18 +110,6 @@ public partial class StrategyConfigViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task LoadStrategiesAsync()
-    {
-        await SafeExecuteAsync(async () =>
-        {
-            var strategies = await _dataService.GetAllStrategiesAsync();
-            Strategies.Clear();
-            foreach (var s in strategies)
-                Strategies.Add(s);
-        }, "加载策略列表");
-    }
-
-    [RelayCommand]
     private async Task CreateStrategyAsync()
     {
         if (string.IsNullOrWhiteSpace(NewSymbol))

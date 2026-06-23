@@ -2,7 +2,7 @@ using Avalonia.Data.Converters;
 using MarketAssistant.Infrastructure.Extensions;
 using System.Globalization;
 
-namespace MarketAssistant.Converts;
+namespace MarketAssistant.Converters;
 
 public class EnumDescriptionConverter : IValueConverter
 {

@@ -20,8 +20,8 @@
     <Company>X2Agent</Company>
     <Product>Market Assistant</Product>
     <AssemblyTitle>Market Assistant</AssemblyTitle>
-    <Copyright>Copyright © 2025</Copyright>
-    <Description>AI-powered market analysis assistant</Description>
+    <Copyright>Copyright © 2026</Copyright>
+    <Description>AI 智能市场分析助手</Description>
     
     <!-- macOS 特定配置 -->
     <CFBundleName>MarketAssistant</CFBundleName>

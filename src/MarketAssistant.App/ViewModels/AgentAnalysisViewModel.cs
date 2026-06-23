@@ -4,11 +4,10 @@ using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Applications.Analysis;
-using MarketAssistant.Infrastructure;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Export;
+using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
@@ -20,7 +19,11 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
-    public override string Title => "AI股票分析";
+    public override string Title => MarketContext?.CurrentMarket switch
+    {
+        MarketType.Crypto => "AI虚拟币分析",
+        _ => "AI股票分析"
+    };
 
     private readonly AnalysisOrchestrationService _orchestrationService;
 
@@ -118,10 +121,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisOrchestrationService orchestrationService,
         AnalysisReportViewModel analysisReportViewModel,
         ChatSidebarViewModel chatSidebarViewModel,
+        MarketContext marketContext,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
+
+        SubscribeToMarketChanges(marketContext);
 
         ChatSidebarViewModel = chatSidebarViewModel;
         ChatSidebarViewModel.InitializeEmpty();
@@ -218,7 +224,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                 }
             });
 
-        }, "股票分析");
+        }, "资产分析");
     }
 
     /// <summary>
@@ -259,18 +265,21 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         Logger?.LogInformation("分析报告已导出: {Path}", file.Name);
     }
 
-    public void OnNavigatedTo(AssetNavigationParameter parameter)
+    public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
     {
         if (!string.IsNullOrEmpty(parameter.Code))
         {
             StockCode = parameter.Code;
-            Logger?.LogInformation("导航到 AI 股票分析页面，股票代码: {Code}", StockCode);
-            // 异步加载数据
-            _ = LoadAnalysisDataAsync();
+            Logger?.LogInformation("导航到 AI 分析页面，资产代码: {Code}，重新激活: {IsReactivation}", StockCode, isReactivation);
+            // GoBack 重新激活时不重复启动分析，避免重复请求
+            if (!isReactivation)
+            {
+                _ = LoadAnalysisDataAsync();
+            }
         }
         else
         {
-            Logger?.LogInformation("导航到 AI 股票分析页面，但未提供股票代码");
+            Logger?.LogInformation("导航到 AI 分析页面，但未提供资产代码");
         }
     }
 
@@ -311,11 +320,19 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }, "加载历史报告");
     }
 
+    protected override void OnMarketChanged(MarketType newMarket)
+    {
+        OnPropertyChanged(nameof(Title));
+    }
+
     public void Dispose()
     {
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
+
+        if (MarketContext != null)
+            UnsubscribeFromMarketChanges(MarketContext);
 
         if (_chatSidebarViewModel != null)
             _chatSidebarViewModel.PropertyChanged -= OnChatSidebarPropertyChanged;

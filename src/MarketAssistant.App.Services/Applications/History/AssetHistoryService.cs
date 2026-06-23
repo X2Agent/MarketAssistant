@@ -1,24 +1,35 @@
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Configuration;
+using MarketAssistant.Infrastructure.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace MarketAssistant.Applications.History;
 
 /// <summary>
-/// 资产历史记录服务基类，封装本地存储与容量控制逻辑。
+/// 资产历史记录服务：封装本地存储与容量控制逻辑。
+/// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public abstract class AssetHistoryServiceBase : IAssetHistoryService
+public sealed class AssetHistoryService : IAssetHistoryService
 {
     private const int MaxHistoryCount = 10;
-    private readonly ILogger _logger;
+    private readonly ILogger<AssetHistoryService> _logger;
+    private readonly string _preferenceKey;
+    private readonly string _marketLabel;
 
-    protected AssetHistoryServiceBase(ILogger logger)
+    public AssetHistoryService([ServiceKey] MarketType marketType, ILogger<AssetHistoryService> logger)
     {
         _logger = logger;
+        _preferenceKey = PreferenceKeys.GetRecentAssetsKey(marketType);
+        _marketLabel = marketType switch
+        {
+            MarketType.AShare => "A股",
+            MarketType.Crypto => "虚拟币",
+            _ => marketType.ToString()
+        };
     }
-
-    protected abstract string PreferenceKey { get; }
 
     public void AddHistory(AssetItem asset)
     {
@@ -41,14 +52,14 @@ public abstract class AssetHistoryServiceBase : IAssetHistoryService
         }
 
         SaveHistory(historyList);
-        LogHistoryAdded(asset);
+        _logger.LogInformation("已添加{Market}到历史记录: {Code}", _marketLabel, asset.Code);
     }
 
     public List<AssetItem> GetHistory()
     {
         try
         {
-            var json = Preferences.Default.Get(PreferenceKey, string.Empty);
+            var json = Preferences.Default.Get(_preferenceKey, string.Empty);
             if (string.IsNullOrWhiteSpace(json))
             {
                 return [];
@@ -66,15 +77,7 @@ public abstract class AssetHistoryServiceBase : IAssetHistoryService
     public void ClearHistory()
     {
         SaveHistory([]);
-        LogHistoryCleared();
-    }
-
-    protected virtual void LogHistoryAdded(AssetItem asset)
-    {
-    }
-
-    protected virtual void LogHistoryCleared()
-    {
+        _logger.LogInformation("已清空{Market}历史记录", _marketLabel);
     }
 
     private void SaveHistory(List<AssetItem> historyList)
@@ -82,7 +85,7 @@ public abstract class AssetHistoryServiceBase : IAssetHistoryService
         try
         {
             var json = JsonSerializer.Serialize(historyList);
-            Preferences.Default.Set(PreferenceKey, json);
+            Preferences.Default.Set(_preferenceKey, json);
         }
         catch (Exception ex)
         {

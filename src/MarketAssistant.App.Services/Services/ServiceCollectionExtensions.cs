@@ -27,9 +27,9 @@ using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Http;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
-using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
@@ -38,10 +38,13 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Exchanges;
+using System.Net;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly.RateLimiting;
 using Serilog;
+using System.Threading.RateLimiting;
 
 namespace MarketAssistant.Services;
 
@@ -62,7 +65,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddRagServices();
         services.AddMarketDataServices();
         services.AddTradingServices();
-        services.AddMarketSpecificServices();
         services.AddWorkflowServices();
         services.AddMarketModules();
         services.AddSingleton<IReleaseService, GitHubReleaseService>();
@@ -88,37 +90,105 @@ public static class BusinessServiceCollectionExtensions
         {
             client.BaseAddress = new Uri("https://api.binance.com");
             client.Timeout = TimeSpan.FromSeconds(30);
-        }).AddStandardResilienceHandler();
+        }).AddStandardResilienceHandler(options =>
+        {
+            // 币安 REST API 限流：IP 维度 6000 weight/min，单连接并发过高易触发 429。
+            // 桌面端场景下限制并发请求数即可，配合标准重试/熔断策略。
+            ConfigureBinanceRateLimiter(options);
+        });
 
         services.AddHttpClient("BinanceFutures", client =>
         {
             client.BaseAddress = new Uri("https://fapi.binance.com");
             client.Timeout = TimeSpan.FromSeconds(30);
-        }).AddStandardResilienceHandler();
+        }).AddStandardResilienceHandler(options =>
+        {
+            ConfigureBinanceRateLimiter(options);
+        });
+
+        // CoinGecko API Key 通过 DelegatingHandler 注入，避免 DataProviders 反向依赖 App.Services
+        services.AddTransient<CoinGeckoApiKeyHandler>();
 
         services.AddHttpClient("CoinGecko", client =>
         {
-            client.BaseAddress = new Uri("https://api.coingecko.com/api/v3");
+            client.BaseAddress = new Uri("https://api.coingecko.com/api/v3/");
             client.Timeout = TimeSpan.FromSeconds(25);
-        }).AddStandardResilienceHandler();
-
-        services.AddHttpClient("CoinDesk", client =>
-        {
-            client.BaseAddress = new Uri("https://data-api.coindesk.com");
-            client.Timeout = TimeSpan.FromSeconds(15);
-            client.DefaultRequestHeaders.Accept.Add(
-                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
-        }).AddStandardResilienceHandler();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MarketAssistant/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        })
+        .AddHttpMessageHandler<CoinGeckoApiKeyHandler>()
+        .AddStandardResilienceHandler();
 
         services.AddHttpClient("ZhiTu", client =>
         {
             client.BaseAddress = new Uri("https://api.zhituapi.com");
-            client.Timeout = TimeSpan.FromSeconds(15);
-        }).AddStandardResilienceHandler();
+            client.Timeout = TimeSpan.FromSeconds(60);
+        }).AddStandardResilienceHandler(options =>
+        {
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+        });
 
         services.AddHttpClient("Cls", client =>
         {
             client.BaseAddress = new Uri("https://x-quote.cls.cn");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        }).AddStandardResilienceHandler();
+
+        // 东方财富搜索接口（新闻搜索等，返回 JSONP）
+        services.AddHttpClient("EastMoneySearch", client =>
+        {
+            client.BaseAddress = new Uri("https://search-api-web.eastmoney.com/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        }).AddStandardResilienceHandler();
+
+        // 新浪财经资金流接口（热门股票资金流排行）
+        // 原 push2.eastmoney.com 端点在部分网络环境下 TLS 重协商被中断，改用新浪接口
+        services.AddHttpClient("SinaFinance", client =>
+        {
+            client.BaseAddress = new Uri("https://vip.stock.finance.sina.com.cn");
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Referrer = new Uri("https://vip.stock.finance.sina.com.cn/");
+        }).AddStandardResilienceHandler();
+
+        // 雪球选股 API（支持全部 38 个筛选指标，Cookie 跨请求共享）
+        services.AddSingleton<CookieContainer>();
+        services.AddHttpClient("Xueqiu", client =>
+        {
+            client.BaseAddress = new Uri("https://xueqiu.com");
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        })
+        .ConfigurePrimaryHttpMessageHandler(sp => new HttpClientHandler
+        {
+            UseCookies = true,
+            CookieContainer = sp.GetRequiredService<CookieContainer>()
+        })
+        .AddStandardResilienceHandler();
+
+        // 虚拟币新闻 RSS 源（CoinTelegraph 等）
+        services.AddHttpClient("CryptoNewsRss", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        }).AddStandardResilienceHandler();
+
+        // 同花顺快讯接口
+        services.AddHttpClient("AShareTelegram", client =>
+        {
+            client.BaseAddress = new Uri("https://news.10jqka.com.cn");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        }).AddStandardResilienceHandler();
+
+        // 虚拟币快讯接口（PANews）
+        services.AddHttpClient("CryptoTelegram", client =>
+        {
+            client.BaseAddress = new Uri("https://universal-api.panewslab.com");
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
@@ -131,7 +201,33 @@ public static class BusinessServiceCollectionExtensions
                 new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         }).AddStandardResilienceHandler();
 
+        // 专用于下载 Release 二进制文件的 HttpClient，不带 GitHub API 专用 Accept 头
+        services.AddHttpClient("GitHubDownload", client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+        });
+
         return services;
+    }
+
+    /// <summary>
+    /// 为币安 HttpClient 配置并发限流：最多 10 个并发请求，排队上限 50。
+    /// 币安 REST API 限流为 IP 维度 6000 weight/min，桌面端控制并发即可避免触发 429。
+    /// </summary>
+    private static void ConfigureBinanceRateLimiter(HttpStandardResilienceOptions options)
+    {
+        var limiter = new ConcurrencyLimiter(new ConcurrencyLimiterOptions
+        {
+            PermitLimit = 10,
+            QueueLimit = 50,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+        });
+
+        options.RateLimiter = new HttpRateLimiterStrategyOptions
+        {
+            RateLimiter = args => limiter.AcquireAsync(1, args.Context.CancellationToken)
+        };
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -205,11 +301,11 @@ public static class BusinessServiceCollectionExtensions
     private static IServiceCollection AddMarketDataServices(this IServiceCollection services)
     {
         services.AddSingleton<CoinGeckoApiService>();
+        services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
-        services.AddSingleton<CoinDeskApiService>();
         services.AddSingleton<BinanceAuthService>();
         services.AddSingleton<BinanceAccountService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -231,19 +327,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
-
-        return services;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // 市场特定服务（Keyed：资产 / K线 / 缓存 / 快讯 / 新闻 / 筛选 / 浏览器）
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private static IServiceCollection AddMarketSpecificServices(this IServiceCollection services)
-    {
-        // 浏览器自动化
-        services.AddSingleton<PlaywrightService>();
-        services.AddSingleton<IBrowserService, BrowserService>();
 
         return services;
     }

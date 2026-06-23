@@ -44,7 +44,7 @@ cat > "$RPM_DIR/SPECS/$APP_NAME.spec" << EOF
 Name:           $APP_NAME
 Version:        $VERSION
 Release:        $RELEASE%{?dist}
-Summary:        AI-powered market analysis assistant
+Summary:        AI 智能市场分析助手
 License:        Proprietary
 URL:            https://github.com/yourusername/MarketAssistant
 BuildArch:      $ARCH
@@ -52,9 +52,9 @@ BuildArch:      $ARCH
 Requires:       libicu >= 60, openssl-libs >= 1.1
 
 %description
-Market Assistant is a cross-platform desktop application that provides
-AI-powered market analysis and insights. It features real-time data
-analysis, technical indicators, and intelligent recommendations.
+市场分析助手是一款跨平台的桌面应用程序，提供
+AI 智能市场分析与洞察。它具有实时数据分析、
+技术指标和智能推荐功能。
 
 %prep
 # Nothing to prep

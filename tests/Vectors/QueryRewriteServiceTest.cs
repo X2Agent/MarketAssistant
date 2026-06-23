@@ -141,7 +141,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Rewrite_WithFinancialTerms_ShouldGenerateAnalysisDimensions()
+    public void Rewrite_WithFinancialTerms_ShouldGenerateSynonymVariants()
     {
         // Arrange
         var query = "新能源股票投资";
@@ -153,9 +153,13 @@ public class QueryRewriteServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count > 0);
 
-        // Should include analysis dimensions like 基本面、技术面 etc.
-        var hasAnalysisDimension = result.Any(r =>
-            r.Contains("基本面") || r.Contains("技术面") || r.Contains("消息面") || r.Contains("估值"));
+        // 应通过同义词替换生成变体（如"股票"→"证券"/"股份"等）
+        var hasSynonymVariant = result.Any(r =>
+            r.Contains("证券") || r.Contains("股份") || r.Contains("股权") ||
+            r.Contains("个股") || r.Contains("股价") ||
+            r.Contains("电动车") || r.Contains("新能车") || r.Contains("锂电"));
+
+        Assert.IsTrue(hasSynonymVariant, "应生成包含同义词替换的变体");
 
         foreach (var variant in result)
         {
@@ -165,7 +169,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Rewrite_WithTimeFrameTerms_ShouldGenerateTimeVariants()
+    public void Rewrite_WithTimeFrameTerms_ShouldGenerateSynonymVariants()
     {
         // Arrange
         var query = "芯片股票研究";
@@ -177,7 +181,13 @@ public class QueryRewriteServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count > 0);
 
-        // Should include time-related variants
+        // 应通过同义词替换生成变体
+        var hasSynonymVariant = result.Any(r =>
+            r.Contains("半导体") || r.Contains("集成电路") || r.Contains("处理器") ||
+            r.Contains("证券") || r.Contains("股份") || r.Contains("个股"));
+
+        Assert.IsTrue(hasSynonymVariant, "应生成包含同义词替换的变体");
+
         foreach (var variant in result)
         {
             Console.WriteLine($"Generated variant: {variant}");

@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Data;
@@ -15,7 +17,12 @@ namespace MarketAssistant.Applications.PriceAlert;
 /// </summary>
 public sealed class PriceAlertService : IDisposable
 {
-    private const string StorageKey = "PriceAlertRules";
+    /// <summary>
+    /// 历史遗留的单一存储键，仅用于一次性迁移到按市场分键存储。
+    /// 迁移完成后此键会被清除，新规则通过 <see cref="PreferenceKeys.GetPriceAlertRulesKey"/> 存储。
+    /// </summary>
+    private static readonly string LegacyStorageKey = PreferenceKeys.PriceAlertRules;
+
     private static readonly TimeSpan ASharePollingInterval = TimeSpan.FromSeconds(20);
 
     private readonly BinanceWebSocketService _wsService;
@@ -27,8 +34,19 @@ public sealed class PriceAlertService : IDisposable
     private readonly object _syncRoot = new();
     private List<PriceAlertRule> _rules = [];
     private readonly CancellationTokenSource _pollingCts = new();
+    private Task? _pollingTask;
 
-    public IReadOnlyList<PriceAlertRule> Rules => _rules;
+    public IReadOnlyList<PriceAlertRule> Rules
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                // 返回快照，避免外部枚举时内部修改引发竞态
+                return _rules.ToList();
+            }
+        }
+    }
     public event Action? RulesChanged;
 
     public PriceAlertService(
@@ -47,7 +65,7 @@ public sealed class PriceAlertService : IDisposable
         LoadRules();
         _wsService.PriceUpdated += OnCryptoPriceUpdated;
         SubscribeActiveCryptoRules();
-        _ = Task.Run(() => PollASharePricesAsync(_pollingCts.Token));
+        _pollingTask = Task.Run(() => PollASharePricesAsync(_pollingCts.Token));
     }
 
     public void AddRule(PriceAlertRule rule)
@@ -160,7 +178,7 @@ public sealed class PriceAlertService : IDisposable
             var url =
                 $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px&app=CailianpressWeb&os=web&sv=8.4.6";
 
-            using var httpClient = _httpClientFactory.CreateClient();
+            using var httpClient = _httpClientFactory.CreateClient("Cls");
             using var response = await httpClient.GetAsync(url, cancellationToken);
             if (!response.IsSuccessStatusCode)
                 return null;
@@ -177,7 +195,7 @@ public sealed class PriceAlertService : IDisposable
                 return price;
 
             if (priceElement.ValueKind == JsonValueKind.String &&
-                decimal.TryParse(priceElement.GetString(), out var stringPrice))
+                decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
                 return stringPrice;
 
             return null;
@@ -247,22 +265,25 @@ public sealed class PriceAlertService : IDisposable
     {
         try
         {
-            var json = Preferences.Default.Get(StorageKey, string.Empty);
-            if (!string.IsNullOrEmpty(json))
+            // 一次性迁移历史单一存储键到按市场分键存储
+            MigrateLegacyStorageIfNeeded();
+
+            // 从各市场独立键加载并合并
+            var allRules = new List<PriceAlertRule>();
+            foreach (MarketType market in Enum.GetValues<MarketType>())
             {
-                var rules = JsonSerializer.Deserialize<List<PriceAlertRule>>(json) ?? [];
-
-                foreach (var rule in rules.Where(r =>
-                    r.MarketType == MarketType.AShare &&
-                    r.AssetCode.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)))
+                var key = PreferenceKeys.GetPriceAlertRulesKey(market);
+                var json = Preferences.Default.Get(key, string.Empty);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    rule.MarketType = MarketType.Crypto;
+                    var rules = JsonSerializer.Deserialize<List<PriceAlertRule>>(json) ?? [];
+                    allRules.AddRange(rules);
                 }
+            }
 
-                lock (_syncRoot)
-                {
-                    _rules = rules;
-                }
+            lock (_syncRoot)
+            {
+                _rules = allRules;
             }
         }
         catch (Exception ex)
@@ -272,6 +293,43 @@ public sealed class PriceAlertService : IDisposable
             {
                 _rules = [];
             }
+        }
+    }
+
+    /// <summary>
+    /// 将历史单一存储键 <see cref="LegacyStorageKey"/> 的规则按市场拆分迁移到新键，迁移后清除旧键。
+    /// </summary>
+    private void MigrateLegacyStorageIfNeeded()
+    {
+        var legacyJson = Preferences.Default.Get(LegacyStorageKey, string.Empty);
+        if (string.IsNullOrEmpty(legacyJson))
+            return;
+
+        try
+        {
+            var rules = JsonSerializer.Deserialize<List<PriceAlertRule>>(legacyJson) ?? [];
+
+            // 修复历史数据：A股规则不应以 USDT 结尾，归入虚拟币
+            foreach (var rule in rules.Where(r =>
+                r.MarketType == MarketType.AShare &&
+                r.AssetCode.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)))
+            {
+                rule.MarketType = MarketType.Crypto;
+            }
+
+            // 按市场分组保存到新键
+            foreach (var group in rules.GroupBy(r => r.MarketType))
+            {
+                var key = PreferenceKeys.GetPriceAlertRulesKey(group.Key);
+                Preferences.Default.Set(key, JsonSerializer.Serialize(group.ToList()));
+            }
+
+            Preferences.Default.Remove(LegacyStorageKey);
+            _logger.LogInformation("已将价格提醒规则从历史单一键迁移到按市场分键存储");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "迁移历史价格提醒规则失败");
         }
     }
 
@@ -285,8 +343,23 @@ public sealed class PriceAlertService : IDisposable
                 rules = [.. _rules];
             }
 
-            var json = JsonSerializer.Serialize(rules);
-            Preferences.Default.Set(StorageKey, json);
+            // 按市场分组分别存储，实现多市场数据隔离
+            var marketsWithRules = new HashSet<MarketType>();
+            foreach (var group in rules.GroupBy(r => r.MarketType))
+            {
+                var key = PreferenceKeys.GetPriceAlertRulesKey(group.Key);
+                Preferences.Default.Set(key, JsonSerializer.Serialize(group.ToList()));
+                marketsWithRules.Add(group.Key);
+            }
+
+            // 清除没有规则的市场键，避免残留空数据
+            foreach (MarketType market in Enum.GetValues<MarketType>())
+            {
+                if (!marketsWithRules.Contains(market))
+                {
+                    Preferences.Default.Remove(PreferenceKeys.GetPriceAlertRulesKey(market));
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -298,6 +371,16 @@ public sealed class PriceAlertService : IDisposable
     {
         _wsService.PriceUpdated -= OnCryptoPriceUpdated;
         _pollingCts.Cancel();
+        // 等待后台轮询任务退出，避免在 SaveRules 写入文件过程中被中断导致持久化数据损坏
+        try
+        {
+            _pollingTask?.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException ex)
+        {
+            // OperationCanceledException 是预期内的，仅记录其他异常
+            ex.Handle(e => e is OperationCanceledException);
+        }
         _pollingCts.Dispose();
     }
 

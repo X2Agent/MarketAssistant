@@ -3,13 +3,17 @@ using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace TestMarketAssistant.Application;
 
 /// <summary>
 /// IAssetCacheService 接口测试（覆盖 A股 和 虚拟币 实现）
+/// 注意：因 Clear 操作影响整个 IMemoryCache，本类禁用方法级并行以避免测试间相互干扰
 /// </summary>
 [TestClass]
+[DoNotParallelize]
 public class AssetCacheServiceTest
 {
     private ServiceProvider? _serviceProvider;
@@ -21,8 +25,8 @@ public class AssetCacheServiceTest
         services.AddLogging();
         services.AddMemoryCache();
 
-        services.AddKeyedSingleton<IAssetCacheService, AShareAssetCacheService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetCacheService, CryptoAssetCacheService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
     }

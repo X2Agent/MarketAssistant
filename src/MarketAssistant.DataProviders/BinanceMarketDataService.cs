@@ -124,6 +124,25 @@ public sealed class BinanceMarketDataService
         return tickers ?? new List<Binance24hrTicker>();
     }
 
+    /// <summary>
+    /// 获取所有交易对的24小时价格变动统计（FULL格式，含 PriceChangePercent，权重80）
+    /// 用于 CoinGecko 不可用时的兜底数据源
+    /// </summary>
+    public async Task<List<Binance24hrTicker>> GetAll24hrTickersFullAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var url = "/api/v3/ticker/24hr?symbolStatus=TRADING";
+        _logger.LogDebug("调用币安API获取所有交易对24h行情(FULL)");
+
+        using var httpClient = _httpClientFactory.CreateClient("Binance");
+        var response = await httpClient.GetAsync(url, cancellationToken);
+        var content = await CheckAndReadResponseAsync(response, cancellationToken);
+
+        var tickers = JsonSerializer.Deserialize<List<Binance24hrTicker>>(content, BinanceJsonSerializerOptions);
+        _logger.LogInformation("成功获取所有币安24h行情数据(FULL)，交易对数量: {Count}", tickers?.Count ?? 0);
+        return tickers ?? new List<Binance24hrTicker>();
+    }
+
     #endregion
 
     #region 交易所信息

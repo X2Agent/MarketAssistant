@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -10,32 +12,18 @@ namespace MarketAssistant.Trading;
 /// <summary>
 /// 交易数据持久化服务，管理策略、交易记录和日统计的 SQLite 存储
 /// </summary>
-public class TradingDataService : IDisposable
+public class TradingDataService : SqliteServiceBase
 {
-    private readonly string _connectionString;
-    private readonly ILogger<TradingDataService> _logger;
-    private readonly Task _initializeTask;
-
     public TradingDataService(ILogger<TradingDataService> logger)
+        : base("trading.db", logger)
     {
-        _logger = logger;
-
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
-
-        var dbPath = Path.Combine(appDataDir, "trading.db");
-        _connectionString = $"Data Source={dbPath}";
-
-        _initializeTask = InitializeDatabaseAsync();
     }
 
     #region 策略 CRUD
 
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -69,7 +57,7 @@ public class TradingDataService : IDisposable
 
     public async Task<TradingStrategy?> GetStrategyAsync(string id, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM strategies WHERE id = @id";
@@ -80,7 +68,7 @@ public class TradingDataService : IDisposable
 
     public async Task<List<TradingStrategy>> GetStrategiesByStatusAsync(StrategyStatus status, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM strategies WHERE status = @status ORDER BY created_at DESC";
@@ -90,7 +78,7 @@ public class TradingDataService : IDisposable
 
     public async Task<List<TradingStrategy>> GetAllStrategiesAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM strategies ORDER BY created_at DESC";
@@ -99,7 +87,7 @@ public class TradingDataService : IDisposable
 
     public async Task UpdateStrategyStatusAsync(string id, StrategyStatus status, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE strategies SET status = @status WHERE id = @id";
@@ -110,7 +98,7 @@ public class TradingDataService : IDisposable
 
     public async Task DeleteStrategyAsync(string id, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM strategies WHERE id = @id";
@@ -120,7 +108,7 @@ public class TradingDataService : IDisposable
 
     public async Task UpdateStrategyTriggeredAsync(string id, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -138,7 +126,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task UpdateStrategyTriggeredWithParamsAsync(string id, string? customParams, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
         try
@@ -167,7 +155,7 @@ public class TradingDataService : IDisposable
 
     public async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE strategies SET custom_params = @customParams WHERE id = @id";
@@ -181,7 +169,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE strategies SET trailing_peak_price = @peak WHERE id = @id";
@@ -196,7 +184,7 @@ public class TradingDataService : IDisposable
 
     public async Task SaveTradeRecordAsync(TradeRecord record, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -232,7 +220,7 @@ public class TradingDataService : IDisposable
         string? symbol = null, DateTime? from = null, DateTime? to = null, int limit = 50,
         CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
 
@@ -266,7 +254,7 @@ public class TradingDataService : IDisposable
 
     public async Task<List<TradeRecord>> GetRecordsByStrategyAsync(string strategyId, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM trade_records WHERE strategy_id = @stratId ORDER BY created_at DESC";
@@ -284,14 +272,17 @@ public class TradingDataService : IDisposable
     #region 日统计
 
     /// <summary>
-    /// 获取今日日期字符串（本地时区，与用户交易日一致）。
-    /// 原实现按 UTC 切分，亚洲用户 UTC 16:00 后实际是次日，导致日统计错位。
+    /// 获取今日日期字符串，用于日统计与账户快照的日期分组键。
+    /// 刻意使用本地时间（DateTime.Now）而非 UTC：交易日的切分以用户所在时区为准，
+    /// 原实现按 UTC 切分时，亚洲用户在 UTC 16:00 后实际已是次日，导致日统计错位。
+    /// 注意：本文件中事件时间戳（如 last_triggered_at、snapshot_at）统一使用 DateTime.UtcNow，
+    /// 与此处的日期分组键用途不同——前者记录精确发生时刻（绝对时间），后者划分交易日归属。
     /// </summary>
     private static string GetTodayDateString() => DateTime.Now.ToString("yyyy-MM-dd");
 
     public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -315,7 +306,7 @@ public class TradingDataService : IDisposable
 
     public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -338,7 +329,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task<decimal> GetAverageEntryPriceAsync(string symbol, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -363,7 +354,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task<decimal> GetAverageSellPriceAsync(string symbol, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -392,7 +383,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task OpenPositionAsync(Position position, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -418,7 +409,7 @@ public class TradingDataService : IDisposable
         if (closeQty <= 0)
             return 0;
 
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
 
@@ -487,7 +478,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task<List<Position>> GetOpenPositionsAsync(string? symbol = null, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
 
@@ -523,7 +514,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -566,14 +557,12 @@ public class TradingDataService : IDisposable
 
     #region 风控配置持久化
 
-    private const string RiskConfigKey = "TradingRiskConfig";
-
     /// <summary>
     /// 保存每日账户快照（用于计算最大回撤）
     /// </summary>
     public async Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -595,7 +584,7 @@ public class TradingDataService : IDisposable
     /// </summary>
     public async Task<decimal> GetPeakAccountValueAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT MAX(total_value_usdt) FROM account_snapshots";
@@ -607,7 +596,10 @@ public class TradingDataService : IDisposable
 
     public RiskConfig LoadRiskConfig()
     {
-        var json = Preferences.Default.Get(RiskConfigKey, string.Empty);
+        // 一次性迁移历史单一键到按市场分键存储
+        MigrateLegacyRiskConfigIfNeeded();
+
+        var json = Preferences.Default.Get(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), string.Empty);
         if (string.IsNullOrEmpty(json))
             return new RiskConfig();
         try
@@ -616,7 +608,7 @@ public class TradingDataService : IDisposable
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "风控配置反序列化失败，将使用默认配置");
+            Logger.LogWarning(ex, "风控配置反序列化失败，将使用默认配置");
             return new RiskConfig();
         }
     }
@@ -624,21 +616,28 @@ public class TradingDataService : IDisposable
     public void SaveRiskConfig(RiskConfig config)
     {
         var json = JsonSerializer.Serialize(config);
-        Preferences.Default.Set(RiskConfigKey, json);
+        Preferences.Default.Set(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), json);
+    }
+
+    /// <summary>
+    /// 将历史单一存储键 <see cref="PreferenceKeys.TradingRiskConfig"/> 迁移到按市场分键存储，迁移后清除旧键。
+    /// </summary>
+    private void MigrateLegacyRiskConfigIfNeeded()
+    {
+        var legacyJson = Preferences.Default.Get(PreferenceKeys.TradingRiskConfig, string.Empty);
+        if (string.IsNullOrEmpty(legacyJson))
+            return;
+
+        Preferences.Default.Set(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), legacyJson);
+        Preferences.Default.Remove(PreferenceKeys.TradingRiskConfig);
+        Logger.LogInformation("已将交易风控配置从历史键迁移到按市场分键存储");
     }
 
     #endregion
 
     #region 内部方法
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct = default)
-    {
-        var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
-        return conn;
-    }
-
-    private async Task InitializeDatabaseAsync()
+    protected override async Task InitializeDatabaseAsync()
     {
         try
         {
@@ -716,11 +715,11 @@ public class TradingDataService : IDisposable
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("交易数据库初始化完成");
+            Logger.LogInformation("交易数据库初始化完成");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初始化交易数据库失败");
+            Logger.LogError(ex, "初始化交易数据库失败");
             throw new InvalidOperationException("交易数据库初始化失败，应用无法继续运行", ex);
         }
     }
@@ -807,6 +806,4 @@ public class TradingDataService : IDisposable
     }
 
     #endregion
-
-    public void Dispose() => GC.SuppressFinalize(this);
 }

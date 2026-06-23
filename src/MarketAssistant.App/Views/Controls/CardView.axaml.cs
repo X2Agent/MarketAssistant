@@ -28,7 +28,7 @@ public partial class CardView : ContentControl
 
     static CardView()
     {
-        HeaderProperty.Changed.AddClassHandler<CardView>((x, e) => 
+        HeaderProperty.Changed.AddClassHandler<CardView>((x, e) =>
         {
             x.UpdateHeader();
         });
@@ -45,13 +45,13 @@ public partial class CardView : ContentControl
 
         // 初始化状态
         if (_stringHeaderLabel != null) _stringHeaderLabel.IsVisible = false;
-        if (_viewHeaderPresenter != null) 
+        if (_viewHeaderPresenter != null)
         {
             _viewHeaderPresenter.IsVisible = false;
             _viewHeaderPresenter.Content = null;
         }
         if (_divider != null) _divider.IsVisible = false;
-        
+
         // 应用当前Header值
         UpdateHeader();
     }

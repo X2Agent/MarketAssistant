@@ -17,6 +17,7 @@ namespace TestMarketAssistant;
 public class AnalysisCacheServiceTest
 {
     private Mock<ILogger<AnalysisCacheService>> _mockLogger;
+    private Mock<IUserSettingService> _mockSettingService;
     private IMemoryCache _memoryCache;
     private AnalysisCacheService _cacheService;
     private MarketContext _marketContext;
@@ -27,12 +28,12 @@ public class AnalysisCacheServiceTest
         _mockLogger = new Mock<ILogger<AnalysisCacheService>>();
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
-        var mockSettingService = new Mock<IUserSettingService>();
-        mockSettingService.Setup(s => s.CurrentSetting).Returns(new UserSetting());
+        _mockSettingService = new Mock<IUserSettingService>();
+        _mockSettingService.Setup(s => s.CurrentSetting).Returns(new UserSetting());
         var mockServiceProvider = new Mock<IServiceProvider>();
-        _marketContext = new MarketContext(mockSettingService.Object, mockServiceProvider.Object);
+        _marketContext = new MarketContext(_mockSettingService.Object, mockServiceProvider.Object);
 
-        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache, _marketContext);
+        _cacheService = new AnalysisCacheService(_mockLogger.Object, _memoryCache, _marketContext, _mockSettingService.Object);
     }
 
     [TestCleanup]

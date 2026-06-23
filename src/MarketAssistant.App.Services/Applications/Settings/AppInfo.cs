@@ -7,7 +7,7 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public static class AppInfo
 {
-    private static readonly Assembly _assembly = Assembly.GetExecutingAssembly();
+    private static readonly Assembly _assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 
     #region 应用基本信息
 
@@ -109,6 +109,20 @@ public static class AppInfo
 
     #endregion
 
+    #region GitHub 仓库常量
+
+    /// <summary>
+    /// GitHub 仓库所有者
+    /// </summary>
+    public const string GitHubOwner = "X2Agent";
+
+    /// <summary>
+    /// GitHub 仓库名称
+    /// </summary>
+    public const string GitHubRepo = "MarketAssistant";
+
+    #endregion
+
     #region 网站和URL常量
 
     /// <summary>
@@ -119,22 +133,22 @@ public static class AppInfo
     /// <summary>
     /// 更新日志地址
     /// </summary>
-    public static string ChangelogUrl => $"https://github.com/{Company}/{AppName}/releases";
+    public const string ChangelogUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/releases";
 
     /// <summary>
     /// 意见反馈地址
     /// </summary>
-    public static string FeedbackUrl => $"https://github.com/{Company}/{AppName}/issues";
+    public const string FeedbackUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/issues";
 
     /// <summary>
     /// GitHub仓库地址
     /// </summary>
-    public static string GitHubRepoUrl => $"https://github.com/{Company}/{AppName}";
+    public const string GitHubRepoUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}";
 
     /// <summary>
     /// 许可证地址
     /// </summary>
-    public static string LicenseUrl => $"https://github.com/{Company}/{AppName}/blob/main/LICENSE";
+    public const string LicenseUrl = $"https://github.com/{GitHubOwner}/{GitHubRepo}/blob/main/LICENSE";
 
     /// <summary>
     /// 官方QQ群号码

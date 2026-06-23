@@ -36,7 +36,6 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-    <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
     <PackageReference Include="ModelContextProtocol" />
@@ -49,5 +48,7 @@
     <!-- Added for CLIP ONNX embedding support -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="YamlDotNet" />
+    <!-- RSS 解析（CoinTelegraph 等虚拟币新闻源） -->
+    <PackageReference Include="System.ServiceModel.Syndication" />
   </ItemGroup>
 </Project>

@@ -28,7 +28,7 @@ public class FundamentalAnalystAgent : AnalystAgentBase
 
     public FundamentalAnalystAgent(
         IChatClient chatClient,
-        IBasicDataTools basicTools,
+        IList<AITool> tools,
         AnalystPromptLoader promptLoader,
         AIContextProvider[]? aiContextProviders = null,
         AgentSkillsProvider? skillsProvider = null)
@@ -36,7 +36,7 @@ public class FundamentalAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("FundamentalAnalyst"),
             ResponseFormat,
-            [.. basicTools.GetFunctions()],
+            tools,
             aiContextProviders,
             skillsProvider)
     {

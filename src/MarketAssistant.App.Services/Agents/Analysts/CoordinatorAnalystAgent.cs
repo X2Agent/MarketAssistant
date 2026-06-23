@@ -29,6 +29,7 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
 
     public CoordinatorAnalystAgent(
         IChatClient chatClient,
+        IList<AITool> tools,
         GroundingSearchTools searchTools,
         IUserSettingService userSettingService,
         ILoggerFactory loggerFactory,
@@ -39,7 +40,7 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("CoordinatorAnalyst"),
             ResponseFormat,
-            [AIFunctionFactory.Create(searchTools.SearchAsync)],
+            [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],
             [
                 new InvestmentPreferenceContextProvider(
                     userSettingService.CurrentSetting.InvestmentPreference,

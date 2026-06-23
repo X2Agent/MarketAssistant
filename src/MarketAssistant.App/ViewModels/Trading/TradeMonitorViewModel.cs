@@ -12,6 +12,9 @@ namespace MarketAssistant.ViewModels.Trading;
 
 public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 {
+    private const decimal RiskWarningThreshold = 0.8m;
+    private const int ConfirmationTimeoutSeconds = 60;
+
     private readonly MarketMonitor _marketMonitor;
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
@@ -68,8 +71,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _isMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
 
-        // 接管 TradeExecutor 的确认回调
-        _tradeExecutor.ConfirmationCallback = OnTradeConfirmationRequestedAsync;
+        // 接管 TradeExecutor 的确认事件（使用事件模式，Dispose 时取消订阅）
+        _tradeExecutor.ConfirmationRequested += OnTradeConfirmationRequestedAsync;
     }
 
     [RelayCommand]
@@ -117,9 +120,9 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
                 // 风控阈值预警（达到限额 80% 视为高位）
                 IsDailyLossHigh = RiskConfig.MaxDailyLossPercent > 0
-                                  && DailyLossPercent / RiskConfig.MaxDailyLossPercent >= 0.8m;
+                                  && DailyLossPercent / RiskConfig.MaxDailyLossPercent >= RiskWarningThreshold;
                 IsPositionHigh = RiskConfig.MaxTotalPositionPercent > 0
-                                 && TotalPositionPercent / RiskConfig.MaxTotalPositionPercent >= 0.8m;
+                                 && TotalPositionPercent / RiskConfig.MaxTotalPositionPercent >= RiskWarningThreshold;
 
                 // 加载 FIFO 持仓
                 var positions = await _dataService.GetOpenPositionsAsync();
@@ -180,7 +183,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
         // 60 秒超时自动拒绝，避免用户离开后交易长时间挂起
         _confirmationCts?.Dispose();
-        _confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        _confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(ConfirmationTimeoutSeconds));
         _confirmationCts.Token.Register(() => _confirmationTcs.TrySetResult(false));
 
         return _confirmationTcs.Task;
@@ -190,7 +193,11 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private void ApproveConfirmation()
     {
         HasPendingConfirmation = false;
-        _confirmationCts?.Cancel();
+        // 注意：必须 Dispose 而非 Cancel。
+        // Cancel 会同步触发 Token.Register 的回调（TrySetResult(false)），
+        // 导致随后的 TrySetResult(true) 被忽略，用户批准反而变成拒绝。
+        _confirmationCts?.Dispose();
+        _confirmationCts = null;
         _confirmationTcs?.TrySetResult(true);
     }
 
@@ -198,14 +205,20 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private void RejectConfirmation()
     {
         HasPendingConfirmation = false;
-        _confirmationCts?.Cancel();
+        _confirmationCts?.Dispose();
+        _confirmationCts = null;
         _confirmationTcs?.TrySetResult(false);
     }
 
     public void Dispose()
     {
         _marketMonitor.StatusChanged -= OnMonitorStatusChanged;
+        // 取消订阅事件，避免单例 TradeExecutor 持有已 Dispose 的 ViewModel 引用
+        _tradeExecutor.ConfirmationRequested -= OnTradeConfirmationRequestedAsync;
+        // 释放前若仍有待确认请求，按拒绝处理，避免调用方永久挂起
+        _confirmationTcs?.TrySetResult(false);
         _confirmationCts?.Dispose();
+        _confirmationCts = null;
         GC.SuppressFinalize(this);
     }
 }

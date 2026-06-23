@@ -3,10 +3,8 @@ using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
-using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.Data;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -39,7 +37,6 @@ public sealed class AssetScreenerServiceTest
                 ApiKey = "test-key"
             });
         services.AddSingleton(mockUserSettingService.Object);
-        services.AddSingleton<PlaywrightService>();
         services.AddLogging();
         services.AddHttpClient();
         services.AddTestMarketDataHttpClients();
@@ -98,8 +95,9 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
+        Assert.IsTrue(result.Count > 0, "A股默认条件筛选应返回至少一只股票");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
 
         Console.WriteLine($"A股默认条件筛选 - 返回股票数量: {result.Count}");
     }
@@ -132,8 +130,9 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
+        Assert.IsTrue(result.Count > 0, "市值50-250亿筛选应返回至少一只股票");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
 
         Console.WriteLine($"A股单条件筛选（市值50-250亿） - 返回股票数量: {result.Count}");
     }
@@ -173,8 +172,9 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count >= 0);
-        Assert.IsTrue(result.Count <= criteria.Limit);
+        Assert.IsTrue(result.Count > 0, "市值500亿-1万亿+PE 5-50 筛选应返回至少一只股票");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
 
         Console.WriteLine($"A股多条件筛选（市值+PE） - 返回股票数量: {result.Count}");
     }
@@ -207,20 +207,15 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        try
-        {
-            var result = await service.ScreenAsync(criteria);
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Count >= 0);
-            Assert.IsTrue(result.Count <= criteria.Limit);
-            Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)));
+        var result = await service.ScreenAsync(criteria);
 
-            Console.WriteLine($"虚拟币默认条件筛选 - 返回数量: {result.Count}");
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0, "虚拟币默认条件筛选应返回至少一条记录");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+
+        Console.WriteLine($"虚拟币默认条件筛选 - 返回数量: {result.Count}");
     }
 
     [TestMethod]
@@ -244,19 +239,15 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        try
-        {
-            var result = await service.ScreenAsync(criteria);
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Count >= 0);
-            Assert.IsTrue(result.Count <= criteria.Limit);
+        var result = await service.ScreenAsync(criteria);
 
-            Console.WriteLine($"虚拟币市值筛选（10-500亿美元） - 返回数量: {result.Count}");
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0, "市值10-500亿美元筛选应返回至少一条记录");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+
+        Console.WriteLine($"虚拟币市值筛选（10-500亿美元） - 返回数量: {result.Count}");
     }
 
     [TestMethod]
@@ -280,19 +271,15 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        try
-        {
-            var result = await service.ScreenAsync(criteria);
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Count >= 0);
-            Assert.IsTrue(result.Count <= criteria.Limit);
+        var result = await service.ScreenAsync(criteria);
 
-            Console.WriteLine($"虚拟币价格变化筛选（-10% ~ +50%） - 返回数量: {result.Count}");
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0, "价格变化筛选应返回至少一条记录");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+
+        Console.WriteLine($"虚拟币价格变化筛选（-10% ~ +50%） - 返回数量: {result.Count}");
     }
 
     [TestMethod]
@@ -321,19 +308,15 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        try
-        {
-            var result = await service.ScreenAsync(criteria);
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Count >= 0);
-            Assert.IsTrue(result.Count <= criteria.Limit);
+        var result = await service.ScreenAsync(criteria);
 
-            Console.WriteLine($"虚拟币多条件筛选（市值+交易量） - 返回数量: {result.Count}");
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0, "市值+交易量组合筛选应返回至少一条记录");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+
+        Console.WriteLine($"虚拟币多条件筛选（市值+交易量） - 返回数量: {result.Count}");
     }
 
     [TestMethod]
@@ -357,19 +340,15 @@ public sealed class AssetScreenerServiceTest
         };
 
         // Act
-        try
-        {
-            var result = await service.ScreenAsync(criteria);
-            Assert.IsNotNull(result);
-            Assert.IsTrue(result.Count >= 0);
-            Assert.IsTrue(result.Count <= criteria.Limit);
+        var result = await service.ScreenAsync(criteria);
 
-            Console.WriteLine($"虚拟币市值排名筛选（前50名） - 返回数量: {result.Count}");
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        // Assert
+        Assert.IsNotNull(result);
+        Assert.IsTrue(result.Count > 0, "市值排名前50筛选应返回至少一条记录");
+        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+
+        Console.WriteLine($"虚拟币市值排名筛选（前50名） - 返回数量: {result.Count}");
     }
 
     [TestMethod]

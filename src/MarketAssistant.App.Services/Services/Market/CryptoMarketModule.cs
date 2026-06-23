@@ -14,6 +14,7 @@ using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Exchanges;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Market;
@@ -52,11 +53,11 @@ public sealed class CryptoMarketModule : IMarketModule
 
         // 资产服务
         services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IHomeAssetService, CryptoHomeService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IFavoriteService, CryptoFavoriteService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IAssetHistoryService, CryptoHistoryService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IHomeAssetService, HomeAssetService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetHistoryService, AssetHistoryService>(MarketType.Crypto);
         services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
-        services.AddKeyedSingleton<IAssetCacheService, CryptoAssetCacheService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>(MarketType.Crypto);
 
         // 工作流

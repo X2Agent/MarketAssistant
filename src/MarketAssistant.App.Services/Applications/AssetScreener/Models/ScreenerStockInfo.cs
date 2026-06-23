@@ -1,7 +1,7 @@
 namespace MarketAssistant.Applications.AssetScreener.Models;
 
 /// <summary>
-/// A股筛选结果（雪球网数据源）
+/// A股筛选结果（雪球 HTTP API 数据源，支持全部 38 个筛选指标）
 /// </summary>
 public class ScreenerStockInfo : ScreenerAssetInfo
 {

@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="MarketAssistant.Views.Pages.SettingsPageView"
              x:DataType="vm:SettingsPageViewModel">
@@ -64,9 +64,8 @@
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
                                         Content="获取密钥"
+                                        Classes="btn-primary"
                                         Command="{Binding OpenModelApiWebsiteCommand}"
-                                        Background="{DynamicResource PrimaryBrush}"
-                                        Foreground="White"
                                         Margin="{StaticResource SmallLeftMargin}"/>
                             </Grid>
                         </StackPanel>
@@ -97,9 +96,8 @@
                                          PasswordChar="&#9679;"/>
                                 <Button Grid.Column="1"
                                         Content="获取密鑰"
+                                        Classes="btn-info"
                                         Command="{Binding OpenEmbeddingApiWebsiteCommand}"
-                                        Background="{DynamicResource InfoBrush}"
-                                        Foreground="White"
                                         Margin="{StaticResource SmallLeftMargin}"/>
                             </Grid>
                         </StackPanel>
@@ -145,9 +143,8 @@
                                          PlaceholderText="请输入ZhiTu API令牌"/>
                                 <Button Grid.Column="1"
                                         Content="获取令牌"
+                                        Classes="btn-info"
                                         Command="{Binding OpenZhiTuApiWebsiteCommand}"
-                                        Background="{DynamicResource InfoBrush}"
-                                        Foreground="White"
                                         Margin="{StaticResource SmallLeftMargin}"/>
                             </Grid>
                         </StackPanel>
@@ -166,9 +163,8 @@
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
                                         Content="获取密钥"
+                                        Classes="btn-info"
                                         Command="{Binding OpenCoinGeckoApiWebsiteCommand}"
-                                        Background="{DynamicResource InfoBrush}"
-                                        Foreground="White"
                                         Margin="{StaticResource SmallLeftMargin}"/>
                             </Grid>
                             <TextBlock Text="用于获取代币市值、供应量等数据。免费版有限额但无需API Key"
@@ -255,9 +251,8 @@
                                              IsReadOnly="True"/>
                                     <Button Grid.Column="1"
                                             Content="浏览"
+                                            Classes="btn-primary"
                                             Command="{Binding SelectKnowledgeDirectoryCommand}"
-                                            Background="{DynamicResource PrimaryBrush}"
-                                            Foreground="White"
                                             Margin="{StaticResource SmallLeftMargin}"/>
                                 </Grid>
                             </StackPanel>
@@ -270,9 +265,8 @@
                                 
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                     <Button Content="向量化文档"
+                                            Classes="success"
                                             Command="{Binding VectorizeDocumentsCommand}"
-                                            Background="{DynamicResource SuccessBrush}"
-                                            Foreground="White"
                                             IsEnabled="{Binding IsKnowledgeDirectoryValid}"/>
                                     <PathIcon Data="{StaticResource LoadingIcon}"
                                               Width="{StaticResource DefaultIconSize}"
@@ -353,30 +347,6 @@
                               Content="开启通知"/>
                 </controls:CardView>
 
-                <!-- 浏览器设置区域 -->
-                <controls:CardView Header="浏览器设置">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="浏览器路径"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding UserSetting.BrowserPath}"
-                                     PlaceholderText="请选择浏览器路径（留空则自动检测）"
-                                     IsReadOnly="True"/>
-                            <Button Grid.Column="1"
-                                    Content="浏览"
-                                    Command="{Binding SelectBrowserPathCommand}"
-                                    Background="{DynamicResource InfoBrush}"
-                                    Foreground="White"
-                                    Margin="{StaticResource SmallLeftMargin}"/>
-                        </Grid>
-                        <TextBlock Text="注意：如果留空，系统将自动使用默认浏览器"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    </StackPanel>
-                </controls:CardView>
-
                 <!-- 日志设置区域 -->
                 <controls:CardView Header="日志设置">
                     <StackPanel Spacing="{StaticResource SmallSpacing}">
@@ -389,9 +359,8 @@
                                      PlaceholderText="请输入日志文件路径"/>
                             <Button Grid.Column="1"
                                     Content="浏览"
+                                    Classes="btn-info"
                                     Command="{Binding SelectLogPathCommand}"
-                                    Background="{DynamicResource InfoBrush}"
-                                    Foreground="White"
                                     Margin="{StaticResource SmallLeftMargin}"/>
                         </Grid>
                     </StackPanel>
@@ -447,9 +416,8 @@
                                    FontSize="{StaticResource LabelFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <Button Content="MCP服务器配置"
+                                Classes="btn-info"
                                 Command="{Binding NavigateToMCPConfigCommand}"
-                                Background="{DynamicResource InfoBrush}"
-                                Foreground="White"
                                 HorizontalAlignment="Left"/>
                     </StackPanel>
                 </controls:CardView>
@@ -473,9 +441,8 @@
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"/>
                 <Button Content="保存"
+                        Classes="btn-primary"
                         Command="{Binding SaveCommand}"
-                        Background="{DynamicResource PrimaryButtonBrush}"
-                        Foreground="White"
                         MinWidth="{StaticResource MediumButtonMinWidth}"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"/>

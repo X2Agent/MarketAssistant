@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              xmlns:assets="using:MarketAssistant.Applications.Assets.Models"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"

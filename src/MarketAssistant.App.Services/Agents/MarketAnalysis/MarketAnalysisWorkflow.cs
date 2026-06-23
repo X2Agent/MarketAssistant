@@ -9,6 +9,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 using System.Reflection;
 
 namespace MarketAssistant.Agents.MarketAnalysis;
@@ -17,7 +18,7 @@ namespace MarketAssistant.Agents.MarketAnalysis;
 /// 市场分析并发工作流（基于 Agent Framework 最佳实践）
 /// 参考: https://learn.microsoft.com/zh-cn/agent-framework/tutorials/workflows/agents-in-workflows
 /// </summary>
-public class MarketAnalysisWorkflow : IDisposable
+public class MarketAnalysisWorkflow
 {
     private readonly AnalysisAggregatorExecutor _aggregatorExecutor;
     private readonly CoordinatorExecutor _coordinatorExecutor;
@@ -27,7 +28,20 @@ public class MarketAnalysisWorkflow : IDisposable
     private readonly ILogger<MarketAnalysisWorkflow> _logger;
     private readonly AnalysisReportCache _reportCache;
 
-    private bool _disposed = false;
+    /// <summary>
+    /// MAF Agent <c>Name</c>（ASCII 标识符，如 "FundamentalAnalyst"）→ 中文显示名（如"基本面分析师"）映射。
+    /// 在 <see cref="CreateAnalystAgents"/> 创建 Agent 时一并建立，供
+    /// <see cref="GetDisplayNameForExecutorId"/> 把工作流 ExecutorId（如
+    /// <c>FundamentalAnalyst_826faad2...</c>）翻译为用户可读的显示名。
+    /// </summary>
+    /// <remarks>
+    /// 为何不能直接把中文 DisplayName 作为 MAF Agent Name：MAF 的
+    /// <c>AIAgentExtensions.GetDescriptiveId</c> 会用正则 <c>[^0-9A-Za-z]+</c> 清洗
+    /// <c>Name + "_" + Id</c> 生成 ExecutorId，中文字符会被整体替换为单个下划线，
+    /// 导致 ExecutorId 退化为 <c>_826faad2...</c>。故 Name 必须为 ASCII，
+    /// 显示名在本映射中维护。
+    /// </remarks>
+    private readonly Dictionary<string, string> _agentNameToDisplayName = new();
 
     /// <summary>
     /// 分析进度事件
@@ -84,7 +98,7 @@ public class MarketAnalysisWorkflow : IDisposable
 
             var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot);
             var failedAnalystNames = analystAgents.FailedTypes
-                .Select(t => t.GetCustomAttribute<System.ComponentModel.DisplayNameAttribute>()?.DisplayName ?? t.Name)
+                .Select(GetAnalystDisplayNameFromType)
                 .ToList();
             var createdAgents = analystAgents.Agents;
 
@@ -140,19 +154,20 @@ public class MarketAnalysisWorkflow : IDisposable
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
+        bool reportReceived = false;
         int completedAnalysts = 0;
         int totalAnalysts = analystCount;
         var failedSteps = new List<string>();
 
         // 执行工作流（流式处理）
+        // 初始输入 assetSymbol 会触发 Dispatcher，Dispatcher 再通过 context.SendMessageAsync
+        // 广播 ChatMessage 和 TurnToken 给所有分析师，触发其 LLM 调用
         await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             assetSymbol,
             checkpointManager: null,
             sessionId: null,
             cancellationToken);
-
-        await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
 
         await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -161,18 +176,13 @@ public class MarketAnalysisWorkflow : IDisposable
                 case ExecutorInvokedEvent executorInvoked:
                     _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
 
-                    string stageName = executorInvoked.ExecutorId switch
+                    string stageName = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
                     {
                         "AnalysisDispatcher" => "正在分发分析任务",
                         "AnalysisAggregator" => "正在聚合分析结果",
                         "Coordinator" => "正在生成综合报告",
-                        _ => $"{executorInvoked.ExecutorId} 正在分析"
+                        _ => $"{GetDisplayNameForExecutorId(executorInvoked.ExecutorId)} 正在分析"
                     };
-
-                    if (executorInvoked.ExecutorId == "AnalysisDispatcher")
-                    {
-                        // Dispatcher 启动时记录总数
-                    }
 
                     OnProgressChanged(new AnalysisProgressEventArgs
                     {
@@ -186,13 +196,12 @@ public class MarketAnalysisWorkflow : IDisposable
                 case ExecutorCompletedEvent executorComplete:
                     _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
 
-                    if (executorComplete.ExecutorId is not "AnalysisDispatcher"
-                        and not "AnalysisAggregator" and not "Coordinator")
+                    if (IsAnalystExecutor(executorComplete.ExecutorId))
                     {
                         completedAnalysts++;
                         OnProgressChanged(new AnalysisProgressEventArgs
                         {
-                            StageDescription = $"{executorComplete.ExecutorId} 分析完成",
+                            StageDescription = $"{GetDisplayNameForExecutorId(executorComplete.ExecutorId)} 分析完成",
                             IsInProgress = true,
                             TotalAnalysts = totalAnalysts,
                             CompletedAnalysts = completedAnalysts,
@@ -202,8 +211,12 @@ public class MarketAnalysisWorkflow : IDisposable
                     break;
 
                 case WorkflowOutputEvent workflowOutput:
-                    finalReport = workflowOutput.Data as MarketAnalysisReport;
-                    _logger.LogInformation("工作流完成，生成最终报告");
+                    if (!reportReceived)
+                    {
+                        finalReport = workflowOutput.Data as MarketAnalysisReport;
+                        reportReceived = true;
+                        _logger.LogInformation("工作流完成，生成最终报告");
+                    }
                     break;
 
                 case ExecutorFailedEvent executorFailed:
@@ -212,17 +225,17 @@ public class MarketAnalysisWorkflow : IDisposable
                         "步骤失败: {ExecutorId}, 错误: {Error}",
                         executorFailed.ExecutorId,
                         errorMessage);
-                    failedSteps.Add(executorFailed.ExecutorId);
+                    failedSteps.Add(GetDisplayNameForExecutorId(executorFailed.ExecutorId));
 
                     // 关键步骤失败则抛出，非关键步骤记录并继续
-                    if (executorFailed.ExecutorId is "Coordinator" or "AnalysisAggregator" or "AnalysisDispatcher")
+                    if (IsSystemExecutor(executorFailed.ExecutorId))
                     {
                         throw new FriendlyException(errorMessage);
                     }
 
                     OnProgressChanged(new AnalysisProgressEventArgs
                     {
-                        StageDescription = $"{executorFailed.ExecutorId} 分析失败，继续其他分析",
+                        StageDescription = $"{GetDisplayNameForExecutorId(executorFailed.ExecutorId)} 分析失败，继续其他分析",
                         IsInProgress = true,
                         TotalAnalysts = totalAnalysts,
                         CompletedAnalysts = completedAnalysts,
@@ -307,6 +320,16 @@ public class MarketAnalysisWorkflow : IDisposable
             {
                 var agent = _analystAgentFactory.CreateAnalyst(type, sharedProviders);
                 createdAgents.Add(agent);
+
+                // 创建时即建立 Name → DisplayName 映射。
+                // agent.Name 经 DelegatingAIAgent 透传，等于 YAML 中的 ASCII config.Name
+                // （如 "FundamentalAnalyst"），正是 MAF 生成 ExecutorId 时使用的前缀。
+                // DisplayName 取类型上的 [DisplayName] 特性（与 YAML displayName 一致）。
+                var displayName = GetAnalystDisplayNameFromType(type);
+                if (!string.IsNullOrEmpty(agent.Name))
+                {
+                    _agentNameToDisplayName[agent.Name] = displayName;
+                }
             }
             catch (Exception ex)
             {
@@ -317,6 +340,65 @@ public class MarketAnalysisWorkflow : IDisposable
 
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
         return (createdAgents, failedTypes);
+    }
+
+    /// <summary>
+    /// 根据分析师类型获取显示名称（用于创建失败时的降级提示）。
+    /// 优先读取 <see cref="DisplayNameAttribute"/>，回退到类型名。
+    /// </summary>
+    private static string GetAnalystDisplayNameFromType(Type analystType)
+    {
+        return analystType.GetCustomAttribute<DisplayNameAttribute>()?.DisplayName
+            ?? analystType.Name;
+    }
+
+    /// <summary>
+    /// 从 ExecutorId 中提取 Name 前缀（第一个下划线之前的部分）。
+    /// <para>
+    /// MAF 的 <c>AIAgentExtensions.GetDescriptiveId</c> 生成 ExecutorId 的方式为
+    /// <c>Regex.Replace(Name + "_" + Id, "[^0-9A-Za-z]+", "_")</c>。由于 <c>Name</c>
+    /// 为 ASCII 标识符、<c>Id</c> 为 GUID 的 "N" 格式（纯十六进制），二者均不含下划线，
+    /// 因此 ExecutorId 中有且仅有一个下划线作为分隔符。
+    /// </para>
+    /// </summary>
+    private static string GetExecutorNamePrefix(string executorId)
+    {
+        var separatorIndex = executorId.IndexOf('_');
+        return separatorIndex > 0 ? executorId[..separatorIndex] : executorId;
+    }
+
+    /// <summary>
+    /// 判断是否为系统 Executor（Dispatcher / Aggregator / Coordinator），
+    /// 即非分析师的业务执行器。
+    /// </summary>
+    private static bool IsSystemExecutor(string executorId)
+    {
+        var prefix = GetExecutorNamePrefix(executorId);
+        return prefix is "AnalysisDispatcher" or "AnalysisAggregator" or "Coordinator";
+    }
+
+    /// <summary>
+    /// 判断是否为分析师 Executor（排除系统 Executor）。
+    /// </summary>
+    private static bool IsAnalystExecutor(string executorId) => !IsSystemExecutor(executorId);
+
+    /// <summary>
+    /// 判断是否为 Dispatcher Executor。
+    /// </summary>
+    private static bool IsDispatcherExecutor(string executorId)
+        => GetExecutorNamePrefix(executorId) == "AnalysisDispatcher";
+
+    /// <summary>
+    /// 从工作流 ExecutorId 中提取分析师显示名称。
+    /// 按第一个下划线切出 Name 前缀，再在 <see cref="_agentNameToDisplayName"/> 中查中文显示名。
+    /// </summary>
+    private string GetDisplayNameForExecutorId(string executorId)
+    {
+        var namePrefix = GetExecutorNamePrefix(executorId);
+
+        return _agentNameToDisplayName.TryGetValue(namePrefix, out var displayName)
+            ? displayName
+            : executorId;
     }
 
     /// <summary>
@@ -370,20 +452,6 @@ public class MarketAnalysisWorkflow : IDisposable
     {
         ProgressChanged?.Invoke(this, e);
     }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed && disposing)
-        {
-            _disposed = true;
-        }
-    }
 }
 
 /// <summary>
@@ -432,7 +500,7 @@ public sealed class AnalysisProgressEventArgs : EventArgs
             if (!IsInProgress) return 100;
             // 正在进行分析
             if (TotalAnalysts > 0)
-                return (int)((double)CompletedAnalysts / TotalAnalysts * 100);
+                return Math.Min(100, (int)((double)CompletedAnalysts / TotalAnalysts * 100));
             // 准备阶段（未开始分析）
             return 0;
         }

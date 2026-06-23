@@ -1,4 +1,5 @@
-﻿using MarketAssistant.Services.Dialog;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
@@ -26,6 +27,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<NavigationService>();
+
+        // 注册全局异常处理器（Singleton，由 DI 创建实例）
+        services.AddSingleton<GlobalExceptionHandler>();
 
         return services;
     }

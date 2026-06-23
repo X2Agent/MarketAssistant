@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
+using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
@@ -14,6 +15,8 @@ namespace MarketAssistant;
 
 public partial class App : Application
 {
+    // 应用启动期间用于解析少量根服务（异常处理器、主题设置、主窗口 ViewModel），
+    // 业务层应通过构造函数注入获取依赖，不应直接访问此属性。
     public static IServiceProvider? ServiceProvider { get; private set; }
     private Window? _mainWindow;
 
@@ -27,10 +30,12 @@ public partial class App : Application
         // 配置依赖注入
         ServiceProvider = Program.ConfigureServices();
 
-        // 初始化全局异常处理器（直接传入所需服务，避免服务定位器）
+        // 初始化全局异常处理器（由 DI 创建实例，避免静态工厂自行 new）
         GlobalExceptionHandler.Initialize(
-            ServiceProvider.GetRequiredService<ILogger<GlobalExceptionHandler>>(),
-            ServiceProvider.GetRequiredService<IDialogService>());
+            ServiceProvider.GetRequiredService<GlobalExceptionHandler>());
+
+        // 激活价格预警服务：触发历史存储迁移 + 启动后台监控
+        ServiceProvider.GetRequiredService<PriceAlertService>();
 
         // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();

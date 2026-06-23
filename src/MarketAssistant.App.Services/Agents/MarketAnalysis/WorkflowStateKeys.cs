@@ -17,12 +17,6 @@ internal static class WorkflowStateKeys
     public const string AssetSymbol = nameof(AssetSymbol);
 
     /// <summary>
-    /// 兼容旧状态键名，内部统一使用 AssetSymbol。
-    /// </summary>
-    [Obsolete("Use AssetSymbol instead.")]
-    public const string StockSymbol = AssetSymbol;
-
-    /// <summary>
     /// 预期分析师数量的状态键
     /// </summary>
     public const string ExpectedAnalystCount = nameof(ExpectedAnalystCount);

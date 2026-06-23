@@ -27,7 +27,7 @@ public class TechnicalAnalystAgent : AnalystAgentBase
 
     public TechnicalAnalystAgent(
         IChatClient chatClient,
-        ITechnicalDataTools technicalTools,
+        IList<AITool> tools,
         AnalystPromptLoader promptLoader,
         AIContextProvider[]? aiContextProviders = null,
         AgentSkillsProvider? skillsProvider = null)
@@ -35,7 +35,7 @@ public class TechnicalAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("TechnicalAnalyst"),
             ResponseFormat,
-            [.. technicalTools.GetFunctions()],
+            tools,
             aiContextProviders,
             skillsProvider)
     {

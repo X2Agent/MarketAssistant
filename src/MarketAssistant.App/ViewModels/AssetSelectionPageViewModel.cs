@@ -10,6 +10,7 @@ using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -47,7 +48,7 @@ public enum SelectionModeType
 /// <summary>
 /// AI选股功能的ViewModel
 /// </summary>
-public partial class AssetSelectionPageViewModel : ViewModelBase
+public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 {
     private readonly InvestmentSelectionService _investmentSelectionService;
     private readonly IServiceProvider _serviceProvider;
@@ -127,11 +128,13 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
     public bool IsQuickStrategyAreaVisible => SelectedMode?.ModeType == SelectionModeType.QuickStrategy;
 
     /// <summary>
-    /// 当前占位符文本
+    /// 当前占位符文本，根据市场类型动态调整
     /// </summary>
     public string CurrentPlaceholder => SelectedMode?.ModeType switch
     {
-        SelectionModeType.UserRequirement => "请描述您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍，近期涨幅不超过10%的价值股",
+        SelectionModeType.UserRequirement => _marketContext.CurrentMarket == MarketType.Crypto
+            ? "请描述您的选币需求，例如：寻找市值前50、24h涨幅超过5%、交易量活跃的虚拟币"
+            : "请描述您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍，近期涨幅不超过10%的价值股",
         SelectionModeType.NewsAnalysis => "请输入新闻内容或热点信息，例如：央行降准利好银行股，新能源汽车销量创新高等",
         _ => "请输入内容"
     };
@@ -169,6 +172,49 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
         SelectionResult?.RiskWarnings != null && SelectionResult.RiskWarnings.Count > 0;
 
     /// <summary>
+    /// 加载提示文字，根据当前市场类型动态调整
+    /// </summary>
+    public string LoadingText => _marketContext.CurrentMarket == MarketType.Crypto
+        ? "AI 正在为您精选优质虚拟币，请稍候..."
+        : "AI 正在为您精选优质股票，请稍候...";
+
+    /// <summary>
+    /// 页面标题，根据当前市场类型动态调整
+    /// </summary>
+    public string PageTitle => _marketContext.CurrentMarket == MarketType.Crypto
+        ? "AI智能选币"
+        : "AI智能选股";
+
+    /// <summary>
+    /// 模式标签标题
+    /// </summary>
+    public string ModeLabel => _marketContext.CurrentMarket == MarketType.Crypto ? "选币模式" : "选股模式";
+
+    /// <summary>
+    /// 快速策略标题
+    /// </summary>
+    public string QuickStrategyTitle => _marketContext.CurrentMarket == MarketType.Crypto ? "快速选币策略" : "快速选股策略";
+
+    /// <summary>
+    /// 快速策略描述
+    /// </summary>
+    public string QuickStrategyDescription => _marketContext.CurrentMarket == MarketType.Crypto
+        ? "选择预设的选币策略，快速获得投资建议"
+        : "选择预设的选股策略，快速获得投资建议";
+
+    /// <summary>
+    /// 结果区域标题
+    /// </summary>
+    public string ResultTitle => _marketContext.CurrentMarket == MarketType.Crypto ? "选币结果" : "选股结果";
+
+    /// <summary>
+    /// 推荐列表标题
+    /// </summary>
+    public string RecommendationTitle => _marketContext.CurrentMarket == MarketType.Crypto
+        ? "📈 推荐虚拟币"
+        : "📈 推荐股票";
+
+    /// <summary>
     /// 构造函数（使用依赖注入）
     /// </summary>
     public AssetSelectionPageViewModel(
@@ -181,6 +227,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
         _investmentSelectionService = investmentSelectionService;
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
+        SubscribeToMarketChanges(_marketContext);
         _dialogService = dialogService;
         _ = LoadQuickStrategiesAsync();
         _ = LoadSelectionModesAsync();
@@ -203,6 +250,19 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
         OnPropertyChanged(nameof(RecommendedStocks));
         OnPropertyChanged(nameof(FormattedRiskWarnings));
         OnPropertyChanged(nameof(HasRiskWarnings));
+    }
+
+    protected override void OnMarketChanged(MarketType newMarket)
+    {
+        OnPropertyChanged(nameof(LoadingText));
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(ModeLabel));
+        OnPropertyChanged(nameof(QuickStrategyTitle));
+        OnPropertyChanged(nameof(QuickStrategyDescription));
+        OnPropertyChanged(nameof(ResultTitle));
+        OnPropertyChanged(nameof(RecommendationTitle));
+        OnPropertyChanged(nameof(CurrentPlaceholder));
+        _ = LoadQuickStrategiesAsync();
     }
 
     [RelayCommand]
@@ -419,6 +479,12 @@ public partial class AssetSelectionPageViewModel : ViewModelBase
             });
             return Task.CompletedTask;
         }, "加载选股模式");
+    }
+
+    public void Dispose()
+    {
+        UnsubscribeFromMarketChanges(_marketContext);
+        GC.SuppressFinalize(this);
     }
 }
 

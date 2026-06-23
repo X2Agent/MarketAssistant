@@ -2,9 +2,14 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services;
+using MarketAssistant.Services.Data;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace TestMarketAssistant.Tools;
 
@@ -22,7 +27,17 @@ public class CryptoMetricsToolsTest
         var services = new ServiceCollection();
 
         services.AddLogging();
-        services.AddHttpClient();
+        // 注册命名 HttpClient（含 BaseAddress 与弹性策略），与生产配置一致
+        services.AddNamedMarketHttpClients();
+        // 注册虚拟币指标工具依赖的数据服务（Binance 行情 + CoinGecko 市场指标）
+        services.AddSingleton<BinanceMarketDataService>();
+        services.AddSingleton<CoinGeckoApiService>();
+
+        // 通过 Mock 注入 UserSetting（CoinGeckoApiKey 可为空，使用免费 API）
+        var userSetting = new UserSetting();
+        var userSettingServiceMock = new Mock<IUserSettingService>();
+        userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(userSetting);
+        services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
 
@@ -49,6 +64,13 @@ public class CryptoMetricsToolsTest
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count > 0);
         Assert.IsTrue(result[0].Volume > 0);
+        // 加强验证：交易所名称、占比、交易对数量等字段
+        Assert.IsFalse(string.IsNullOrEmpty(result[0].Exchange), $"交易所名称不应为空，实际: '{result[0].Exchange}'");
+        Assert.IsTrue(result[0].Percentage > 0, $"占比应大于0，实际: {result[0].Percentage}");
+        Assert.IsTrue(result[0].PairCount > 0, $"交易对数量应大于0，实际: {result[0].PairCount}");
+        // 所有条目的占比之和应接近 100（允许浮点精度误差）
+        var totalPercentage = result.Sum(x => x.Percentage);
+        Assert.IsTrue(totalPercentage > 98 && totalPercentage < 102, $"占比总和应接近100，实际: {totalPercentage}");
     }
 
     [TestMethod]
@@ -76,6 +98,16 @@ public class CryptoMetricsToolsTest
         Assert.AreEqual("1d", result.Interval);
         Assert.IsTrue(result.Candles.Count > 0);
         Assert.IsTrue(result.Candles[0].Close > 0);
+        // 加强验证：OHLC 关系与成交量/时间戳
+        Assert.IsTrue(result.Candles[0].Open > 0, $"开盘价应大于0，实际: {result.Candles[0].Open}");
+        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Low, $"最高价({result.Candles[0].High})应大于等于最低价({result.Candles[0].Low})");
+        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Open, $"最高价({result.Candles[0].High})应大于等于开盘价({result.Candles[0].Open})");
+        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Close, $"最高价({result.Candles[0].High})应大于等于收盘价({result.Candles[0].Close})");
+        Assert.IsTrue(result.Candles[0].Low <= result.Candles[0].Open, $"最低价({result.Candles[0].Low})应小于等于开盘价({result.Candles[0].Open})");
+        Assert.IsTrue(result.Candles[0].Low <= result.Candles[0].Close, $"最低价({result.Candles[0].Low})应小于等于收盘价({result.Candles[0].Close})");
+        Assert.IsTrue(result.Candles[0].Volume > 0, $"成交量应大于0，实际: {result.Candles[0].Volume}");
+        Assert.IsTrue(result.Candles[0].OpenTime > 0, $"开盘时间戳应大于0，实际: {result.Candles[0].OpenTime}");
+        Assert.IsTrue(result.Candles[0].CloseTime > result.Candles[0].OpenTime, $"收盘时间戳({result.Candles[0].CloseTime})应大于开盘时间戳({result.Candles[0].OpenTime})");
     }
 
     [TestMethod]

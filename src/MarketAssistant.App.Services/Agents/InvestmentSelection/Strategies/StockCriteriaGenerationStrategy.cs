@@ -236,7 +236,7 @@ public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Stock
 
     public StockCriteria DeserializeCriteria(string json)
     {
-        var criteria = JsonSerializer.Deserialize<StockCriteria>(json, DeserializationOptions);
+        var criteria = LlmJsonExtractor.Deserialize<StockCriteria>(json, DeserializationOptions);
         if (criteria == null)
         {
             throw new InvalidOperationException("股票筛选条件 JSON 解析失败");

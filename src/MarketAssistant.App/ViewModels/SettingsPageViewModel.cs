@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
@@ -36,6 +35,42 @@ public partial class SettingsPageViewModel : ViewModelBase
     // UserSetting对象，包含所有用户设置
     [ObservableProperty]
     private UserSetting _userSetting = new();
+
+    /// <summary>
+    /// UserSetting 属性变更时，自动转发关联的计算属性通知
+    /// </summary>
+    partial void OnUserSettingChanged(UserSetting? oldValue, UserSetting newValue)
+    {
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= ForwardComputedProperties;
+
+        if (newValue is not null)
+            newValue.PropertyChanged += ForwardComputedProperties;
+    }
+
+    private void ForwardComputedProperties(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(UserSetting.ThemeMode):
+                OnPropertyChanged(nameof(IsThemeDefault));
+                OnPropertyChanged(nameof(IsThemeLight));
+                OnPropertyChanged(nameof(IsThemeDark));
+                break;
+            case nameof(UserSetting.CurrentMarketType):
+                OnPropertyChanged(nameof(IsAShareMarket));
+                OnPropertyChanged(nameof(IsCryptoMarket));
+                break;
+            case nameof(UserSetting.WebSearchProvider):
+                OnPropertyChanged(nameof(IsBingProvider));
+                OnPropertyChanged(nameof(IsBraveProvider));
+                OnPropertyChanged(nameof(IsTavilyProvider));
+                break;
+            case nameof(UserSetting.KnowledgeFileDirectory):
+                OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
+                break;
+        }
+    }
 
     // 模型列表 - ViewModel特有属性
     [ObservableProperty]
@@ -73,7 +108,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
-    public string JinaApiUrl { get; } = "https://jina.ai/api-dashboard/key-manager";
+    public string JinaApiUrl { get; } = "https://jina.ai/embeddings";
 
     /// <summary>
     /// 主题：跟随系统
@@ -87,9 +122,6 @@ public partial class SettingsPageViewModel : ViewModelBase
             {
                 UserSetting.ThemeMode = "Default";
                 ApplyTheme("Default");
-                OnPropertyChanged(nameof(IsThemeDefault));
-                OnPropertyChanged(nameof(IsThemeLight));
-                OnPropertyChanged(nameof(IsThemeDark));
             }
         }
     }
@@ -106,9 +138,6 @@ public partial class SettingsPageViewModel : ViewModelBase
             {
                 UserSetting.ThemeMode = "Light";
                 ApplyTheme("Light");
-                OnPropertyChanged(nameof(IsThemeDefault));
-                OnPropertyChanged(nameof(IsThemeLight));
-                OnPropertyChanged(nameof(IsThemeDark));
             }
         }
     }
@@ -125,9 +154,6 @@ public partial class SettingsPageViewModel : ViewModelBase
             {
                 UserSetting.ThemeMode = "Dark";
                 ApplyTheme("Dark");
-                OnPropertyChanged(nameof(IsThemeDefault));
-                OnPropertyChanged(nameof(IsThemeLight));
-                OnPropertyChanged(nameof(IsThemeDark));
             }
         }
     }
@@ -153,11 +179,11 @@ public partial class SettingsPageViewModel : ViewModelBase
         {
             if (value && UserSetting.CurrentMarketType != MarketType.AShare)
             {
+                // 仅修改本地 UserSetting，不立即调用 SwitchMarket
+                // 避免触发 MainWindowViewModel 重建导航，导致正在编辑的设置丢失
+                // 实际市场切换统一在 Save() 中执行
                 UserSetting.CurrentMarketType = MarketType.AShare;
-                _marketContext.SwitchMarket(MarketType.AShare);
-                OnPropertyChanged(nameof(IsAShareMarket));
-                OnPropertyChanged(nameof(IsCryptoMarket));
-                Logger?.LogInformation("市场已切换到: A股");
+                Logger?.LogInformation("市场选择已改为: A股（保存后生效）");
             }
         }
     }
@@ -172,11 +198,9 @@ public partial class SettingsPageViewModel : ViewModelBase
         {
             if (value && UserSetting.CurrentMarketType != MarketType.Crypto)
             {
+                // 仅修改本地 UserSetting，不立即调用 SwitchMarket
                 UserSetting.CurrentMarketType = MarketType.Crypto;
-                _marketContext.SwitchMarket(MarketType.Crypto);
-                OnPropertyChanged(nameof(IsAShareMarket));
-                OnPropertyChanged(nameof(IsCryptoMarket));
-                Logger?.LogInformation("市场已切换到: 虚拟币");
+                Logger?.LogInformation("市场选择已改为: 虚拟币（保存后生效）");
             }
         }
     }
@@ -190,12 +214,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         set
         {
             if (value)
-            {
                 UserSetting.WebSearchProvider = "Bing";
-                OnPropertyChanged(nameof(IsBingProvider));
-                OnPropertyChanged(nameof(IsBraveProvider));
-                OnPropertyChanged(nameof(IsTavilyProvider));
-            }
         }
     }
 
@@ -208,12 +227,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         set
         {
             if (value)
-            {
                 UserSetting.WebSearchProvider = "Brave";
-                OnPropertyChanged(nameof(IsBingProvider));
-                OnPropertyChanged(nameof(IsBraveProvider));
-                OnPropertyChanged(nameof(IsTavilyProvider));
-            }
         }
     }
 
@@ -226,12 +240,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         set
         {
             if (value)
-            {
                 UserSetting.WebSearchProvider = "Tavily";
-                OnPropertyChanged(nameof(IsBingProvider));
-                OnPropertyChanged(nameof(IsBraveProvider));
-                OnPropertyChanged(nameof(IsTavilyProvider));
-            }
         }
     }
 
@@ -268,7 +277,7 @@ public partial class SettingsPageViewModel : ViewModelBase
     {
         // 先加载模型列表
         await LoadModelsAsync();
-        // 加载用户设置
+        // 加载用户设置（OnUserSettingChanged 会自动订阅 PropertyChanged）
         UserSetting = _userSettingService.CurrentSetting;
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
@@ -276,15 +285,6 @@ public partial class SettingsPageViewModel : ViewModelBase
         LoadAnalystRoles();
         // 应用保存的主题
         ApplyTheme(UserSetting.ThemeMode);
-        // 触发属性变更通知
-        OnPropertyChanged(nameof(IsThemeDefault));
-        OnPropertyChanged(nameof(IsThemeLight));
-        OnPropertyChanged(nameof(IsThemeDark));
-        OnPropertyChanged(nameof(IsAShareMarket));
-        OnPropertyChanged(nameof(IsCryptoMarket));
-        OnPropertyChanged(nameof(IsBingProvider));
-        OnPropertyChanged(nameof(IsBraveProvider));
-        OnPropertyChanged(nameof(IsTavilyProvider));
     }
 
     private void LoadAnalystRoles()
@@ -356,42 +356,8 @@ public partial class SettingsPageViewModel : ViewModelBase
             if (folders.Count > 0)
             {
                 UserSetting.KnowledgeFileDirectory = folders[0].Path.LocalPath;
-                OnPropertyChanged(nameof(UserSetting));
-                OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
             }
         }, "选择知识库目录");
-    }
-
-    /// <summary>
-    /// 选择浏览器路径
-    /// </summary>
-    [RelayCommand]
-    private async Task SelectBrowserPath()
-    {
-        if (_storageProvider == null) return;
-
-        await SafeExecuteAsync(async () =>
-        {
-            // 定义可执行文件类型
-            var executableFileType = new FilePickerFileType("可执行文件")
-            {
-                Patterns = new[] { "*.exe", "*" },
-                MimeTypes = new[] { "application/octet-stream" }
-            };
-
-            var files = await _storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "选择浏览器可执行文件",
-                AllowMultiple = false,
-                FileTypeFilter = new[] { executableFileType, FilePickerFileTypes.All }
-            });
-
-            if (files.Count > 0)
-            {
-                UserSetting.BrowserPath = files[0].Path.LocalPath;
-                OnPropertyChanged(nameof(UserSetting));
-            }
-        }, "选择浏览器路径");
     }
 
     /// <summary>
@@ -413,7 +379,6 @@ public partial class SettingsPageViewModel : ViewModelBase
             if (folders.Count > 0)
             {
                 UserSetting.LogPath = Path.Combine(folders[0].Path.LocalPath, "logs");
-                OnPropertyChanged(nameof(UserSetting));
             }
         }, "选择日志路径");
     }
@@ -574,7 +539,6 @@ public partial class SettingsPageViewModel : ViewModelBase
             _userSettingService.ResetSettings();
             UserSetting = _userSettingService.CurrentSetting;
             LoadAnalystRoles(); // 重新加载角色
-            OnPropertyChanged(nameof(UserSetting));
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");
         }, "重置设置");
@@ -643,8 +607,9 @@ public partial class SettingsPageViewModel : ViewModelBase
 
             return models;
         }
-        catch
+        catch (Exception ex)
         {
+            Logger?.LogWarning(ex, "从 YAML 加载模型列表失败");
             return new List<string>();
         }
     }

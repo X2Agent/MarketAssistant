@@ -33,6 +33,7 @@ public class MarketChatSession : IDisposable
     private AgentSession? _currentSession;
     private readonly List<AITool> _searchToolCache = [];
     private readonly List<ChatMessage> _conversationHistory = [];
+    private readonly object _conversationLock = new();
 
     private string _sessionId = Guid.NewGuid().ToString("N");
     private string _currentStockCode = string.Empty;
@@ -55,9 +56,13 @@ public class MarketChatSession : IDisposable
         get
         {
             var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(_currentSession);
-            return input + output > 0
-                ? input + output
-                : TokenEstimator.EstimateTotalTokens(_conversationHistory);
+            if (input + output > 0)
+                return input + output;
+
+            lock (_conversationLock)
+            {
+                return TokenEstimator.EstimateTotalTokens(_conversationHistory);
+            }
         }
     }
 
@@ -187,7 +192,10 @@ public class MarketChatSession : IDisposable
     /// </summary>
     public Task<IReadOnlyList<ChatMessage>> GetConversationHistoryAsync()
     {
-        return Task.FromResult<IReadOnlyList<ChatMessage>>(_conversationHistory.AsReadOnly());
+        lock (_conversationLock)
+        {
+            return Task.FromResult<IReadOnlyList<ChatMessage>>(_conversationHistory.AsReadOnly());
+        }
     }
 
     public string CurrentStockCode => _currentStockCode;
@@ -209,7 +217,10 @@ public class MarketChatSession : IDisposable
         _analysisContext = BuildAnalysisSummary(analysisMessages);
         _cachedInstructions = null;
         _currentSession = null;
-        _conversationHistory.Clear();
+        lock (_conversationLock)
+        {
+            _conversationHistory.Clear();
+        }
 
         _logger.LogInformation(
             "注入分析上下文，标的: {StockCode}，摘要长度: {Length}",
@@ -257,7 +268,14 @@ public class MarketChatSession : IDisposable
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _currentCancellationTokenSource = cts;
 
-        _conversationHistory.Add(new ChatMessage(ChatRole.User, userMessage));
+        // 加锁保护 _conversationHistory 的 Add，并取快照传给流式调用
+        // 避免流式枚举期间持锁，同时防止并发修改
+        List<ChatMessage> historySnapshot;
+        lock (_conversationLock)
+        {
+            _conversationHistory.Add(new ChatMessage(ChatRole.User, userMessage));
+            historySnapshot = _conversationHistory.ToList();
+        }
 
         var completeResponse = new StringBuilder();
 
@@ -271,7 +289,7 @@ public class MarketChatSession : IDisposable
         };
 
         var streamingUpdates = _agent.RunStreamingAsync(
-            messages: _conversationHistory,
+            messages: historySnapshot,
             session: _currentSession,
             options: runOptions,
             cancellationToken: cts.Token);
@@ -292,15 +310,18 @@ public class MarketChatSession : IDisposable
         }
         finally
         {
-            if (completed)
+            lock (_conversationLock)
             {
-                _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, completeResponse.ToString()));
-            }
-            else
-            {
-                var partial = completeResponse.ToString();
-                _conversationHistory.Add(new ChatMessage(ChatRole.Assistant,
-                    partial.Length > 0 ? partial + "\n\n[回复被中断]" : "[回复被中断]"));
+                if (completed)
+                {
+                    _conversationHistory.Add(new ChatMessage(ChatRole.Assistant, completeResponse.ToString()));
+                }
+                else
+                {
+                    var partial = completeResponse.ToString();
+                    _conversationHistory.Add(new ChatMessage(ChatRole.Assistant,
+                        partial.Length > 0 ? partial + "\n\n[回复被中断]" : "[回复被中断]"));
+                }
             }
 
             _currentCancellationTokenSource = null;
@@ -324,17 +345,22 @@ public class MarketChatSession : IDisposable
         _sessionId = snapshot.Id;
         _currentStockCode = snapshot.StockCode;
         _analysisContext = snapshot.AnalysisContext ?? string.Empty;
-        _conversationHistory.Clear();
-        foreach (var dto in snapshot.Messages)
+        int messageCount;
+        lock (_conversationLock)
         {
-            _conversationHistory.Add(new ChatMessage(new ChatRole(dto.Role), dto.Content)
+            _conversationHistory.Clear();
+            foreach (var dto in snapshot.Messages)
             {
-                AuthorName = dto.AuthorName
-            });
+                _conversationHistory.Add(new ChatMessage(new ChatRole(dto.Role), dto.Content)
+                {
+                    AuthorName = dto.AuthorName
+                });
+            }
+            messageCount = _conversationHistory.Count;
         }
         _currentSession = null; // 强制创建新 AgentSession
 
-        _logger.LogInformation("恢复会话 {SessionId}，消息数: {Count}", sessionId, _conversationHistory.Count);
+        _logger.LogInformation("恢复会话 {SessionId}，消息数: {Count}", sessionId, messageCount);
         return true;
     }
 
@@ -344,13 +370,19 @@ public class MarketChatSession : IDisposable
 
         try
         {
+            List<ChatMessage> historyCopy;
+            lock (_conversationLock)
+            {
+                historyCopy = _conversationHistory.ToList();
+            }
+
             var snapshot = new ChatSessionSnapshot
             {
                 Id = _sessionId,
                 StockCode = _currentStockCode,
-                Title = BuildSessionTitle(),
+                Title = BuildSessionTitle(historyCopy),
                 AnalysisContext = _analysisContext,
-                Messages = _conversationHistory.Select(m => new ChatMessageDto
+                Messages = historyCopy.Select(m => new ChatMessageDto
                 {
                     Role = m.Role.Value,
                     Content = m.Text ?? string.Empty,
@@ -370,12 +402,16 @@ public class MarketChatSession : IDisposable
             _turnsSinceLastExtraction >= _memoryExtraction.ExtractionInterval)
         {
             _turnsSinceLastExtraction = 0;
-            var snapshot = _conversationHistory.ToList();
+            List<ChatMessage> extractionSnapshot;
+            lock (_conversationLock)
+            {
+                extractionSnapshot = _conversationHistory.ToList();
+            }
             _ = Task.Run(async () =>
             {
                 try
                 {
-                    await _memoryExtraction.ExtractAndSaveAsync(snapshot, ct: CancellationToken.None);
+                    await _memoryExtraction.ExtractAndSaveAsync(extractionSnapshot, ct: CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
@@ -385,9 +421,9 @@ public class MarketChatSession : IDisposable
         }
     }
 
-    private string BuildSessionTitle()
+    private string BuildSessionTitle(List<ChatMessage> history)
     {
-        var firstUserMsg = _conversationHistory.FirstOrDefault(m => m.Role == ChatRole.User);
+        var firstUserMsg = history.FirstOrDefault(m => m.Role == ChatRole.User);
         var title = firstUserMsg?.Text ?? _currentStockCode;
         return title.Length > 50 ? title[..50] + "…" : title;
     }
@@ -395,7 +431,10 @@ public class MarketChatSession : IDisposable
     public void ClearHistory()
     {
         _currentSession = null;
-        _conversationHistory.Clear();
+        lock (_conversationLock)
+        {
+            _conversationHistory.Clear();
+        }
         _analysisContext = string.Empty;
         _logger.LogInformation("清除聊天历史（重置 Session 和上下文）");
     }

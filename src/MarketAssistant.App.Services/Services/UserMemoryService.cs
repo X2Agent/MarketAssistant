@@ -1,4 +1,4 @@
-using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -9,27 +9,14 @@ namespace MarketAssistant.Services;
 /// 存储用户的投资偏好、历史分析结论、自定义标签等，供 AI 上下文使用。
 /// 采用有界设计：条目数上限 <see cref="MaxEntryCount"/>，总字符上限 <see cref="MaxTotalChars"/>。
 /// </summary>
-public class UserMemoryService
+public class UserMemoryService : SqliteServiceBase
 {
     public const int MaxEntryCount = 50;
     public const int MaxTotalChars = 5000;
 
-    private readonly string _connectionString;
-    private readonly ILogger<UserMemoryService> _logger;
-    private readonly Task _initializeTask;
-
     public UserMemoryService(ILogger<UserMemoryService> logger)
+        : base("user_memory.db", logger)
     {
-        _logger = logger;
-
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
-
-        var dbPath = Path.Combine(appDataDir, "user_memory.db");
-        _connectionString = $"Data Source={dbPath}";
-        _initializeTask = InitializeDatabaseAsync();
     }
 
     /// <summary>
@@ -38,7 +25,7 @@ public class UserMemoryService
     public async Task<(bool Success, string? Error)> SaveMemoryAsync(
         string category, string key, string value, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
 
         var usage = await GetUsageAsync(ct);
         bool isReplace = await ExistsAsync(category, key, ct);
@@ -74,7 +61,7 @@ public class UserMemoryService
     /// </summary>
     public async Task<Dictionary<string, string>> GetMemoriesAsync(string category, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT key, value FROM user_memories WHERE category = @category ORDER BY priority DESC, updated_at DESC";
@@ -94,7 +81,7 @@ public class UserMemoryService
     /// </summary>
     public async Task<List<(string Category, string Key, string Value)>> GetAllMemoriesAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT category, key, value FROM user_memories ORDER BY priority DESC, category, updated_at DESC";
@@ -114,7 +101,7 @@ public class UserMemoryService
     public async Task<List<(string Category, string Key, string Value)>> GetHighPriorityMemoriesAsync(
         int minPriority = 1, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -138,7 +125,7 @@ public class UserMemoryService
     /// </summary>
     public async Task SetPriorityAsync(string category, string key, int priority, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "UPDATE user_memories SET priority = @priority WHERE category = @category AND key = @key";
@@ -153,7 +140,7 @@ public class UserMemoryService
     /// </summary>
     public async Task DeleteMemoryAsync(string category, string key, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM user_memories WHERE category = @category AND key = @key";
@@ -167,7 +154,7 @@ public class UserMemoryService
     /// </summary>
     public async Task<MemoryUsage> GetUsageAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(LENGTH(value)), 0) FROM user_memories";
@@ -193,14 +180,7 @@ public class UserMemoryService
         return await cmd.ExecuteScalarAsync(ct) is not null;
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct = default)
-    {
-        var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
-        return conn;
-    }
-
-    private async Task InitializeDatabaseAsync()
+    protected override async Task InitializeDatabaseAsync()
     {
         try
         {
@@ -219,11 +199,12 @@ public class UserMemoryService
                 CREATE INDEX IF NOT EXISTS idx_memories_priority ON user_memories(priority);
                 """;
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("用户记忆数据库初始化完成");
+            Logger.LogInformation("用户记忆数据库初始化完成");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初始化用户记忆数据库失败");
+            Logger.LogError(ex, "初始化用户记忆数据库失败");
+            throw;
         }
     }
 }

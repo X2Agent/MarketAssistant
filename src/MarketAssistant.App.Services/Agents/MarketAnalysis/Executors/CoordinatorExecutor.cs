@@ -1,12 +1,11 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Retry;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Executors;
@@ -20,20 +19,6 @@ public sealed partial class CoordinatorExecutor : Executor
 {
     private readonly AIAgent _coordinatorAgent;
     private readonly ILogger<CoordinatorExecutor> _logger;
-
-    // 针对瞬态 LLM 故障的重试管道：最多重试 2 次，指数退避 + 抖动
-    private static readonly ResiliencePipeline _llmRetryPipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 2,
-            BackoffType = DelayBackoffType.Exponential,
-            UseJitter = true,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = new PredicateBuilder()
-                .Handle<HttpRequestException>()
-                .Handle<TaskCanceledException>(ex => ex.InnerException is TimeoutException)
-        })
-        .Build();
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
@@ -96,6 +81,13 @@ public sealed partial class CoordinatorExecutor : Executor
                 .Where(m => !m.Contents.Any(c => c is FunctionCallContent or FunctionResultContent))
                 .ToList();
 
+            // 所有分析师均无文本输出（仅产生工具调用）时，无法生成有意义的综合报告
+            if (filteredMessages.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "所有分析师均未产生文本结论，无法生成综合报告");
+            }
+
             // 构建聊天消息列表
             var messages = new List<ChatMessage>(filteredMessages)
             {
@@ -105,14 +97,13 @@ public sealed partial class CoordinatorExecutor : Executor
                 $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
             };
 
-            // 使用带结构化输出的 ChatClientAgent 运行（包含重试）
+            // 使用带结构化输出的 ChatClientAgent 运行
+            // 重试由 ResilientChatClient 装饰器统一提供，此处无需额外重试管道
             // session: null — 无状态一次性调用，无需会话累积
-            var agentResponse = await _llmRetryPipeline.ExecuteAsync(
-                async ct => await _coordinatorAgent.RunAsync(
-                    messages,
-                    session: null,
-                    options: null,
-                    ct),
+            var agentResponse = await _coordinatorAgent.RunAsync(
+                messages,
+                session: null,
+                options: null,
                 cancellationToken);
 
             // 提取协调分析师的回复（最后一条 Assistant 消息）
@@ -125,13 +116,14 @@ public sealed partial class CoordinatorExecutor : Executor
             }
 
             // 从协调分析师的回复文本中反序列化结构化结果
-            // ChatResponseFormat.ForJsonSchema 保证输出为纯 JSON，无需正则剥离 markdown 代码块
+            // 某些 LLM 即使指定了 ForJsonSchema 也可能在 JSON 前后输出多余文本（前缀词、markdown 代码块等），
+            // 使用 LlmJsonExtractor 进行多层兜底解析（直接解析 → 剥离 markdown → Utf8JsonReader 精确定位）
             var rawText = coordinatorMessage.Text ?? string.Empty;
 
             CoordinatorResult? coordinatorResult;
             try
             {
-                coordinatorResult = JsonSerializer.Deserialize<CoordinatorResult>(rawText, JsonOptions);
+                coordinatorResult = LlmJsonExtractor.Deserialize<CoordinatorResult>(rawText, JsonOptions);
             }
             catch (JsonException jsonEx)
             {
@@ -153,10 +145,11 @@ public sealed partial class CoordinatorExecutor : Executor
                 coordinatorResult.InvestmentRating);
 
             // 创建最终报告
+            // 仅保存过滤后的分析师消息（不含工具调用细节），避免归档时序列化 FunctionResultContent 失败
             var finalReport = new MarketAnalysisReport
             {
                 AssetSymbol = assetSymbol,
-                AnalystMessages = new List<ChatMessage>(analystMessages)
+                AnalystMessages = new List<ChatMessage>(filteredMessages)
                 {
                     coordinatorMessage
                 },

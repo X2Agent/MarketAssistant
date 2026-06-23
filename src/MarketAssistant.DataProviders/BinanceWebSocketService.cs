@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -90,20 +91,30 @@ public sealed class BinanceWebSocketService : IDisposable
 
     private async Task ReceiveLoopAsync(ClientWebSocket ws, CancellationToken ct)
     {
-        var buffer = new byte[4096];
+        // Binance 组合流消息可能分片到达，使用动态缓冲区拼接完整消息
+        var buffer = new byte[8192];
+        using var messageStream = new MemoryStream();
 
         try
         {
             while (ws.State == WebSocketState.Open && !ct.IsCancellationRequested)
             {
-                var result = await ws.ReceiveAsync(buffer, ct);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    _logger.LogInformation("Binance WebSocket 服务端关闭连接");
-                    break;
-                }
+                WebSocketReceiveResult result;
+                messageStream.SetLength(0);
 
-                var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                do
+                {
+                    result = await ws.ReceiveAsync(buffer, ct);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        _logger.LogInformation("Binance WebSocket 服务端关闭连接");
+                        return;
+                    }
+                    messageStream.Write(buffer, 0, result.Count);
+                }
+                while (!result.EndOfMessage);
+
+                var json = Encoding.UTF8.GetString(messageStream.GetBuffer(), 0, (int)messageStream.Length);
                 ProcessMessage(json);
             }
         }
@@ -135,8 +146,8 @@ public sealed class BinanceWebSocketService : IDisposable
 
             if (symbol == null || lastPriceStr == null || openPriceStr == null) return;
 
-            var lastPrice = decimal.Parse(lastPriceStr);
-            var openPrice = decimal.Parse(openPriceStr);
+            var lastPrice = decimal.Parse(lastPriceStr, CultureInfo.InvariantCulture);
+            var openPrice = decimal.Parse(openPriceStr, CultureInfo.InvariantCulture);
             var changePercent = openPrice > 0
                 ? Math.Round((lastPrice - openPrice) / openPrice * 100, 2)
                 : 0m;

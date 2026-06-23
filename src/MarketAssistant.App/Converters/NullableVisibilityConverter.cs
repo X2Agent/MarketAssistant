@@ -1,27 +1,27 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace MarketAssistant.Converts;
+namespace MarketAssistant.Converters;
 
 /// <summary>
-/// ¿É¿ÕÖµ¿É¼ûÐÔ×ª»»Æ÷ - µ±ÖµÎª null Ê±·µ»Ø false£¬ÓÃÓÚ IsVisible °ó¶¨
+/// ï¿½É¿ï¿½Öµï¿½É¼ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ÖµÎª null Ê±ï¿½ï¿½ï¿½ï¿½ falseï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ IsVisible ï¿½ï¿½
 /// </summary>
 public class NullableVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // ¼ì²éÊÇ·ñÎª null
+        // ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Îª null
         if (value == null)
             return false;
 
-        // ¼ì²é×Ö·û´®ÊÇ·ñÎª¿Õ
+        // ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Îªï¿½ï¿½
         if (value is string str && string.IsNullOrWhiteSpace(str))
             return false;
 
-        // ¶ÔÓÚÖµÀàÐÍ£¬¼ì²éÊÇ·ñÓÐÖµ
+        // ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½Í£ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Öµ
         var type = value.GetType();
-        
-        // Èç¹ûÊÇ Nullable<T> ÀàÐÍ
+
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ Nullable<T> ï¿½ï¿½ï¿½ï¿½
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
         {
             var hasValueProperty = type.GetProperty("HasValue");

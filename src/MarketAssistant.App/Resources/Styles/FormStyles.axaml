@@ -16,12 +16,15 @@
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
+    </Style>
+    <!-- 单行输入框垂直居中，多行(AcceptsReturn=True)保持默认顶部对齐 -->
+    <Style Selector="TextBox[AcceptsReturn=False]">
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBox:focus">
         <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>

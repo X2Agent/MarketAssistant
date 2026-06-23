@@ -13,6 +13,8 @@ namespace MarketAssistant.Agents.Middleware;
 /// </summary>
 public sealed class TradingFunctionGuardMiddleware
 {
+    private const int DefaultMaxToolCalls = 20;
+
     /// <summary>
     /// 需人工确认的回调。返回 true 表示用户确认放行，false 表示拒绝。
     /// 未设置时自动拒绝需确认的操作。
@@ -24,7 +26,7 @@ public sealed class TradingFunctionGuardMiddleware
     private int _toolCallCount;
 
     /// <param name="maxToolCalls">单次 Agent 运行最大工具调用次数，防止无限循环（默认 20）</param>
-    public TradingFunctionGuardMiddleware(ILogger<TradingFunctionGuardMiddleware> logger, int maxToolCalls = 20)
+    public TradingFunctionGuardMiddleware(ILogger<TradingFunctionGuardMiddleware> logger, int maxToolCalls = DefaultMaxToolCalls)
     {
         _logger = logger;
         _maxToolCalls = maxToolCalls;
@@ -95,7 +97,7 @@ public sealed class TradingFunctionGuardMiddleware
         return functionName is "PlaceOrderAsync" or "CancelOrderAsync";
     }
 
-    private static string FormatArguments(FunctionInvocationContext context)
+    private string FormatArguments(FunctionInvocationContext context)
     {
         try
         {
@@ -104,8 +106,9 @@ public sealed class TradingFunctionGuardMiddleware
                 ? JsonSerializer.Serialize(context.Arguments)
                 : "N/A";
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "序列化交易工具参数失败，函数: {Function}", context.Function.Name);
             return "N/A";
         }
     }

@@ -11,11 +11,11 @@ namespace MarketAssistant.Rag.Services;
 public sealed class LocalImageStorageService : IImageStorageService
 {
     private readonly ILogger<LocalImageStorageService> _logger;
-    
+
     // Configuration constants
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10MB
     private const string DefaultExtension = ".png";
-    
+
     // Pre-compiled regex for filename cleanup
     private static readonly Regex FileNameCleanupRegex = new(@"[<>:""/\\|?*\x00-\x1f]", RegexOptions.Compiled);
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -31,16 +31,16 @@ public sealed class LocalImageStorageService : IImageStorageService
     public async Task<string> SaveImageAsync(byte[] imageBytes, string? fileName, string documentPath, CancellationToken cancellationToken = default)
     {
         ValidateInputs(imageBytes, fileName ?? string.Empty, documentPath);
-        
+
         // Generate GUID-based filename if not provided
         if (string.IsNullOrWhiteSpace(fileName))
         {
             fileName = $"{Guid.NewGuid()}.png";
         }
-        
+
         // Ensure document's image directory exists
         EnsureDocumentStorageAvailable(documentPath);
-        
+
         var imageDir = GetDocumentImageDirectory(documentPath);
         var safeFileName = GenerateSafeFileName(fileName);
         var fullPath = Path.Combine(imageDir, safeFileName);
@@ -48,18 +48,18 @@ public sealed class LocalImageStorageService : IImageStorageService
         try
         {
             _logger.LogDebug("Saving image to: {FullPath}, Size: {Size} bytes", fullPath, imageBytes.Length);
-            
+
             // Directly overwrite if file exists
             await File.WriteAllBytesAsync(fullPath, imageBytes, cancellationToken);
-            
-            _logger.LogInformation("Successfully saved image: {FileName} for document: {DocumentPath}", 
+
+            _logger.LogInformation("Successfully saved image: {FileName} for document: {DocumentPath}",
                 safeFileName, documentPath);
-            
+
             return fullPath;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Failed to save image {FileName} for document {DocumentPath}", 
+            _logger.LogError(ex, "Failed to save image {FileName} for document {DocumentPath}",
                 safeFileName, documentPath);
             throw new InvalidOperationException($"Failed to save image: {ex.Message}", ex);
         }
@@ -85,7 +85,7 @@ public sealed class LocalImageStorageService : IImageStorageService
 
         // Handle relative paths with multiple resolution strategies
         var documentDir = Path.GetDirectoryName(documentPath) ?? throw new ArgumentException("Invalid document path", nameof(documentPath));
-        
+
         // 1. Check relative to document directory
         var relativeToDoc = Path.Combine(documentDir, imagePath);
         if (File.Exists(relativeToDoc))
@@ -107,17 +107,17 @@ public sealed class LocalImageStorageService : IImageStorageService
 
     private string GetDocumentImageDirectory(string documentPath)
     {
-        var documentDir = Path.GetDirectoryName(documentPath) 
+        var documentDir = Path.GetDirectoryName(documentPath)
             ?? throw new ArgumentException("Invalid document path", nameof(documentPath));
         var documentName = Path.GetFileNameWithoutExtension(documentPath);
-        
+
         // Clean document name to ensure it's a valid directory name
         var cleanDocumentName = FileNameCleanupRegex.Replace(documentName, "_");
         if (string.IsNullOrWhiteSpace(cleanDocumentName))
         {
             cleanDocumentName = "document";
         }
-        
+
         return Path.Combine(documentDir, cleanDocumentName);
     }
 
@@ -155,10 +155,10 @@ public sealed class LocalImageStorageService : IImageStorageService
     {
         // Clean illegal characters from filename
         var cleanName = FileNameCleanupRegex.Replace(fileName.Trim(), "_");
-        
+
         // Prevent path traversal attacks
         cleanName = Path.GetFileName(cleanName);
-        
+
         if (string.IsNullOrWhiteSpace(cleanName))
         {
             return Guid.NewGuid().ToString("N") + DefaultExtension;
@@ -166,13 +166,13 @@ public sealed class LocalImageStorageService : IImageStorageService
 
         var extension = Path.GetExtension(cleanName);
         var baseName = Path.GetFileNameWithoutExtension(cleanName);
-        
+
         // Validate extension
         if (string.IsNullOrEmpty(extension) || !AllowedExtensions.Contains(extension))
         {
             extension = DefaultExtension;
         }
-        
+
         // Ensure base name is not empty
         if (string.IsNullOrWhiteSpace(baseName))
         {

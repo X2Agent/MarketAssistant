@@ -20,12 +20,12 @@ public class TradeExecutor
     private readonly ILogger<TradeExecutor> _logger;
 
     /// <summary>
-    /// Human-in-the-Loop 确认回调。
-    /// 当风控返回 NeedsConfirmation 时，调用此回调等待用户确认。
-    /// 参数: (symbol, side, price, quantity, reason) → true=放行 false=拒绝。
-    /// 未设置时保持现有行为（直接拒绝）。
+    /// Human-in-the-Loop 确认事件。
+    /// 当风控返回 NeedsConfirmation 时触发，等待订阅者返回 true（放行）或 false（拒绝）。
+    /// 使用事件模式而非单一回调属性，避免单例被多个 ViewModel 订阅时相互覆盖。
+    /// 未订阅时保持现有行为（直接拒绝）。
     /// </summary>
-    public Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationCallback { get; set; }
+    public event Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationRequested;
 
     public TradeExecutor(
         [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
@@ -96,9 +96,9 @@ public class TradeExecutor
             _logger.LogWarning("交易需人工确认: {InstrumentSymbol} {Side} 金额:{Amount}",
                 instrumentSymbol, side, quantity * currentPrice);
 
-            if (ConfirmationCallback != null)
+            if (ConfirmationRequested != null)
             {
-                var approved = await ConfirmationCallback(
+                var approved = await ConfirmationRequested.Invoke(
                     instrumentSymbol, side, currentPrice, quantity, riskCheck.Reason ?? "需人工确认");
                 if (!approved)
                     return new TradeResult { Success = false, ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}" };

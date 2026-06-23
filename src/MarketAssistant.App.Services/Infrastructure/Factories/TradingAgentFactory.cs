@@ -1,10 +1,12 @@
 using System.Reflection;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.Middleware;
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -59,14 +61,10 @@ public class TradingAgentFactory : ITradingAgentFactory
         try
         {
             var chatClient = _chatClientFactory.CreateClient();
-            var toolParams = ResolveToolParameters();
-
-            var allParams = new object[toolParams.Length + 1];
-            allParams[0] = chatClient;
-            toolParams.CopyTo(allParams, 1);
+            var tools = ResolveToolParameters();
 
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(
-                _serviceProvider, typeof(TradingAgent), allParams);
+                _serviceProvider, typeof(TradingAgent), chatClient, tools);
 
             // 创建 Function Calling 守卫中间件（每次 CreateAgent 新建实例以重置调用计数）
             var guardMiddleware = new TradingFunctionGuardMiddleware(
@@ -92,18 +90,17 @@ public class TradingAgentFactory : ITradingAgentFactory
         }
     }
 
-    private object[] ResolveToolParameters()
+    private IList<AITool> ResolveToolParameters()
     {
         var toolAttributes = typeof(TradingAgent).GetCustomAttributes<RequiresToolsAttribute>().ToList();
-        var tools = new object[toolAttributes.Count];
+        var tools = new List<AITool>();
 
-        for (var i = 0; i < toolAttributes.Count; i++)
+        foreach (var attr in toolAttributes)
         {
-            var attr = toolAttributes[i];
             var toolService = _serviceProvider.GetKeyedService(attr.ToolInterfaceType, MarketType.Crypto);
-            if (toolService != null)
+            if (toolService is IToolsProvider provider)
             {
-                tools[i] = toolService;
+                tools.AddRange(provider.GetFunctions());
             }
             else
             {

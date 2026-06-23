@@ -14,7 +14,7 @@ public sealed class GlobalExceptionHandler
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
 
-    // 直接注入具体服务，消除 IServiceProvider 服务定位器引用
+    // 通过 DI 注入具体服务
     public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         _logger = logger;
@@ -22,16 +22,17 @@ public sealed class GlobalExceptionHandler
     }
 
     /// <summary>
-    /// 注册全局异常处理钩子。应在 DI 容器构建完毕后调用一次。
+    /// 注册全局异常处理钩子。应在 DI 容器构建完毕后调用一次，
+    /// 传入由 DI 容器创建的实例，避免静态工厂自行 new。
     /// </summary>
-    public static void Initialize(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
+    public static void Initialize(GlobalExceptionHandler instance)
     {
         if (_instance != null) return;
 
         lock (_lock)
         {
             if (_instance != null) return;
-            _instance = new GlobalExceptionHandler(logger, dialogService);
+            _instance = instance;
             _instance.RegisterHandlers();
         }
     }
@@ -193,6 +194,11 @@ public sealed class GlobalExceptionHandler
         {
             await operation();
         }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            // 用户主动取消，不显示错误对话框，仅记录信息日志
+            logger?.LogInformation("'{Operation}' 被用户取消", operationName ?? "未知操作");
+        }
         catch (Exception ex)
         {
             if (_instance != null)
@@ -232,6 +238,12 @@ public sealed class GlobalExceptionHandler
         try
         {
             return await operation();
+        }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            // 用户主动取消，不显示错误对话框，仅记录信息日志
+            logger?.LogInformation("'{Operation}' 被用户取消", operationName ?? "未知操作");
+            return default;
         }
         catch (Exception ex)
         {

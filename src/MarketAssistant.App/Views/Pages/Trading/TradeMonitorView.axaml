@@ -6,7 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:models="using:MarketAssistant.Trading.Models"
              xmlns:abstractions="using:MarketAssistant.Trading.Abstractions"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradeMonitorView"
              x:DataType="vm:TradeMonitorViewModel">

@@ -11,7 +11,7 @@ public class UserSetting : INotifyPropertyChanged
 {
     public string ModelId { get; set; } = "";
 
-    public string EmbeddingModelId { get; set; } = "BAAI/bge-m3";
+    public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
     public string EmbeddingEndpoint { get; set; } = "https://api.jina.ai";
 
@@ -45,15 +45,26 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 主题模式：Default=跟随系统, Light=浅色, Dark=深色
     /// </summary>
-    public string ThemeMode { get; set; } = "Default";
+    private string _themeMode = "Default";
+    public string ThemeMode
+    {
+        get => _themeMode;
+        set => SetProperty(ref _themeMode, value);
+    }
 
     /// <summary>
     /// 当前市场类型
     /// </summary>
-    public MarketType CurrentMarketType { get; set; } = MarketType.AShare;
+    private MarketType _currentMarketType = MarketType.AShare;
+    public MarketType CurrentMarketType
+    {
+        get => _currentMarketType;
+        set => SetProperty(ref _currentMarketType, value);
+    }
 
     /// <summary>
-    /// CoinGecko API密钥（可选，免费版无需填写）
+    /// CoinGecko API 密钥（Demo 版免费，需在 https://www.coingecko.com/api/dashboard 注册获取）
+    /// /coins/markets 等端点现要求携带 Demo Key，留空可能导致虚拟币筛选失败
     /// </summary>
     public string CoinGeckoApiKey { get; set; } = "";
 
@@ -66,16 +77,6 @@ public class UserSetting : INotifyPropertyChanged
     /// Binance Secret Key（交易功能必须）
     /// </summary>
     public string BinanceSecretKey { get; set; } = "";
-
-    /// <summary>
-    /// 浏览器路径，如果为空则自动检测
-    /// </summary>
-    private string _browserPath = "";
-    public string BrowserPath
-    {
-        get => _browserPath;
-        set => SetProperty(ref _browserPath, value);
-    }
 
     /// <summary>
     /// 日志文件路径
@@ -105,7 +106,12 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// Web Search服务商
     /// </summary>
-    public string WebSearchProvider { get; set; } = "Bing";
+    private string _webSearchProvider = "Bing";
+    public string WebSearchProvider
+    {
+        get => _webSearchProvider;
+        set => SetProperty(ref _webSearchProvider, value);
+    }
 
     /// <summary>
     /// 启用的分析师角色字典 Key: AgentName, Value: IsEnabled

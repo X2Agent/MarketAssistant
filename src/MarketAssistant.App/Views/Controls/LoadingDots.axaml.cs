@@ -57,7 +57,7 @@ public partial class LoadingDots : UserControl
     public LoadingDots()
     {
         InitializeComponent();
-        
+
         // 默认使用主题色
         if (DotColor == null)
         {

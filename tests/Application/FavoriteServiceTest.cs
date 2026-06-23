@@ -1,11 +1,11 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace TestMarketAssistant.Application;
 
@@ -28,7 +28,6 @@ public class FavoriteServiceTest
         services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
-        services.AddSingleton<PlaywrightService>();
         services.AddSingleton<BinanceMarketDataService>();
 
         // 注册 AssetInfoService（FavoriteService 的依赖）
@@ -36,8 +35,8 @@ public class FavoriteServiceTest
         services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
 
         // 注册被测试的服务
-        services.AddKeyedSingleton<IFavoriteService, AShareFavoriteService>(MarketType.AShare);
-        services.AddKeyedSingleton<IFavoriteService, CryptoFavoriteService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.AShare);
+        services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
     }

@@ -5,7 +5,7 @@
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:models="using:MarketAssistant.Models"
              xmlns:controls="using:MarketAssistant.Views.Controls"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Components.AnalysisReportView"
              x:DataType="vm:AnalysisReportViewModel">
@@ -97,20 +97,23 @@
                         <StackPanel Grid.Column="1" Spacing="{StaticResource DefaultSpacing}" VerticalAlignment="Center">
                             
                             <!-- 第一行：目标价格与风险等级 -->
-                            <Grid ColumnDefinitions="*,*">
+                            <Grid ColumnDefinitions="*,Auto">
                                 <!-- 目标价格 -->
-                                <StackPanel Grid.Column="0">
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
                                     <TextBlock Text="目标价格" Classes="label"/>
-                                    <TextBlock Text="{Binding TargetPrice}" Classes="value" FontSize="24"/>
+                                    <TextBlock Text="{Binding TargetPrice}" 
+                                               Classes="value" 
+                                               FontSize="{StaticResource LabelFontSize}"
+                                               TextWrapping="Wrap"
+                                               LineHeight="22"/>
                                 </StackPanel>
 
                                 <!-- 风险等级 -->
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock Text="风险等级" Classes="label"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="风险等级" Classes="label" HorizontalAlignment="Center"/>
                                     <Border Background="{DynamicResource SurfaceVariantBrush}" 
                                             CornerRadius="4" 
-                                            Padding="8,4" 
-                                            HorizontalAlignment="Left"
+                                            Padding="12,4" 
                                             Margin="0,4,0,0">
                                         <TextBlock Text="{Binding RiskLevel}" 
                                                    FontWeight="Bold"

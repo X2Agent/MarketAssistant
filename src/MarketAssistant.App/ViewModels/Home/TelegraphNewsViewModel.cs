@@ -33,21 +33,6 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     /// </summary>
     public IAsyncRelayCommand<Telegram> OpenNewsCommand { get; }
 
-    /// <summary>
-    /// 刷新新闻命令
-    /// </summary>
-    public IRelayCommand RefreshCommand { get; }
-
-    /// <summary>
-    /// 启动更新命令
-    /// </summary>
-    public IRelayCommand StartUpdatesCommand { get; }
-
-    /// <summary>
-    /// 停止更新命令
-    /// </summary>
-    public IRelayCommand StopUpdatesCommand { get; }
-
     public TelegraphNewsViewModel(
         IServiceProvider serviceProvider,
         MarketContext marketContext,
@@ -61,42 +46,25 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(_marketContext.CurrentMarket);
 
         OpenNewsCommand = new AsyncRelayCommand<Telegram>(OnOpenNewsAsync);
-        RefreshCommand = new RelayCommand(() => _newsUpdateService.StartUpdates());
-        StartUpdatesCommand = new RelayCommand(_newsUpdateService.StartUpdates);
-        StopUpdatesCommand = new RelayCommand(_newsUpdateService.StopUpdates);
 
         // 订阅新闻更新服务事件
         _newsUpdateService.NewsUpdated += OnNewsUpdated;
         _newsUpdateService.CountdownUpdated += OnCountdownUpdated;
 
         // 订阅市场切换事件
-        _marketContext.PropertyChanged += OnMarketContextPropertyChanged;
+        SubscribeToMarketChanges(_marketContext);
 
         // 自动启动新闻更新
         _newsUpdateService.StartUpdates();
     }
 
     /// <summary>
-    /// 处理市场切换事件
-    /// </summary>
-    private void OnMarketContextPropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MarketContext.CurrentMarket))
-        {
-            OnMarketChanged(_marketContext.CurrentMarket);
-        }
-    }
-
-    /// <summary>
     /// 市场切换时更换新闻服务
     /// </summary>
-    private void OnMarketChanged(MarketType newMarket)
+    protected override void OnMarketChanged(MarketType newMarket)
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            // 记录旧服务状态
-            var wasRunning = _newsUpdateService.IsRunning;
-
             // 停止旧服务并取消事件订阅
             _newsUpdateService.StopUpdates();
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;
@@ -113,11 +81,8 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
             Telegraphs.Clear();
             TelegraphRefreshCountdown = "";
 
-            // 如果之前在运行，重新启动
-            if (wasRunning)
-            {
-                _newsUpdateService.StartUpdates();
-            }
+            // 始终启动新闻更新
+            _newsUpdateService.StartUpdates();
 
             Logger?.LogInformation("已切换到 {Market} 市场新闻源", newMarket);
         });
@@ -173,29 +138,6 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 启动新闻更新
-    /// </summary>
-    public void StartUpdates()
-    {
-        _newsUpdateService.StartUpdates();
-        Logger?.LogInformation("新闻更新服务已启动");
-    }
-
-    /// <summary>
-    /// 停止新闻更新
-    /// </summary>
-    public void StopUpdates()
-    {
-        _newsUpdateService.StopUpdates();
-        Logger?.LogInformation("新闻更新服务已停止");
-    }
-
-    /// <summary>
-    /// 是否正在更新
-    /// </summary>
-    public bool IsUpdating => _newsUpdateService.IsRunning;
-
-    /// <summary>
     /// 释放资源
     /// </summary>
     public void Dispose()
@@ -203,7 +145,7 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         if (!_disposed)
         {
             // 取消市场切换事件订阅
-            _marketContext.PropertyChanged -= OnMarketContextPropertyChanged;
+            UnsubscribeFromMarketChanges(_marketContext);
 
             // 取消新闻服务事件订阅
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;

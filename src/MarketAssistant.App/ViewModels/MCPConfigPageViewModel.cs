@@ -390,7 +390,13 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
     public void OnNavigatedTo(object? parameter)
     {
-        // 每次进入页面时刷新配置列表，确保数据最新
+        // 默认调用：首次进入
+        OnNavigatedTo(parameter, isReactivation: false);
+    }
+
+    public void OnNavigatedTo(object? parameter, bool isReactivation)
+    {
+        // 首次进入时加载配置；GoBack 重新激活时也刷新，确保数据最新
         LoadServerConfigs();
     }
 }

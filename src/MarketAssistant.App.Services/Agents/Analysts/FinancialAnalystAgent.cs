@@ -27,7 +27,7 @@ public class FinancialAnalystAgent : AnalystAgentBase
 
     public FinancialAnalystAgent(
         IChatClient chatClient,
-        IFinancialTools financialTools,
+        IList<AITool> tools,
         AnalystPromptLoader promptLoader,
         AIContextProvider[]? aiContextProviders = null,
         AgentSkillsProvider? skillsProvider = null)
@@ -35,7 +35,7 @@ public class FinancialAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("FinancialAnalyst"),
             ResponseFormat,
-            [.. financialTools.GetFunctions()],
+            tools,
             aiContextProviders,
             skillsProvider)
     {

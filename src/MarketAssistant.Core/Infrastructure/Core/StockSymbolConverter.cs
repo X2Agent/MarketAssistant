@@ -6,7 +6,7 @@ namespace MarketAssistant.Infrastructure.Core;
 public static class StockSymbolConverter
 {
     /// <summary>
-    /// 将股票代码转换为财联社格式（如 SH600000、SZ000001）
+    /// 将股票代码转换为财联社格式（如 sh600000、sz000001，均为小写）
     /// </summary>
     public static string ToClsFormat(string stockCode)
     {
@@ -20,14 +20,14 @@ public static class StockSymbolConverter
              normalized.Length > 2 &&
              normalized.Skip(2).All(char.IsDigit))
         {
-            return normalized;
+            return normalized.ToLowerInvariant();
         }
 
         string digits = ExtractDigits(stockCode);
         if (string.IsNullOrEmpty(digits)) return stockCode; // 无法提取数字则返回原值
 
         string prefix = GetExchangePrefix(digits);
-        return $"{prefix}{digits}";
+        return $"{prefix}{digits}".ToLowerInvariant();
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -53,7 +54,7 @@ public sealed class StringToDecimalConverter : JsonConverterFactory
                 var stringValue = reader.GetString();
                 if (string.IsNullOrEmpty(stringValue))
                     return null;
-                if (decimal.TryParse(stringValue, out var value))
+                if (decimal.TryParse(stringValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
                     return value;
                 return null;
             }

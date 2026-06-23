@@ -1,4 +1,4 @@
-using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -9,24 +9,11 @@ namespace MarketAssistant.Services;
 /// 存储实体-关系三元组（subject, predicate, object），每个三元组有有效时间窗口。
 /// 参考 MemPalace 的时序知识图谱设计，适配金融投资领域。
 /// </summary>
-public class UserKnowledgeGraphService
+public class UserKnowledgeGraphService : SqliteServiceBase
 {
-    private readonly string _connectionString;
-    private readonly ILogger<UserKnowledgeGraphService> _logger;
-    private readonly Task _initializeTask;
-
     public UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger)
+        : base("knowledge_graph.db", logger)
     {
-        _logger = logger;
-
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
-
-        var dbPath = Path.Combine(appDataDir, "knowledge_graph.db");
-        _connectionString = $"Data Source={dbPath}";
-        _initializeTask = InitializeDatabaseAsync();
     }
 
     /// <summary>
@@ -37,7 +24,7 @@ public class UserKnowledgeGraphService
         string? validFrom = null, string? metadata = null,
         CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -52,7 +39,7 @@ public class UserKnowledgeGraphService
         cmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
 
-        _logger.LogDebug("知识图谱新增三元组: {S} --[{P}]--> {O}", subject, predicate, obj);
+        Logger.LogDebug("知识图谱新增三元组: {S} --[{P}]--> {O}", subject, predicate, obj);
     }
 
     /// <summary>
@@ -61,7 +48,7 @@ public class UserKnowledgeGraphService
     public async Task<List<KnowledgeTriple>> QueryEntityAsync(
         string entity, string? asOf = null, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         var dateFilter = asOf ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
 
         await using var conn = await OpenConnectionAsync(ct);
@@ -87,7 +74,7 @@ public class UserKnowledgeGraphService
         string subject, string predicate, string obj,
         string? ended = null, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -101,7 +88,7 @@ public class UserKnowledgeGraphService
         cmd.Parameters.AddWithValue("@ended", ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd"));
         await cmd.ExecuteNonQueryAsync(ct);
 
-        _logger.LogDebug("知识图谱三元组过期: {S} --[{P}]--> {O}", subject, predicate, obj);
+        Logger.LogDebug("知识图谱三元组过期: {S} --[{P}]--> {O}", subject, predicate, obj);
     }
 
     /// <summary>
@@ -110,7 +97,7 @@ public class UserKnowledgeGraphService
     public async Task<List<KnowledgeTriple>> TimelineAsync(
         string entity, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -145,14 +132,7 @@ public class UserKnowledgeGraphService
         return result;
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct = default)
-    {
-        var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
-        return conn;
-    }
-
-    private async Task InitializeDatabaseAsync()
+    protected override async Task InitializeDatabaseAsync()
     {
         try
         {
@@ -175,11 +155,12 @@ public class UserKnowledgeGraphService
                 CREATE INDEX IF NOT EXISTS idx_triples_validity ON triples(valid_from, valid_to);
                 """;
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("知识图谱数据库初始化完成");
+            Logger.LogInformation("知识图谱数据库初始化完成");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初始化知识图谱数据库失败");
+            Logger.LogError(ex, "初始化知识图谱数据库失败");
+            throw;
         }
     }
 }

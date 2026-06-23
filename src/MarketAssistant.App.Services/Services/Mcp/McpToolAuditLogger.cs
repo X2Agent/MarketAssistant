@@ -69,6 +69,5 @@ public class McpToolAuditEntry
 public enum McpAuditEventType
 {
     ToolLoaded,
-    ToolFiltered,
-    ToolInvoked
+    ToolFiltered
 }

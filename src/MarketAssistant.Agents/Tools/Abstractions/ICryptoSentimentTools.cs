@@ -16,7 +16,7 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// - 当前费率和下次结算时间：GET /fapi/v1/premiumIndex
     /// - 历史费率：GET /fapi/v1/fundingRate
     /// </remarks>
-    Task<FundingRateHistory> GetFundingRateAsync(string symbol);
+    Task<FundingRateHistory> GetFundingRateAsync(string symbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取全局账户多空比历史数据
@@ -28,7 +28,7 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// 数据源：币安 Futures API - GET /futures/data/globalLongShortAccountRatio
     /// 含义：全市场所有账户的多空比，可与顶级交易员数据对比分析
     /// </remarks>
-    Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30);
+    Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取顶级交易员账户多空比历史数据
@@ -40,7 +40,7 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// 数据源：币安 Futures API - GET /futures/data/topLongShortAccountRatio
     /// 含义：大户账户数的多空比（按账户数量统计）
     /// </remarks>
-    Task<LongShortRatioHistory> GetTopTraderAccountRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30);
+    Task<LongShortRatioHistory> GetTopTraderAccountRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取顶级交易员持仓多空比历史数据
@@ -52,7 +52,7 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// 数据源：币安 Futures API - GET /futures/data/topLongShortPositionRatio
     /// 含义：大户持仓量的多空比（按持仓金额统计），更能反映真实资金流向
     /// </remarks>
-    Task<LongShortRatioHistory> GetTopTraderPositionRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30);
+    Task<LongShortRatioHistory> GetTopTraderPositionRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取合约持仓量
@@ -62,5 +62,5 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// <remarks>
     /// 数据源：币安 Futures API - GET /futures/data/openInterestHist
     /// </remarks>
-    Task<OpenInterest> GetOpenInterestAsync(string symbol, Period period = Period.OneHour);
+    Task<OpenInterest> GetOpenInterestAsync(string symbol, Period period = Period.OneHour, CancellationToken cancellationToken = default);
 }

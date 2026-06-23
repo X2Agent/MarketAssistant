@@ -1,7 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -19,13 +18,6 @@ public sealed class AShareBasicTools : IShareBasicTools
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareBasicTools> _logger;
 
-    // 支持 API 返回的字符串数值/null/--占位自动容错转换为 decimal/decimal?
-    private static readonly JsonSerializerOptions ClsJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new StringToDecimalConverter() }
-    };
-
     public AShareBasicTools(
         IHttpClientFactory httpClientFactory,
         IUserSettingService userSettingService,
@@ -37,7 +29,7 @@ public sealed class AShareBasicTools : IShareBasicTools
     }
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
-    public async Task<StockQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol)
+    public async Task<StockQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -48,14 +40,14 @@ public sealed class AShareBasicTools : IShareBasicTools
             var url = $"/quote/stock/basic?secu_code={formattedSymbol}&fields=open_px,av_px,high_px,low_px,change,change_px,down_price,change_3,change_5,qrr,entrust_rate,tr,amp,TotalShares,mc,NetAssetPS,NonRestrictedShares,cmc,business_amount,business_balance,pe,ttm_pe,pb,secu_name,secu_code,trade_status,secu_type,preclose_px,up_price,last_px&app=CailianpressWeb&os=web&sv=8.4.6";
 
             using var httpClient = _httpClientFactory.CreateClient("Cls");
-            var response = await httpClient.GetStringAsync(url);
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
             using var jsonDocument = JsonDocument.Parse(response);
 
             if (jsonDocument.RootElement.TryGetProperty("data", out var data) == false || data.ValueKind == JsonValueKind.Null)
                 throw new FriendlyException($"未找到股票 {assetSymbol} ({formattedSymbol}) 的数据，请检查代码是否正确。");
 
             // 通过 StringToDecimalConverter 容错反序列化：字符串数值/null/--占位均安全降级，不再抛出转换异常
-            var raw = JsonSerializer.Deserialize<ClsStockQuoteData>(data.GetRawText(), ClsJsonOptions)
+            var raw = JsonSerializer.Deserialize<ClsStockQuoteData>(data.GetRawText(), JsonOptions.AShareApiOptions)
                 ?? throw new FriendlyException($"解析股票 {assetSymbol} 行情数据失败。");
 
             return new StockQuoteInfo
@@ -100,7 +92,7 @@ public sealed class AShareBasicTools : IShareBasicTools
     }
 
     [Description("根据股票代码获取上市公司基本面信息，包括公司简介、主营业务、所属行业等")]
-    public async Task<CompanyInfo> GetCompanyInfoAsync([Description("股票代码")] string assetSymbol)
+    public async Task<CompanyInfo> GetCompanyInfoAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -110,8 +102,8 @@ public sealed class AShareBasicTools : IShareBasicTools
             var url = $"/hs/gs/gsjj/{assetSymbol}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url);
-            var info = JsonSerializer.Deserialize<CompanyInfo>(response, ClsJsonOptions);
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            var info = JsonSerializer.Deserialize<CompanyInfo>(response, JsonOptions.AShareApiOptions);
 
             return info ?? throw new FriendlyException("GetCompanyInfoAsync返回数据为空");
         }

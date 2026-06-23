@@ -27,7 +27,7 @@ public class NewsEventAnalystAgent : AnalystAgentBase
 
     public NewsEventAnalystAgent(
         IChatClient chatClient,
-        INewsDataTools newsTools,
+        IList<AITool> tools,
         AnalystPromptLoader promptLoader,
         AIContextProvider[]? aiContextProviders = null,
         AgentSkillsProvider? skillsProvider = null)
@@ -35,7 +35,7 @@ public class NewsEventAnalystAgent : AnalystAgentBase
             chatClient,
             promptLoader.GetConfig("NewsEventAnalyst"),
             ResponseFormat,
-            [.. newsTools.GetFunctions()],
+            tools,
             aiContextProviders,
             skillsProvider)
     {

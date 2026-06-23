@@ -15,6 +15,7 @@ MarketAssistant.Core/
 │   │   ├── ErrorMessageMapper.cs      ← 技术异常 → 用户友好消息映射
 │   │   ├── StockSymbolConverter.cs    ← A 股代码格式转换
 │   │   ├── CryptoSymbolConverter.cs   ← 加密货币符号转换
+│   │   └── LlmJsonExtractor.cs        ← LLM 返回文本 JSON 稳健提取/反序列化
 │   ├── Extensions/
 │   │   └── EnumExtensions.cs          ← GetDescription() 扩展
 │   └── NavigationParameters.cs        ← 导航参数（StockNavigationParameter）
@@ -30,6 +31,7 @@ MarketAssistant.Core/
 | `FriendlyException` | 抛出后消息直接展示给用户，不要用于非用户可见的内部错误 |
 | `ErrorMessageMapper` | 静态方法 `GetUserFriendlyMessage(Exception)` |
 | `StockSymbolConverter` / `CryptoSymbolConverter` | 不同 API 间的代码格式转换 |
+| `LlmJsonExtractor` | LLM 返回文本的 JSON 稳健提取与反序列化（多层兜底：直接解析→剥离 markdown→Utf8JsonReader 精确定位） |
 
 ---
 

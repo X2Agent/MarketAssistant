@@ -13,6 +13,9 @@ namespace MarketAssistant.Views.Components;
 /// </summary>
 public class KLineChartView : UserControl
 {
+    private const int MaxWaitTimeMs = 5000; // 5秒
+    private const int CheckIntervalMs = 100; // 100毫秒
+
     private bool _isInitialized = false;
     private NativeWebView? _webView;
     private StackPanel? _loadingPanel;
@@ -198,8 +201,9 @@ public class KLineChartView : UserControl
             // 如果都失败，返回默认HTML
             return GetDefaultChartHtml();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"加载图表 HTML 内容失败，回退到默认图表: {ex.Message}");
             return GetDefaultChartHtml();
         }
     }
@@ -396,14 +400,12 @@ public class KLineChartView : UserControl
     /// </summary>
     private async Task WaitForInitializationAsync()
     {
-        const int maxWaitTime = 5000; // 5秒
-        const int checkInterval = 100; // 100毫秒
         int elapsed = 0;
 
-        while (!_isInitialized && elapsed < maxWaitTime)
+        while (!_isInitialized && elapsed < MaxWaitTimeMs)
         {
-            await Task.Delay(checkInterval);
-            elapsed += checkInterval;
+            await Task.Delay(CheckIntervalMs);
+            elapsed += CheckIntervalMs;
         }
 
         if (!_isInitialized)

@@ -3,7 +3,6 @@ using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
-using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +32,6 @@ public class KLineServiceTest
             });
 
         services.AddSingleton(mockUserSettingService.Object);
-        services.AddSingleton<PlaywrightService>();
         services.AddHttpClient();
         services.AddTestMarketDataHttpClients();
         services.AddSingleton<BinanceMarketDataService>();
@@ -55,19 +53,18 @@ public class KLineServiceTest
         }
     }
 
-    private static async Task AssertHasDataOrFriendlyFailureAsync(Task<List<KLineData>> action)
+    /// <summary>
+    /// 验证 K 线数据的真实性：数量、OHLC 关系、收盘价为正
+    /// </summary>
+    private static void AssertKLineDataValid(List<KLineData> kLineData, int expectedMinCount)
     {
-        try
-        {
-            var kLineData = await action;
-            Assert.IsNotNull(kLineData);
-            Assert.IsTrue(kLineData.Count > 0);
-            Assert.IsTrue(kLineData.All(k => k.Close > 0));
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        Assert.IsNotNull(kLineData, "K线数据不应为 null");
+        Assert.IsTrue(kLineData.Count >= expectedMinCount, $"K线数据数量应至少为 {expectedMinCount}，实际 {kLineData.Count}");
+        Assert.IsTrue(kLineData.All(k => k.Close > 0), "所有K线的收盘价应大于 0");
+        Assert.IsTrue(kLineData.All(k => k.High >= k.Close), "所有K线的最高价应不低于收盘价");
+        Assert.IsTrue(kLineData.All(k => k.Low <= k.Close), "所有K线的最低价应不高于收盘价");
+        Assert.IsTrue(kLineData.All(k => k.High >= k.Low), "所有K线的最高价应不低于最低价");
+        Assert.IsTrue(kLineData.All(k => k.Open > 0), "所有K线的开盘价应大于 0");
     }
 
     [TestMethod]
@@ -78,7 +75,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.AShare);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("SH600519", KLineType.Minute15, 50));
+        var kLineData = await service.GetKLineDataAsync("SH600519", KLineType.Minute15, 50);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -89,7 +89,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.AShare);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("SH600519", KLineType.Daily, 100));
+        var kLineData = await service.GetKLineDataAsync("SH600519", KLineType.Daily, 100);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -100,7 +103,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.AShare);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("SH600519", KLineType.Weekly, 50));
+        var kLineData = await service.GetKLineDataAsync("SH600519", KLineType.Weekly, 50);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -111,7 +117,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("BTCUSDT", KLineType.Minute15, 50));
+        var kLineData = await service.GetKLineDataAsync("BTCUSDT", KLineType.Minute15, 50);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -122,7 +131,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("BTCUSDT", KLineType.Daily, 100));
+        var kLineData = await service.GetKLineDataAsync("BTCUSDT", KLineType.Daily, 100);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -133,7 +145,10 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("BTCUSDT", KLineType.Weekly, 50));
+        var kLineData = await service.GetKLineDataAsync("BTCUSDT", KLineType.Weekly, 50);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 
     [TestMethod]
@@ -144,6 +159,9 @@ public class KLineServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
 
         // Act
-        await AssertHasDataOrFriendlyFailureAsync(service.GetKLineDataAsync("ETHUSDT", KLineType.Monthly, 30));
+        var kLineData = await service.GetKLineDataAsync("ETHUSDT", KLineType.Monthly, 30);
+
+        // Assert
+        AssertKLineDataValid(kLineData, 1);
     }
 }

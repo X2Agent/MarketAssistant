@@ -2,7 +2,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using System.Globalization;
 
-namespace MarketAssistant.Converts;
+namespace MarketAssistant.Converters;
 
 /// <summary>
 /// 根据分数返回颜色的转换器

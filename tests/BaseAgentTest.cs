@@ -2,6 +2,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services;
 using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -10,7 +11,7 @@ namespace TestMarketAssistant;
 
 /// <summary>
 /// Agent Framework 测试基类
-/// 环境变量可选：缺失时使用占位值，LLM 相关测试标记为 Inconclusive
+/// 环境变量必需：缺失时对应测试失败（不跳过），确保真实场景验证
 /// </summary>
 public class BaseAgentTest
 {
@@ -43,13 +44,13 @@ public class BaseAgentTest
     }
 
     /// <summary>
-    /// 需要真实 LLM 的测试调用此方法，缺失 API Key 时跳过而非失败
+    /// 断言真实 LLM API Key 已配置（缺失则测试失败，而非跳过）
     /// </summary>
     protected void RequireLlm()
     {
         if (!IsLlmAvailable)
         {
-            Assert.Inconclusive("跳过：未配置 OPENAI_API_KEY 环境变量，无法调用真实 LLM");
+            Assert.Fail("OPENAI_API_KEY 环境变量未配置，无法调用真实 LLM 进行真实场景验证");
         }
     }
 
@@ -65,6 +66,7 @@ public class BaseAgentTest
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "";
         var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? "";
         var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? "";
+        var embeddingApiKey = Environment.GetEnvironmentVariable("JINA_API_KEY") ?? "";
 
         IsLlmAvailable = !string.IsNullOrEmpty(apiKey);
 
@@ -78,7 +80,9 @@ public class BaseAgentTest
         {
             ZhiTuApiToken = zhiTuApiToken,
             ModelId = modelId,
-            EmbeddingModelId = "BAAI/bge-m3",
+            EmbeddingModelId = "jina-embeddings-v5-text-small",
+            EmbeddingEndpoint = "https://api.jina.ai",
+            EmbeddingApiKey = embeddingApiKey,
             Endpoint = endpoint,
             ApiKey = apiKey,
             EnabledAnalystRoles = new Dictionary<string, bool>
@@ -96,6 +100,17 @@ public class BaseAgentTest
         var userSettingServiceMock = new Mock<IUserSettingService>();
         userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
+
+        // 注册 IEmbeddingGenerator（RAG 测试依赖），通过 IEmbeddingFactory 创建
+        // 仅当配置了 Jina EmbeddingApiKey 时注册，避免无密钥场景下工厂构造抛异常
+        if (!string.IsNullOrEmpty(embeddingApiKey))
+        {
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
+            {
+                var factory = sp.GetRequiredService<IEmbeddingFactory>();
+                return factory.Create();
+            });
+        }
 
         return services.BuildServiceProvider();
     }

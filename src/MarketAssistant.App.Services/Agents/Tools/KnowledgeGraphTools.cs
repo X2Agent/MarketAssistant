@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ namespace MarketAssistant.Agents.Tools;
 /// 知识图谱工具，允许 Agent 记录和查询实体间关系。
 /// 适用于记录：用户持有/关注的标的、分析过的股票/币种、行业关联、重大事件影响。
 /// </summary>
-public class KnowledgeGraphTools
+public class KnowledgeGraphTools : IToolsProvider
 {
     private readonly UserKnowledgeGraphService _kgService;
     private readonly ILogger<KnowledgeGraphTools> _logger;

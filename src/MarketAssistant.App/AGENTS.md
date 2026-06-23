@@ -10,7 +10,13 @@
 MarketAssistant.App/
 ├── config/
 │   ├── models.yaml                ← AI 模型与供应商配置
-│   └── prompts/analysts.yaml      ← 分析师提示词配置
+│   └── prompts/                   ← 分析师提示词配置（每个分析师一个 yaml 文件）
+│       ├── FundamentalAnalyst.yaml
+│       ├── FinancialAnalyst.yaml
+│       ├── TechnicalAnalyst.yaml
+│       ├── MarketSentimentAnalyst.yaml
+│       ├── NewsEventAnalyst.yaml
+│       └── CoordinatorAnalyst.yaml
 ├── Converts/                      ← AXAML 值转换器
 ├── Infrastructure/                ← ViewLocator 等 UI 宿主基础设施
 ├── Resources/Styles/              ← Avalonia 样式资源字典
@@ -84,7 +90,7 @@ MarketAssistant.App/
 
 ## 配置文件
 
-- `config/prompts/analysts.yaml`：分析师提示词配置，每个分析师含 `name`、`displayName`、`temperature`、`topP`、`topK`、`instructions` 字段，运行时热加载。
+- `config/prompts/*.yaml`：分析师提示词配置，每个分析师一个独立文件（如 `FundamentalAnalyst.yaml`），含 `name`、`displayName`、`temperature`、`topP`、`topK`、`instructions` 字段，运行时热加载。
 - `config/models.yaml`：AI 模型与供应商配置。
 
 ---
@@ -97,11 +103,4 @@ dotnet build src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 
 # 运行
 dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
-```
-
-可选：安装 Playwright CLI（业务运行时中的浏览器自动化依赖会使用）：
-
-```bash
-dotnet tool update --global Microsoft.Playwright.CLI
-playwright install
 ```

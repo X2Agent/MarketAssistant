@@ -30,7 +30,7 @@ public partial class HomePageView : UserControl
             viewModel.Search.IsSearchResultVisible = false;
 
             // 执行导航
-            viewModel.Search.SelectAssetCommand.Execute(selectedAsset);
+            viewModel.Search.NavigateToAssetCommand.Execute(selectedAsset);
         }
     }
 

@@ -14,7 +14,7 @@ public interface IKLineService
     /// <param name="kLineType">K线类型（时间周期）</param>
     /// <param name="count">数据条数</param>
     /// <returns>K线数据列表</returns>
-    Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 100);
+    Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 250);
 }
 
 

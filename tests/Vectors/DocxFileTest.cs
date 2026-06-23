@@ -231,19 +231,21 @@ public class DocxFileTest : BaseAgentTest
             // 创建一个空的或损坏的DOCX文件
             await File.WriteAllTextAsync(tempFile, "这不是一个有效的DOCX文件");
 
-            // Act & Assert
+            // Act & Assert - 损坏的DOCX应返回空块列表或抛出异常
+            var threw = false;
+            List<DocumentBlock> blockList = new();
             try
             {
                 var blocks = await _reader.ReadBlocksAsync(tempFile);
-                // 如果没有抛出异常，检查结果是否为空或合理
-                var blockList = blocks.ToList();
-                Assert.IsTrue(blockList.Count == 0, "损坏的DOCX文件应该返回空块列表或抛出异常");
+                blockList = blocks.ToList();
             }
             catch (Exception)
             {
-                // 抛出异常是预期的行为
-                Assert.IsTrue(true, "处理无效DOCX文件时抛出异常是正常的");
+                threw = true;
             }
+
+            // 必须满足以下两种情况之一：抛出异常 或 返回空块列表
+            Assert.IsTrue(threw || blockList.Count == 0, "损坏的DOCX文件应该返回空块列表或抛出异常");
         }
         finally
         {
@@ -262,17 +264,18 @@ public class DocxFileTest : BaseAgentTest
         // Arrange
         var nonExistentFile = "non_existent_file.docx";
 
-        // Act & Assert
+        // Act & Assert - 不存在的文件应抛出异常
+        var threw = false;
         try
         {
             var blocks = await _reader.ReadBlocksAsync(nonExistentFile);
-            Assert.Fail("应该抛出异常处理不存在的文件");
+            _ = blocks.ToList(); // 触发枚举
         }
         catch (Exception)
         {
-            // 抛出异常是预期的行为
-            Assert.IsTrue(true, "处理不存在的文件时抛出异常是正常的");
+            threw = true;
         }
+        Assert.IsTrue(threw, "处理不存在的文件时应抛出异常");
     }
 
     #endregion

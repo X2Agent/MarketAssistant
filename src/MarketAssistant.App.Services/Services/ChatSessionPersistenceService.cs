@@ -1,5 +1,5 @@
 using System.Text.Json;
-using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -8,24 +8,11 @@ namespace MarketAssistant.Services;
 /// <summary>
 /// 聊天会话持久化服务，支持将对话历史保存到 SQLite 并在应用重启后恢复。
 /// </summary>
-public class ChatSessionPersistenceService : IDisposable
+public class ChatSessionPersistenceService : SqliteServiceBase
 {
-    private readonly string _connectionString;
-    private readonly ILogger<ChatSessionPersistenceService> _logger;
-    private readonly Task _initializeTask;
-
     public ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger)
+        : base("chat_sessions.db", logger)
     {
-        _logger = logger;
-
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
-
-        var dbPath = Path.Combine(appDataDir, "chat_sessions.db");
-        _connectionString = $"Data Source={dbPath}";
-        _initializeTask = InitializeDatabaseAsync();
     }
 
     /// <summary>
@@ -33,7 +20,7 @@ public class ChatSessionPersistenceService : IDisposable
     /// </summary>
     public async Task SaveSessionAsync(ChatSessionSnapshot snapshot, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -57,7 +44,7 @@ public class ChatSessionPersistenceService : IDisposable
     /// </summary>
     public async Task<ChatSessionSnapshot?> LoadSessionAsync(string sessionId, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM chat_sessions WHERE id = @id";
@@ -75,7 +62,7 @@ public class ChatSessionPersistenceService : IDisposable
     /// </summary>
     public async Task<List<ChatSessionSummary>> GetSessionSummariesAsync(CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -106,7 +93,7 @@ public class ChatSessionPersistenceService : IDisposable
     /// </summary>
     public async Task DeleteSessionAsync(string sessionId, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
 
         await using var ftsCmd = conn.CreateCommand();
@@ -139,20 +126,13 @@ public class ChatSessionPersistenceService : IDisposable
         };
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken ct = default)
-    {
-        var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(ct);
-        return conn;
-    }
-
     /// <summary>
     /// 全文搜索历史对话消息
     /// </summary>
     public async Task<List<SessionSearchResult>> SearchSessionsAsync(
         string query, int limit = 10, CancellationToken ct = default)
     {
-        await _initializeTask;
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
         if (string.IsNullOrWhiteSpace(query)) return [];
 
         await using var conn = await OpenConnectionAsync(ct);
@@ -189,7 +169,7 @@ public class ChatSessionPersistenceService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "FTS5 搜索失败，查询: {Query}", query);
+            Logger.LogWarning(ex, "FTS5 搜索失败，查询: {Query}", query);
         }
         return results;
     }
@@ -227,7 +207,7 @@ public class ChatSessionPersistenceService : IDisposable
         }
     }
 
-    private async Task InitializeDatabaseAsync()
+    protected override async Task InitializeDatabaseAsync()
     {
         try
         {
@@ -256,15 +236,14 @@ public class ChatSessionPersistenceService : IDisposable
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();
-            _logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引）");
+            Logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引）");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初始化聊天会话数据库失败");
+            Logger.LogError(ex, "初始化聊天会话数据库失败");
+            throw;
         }
     }
-
-    public void Dispose() => GC.SuppressFinalize(this);
 }
 
 /// <summary>

@@ -152,18 +152,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         }
 
         // 释放旧页面资源
-        if (poppedItem.ViewModel is IDisposable disposable)
-        {
-            try
-            {
-                disposable.Dispose();
-                _logger?.LogDebug("已释放 ViewModel 资源: {Type}", poppedItem.ViewModel.GetType().Name);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "释放 ViewModel 资源时发生错误: {Type}", poppedItem.ViewModel.GetType().Name);
-            }
-        }
+        DisposeViewModel(poppedItem.ViewModel);
 
         if (_navigationStack.Count > 0)
         {
@@ -172,10 +161,11 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
             _logger?.LogInformation("返回到页面: {PageType}", currentItem.ViewModel.GetType().Name);
 
             // 2. 通知重新显示的页面（Re-activation）
-            // 我们传递它原始的参数，以便它决定是否需要刷新
+            // 传递 isReactivation: true，让页面区分首次进入与 GoBack 重新激活，
+            // 避免重复执行订阅、加载等副作用
             if (currentItem.ViewModel is INavigationAware currentAware)
             {
-                currentAware.OnNavigatedTo(currentItem.Parameter);
+                currentAware.OnNavigatedTo(currentItem.Parameter, isReactivation: true);
             }
 
             // 3. 更新状态（触发UI变更）
@@ -201,17 +191,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         while (_navigationStack.Count > 0)
         {
             var item = _navigationStack.Pop();
-            if (item.ViewModel is IDisposable disposable)
-            {
-                try
-                {
-                    disposable.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "释放 ViewModel 资源时发生错误: {Type}", item.ViewModel.GetType().Name);
-                }
-            }
+            DisposeViewModel(item.ViewModel);
         }
 
         NavigateToInternal(viewModel, null, rootNavigationItemTitle);
@@ -230,17 +210,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         while (_navigationStack.Count > 0)
         {
             var item = _navigationStack.Pop();
-            if (item.ViewModel is IDisposable disposable)
-            {
-                try
-                {
-                    disposable.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "释放 ViewModel 资源时发生错误: {Type}", item.ViewModel.GetType().Name);
-                }
-            }
+            DisposeViewModel(item.ViewModel);
         }
 
         UpdateState();
@@ -260,6 +230,25 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         {
             CurrentPage = null;
             CurrentRootNavigationItemTitle = null;
+        }
+    }
+
+    /// <summary>
+    /// 释放 ViewModel 资源（如果实现了 IDisposable）
+    /// </summary>
+    private void DisposeViewModel(ViewModelBase? viewModel)
+    {
+        if (viewModel is not IDisposable disposable)
+            return;
+
+        try
+        {
+            disposable.Dispose();
+            _logger?.LogDebug("已释放 ViewModel 资源: {Type}", viewModel.GetType().Name);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "释放 ViewModel 资源时发生错误: {Type}", viewModel.GetType().Name);
         }
     }
 }

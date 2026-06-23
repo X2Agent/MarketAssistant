@@ -1,6 +1,8 @@
+using MarketAssistant.Applications.Assets;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace MarketAssistant.Applications.Telegrams;
 
@@ -12,16 +14,19 @@ public class CryptoTelegramService : ITelegramService
 {
     private readonly ILogger<CryptoTelegramService> _logger;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ICryptoAliasRegistry _aliasRegistry;
 
-    // PANews 快讯API - rn=条数, lid=语言(1=中文), apppush=0
-    private const string ApiUrl = "https://api.panewslab.com/webapi/flashnews?rn=20&lid=1&apppush=0";
+    private const string ApiUrl =
+        "https://universal-api.panewslab.com/articles?type=NEWS&isShowInList=true&take=20&skip=0&isImportant=true";
 
     public CryptoTelegramService(
         ILogger<CryptoTelegramService> logger,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        ICryptoAliasRegistry aliasRegistry)
     {
         _logger = logger;
         _httpClientFactory = httpClientFactory;
+        _aliasRegistry = aliasRegistry;
     }
 
     /// <summary>
@@ -30,16 +35,13 @@ public class CryptoTelegramService : ITelegramService
     public async Task<List<Telegram>> GetTelegraphsAsync(CancellationToken cancellationToken = default)
     {
         var result = new List<Telegram>();
-        
-        var client = _httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(10);
+
+        var client = _httpClientFactory.CreateClient("CryptoTelegram");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, ApiUrl);
-        request.Headers.TryAddWithoutValidation("Accept", "*/*");
-        request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,en-GB;q=0.8,en;q=0.7");
-        request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36");
-        request.Headers.TryAddWithoutValidation("Origin", "https://www.panewslab.com");
-        request.Headers.TryAddWithoutValidation("Referer", "https://www.panewslab.com/");
+        request.Headers.TryAddWithoutValidation("Accept", "application/json");
+        request.Headers.TryAddWithoutValidation("User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -49,66 +51,36 @@ public class CryptoTelegramService : ITelegramService
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        var apiResponse = JsonSerializer.Deserialize<PanewsResponse>(json, JsonOptions);
+        var articles = JsonSerializer.Deserialize<List<PanewsArticle>>(json, JsonOptions);
 
-        if (apiResponse?.Data == null)
+        if (articles is not { Count: > 0 })
         {
-            _logger.LogWarning("PANews API 返回数据为空，ErrorNo: {ErrorNo}, Message: {Message}", 
-                apiResponse?.ErrorNo, apiResponse?.Message);
+            _logger.LogWarning("PANews API 返回数据为空");
             return result;
         }
 
-        // 从 flashNews 中提取所有 list 集合
-        var allItems = apiResponse.Data.FlashNews
-            .SelectMany(group => group.List)
-            .ToList();
+        _logger.LogInformation("PANews API 返回 {Count} 条快讯", articles.Count);
 
-        _logger.LogInformation("PANews API 返回数据：共 {GroupCount} 个日期分组，总计 {ItemCount} 条快讯", 
-            apiResponse.Data.FlashNews.Count, allItems.Count);
-
-        if (allItems.Count == 0)
-        {
-            _logger.LogWarning("PANews API 未返回任何快讯");
-            return result;
-        }
-
-        // 处理所有返回的快讯（已限制 20 条）
-        foreach (var item in allItems.Take(20))
+        foreach (var article in articles)
         {
             try
             {
-                var timestamp = item.PublishTime ?? item.CTime ?? 0;
-                var timeText = FormatUnixTime(timestamp);
-                var title = item.Title ?? string.Empty;
-                
-                // 使用 desc 字段作为内容，如果为空则使用 title
-                var content = !string.IsNullOrWhiteSpace(item.Desc) 
-                    ? item.Desc 
-                    : title;
-                
-                var url = $"https://www.panewslab.com/zh/articles/{item.Id}";
-                
-                var cryptos = ExtractCryptoSymbols(content, title);
-                
-                // type=2 并且 apppush=1 可能表示重要快讯
-                var isImportant = item.AppPush == 1;
-
-                _logger.LogDebug("处理快讯项：Title={Title}, Time={Time}, Author={Author}", 
-                    title, timeText, item.Author?.Name);
+                var title = article.Title ?? string.Empty;
+                var content = !string.IsNullOrWhiteSpace(article.Desc) ? article.Desc : title;
 
                 result.Add(new Telegram
                 {
-                    Time = timeText,
+                    Time = FormatIsoTime(article.PublishedAt),
                     Title = title,
                     Content = content,
-                    Url = url,
-                    Symbols = cryptos,
-                    IsImportant = isImportant
+                    Url = $"https://www.panewslab.com/zh/articles/{article.Id}",
+                    Symbols = await ExtractCryptoSymbolsAsync(title, content, cancellationToken),
+                    IsImportant = article.IsImportant == true
                 });
             }
-            catch (Exception mapEx)
+            catch (Exception ex)
             {
-                _logger.LogWarning(mapEx, "映射 PANews 快讯项失败: {Message}", mapEx.Message);
+                _logger.LogWarning(ex, "映射 PANews 快讯项失败: {Message}", ex.Message);
             }
         }
 
@@ -116,23 +88,23 @@ public class CryptoTelegramService : ITelegramService
         return result;
     }
 
-    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
     /// <summary>
-    /// 格式化 Unix 时间戳为本地时间
+    /// 格式化 ISO 8601 时间为本地时间字符串
     /// </summary>
-    private static string FormatUnixTime(long unixSeconds)
+    private static string FormatIsoTime(string? isoTime)
     {
-        if (unixSeconds == 0)
+        if (string.IsNullOrWhiteSpace(isoTime))
             return string.Empty;
 
         try
         {
-            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime().ToString("HH:mm:ss");
+            return DateTimeOffset.Parse(isoTime).ToLocalTime().ToString("HH:mm:ss");
         }
         catch
         {
@@ -141,141 +113,25 @@ public class CryptoTelegramService : ITelegramService
     }
 
     /// <summary>
-    /// 从HTML内容中提取纯文本标题（取第一句话）
+    /// 从新闻文本中提取关联的加密货币符号（基于词边界正则匹配，动态从 CryptoAliasRegistry 获取）
     /// </summary>
-    private static string ExtractTitle(string? htmlContent, int maxLength = 50)
+    private async Task<List<string>> ExtractCryptoSymbolsAsync(
+        string title, string content, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(htmlContent))
-            return string.Empty;
-
-        // 清除HTML标签
-        var text = System.Text.RegularExpressions.Regex.Replace(htmlContent, "<.*?>", " ");
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
-
-        if (string.IsNullOrEmpty(text))
-            return string.Empty;
-
-        // 提取第一句话作为标题
-        var sentences = text.Split(new[] { '。', '！', '？', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
-        var title = sentences.Length > 0 ? sentences[0].Trim() : text;
-
-        // 限制长度
-        if (title.Length > maxLength)
-            title = title.Substring(0, maxLength) + "...";
-
-        return title;
+        var patterns = await _aliasRegistry.GetMatchPatternsAsync(cancellationToken);
+        var text = $"{title} {content}";
+        return patterns
+            .Where(kv => kv.Value.IsMatch(text))
+            .Select(kv => kv.Key)
+            .OrderBy(s => s)
+            .ToList();
     }
 
-    /// <summary>
-    /// 清理HTML内容为纯文本
-    /// </summary>
-    private static string CleanHtmlContent(string? htmlContent, int maxLength = 200)
-    {
-        if (string.IsNullOrWhiteSpace(htmlContent))
-            return string.Empty;
+    // ─────────────────────────────────────────────────────────────
+    // PANews API 响应模型
+    // ─────────────────────────────────────────────────────────────
 
-        // 清除HTML标签
-        var text = System.Text.RegularExpressions.Regex.Replace(htmlContent, "<.*?>", " ");
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
-
-        // 限制长度
-        if (text.Length > maxLength)
-            text = text.Substring(0, maxLength) + "...";
-
-        return text;
-    }
-
-    /// <summary>
-    /// 从文本中提取加密货币符号
-    /// </summary>
-    private static List<string> ExtractCryptoSymbols(string content, string title)
-    {
-        var symbols = new HashSet<string>();
-        var text = $"{title} {content}".ToUpperInvariant();
-
-        // 常见加密货币符号及其变体
-        var cryptoPatterns = new Dictionary<string, string[]>
-        {
-            { "BTC", new[] { "BTC", "比特币", "BITCOIN" } },
-            { "ETH", new[] { "ETH", "以太坊", "ETHEREUM" } },
-            { "USDT", new[] { "USDT", "泰达币", "TETHER" } },
-            { "BNB", new[] { "BNB", "币安币", "BINANCE" } },
-            { "SOL", new[] { "SOL", "SOLANA", "索拉纳" } },
-            { "XRP", new[] { "XRP", "瑞波币", "RIPPLE" } },
-            { "ADA", new[] { "ADA", "艾达币", "CARDANO" } },
-            { "DOGE", new[] { "DOGE", "狗狗币", "DOGECOIN" } },
-            { "MATIC", new[] { "MATIC", "POLYGON", "马蹄" } },
-            { "DOT", new[] { "DOT", "波卡", "POLKADOT" } },
-            { "AVAX", new[] { "AVAX", "雪崩", "AVALANCHE" } },
-            { "SHIB", new[] { "SHIB", "柴犬币" } },
-            { "LTC", new[] { "LTC", "莱特币", "LITECOIN" } },
-            { "UNI", new[] { "UNI", "UNISWAP" } },
-            { "LINK", new[] { "LINK", "CHAINLINK" } }
-        };
-
-        foreach (var (symbol, patterns) in cryptoPatterns)
-        {
-            if (patterns.Any(p => text.Contains(p)))
-            {
-                symbols.Add(symbol);
-            }
-        }
-
-        return symbols.OrderBy(s => s).ToList();
-    }
-
-    /// <summary>
-    /// PANews API 响应模型
-    /// </summary>
-    private class PanewsResponse
-    {
-        [JsonPropertyName("errno")]
-        public int ErrorNo { get; set; }
-
-        [JsonPropertyName("msg")]
-        public string? Message { get; set; }
-
-        [JsonPropertyName("data")]
-        public PanewsData? Data { get; set; }
-    }
-
-    /// <summary>
-    /// PANews 数据容器
-    /// </summary>
-    private class PanewsData
-    {
-        [JsonPropertyName("flashNews")]
-        public List<FlashNewsGroup> FlashNews { get; set; } = new();
-
-        [JsonPropertyName("tag")]
-        public List<object> Tag { get; set; } = new();
-    }
-
-    /// <summary>
-    /// PANews 快讯分组（按日期）
-    /// </summary>
-    private class FlashNewsGroup
-    {
-        [JsonPropertyName("date")]
-        public string? Date { get; set; }
-
-        [JsonPropertyName("week")]
-        public string? Week { get; set; }
-
-        [JsonPropertyName("month")]
-        public string? Month { get; set; }
-
-        [JsonPropertyName("unix")]
-        public long Unix { get; set; }
-
-        [JsonPropertyName("list")]
-        public List<PanewsFlashItem> List { get; set; } = new();
-    }
-
-    /// <summary>
-    /// PANews 快讯条目
-    /// </summary>
-    private class PanewsFlashItem
+    private class PanewsArticle
     {
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
@@ -286,49 +142,16 @@ public class CryptoTelegramService : ITelegramService
         [JsonPropertyName("desc")]
         public string? Desc { get; set; }
 
-        [JsonPropertyName("publishTime")]
-        public long? PublishTime { get; set; }
+        [JsonPropertyName("publishedAt")]
+        public string? PublishedAt { get; set; }
 
-        [JsonPropertyName("type")]
-        public int? Type { get; set; }
-
-        [JsonPropertyName("img")]
-        public string? Img { get; set; }
-
-        [JsonPropertyName("readnum")]
-        public int? ReadNum { get; set; }
-
-        [JsonPropertyName("tags")]
-        public object? Tags { get; set; }
+        [JsonPropertyName("isImportant")]
+        public bool? IsImportant { get; set; }
 
         [JsonPropertyName("author")]
         public PanewsAuthor? Author { get; set; }
-
-        [JsonPropertyName("collection")]
-        public int? Collection { get; set; }
-
-        [JsonPropertyName("like")]
-        public int? Like { get; set; }
-
-        [JsonPropertyName("lovenum")]
-        public int? LoveNum { get; set; }
-
-        [JsonPropertyName("status")]
-        public int? Status { get; set; }
-
-        [JsonPropertyName("topTime")]
-        public long? TopTime { get; set; }
-
-        [JsonPropertyName("apppush")]
-        public int? AppPush { get; set; }
-
-        [JsonPropertyName("ctime")]
-        public long? CTime { get; set; }
     }
 
-    /// <summary>
-    /// PANews 作者信息
-    /// </summary>
     private class PanewsAuthor
     {
         [JsonPropertyName("id")]
@@ -336,18 +159,6 @@ public class CryptoTelegramService : ITelegramService
 
         [JsonPropertyName("name")]
         public string? Name { get; set; }
-
-        [JsonPropertyName("img")]
-        public string? Img { get; set; }
-
-        [JsonPropertyName("tag")]
-        public string? Tag { get; set; }
-
-        [JsonPropertyName("brief")]
-        public string? Brief { get; set; }
-
-        [JsonPropertyName("follow")]
-        public int? Follow { get; set; }
     }
 }
 

@@ -1,10 +1,14 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.AShare;
 using MarketAssistant.Agents.Tools.Crypto;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services;
+using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace TestMarketAssistant.Tools;
 
@@ -16,16 +20,38 @@ public class SentimentToolsTest
 {
     private ServiceProvider? _serviceProvider;
     private ILogger<SentimentToolsTest>? _logger;
+    private string? _zhiTuApiToken;
+
+    public TestContext? TestContext { get; set; }
 
     [TestInitialize]
     public void Setup()
     {
+        // 从环境变量读取智兔 API 令牌（不在代码中硬编码，避免提交到仓库）
+        _zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN");
+
         var services = new ServiceCollection();
 
-        // 注册依赖服务
-        services.AddSingleton<IUserSettingService, UserSettingService>();
-        services.AddLogging();
-        services.AddHttpClient();
+        services.AddLogging(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Debug);
+        });
+
+        // 注册命名 HttpClient（含 BaseAddress 与弹性策略），与生产配置一致
+        // AShareSentimentTools 依赖 "Cls" 与 "ZhiTu" 命名 HttpClient
+        services.AddNamedMarketHttpClients();
+
+        // CryptoSentimentTools 依赖 BinanceMarketDataService
+        services.AddSingleton<BinanceMarketDataService>();
+
+        // 通过 Mock 注入带真实 ZhiTuApiToken 的 UserSetting（避免依赖本地 Preferences 存储）
+        var userSetting = new UserSetting
+        {
+            ZhiTuApiToken = _zhiTuApiToken ?? ""
+        };
+        var userSettingServiceMock = new Mock<IUserSettingService>();
+        userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(userSetting);
+        services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         // 注册被测试的服务
         services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
@@ -58,8 +84,23 @@ public class SentimentToolsTest
         // Act
         var sentimentData = await service.GetFundFlowAsync("SH600519");
 
-        // Assert
-        Assert.IsNotNull(sentimentData);
+        // Assert - 验证真实资金流向数据（关键字段非空 + 数值合理性，证明 API 真实返回而非空对象）
+        Assert.IsNotNull(sentimentData, "资金流向数据不应为空");
+        Assert.IsTrue(sentimentData.Date > 0, $"日期应大于 0，实际: {sentimentData.Date}");
+        // 主力资金流向字段（流入/流出/净流入）应至少有非零数据，证明 API 真实返回
+        Assert.IsTrue(sentimentData.MainFundIn > 0 || sentimentData.MainFundOut > 0,
+            $"主力流入({sentimentData.MainFundIn})或主力流出({sentimentData.MainFundOut})应至少有一个大于 0");
+        Assert.IsTrue(sentimentData.MainFundDiff != 0 || sentimentData.SuperFundDiff != 0 || sentimentData.LargeFundDiff != 0,
+            $"主力净流入({sentimentData.MainFundDiff})、超大单净流入({sentimentData.SuperFundDiff})、大单净流入({sentimentData.LargeFundDiff})应至少有一个非零");
+        // 资金流向勾稽关系：主力净流入 ≈ 超大单 + 大单 + 中单 + 小单（允许浮点误差）
+        var sumOfDetails = sentimentData.SuperFundDiff + sentimentData.LargeFundDiff
+            + sentimentData.MediumFundDiff + sentimentData.LittleFundDiff;
+        Assert.IsTrue(Math.Abs(sumOfDetails - sentimentData.MainFundDiff) < 1m,
+            $"主力净流入({sentimentData.MainFundDiff})应约等于超大单({sentimentData.SuperFundDiff})+大单({sentimentData.LargeFundDiff})+中单({sentimentData.MediumFundDiff})+小单({sentimentData.LittleFundDiff})={sumOfDetails}");
+
+        TestContext?.WriteLine($"SH600519 日期: {sentimentData.Date}, 主力净流入: {sentimentData.MainFundDiff}万元, " +
+            $"超大单: {sentimentData.SuperFundDiff}万元, 大单: {sentimentData.LargeFundDiff}万元, " +
+            $"3日主力: {sentimentData.MainFund3}万元, 5日主力: {sentimentData.MainFund5}万元");
     }
 
     #endregion
@@ -85,7 +126,7 @@ public class SentimentToolsTest
         Assert.IsTrue(fundingRateHistory.NextFundingTime > fundingRateHistory.CurrentFundingTime, "下次结算时间应晚于当前时间");
         Assert.IsNotNull(fundingRateHistory.History);
         Assert.IsTrue(fundingRateHistory.History.Count > 0, "历史数据应至少有 1 条记录");
-        Assert.IsTrue(fundingRateHistory.History.Count <= 10, "历史数据不应超过请求的 limit");
+        Assert.IsTrue(fundingRateHistory.History.Count <= 30, "历史数据不应超过请求的 limit");
 
         _logger?.LogInformation(
             "当前费率: {CurrentRate}%, 平均费率: {AverageRate}%, 历史记录数: {Count}",

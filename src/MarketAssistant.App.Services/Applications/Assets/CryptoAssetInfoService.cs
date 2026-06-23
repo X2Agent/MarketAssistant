@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Services.Data;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -13,18 +14,20 @@ public class CryptoAssetInfoService : IAssetInfoService
 {
     private readonly BinanceMarketDataService _binanceService;
     private readonly CoinGeckoApiService _coinGeckoService;
+    private readonly ICryptoAliasRegistry _aliasRegistry;
     private readonly ILogger<CryptoAssetInfoService> _logger;
     private readonly IMemoryCache _memoryCache;
-    private const string SYMBOLS_CACHE_KEY = "BinanceSymbols";
 
     public CryptoAssetInfoService(
         BinanceMarketDataService binanceService,
         CoinGeckoApiService coinGeckoService,
+        ICryptoAliasRegistry aliasRegistry,
         ILogger<CryptoAssetInfoService> logger,
         IMemoryCache memoryCache)
     {
         _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
         _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+        _aliasRegistry = aliasRegistry;
         _logger = logger;
         _memoryCache = memoryCache;
     }
@@ -146,7 +149,10 @@ public class CryptoAssetInfoService : IAssetInfoService
     {
         try
         {
-            var coinId = ToCoinGeckoId(baseCurrency);
+            var idMap = await _aliasRegistry.GetCoinGeckoIdMapAsync(cancellationToken);
+            var coinId = idMap.TryGetValue(baseCurrency.ToUpperInvariant(), out var id)
+                ? id
+                : ToCoinGeckoId(baseCurrency);
             var marketData = await _coinGeckoService.GetCoinMarketDataAsync(coinId, cancellationToken: cancellationToken);
 
             if (marketData is { Count: > 0 } && marketData[0] is System.Text.Json.Nodes.JsonObject data)
@@ -174,7 +180,7 @@ public class CryptoAssetInfoService : IAssetInfoService
     private async Task<List<BinanceSymbolInfo>> GetSymbolsAsync(CancellationToken cancellationToken)
     {
         // 尝试从缓存获取
-        if (_memoryCache.TryGetValue(SYMBOLS_CACHE_KEY, out List<BinanceSymbolInfo>? cachedSymbols) && cachedSymbols != null)
+        if (_memoryCache.TryGetValue(CacheKeys.CryptoSymbols, out List<BinanceSymbolInfo>? cachedSymbols) && cachedSymbols != null)
         {
             return cachedSymbols;
         }
@@ -189,7 +195,7 @@ public class CryptoAssetInfoService : IAssetInfoService
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
         };
-        _memoryCache.Set(SYMBOLS_CACHE_KEY, tradingSymbols, cacheOptions);
+        _memoryCache.Set(CacheKeys.CryptoSymbols, tradingSymbols, cacheOptions);
 
         _logger.LogInformation("已缓存 {Count} 个 TRADING 状态的交易对", tradingSymbols.Count);
         return tradingSymbols;

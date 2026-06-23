@@ -4,6 +4,7 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -39,7 +40,7 @@ public class AShareKLineService : IKLineService
     /// <summary>
     /// 获取K线数据（统一入口，根据类型调用对应的实现）
     /// </summary>
-    public async Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 100)
+    public async Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 250)
     {
         // 根据K线类型映射到智图API的时间周期参数
         var (interval, dataTypeName) = kLineType switch
@@ -52,7 +53,7 @@ public class AShareKLineService : IKLineService
             _ => ("d", "日K线") // 默认日K线
         };
 
-        var dataset = await GetKLineDataInternalAsync(code, interval, dataTypeName);
+        var dataset = await GetKLineDataInternalAsync(code, interval, dataTypeName, count: count);
         return dataset?.Data ?? new List<KLineData>();
     }
 
@@ -64,7 +65,8 @@ public class AShareKLineService : IKLineService
         string dataType,
         DateTime? startDate = null,
         DateTime? endDate = null,
-        string adjustType = "n")
+        string adjustType = "n",
+        int? count = null)
     {
         try
         {
@@ -94,6 +96,14 @@ public class AShareKLineService : IKLineService
             // 解析数据
             ParseZhiTuKLineData(zhiTuData, klineDataSet);
 
+            // 按调用方请求的 count 截取最近的 N 条（已按时间升序排序，取最后 count 条）
+            if (count.HasValue && count.Value > 0 && klineDataSet.Data.Count > count.Value)
+            {
+                klineDataSet.Data = klineDataSet.Data
+                    .Skip(klineDataSet.Data.Count - count.Value)
+                    .ToList();
+            }
+
             return klineDataSet;
         }
         catch (Exception ex)
@@ -116,14 +126,14 @@ public class AShareKLineService : IKLineService
         {
             switch (interval.ToLower())
             {
-                case "d": // 日K线，默认查询最近6个月
-                    defaultStartDate = DateTime.Now.AddMonths(-6);
-                    break;
-                case "w": // 周K线，默认查询最近1年
+                case "d": // 日K线，默认查询最近1年
                     defaultStartDate = DateTime.Now.AddYears(-1);
                     break;
-                case "m": // 月K线，默认查询最近3年
+                case "w": // 周K线，默认查询最近3年
                     defaultStartDate = DateTime.Now.AddYears(-3);
+                    break;
+                case "m": // 月K线，默认查询最近10年
+                    defaultStartDate = DateTime.Now.AddYears(-10);
                     break;
                 case "y": // 年K线，默认查询最近10年
                     defaultStartDate = DateTime.Now.AddYears(-10);
@@ -132,8 +142,8 @@ public class AShareKLineService : IKLineService
                 case "5":
                 case "15":
                 case "30":
-                case "60": // 分钟级别数据，默认查询最近30天
-                    defaultStartDate = DateTime.Now.AddDays(-30);
+                case "60": // 分钟级别数据，默认查询最近60天
+                    defaultStartDate = DateTime.Now.AddDays(-60);
                     break;
                 default: // 其他情况，默认查询最近1年
                     defaultStartDate = DateTime.Now.AddYears(-1);
@@ -163,7 +173,7 @@ public class AShareKLineService : IKLineService
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient();
+            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
@@ -192,7 +202,7 @@ public class AShareKLineService : IKLineService
         foreach (var item in zhiTuData)
         {
             // 解析时间戳
-            if (DateTime.TryParse(item.T, out DateTime timestamp))
+            if (DateTime.TryParse(item.T, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime timestamp))
             {
                 var klineData = new KLineData
                 {

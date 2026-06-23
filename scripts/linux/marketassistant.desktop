@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Name=Market Assistant
-Comment=AI-powered market analysis assistant
+Comment=AI 智能市场分析助手
 Exec=/opt/MarketAssistant/MarketAssistant
 Icon=marketassistant
 Terminal=false

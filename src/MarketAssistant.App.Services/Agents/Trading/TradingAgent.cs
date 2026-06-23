@@ -19,15 +19,8 @@ public class TradingAgent : DelegatingAIAgent
 
     public TradingAgent(
         IChatClient chatClient,
-        ITradingExecutionTools tradingTools,
-        IStrategyTools strategyTools,
-        IBasicDataTools basicTools,
-        ITechnicalDataTools technicalTools)
-        : base(CreateInnerAgent(chatClient,
-            [.. tradingTools.GetFunctions(),
-             .. strategyTools.GetFunctions(),
-             .. basicTools.GetFunctions(),
-             .. technicalTools.GetFunctions()]))
+        IList<AITool> tools)
+        : base(CreateInnerAgent(chatClient, tools))
     {
     }
 

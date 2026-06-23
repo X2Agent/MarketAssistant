@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ namespace MarketAssistant.Agents.Tools;
 /// 历史会话搜索工具，允许 Agent 跨会话搜索过去讨论过的内容。
 /// 基于 SQLite FTS5 全文索引实现。
 /// </summary>
-public class SessionSearchTools
+public class SessionSearchTools : IToolsProvider
 {
     private readonly ChatSessionPersistenceService _persistenceService;
     private readonly ILogger<SessionSearchTools> _logger;

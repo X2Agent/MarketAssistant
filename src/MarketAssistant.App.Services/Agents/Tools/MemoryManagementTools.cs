@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ namespace MarketAssistant.Agents.Tools;
 /// 用户长期记忆管理工具，暴露给 Agent 用于主动保存、查询和删除记忆。
 /// Agent 应在学习到用户偏好、被纠正、发现重要结论时主动调用。
 /// </summary>
-public class MemoryManagementTools
+public class MemoryManagementTools : IToolsProvider
 {
     private readonly UserMemoryService _memoryService;
     private readonly ILogger<MemoryManagementTools> _logger;

@@ -12,14 +12,14 @@ namespace MarketAssistant.ViewModels.Home;
 /// <summary>
 /// 主页搜索功能ViewModel
 /// </summary>
-public partial class HomeSearchViewModel : ViewModelBase
+public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
     private CancellationTokenSource? _debounceCts;
     private const int DebounceDelayMs = 200;
 
-    private IHomeAssetService HomeAssetService => 
+    private IHomeAssetService HomeAssetService =>
         _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
 
     [ObservableProperty]
@@ -37,16 +37,6 @@ public partial class HomeSearchViewModel : ViewModelBase
     public ObservableCollection<AssetItem> SearchResults { get; } = new();
 
     /// <summary>
-    /// 搜索命令
-    /// </summary>
-    public IAsyncRelayCommand<string> SearchCommand { get; }
-
-    /// <summary>
-    /// 选择资产命令
-    /// </summary>
-    public IRelayCommand<AssetItem> SelectAssetCommand { get; }
-
-    /// <summary>
     /// 资产选择事件
     /// </summary>
     public event EventHandler<AssetItem>? AssetSelected;
@@ -59,13 +49,10 @@ public partial class HomeSearchViewModel : ViewModelBase
     {
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
-
-        SearchCommand = new AsyncRelayCommand<string>(OnSearchAsync);
-        SelectAssetCommand = new RelayCommand<AssetItem>(OnSelectAsset);
     }
 
     /// <summary>
-    /// 当 SearchQuery 变化时自动触发搜索（带500毫秒防抖）
+    /// 当 SearchQuery 变化时自动触发搜索（带200毫秒防抖）
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
@@ -97,7 +84,7 @@ public partial class HomeSearchViewModel : ViewModelBase
                 // 如果没有被取消，执行搜索
                 if (!cancellationToken.IsCancellationRequested)
                 {
-                    await OnSearchAsync(value);
+                    await SearchAsync(value);
                 }
             }
             catch (TaskCanceledException)
@@ -115,7 +102,8 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// <summary>
     /// 执行搜索
     /// </summary>
-    private async Task OnSearchAsync(string? query)
+    [RelayCommand]
+    private async Task SearchAsync(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -147,7 +135,7 @@ public partial class HomeSearchViewModel : ViewModelBase
 
                 IsSearchResultVisible = SearchResults.Count > 0;
             });
-            
+
             if (results.Count == 0)
             {
                 Logger?.LogWarning("未找到匹配的资产，查询：{Query}", query);
@@ -160,7 +148,8 @@ public partial class HomeSearchViewModel : ViewModelBase
     /// <summary>
     /// 选择资产
     /// </summary>
-    private void OnSelectAsset(AssetItem? asset)
+    [RelayCommand]
+    private void NavigateToAsset(AssetItem? asset)
     {
         if (asset == null) return;
 
@@ -185,5 +174,16 @@ public partial class HomeSearchViewModel : ViewModelBase
         SearchResults.Clear();
         IsSearchResultVisible = false;
         IsSearching = false;
+    }
+
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        _debounceCts = null;
+        GC.SuppressFinalize(this);
     }
 }

@@ -1,6 +1,5 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Browser;
 using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
@@ -29,7 +28,6 @@ public class AssetInfoServiceTest
         services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
         services.AddSingleton<MarketContext>();
-        services.AddSingleton<PlaywrightService>();
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<CoinGeckoApiService>();
 
@@ -63,7 +61,9 @@ public class AssetInfoServiceTest
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.IsTrue(results.Count >= 0);
+        Assert.IsTrue(results.Count > 0, "搜索'贵州茅台'应返回至少一条结果");
+        Assert.IsTrue(results.All(r => !string.IsNullOrWhiteSpace(r.Code)), "所有结果应包含有效代码");
+        Assert.IsTrue(results.Any(r => r.Name.Contains("茅台")), "结果中应包含茅台相关股票");
     }
 
     [TestMethod]
@@ -81,6 +81,7 @@ public class AssetInfoServiceTest
         Assert.IsNotNull(assetInfo);
         Assert.AreEqual(MarketType.AShare, assetInfo.MarketType);
         Assert.IsFalse(string.IsNullOrWhiteSpace(assetInfo.Code));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(assetInfo.Name));
     }
 
     [TestMethod]
@@ -92,17 +93,12 @@ public class AssetInfoServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetInfoService>(MarketType.AShare);
 
         // Act
-        try
-        {
-            var hotAssets = await service.GetHotAssetsAsync();
-            Assert.IsNotNull(hotAssets);
-            Assert.IsTrue(hotAssets.Count >= 0);
-            Assert.IsTrue(hotAssets.All(h => !string.IsNullOrEmpty(h.Code)));
-        }
-        catch (Exception ex) when (ex is FriendlyException or HttpRequestException)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        var hotAssets = await service.GetHotAssetsAsync();
+
+        // Assert
+        Assert.IsNotNull(hotAssets);
+        Assert.IsTrue(hotAssets.Count > 0, "A股热门资产列表不应为空");
+        Assert.IsTrue(hotAssets.All(h => !string.IsNullOrEmpty(h.Code)), "所有热门资产应包含有效代码");
     }
 
     [TestMethod]
@@ -114,16 +110,13 @@ public class AssetInfoServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetInfoService>(MarketType.Crypto);
 
         // Act
-        try
-        {
-            var results = await service.SearchAsync("BTC");
-            Assert.IsNotNull(results);
-            Assert.IsTrue(results.Count >= 0);
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        var results = await service.SearchAsync("BTC");
+
+        // Assert
+        Assert.IsNotNull(results);
+        Assert.IsTrue(results.Count > 0, "搜索'BTC'应返回至少一条结果");
+        Assert.IsTrue(results.All(r => !string.IsNullOrWhiteSpace(r.Code)), "所有结果应包含有效代码");
+        Assert.IsTrue(results.Any(r => r.Code.Contains("BTC")), "结果中应包含 BTC 相关资产");
     }
 
     [TestMethod]
@@ -135,17 +128,12 @@ public class AssetInfoServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetInfoService>(MarketType.Crypto);
 
         // Act
-        try
-        {
-            var assetInfo = await service.GetAssetInfoAsync("BTCUSDT");
-            Assert.IsNotNull(assetInfo);
-            Assert.IsTrue(assetInfo.Code.Contains("BTC"));
-            Assert.IsFalse(string.IsNullOrEmpty(assetInfo.CurrentPrice));
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        var assetInfo = await service.GetAssetInfoAsync("BTCUSDT");
+
+        // Assert
+        Assert.IsNotNull(assetInfo);
+        Assert.IsTrue(assetInfo.Code.Contains("BTC"), "返回的代码应包含 BTC");
+        Assert.IsFalse(string.IsNullOrEmpty(assetInfo.CurrentPrice), "应返回当前价格");
     }
 
     [TestMethod]
@@ -157,16 +145,11 @@ public class AssetInfoServiceTest
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetInfoService>(MarketType.Crypto);
 
         // Act
-        try
-        {
-            var hotAssets = await service.GetHotAssetsAsync();
-            Assert.IsNotNull(hotAssets);
-            Assert.IsTrue(hotAssets.Count >= 0);
-            Assert.IsTrue(hotAssets.All(h => !string.IsNullOrEmpty(h.Code)));
-        }
-        catch (FriendlyException ex)
-        {
-            Assert.IsFalse(string.IsNullOrWhiteSpace(ex.Message));
-        }
+        var hotAssets = await service.GetHotAssetsAsync();
+
+        // Assert
+        Assert.IsNotNull(hotAssets);
+        Assert.IsTrue(hotAssets.Count > 0, "虚拟币热门资产列表不应为空");
+        Assert.IsTrue(hotAssets.All(h => !string.IsNullOrEmpty(h.Code)), "所有热门资产应包含有效代码");
     }
 }

@@ -5,7 +5,7 @@
 #define MyAppName "Market Assistant"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "MarketAssistant Team"
-#define MyAppURL "https://github.com/yourusername/MarketAssistant"
+#define MyAppURL "https://github.com/X2Agent/MarketAssistant"
 #define MyAppExeName "MarketAssistant.exe"
 #define MyAppId "{{8A5B3C2D-9E1F-4A7B-8C6D-3E2F1A9B8C7D}"
 
@@ -25,7 +25,7 @@ LicenseFile=..\..\LICENSE
 InfoBeforeFile=..\..\README.md
 OutputDir=..\..\Release\Windows
 OutputBaseFilename=MarketAssistant-Setup-{#MyAppVersion}
-SetupIconFile=..\..\src\Assets\logo.ico
+SetupIconFile=..\..\src\MarketAssistant.App\Assets\logo.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

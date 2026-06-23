@@ -9,6 +9,8 @@ namespace MarketAssistant.Trading;
 /// </summary>
 public class RiskManager
 {
+    private static readonly string[] QuoteAssets = { "USDT", "USDC", "BUSD", "BTC", "ETH", "BNB" };
+
     private readonly TradingDataService _dataService;
     private readonly CryptoPortfolioService _portfolioService;
     private readonly ILogger<RiskManager> _logger;
@@ -148,8 +150,7 @@ public class RiskManager
     private static string ExtractBaseAsset(string instrumentSymbol)
     {
         // 常见报价资产后缀
-        var quoteAssets = new[] { "USDT", "USDC", "BUSD", "BTC", "ETH", "BNB" };
-        foreach (var quote in quoteAssets)
+        foreach (var quote in QuoteAssets)
         {
             if (instrumentSymbol.EndsWith(quote, StringComparison.OrdinalIgnoreCase))
                 return instrumentSymbol[..^quote.Length];

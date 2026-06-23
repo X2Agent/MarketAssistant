@@ -23,7 +23,7 @@ public class CryptoStrategyTools : IStrategyTools
     }
 
     [Description("获取所有活跃状态的交易策略列表")]
-    public async Task<List<TradingStrategy>> GetActiveStrategiesAsync()
+    public async Task<List<TradingStrategy>> GetActiveStrategiesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -38,7 +38,8 @@ public class CryptoStrategyTools : IStrategyTools
 
     [Description("根据策略ID获取策略详情")]
     public async Task<TradingStrategy?> GetStrategyAsync(
-        [Description("策略ID")] string strategyId)
+        [Description("策略ID")] string strategyId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -54,7 +55,8 @@ public class CryptoStrategyTools : IStrategyTools
     [Description("更新策略状态（如暂停、完成、失败）")]
     public async Task UpdateStrategyStatusAsync(
         [Description("策略ID")] string strategyId,
-        [Description("新状态")] StrategyStatus status)
+        [Description("新状态")] StrategyStatus status,
+        CancellationToken cancellationToken = default)
     {
         try
         {

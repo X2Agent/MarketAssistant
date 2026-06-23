@@ -2,6 +2,7 @@ using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Services.Data;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Text.Json.Nodes;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
@@ -26,7 +27,7 @@ public class CryptoKLineService : IKLineService
     /// <summary>
     /// 获取K线数据
     /// </summary>
-    public async Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 100)
+    public async Task<List<KLineData>> GetKLineDataAsync(string code, KLineType kLineType, int count = 250)
     {
         var interval = kLineType switch
         {
@@ -69,12 +70,12 @@ public class CryptoKLineService : IKLineService
             result.Add(new KLineData
             {
                 Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(arr[0]!.GetValue<long>()).DateTime,
-                Open = decimal.Parse(arr[1]!.GetValue<string>()),
-                High = decimal.Parse(arr[2]!.GetValue<string>()),
-                Low = decimal.Parse(arr[3]!.GetValue<string>()),
-                Close = decimal.Parse(arr[4]!.GetValue<string>()),
-                Volume = decimal.Parse(arr[5]!.GetValue<string>()),
-                Amount = decimal.Parse(arr[7]!.GetValue<string>())
+                Open = decimal.Parse(arr[1]!.GetValue<string>(), CultureInfo.InvariantCulture),
+                High = decimal.Parse(arr[2]!.GetValue<string>(), CultureInfo.InvariantCulture),
+                Low = decimal.Parse(arr[3]!.GetValue<string>(), CultureInfo.InvariantCulture),
+                Close = decimal.Parse(arr[4]!.GetValue<string>(), CultureInfo.InvariantCulture),
+                Volume = decimal.Parse(arr[5]!.GetValue<string>(), CultureInfo.InvariantCulture),
+                Amount = decimal.Parse(arr[7]!.GetValue<string>(), CultureInfo.InvariantCulture)
             });
         }
 

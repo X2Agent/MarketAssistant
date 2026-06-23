@@ -23,6 +23,13 @@ public sealed class ConversationCompressionMiddleware
     /// </summary>
     public const string CompressionSummaryKey = "middleware:compressionSummary";
 
+    private const int DefaultMaxTokens = 8000;
+    private const int DefaultReserveRecentCount = 4;
+    private const int SummaryTextTruncationThreshold = 500;
+    private const int SummaryMaxOutputTokens = 500;
+    private const float SummaryTemperature = 0.1f;
+    private const int FallbackSummaryTruncationThreshold = 100;
+
     private readonly ILogger _logger;
     private readonly Func<IChatClient> _chatClientFactory;
 
@@ -34,12 +41,12 @@ public sealed class ConversationCompressionMiddleware
     /// <summary>
     /// 触发压缩的 Token 阈值
     /// </summary>
-    public int MaxTokens { get; set; } = 8000;
+    public int MaxTokens { get; set; } = DefaultMaxTokens;
 
     /// <summary>
     /// 压缩时保留最近消息数
     /// </summary>
-    public int ReserveRecentCount { get; set; } = 4;
+    public int ReserveRecentCount { get; set; } = DefaultReserveRecentCount;
 
     public ConversationCompressionMiddleware(Func<IChatClient> chatClientFactory, ILogger<ConversationCompressionMiddleware> logger)
     {
@@ -169,15 +176,15 @@ public sealed class ConversationCompressionMiddleware
                 var text = msg.Text;
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
-                if (text.Length > 500)
-                    text = text[..500] + "...";
+                if (text.Length > SummaryTextTruncationThreshold)
+                    text = text[..SummaryTextTruncationThreshold] + "...";
 
                 sb.AppendLine($"【{role}】{text}");
             }
 
             var response = await _chatClientFactory().GetResponseAsync(
                 [new ChatMessage(ChatRole.User, sb.ToString())],
-                new ChatOptions { Temperature = 0.1f, MaxOutputTokens = 500 },
+                new ChatOptions { Temperature = SummaryTemperature, MaxOutputTokens = SummaryMaxOutputTokens },
                 cancellationToken);
 
             return response.Text ?? "对话历史摘要不可用";
@@ -203,7 +210,7 @@ public sealed class ConversationCompressionMiddleware
         {
             var text = msg.Text;
             if (string.IsNullOrWhiteSpace(text)) continue;
-            var truncated = text.Length > 100 ? text[..100] + "..." : text;
+            var truncated = text.Length > FallbackSummaryTruncationThreshold ? text[..FallbackSummaryTruncationThreshold] + "..." : text;
             sb.AppendLine($"- {truncated}");
         }
         return sb.ToString();

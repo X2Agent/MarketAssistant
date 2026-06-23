@@ -3,7 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:components="using:MarketAssistant.Views.Components"
              mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="800"

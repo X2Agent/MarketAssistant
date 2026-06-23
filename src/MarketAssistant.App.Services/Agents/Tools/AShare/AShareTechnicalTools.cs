@@ -1,7 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -19,13 +18,6 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareTechnicalTools> _logger;
 
-    // 支持 API 返回的字符串数值自动转换为 decimal/decimal?
-    private static readonly JsonSerializerOptions TechnicalJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new StringToDecimalConverter() }
-    };
-
     public AShareTechnicalTools(
         IHttpClientFactory httpClientFactory,
         IUserSettingService userSettingService,
@@ -36,7 +28,7 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
         _logger = logger;
     }
 
-    private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol)
+    private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -45,8 +37,8 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
             var url = $"/hs/history/{indicator}/{formattedSymbol}/d/n?token={token}&lt=30";
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url);
-            var items = JsonSerializer.Deserialize<List<T>>(response, TechnicalJsonOptions);
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            var items = JsonSerializer.Deserialize<List<T>>(response, JsonOptions.AShareApiOptions);
 
             if (items == null || !items.Any())
                 throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
@@ -61,26 +53,27 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
     }
 
     [Description("获取近30日最新日线KDJ")]
-    public Task<TechnicalKDJ> GetKDJAsync([Description("股票代码")] string assetSymbol)
-        => GetIndicatorAsync<TechnicalKDJ>("kdj", assetSymbol);
+    public Task<TechnicalKDJ> GetKDJAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync<TechnicalKDJ>("kdj", assetSymbol, cancellationToken);
 
     [Description("获取近30日最新日线MACD")]
-    public Task<TechnicalMACD> GetMACDAsync([Description("股票代码")] string assetSymbol)
-        => GetIndicatorAsync<TechnicalMACD>("macd", assetSymbol);
+    public Task<TechnicalMACD> GetMACDAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync<TechnicalMACD>("macd", assetSymbol, cancellationToken);
 
     [Description("获取近30日最新日线BOLL")]
-    public Task<TechnicalBoll> GetBOLLAsync([Description("股票代码")] string assetSymbol)
-        => GetIndicatorAsync<TechnicalBoll>("boll", assetSymbol);
+    public Task<TechnicalBoll> GetBOLLAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync<TechnicalBoll>("boll", assetSymbol, cancellationToken);
 
     [Description("获取近30日最新日线MA")]
-    public Task<TechnicalMA> GetMAAsync([Description("股票代码")] string assetSymbol)
-        => GetIndicatorAsync<TechnicalMA>("ma", assetSymbol);
+    public Task<TechnicalMA> GetMAAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetIndicatorAsync<TechnicalMA>("ma", assetSymbol, cancellationToken);
 
     [Description("获取K线历史序列（OHLCV），interval支持5m/15m/daily/weekly，用于判断趋势方向")]
     public async Task<List<OhlcvBar>> GetKLinesAsync(
         [Description("股票代码")] string assetSymbol,
         [Description("K线周期：5m/15m/daily/weekly")] string interval = "daily",
-        [Description("返回根数，最大100")] int count = 30)
+        [Description("返回根数，最大250")] int count = 30,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -94,10 +87,10 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
                 _ => "d"
             };
 
-            var clampedCount = Math.Clamp(count, 1, 100);
+            var clampedCount = Math.Clamp(count, 1, 250);
             var daysBack = zhiTuInterval switch
             {
-                "5" or "15" => 30,
+                "5" or "15" => 60,
                 "w" => clampedCount * 7 + 14,
                 _ => (int)(clampedCount * 1.6) + 10
             };
@@ -107,8 +100,8 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
             var url = $"/hs/history/{formattedSymbol}/{zhiTuInterval}/n?token={token}&st={startDate}&et={endDate}";
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url);
-            var items = JsonSerializer.Deserialize<List<ZhiTuKLineBar>>(response, TechnicalJsonOptions);
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            var items = JsonSerializer.Deserialize<List<ZhiTuKLineBar>>(response, JsonOptions.AShareApiOptions);
 
             if (items == null || items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");

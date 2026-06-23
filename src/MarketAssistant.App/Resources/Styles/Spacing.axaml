@@ -121,9 +121,9 @@
     <x:Double x:Key="MaxInputHeight">120</x:Double>
     
     <!-- ========== 特殊容器尺寸 ========== -->
-    <x:Double x:Key="SidebarDefaultWidth">420</x:Double>
-    <x:Double x:Key="SidebarMinWidth">300</x:Double>
-    <x:Double x:Key="SidebarMaxWidth">700</x:Double>
+    <x:Double x:Key="SidebarDefaultWidth">480</x:Double>
+    <x:Double x:Key="SidebarMinWidth">360</x:Double>
+    <x:Double x:Key="SidebarMaxWidth">720</x:Double>
     <x:Double x:Key="NotificationWidth">320</x:Double>
     <x:Double x:Key="NotificationHeight">72</x:Double>
     <x:Double x:Key="DialogWidth">400</x:Double>

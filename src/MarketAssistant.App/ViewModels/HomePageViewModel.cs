@@ -68,11 +68,11 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         var assetCode = asset.MarketType == Infrastructure.Core.MarketType.Crypto
             ? asset.Code.ToLower()
             : $"{asset.Market}{asset.Code}".ToLower();
-        
+
         // 解析价格信息
         decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
         decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;
-        
+
         // 传递完整的基本信息，避免详情页等待
         var parameter = new AssetNavigationParameter(
             assetCode,
@@ -80,10 +80,10 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
             currentPrice,
             changePercent
         );
-        
+
         WeakReferenceMessenger.Default.Send(new NavigationMessage("Asset", parameter));
         Logger?.LogInformation($"导航到资产详情页: {assetCode}");
-        
+
         // 异步添加到最近查看
         var assetItem = new AssetItem { Name = asset.Name, Code = assetCode };
         _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
@@ -105,7 +105,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         // 立即发送导航消息，不阻塞UI
         WeakReferenceMessenger.Default.Send(
             new NavigationMessage("Asset", new AssetNavigationParameter(
-                assetItem.Code, 
+                assetItem.Code,
                 assetItem.Name,
                 currentPrice,
                 changePercent)));
@@ -114,40 +114,6 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
 
         // 异步添加到最近查看，不阻塞导航
         _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
-    }
-
-    /// <summary>
-    /// 启动定时器
-    /// </summary>
-    public void StartTimer()
-    {
-        News.StartUpdates();
-        Logger?.LogInformation("新闻更新服务已启动");
-    }
-
-    /// <summary>
-    /// 暂停定时器
-    /// </summary>
-    public void StopTimer()
-    {
-        News.StopUpdates();
-        Logger?.LogInformation("新闻更新服务已暂停");
-    }
-
-    /// <summary>
-    /// 刷新热门资产
-    /// </summary>
-    public async Task RefreshHotAssetsAsync()
-    {
-        await HotAssets.LoadHotAssetsAsync();
-    }
-
-    /// <summary>
-    /// 刷新最近查看资产
-    /// </summary>
-    public void RefreshRecentAssets()
-    {
-        RecentAssets.LoadRecentAssets();
     }
 
     /// <summary>
@@ -161,6 +127,8 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         RecentAssets.RecentAssetSelected -= OnRecentAssetSelected;
 
         // 释放子ViewModel资源
+        HotAssets.Dispose();
+        RecentAssets.Dispose();
         News.Dispose();
 
         GC.SuppressFinalize(this);

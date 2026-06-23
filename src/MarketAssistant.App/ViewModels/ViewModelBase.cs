@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -7,6 +9,11 @@ public abstract class ViewModelBase : ObservableObject
 {
     private bool _isBusy;
     protected readonly ILogger? Logger;
+
+    /// <summary>
+    /// 当前市场上下文（由 SubscribeToMarketChanges 设置）
+    /// </summary>
+    protected MarketContext? MarketContext { get; private set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the view model is busy performing an operation.
@@ -64,5 +71,38 @@ public abstract class ViewModelBase : ObservableObject
             operationName,
             Logger
         );
+    }
+
+    /// <summary>
+    /// 市场切换时的回调方法，派生类可重写以响应市场变化
+    /// </summary>
+    protected virtual void OnMarketChanged(MarketType newMarket)
+    {
+        // 默认空实现，派生类可按需重写
+    }
+
+    /// <summary>
+    /// 订阅市场上下文的 PropertyChanged 事件，在 CurrentMarket 变化时调用 OnMarketChanged
+    /// </summary>
+    protected void SubscribeToMarketChanges(MarketContext marketContext)
+    {
+        MarketContext = marketContext;
+        marketContext.PropertyChanged += OnMarketContextPropertyChanged;
+    }
+
+    /// <summary>
+    /// 取消订阅市场上下文的 PropertyChanged 事件
+    /// </summary>
+    protected void UnsubscribeFromMarketChanges(MarketContext marketContext)
+    {
+        marketContext.PropertyChanged -= OnMarketContextPropertyChanged;
+    }
+
+    private void OnMarketContextPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MarketContext.CurrentMarket) && MarketContext != null)
+        {
+            OnMarketChanged(MarketContext.CurrentMarket);
+        }
     }
 }

@@ -35,13 +35,13 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     }
 
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
-    public async Task<AccountBalanceSummary> GetAccountBalanceAsync()
+    public async Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)
     {
         return await _portfolioService.GetAccountBalanceSummaryAsync();
     }
 
     [Description("查询当前持仓列表，显示每个币种的数量、入场均价、当前价和未实现盈亏")]
-    public async Task<List<PositionInfo>> GetCurrentPositionsAsync()
+    public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken cancellationToken = default)
     {
         return await _portfolioService.GetCurrentPositionsAsync();
     }
@@ -52,7 +52,8 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         [Description("买卖方向")] OrderSide side,
         [Description("订单类型")] OrderType type,
         [Description("交易数量")] decimal quantity,
-        [Description("限价单价格，市价单可不填")] decimal? price = null)
+        [Description("限价单价格，市价单可不填")] decimal? price = null,
+        CancellationToken cancellationToken = default)
     {
         var effectivePrice = price ?? 0;
         if (type == OrderType.Market && effectivePrice == 0)
@@ -82,7 +83,8 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     [Description("查询指定订单的状态")]
     public async Task<OrderStatusInfo> GetOrderStatusAsync(
         [Description("交易对")] string symbol,
-        [Description("Binance订单ID")] long orderId)
+        [Description("Binance订单ID")] long orderId,
+        CancellationToken cancellationToken = default)
     {
         var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString());
         return new OrderStatusInfo
@@ -98,7 +100,8 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     [Description("取消指定订单")]
     public async Task<bool> CancelOrderAsync(
         [Description("交易对")] string symbol,
-        [Description("Binance订单ID")] long orderId)
+        [Description("Binance订单ID")] long orderId,
+        CancellationToken cancellationToken = default)
     {
         try
         {

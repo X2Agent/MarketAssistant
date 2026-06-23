@@ -10,6 +10,15 @@ namespace MarketAssistant.Views.Components;
 
 public partial class AdaptiveCardView : UserControl
 {
+    private const int SmallFontSize = 12;
+    private const int DefaultFontSize = 14;
+    private const int MediumFontSize = 16;
+    private const int LargeFontSize = 20;
+    private const int ExtraLargeFontSize = 24;
+    private const int ContainerSpacing = 8;
+    private const int ContainerPadding = 12;
+    private const int ContainerCornerRadius = 6;
+
     public static readonly StyledProperty<AdaptiveCard?> CardProperty =
         AvaloniaProperty.Register<AdaptiveCardView, AdaptiveCard?>(nameof(Card));
 
@@ -72,12 +81,12 @@ public partial class AdaptiveCardView : UserControl
         // Size
         tb.FontSize = textBlock.Size switch
         {
-            AdaptiveTextSize.Small => 12,
-            AdaptiveTextSize.Default => 14,
-            AdaptiveTextSize.Medium => 16,
-            AdaptiveTextSize.Large => 20,
-            AdaptiveTextSize.ExtraLarge => 24,
-            _ => 14
+            AdaptiveTextSize.Small => SmallFontSize,
+            AdaptiveTextSize.Default => DefaultFontSize,
+            AdaptiveTextSize.Medium => MediumFontSize,
+            AdaptiveTextSize.Large => LargeFontSize,
+            AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
+            _ => DefaultFontSize
         };
 
         // Weight
@@ -117,7 +126,7 @@ public partial class AdaptiveCardView : UserControl
     {
         var stackPanel = new StackPanel
         {
-            Spacing = 8
+            Spacing = ContainerSpacing
         };
 
         foreach (var item in container.Items)
@@ -132,8 +141,8 @@ public partial class AdaptiveCardView : UserControl
         var border = new Border
         {
             Child = stackPanel,
-            Padding = new Thickness(12),
-            CornerRadius = new CornerRadius(6)
+            Padding = new Thickness(ContainerPadding),
+            CornerRadius = new CornerRadius(ContainerCornerRadius)
         };
 
         // Style based on container style —— 两种容器风格一致，仅靠颜色区分语义
@@ -146,7 +155,7 @@ public partial class AdaptiveCardView : UserControl
             border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerBackgroundBrush");
             border[!Border.BorderBrushProperty] = new DynamicResourceExtension("ErrorDarkTextBrush");
             border.BorderThickness = new Thickness(3, 0, 0, 0);
-            border.CornerRadius = new CornerRadius(6, 0, 0, 6);
+            border.CornerRadius = new CornerRadius(ContainerCornerRadius, 0, 0, ContainerCornerRadius);
         }
 
         return border;

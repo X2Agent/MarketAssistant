@@ -45,9 +45,10 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
                 return true;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore deserialization errors
+            // 反序列化失败时记录警告，便于排查 JSON 格式问题
+            System.Diagnostics.Debug.WriteLine($"AdaptiveCard 反序列化失败: {ex.Message}");
         }
         return false;
     }

@@ -31,7 +31,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 数据源：币安API - /api/v3/klines
     /// 用于技术分析、回测和趋势判断
     /// </remarks>
-    Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null);
+    Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取订单簿深度数据
@@ -42,7 +42,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 数据源：币安API - /api/v3/depth
     /// 用于分析流动性、支撑压力位、买卖价差
     /// </remarks>
-    Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100);
+    Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取最近成交数据
@@ -53,7 +53,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 数据源：币安API - /api/v3/trades
     /// 用于分析买卖力量对比、成交活跃度
     /// </remarks>
-    Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500);
+    Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500, CancellationToken cancellationToken = default);
 
     // ==================== 综合市场指标（CoinGecko） ====================
 
@@ -66,7 +66,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 提供市值、供应量、排名、历史高低点、流通率等数值型市场指标
     /// 注意：项目描述等基本面信息请使用 ICryptoBasicTools.GetProjectInfoAsync
     /// </remarks>
-    Task<CryptoMarketMetrics> GetMarketMetricsAsync(string symbol);
+    Task<CryptoMarketMetrics> GetMarketMetricsAsync(string symbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取交易量分布（不同交易所的交易量占比）
@@ -76,7 +76,7 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 数据源：CoinGecko - /api/v3/coins/{id}/tickers
     /// 用于分析流动性分布、交易所选择
     /// </remarks>
-    Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol);
+    Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol, CancellationToken cancellationToken = default);
 
     // ==================== 衍生计算指标 ====================
 
@@ -89,5 +89,5 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 基于历史K线数据计算
     /// 用于风险评估、仓位管理、策略制定
     /// </remarks>
-    Task<CryptoVolatilityMetrics> GetVolatilityMetricsAsync(string symbol, int days = 30);
+    Task<CryptoVolatilityMetrics> GetVolatilityMetricsAsync(string symbol, int days = 30, CancellationToken cancellationToken = default);
 }

@@ -96,10 +96,10 @@ Architecture: $ARCH
 Installed-Size: $INSTALLED_SIZE
 Maintainer: MarketAssistant Team <support@marketassistant.com>
 Homepage: https://github.com/yourusername/MarketAssistant
-Description: AI-powered market analysis assistant
- Market Assistant is a cross-platform desktop application that provides
- AI-powered market analysis and insights. It features real-time data
- analysis, technical indicators, and intelligent recommendations.
+Description: AI 智能市场分析助手
+ 市场分析助手是一款跨平台的桌面应用程序，提供
+ AI 智能市场分析与洞察。它具有实时数据分析、
+ 技术指标和智能推荐功能。
 Depends: libicu70 | libicu72, libssl3 | libssl1.1
 EOF
 

@@ -1,4 +1,5 @@
 using AdaptiveCards;
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using System;
@@ -54,6 +55,6 @@ public class AdaptiveCardConverter : IValueConverter
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        return BindingOperations.DoNothing;
     }
 }

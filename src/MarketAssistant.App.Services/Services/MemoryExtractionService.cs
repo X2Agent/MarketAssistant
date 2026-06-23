@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -124,23 +125,15 @@ public class MemoryExtractionService
         return ParseExtractedMemories(text2);
     }
 
-    private static ExtractedMemories? ParseExtractedMemories(string responseText)
+    private ExtractedMemories? ParseExtractedMemories(string responseText)
     {
         try
         {
-            var jsonStart = responseText.IndexOf('{');
-            var jsonEnd = responseText.LastIndexOf('}');
-            if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart)
-                return null;
-
-            var json = responseText[jsonStart..(jsonEnd + 1)];
-            return JsonSerializer.Deserialize<ExtractedMemories>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            return LlmJsonExtractor.Deserialize<ExtractedMemories>(responseText);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "解析 LLM 记忆提取响应失败");
             return null;
         }
     }

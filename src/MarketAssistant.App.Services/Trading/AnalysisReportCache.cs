@@ -1,22 +1,97 @@
 using System.Collections.Concurrent;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Applications.Cache;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Market;
 
 namespace MarketAssistant.Trading;
 
 /// <summary>
 /// 分析报告内存缓存：线程安全地存储最近一次市场分析结果，
 /// 供交易模块在 AI 信号策略决策时读取，打通分析-交易链路。
+/// 缓存键包含市场类型前缀，避免 A 股与虚拟币同代码（理论上）相互覆盖。
 /// </summary>
 public sealed class AnalysisReportCache
 {
+    private const int MaxEntries = 50;
+    private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
+
     private readonly ConcurrentDictionary<string, CachedReport> _reports =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public void Set(string symbol, MarketAnalysisReport report) =>
-        _reports[symbol] = new CachedReport(report, DateTime.UtcNow);
+    private readonly MarketContext _marketContext;
 
-    public CachedReport? Get(string symbol) =>
-        _reports.TryGetValue(symbol, out var cached) ? cached : null;
+    public AnalysisReportCache(MarketContext marketContext)
+    {
+        _marketContext = marketContext;
+    }
+
+    public void Set(string symbol, MarketAnalysisReport report)
+    {
+        // 惰性清理：写入前移除已过期条目，并在超限时淘汰最旧的条目
+        EvictExpired();
+        EnsureCapacity();
+
+        _reports[BuildKey(symbol)] = new CachedReport(report, DateTime.UtcNow);
+    }
+
+    public CachedReport? Get(string symbol)
+    {
+        var key = BuildKey(symbol);
+        if (!_reports.TryGetValue(key, out var cached))
+            return null;
+
+        if (DateTime.UtcNow - cached.CachedAt > Ttl)
+        {
+            _reports.TryRemove(key, out _);
+            return null;
+        }
+
+        return cached;
+    }
+
+    /// <summary>
+    /// 构建包含市场类型的缓存键，避免跨市场冲突。
+    /// 键格式由 <see cref="CacheKeys.GetTradingAnalysisReportKey"/> 统一管理。
+    /// </summary>
+    private string BuildKey(string symbol)
+        => CacheKeys.GetTradingAnalysisReportKey(_marketContext.CurrentMarket, symbol);
+
+    /// <summary>
+    /// 移除所有已过期条目
+    /// </summary>
+    private void EvictExpired()
+    {
+        var threshold = DateTime.UtcNow - Ttl;
+        foreach (var kv in _reports)
+        {
+            if (kv.Value.CachedAt < threshold)
+            {
+                _reports.TryRemove(kv.Key, out _);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 容量超限时淘汰最旧的条目
+    /// </summary>
+    private void EnsureCapacity()
+    {
+        if (_reports.Count < MaxEntries) return;
+
+        // 按 CachedAt 升序，淘汰最旧的若干条目，留出少量余量避免频繁触发
+        var overflow = _reports.Count - MaxEntries + 1;
+        var oldest = _reports
+            .OrderBy(kv => kv.Value.CachedAt)
+            .Take(overflow)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var key in oldest)
+        {
+            _reports.TryRemove(key, out _);
+        }
+    }
 
     public sealed record CachedReport(MarketAnalysisReport Report, DateTime CachedAt);
 }

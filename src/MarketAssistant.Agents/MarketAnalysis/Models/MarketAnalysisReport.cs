@@ -1,5 +1,4 @@
 using Microsoft.Extensions.AI;
-using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Models;
 
@@ -14,17 +13,6 @@ public sealed class MarketAnalysisReport
     /// 分析标的代码
     /// </summary>
     public string AssetSymbol
-    {
-        get => _assetSymbol;
-        init => _assetSymbol = value;
-    }
-
-    /// <summary>
-    /// 兼容旧字段名，内部统一使用 AssetSymbol。
-    /// </summary>
-    [Obsolete("Use AssetSymbol instead.")]
-    [JsonPropertyName("stockSymbol")]
-    public string StockSymbol
     {
         get => _assetSymbol;
         init => _assetSymbol = value;

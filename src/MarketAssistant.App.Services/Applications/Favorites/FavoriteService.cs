@@ -1,38 +1,43 @@
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Applications.Favorites;
 
 /// <summary>
-/// 收藏服务基类，封装本地存储与最新行情查询的共同行为。
+/// 收藏服务：封装本地存储与最新行情查询的共同行为。
+/// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public abstract class FavoriteServiceBase : IFavoriteService
+public sealed class FavoriteService : IFavoriteService
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger _logger;
+    private readonly IAssetInfoService _assetInfoService;
+    private readonly ILogger<FavoriteService> _logger;
+    private readonly MarketType _marketType;
+    private readonly string _preferenceKey;
+    private readonly string _marketLabel;
 
-    protected FavoriteServiceBase(IServiceProvider serviceProvider, ILogger logger)
+    public FavoriteService(
+        [ServiceKey] MarketType marketType,
+        IServiceProvider serviceProvider,
+        ILogger<FavoriteService> logger)
     {
-        _serviceProvider = serviceProvider;
+        _marketType = marketType;
+        _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
         _logger = logger;
-    }
-
-    protected abstract string PreferenceKey { get; }
-
-    protected IAssetInfoService AssetInfoService
-    {
-        get
+        _preferenceKey = PreferenceKeys.GetFavoriteAssetsKey(marketType);
+        _marketLabel = marketType switch
         {
-            var marketContext = _serviceProvider.GetRequiredService<MarketContext>();
-            return _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketContext.CurrentMarket);
-        }
+            MarketType.AShare => "A股",
+            MarketType.Crypto => "虚拟币",
+            _ => marketType.ToString()
+        };
     }
 
     public void AddFavorite(string code, string market)
@@ -58,7 +63,7 @@ public abstract class FavoriteServiceBase : IFavoriteService
         favoriteList.Add(normalizedFavorite);
         SaveFavorites(favoriteList);
         WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        LogFavoriteAdded(normalizedFavorite);
+        _logger.LogInformation("已添加{Market}到收藏: {Code}", _marketLabel, normalizedFavorite.Code);
     }
 
     public void RemoveFavorite(string code, string market)
@@ -80,7 +85,7 @@ public abstract class FavoriteServiceBase : IFavoriteService
         favoriteList.Remove(itemToRemove);
         SaveFavorites(favoriteList);
         WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        LogFavoriteRemoved(normalizedFavorite);
+        _logger.LogInformation("已从收藏中移除{Market}: {Code}", _marketLabel, normalizedFavorite.Code);
     }
 
     public bool IsFavorite(string code, string market)
@@ -99,7 +104,7 @@ public abstract class FavoriteServiceBase : IFavoriteService
     {
         try
         {
-            var json = Preferences.Default.Get(PreferenceKey, string.Empty);
+            var json = Preferences.Default.Get(_preferenceKey, string.Empty);
             if (string.IsNullOrWhiteSpace(json))
             {
                 return [];
@@ -110,7 +115,7 @@ public abstract class FavoriteServiceBase : IFavoriteService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "获取收藏资产时出错: {Message}", ex.Message);
+            _logger.LogError(ex, "获取收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
             return [];
         }
     }
@@ -127,11 +132,11 @@ public abstract class FavoriteServiceBase : IFavoriteService
         {
             try
             {
-                return await AssetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market, cancellationToken);
+                return await _assetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market, cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "获取资产 {Code} 最新数据时出错: {Message}", favorite.Code, ex.Message);
+                _logger.LogError(ex, "获取{Market} {Code} 最新数据时出错: {Message}", _marketLabel, favorite.Code, ex.Message);
                 return CreateFallbackAssetInfo(favorite);
             }
         });
@@ -144,10 +149,10 @@ public abstract class FavoriteServiceBase : IFavoriteService
     {
         SaveFavorites([]);
         WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        _logger.LogInformation("已清空所有收藏资产");
+        _logger.LogInformation("已清空所有收藏{Market}", _marketLabel);
     }
 
-    protected virtual FavoriteAsset NormalizeFavorite(FavoriteAsset favorite)
+    private static FavoriteAsset NormalizeFavorite(FavoriteAsset favorite)
     {
         return new FavoriteAsset
         {
@@ -156,16 +161,26 @@ public abstract class FavoriteServiceBase : IFavoriteService
         };
     }
 
-    protected abstract AssetInfo CreateFallbackAssetInfo(FavoriteAsset favorite);
-
-    protected virtual void LogFavoriteAdded(FavoriteAsset favorite)
+    /// <summary>
+    /// 行情获取失败时的兜底 AssetInfo：A股使用 Market.Code 形式，虚拟币使用基础币种名称。
+    /// </summary>
+    private AssetInfo CreateFallbackAssetInfo(FavoriteAsset favorite)
     {
-        _logger.LogInformation("已添加资产到收藏: {Code}", favorite.Code);
-    }
+        var displayName = _marketType switch
+        {
+            MarketType.Crypto => ExtractBaseCurrency(favorite.Code),
+            _ => string.IsNullOrWhiteSpace(favorite.Market)
+                ? favorite.Code
+                : $"{favorite.Market}.{favorite.Code}"
+        };
 
-    protected virtual void LogFavoriteRemoved(FavoriteAsset favorite)
-    {
-        _logger.LogInformation("已从收藏中移除资产: {Code}", favorite.Code);
+        return new AssetInfo
+        {
+            Code = favorite.Code,
+            Market = favorite.Market,
+            Name = displayName,
+            MarketType = _marketType
+        };
     }
 
     private void SaveFavorites(List<FavoriteAsset> favoriteList)
@@ -173,11 +188,11 @@ public abstract class FavoriteServiceBase : IFavoriteService
         try
         {
             var json = JsonSerializer.Serialize(favoriteList);
-            Preferences.Default.Set(PreferenceKey, json);
+            Preferences.Default.Set(_preferenceKey, json);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存收藏资产时出错: {Message}", ex.Message);
+            _logger.LogError(ex, "保存收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
         }
     }
 }

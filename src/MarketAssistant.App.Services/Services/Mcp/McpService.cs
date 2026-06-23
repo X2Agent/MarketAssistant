@@ -11,8 +11,8 @@ namespace MarketAssistant.Services.Mcp;
 /// </summary>
 public class McpService : IAsyncDisposable
 {
-    private readonly ILogger<McpService>? _logger;
-    private readonly McpToolAuditLogger? _auditLogger;
+    private readonly ILogger<McpService> _logger;
+    private readonly McpToolAuditLogger _auditLogger;
     private readonly MCPServerConfigService _configService;
     private readonly List<McpClient> _mcpClients = new();
     private readonly object _clientsLock = new();
@@ -30,13 +30,13 @@ public class McpService : IAsyncDisposable
     /// 创建 MCP 服务
     /// </summary>
     public McpService(
-        ILogger<McpService>? logger = null,
-        McpToolAuditLogger? auditLogger = null,
-        MCPServerConfigService? configService = null)
+        ILogger<McpService> logger,
+        McpToolAuditLogger auditLogger,
+        MCPServerConfigService configService)
     {
-        _logger = logger;
-        _auditLogger = auditLogger;
-        _configService = configService ?? new MCPServerConfigService();
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
     }
 
     /// <summary>
@@ -75,22 +75,22 @@ public class McpService : IAsyncDisposable
                     if (config.AllowedTools.Count > 0 &&
                         !config.AllowedTools.Contains(toolName, StringComparer.OrdinalIgnoreCase))
                     {
-                        _auditLogger?.LogToolFiltered(config.Name, toolName,
+                        _auditLogger.LogToolFiltered(config.Name, toolName,
                             "不在允许列表中");
                         continue;
                     }
 
-                    _auditLogger?.LogToolLoaded(config.Name, toolName, config.Category);
+                    _auditLogger.LogToolLoaded(config.Name, toolName, config.Category);
                     tools.Add(tool);
                 }
 
-                _logger?.LogInformation(
+                _logger.LogInformation(
                     "成功连接到 MCP 服务器 {Name} (分类: {Category})，加载 {Count}/{Total} 个工具",
                     config.Name, config.Category, tools.Count, mcpTools.Count);
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
+                _logger.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
             }
         }
 
@@ -188,11 +188,11 @@ public class McpService : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "重置 MCP 连接时释放客户端出错");
+                _logger.LogWarning(ex, "重置 MCP 连接时释放客户端出错");
             }
         }
 
-        _logger?.LogInformation("已重置 {Count} 个 MCP 连接", clientsToDispose.Count);
+        _logger.LogInformation("已重置 {Count} 个 MCP 连接", clientsToDispose.Count);
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ public class McpService : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "释放 MCP 客户端时发生错误");
+                _logger.LogWarning(ex, "释放 MCP 客户端时发生错误");
             }
         }
 

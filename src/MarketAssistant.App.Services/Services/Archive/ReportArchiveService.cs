@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Agents.MarketAnalysis.Models;
-using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
@@ -10,35 +10,23 @@ namespace MarketAssistant.Services.Archive;
 /// <summary>
 /// 分析报告存档服务，使用 SQLite 持久化历史报告
 /// </summary>
-public class ReportArchiveService : IDisposable
+public class ReportArchiveService : SqliteServiceBase
 {
-    private readonly string _connectionString;
-    private readonly ILogger<ReportArchiveService> _logger;
-    private readonly Task _initializeTask;
-
     public ReportArchiveService(ILogger<ReportArchiveService> logger)
+        : base("reports.db", logger)
     {
-        _logger = logger;
-
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
-
-        var dbPath = Path.Combine(appDataDir, "reports.db");
-        _connectionString = $"Data Source={dbPath}";
-
-        _initializeTask = InitializeDatabaseAsync();
     }
 
     /// <summary>
-    /// 保存分析报告
+    /// 保存分析报告。失败时抛出异常，调用方可据此决定是否回滚缓存等后续操作。
     /// </summary>
     public async Task SaveAsync(MarketAnalysisReport report, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(report);
+
         try
         {
-            await _initializeTask;
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
@@ -53,7 +41,8 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存分析报告失败: {Asset}", report.AssetSymbol);
+            // 抛出异常而非吞并，让调用方感知归档失败（避免幽灵报告）
+            throw new InvalidOperationException($"保存分析报告失败: {report.AssetSymbol}", ex);
         }
     }
 
@@ -68,7 +57,7 @@ public class ReportArchiveService : IDisposable
         var results = new List<ReportSummary>();
         try
         {
-            await _initializeTask;
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
@@ -100,7 +89,7 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "查询报告摘要失败: {Asset}", assetCode);
+            Logger.LogWarning(ex, "查询报告摘要失败: {Asset}", assetCode);
         }
         return results;
     }
@@ -112,7 +101,7 @@ public class ReportArchiveService : IDisposable
     {
         try
         {
-            await _initializeTask;
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT report_json FROM reports WHERE id = @id";
@@ -123,7 +112,7 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "加载报告失败: id={Id}", id);
+            Logger.LogWarning(ex, "加载报告失败: id={Id}", id);
             return null;
         }
     }
@@ -135,7 +124,7 @@ public class ReportArchiveService : IDisposable
     {
         try
         {
-            await _initializeTask;
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "DELETE FROM reports WHERE id = @id";
@@ -144,18 +133,11 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "删除报告失败: id={Id}", id);
+            Logger.LogWarning(ex, "删除报告失败: id={Id}", id);
         }
     }
 
-    private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
-    {
-        var conn = new SqliteConnection(_connectionString);
-        await conn.OpenAsync(cancellationToken);
-        return conn;
-    }
-
-    private async Task InitializeDatabaseAsync()
+    protected override async Task InitializeDatabaseAsync()
     {
         try
         {
@@ -176,7 +158,10 @@ public class ReportArchiveService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "初始化报告数据库失败");
+            // 记录异常并重新抛出：让 _initializeTask 处于 Faulted 状态，
+            // 后续 await _initializeTask 会抛出异常，调用方能感知数据库不可用
+            Logger.LogError(ex, "初始化报告数据库失败");
+            throw;
         }
     }
 
@@ -194,8 +179,9 @@ public class ReportArchiveService : IDisposable
             summary.SentimentScore = scores.Sentiment;
             summary.NewsScore = scores.News;
         }
-        catch
+        catch (JsonException)
         {
+            // 反序列化失败时维度分数保持默认值 0，不影响摘要展示
         }
     }
 
@@ -222,10 +208,6 @@ public class ReportArchiveService : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        GC.SuppressFinalize(this);
-    }
 }
 
 /// <summary>

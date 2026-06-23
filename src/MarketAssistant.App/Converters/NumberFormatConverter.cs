@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace MarketAssistant.Converts;
+namespace MarketAssistant.Converters;
 
 public class NumberFormatConverter : IValueConverter
 {

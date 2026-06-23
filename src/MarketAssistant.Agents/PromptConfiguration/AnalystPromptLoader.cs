@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -16,11 +17,12 @@ public class AnalystPromptLoader
 
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
         .WithNamingConvention(PascalCaseNamingConvention.Instance)
+        .WithCaseInsensitivePropertyMatching()
         .IgnoreUnmatchedProperties()
         .Build();
 
     private readonly ILogger<AnalystPromptLoader> _logger;
-    private readonly Dictionary<string, CacheEntry> _cache = new();
+    private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
 
     public AnalystPromptLoader(ILogger<AnalystPromptLoader> logger)
     {

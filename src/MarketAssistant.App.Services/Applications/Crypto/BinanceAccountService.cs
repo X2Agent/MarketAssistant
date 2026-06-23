@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MarketAssistant.Infrastructure;
@@ -28,7 +29,7 @@ public class BinanceAccountService
     /// 获取账户信息（需要USER_DATA权限）
     /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/account-endpoints#account-information-user_data
     /// </summary>
-    public async Task<BinanceAccountInfo> GetAccountInfoAsync()
+    public async Task<BinanceAccountInfo> GetAccountInfoAsync(CancellationToken cancellationToken = default)
     {
         try
         {
@@ -45,10 +46,10 @@ public class BinanceAccountService
             // 4. 发送请求
             _logger.LogInformation("正在获取币安账户信息...");
             using var httpClient = _httpClientFactory.CreateClient("Binance");
-            var response = await httpClient.SendAsync(request);
+            var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var accountInfo = await response.Content.ReadFromJsonAsync<BinanceAccountInfo>();
+            var accountInfo = await response.Content.ReadFromJsonAsync<BinanceAccountInfo>(cancellationToken);
 
             if (accountInfo == null)
             {
@@ -84,17 +85,20 @@ public class BinanceAccountService
         string side,
         string type,
         decimal quantity,
-        decimal? price = null)
+        decimal? price = null,
+        CancellationToken cancellationToken = default)
     {
         try
         {
             // 1. 构建请求参数
+            // 注意：数量/价格必须使用 InvariantCulture 格式化，否则在逗号小数区域（如 de-DE）
+            // 会生成 "1,23456789"，币安 API 返回 -1100 非法字符错误。
             var parameters = new Dictionary<string, string>
             {
                 ["symbol"] = symbol.ToUpper(),
                 ["side"] = side.ToUpper(),
                 ["type"] = type.ToUpper(),
-                ["quantity"] = quantity.ToString("F8")
+                ["quantity"] = quantity.ToString("F8", CultureInfo.InvariantCulture)
             };
 
             // 限价单需要价格和timeInForce
@@ -104,7 +108,7 @@ public class BinanceAccountService
                 {
                     throw new ArgumentException("限价单必须指定价格");
                 }
-                parameters["price"] = price.Value.ToString("F8");
+                parameters["price"] = price.Value.ToString("F8", CultureInfo.InvariantCulture);
                 parameters["timeInForce"] = "GTC"; // Good Till Cancel
             }
 
@@ -124,11 +128,11 @@ public class BinanceAccountService
                 symbol, side, type, quantity);
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
-            var response = await httpClient.SendAsync(request);
+            var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             // 6. 解析响应
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>();
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken);
 
             if (orderResponse == null)
             {
@@ -155,7 +159,7 @@ public class BinanceAccountService
     /// <summary>
     /// 查询订单状态（需要USER_DATA权限）
     /// </summary>
-    public async Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId)
+    public async Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -167,10 +171,10 @@ public class BinanceAccountService
             _authService.AddAuthHeaders(request);
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
-            var response = await httpClient.SendAsync(request);
+            var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>()
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
                 ?? throw new FriendlyException("解析订单信息失败");
 
             return orderResponse;
@@ -190,7 +194,7 @@ public class BinanceAccountService
     /// <summary>
     /// 取消订单（需要TRADE权限）
     /// </summary>
-    public async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId)
+    public async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -204,10 +208,10 @@ public class BinanceAccountService
             _logger.LogInformation("正在取消订单: {Symbol} OrderId:{OrderId}", symbol, orderId);
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
-            var response = await httpClient.SendAsync(request);
+            var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>()
+            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
                 ?? throw new FriendlyException("解析取消订单响应失败");
 
             _logger.LogInformation("取消订单成功，订单ID: {OrderId}", orderId);
@@ -228,7 +232,7 @@ public class BinanceAccountService
     /// <summary>
     /// 查询当前挂单（需要USER_DATA权限）
     /// </summary>
-    public async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null)
+    public async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -240,10 +244,10 @@ public class BinanceAccountService
             _authService.AddAuthHeaders(request);
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
-            var response = await httpClient.SendAsync(request);
+            var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            return await response.Content.ReadFromJsonAsync<List<BinanceOrderResponse>>() ?? [];
+            return await response.Content.ReadFromJsonAsync<List<BinanceOrderResponse>>(cancellationToken) ?? [];
         }
         catch (HttpRequestException ex)
         {

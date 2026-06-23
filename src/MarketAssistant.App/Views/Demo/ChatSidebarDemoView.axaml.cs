@@ -9,9 +9,4 @@ public partial class ChatSidebarDemoView : UserControl
     {
         InitializeComponent();
     }
-
-    private void InitializeComponent()
-    {
-        Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
-    }
 }

@@ -41,6 +41,10 @@ public class MarketMonitor : IDisposable
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _strategyLocks = new();
 
+    // 适配 BinanceWebSocketService.PriceUpdated 事件签名（Action<string, decimal, decimal>）
+    // 到不含 changePercent 的 OnPriceUpdated 处理方法，需存储委托实例以支持 -= 取消订阅
+    private readonly Action<string, decimal, decimal> _priceUpdatedAdapter;
+
     public bool IsRunning => _isRunning;
 
     /// <summary>
@@ -71,6 +75,7 @@ public class MarketMonitor : IDisposable
         _portfolioService = portfolioService;
         _reportCache = reportCache;
         _logger = logger;
+        _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
     }
 
     /// <summary>
@@ -96,7 +101,7 @@ public class MarketMonitor : IDisposable
             if (instrumentSymbols.Count > 0)
                 await _webSocketService.SubscribeAsync(instrumentSymbols);
 
-            _webSocketService.PriceUpdated += OnPriceUpdated;
+            _webSocketService.PriceUpdated += _priceUpdatedAdapter;
             _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
             _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
@@ -119,7 +124,7 @@ public class MarketMonitor : IDisposable
             if (!_isRunning)
                 return;
 
-            _webSocketService.PriceUpdated -= OnPriceUpdated;
+            _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
             _cts?.Cancel();
 
             if (_consumerTask != null)
@@ -162,7 +167,7 @@ public class MarketMonitor : IDisposable
         _logger.LogInformation("已刷新监控列表: {Count} 个交易标的", newSymbols.Count);
     }
 
-    private void OnPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    private void OnPriceUpdated(string symbol, decimal lastPrice)
     {
         _priceChannel.Writer.TryWrite((symbol, lastPrice));
     }
@@ -178,7 +183,7 @@ public class MarketMonitor : IDisposable
             {
                 try
                 {
-                    var triggered = await _strategyEngine.EvaluateStrategiesAsync(symbol, price, ct);
+                    var triggered = await _strategyEngine.EvaluateAndUpdateStrategiesAsync(symbol, price, ct);
                     foreach (var strategy in triggered)
                         _ = ExecuteWithStrategyLockAsync(strategy, price, ct);
                 }
@@ -295,80 +300,9 @@ public class MarketMonitor : IDisposable
         {
             TradingContext.CurrentStrategyId = strategy.Id;
 
-            var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, _cts?.Token ?? default)
-                .ConfigureAwait(false);
-            var recentSummary = priorRecords.Count == 0
-                ? "（该策略尚无成交记录）"
-                : string.Join("\n", priorRecords.Take(5).Select(r =>
-                    $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
-
-            var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol);
-            var analysisContext = BuildAnalysisContext(strategy.Symbol);
-
-            var agent = _agentFactory.CreateAgent();
-            var stopLossInfo = strategy.StopLossPrice.HasValue
-                ? $"止损价: {strategy.StopLossPrice.Value}"
-                : "未设置止损";
-            var takeProfitInfo = strategy.TakeProfitPrice.HasValue
-                ? $"止盈价: {strategy.TakeProfitPrice.Value}"
-                : "未设置止盈";
-            var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
-            var todayStats = await _dataService.GetTodayStatsAsync(_cts?.Token ?? default);
-            var maxDailyTrades = _dataService.LoadRiskConfig().MaxDailyTrades;
-            var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
-            var prompt = $"""
-                分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
-
-                ## 风险预算（必须严格遵守）
-                - 本次交易后该 symbol 总仓位不得超过账户总值的 {maxPositionPercent:F1}%
-                - 今日已实现盈亏: {todayStats.TotalPnl:F2} USDT
-                - 今日剩余交易次数: {remainingTrades}
-
-                ## 策略配置
-                {strategy.CustomParams ?? "无"}
-                风险边界: {stopLossInfo} | {takeProfitInfo}
-
-                ## 当前仓位状态
-                {positionSummary}
-
-                ## 最新市场分析报告
-                {analysisContext}
-
-                近期该策略成交摘要（最多 5 笔，按时间倒序）:
-                {recentSummary}
-
-                ## 决策要求
-                请输出结构化决策：
-                1. 决策: BUY / SELL / HOLD
-                2. 置信度: 0-100
-                3. 入场逻辑
-                4. 退出计划（止损/止盈具体价位）
-                5. 主要风险因素
-
-                如果置信度低于 60，建议 HOLD。
-                如果决定交易，请调用 PlaceOrder 工具执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
-                如果决定不交易，请说明理由。
-                """;
-
-            var messages = new List<ChatMessage>
-            {
-                new(ChatRole.User, prompt)
-            };
-
-            var response = await agent.RunAsync(messages, session: null, options: null,
-                cancellationToken: _cts?.Token ?? default);
-            _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
-
-            // 只在 Agent 实际执行了交易后才更新触发计数
-            var recentRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
-            var hasNewTrade = recentRecords.Any(r =>
-                r.CreatedAt > (strategy.LastTriggeredAt ?? DateTime.MinValue));
-
-            if (hasNewTrade)
-            {
-                await _dataService.UpdateStrategyTriggeredAsync(strategy.Id);
-                await CheckStrategyCompletionAsync(strategy);
-            }
+            var prompt = await BuildAIPromptAsync(strategy, currentPrice);
+            await InvokeAgentAsync(prompt);
+            await ProcessAgentResponseAsync(strategy);
         }
         catch (Exception ex)
         {
@@ -378,6 +312,108 @@ public class MarketMonitor : IDisposable
         {
             TradingContext.CurrentStrategyId = null;
         }
+    }
+
+    /// <summary>
+    /// 构建 AI 决策 prompt：聚合历史成交、仓位、分析报告与风险预算
+    /// </summary>
+    private async Task<string> BuildAIPromptAsync(TradingStrategy strategy, decimal currentPrice)
+    {
+        var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, _cts?.Token ?? default)
+            .ConfigureAwait(false);
+        var recentSummary = priorRecords.Count == 0
+            ? "（该策略尚无成交记录）"
+            : string.Join("\n", priorRecords.Take(5).Select(r =>
+                $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
+
+        var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol);
+        var analysisContext = BuildAnalysisContext(strategy.Symbol);
+
+        var stopLossInfo = strategy.StopLossPrice.HasValue
+            ? $"止损价: {strategy.StopLossPrice.Value}"
+            : "未设置止损";
+        var takeProfitInfo = strategy.TakeProfitPrice.HasValue
+            ? $"止盈价: {strategy.TakeProfitPrice.Value}"
+            : "未设置止盈";
+        var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
+        var todayStats = await _dataService.GetTodayStatsAsync(_cts?.Token ?? default);
+        var maxDailyTrades = _dataService.LoadRiskConfig().MaxDailyTrades;
+        var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
+
+        return $"""
+            分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
+
+            ## 风险预算（必须严格遵守）
+            - 本次交易后该 symbol 总仓位不得超过账户总值的 {maxPositionPercent:F1}%
+            - 今日已实现盈亏: {todayStats.TotalPnl:F2} USDT
+            - 今日剩余交易次数: {remainingTrades}
+
+            ## 策略配置
+            {strategy.CustomParams ?? "无"}
+            风险边界: {stopLossInfo} | {takeProfitInfo}
+
+            ## 当前仓位状态
+            {positionSummary}
+
+            ## 最新市场分析报告
+            {analysisContext}
+
+            近期该策略成交摘要（最多 5 笔，按时间倒序）:
+            {recentSummary}
+
+            ## 决策要求
+            请输出结构化决策：
+            1. 决策: BUY / SELL / HOLD
+            2. 置信度: 0-100
+            3. 入场逻辑
+            4. 退出计划（止损/止盈具体价位）
+            5. 主要风险因素
+
+            如果置信度低于 60，建议 HOLD。
+            如果决定交易，请调用 PlaceOrder 工具执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
+            如果决定不交易，请说明理由。
+            """;
+    }
+
+    /// <summary>
+    /// 调用 TradingAgent 执行决策
+    /// </summary>
+    private async Task InvokeAgentAsync(string prompt)
+    {
+        var agent = _agentFactory.CreateAgent();
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, prompt)
+        };
+
+        var response = await agent.RunAsync(messages, session: null, options: null,
+            cancellationToken: _cts?.Token ?? default);
+        _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
+    }
+
+    /// <summary>
+    /// 处理 Agent 响应结果：检测是否产生新成交，若产生则更新触发计数
+    /// </summary>
+    private async Task ProcessAgentResponseAsync(TradingStrategy strategy)
+    {
+        // 只在 Agent 实际执行了交易后才更新触发计数
+        var recentRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
+        var hasNewTrade = recentRecords.Any(r =>
+            r.CreatedAt > (strategy.LastTriggeredAt ?? DateTime.MinValue));
+
+        if (hasNewTrade)
+        {
+            await UpdateTriggerCountAsync(strategy);
+        }
+    }
+
+    /// <summary>
+    /// 更新策略触发计数并检查是否达到最大执行次数
+    /// </summary>
+    private async Task UpdateTriggerCountAsync(TradingStrategy strategy)
+    {
+        await _dataService.UpdateStrategyTriggeredAsync(strategy.Id);
+        await CheckStrategyCompletionAsync(strategy);
     }
 
     private async Task<string> BuildPositionSummaryAsync(string symbol)
@@ -462,7 +498,7 @@ public class MarketMonitor : IDisposable
 
         TradeExecuted = null;
         StatusChanged = null;
-        _webSocketService.PriceUpdated -= OnPriceUpdated;
+        _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
 
         GC.SuppressFinalize(this);
     }

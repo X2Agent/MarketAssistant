@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Memory;
 using System.Net;
 using System.Net.Http.Json;
+using MarketAssistant.Applications.Cache;
 
 namespace MarketAssistant.Applications.Settings;
 
@@ -13,10 +14,9 @@ public class GitHubReleaseService : IReleaseService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<GitHubReleaseService> _logger;
-    private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases";
-    private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.Company}/{AppInfo.AppName}/releases/latest";
+    private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
+    private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
 
-    private const string ReleasesCacheKey = "github.releases";
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(10);
     private RateLimitInfo? _rateLimitInfo;
 
@@ -57,10 +57,15 @@ public class GitHubReleaseService : IReleaseService
             if (includePrerelease)
             {
                 var allReleases = await GetAllReleasesInternalAsync();
-                latestRelease = allReleases
-                    .Where(r => !r.Draft)
-                    .OrderByDescending(r => r.PublishedAt)
-                    .FirstOrDefault();
+                var nonDraftReleases = allReleases.Where(r => !r.Draft).ToList();
+                if (nonDraftReleases.Count == 0)
+                {
+                    throw new FriendlyException("未找到可用的发布版本");
+                }
+
+                latestRelease = nonDraftReleases
+                    .Aggregate((best, next) =>
+                        CompareVersions(next.TagName.TrimStart('v'), best.TagName.TrimStart('v')) > 0 ? next : best);
             }
             else
             {
@@ -128,8 +133,8 @@ public class GitHubReleaseService : IReleaseService
 
             _logger.LogInformation("开始下载更新文件：{Url} -> {SavePath}", downloadUrl, savePath);
 
-            using var httpClient = CreateGitHubClient();
-            httpClient.Timeout = TimeSpan.FromMinutes(10);
+            // 下载二进制文件使用专用 HttpClient，避免携带 GitHub API 的 Accept 头
+            var httpClient = CreateDownloadClient();
 
             var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
@@ -212,7 +217,7 @@ public class GitHubReleaseService : IReleaseService
     /// </summary>
     public void ClearCache()
     {
-        _memoryCache.Remove(ReleasesCacheKey);
+        _memoryCache.Remove(CacheKeys.GitHubReleases);
         _logger.LogInformation("已清除版本信息缓存");
     }
 
@@ -222,7 +227,7 @@ public class GitHubReleaseService : IReleaseService
     private async Task<List<ReleaseInfo>> GetAllReleasesInternalAsync()
     {
         // 检查缓存
-        if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedReleases) &&
+        if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedReleases) &&
             cachedReleases is not null)
         {
             _logger.LogDebug("从缓存返回所有版本信息");
@@ -231,7 +236,7 @@ public class GitHubReleaseService : IReleaseService
 
         try
         {
-            using var httpClient = CreateGitHubClient();
+            var httpClient = CreateGitHubClient();
 
             var response = await httpClient.GetAsync(_githubApiBaseUrl);
             UpdateRateLimitInfo(response);
@@ -240,7 +245,7 @@ public class GitHubReleaseService : IReleaseService
             {
                 _logger.LogWarning("GitHub API 速率限制已达上限");
                 // 如果有缓存数据，返回缓存
-                if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? fallbackReleases) &&
+                if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? fallbackReleases) &&
                     fallbackReleases is not null)
                 {
                     return fallbackReleases;
@@ -256,7 +261,7 @@ public class GitHubReleaseService : IReleaseService
                 throw new FriendlyException("获取版本信息失败：响应数据为空");
             }
 
-            _memoryCache.Set(ReleasesCacheKey, releases, CacheExpiration);
+            _memoryCache.Set(CacheKeys.GitHubReleases, releases, CacheExpiration);
             _logger.LogInformation("成功获取 {Count} 个版本信息", releases.Count);
             return releases;
         }
@@ -264,7 +269,7 @@ public class GitHubReleaseService : IReleaseService
         {
             _logger.LogError(ex, "获取版本信息失败：HTTP 请求异常");
             // 如果有缓存，返回缓存数据作为降级方案
-            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+            if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
                 cachedFallback is not null)
             {
                 _logger.LogInformation("返回缓存的版本信息作为降级方案");
@@ -275,7 +280,7 @@ public class GitHubReleaseService : IReleaseService
         catch (TaskCanceledException ex)
         {
             _logger.LogError(ex, "获取版本信息失败：请求超时");
-            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+            if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
                 cachedFallback is not null)
             {
                 return cachedFallback;
@@ -289,7 +294,7 @@ public class GitHubReleaseService : IReleaseService
         catch (Exception ex)
         {
             _logger.LogError(ex, "获取版本信息失败：未知异常");
-            if (_memoryCache.TryGetValue(ReleasesCacheKey, out List<ReleaseInfo>? cachedFallback) &&
+            if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedFallback) &&
                 cachedFallback is not null)
             {
                 return cachedFallback;
@@ -305,7 +310,7 @@ public class GitHubReleaseService : IReleaseService
     {
         try
         {
-            using var httpClient = CreateGitHubClient();
+            var httpClient = CreateGitHubClient();
 
             var response = await httpClient.GetAsync(_githubApiLatestUrl);
             UpdateRateLimitInfo(response);
@@ -402,6 +407,14 @@ public class GitHubReleaseService : IReleaseService
     private HttpClient CreateGitHubClient()
     {
         return _httpClientFactory.CreateClient("GitHub");
+    }
+
+    /// <summary>
+    /// 创建用于下载 Release 二进制文件的 HttpClient（不带 GitHub API 专用 Accept 头）
+    /// </summary>
+    private HttpClient CreateDownloadClient()
+    {
+        return _httpClientFactory.CreateClient("GitHubDownload");
     }
 
     /// <summary>

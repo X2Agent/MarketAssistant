@@ -23,8 +23,8 @@ public class AShareTelegramService : ITelegramService
     public async Task<List<Telegram>> GetTelegraphsAsync(CancellationToken cancellationToken = default)
     {
         var result = new List<Telegram>();
-        
-        var client = _httpClientFactory.CreateClient();
+
+        var client = _httpClientFactory.CreateClient("AShareTelegram");
         client.Timeout = TimeSpan.FromSeconds(10);
 
         // 获取最新20条快讯（不使用 ctime 参数，避免增量更新导致数据为空）

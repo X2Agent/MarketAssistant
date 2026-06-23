@@ -2,7 +2,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -12,13 +11,11 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 聊天侧边栏视图模型
 /// </summary>
-public partial class ChatSidebarViewModel : ViewModelBase
+public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 {
     private readonly MarketChatSession _chatSession;
-    private readonly ChatSessionPersistenceService? _sessionPersistence;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
-    public ObservableCollection<ChatSessionSummary> SessionHistory { get; } = [];
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
@@ -40,16 +37,12 @@ public partial class ChatSidebarViewModel : ViewModelBase
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        IMarketChatSessionFactory chatSessionFactory,
-        ChatSessionPersistenceService? sessionPersistence = null)
+        IMarketChatSessionFactory chatSessionFactory)
         : base(logger)
     {
-        _sessionPersistence = sessionPersistence;
         _chatSession = chatSessionFactory.Create();
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
-        if (_sessionPersistence is not null)
-            _ = LoadSessionHistoryAsync();
     }
 
     /// <summary>
@@ -141,6 +134,7 @@ public partial class ChatSidebarViewModel : ViewModelBase
         {
             IsProcessing = false;
             SendButtonText = "➤";
+            _currentCancellationTokenSource?.Dispose();
             _currentCancellationTokenSource = null;
         }
     }
@@ -196,25 +190,6 @@ public partial class ChatSidebarViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 添加单条分析消息到 UI 展示
-    /// </summary>
-    public void AddAnalysisMessage(ChatMessage message)
-    {
-        if (string.IsNullOrWhiteSpace(message.Text)) return;
-        ChatMessages.Add(new ChatMessageAdapter(message));
-    }
-
-    /// <summary>
-    /// 添加系统消息到 UI 展示
-    /// </summary>
-    public void AddSystemMessage(string content)
-    {
-        var systemMessage = new ChatMessageAdapter(
-            new ChatMessage(ChatRole.System, content) { AuthorName = "系统" });
-        ChatMessages.Add(systemMessage);
-    }
-
-    /// <summary>
     /// 初始化为空白状态（显示欢迎消息）
     /// </summary>
     public void InitializeEmpty()
@@ -224,71 +199,15 @@ public partial class ChatSidebarViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 清空聊天历史
+    /// 释放资源
     /// </summary>
-    public void ClearChatHistory()
+    public void Dispose()
     {
-        ChatMessages.Clear();
-        _chatSession.ClearHistory();
-        AddWelcomeMessage();
-    }
-
-    /// <summary>
-    /// 加载历史会话列表
-    /// </summary>
-    private async Task LoadSessionHistoryAsync()
-    {
-        if (_sessionPersistence is null) return;
-
-        try
-        {
-            var summaries = await _sessionPersistence.GetSessionSummariesAsync();
-            SessionHistory.Clear();
-            foreach (var s in summaries)
-                SessionHistory.Add(s);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "加载会话历史失败");
-        }
-    }
-
-    /// <summary>
-    /// 恢复历史会话
-    /// </summary>
-    [RelayCommand]
-    private async Task RestoreSessionAsync(ChatSessionSummary summary)
-    {
-        if (summary is null) return;
-
-        var restored = await _chatSession.RestoreSessionAsync(summary.Id);
-        if (!restored)
-        {
-            Logger?.LogWarning("恢复会话失败: {SessionId}", summary.Id);
-            return;
-        }
-
-        ChatMessages.Clear();
-        var history = await _chatSession.GetConversationHistoryAsync();
-        foreach (var msg in history)
-        {
-            ChatMessages.Add(new ChatMessageAdapter(msg));
-        }
-
-        StockCode = _chatSession.CurrentStockCode;
-    }
-
-    /// <summary>
-    /// 删除历史会话
-    /// </summary>
-    [RelayCommand]
-    private async Task DeleteSessionAsync(ChatSessionSummary summary)
-    {
-        if (summary is null) return;
-        if (_sessionPersistence is null) return;
-
-        await _sessionPersistence.DeleteSessionAsync(summary.Id);
-        SessionHistory.Remove(summary);
+        _chatSession.Dispose();
+        _currentCancellationTokenSource?.Cancel();
+        _currentCancellationTokenSource?.Dispose();
+        _currentCancellationTokenSource = null;
+        GC.SuppressFinalize(this);
     }
 }
 

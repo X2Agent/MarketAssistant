@@ -11,13 +11,13 @@ public class BalanceSheet
     /// 截止日期
     /// </summary>
     [JsonPropertyName("jzrq")]
-    public string EndDate { get; set; } = "";
+    public string EndDate { get; set; } = string.Empty;
 
     /// <summary>
     /// 披露日期
     /// </summary>
     [JsonPropertyName("plrq")]
-    public string DisclosureDate { get; set; } = "";
+    public string DisclosureDate { get; set; } = string.Empty;
 
     /// <summary>
     /// 货币资金
@@ -26,7 +26,7 @@ public class BalanceSheet
     public decimal? MonetaryFunds { get; set; }
 
     /// <summary>
-    /// 交易性金融资�?
+    /// 交易性金融资�?
     /// </summary>
     [JsonPropertyName("jyxjrzc")]
     public decimal? TradingFinancialAssets { get; set; }
@@ -50,7 +50,7 @@ public class BalanceSheet
     public decimal? AdvancePayments { get; set; }
 
     /// <summary>
-    /// 其他应收�?
+    /// 其他应收�?
     /// </summary>
     [JsonPropertyName("qtysk")]
     public decimal? OtherReceivables { get; set; }
@@ -110,7 +110,7 @@ public class BalanceSheet
     public decimal? DeferredTaxAssets { get; set; }
 
     /// <summary>
-    /// 非流动资产合�?
+    /// 非流动资产合�?
     /// </summary>
     [JsonPropertyName("fldzchj")]
     public decimal? TotalNonCurrentAssets { get; set; }
@@ -164,25 +164,25 @@ public class BalanceSheet
     public decimal? InterestPayable { get; set; }
 
     /// <summary>
-    /// 其他应付�?
+    /// 其他应付�?
     /// </summary>
     [JsonPropertyName("qtfzk")]
     public decimal? OtherPayables { get; set; }
 
     /// <summary>
-    /// 一年内到期的非流动负�?
+    /// 一年内到期的非流动负�?
     /// </summary>
     [JsonPropertyName("ynndqdfldfz")]
     public decimal? CurrentPortionOfNonCurrentLiabilities { get; set; }
 
     /// <summary>
-    /// 其他流动负�?
+    /// 其他流动负�?
     /// </summary>
     [JsonPropertyName("qtldfz")]
     public decimal? OtherCurrentLiabilities { get; set; }
 
     /// <summary>
-    /// 流动负债合�?
+    /// 流动负债合�?
     /// </summary>
     [JsonPropertyName("ldfzhj")]
     public decimal? TotalCurrentLiabilities { get; set; }
@@ -200,31 +200,31 @@ public class BalanceSheet
     public decimal? BondsPayable { get; set; }
 
     /// <summary>
-    /// 递延所得税负�?
+    /// 递延所得税负�?
     /// </summary>
     [JsonPropertyName("dysdsfz")]
     public decimal? DeferredTaxLiabilities { get; set; }
 
     /// <summary>
-    /// 其他非流动负�?
+    /// 其他非流动负�?
     /// </summary>
     [JsonPropertyName("qtfldfz")]
     public decimal? OtherNonCurrentLiabilities { get; set; }
 
     /// <summary>
-    /// 非流动负债合�?
+    /// 非流动负债合�?
     /// </summary>
     [JsonPropertyName("fldfzhj")]
     public decimal? TotalNonCurrentLiabilities { get; set; }
 
     /// <summary>
-    /// 负债合�?
+    /// 负债合�?
     /// </summary>
     [JsonPropertyName("fzhj")]
     public decimal? TotalLiabilities { get; set; }
 
     /// <summary>
-    /// 实收资本(或股�?
+    /// 实收资本(或股�?
     /// </summary>
     [JsonPropertyName("sszb")]
     public decimal? PaidInCapital { get; set; }
@@ -242,7 +242,7 @@ public class BalanceSheet
     public decimal? SurplusReserve { get; set; }
 
     /// <summary>
-    /// 未分配利�?
+    /// 未分配利�?
     /// </summary>
     [JsonPropertyName("wfplr")]
     public decimal? RetainedEarnings { get; set; }
@@ -260,7 +260,7 @@ public class BalanceSheet
     public decimal? MinorityInterest { get; set; }
 
     /// <summary>
-    /// 所有者权益合�?
+    /// 所有者权益合�?
     /// </summary>
     [JsonPropertyName("syzqyhj")]
     public decimal? TotalEquity { get; set; }

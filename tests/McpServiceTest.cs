@@ -24,7 +24,10 @@ public class McpServiceTest
             EnvironmentVariables = new Dictionary<string, string?>()
         };
 
-        var service = new McpService(NullLogger<McpService>.Instance);
+        var service = new McpService(
+            NullLogger<McpService>.Instance,
+            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
+            new MCPServerConfigService());
 
         var tools = await service.GetAIToolsAsync([config]);
 
@@ -60,7 +63,10 @@ public class McpServiceTest
             new MCPServerConfig { Name = "disabled", Command = "test", IsEnabled = false }
         ]);
 
-        var service = new McpService(NullLogger<McpService>.Instance, null, configService);
+        var service = new McpService(
+            NullLogger<McpService>.Instance,
+            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
+            configService);
 
         var configs = service.GetEnabledConfigs();
 
@@ -82,7 +88,10 @@ public class McpServiceTest
             EnvironmentVariables = new Dictionary<string, string?>()
         };
 
-        await using var service = new McpService(NullLogger<McpService>.Instance);
+        await using var service = new McpService(
+            NullLogger<McpService>.Instance,
+            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
+            new MCPServerConfigService());
 
         var tools = await service.GetAIToolsAsync([config]);
 
@@ -94,7 +103,10 @@ public class McpServiceTest
     [Timeout(120000)]
     public async Task GetAITools_EmptyConfigs_ReturnsEmpty()
     {
-        var service = new McpService(NullLogger<McpService>.Instance);
+        var service = new McpService(
+            NullLogger<McpService>.Instance,
+            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
+            new MCPServerConfigService());
 
         var tools = await service.GetAIToolsAsync([]);
 

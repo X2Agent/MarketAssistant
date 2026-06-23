@@ -1,6 +1,5 @@
 using MarketAssistant.Applications.Telegrams;
 using Microsoft.Extensions.Logging;
-using System.Timers;
 
 namespace MarketAssistant.Applications.News;
 
@@ -9,15 +8,18 @@ namespace MarketAssistant.Applications.News;
 /// </summary>
 public class NewsUpdateService : INewsUpdateService
 {
+    private const int UpdateIntervalSeconds = 60;
+
     private readonly ITelegramService _telegramService;
     private readonly ILogger<NewsUpdateService> _logger;
-    private System.Timers.Timer? _updateTimer;
+    private CancellationTokenSource? _cts;
+    private Task? _updateLoopTask;
     private bool _disposed;
 
     public event EventHandler<List<Telegram>>? NewsUpdated;
     public event EventHandler<string>? CountdownUpdated;
 
-    public bool IsRunning => _updateTimer?.Enabled ?? false;
+    public bool IsRunning => _updateLoopTask != null && !_updateLoopTask.IsCompleted;
 
     public NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpdateService> logger)
     {
@@ -33,19 +35,13 @@ public class NewsUpdateService : INewsUpdateService
         if (_disposed)
             throw new ObjectDisposedException(nameof(NewsUpdateService));
 
-        if (_updateTimer != null && _updateTimer.Enabled)
+        if (_updateLoopTask != null && !_updateLoopTask.IsCompleted)
             return;
 
-        // 设置统一的定时器，每秒触发一次
-        _updateTimer = new System.Timers.Timer(1000); // 1秒
-        _updateTimer.Elapsed += OnTimerElapsed;
-        _updateTimer.AutoReset = true;
-        _updateTimer.Start();
+        _cts = new CancellationTokenSource();
+        _updateLoopTask = UpdateLoopAsync(_cts.Token);
 
         _logger?.LogInformation("新闻更新定时器已启动");
-
-        // 立即更新一次新闻
-        _ = UpdateNewsItemsAsync();
     }
 
     /// <summary>
@@ -53,68 +49,60 @@ public class NewsUpdateService : INewsUpdateService
     /// </summary>
     public void StopUpdates()
     {
-        if (_updateTimer != null)
+        if (_cts != null)
         {
-            _updateTimer.Stop();
-            _updateTimer.Elapsed -= OnTimerElapsed;
-            _updateTimer.Dispose();
-            _updateTimer = null;
-            _logger?.LogInformation("新闻更新定时器已停止");
+            _cts.Cancel();
+            _cts.Dispose();
+            _cts = null;
         }
+        _updateLoopTask = null;
+        _logger?.LogInformation("新闻更新定时器已停止");
     }
 
-    private async void OnTimerElapsed(object? sender, ElapsedEventArgs e)
+    private async Task UpdateLoopAsync(CancellationToken ct)
     {
         try
         {
-            // 更新倒计时
-            UpdateCountdown();
-
-            // 每10秒更新一次新闻
-            if (DateTime.Now.Second % 10 == 0)
+            while (!ct.IsCancellationRequested)
             {
-                await UpdateNewsItemsAsync();
+                await UpdateNewsItemsAsync(ct);
+
+                for (var remaining = UpdateIntervalSeconds; remaining > 0; remaining--)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    CountdownUpdated?.Invoke(this, $"{remaining}秒后更新");
+                    await Task.Delay(1000, ct);
+                }
             }
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            _logger?.LogError(ex, "执行 '定时器更新' 时发生错误");
-        }
-    }
-
-    private void UpdateCountdown()
-    {
-        try
-        {
-            var seconds = DateTime.Now.Second % 10;
-            var nextUpdate = (seconds == 0) ? 10 : (10 - seconds);
-            var countdownText = $"{nextUpdate}秒后更新";
-
-            CountdownUpdated?.Invoke(this, countdownText);
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "更新倒计时出错");
-            CountdownUpdated?.Invoke(this, "更新中...");
+            _logger?.LogError(ex, "新闻更新循环异常退出");
         }
     }
 
-    private async Task UpdateNewsItemsAsync()
+    private async Task UpdateNewsItemsAsync(CancellationToken ct)
     {
         try
         {
-            // 通知正在更新
             CountdownUpdated?.Invoke(this, "正在更新...");
 
-            var news = await _telegramService.GetTelegraphsAsync(CancellationToken.None);
+            var news = await _telegramService.GetTelegraphsAsync(ct);
 
-            // 通知新闻已更新
             NewsUpdated?.Invoke(this, news);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "获取咨询时出错");
+            _logger?.LogError(ex, "获取快讯时出错");
             CountdownUpdated?.Invoke(this, "更新失败");
+            await Task.Delay(3000, ct);
         }
     }
 
@@ -127,4 +115,3 @@ public class NewsUpdateService : INewsUpdateService
         }
     }
 }
-

@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using MarketAssistant.ViewModels;
 
 namespace MarketAssistant.Views.Pages;
@@ -20,5 +21,16 @@ public partial class AgentAnalysisPageView : UserControl
                 vm.SetStorageProvider(topLevel?.StorageProvider);
             }
         };
+    }
+
+    /// <summary>
+    /// 点击遮罩层关闭侧边栏
+    /// </summary>
+    private void OnOverlayTapped(object? sender, TappedEventArgs e)
+    {
+        if (DataContext is AgentAnalysisViewModel vm)
+        {
+            vm.ToggleChatSidebarCommand.Execute(null);
+        }
     }
 }

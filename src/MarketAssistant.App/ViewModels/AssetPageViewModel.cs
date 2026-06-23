@@ -221,23 +221,23 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    public void OnNavigatedTo(AssetNavigationParameter parameter)
+    public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
     {
         if (!string.IsNullOrEmpty(parameter.Code))
         {
             // 1. 立即设置加载状态，确保骨架屏显示
             IsBusy = true;
             HasError = false;
-            
+
             // 2. 设置基本信息（立即显示）
             AssetName = !string.IsNullOrEmpty(parameter.Name) ? parameter.Name : parameter.Code;
             AssetCode = parameter.Code;
-            
+
             // 3. 如果导航参数中包含价格信息，立即显示
             if (parameter.CurrentPrice.HasValue)
             {
                 CurrentPrice = parameter.CurrentPrice.Value;
-                
+
                 if (parameter.ChangePercent.HasValue)
                 {
                     PriceChangePercent = parameter.ChangePercent.Value;
@@ -251,15 +251,21 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                 PriceChangePercent = 0;
                 PriceChange = 0;
             }
-            
-            // 4. 在后台线程加载完整数据（不阻塞导航）
-            _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
 
-            // 5. 虚拟币市场订阅 WebSocket 实时价格
-            if (_marketContext.CurrentMarket == MarketType.Crypto)
+            // 4. 在后台线程加载完整数据（不阻塞导航）
+            // GoBack 重新激活时不重复加载，避免重复订阅 WebSocket 和重复请求
+            if (!isReactivation)
             {
-                _wsService.PriceUpdated += OnDetailPriceUpdated;
-                _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+                _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
+
+                // 5. 虚拟币市场订阅 WebSocket 实时价格
+                if (_marketContext.CurrentMarket == MarketType.Crypto)
+                {
+                    // 订阅前先取消订阅，防止重复
+                    _wsService.PriceUpdated -= OnDetailPriceUpdated;
+                    _wsService.PriceUpdated += OnDetailPriceUpdated;
+                    _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+                }
             }
         }
     }

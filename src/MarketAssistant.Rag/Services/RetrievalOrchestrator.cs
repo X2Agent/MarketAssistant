@@ -11,8 +11,8 @@ namespace MarketAssistant.Rag.Services;
 /// RAG 检索编排器，专注于知识库检索的核心管理
 /// 包含经典的检索优化：
 /// 1) 查询重写——将原始查询生成多个候选，提高召回。
-/// 2) 向量检索——对每个候选在内部向量集合中检索。
-/// 3) 去重与重排：去重相似条目，重排获得优质结果。
+/// 2) 向量检索——对每个候选在内部向量集合中检索，保留向量相似度分数。
+/// 3) 去重与重排：去重相似条目，融合向量分数与启发式评分重排。
 /// </summary>
 public class RetrievalOrchestrator : IRetrievalOrchestrator
 {
@@ -61,11 +61,19 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         var queries = new List<string> { query };
         queries.AddRange(rewrites);
 
-        // 2) 向量检索——对每个查询在向量集合中检索，合并结果。
-        var merged = new List<TextSearchResult>();
+        var distinctQueries = queries.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        // VectorStoreTextSearch 无法自动推断向量字段的类型问题，推荐 SearchAsync 时指定 VectorProperty。
-        //var vectorTextSearch = new VectorStoreTextSearch<TextParagraph>(collection, _embeddingGenerator);
+        // 2) 批量生成查询向量，减少 HTTP 往返
+        GeneratedEmbeddings<Embedding<float>>? queryEmbeddings = null;
+        try
+        {
+            queryEmbeddings = await embeddingGenerator.GenerateAsync(distinctQueries, cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "批量生成查询向量失败");
+            return Array.Empty<TextSearchResult>();
+        }
 
         // 指定使用TextEmbedding字段进行向量搜索（避免向量字段推断问题）
         var vectorSearchOptions = new VectorSearchOptions<TextParagraph>
@@ -73,18 +81,19 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
             VectorProperty = r => r.TextEmbedding
         };
 
-        // 对于每个查询的检索量，确保获得足够候选项供后续去重和重排
-        // 多查询策略 + 向量搜索，能让查询获得更低的结果遗漏
-        var perQueryLimit = Math.Max(top / 2, 3); // 至少3个，处理top很小时的边界情况
+        // 确保重排候选池足够大：每个查询召回 top*3，至少 10 条
+        var perQueryLimit = Math.Max(top * 3, 10);
 
-        foreach (var q in queries.Distinct(StringComparer.OrdinalIgnoreCase))
+        // 3) 向量检索——对每个查询在向量集合中检索，合并结果并保留向量分数
+        var merged = new List<ScoredSearchResult>();
+
+        for (int qi = 0; qi < distinctQueries.Count; qi++)
         {
+            var q = distinctQueries[qi];
             try
             {
-                // 生成查询向量
-                var queryVector = await embeddingGenerator.GenerateAsync(q);
+                var queryVector = queryEmbeddings[qi];
 
-                // 使用SearchAsync方法，显式指定使用TextEmbedding向量字段
                 var searchResults = collection.SearchAsync(
                     queryVector.Vector,
                     perQueryLimit,
@@ -93,14 +102,14 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
 
                 await foreach (var searchResult in searchResults)
                 {
-                    // Microsoft.SemanticKernel.Data.TextSearchResult 构造函数接收 string value
-                    // Name 和 Link 是它的属性，不是构造函数参数
                     var textResult = new TextSearchResult(value: searchResult.Record.Text)
                     {
                         Name = searchResult.Record.ParagraphId,
                         Link = searchResult.Record.DocumentUri
                     };
-                    merged.Add(textResult);
+                    // 保留向量相似度分数，用于后续重排融合
+                    var score = (float)(searchResult.Score ?? 0f);
+                    merged.Add(new ScoredSearchResult(textResult, score));
                 }
             }
             catch (Exception ex)
@@ -109,19 +118,19 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
             }
         }
 
-        // 3) 如果检索为空的兜底提示。
+        // 4) 如果检索为空的兜底提示。
         if (merged.Count == 0)
         {
             return Array.Empty<TextSearchResult>();
         }
 
-        // 4) 标准去重：通过文本内容合并重复项
+        // 5) 标准去重：通过文本内容合并重复项，保留向量分数最高的
         var dedup = merged
-            .GroupBy(r => $"{r.Link}|{r.Name}|{r.Value}", StringComparer.Ordinal)
-            .Select(g => g.First())
+            .GroupBy(r => $"{r.Item.Link}|{r.Item.Name}|{r.Item.Value}", StringComparer.Ordinal)
+            .Select(g => g.OrderByDescending(x => x.VectorScore).First())
             .ToList();
 
-        // 5) 重排（支持RankGPT/启发式模型进一步优化重排）
+        // 6) 重排：融合向量相似度分数与启发式评分
         var reranked = _reranker.Rerank(query, dedup);
         return reranked.Take(top).ToList();
     }

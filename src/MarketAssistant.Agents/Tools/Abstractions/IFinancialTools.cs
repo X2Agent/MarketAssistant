@@ -1,19 +1,14 @@
-using Microsoft.Extensions.AI;
-
 namespace MarketAssistant.Agents.Tools.Abstractions;
 
 /// <summary>
-/// 财务分析工具的统一基接口
+/// 财务/市场数据工具的 DI 分发标记接口，用于 <c>[RequiresTools]</c> 声明和 Keyed DI 注册。
+/// 本身不定义业务方法，具体 API 由市场专用子接口提供。
 /// </summary>
 /// <remarks>
-/// 为不同市场的财务分析工具提供统一抽象：
-/// - A股市场：实现为 IShareFinancialTools（传统财务报表）
-/// - 虚拟币市场：实现为 ICryptoMetricsTools（链上财务指标）
+/// 市场专用实现：
+/// - A 股：<see cref="IShareFinancialTools"/>（财务报表、财务指标）
+/// - 虚拟币：<see cref="ICryptoMetricsTools"/>（市场深度、波动率、OHLCV 指标）
 /// </remarks>
-public interface IFinancialTools
+public interface IFinancialTools : IToolsProvider
 {
-    /// <summary>
-    /// 获取 AI 工具函数列表
-    /// </summary>
-    IEnumerable<AIFunction> GetFunctions();
 }

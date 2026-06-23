@@ -29,12 +29,12 @@ public class FundFlow
 
     /// <summary>
     /// 中单流入 (万元)
-    /// <summary>
+    /// </summary>
     public decimal MediumFundDiff { get; set; }
 
     /// <summary>
     /// 小单流入 (万元)
-    /// <summary>
+    /// </summary>
     public decimal LittleFundDiff { get; set; }
 
     /// <summary>

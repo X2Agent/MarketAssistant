@@ -1,8 +1,10 @@
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace TestMarketAssistant.Application;
 
@@ -18,14 +20,14 @@ public class AssetHistoryServiceTest
     [TestInitialize]
     public void Setup()
     {
-        Preferences.Default.Clear("RecentAssets_AShare");
-        Preferences.Default.Clear("RecentAssets_Crypto");
+        Preferences.Default.Clear(PreferenceKeys.GetRecentAssetsKey(MarketType.AShare));
+        Preferences.Default.Clear(PreferenceKeys.GetRecentAssetsKey(MarketType.Crypto));
 
         var services = new ServiceCollection();
         services.AddLogging();
 
-        services.AddKeyedSingleton<IAssetHistoryService, AShareHistoryService>(MarketType.AShare);
-        services.AddKeyedSingleton<IAssetHistoryService, CryptoHistoryService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IAssetHistoryService, AssetHistoryService>(MarketType.AShare);
+        services.AddKeyedSingleton<IAssetHistoryService, AssetHistoryService>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
     }

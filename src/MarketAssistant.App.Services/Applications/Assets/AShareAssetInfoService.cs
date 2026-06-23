@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 
@@ -40,7 +41,7 @@ public class AShareAssetInfoService : IAssetInfoService
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient();
+            using var httpClient = _httpClientFactory.CreateClient("Cls");
             httpClient.Timeout = TimeSpan.FromSeconds(10);
 
             using var content = new StringContent(
@@ -154,52 +155,58 @@ public class AShareAssetInfoService : IAssetInfoService
 
     public async Task<List<HotAsset>> GetHotAssetsAsync()
     {
+        // 新浪财经个股资金流排行 API：按净流入降序，返回 symbol/name/trade/changeratio/netamount 等
+        // 原 push2.eastmoney.com 端点在部分网络环境下 TLS 重协商被中断（"The response ended prematurely"），
+        // 新浪接口稳定且响应更快，直接作为唯一数据源。
+        // 注意：新浪接口返回 Content-Type: application/json; charset=gbk，
+        // .NET 默认不支持 GBK 编码，需注册 CodePagesEncodingProvider 并手动用 GBK 解码。
+        var url = "/quotes_service/api/json_v2.php/MoneyFlow.ssl_bkzj_ssggzj?page=1&num=8&sort=netamount&asc=0";
+
         try
         {
-            // 东方财富主力资金排行 API：GET 请求、无需认证、包含名称/价格/涨跌幅/资金流入
-            var url = "https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=8&po=1&np=1&fltt=2&invt=2&fid=f62" +
-                      "&fs=m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" +
-                      "&fields=f2,f3,f12,f13,f14,f62";
+            // 注册中文编码提供程序（幂等），使 GBK/GB2312 可用
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
 
-            using var httpClient = _httpClientFactory.CreateClient();
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
-
-            using var response = await httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            var json = await response.Content.ReadAsStringAsync();
+            using var httpClient = _httpClientFactory.CreateClient("SinaFinance");
+            using var stream = await httpClient.GetStreamAsync(url);
+            using var reader = new StreamReader(stream, System.Text.Encoding.GetEncoding("gbk"));
+            var json = await reader.ReadToEndAsync();
             using var jsonDocument = JsonDocument.Parse(json);
-            var root = jsonDocument.RootElement;
 
-            if (!root.TryGetProperty("data", out var data) ||
-                !data.TryGetProperty("diff", out var diff) ||
-                diff.ValueKind != JsonValueKind.Array)
+            if (jsonDocument.RootElement.ValueKind != JsonValueKind.Array)
             {
-                _logger.LogError("GetHotAssetsAsync: 东方财富API返回数据格式异常");
+                _logger.LogError("GetHotAssetsAsync: 新浪API返回数据格式异常");
                 return [];
             }
 
             var hotAssets = new List<HotAsset>();
 
-            foreach (var item in diff.EnumerateArray())
+            foreach (var item in jsonDocument.RootElement.EnumerateArray())
             {
-                var code = item.TryGetProperty("f12", out var codeEl) ? codeEl.GetString() ?? "" : "";
-                var marketId = item.TryGetProperty("f13", out var mktEl) ? mktEl.GetInt32() : 0;
-                var market = marketId == 1 ? "SH" : "SZ";
+                var symbol = item.TryGetProperty("symbol", out var symEl) ? symEl.GetString() ?? "" : "";
+                if (symbol.Length < 2)
+                    continue;
 
-                var changeRaw = item.TryGetProperty("f3", out var changeEl) ? changeEl.GetDouble() : 0;
-                var flowRaw = item.TryGetProperty("f62", out var flowEl) ? flowEl.GetDouble() : 0;
+                var market = symbol.StartsWith("sh", StringComparison.OrdinalIgnoreCase) ? "SH" :
+                             symbol.StartsWith("sz", StringComparison.OrdinalIgnoreCase) ? "SZ" :
+                             symbol.StartsWith("bj", StringComparison.OrdinalIgnoreCase) ? "BJ" : "";
+
+                var code = symbol[2..];
+                var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                var price = item.TryGetProperty("trade", out var tradeEl) ? tradeEl.GetString() ?? "" : "";
+                // 新浪接口的 changeratio 和 netamount 均为字符串类型，需手动解析
+                var changeRatio = ParseDouble(item, "changeratio");
+                var netAmount = ParseDouble(item, "netamount");
 
                 hotAssets.Add(new HotAsset
                 {
-                    Name = item.TryGetProperty("f14", out var nameEl) ? nameEl.GetString() ?? "" : "",
+                    Name = name,
                     Code = code,
                     Market = market,
-                    CurrentPrice = item.TryGetProperty("f2", out var priceEl) ? priceEl.GetDouble().ToString("F2") : "",
-                    ChangePercentage = $"{changeRaw:+0.00;-0.00;0.00}%",
+                    CurrentPrice = price,
+                    ChangePercentage = $"{changeRatio * 100:+0.00;-0.00;0.00}%",
                     MetricLabel = "净流入",
-                    MetricValue = flowRaw.ToString("F0"),
+                    MetricValue = netAmount.ToString("F0"),
                     MarketType = MarketType.AShare
                 });
             }
@@ -208,9 +215,26 @@ public class AShareAssetInfoService : IAssetInfoService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GetHotAssetsAsync未知异常: {Message}", ex.Message);
+            _logger.LogError(ex, "GetHotAssetsAsync: {Message}", ex.Message);
             throw new Infrastructure.Core.FriendlyException($"获取热门股票失败: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// 从 JSON 元素解析 double 值，兼容字符串和数字两种类型。
+    /// 新浪接口返回的数值字段多为字符串类型。
+    /// </summary>
+    private static double ParseDouble(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var element))
+            return 0;
+
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => double.TryParse(element.GetString(), out var v) ? v : 0,
+            JsonValueKind.Number => element.GetDouble(),
+            _ => 0
+        };
     }
 }
 

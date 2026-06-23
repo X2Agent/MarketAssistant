@@ -5,14 +5,14 @@ using System.Text.RegularExpressions;
 namespace MarketAssistant.Rag.Services;
 
 /// <summary>
-/// 优化的查询改写服务，融合算法和启发式规则，不依赖大模型。
-/// 针对金融投资场景深度优化，支持多维度智能扩展。
+/// 查询改写服务，融合同义词扩展和关键词重组，不依赖大模型。
+/// 针对金融投资场景优化，只保留高价值变体以减少无效 embedding 调用。
 /// </summary>
 public class QueryRewriteService : IQueryRewriteService
 {
     private readonly ILogger<QueryRewriteService> _logger;
 
-    // 合并的同义词词典（覆盖基础+热门词汇）
+    // 同义词词典（覆盖基础+热门词汇）
     private static readonly Dictionary<string, string[]> SynonymMap = new(StringComparer.OrdinalIgnoreCase)
     {
         // 基础金融词汇
@@ -43,31 +43,13 @@ public class QueryRewriteService : IQueryRewriteService
         ["GDP"] = ["经济增长", "国内生产总值"]
     };
 
-    // 投资分析维度
-    private static readonly string[] AnalysisDimensions =
-    {
-        "基本面", "技术面", "消息面", "估值", "风险", "催化剂", "政策面"
-    };
-
-    // 时间范围限定词
-    private static readonly string[] TimeFrames =
-    {
-        "最新", "近一个月", "近三个月", "近半年", "近一年", "历史"
-    };
-
-    // 信息类型限定词
-    private static readonly string[] InfoTypes =
-    {
-        "数据", "指标", "新闻", "公告", "研报", "财报", "分析"
-    };
-
-    // 停用词（简化版）
+    // 停用词
     private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "的", "了", "呢", "吗", "啊", "吧", "和", "与", "或", "但", "是", "在"
     };
 
-    // 预编译正则表达式（简化版本）
+    // 预编译正则表达式
     private static readonly Regex ChineseWordRegex = new(@"[\u4e00-\u9fa5]{2,}", RegexOptions.Compiled);
 
     public QueryRewriteService(ILogger<QueryRewriteService> logger)
@@ -90,7 +72,7 @@ public class QueryRewriteService : IQueryRewriteService
             var normalized = NormalizeQuery(query);
             var candidates = new List<string>();
 
-            // 1. 同义词替换（优先级最高）
+            // 1. 同义词替换（最高价值：扩展语义覆盖）
             foreach (var synonym in GenerateSynonymVariants(normalized))
             {
                 candidates.Add(synonym);
@@ -98,31 +80,7 @@ public class QueryRewriteService : IQueryRewriteService
                     return DistinctKeepOrder(candidates);
             }
 
-            // 2. 投资维度扩展
-            foreach (var dimension in GenerateAnalysisDimensionVariants(normalized))
-            {
-                candidates.Add(dimension);
-                if (candidates.Count >= maxCandidates)
-                    return DistinctKeepOrder(candidates);
-            }
-
-            // 3. 时间范围扩展
-            foreach (var timeframe in GenerateTimeFrameVariants(normalized))
-            {
-                candidates.Add(timeframe);
-                if (candidates.Count >= maxCandidates)
-                    return DistinctKeepOrder(candidates);
-            }
-
-            // 4. 信息类型扩展
-            foreach (var infoType in GenerateInfoTypeVariants(normalized))
-            {
-                candidates.Add(infoType);
-                if (candidates.Count >= maxCandidates)
-                    return DistinctKeepOrder(candidates);
-            }
-
-            // 5. 关键词提取和重组（适度简化）
+            // 2. 关键词重组（提取核心词重新组合）
             foreach (var keywordVariant in GenerateKeywordVariants(normalized))
             {
                 candidates.Add(keywordVariant);
@@ -130,7 +88,7 @@ public class QueryRewriteService : IQueryRewriteService
                     return DistinctKeepOrder(candidates);
             }
 
-            // 6. 停用词移除的简化版本
+            // 3. 停用词移除（精简查询）
             var compactQuery = RemoveStopWords(normalized);
             if (!string.Equals(compactQuery, normalized, StringComparison.Ordinal))
             {
@@ -155,9 +113,7 @@ public class QueryRewriteService : IQueryRewriteService
     private static string NormalizeQuery(string query)
     {
         var s = query.Trim();
-        // 清理常见的控制字符
         s = s.Replace("\r", "").Replace("\n", "").Replace("\t", " ");
-        // 压缩多个空格为单个空格
         s = Regex.Replace(s, @"\s+", " ");
         return s;
     }
@@ -180,40 +136,7 @@ public class QueryRewriteService : IQueryRewriteService
     }
 
     /// <summary>
-    /// 生成分析维度变体
-    /// </summary>
-    private static IEnumerable<string> GenerateAnalysisDimensionVariants(string query)
-    {
-        foreach (var dimension in AnalysisDimensions)
-        {
-            yield return $"{query} {dimension}";
-        }
-    }
-
-    /// <summary>
-    /// 生成时间范围变体
-    /// </summary>
-    private static IEnumerable<string> GenerateTimeFrameVariants(string query)
-    {
-        foreach (var timeFrame in TimeFrames)
-        {
-            yield return $"{query} {timeFrame}";
-        }
-    }
-
-    /// <summary>
-    /// 生成信息类型变体
-    /// </summary>
-    private static IEnumerable<string> GenerateInfoTypeVariants(string query)
-    {
-        foreach (var infoType in InfoTypes)
-        {
-            yield return $"{query} {infoType}";
-        }
-    }
-
-    /// <summary>
-    /// 生成关键词变体（简化版本）
+    /// 生成关键词变体（提取核心词重新组合）
     /// </summary>
     private static IEnumerable<string> GenerateKeywordVariants(string query)
     {
@@ -231,7 +154,7 @@ public class QueryRewriteService : IQueryRewriteService
     }
 
     /// <summary>
-    /// 提取关键词（简化版本）
+    /// 提取关键词
     /// </summary>
     private static List<string> ExtractKeywords(string query)
     {
@@ -260,7 +183,7 @@ public class QueryRewriteService : IQueryRewriteService
         // 按长度排序，长词优先
         return keywords.Distinct(StringComparer.OrdinalIgnoreCase)
                       .OrderByDescending(k => k.Length)
-                      .Take(5) // 最多5个关键词，避免过度复杂
+                      .Take(5)
                       .ToList();
     }
 

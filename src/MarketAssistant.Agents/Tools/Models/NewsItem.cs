@@ -8,17 +8,17 @@ namespace MarketAssistant.Agents.Tools.Models;
 public class NewsItem
 {
     [Description("新闻标题")]
-    public string Title { get; set; } = "";
+    public string Title { get; set; } = string.Empty;
 
     [Description("新闻来源站点或频道名称")]
-    public string Source { get; set; } = "";
+    public string Source { get; set; } = string.Empty;
 
     [Description("新闻详情页面链接")]
-    public string Link { get; set; } = "";
+    public string Link { get; set; } = string.Empty;
 
     [Description("新闻发布时间")]
-    public string PublishTime { get; set; } = "";
+    public string PublishTime { get; set; } = string.Empty;
 
     [Description("精简要点摘要（concise 模式可为空，detailed 模式提供）")]
-    public string Summary { get; set; } = "";
+    public string Summary { get; set; } = string.Empty;
 }

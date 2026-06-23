@@ -1,7 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -18,13 +17,6 @@ public sealed class AShareSentimentTools : IShareSentimentTools
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareSentimentTools> _logger;
 
-    // 支持 API 返回的字符串数值自动转换为 float
-    private static readonly JsonSerializerOptions SentimentJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new StringToDecimalConverter() }
-    };
-
     public AShareSentimentTools(
         IHttpClientFactory httpClientFactory,
         IUserSettingService userSettingService,
@@ -36,7 +28,7 @@ public sealed class AShareSentimentTools : IShareSentimentTools
     }
 
     [Description("根据股票代码获取资金流向数据")]
-    public async Task<FundFlow> GetFundFlowAsync([Description("股票代码")] string assetSymbol)
+    public async Task<FundFlow> GetFundFlowAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -45,8 +37,8 @@ public sealed class AShareSentimentTools : IShareSentimentTools
             var url = $"/hs/zjlx/{assetSymbol}?token={token}";
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url);
-            var fundFlow = JsonSerializer.Deserialize<FundFlow>(response, SentimentJsonOptions);
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            var fundFlow = JsonSerializer.Deserialize<FundFlow>(response, JsonOptions.AShareApiOptions);
 
             return fundFlow ?? throw new FriendlyException($"获取资金流向数据为空: {assetSymbol}");
         }

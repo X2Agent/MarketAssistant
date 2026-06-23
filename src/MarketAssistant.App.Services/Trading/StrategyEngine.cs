@@ -25,9 +25,12 @@ public class StrategyEngine
         => await _dataService.UpdateStrategyTrailingPeakAsync(strategyId, null, ct);
 
     /// <summary>
-    /// 评估指定交易标的的所有活跃策略，返回触发的策略列表
+    /// 评估指定交易标的的所有活跃策略，返回触发的策略列表。
+    /// 注意：此方法会修改返回列表中策略对象的 <see cref="TradingStrategy.Side"/> 和
+    /// <see cref="TradingStrategy.Quantity"/> 字段（用于反映触发时的有效方向和数量，
+    /// 如网格交易、DCA 等动态计算值），调用方依赖这些副作用将策略传递给交易执行器。
     /// </summary>
-    public async Task<List<TradingStrategy>> EvaluateStrategiesAsync(
+    public async Task<List<TradingStrategy>> EvaluateAndUpdateStrategiesAsync(
         string symbol, decimal currentPrice, CancellationToken ct = default)
     {
         var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
@@ -67,9 +70,9 @@ public class StrategyEngine
         {
             StrategyType.StopLoss => (EvaluateStopLoss(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TakeProfit => (EvaluateTakeProfit(strategy, currentPrice), strategy.Side, strategy.Quantity),
-            StrategyType.TrailingStop => (await EvaluateTrailingStopAsync(strategy, currentPrice, ct), strategy.Side, strategy.Quantity),
+            StrategyType.TrailingStop => (await EvaluateAndUpdateTrailingStopAsync(strategy, currentPrice, ct), strategy.Side, strategy.Quantity),
             StrategyType.AISignal => (EvaluateAISignal(strategy), strategy.Side, strategy.Quantity),
-            StrategyType.GridTrading => EvaluateGridTrading(strategy, currentPrice, out var gs, out var gq) ? (true, gs, gq) : (false, strategy.Side, strategy.Quantity),
+            StrategyType.GridTrading => EvaluateAndUpdateGridTrading(strategy, currentPrice, out var gs, out var gq) ? (true, gs, gq) : (false, strategy.Side, strategy.Quantity),
             StrategyType.DCA => await EvaluateDCAAsync(strategy, currentPrice, ct),
             _ => (false, strategy.Side, strategy.Quantity)
         };
@@ -94,7 +97,12 @@ public class StrategyEngine
         return currentPrice <= strategy.TriggerPrice;
     }
 
-    private async Task<bool> EvaluateTrailingStopAsync(TradingStrategy strategy, decimal currentPrice, CancellationToken ct)
+    /// <summary>
+    /// 评估追踪止损触发条件。
+    /// 注意：此方法会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.TrailingPeakPrice"/>
+    /// 字段以持久化追踪峰值/谷值状态，并同步写入数据存储，调用方依赖此副作用保持内存与持久化状态一致。
+    /// </summary>
+    private async Task<bool> EvaluateAndUpdateTrailingStopAsync(TradingStrategy strategy, decimal currentPrice, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(strategy.CustomParams))
             return false;
@@ -192,8 +200,10 @@ public class StrategyEngine
     /// 网格交易评估：价格穿越网格线时触发交易。
     /// 网格在 LowerPrice 和 UpperPrice 之间均匀分布。
     /// 价格下穿网格线时买入，上穿时卖出。
+    /// 注意：此方法会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.CustomParams"/>
+    /// 字段以更新网格的 LastTriggeredIndex 状态，调用方依赖此副作用在交易成功后原子持久化更新后的参数。
     /// </summary>
-    private bool EvaluateGridTrading(TradingStrategy strategy, decimal currentPrice,
+    private bool EvaluateAndUpdateGridTrading(TradingStrategy strategy, decimal currentPrice,
         out OrderSide effectiveSide, out decimal effectiveQty)
     {
         effectiveSide = strategy.Side;

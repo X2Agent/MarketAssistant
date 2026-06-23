@@ -10,7 +10,7 @@ public interface IShareSentimentTools : ISentimentTools
     /// <summary>
     /// 获取资金流向数据
     /// </summary>
-    Task<FundFlow> GetFundFlowAsync(string assetSymbol);
+    Task<FundFlow> GetFundFlowAsync(string assetSymbol, CancellationToken cancellationToken = default);
 }
 
 

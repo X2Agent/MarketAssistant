@@ -7,12 +7,12 @@ public class AssetNavigationParameter
 {
     public string Code { get; set; }
     public string Name { get; set; }
-    
+
     /// <summary>
     /// 当前价格（可选）- 用于立即显示基本信息
     /// </summary>
     public decimal? CurrentPrice { get; set; }
-    
+
     /// <summary>
     /// 涨跌幅（可选）- 用于立即显示基本信息
     /// </summary>

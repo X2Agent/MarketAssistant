@@ -25,7 +25,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     }
 
     [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
-    public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
+    public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -63,7 +63,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     }
 
     [Description("获取近30日最新日线MACD，支持BTC、ETH等币种")]
-    public async Task<TechnicalMACD> GetMACDAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
+    public async Task<TechnicalMACD> GetMACDAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -103,7 +103,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     }
 
     [Description("获取近30日最新日线BOLL，支持BTC、ETH等币种")]
-    public async Task<TechnicalBoll> GetBOLLAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
+    public async Task<TechnicalBoll> GetBOLLAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -141,7 +141,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     }
 
     [Description("获取近30日最新日线MA，支持BTC、ETH等币种")]
-    public async Task<TechnicalMA> GetMAAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol)
+    public async Task<TechnicalMA> GetMAAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -220,7 +220,8 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     public async Task<List<OhlcvBar>> GetKLinesAsync(
         [Description("虚拟币代码（如BTC、ETH）")] string assetSymbol,
         [Description("K线周期：5m/15m/daily/weekly")] string interval = "daily",
-        [Description("返回根数，最大500")] int count = 30)
+        [Description("返回根数，最大500")] int count = 30,
+        CancellationToken cancellationToken = default)
     {
         try
         {

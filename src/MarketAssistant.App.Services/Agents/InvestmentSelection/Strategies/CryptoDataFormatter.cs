@@ -20,45 +20,30 @@ public class CryptoDataFormatter : IAssetDataFormatter
                 ["代码"] = c.Symbol
             };
 
-            void AddIfNotZero(string key, decimal value, int decimals = 2, decimal divisor = 1)
-            {
-                if (value != 0)
-                {
-                    var convertedValue = divisor != 1 ? value / divisor : value;
-                    data[key] = Math.Round(convertedValue, decimals);
-                }
-            }
+            data.AddIfNotZero("当前价格_USDT", c.Current);
+            data.AddIfNotZero("市值_亿美元", c.Mc, 2, 100000000);
+            data.AddIfNotZero("完全稀释市值_亿美元", c.Fmc, 2, 100000000);
 
-            AddIfNotZero("当前价格_USDT", c.Current);
-            AddIfNotZero("市值_亿美元", c.Mc, 2, 100000000);
-            AddIfNotZero("完全稀释市值_亿美元", c.Fmc, 2, 100000000);
+            data.AddIfNotZero("24h交易量_万", c.Volume, 0);
+            data.AddIfNotZero("24h成交额_亿美元", c.Amount, 2, 100000000);
 
-            AddIfNotZero("24h交易量_万", c.Volume, 0);
-            AddIfNotZero("24h成交额_亿美元", c.Amount, 2, 100000000);
-
-            AddIfNotZero("24h涨跌幅_百分比", c.Pct);
-            AddIfNotZero("7天涨跌幅_百分比", c.PriceChange7d);
-            AddIfNotZero("30天涨跌幅_百分比", c.PriceChange30d);
-            AddIfNotZero("24h振幅_百分比", c.ChgPct);
+            data.AddIfNotZero("24h涨跌幅_百分比", c.Pct);
+            data.AddIfNotZero("7天涨跌幅_百分比", c.PriceChange7d);
+            data.AddIfNotZero("30天涨跌幅_百分比", c.PriceChange30d);
+            data.AddIfNotZero("24h振幅_百分比", c.ChgPct);
 
             if (c.MarketCapRank > 0)
                 data["市值排名"] = c.MarketCapRank;
 
-            AddIfNotZero("流通供应量", c.CirculatingSupply, 0);
-            AddIfNotZero("总供应量", c.TotalSupply, 0);
+            data.AddIfNotZero("流通供应量", c.CirculatingSupply, 0);
+            data.AddIfNotZero("总供应量", c.TotalSupply, 0);
             if (c.MaxSupply.HasValue && c.MaxSupply.Value > 0)
                 data["最大供应量"] = Math.Round(c.MaxSupply.Value, 0);
 
             return data;
         }).ToList();
 
-        var jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-
-        return JsonSerializer.Serialize(simplifiedCryptos, jsonOptions);
+        return JsonSerializer.Serialize(simplifiedCryptos, JsonOptions.AssetFormatterOptions);
     }
 
     public string GetAnalysisInstructions(bool isNewsAnalysis)

@@ -5,7 +5,7 @@
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
 			 xmlns:components="using:MarketAssistant.Views.Components"
-             xmlns:converts="using:MarketAssistant.Converts"
+             xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AssetPageView"
              x:DataType="vm:AssetPageViewModel">

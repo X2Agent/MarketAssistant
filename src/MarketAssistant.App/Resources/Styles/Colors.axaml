@@ -14,6 +14,14 @@
     <Color x:Key="Warning">#FF9800</Color>
     <Color x:Key="Error">#F44336</Color>
     <Color x:Key="Info">#2196F3</Color>
+
+    <!-- 功能色按钮交互状态 - 悬停(变浅)与按下(变深) -->
+    <Color x:Key="SuccessHover">#66BB6A</Color>
+    <Color x:Key="SuccessPressed">#388E3C</Color>
+    <Color x:Key="WarningHover">#FFB74D</Color>
+    <Color x:Key="WarningPressed">#F57C00</Color>
+    <Color x:Key="InfoHover">#64B5F6</Color>
+    <Color x:Key="InfoPressed">#1976D2</Color>
     
     <!-- 股票涨跌颜色 - 中国市场标准（红涨绿跌） -->
     <Color x:Key="BullishRed">#F44336</Color>
@@ -95,6 +103,14 @@
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource Error}"/>
     <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}"/>
+
+    <!-- 功能色按钮交互状态画刷 -->
+    <SolidColorBrush x:Key="SuccessHoverBrush" Color="{StaticResource SuccessHover}"/>
+    <SolidColorBrush x:Key="SuccessPressedBrush" Color="{StaticResource SuccessPressed}"/>
+    <SolidColorBrush x:Key="WarningHoverBrush" Color="{StaticResource WarningHover}"/>
+    <SolidColorBrush x:Key="WarningPressedBrush" Color="{StaticResource WarningPressed}"/>
+    <SolidColorBrush x:Key="InfoHoverBrush" Color="{StaticResource InfoHover}"/>
+    <SolidColorBrush x:Key="InfoPressedBrush" Color="{StaticResource InfoPressed}"/>
     
     <!-- 股票专用画刷 - 语义化命名 -->
     <SolidColorBrush x:Key="BullishBrush" Color="{StaticResource BullishRed}"/>

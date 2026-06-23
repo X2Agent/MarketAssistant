@@ -13,6 +13,11 @@ public partial class NotificationWindow : Window
     private const int AnimationDuration = 300;
     private const int DisplayDuration = 3000;
 
+    private static readonly Color SuccessColor = Color.Parse("#4CAF50");
+    private static readonly Color ErrorColor = Color.Parse("#F44336");
+    private static readonly Color WarningColor = Color.Parse("#FF9800");
+    private static readonly Color InfoColor = Color.Parse("#2196F3");
+
     public NotificationWindow()
     {
         InitializeComponent();
@@ -48,19 +53,19 @@ public partial class NotificationWindow : Window
                 switch (type)
                 {
                     case NotificationType.Success:
-                        iconBorder.Background = new SolidColorBrush(Color.Parse("#4CAF50"));
+                        iconBorder.Background = new SolidColorBrush(SuccessColor);
                         iconText.Text = "✓";
                         break;
                     case NotificationType.Error:
-                        iconBorder.Background = new SolidColorBrush(Color.Parse("#F44336"));
+                        iconBorder.Background = new SolidColorBrush(ErrorColor);
                         iconText.Text = "✕";
                         break;
                     case NotificationType.Warning:
-                        iconBorder.Background = new SolidColorBrush(Color.Parse("#FF9800"));
+                        iconBorder.Background = new SolidColorBrush(WarningColor);
                         iconText.Text = "!";
                         break;
                     case NotificationType.Info:
-                        iconBorder.Background = new SolidColorBrush(Color.Parse("#2196F3"));
+                        iconBorder.Background = new SolidColorBrush(InfoColor);
                         iconText.Text = "i";
                         break;
                 }

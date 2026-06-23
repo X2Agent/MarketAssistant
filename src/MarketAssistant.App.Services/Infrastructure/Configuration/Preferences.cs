@@ -24,10 +24,10 @@ public static class Preferences
         // 使用用户配置目录存储preferences
         var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var appDataDir = Path.Combine(appDataPath, AppInfo.AppName);
-        
+
         // 确保目录存在
         Directory.CreateDirectory(appDataDir);
-        
+
         _preferencesFilePath = Path.Combine(appDataDir, AppInfo.PreferencesFileName);
         LoadPreferences();
     }
@@ -59,7 +59,7 @@ public static class Preferences
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"加载Preferences时出错: {ex.Message}");
+            System.Diagnostics.Trace.TraceWarning($"加载Preferences时出错: {ex.Message}");
         }
     }
 
@@ -79,7 +79,7 @@ public static class Preferences
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"保存Preferences时出错: {ex.Message}");
+            System.Diagnostics.Trace.TraceWarning($"保存Preferences时出错: {ex.Message}");
         }
     }
 
@@ -116,25 +116,25 @@ public static class Preferences
                     {
                         return directValue;
                     }
-                    
+
                     // 处理JsonElement
                     if (value is JsonElement jsonElement)
                     {
                         return jsonElement.Deserialize<T>(_jsonOptions) ?? defaultValue;
                     }
-                    
+
                     // 处理字符串到枚举的转换
                     if (typeof(T).IsEnum && value is string stringValue)
                     {
                         return (T)Enum.Parse(typeof(T), stringValue);
                     }
-                    
+
                     // 处理基本类型转换
                     if (value is IConvertible)
                     {
                         return (T)Convert.ChangeType(value, typeof(T));
                     }
-                    
+
                     // 尝试JSON反序列化
                     if (value is string jsonString)
                     {
@@ -143,7 +143,7 @@ public static class Preferences
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Preferences类型转换失败: {ex.Message}");
+                    System.Diagnostics.Trace.TraceWarning($"Preferences类型转换失败: {ex.Message}");
                     return defaultValue;
                 }
             }
@@ -163,7 +163,7 @@ public static class Preferences
                 Remove(key);
                 return;
             }
-            
+
             // 对于复杂类型，使用JSON序列化
             if (!IsSimpleType(typeof(T)))
             {
@@ -174,19 +174,19 @@ public static class Preferences
             {
                 _preferences[key] = value;
             }
-            
+
             SavePreferences();
         }
-        
+
         private static bool IsSimpleType(Type type)
         {
-            return type.IsPrimitive || 
-                   type.IsEnum || 
-                   type == typeof(string) || 
-                   type == typeof(decimal) || 
-                   type == typeof(DateTime) || 
-                   type == typeof(DateTimeOffset) || 
-                   type == typeof(TimeSpan) || 
+            return type.IsPrimitive ||
+                   type.IsEnum ||
+                   type == typeof(string) ||
+                   type == typeof(decimal) ||
+                   type == typeof(DateTime) ||
+                   type == typeof(DateTimeOffset) ||
+                   type == typeof(TimeSpan) ||
                    type == typeof(Guid);
         }
     }

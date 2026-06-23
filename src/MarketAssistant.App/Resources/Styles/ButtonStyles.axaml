@@ -33,10 +33,10 @@
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
-    <Style Selector="Button.btn-primary:pointerover">
+    <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
     </Style>
-    <Style Selector="Button.btn-primary:pressed">
+    <Style Selector="Button.btn-primary:pressed /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
     </Style>
     <Style Selector="Button.btn-primary:disabled">
@@ -74,12 +74,11 @@
         <Setter Property="Foreground" Value="{StaticResource DangerTextBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
-    <Style Selector="Button.btn-danger:pointerover">
+    <Style Selector="Button.btn-danger:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource DangerLightBrush}"/>
     </Style>
-    <Style Selector="Button.btn-danger:pressed">
+    <Style Selector="Button.btn-danger:pressed /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource DangerTextBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
     </Style>
 
     <!-- ===== 按钮尺寸变体 ===== -->
@@ -175,6 +174,12 @@
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
+    <Style Selector="Button.success:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource SuccessHoverBrush}"/>
+    </Style>
+    <Style Selector="Button.success:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource SuccessPressedBrush}"/>
+    </Style>
 
     <!-- 警告按钮 -->
     <Style Selector="Button.warning">
@@ -182,6 +187,12 @@
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+    <Style Selector="Button.warning:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource WarningHoverBrush}"/>
+    </Style>
+    <Style Selector="Button.warning:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource WarningPressedBrush}"/>
     </Style>
 
     <!-- 功能按钮 -->
@@ -194,6 +205,25 @@
         <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+    </Style>
+    <Style Selector="Button.feature-button:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource SuccessHoverBrush}"/>
+    </Style>
+    <Style Selector="Button.feature-button:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource SuccessPressedBrush}"/>
+    </Style>
+
+    <!-- Info 按钮 — 信息/链接操作 -->
+    <Style Selector="Button.btn-info">
+        <Setter Property="Background" Value="{StaticResource InfoBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.btn-info:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource InfoHoverBrush}"/>
+    </Style>
+    <Style Selector="Button.btn-info:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource InfoPressedBrush}"/>
     </Style>
 
     <!-- 悬停显示按钮 (删除/收藏) -->

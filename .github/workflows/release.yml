@@ -52,6 +52,20 @@ jobs:
           Get-ChildItem -Path ./publish/windows -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
         shell: pwsh
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $issFile = "scripts\windows\MarketAssistant.iss"
+          $content = Get-Content $issFile -Raw
+          $content = $content -replace '#define MyAppVersion ".*?"', "#define MyAppVersion `"$version`""
+          Set-Content $issFile -Value $content -NoNewline
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" $issFile
+
       - name: Create ZIP archive
         run: |
           Compress-Archive -Path ./publish/windows/* `
@@ -63,7 +77,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: ${{ env.APP_NAME }}-Windows-x64.zip
+          path: |
+            ${{ env.APP_NAME }}-Windows-x64.zip
+            Release/Windows/*.exe
 
   # macOS 构建
   build-macos:
@@ -215,12 +231,13 @@ jobs:
         with:
           files: |
             ./artifacts/**/*.zip
+            ./artifacts/**/*.exe
             ./artifacts/**/*.dmg
             ./artifacts/**/*.deb
             ./artifacts/**/*.rpm
           tag_name: ${{ steps.get_version.outputs.version }}
           name: ${{ steps.get_version.outputs.version }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.get_version.outputs.version, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -6,42 +6,28 @@ using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels.Home;
 
 /// <summary>
 /// 最近查看资产ViewModel
 /// </summary>
-public partial class RecentAssetsViewModel : ViewModelBase
+public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
 
-    private IAssetHistoryService HistoryService => 
+    private IAssetHistoryService HistoryService =>
         _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(_marketContext.CurrentMarket);
 
-    private IHomeAssetService HomeAssetService => 
+    private IHomeAssetService HomeAssetService =>
         _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
 
     /// <summary>
     /// 最近查看资产集合
     /// </summary>
     public ObservableCollection<AssetItem> RecentAssets { get; } = new();
-
-    /// <summary>
-    /// 选择最近资产命令
-    /// </summary>
-    public IRelayCommand<AssetItem> SelectRecentAssetCommand { get; }
-
-    /// <summary>
-    /// 添加到收藏命令
-    /// </summary>
-    public IAsyncRelayCommand<AssetItem> AddToFavoriteCommand { get; }
-
-    /// <summary>
-    /// 刷新最近资产命令
-    /// </summary>
-    public IRelayCommand RefreshCommand { get; }
 
     /// <summary>
     /// 最近资产选择事件
@@ -57,18 +43,26 @@ public partial class RecentAssetsViewModel : ViewModelBase
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
 
-        SelectRecentAssetCommand = new RelayCommand<AssetItem>(OnSelectRecentAsset);
-        AddToFavoriteCommand = new AsyncRelayCommand<AssetItem>(OnAddToFavoriteAsync);
-        RefreshCommand = new RelayCommand(LoadRecentAssets);
+        // 订阅市场切换事件
+        SubscribeToMarketChanges(_marketContext);
 
         // 自动加载最近资产
         LoadRecentAssets();
     }
 
     /// <summary>
+    /// 市场切换时重新加载最近查看资产
+    /// </summary>
+    protected override void OnMarketChanged(MarketType newMarket)
+    {
+        LoadRecentAssets();
+    }
+
+    /// <summary>
     /// 加载最近查看资产
     /// </summary>
-    public void LoadRecentAssets()
+    [RelayCommand]
+    private void LoadRecentAssets()
     {
         SafeExecute(() =>
         {
@@ -97,7 +91,8 @@ public partial class RecentAssetsViewModel : ViewModelBase
     /// <summary>
     /// 选择最近资产
     /// </summary>
-    private void OnSelectRecentAsset(AssetItem? asset)
+    [RelayCommand]
+    private void SelectRecentAsset(AssetItem? asset)
     {
         if (asset == null) return;
 
@@ -108,7 +103,8 @@ public partial class RecentAssetsViewModel : ViewModelBase
     /// <summary>
     /// 添加到收藏
     /// </summary>
-    private async Task OnAddToFavoriteAsync(AssetItem? asset)
+    [RelayCommand]
+    private async Task AddToFavoriteAsync(AssetItem? asset)
     {
         if (asset == null) return;
 
@@ -116,6 +112,15 @@ public partial class RecentAssetsViewModel : ViewModelBase
         {
             await HomeAssetService.AddToFavoriteAsync(asset);
         }, "添加收藏");
+    }
+
+    /// <summary>
+    /// 释放资源
+    /// </summary>
+    public void Dispose()
+    {
+        UnsubscribeFromMarketChanges(_marketContext);
+        GC.SuppressFinalize(this);
     }
 }
 

@@ -10,27 +10,27 @@ public interface IShareFinancialTools : IFinancialTools
     /// <summary>
     /// 获取资产负债表
     /// </summary>
-    Task<List<BalanceSheet>> GetBalanceSheetAsync(string assetSymbol);
+    Task<List<BalanceSheet>> GetBalanceSheetAsync(string assetSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取利润表
     /// </summary>
-    Task<List<IncomeStatement>> GetIncomeStatementAsync(string assetSymbol);
+    Task<List<IncomeStatement>> GetIncomeStatementAsync(string assetSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取现金流量表
     /// </summary>
-    Task<List<CashFlowStatement>> GetCashFlowStatementAsync(string assetSymbol);
+    Task<List<CashFlowStatement>> GetCashFlowStatementAsync(string assetSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取财务主要指标
     /// </summary>
-    Task<List<FinancialRatios>> GetFinancialRatiosAsync(string assetSymbol);
+    Task<List<FinancialRatios>> GetFinancialRatiosAsync(string assetSymbol, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取股本结构
     /// </summary>
-    Task<List<CapitalStructure>> GetCapitalStructureAsync(string assetSymbol);
+    Task<List<CapitalStructure>> GetCapitalStructureAsync(string assetSymbol, CancellationToken cancellationToken = default);
 }
 
 

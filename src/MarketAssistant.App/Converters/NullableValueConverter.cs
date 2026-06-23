@@ -1,17 +1,17 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace MarketAssistant.Converts;
+namespace MarketAssistant.Converters;
 
 /// <summary>
-/// 可空值转换器 - 用于格式化可能为 null 的数值
+/// 锟缴匡拷值转锟斤拷锟斤拷 - 锟斤拷锟节革拷式锟斤拷锟斤拷锟斤拷为 null 锟斤拷锟斤拷值
 /// </summary>
 public class NullableValueConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // 参数格式：format|fallback
-        // 例如："{0:F2}元|待定" 或 "+{0:F1}%|--"
+        // 锟斤拷锟斤拷锟斤拷式锟斤拷format|fallback
+        // 锟斤拷锟界："{0:F2}元|锟斤拷锟斤拷" 锟斤拷 "+{0:F1}%|--"
         var parameterStr = parameter as string ?? "{0}|--";
         var parts = parameterStr.Split('|');
         var format = parts.Length > 0 ? parts[0] : "{0}";
@@ -20,19 +20,19 @@ public class NullableValueConverter : IValueConverter
         if (value == null)
             return fallback;
 
-        // 处理 decimal?
+        // 锟斤拷锟斤拷 decimal?
         if (value is decimal decimalValue)
         {
             return string.Format(culture, format, decimalValue);
         }
 
-        // 处理 float?
+        // 锟斤拷锟斤拷 float?
         if (value is float floatValue)
         {
             return string.Format(culture, format, floatValue);
         }
 
-        // 处理 int?
+        // 锟斤拷锟斤拷 int?
         if (value is int intValue)
         {
             return string.Format(culture, format, intValue);

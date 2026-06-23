@@ -19,64 +19,49 @@ public class StockDataFormatter : IAssetDataFormatter
             data["名称"] = s.Name;
             data["代码"] = s.Symbol;
 
-            void AddIfNotZero(string key, decimal value, int decimals = 2, decimal divisor = 1)
-            {
-                if (value != 0)
-                {
-                    var convertedValue = divisor != 1 ? value / divisor : value;
-                    data[key] = Math.Round(convertedValue, decimals);
-                }
-            }
-
-            AddIfNotZero("当前价_元", s.Current);
-            AddIfNotZero("涨跌幅_百分比", s.Pct);
-            AddIfNotZero("当日振幅_百分比", s.ChgPct);
-            AddIfNotZero("总市值_亿元", s.Mc, 2, 100000000);
-            AddIfNotZero("流通市值_亿元", s.Fmc, 2, 100000000);
-            AddIfNotZero("成交额_亿元", s.Amount, 2, 100000000);
-            AddIfNotZero("成交量_万股", s.Volume);
-            AddIfNotZero("量比", s.VolumeRatio);
-            AddIfNotZero("换手率_百分比", s.Tr);
-            AddIfNotZero("市盈率TTM", s.PeTtm);
-            AddIfNotZero("市盈率LYR", s.PeLyr);
-            AddIfNotZero("市净率", s.Pb);
-            AddIfNotZero("市销率", s.Psr);
-            AddIfNotZero("每股净资产_元", s.Bps);
-            AddIfNotZero("每股收益_元", s.Eps);
-            AddIfNotZero("股息收益率_百分比", s.DyL);
-            AddIfNotZero("净资产收益率ROE_百分比", s.RoeDiluted);
-            AddIfNotZero("总资产报酬率_百分比", s.Niota);
-            AddIfNotZero("净利润_亿元", s.NetProfit, 2, 100000000);
-            AddIfNotZero("营业收入_亿元", s.TotalRevenue, 2, 100000000);
-            AddIfNotZero("净利润同比增长_百分比", s.Npay);
-            AddIfNotZero("营收同比增长_百分比", s.Oiy);
-            AddIfNotZero("近5日涨跌幅_百分比", s.Pct5);
-            AddIfNotZero("近10日涨跌幅_百分比", s.Pct10);
-            AddIfNotZero("近20日涨跌幅_百分比", s.Pct20);
-            AddIfNotZero("近60日涨跌幅_百分比", s.Pct60);
-            AddIfNotZero("近120日涨跌幅_百分比", s.Pct120);
-            AddIfNotZero("近250日涨跌幅_百分比", s.Pct250);
-            AddIfNotZero("年初至今涨跌幅_百分比", s.PctCurrentYear);
-            AddIfNotZero("累计关注人数", s.Follow, 0);
-            AddIfNotZero("累计讨论次数", s.Tweet, 0);
-            AddIfNotZero("累计交易分享数", s.Deal, 0);
-            AddIfNotZero("一周新增关注", s.Follow7d, 0);
-            AddIfNotZero("一周新增讨论数", s.Tweet7d, 0);
-            AddIfNotZero("一周新增交易分享数", s.Deal7d, 0);
-            AddIfNotZero("一周关注增长率_百分比", s.Follow7dPct);
-            AddIfNotZero("一周讨论增长率_百分比", s.Tweet7dPct);
-            AddIfNotZero("一周交易分享增长率_百分比", s.Deal7dPct);
+            data.AddIfNotZero("当前价_元", s.Current);
+            data.AddIfNotZero("涨跌幅_百分比", s.Pct);
+            data.AddIfNotZero("当日振幅_百分比", s.ChgPct);
+            data.AddIfNotZero("总市值_亿元", s.Mc, 2, 100000000);
+            data.AddIfNotZero("流通市值_亿元", s.Fmc, 2, 100000000);
+            data.AddIfNotZero("成交额_亿元", s.Amount, 2, 100000000);
+            data.AddIfNotZero("成交量_万股", s.Volume);
+            data.AddIfNotZero("量比", s.VolumeRatio);
+            data.AddIfNotZero("换手率_百分比", s.Tr);
+            data.AddIfNotZero("市盈率TTM", s.PeTtm);
+            data.AddIfNotZero("市盈率LYR", s.PeLyr);
+            data.AddIfNotZero("市净率", s.Pb);
+            data.AddIfNotZero("市销率", s.Psr);
+            data.AddIfNotZero("每股净资产_元", s.Bps);
+            data.AddIfNotZero("每股收益_元", s.Eps);
+            data.AddIfNotZero("股息收益率_百分比", s.DyL);
+            data.AddIfNotZero("净资产收益率ROE_百分比", s.RoeDiluted);
+            data.AddIfNotZero("总资产报酬率_百分比", s.Niota);
+            data.AddIfNotZero("净利润_亿元", s.NetProfit, 2, 100000000);
+            data.AddIfNotZero("营业收入_亿元", s.TotalRevenue, 2, 100000000);
+            data.AddIfNotZero("净利润同比增长_百分比", s.Npay);
+            data.AddIfNotZero("营收同比增长_百分比", s.Oiy);
+            data.AddIfNotZero("近5日涨跌幅_百分比", s.Pct5);
+            data.AddIfNotZero("近10日涨跌幅_百分比", s.Pct10);
+            data.AddIfNotZero("近20日涨跌幅_百分比", s.Pct20);
+            data.AddIfNotZero("近60日涨跌幅_百分比", s.Pct60);
+            data.AddIfNotZero("近120日涨跌幅_百分比", s.Pct120);
+            data.AddIfNotZero("近250日涨跌幅_百分比", s.Pct250);
+            data.AddIfNotZero("年初至今涨跌幅_百分比", s.PctCurrentYear);
+            data.AddIfNotZero("累计关注人数", s.Follow, 0);
+            data.AddIfNotZero("累计讨论次数", s.Tweet, 0);
+            data.AddIfNotZero("累计交易分享数", s.Deal, 0);
+            data.AddIfNotZero("一周新增关注", s.Follow7d, 0);
+            data.AddIfNotZero("一周新增讨论数", s.Tweet7d, 0);
+            data.AddIfNotZero("一周新增交易分享数", s.Deal7d, 0);
+            data.AddIfNotZero("一周关注增长率_百分比", s.Follow7dPct);
+            data.AddIfNotZero("一周讨论增长率_百分比", s.Tweet7dPct);
+            data.AddIfNotZero("一周交易分享增长率_百分比", s.Deal7dPct);
 
             return data;
         }).ToList();
 
-        var jsonOptions = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-
-        return JsonSerializer.Serialize(simplifiedStocks, jsonOptions);
+        return JsonSerializer.Serialize(simplifiedStocks, JsonOptions.AssetFormatterOptions);
     }
 
     public string GetAnalysisInstructions(bool isNewsAnalysis)

@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Interfaces;
@@ -16,7 +17,7 @@ namespace MarketAssistant.Agents.Tools;
 /// - 混合搜索：当用户同时启用知识库和网络搜索时
 /// - 空结果：当用户都未启用时，返回空结果
 /// </summary>
-public class GroundingSearchTools
+public class GroundingSearchTools : IToolsProvider
 {
     private readonly IRetrievalOrchestrator _orchestrator;
     private readonly IWebTextSearchFactory _webTextSearchFactory;

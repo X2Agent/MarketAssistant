@@ -108,7 +108,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     public async Task GenerateAsync_WithCancellation_ShouldComplete()
     {
         // Arrange
-        using         var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel(); // 立即取消
 
         // Act & Assert - 哈希降级不支持取消，但应该快速完成

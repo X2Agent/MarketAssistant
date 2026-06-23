@@ -9,6 +9,9 @@ namespace MarketAssistant.Agents.TokenManagement;
 /// </summary>
 public static class TokenEstimator
 {
+    private const double ChineseTokenRatio = 1.5;
+    private const double OtherTokenRatio = 4.0;
+
     private static readonly Tokenizer? _tokenizer;
 
     static TokenEstimator()
@@ -18,9 +21,10 @@ public static class TokenEstimator
             // 使用 cl100k_base 编码而非绑定特定模型名，与具体 LLM 提供商无关
             _tokenizer = TiktokenTokenizer.CreateForEncoding("cl100k_base");
         }
-        catch
+        catch (Exception ex)
         {
             // 离线环境或编码数据不可用时回退到启发式估算
+            System.Diagnostics.Debug.WriteLine($"TokenEstimator 初始化 tiktoken 失败，回退到启发式估算: {ex.Message}");
             _tokenizer = null;
         }
     }
@@ -78,7 +82,7 @@ public static class TokenEstimator
             }
         }
 
-        var tokens = (int)(chineseCount / 1.5 + otherCount / 4.0);
+        var tokens = (int)(chineseCount / ChineseTokenRatio + otherCount / OtherTokenRatio);
         return Math.Max(tokens, 1);
     }
 }

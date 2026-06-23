@@ -614,7 +614,7 @@ public class PdfMarkdownConverter : IMarkdownConverter
                         // 保存图片
                         var imagePath = await _imageStorageService.SaveImageAsync(imageBytes, imageFileName, filePath);
                         var relativeImagePath = Path.GetRelativePath(Path.GetDirectoryName(filePath)!, imagePath);
-                        
+
                         markdown.AppendLine();
                         markdown.AppendLine($"![{altText}]({relativeImagePath})");
                         markdown.AppendLine();

@@ -1,7 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -18,13 +17,6 @@ public sealed class AShareFinancialTools : IShareFinancialTools
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareFinancialTools> _logger;
 
-    // 支持 API 返回的字符串数值自动转换为 decimal/decimal?
-    private static readonly JsonSerializerOptions FinancialJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new StringToDecimalConverter() }
-    };
-
     public AShareFinancialTools(
         IHttpClientFactory httpClientFactory,
         IUserSettingService userSettingService,
@@ -38,7 +30,7 @@ public sealed class AShareFinancialTools : IShareFinancialTools
     /// <summary>
     /// 通用财务数据获取方法
     /// </summary>
-    private async Task<List<T>> GetFinancialDataAsync<T>(string endpoint, string assetSymbol, int years = 2)
+    private async Task<List<T>> GetFinancialDataAsync<T>(string endpoint, string assetSymbol, int years = 2, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -50,8 +42,8 @@ public sealed class AShareFinancialTools : IShareFinancialTools
             var url = $"/hs/fin/{endpoint}/{stockCode}?token={token}&st={startDate}&et={endDate}";
 
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url);
-            return JsonSerializer.Deserialize<List<T>>(response, FinancialJsonOptions) ?? new List<T>();
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            return JsonSerializer.Deserialize<List<T>>(response, JsonOptions.AShareApiOptions) ?? new List<T>();
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -61,24 +53,24 @@ public sealed class AShareFinancialTools : IShareFinancialTools
     }
 
     [Description("获取上市公司资产负债表，默认返回最近2年的数据")]
-    public Task<List<BalanceSheet>> GetBalanceSheetAsync([Description("股票代码")] string assetSymbol)
-        => GetFinancialDataAsync<BalanceSheet>("balance", assetSymbol);
+    public Task<List<BalanceSheet>> GetBalanceSheetAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetFinancialDataAsync<BalanceSheet>("balance", assetSymbol, cancellationToken: cancellationToken);
 
     [Description("获取上市公司利润表，默认返回最近2年的数据")]
-    public Task<List<IncomeStatement>> GetIncomeStatementAsync([Description("股票代码")] string assetSymbol)
-        => GetFinancialDataAsync<IncomeStatement>("income", assetSymbol);
+    public Task<List<IncomeStatement>> GetIncomeStatementAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetFinancialDataAsync<IncomeStatement>("income", assetSymbol, cancellationToken: cancellationToken);
 
     [Description("获取上市公司现金流量表，默认返回最近2年的数据")]
-    public Task<List<CashFlowStatement>> GetCashFlowStatementAsync([Description("股票代码")] string assetSymbol)
-        => GetFinancialDataAsync<CashFlowStatement>("cashflow", assetSymbol);
+    public Task<List<CashFlowStatement>> GetCashFlowStatementAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetFinancialDataAsync<CashFlowStatement>("cashflow", assetSymbol, cancellationToken: cancellationToken);
 
     [Description("获取上市公司财务主要指标，默认返回最近2年的数据")]
-    public Task<List<FinancialRatios>> GetFinancialRatiosAsync([Description("股票代码")] string assetSymbol)
-        => GetFinancialDataAsync<FinancialRatios>("ratios", assetSymbol);
+    public Task<List<FinancialRatios>> GetFinancialRatiosAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetFinancialDataAsync<FinancialRatios>("ratios", assetSymbol, cancellationToken: cancellationToken);
 
     [Description("获取上市公司股本结构，默认返回最近3年的变动记录")]
-    public Task<List<CapitalStructure>> GetCapitalStructureAsync([Description("股票代码")] string assetSymbol)
-        => GetFinancialDataAsync<CapitalStructure>("capital", assetSymbol, years: 3);
+    public Task<List<CapitalStructure>> GetCapitalStructureAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
+        => GetFinancialDataAsync<CapitalStructure>("capital", assetSymbol, years: 3, cancellationToken: cancellationToken);
 
     public IEnumerable<AIFunction> GetFunctions()
     {

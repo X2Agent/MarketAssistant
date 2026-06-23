@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
+using System.Globalization;
 
 namespace MarketAssistant.Trading.Exchanges;
 
@@ -20,7 +21,7 @@ public class BinanceExchangeClient : IExchangeClient
 
     public async Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
     {
-        var info = await _accountService.GetAccountInfoAsync();
+        var info = await _accountService.GetAccountInfoAsync(ct);
         return new ExchangeAccountInfo
         {
             CanTrade = info.CanTrade,
@@ -40,7 +41,7 @@ public class BinanceExchangeClient : IExchangeClient
     {
         var response = await _accountService.PlaceOrderAsync(
             symbol, side.ToString().ToUpper(), type.ToString().ToUpper(),
-            quantity, price);
+            quantity, price, ct);
 
         return MapOrderResponse(response);
     }
@@ -48,21 +49,21 @@ public class BinanceExchangeClient : IExchangeClient
     public async Task<ExchangeOrderResult> GetOrderAsync(
         string symbol, string orderId, CancellationToken ct = default)
     {
-        var response = await _accountService.GetOrderAsync(symbol, long.Parse(orderId));
+        var response = await _accountService.GetOrderAsync(symbol, long.Parse(orderId), ct);
         return MapOrderResponse(response);
     }
 
     public async Task<ExchangeOrderResult> CancelOrderAsync(
         string symbol, string orderId, CancellationToken ct = default)
     {
-        var response = await _accountService.CancelOrderAsync(symbol, long.Parse(orderId));
+        var response = await _accountService.CancelOrderAsync(symbol, long.Parse(orderId), ct);
         return MapOrderResponse(response);
     }
 
     public async Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
         string? symbol = null, CancellationToken ct = default)
     {
-        var orders = await _accountService.GetOpenOrdersAsync(symbol);
+        var orders = await _accountService.GetOpenOrdersAsync(symbol, ct);
         return orders.Select(MapOrderResponse).ToList();
     }
 

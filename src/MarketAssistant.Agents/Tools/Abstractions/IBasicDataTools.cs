@@ -1,21 +1,16 @@
-using Microsoft.Extensions.AI;
-
 namespace MarketAssistant.Agents.Tools.Abstractions;
 
 /// <summary>
-/// 基础数据工具基接口
+/// 基础数据工具的 DI 分发标记接口，用于 <c>[RequiresTools]</c> 声明和 Keyed DI 注册。
+/// 本身不定义业务方法，具体 API 由市场专用子接口提供。
 /// </summary>
 /// <remarks>
-/// 为不同市场的基础数据工具提供统一抽象：
-/// - A股市场：实现为 IShareBasicTools（股票行情和公司信息）
-/// - 虚拟币市场：实现为 ICryptoBasicTools（币行情和项目信息）
+/// 市场专用实现：
+/// - A 股：<see cref="IShareBasicTools"/>（股票行情、公司信息）
+/// - 虚拟币：<see cref="ICryptoBasicTools"/>（币行情、项目信息）
 /// </remarks>
-public interface IBasicDataTools
+public interface IBasicDataTools : IToolsProvider
 {
-    /// <summary>
-    /// 获取AI工具函数列表
-    /// </summary>
-    IEnumerable<AIFunction> GetFunctions();
 }
 
 

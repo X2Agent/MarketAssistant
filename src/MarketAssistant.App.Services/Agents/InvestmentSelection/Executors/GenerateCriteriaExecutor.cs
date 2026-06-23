@@ -1,13 +1,10 @@
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using Polly;
-using Polly.Retry;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
@@ -21,20 +18,6 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ICriteriaGenerationStrategy<TCriteria> _strategy;
     private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger;
-
-    // 针对瞬态 LLM 故障（网络错误、超时）的重试管道：最多重试 2 次，指数退避 + 抖动
-    private static readonly ResiliencePipeline _llmRetryPipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 2,
-            BackoffType = DelayBackoffType.Exponential,
-            UseJitter = true,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = new PredicateBuilder()
-                .Handle<HttpRequestException>()
-                .Handle<TaskCanceledException>(ex => ex.InnerException is TimeoutException)
-        })
-        .Build();
 
     private static readonly JsonSerializerOptions SchemaOptions = new()
     {
@@ -89,15 +72,13 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
                 MaxOutputTokens = input.IsNewsAnalysis ? 3500 : 2000
             };
 
-            var response = await _llmRetryPipeline.ExecuteAsync(
-                async ct => await chatClient.GetResponseAsync(
+            var response = await chatClient.GetResponseAsync(
                     [
                         new ChatMessage(ChatRole.System, systemPrompt),
                         new ChatMessage(ChatRole.User, userPrompt)
                     ],
                     chatOptions,
-                    ct),
-                cancellationToken);
+                    cancellationToken);
 
             var criteria = _strategy.DeserializeCriteria(response.Text);
 

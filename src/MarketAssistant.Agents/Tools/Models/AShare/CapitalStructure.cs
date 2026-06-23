@@ -11,28 +11,28 @@ public class CapitalStructure
     /// 变动日期
     /// </summary>
     [JsonPropertyName("bdrq")]
-    public string ChangeDate { get; set; } = "";
+    public string ChangeDate { get; set; } = string.Empty;
 
     /// <summary>
-    /// 公告�?
+    /// 公告�?
     /// </summary>
     [JsonPropertyName("ggr")]
-    public string AnnouncementDate { get; set; } = "";
+    public string AnnouncementDate { get; set; } = string.Empty;
 
     /// <summary>
-    /// 总股�?
+    /// 总股�?
     /// </summary>
     [JsonPropertyName("zgb")]
     public decimal? TotalShares { get; set; }
 
     /// <summary>
-    /// 已上市流通A�?
+    /// 已上市流通A�?
     /// </summary>
     [JsonPropertyName("ysltag")]
     public decimal? CirculatingAShares { get; set; }
 
     /// <summary>
-    /// 限售流通股�?
+    /// 限售流通股�?
     /// </summary>
     [JsonPropertyName("xsltgf")]
     public decimal? RestrictedShares { get; set; }
