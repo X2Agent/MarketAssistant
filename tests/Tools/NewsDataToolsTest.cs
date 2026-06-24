@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.AShare;
 using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Agents.Tools.Models;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Data;
@@ -35,6 +36,11 @@ public class NewsDataToolsTest
         services.AddHttpClient();
         services.AddTestMarketDataHttpClients();
         services.AddLogging();
+
+        // CryptoNewsTools 依赖 ICryptoAliasRegistry（基于 CoinGecko 币种别名）
+        services.AddMemoryCache();
+        services.AddSingleton<CoinGeckoApiService>();
+        services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
 
         // 注册被测试的服务
         services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);

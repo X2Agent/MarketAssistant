@@ -1,40 +1,28 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.Models.AShare;
 
-/// <summary>
-/// 公司股本结构
-/// </summary>
+[Description("公司股本结构")]
 public class CapitalStructure
 {
-    /// <summary>
-    /// 变动日期
-    /// </summary>
+    [Description("变动日期")]
     [JsonPropertyName("bdrq")]
     public string ChangeDate { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 公告�?
-    /// </summary>
+    [Description("公告日")]
     [JsonPropertyName("ggr")]
     public string AnnouncementDate { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 总股�?
-    /// </summary>
+    [Description("总股本")]
     [JsonPropertyName("zgb")]
     public decimal? TotalShares { get; set; }
 
-    /// <summary>
-    /// 已上市流通A�?
-    /// </summary>
+    [Description("已上市流通A股")]
     [JsonPropertyName("ysltag")]
     public decimal? CirculatingAShares { get; set; }
 
-    /// <summary>
-    /// 限售流通股�?
-    /// </summary>
+    [Description("限售流通股份")]
     [JsonPropertyName("xsltgf")]
     public decimal? RestrictedShares { get; set; }
 }
-

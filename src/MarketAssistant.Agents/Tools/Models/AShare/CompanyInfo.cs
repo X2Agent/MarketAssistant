@@ -1,258 +1,164 @@
+﻿using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.Models.AShare;
 
-/// <summary>
-/// 公司信息实体�?
-/// </summary>
+[Description("上市公司基本信息")]
 public class CompanyInfo
 {
-    // ================= 基础信息 =================
-    /// <summary>
-    /// 公司名称
-    /// </summary>
+    [Description("公司名称")]
     [JsonPropertyName("name")]
     public string Name { get; set; } = "";
 
-    /// <summary>
-    /// 公司英文名称
-    /// </summary>
+    [Description("公司英文名称")]
     [JsonPropertyName("ename")]
     public string EName { get; set; } = "";
 
-    /// <summary>
-    /// 上市市场 (例如: 沪市主板/深市创业�?
-    /// </summary>
+    [Description("所属市场（如：主板、创业板、科创板）")]
     [JsonPropertyName("market")]
     public string Market { get; set; } = "";
 
-    // ================= 上市信息 =================
-    /// <summary>
-    /// 概念及板�?(多个概念逗号分隔)
-    /// </summary>
+    [Description("所属概念板块（多个以逗号分隔）")]
     [JsonPropertyName("idea")]
     public string Concept { get; set; } = "";
 
-    /// <summary>
-    /// 上市日期 (格式 yyyy-MM-dd)
-    /// </summary>
+    [Description("上市日期（yyyy-MM-dd）")]
     [JsonPropertyName("ldate")]
     public string ListingDate { get; set; } = "";
 
-    /// <summary>
-    /// 发行价格 (�?
-    /// </summary>
+    [Description("发行价格（元）")]
     [JsonPropertyName("sprice")]
     public string IssuePrice { get; set; } = "";
 
-    // ================= 发行信息 =================
-    /// <summary>
-    /// 主承销�?
-    /// </summary>
+    [Description("主承销商")]
     [JsonPropertyName("principal")]
     public string Underwriter { get; set; } = "";
 
-    /// <summary>
-    /// 成立日期 (格式 yyyy-MM-dd)
-    /// </summary>
+    [Description("成立日期（yyyy-MM-dd）")]
     [JsonPropertyName("rdate")]
     public string EstablishmentDate { get; set; } = "";
 
-    /// <summary>
-    /// 注册资本
-    /// </summary>
+    [Description("注册资本")]
     [JsonPropertyName("rprice")]
     public string RegisteredCapital { get; set; } = "";
 
-    // ================= 机构信息 =================
-    /// <summary>
-    /// 机构类型
-    /// </summary>
+    [Description("机构类型")]
     [JsonPropertyName("instype")]
     public string InstitutionType { get; set; } = "";
 
-    /// <summary>
-    /// 组织形式
-    /// </summary>
+    [Description("组织形式")]
     [JsonPropertyName("organ")]
     public string Organization { get; set; } = "";
 
-    // ================= 联系方式 =================
-    /// <summary>
-    /// 董事会秘�?
-    /// </summary>
+    [Description("董事会秘书")]
     [JsonPropertyName("secre")]
     public string Secretary { get; set; } = "";
 
-    /// <summary>
-    /// 公司电话
-    /// </summary>
+    [Description("公司电话")]
     [JsonPropertyName("phone")]
     public string CompanyPhone { get; set; } = "";
 
-    /// <summary>
-    /// 董秘电话
-    /// </summary>
+    [Description("董秘电话")]
     [JsonPropertyName("sphone")]
     public string SecretaryPhone { get; set; } = "";
 
-    // ================= 其他信息 =================
-    /// <summary>
-    /// 公司传真
-    /// </summary>
+    [Description("公司传真")]
     [JsonPropertyName("fax")]
     public string Fax { get; set; } = "";
 
-    /// <summary>
-    /// 董秘传真
-    /// </summary>
+    [Description("董秘传真")]
     [JsonPropertyName("sfax")]
     public string SecretaryFax { get; set; } = "";
 
-    /// <summary>
-    /// 公司邮箱
-    /// </summary>
+    [Description("公司邮箱")]
     [JsonPropertyName("email")]
     public string Email { get; set; } = "";
 
-    /// <summary>
-    /// 董秘邮箱
-    /// </summary>
+    [Description("董秘邮箱")]
     [JsonPropertyName("semail")]
     public string SecretaryEmail { get; set; } = "";
 
-    // ================= 网站信息 =================
-    /// <summary>
-    /// 公司官网
-    /// </summary>
+    [Description("公司网站")]
     [JsonPropertyName("site")]
     public string Website { get; set; } = "";
 
-    /// <summary>
-    /// 邮政编码
-    /// </summary>
+    [Description("邮政编码")]
     [JsonPropertyName("post")]
     public string PostalCode { get; set; } = "";
 
-    /// <summary>
-    /// 信息披露网站
-    /// </summary>
+    [Description("信息披露网站")]
     [JsonPropertyName("infosite")]
     public string InfoWebsite { get; set; } = "";
 
-    // ================= 历史信息 =================
-    /// <summary>
-    /// 证券简称更名历�?
-    /// </summary>
+    [Description("公司曾用名（历史更名）")]
     [JsonPropertyName("oname")]
     public string NameHistory { get; set; } = "";
 
-    // ================= 地址信息 =================
-    /// <summary>
-    /// 注册地址
-    /// </summary>
+    [Description("注册地址")]
     [JsonPropertyName("addr")]
     public string RegisteredAddress { get; set; } = "";
 
-    /// <summary>
-    /// 办公地址
-    /// </summary>
+    [Description("办公地址")]
     [JsonPropertyName("oaddr")]
     public string OfficeAddress { get; set; } = "";
 
-    // ================= 描述信息 =================
-    /// <summary>
-    /// 公司简�?
-    /// </summary>
+    [Description("公司简介")]
     [JsonPropertyName("desc")]
     public string Description { get; set; } = "";
 
-    /// <summary>
-    /// 经营范围
-    /// </summary>
+    [Description("经营范围")]
     [JsonPropertyName("bscope")]
     public string BusinessScope { get; set; } = "";
 
-    // ================= 发行细节 =================
-    /// <summary>
-    /// 承销方式
-    /// </summary>
+    [Description("承销方式")]
     [JsonPropertyName("printype")]
     public string UnderwritingType { get; set; } = "";
 
-    /// <summary>
-    /// 上市推荐�?
-    /// </summary>
+    [Description("上市推荐人")]
     [JsonPropertyName("referrer")]
     public string ListingReferrer { get; set; } = "";
 
-    /// <summary>
-    /// 发行方式
-    /// </summary>
+    [Description("发行方式")]
     [JsonPropertyName("putype")]
     public string IssueType { get; set; } = "";
 
-    // ================= 财务指标 =================
-    /// <summary>
-    /// 发行市盈�?(按发行后总股�?
-    /// </summary>
+    [Description("发行市盈率")]
     [JsonPropertyName("pe")]
     public string PublishPE { get; set; } = "";
 
-    /// <summary>
-    /// 首发前总股�?(万股)
-    /// </summary>
+    [Description("发行前总股本（万股）")]
     [JsonPropertyName("firgu")]
     public string PreIssueShares { get; set; } = "";
 
-    /// <summary>
-    /// 首发后总股�?(万股)
-    /// </summary>
+    [Description("发行后总股本（万股）")]
     [JsonPropertyName("lastgu")]
     public string PostIssueShares { get; set; } = "";
 
-    /// <summary>
-    /// 实际发行�?(万股)
-    /// </summary>
+    [Description("实际发行数量（万股）")]
     [JsonPropertyName("realgu")]
     public string ActualIssueShares { get; set; } = "";
 
-    // ================= 募集资金 =================
-    /// <summary>
-    /// 预计募集资金 (万元)
-    /// </summary>
+    [Description("预计募集资金（万元）")]
     [JsonPropertyName("planm")]
     public string PlannedFunds { get; set; } = "";
 
-    /// <summary>
-    /// 实际募集资金 (万元)
-    /// </summary>
+    [Description("实际募集资金（万元）")]
     [JsonPropertyName("realm")]
     public string ActualFunds { get; set; } = "";
 
-    /// <summary>
-    /// 发行费用总额 (万元)
-    /// </summary>
+    [Description("发行总费用（万元）")]
     [JsonPropertyName("pubfee")]
     public string TotalIssueCost { get; set; } = "";
 
-    /// <summary>
-    /// 募集资金净�?(万元)
-    /// </summary>
+    [Description("募集资金净额（万元）")]
     [JsonPropertyName("collect")]
     public string NetFunds { get; set; } = "";
 
-    /// <summary>
-    /// 承销费用 (万元)
-    /// </summary>
+    [Description("承销保荐费用（万元）")]
     [JsonPropertyName("signfee")]
     public string UnderwritingFee { get; set; } = "";
 
-    /// <summary>
-    /// 招股公告�?(格式 yyyy-MM-dd)
-    /// </summary>
+    [Description("招股书披露日期（yyyy-MM-dd）")]
     [JsonPropertyName("pdate")]
     public string ProspectusDate { get; set; } = "";
 }
-
-

@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace MarketAssistant.Trading.Models;
 
 #region 枚举类型
@@ -29,45 +31,51 @@ public enum PositionSide { Long, Short }
 
 #region 交易策略
 
+[Description("交易策略配置")]
 public class TradingStrategy
 {
+    [Description("策略唯一ID")]
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    [Description("交易对符号（如BTCUSDT）")]
     public string Symbol { get; set; } = string.Empty;
+    [Description("策略类型：StopLoss/TakeProfit/TrailingStop/GridTrading/DCA/AISignal")]
     public StrategyType Type { get; set; }
+    [Description("策略状态：Active/Paused/Completed/Failed")]
     public StrategyStatus Status { get; set; }
+    [Description("交易方向：Buy或Sell")]
     public OrderSide Side { get; set; }
+    [Description("触发价格")]
     public decimal TriggerPrice { get; set; }
+    [Description("止损价格")]
     public decimal? StopLossPrice { get; set; }
+    [Description("止盈价格")]
     public decimal? TakeProfitPrice { get; set; }
+    [Description("交易数量（DCA策略为USDT金额）")]
     public decimal Quantity { get; set; }
 
-    /// <summary>
-    /// 下单类型（默认市价）。设为 Limit 时按滑点保护价下限价单。
-    /// </summary>
+    [Description("下单类型：Market（市价）或Limit（限价）")]
     public OrderType OrderType { get; set; } = OrderType.Market;
 
-    /// <summary>
-    /// 滑点容忍度（0-1，默认 0.3%）。仅 OrderType=Limit 时生效。
-    /// </summary>
+    [Description("滑点容忍度（0-1），仅限价单生效")]
     public decimal SlippageTolerance { get; set; } = 0.003m;
 
-    /// <summary>
-    /// 显示用标签：DCA 策略以 USDT 定投金额计，其他策略为代币数量。
-    /// </summary>
     public string QuantityLabel => Type == StrategyType.DCA
         ? $"定投: {Quantity:F2} USDT"
         : $"数量: {Quantity:F6}";
+    [Description("最大仓位占比限制（%）")]
     public decimal? MaxPositionPercent { get; set; }
+    [Description("自定义策略参数（JSON）")]
     public string? CustomParams { get; set; }
+    [Description("策略创建时间")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Description("上次触发时间")]
     public DateTime? LastTriggeredAt { get; set; }
+    [Description("已执行次数")]
     public int ExecutionCount { get; set; }
+    [Description("最大执行次数限制")]
     public int? MaxExecutions { get; set; }
 
-    /// <summary>
-    /// 追踪止损的峰值/谷值价格（持久化，重启不丢失）。
-    /// Sell 侧记录最高价，Buy 侧记录最低价。
-    /// </summary>
+    [Description("追踪止损的峰值/谷值价格")]
     public decimal? TrailingPeakPrice { get; set; }
 }
 
@@ -75,23 +83,40 @@ public class TradingStrategy
 
 #region 交易记录
 
+[Description("交易执行记录")]
 public class TradeRecord
 {
+    [Description("记录唯一ID")]
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    [Description("关联策略ID")]
     public string StrategyId { get; set; } = string.Empty;
+    [Description("交易对符号")]
     public string Symbol { get; set; } = string.Empty;
+    [Description("交易方向")]
     public OrderSide Side { get; set; }
+    [Description("订单类型")]
     public OrderType OrderType { get; set; }
+    [Description("请求交易数量")]
     public decimal RequestedQty { get; set; }
+    [Description("实际成交数量")]
     public decimal ExecutedQty { get; set; }
+    [Description("请求价格（限价单）")]
     public decimal? RequestedPrice { get; set; }
+    [Description("实际成交价格")]
     public decimal ExecutedPrice { get; set; }
+    [Description("手续费")]
     public decimal Commission { get; set; }
+    [Description("手续费币种")]
     public string CommissionAsset { get; set; } = string.Empty;
+    [Description("订单状态：Pending/Filled/PartiallyFilled/Cancelled/Failed")]
     public TradeRecordStatus Status { get; set; }
+    [Description("交易所订单ID")]
     public long BinanceOrderId { get; set; }
+    [Description("AI下单理由")]
     public string? AIReasoning { get; set; }
+    [Description("创建时间")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    [Description("完成时间")]
     public DateTime? CompletedAt { get; set; }
 }
 
@@ -136,34 +161,53 @@ public class DailyStats
 
 #region Agent 辅助模型
 
+[Description("账户余额汇总")]
 public class AccountBalanceSummary
 {
+    [Description("账户总资产价值（USDT）")]
     public decimal TotalValueUSDT { get; set; }
+    [Description("各币种余额明细")]
     public List<AssetBalance> Assets { get; set; } = [];
 }
 
+[Description("单币种资产余额")]
 public class AssetBalance
 {
+    [Description("币种名称（如BTC、ETH、USDT）")]
     public string Asset { get; set; } = string.Empty;
+    [Description("可用余额")]
     public decimal Free { get; set; }
+    [Description("冻结余额（挂单中）")]
     public decimal Locked { get; set; }
+    [Description("折合USDT价值")]
     public decimal ValueUSDT { get; set; }
 }
 
+[Description("持仓信息")]
 public class PositionInfo
 {
+    [Description("交易对符号")]
     public string Symbol { get; set; } = string.Empty;
+    [Description("持仓数量")]
     public decimal Quantity { get; set; }
+    [Description("开仓均价")]
     public decimal EntryPrice { get; set; }
+    [Description("当前价格")]
     public decimal CurrentPrice { get; set; }
+    [Description("未实现盈亏（USDT）")]
     public decimal UnrealizedPnl { get; set; }
+    [Description("未实现盈亏百分比（%）")]
     public decimal UnrealizedPnlPercent { get; set; }
 }
 
+[Description("交易执行结果")]
 public class TradeResult
 {
+    [Description("是否成功")]
     public bool Success { get; set; }
+    [Description("失败时的错误信息")]
     public string? ErrorMessage { get; set; }
+    [Description("成功时的交易记录")]
     public TradeRecord? Record { get; set; }
 }
 
@@ -196,12 +240,18 @@ public class Position
     public decimal RemainingQuantity => Quantity - ClosedQuantity;
 }
 
+[Description("订单状态查询结果")]
 public class OrderStatusInfo
 {
+    [Description("订单ID")]
     public long OrderId { get; set; }
+    [Description("交易对符号")]
     public string Symbol { get; set; } = string.Empty;
+    [Description("订单状态")]
     public string Status { get; set; } = string.Empty;
+    [Description("已成交数量")]
     public decimal ExecutedQty { get; set; }
+    [Description("成交价格")]
     public decimal ExecutedPrice { get; set; }
 }
 

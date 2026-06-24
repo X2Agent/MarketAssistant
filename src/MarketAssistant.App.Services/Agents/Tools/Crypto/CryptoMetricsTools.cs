@@ -62,6 +62,7 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 if (klineData is not { Count: > 0 })
                     throw new FriendlyException($"未找到交易对 {binanceSymbol} 的K线数据，请确认代码是否正确");
 
+                var intervalMs = GetIntervalMilliseconds(interval);
                 return new CryptoOHLCV
                 {
                     Symbol = binanceSymbol,
@@ -69,6 +70,7 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                     Candles = klineData.Select(k => new OHLCVCandle
                     {
                         OpenTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds(),
+                        CloseTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds() + intervalMs - 1,
                         Open = k.Open,
                         High = k.High,
                         Low = k.Low,
@@ -149,6 +151,30 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
             _ => throw new ArgumentOutOfRangeException(nameof(interval), interval, null)
         };
     }
+
+    /// <summary>
+    /// 根据 MarketInterval 计算区间时长（毫秒），用于推算 CloseTime
+    /// </summary>
+    private static long GetIntervalMilliseconds(MarketInterval interval) => interval switch
+    {
+        MarketInterval.OneSecond => 1000,
+        MarketInterval.OneMinute => 60 * 1000,
+        MarketInterval.ThreeMinutes => 3 * 60 * 1000,
+        MarketInterval.FiveMinutes => 5 * 60 * 1000,
+        MarketInterval.FifteenMinutes => 15 * 60 * 1000,
+        MarketInterval.ThirtyMinutes => 30 * 60 * 1000,
+        MarketInterval.OneHour => 60 * 60 * 1000,
+        MarketInterval.TwoHours => 2 * 60 * 60 * 1000,
+        MarketInterval.FourHours => 4 * 60 * 60 * 1000,
+        MarketInterval.SixHours => 6 * 60 * 60 * 1000,
+        MarketInterval.EightHours => 8 * 60 * 60 * 1000,
+        MarketInterval.TwelveHours => 12 * 60 * 60 * 1000,
+        MarketInterval.OneDay => 24 * 60 * 60 * 1000,
+        MarketInterval.ThreeDays => 3 * 24 * 60 * 60 * 1000,
+        MarketInterval.OneWeek => 7 * 24 * 60 * 60 * 1000,
+        MarketInterval.OneMonth => 30L * 24 * 60 * 60 * 1000,
+        _ => 24 * 60 * 60 * 1000
+    };
 
     /// <summary>
     /// 获取订单簿深度数据

@@ -1,74 +1,52 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.Models.Technical;
 
+[Description("移动平均线指标，用于判断趋势方向和支撑压力位")]
 public class TechnicalMA
 {
-    /// <summary>
-    /// 交易时间，短分时级别格式为yyyy-MM-ddHH:mm:ss，日线级别为yyyy-MM-dd
-    /// </summary>
+    [Description("交易时间")]
     [JsonPropertyName("t")]
     public string T { get; set; } = "";
 
-    /// <summary>
-    /// MA3，没有则为null
-    /// </summary>
+    [Description("3日均线")]
     [JsonPropertyName("ma3")]
     public decimal? MA3 { get; set; }
 
-    /// <summary>
-    /// MA5，没有则为null
-    /// </summary>
+    [Description("5日均线（短期趋势）")]
     [JsonPropertyName("ma5")]
     public decimal? MA5 { get; set; }
 
-    /// <summary>
-    /// MA10，没有则为null
-    /// </summary>
+    [Description("10日均线（短期趋势）")]
     [JsonPropertyName("ma10")]
     public decimal? MA10 { get; set; }
 
-    /// <summary>
-    /// MA15，没有则为null
-    /// </summary>
+    [Description("15日均线")]
     [JsonPropertyName("ma15")]
     public decimal? MA15 { get; set; }
 
-    /// <summary>
-    /// MA20，没有则为null
-    /// </summary>
+    [Description("20日均线（中短期趋势）")]
     [JsonPropertyName("ma20")]
     public decimal? MA20 { get; set; }
 
-    /// <summary>
-    /// MA30，没有则为null
-    /// </summary>
+    [Description("30日均线（中期趋势）")]
     [JsonPropertyName("ma30")]
     public decimal? MA30 { get; set; }
 
-    /// <summary>
-    /// MA60，没有则为null
-    /// </summary>
+    [Description("60日均线（中期趋势，季线）")]
     [JsonPropertyName("ma60")]
     public decimal? MA60 { get; set; }
 
-    /// <summary>
-    /// MA120，没有则为null
-    /// </summary>
+    [Description("120日均线（半年线，重要支撑/压力）")]
     [JsonPropertyName("ma120")]
     public decimal? MA120 { get; set; }
 
-    /// <summary>
-    /// MA200，没有则为null
-    /// </summary>
+    [Description("200日均线（长期趋势分界线）")]
     [JsonPropertyName("ma200")]
     public decimal? MA200 { get; set; }
 
-    /// <summary>
-    /// MA250，没有则为null
-    /// </summary>
+    [Description("250日均线（年线，牛熊分界参考）")]
     [JsonPropertyName("ma250")]
     public decimal? MA250 { get; set; }
 }
-
-

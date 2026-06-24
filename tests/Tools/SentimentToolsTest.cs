@@ -87,20 +87,19 @@ public class SentimentToolsTest
         // Assert - 验证真实资金流向数据（关键字段非空 + 数值合理性，证明 API 真实返回而非空对象）
         Assert.IsNotNull(sentimentData, "资金流向数据不应为空");
         Assert.IsTrue(sentimentData.Date > 0, $"日期应大于 0，实际: {sentimentData.Date}");
-        // 主力资金流向字段（流入/流出/净流入）应至少有非零数据，证明 API 真实返回
         Assert.IsTrue(sentimentData.MainFundIn > 0 || sentimentData.MainFundOut > 0,
             $"主力流入({sentimentData.MainFundIn})或主力流出({sentimentData.MainFundOut})应至少有一个大于 0");
         Assert.IsTrue(sentimentData.MainFundDiff != 0 || sentimentData.SuperFundDiff != 0 || sentimentData.LargeFundDiff != 0,
             $"主力净流入({sentimentData.MainFundDiff})、超大单净流入({sentimentData.SuperFundDiff})、大单净流入({sentimentData.LargeFundDiff})应至少有一个非零");
-        // 资金流向勾稽关系：主力净流入 ≈ 超大单 + 大单 + 中单 + 小单（允许浮点误差）
-        var sumOfDetails = sentimentData.SuperFundDiff + sentimentData.LargeFundDiff
-            + sentimentData.MediumFundDiff + sentimentData.LittleFundDiff;
-        Assert.IsTrue(Math.Abs(sumOfDetails - sentimentData.MainFundDiff) < 1m,
-            $"主力净流入({sentimentData.MainFundDiff})应约等于超大单({sentimentData.SuperFundDiff})+大单({sentimentData.LargeFundDiff})+中单({sentimentData.MediumFundDiff})+小单({sentimentData.LittleFundDiff})={sumOfDetails}");
+        // 主力 = 特大单 + 大单，勾稽关系：MainFundDiff = SuperFundDiff + LargeFundDiff
+        var expectedMainDiff = sentimentData.SuperFundDiff + sentimentData.LargeFundDiff;
+        Assert.IsTrue(Math.Abs(expectedMainDiff - sentimentData.MainFundDiff) < 1m,
+            $"主力净流入({sentimentData.MainFundDiff})应等于超大单({sentimentData.SuperFundDiff})+大单({sentimentData.LargeFundDiff})={expectedMainDiff}");
 
-        TestContext?.WriteLine($"SH600519 日期: {sentimentData.Date}, 主力净流入: {sentimentData.MainFundDiff}万元, " +
-            $"超大单: {sentimentData.SuperFundDiff}万元, 大单: {sentimentData.LargeFundDiff}万元, " +
-            $"3日主力: {sentimentData.MainFund3}万元, 5日主力: {sentimentData.MainFund5}万元");
+        TestContext?.WriteLine($"SH600519 日期: {sentimentData.Date}, 主力净流入: {sentimentData.MainFundDiff}, " +
+            $"超大单: {sentimentData.SuperFundDiff}, 大单: {sentimentData.LargeFundDiff}, " +
+            $"中单: {sentimentData.MediumFundDiff}, 小单: {sentimentData.LittleFundDiff}, " +
+            $"3日主力: {sentimentData.MainFund3}, 5日主力: {sentimentData.MainFund5}");
     }
 
     #endregion

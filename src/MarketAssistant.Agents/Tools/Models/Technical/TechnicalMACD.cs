@@ -1,44 +1,32 @@
+﻿using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.Models.Technical;
 
+[Description("MACD指标（移动平均收敛/发散），用于判断趋势方向和买卖时机")]
 public class TechnicalMACD
 {
-    /// <summary>
-    /// 交易时间，短分时级别格式为yyyy-MM-ddHH:mm:ss，日线级别为yyyy-MM-dd
-    /// </summary>
+    [Description("交易时间")]
     [JsonPropertyName("t")]
     public string T { get; set; } = "";
 
-    /// <summary>
-    /// DIFF�?
-    /// </summary>
+    [Description("DIFF快线（EMA12与EMA26之差），反映短期动能")]
     [JsonPropertyName("diff")]
     public decimal Diff { get; set; }
 
-    /// <summary>
-    /// DEA�?
-    /// </summary>
+    [Description("DEA慢线（DIFF的9日均线），DIFF上穿DEA为金叉")]
     [JsonPropertyName("dea")]
     public decimal Dea { get; set; }
 
-    /// <summary>
-    /// MACD�?
-    /// </summary>
+    [Description("MACD柱线（2*(DIFF-DEA)），红柱看多绿柱看空")]
     [JsonPropertyName("macd")]
     public decimal Macd { get; set; }
 
-    /// <summary>
-    /// EMA�?2）�?
-    /// </summary>
+    [Description("12日指数移动均线")]
     [JsonPropertyName("ema12")]
     public decimal Ema12 { get; set; }
 
-    /// <summary>
-    /// EMA�?6）�?
-    /// </summary>
+    [Description("26日指数移动均线")]
     [JsonPropertyName("ema26")]
     public decimal Ema26 { get; set; }
 }
-
-

@@ -1,37 +1,24 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.Models.Technical;
 
+[Description("布林带指标，用于判断价格波动区间和突破信号")]
 public class TechnicalBoll
 {
-    /// <summary>
-    /// 交易时间，短分时级别格式为yyyy-MM-ddHH:mm:ss，日线级别为yyyy-MM-dd
-    /// </summary>
+    [Description("交易时间")]
     [JsonPropertyName("t")]
     public string T { get; set; } = "";
 
-    /// <summary>
-    /// 上轨
-    /// </summary>
+    [Description("上轨（中轨+2倍标准差），价格触及上轨可能面临压力")]
     [JsonPropertyName("u")]
     public decimal? U { get; set; }
 
-    /// <summary>
-    /// 下轨
-    /// </summary>
+    [Description("下轨（中轨-2倍标准差），价格触及下轨可能获得支撑")]
     [JsonPropertyName("d")]
     public decimal? D { get; set; }
 
-    /// <summary>
-    /// 中轨
-    /// </summary>
+    [Description("中轨（20日移动平均线），趋势方向的参考基准")]
     [JsonPropertyName("m")]
     public decimal? M { get; set; }
-
-    /// <summary>
-    /// 数据的自然语言描述，辅助大模型理解
-    /// </summary>
-    public string Description => $"日期: {T}, 上轨(Upper): {U}, 中轨(Middle): {M}, 下轨(Lower): {D}";
 }
-
-
