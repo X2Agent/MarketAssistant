@@ -28,8 +28,8 @@ public class BinanceExchangeClient : IExchangeClient
             Balances = info.Balances.Select(b => new ExchangeBalance
             {
                 Asset = b.Asset,
-                Free = decimal.TryParse(b.Free, out var f) ? f : 0,
-                Locked = decimal.TryParse(b.Locked, out var l) ? l : 0
+                Free = decimal.TryParse(b.Free, NumberStyles.Number, CultureInfo.InvariantCulture, out var f) ? f : 0,
+                Locked = decimal.TryParse(b.Locked, NumberStyles.Number, CultureInfo.InvariantCulture, out var l) ? l : 0
             }).ToList()
         };
     }
@@ -37,11 +37,12 @@ public class BinanceExchangeClient : IExchangeClient
     public async Task<ExchangeOrderResult> PlaceOrderAsync(
         string symbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
+        string? clientOrderId = null,
         CancellationToken ct = default)
     {
         var response = await _accountService.PlaceOrderAsync(
             symbol, side.ToString().ToUpper(), type.ToString().ToUpper(),
-            quantity, price, ct);
+            quantity, price, clientOrderId, ct);
 
         return MapOrderResponse(response);
     }
@@ -76,7 +77,7 @@ public class BinanceExchangeClient : IExchangeClient
         {
             foreach (var fill in response.Fills)
             {
-                if (decimal.TryParse(fill.Commission, out var c))
+                if (decimal.TryParse(fill.Commission, NumberStyles.Number, CultureInfo.InvariantCulture, out var c))
                     totalCommission += c;
                 commissionAsset ??= fill.CommissionAsset;
             }
@@ -89,9 +90,9 @@ public class BinanceExchangeClient : IExchangeClient
             Status = response.Status,
             Side = response.Side,
             Type = response.Type,
-            RequestedQty = decimal.TryParse(response.OrigQty, out var rq) ? rq : 0,
-            ExecutedQty = decimal.TryParse(response.ExecutedQty, out var eq) ? eq : 0,
-            Price = decimal.TryParse(response.Price, out var p) ? p : 0,
+            RequestedQty = decimal.TryParse(response.OrigQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var rq) ? rq : 0,
+            ExecutedQty = decimal.TryParse(response.ExecutedQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var eq) ? eq : 0,
+            Price = decimal.TryParse(response.Price, NumberStyles.Number, CultureInfo.InvariantCulture, out var p) ? p : 0,
             FillCommission = totalCommission,
             CommissionAsset = commissionAsset
         };

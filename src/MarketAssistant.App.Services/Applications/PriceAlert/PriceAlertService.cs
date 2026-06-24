@@ -79,7 +79,7 @@ public sealed class PriceAlertService : IDisposable
         RulesChanged?.Invoke();
 
         if (rule.Enabled && rule.MarketType == MarketType.Crypto)
-            _ = _wsService.SubscribeAsync([ToBinanceFormat(rule.AssetCode)]);
+            _ = SubscribeSafeAsync([ToBinanceFormat(rule.AssetCode)]);
     }
 
     public void RemoveRule(string ruleId)
@@ -108,7 +108,7 @@ public sealed class PriceAlertService : IDisposable
         RulesChanged?.Invoke();
 
         if (rule.Enabled && rule.MarketType == MarketType.Crypto)
-            _ = _wsService.SubscribeAsync([ToBinanceFormat(rule.AssetCode)]);
+            _ = SubscribeSafeAsync([ToBinanceFormat(rule.AssetCode)]);
     }
 
     private void OnCryptoPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
@@ -206,7 +206,7 @@ public sealed class PriceAlertService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "获取A股价格失败: {AssetCode}", assetCode);
+            _logger.LogWarning(ex, "获取A股价格失败: {AssetCode}", assetCode);
             return null;
         }
     }
@@ -258,7 +258,23 @@ public sealed class PriceAlertService : IDisposable
         }
 
         if (symbols.Count > 0)
-            _ = _wsService.SubscribeAsync(symbols);
+            _ = SubscribeSafeAsync(symbols);
+    }
+
+    /// <summary>
+    /// 安全的 WebSocket 订阅封装：捕获并记录异常，避免 fire-and-forget 调用吞掉错误。
+    /// </summary>
+    private async Task SubscribeSafeAsync(IReadOnlyCollection<string> symbols)
+    {
+        try
+        {
+            await _wsService.SubscribeAsync(symbols);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "WebSocket 订阅失败，价格预警可能无法实时推送: {Symbols}",
+                string.Join(", ", symbols));
+        }
     }
 
     private void LoadRules()

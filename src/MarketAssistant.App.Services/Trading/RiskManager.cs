@@ -101,6 +101,23 @@ public class RiskManager
                 }
             }
 
+            // 卖出订单校验持仓充足性：本地 FIFO 持仓追踪不允许超卖，
+            // 否则会产生负持仓并导致 PnL 计算错误。
+            if (side == OrderSide.Sell)
+            {
+                var baseAsset = ExtractBaseAsset(instrumentSymbol);
+                if (!string.IsNullOrEmpty(baseAsset))
+                {
+                    var positions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
+                    var availableQty = positions
+                        .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
+                        .Sum(p => p.Quantity);
+                    if (quantity > availableQty)
+                        return RiskCheckResult.Reject(
+                            $"卖出数量 {quantity} 超过可用持仓 {availableQty}（含部分成交未同步的偏差）");
+                }
+            }
+
             // 最大回撤熔断
             if (config.MaxDrawdownPercent > 0)
             {
@@ -114,10 +131,16 @@ public class RiskManager
                 }
             }
 
-            var dailyLossPercent = Math.Abs(todayStats.TotalPnl) / totalUSDT * 100;
-            if (todayStats.TotalPnl < 0 && dailyLossPercent >= config.MaxDailyLossPercent)
-                return RiskCheckResult.Reject(
-                    $"今日亏损 {dailyLossPercent:F1}% 已达上限 {config.MaxDailyLossPercent}%");
+            // 日亏损熔断：仅当账户总值达到有意义的最小阈值时才计算百分比，
+            // 避免极小余额（如 0.01 USDT）导致百分比爆炸误触发熔断
+            const decimal MinMeaningfulTotalUsdt = 10m;
+            if (totalUSDT >= MinMeaningfulTotalUsdt)
+            {
+                var dailyLossPercent = Math.Abs(todayStats.TotalPnl) / totalUSDT * 100;
+                if (todayStats.TotalPnl < 0 && dailyLossPercent >= config.MaxDailyLossPercent)
+                    return RiskCheckResult.Reject(
+                        $"今日亏损 {dailyLossPercent:F1}% 已达上限 {config.MaxDailyLossPercent}%");
+            }
         }
 
         if (config.RequireConfirmation && orderValueUSDT >= config.ConfirmationThreshold)

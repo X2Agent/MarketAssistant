@@ -127,6 +127,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         RecentAssets.RecentAssetSelected -= OnRecentAssetSelected;
 
         // 释放子ViewModel资源
+        Search.Dispose();
         HotAssets.Dispose();
         RecentAssets.Dispose();
         News.Dispose();

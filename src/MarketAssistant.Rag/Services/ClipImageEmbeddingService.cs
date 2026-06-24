@@ -36,6 +36,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     // 目标嵌入向量维度，引用统一常量
     private const int TargetDim = RagConstants.EmbeddingDimension;
 
+    // ImageNet 标准化参数（CLIP 模型训练时使用）
+    private static readonly float[] ImageNetMean = { 0.485f, 0.456f, 0.406f };
+    private static readonly float[] ImageNetStd = { 0.229f, 0.224f, 0.225f };
+
     // 【依赖注入】：服务的依赖项
     private readonly ILogger<ClipImageEmbeddingService> _logger;          // 结构化日志记录
     private readonly IChatCompletionService? _chat;                       // 多模态聊天服务（可选）
@@ -344,10 +348,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 图像预处理：将原始字节转换为CLIP模型所需的标准张量（简化版）
+    /// 图像预处理：将原始字节转换为CLIP模型所需的标准张量
     /// 
-    /// 【处理流程】：图像解码 -> 缩放到224x224 -> 转换为CHW张量格式
-    /// 【简化】：未移除均值和方差（ImageNet标准），此处使用更简单的归一化
+    /// 【处理流程】：图像解码 -> 缩放到224x224 -> ImageNet标准化 -> CHW张量格式
+    /// CLIP 模型训练时使用 ImageNet 均值和方差标准化，不做标准化会导致
+    /// 图像嵌入与文本嵌入向量空间错位，跨模态检索失效。
     /// </summary>
     private static DenseTensor<float> PreprocessToTensor(byte[] bytes)
     {
@@ -360,13 +365,14 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
             if (original == null) throw new InvalidOperationException("Failed to decode image");
 
             using var resized = new SKBitmap(size, size);
-            original.ScalePixels(resized, SKFilterQuality.Medium);
+            original.ScalePixels(resized, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 
             // 准备数据数组（注意batch维度）
             var tensorData = new float[1 * channels * size * size];
             var pixels = resized.Pixels;
 
             // CHW格式：Channel-Height-Width
+            // 先归一化到 [0,1]，再应用 ImageNet 标准化：(x - mean) / std
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -377,10 +383,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                     var b = pixel.Blue / 255f;
 
                     var baseIndex = y * size + x;
-                    // CHW格式：[batch, channel, height, width]
-                    tensorData[0 * size * size + baseIndex] = r;  // R通道
-                    tensorData[1 * size * size + baseIndex] = g;  // G通道  
-                    tensorData[2 * size * size + baseIndex] = b;  // B通道
+                    // CHW格式：[batch, channel, height, width]，应用 ImageNet 标准化
+                    tensorData[0 * size * size + baseIndex] = (r - ImageNetMean[0]) / ImageNetStd[0];
+                    tensorData[1 * size * size + baseIndex] = (g - ImageNetMean[1]) / ImageNetStd[1];
+                    tensorData[2 * size * size + baseIndex] = (b - ImageNetMean[2]) / ImageNetStd[2];
                 }
             }
 
@@ -400,7 +406,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     /// - L2归一化：||v|| = 1，确保余弦相似度计算准确
     /// - 维度对齐：不同模型输出维度可能不同，需要统一
     /// - 鲁棒性：处理零向量和维度不匹配情况
-    /// - 循环填充：简单有效的维度扩展策略
+    /// - 零填充/截断：避免循环填充引入周期性模式破坏余弦相似度
     /// 
     /// 【数学原理】：
     /// - L2范数：||v|| = sqrt(v1² + v2² + ... + vn²)
@@ -425,10 +431,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         // 维度匹配：若维度已正确则直接返回
         if (normalized.Length == dim) return normalized;
 
-        // 维度调整：循环填充到目标维度
+        // 维度调整：源向量短则零填充，长则截断
+        // 零填充不会引入伪周期模式，保持向量语义完整性
         var dst = new float[dim];
-        for (int i = 0; i < dim; i++)
-            dst[i] = normalized[i % normalized.Length];  // 循环复制使用原向量元素
+        var copyLen = Math.Min(normalized.Length, dim);
+        Array.Copy(normalized, dst, copyLen);
 
         return dst;
     }

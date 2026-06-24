@@ -18,6 +18,12 @@ public sealed class TokenTrackingMiddleware
     public const string InputTokensKey = "middleware:cumulativeInputTokens";
     public const string OutputTokensKey = "middleware:cumulativeOutputTokens";
 
+    /// <summary>
+    /// 单个 Agent 会话累计 Token 上限，超过后抛出异常终止执行，防止工具调用循环失控。
+    /// 正常多轮对话约消耗 30k~80k tokens，此值设为 200k 以只拦截真正的死循环。
+    /// </summary>
+    public const int MaxCumulativeTokens = 200_000;
+
     private readonly ILogger _logger;
 
     public TokenTrackingMiddleware(ILogger<TokenTrackingMiddleware> logger)
@@ -111,6 +117,17 @@ public sealed class TokenTrackingMiddleware
 
         session.StateBag.SetValue(InputTokensKey, cumulativeInput.ToString());
         session.StateBag.SetValue(OutputTokensKey, cumulativeOutput.ToString());
+
+        // 熔断：累计 Token 超过上限时抛出异常，终止 Agent 执行，防止工具调用循环失控
+        var total = cumulativeInput + cumulativeOutput;
+        if (total > MaxCumulativeTokens)
+        {
+            _logger.LogWarning(
+                "Token 熔断触发 [{Agent}] - 累计 {Total} 超过上限 {Limit}（输入 {In}, 输出 {Out}）",
+                agentName ?? "Unknown", total, MaxCumulativeTokens, cumulativeInput, cumulativeOutput);
+            throw new InvalidOperationException(
+                $"Agent 累计 Token 用量 {total} 超过熔断上限 {MaxCumulativeTokens}，已终止执行以防止工具调用循环失控");
+        }
     }
 
     /// <summary>

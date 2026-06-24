@@ -21,9 +21,11 @@ public interface IExchangeClient
     /// <summary>
     /// 对交易标的下单
     /// </summary>
+    /// <param name="clientOrderId">客户端自定义订单 ID，用于网络重试时实现幂等性，避免重复下单</param>
     Task<ExchangeOrderResult> PlaceOrderAsync(
         string instrumentSymbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
+        string? clientOrderId = null,
         CancellationToken ct = default);
 
     /// <summary>

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Navigation;
@@ -96,7 +97,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         catch (Exception ex)
         {
             Logger?.LogError(ex, "加载MCP服务器配置失败");
-            _notificationService?.ShowError($"加载配置失败: {ex.Message}");
+            _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "加载配置"));
         }
     }
 
@@ -187,7 +188,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         catch (Exception ex)
         {
             Logger?.LogError(ex, "保存MCP服务器配置失败");
-            _notificationService?.ShowError($"保存失败: {ex.Message}");
+            _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "保存配置"));
         }
     }
 
@@ -272,8 +273,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             }
             catch (Exception ex)
             {
-                TestStatus = $"连接失败: {ex.Message}";
-                _notificationService?.ShowError($"连接失败: {ex.Message}");
+                TestStatus = "连接失败";
+                _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "连接"));
                 Logger?.LogError(ex, "MCP服务器测试连接失败: {Name}", Name);
             }
         }

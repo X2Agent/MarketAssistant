@@ -9,7 +9,7 @@ namespace MarketAssistant.Trading;
 /// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算。
 /// 同一交易对在任意时刻仅允许一条下单路径进入交易所调用，避免并发重复下单。
 /// </summary>
-public class TradeExecutor
+public class TradeExecutor : IDisposable
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _symbolExecutionLocks =
         new(StringComparer.OrdinalIgnoreCase);
@@ -140,9 +140,15 @@ public class TradeExecutor
     {
         try
         {
+            // 生成幂等订单 ID：同一笔交易的所有重试使用相同 ID，
+            // 币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
+            // 币安限制 newClientOrderId 最长 36 字符，使用 Base36 编码压缩 GUID。
+            var clientOrderId = "MA" + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
+
             // 网络异常重试：最多 3 次，指数退避 1s/2s/4s。
             // 业务错误（如余额不足、风控拒绝）不重试，直接抛出。
             ExchangeOrderResult? response = null;
+            Exception? lastNetworkException = null;
             const int maxRetries = 3;
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
@@ -150,21 +156,27 @@ public class TradeExecutor
                 {
                     response = await _exchangeClient.PlaceOrderAsync(
                         instrumentSymbol, side, type, quantity,
-                        type == OrderType.Limit ? limitPrice : null, ct);
+                        type == OrderType.Limit ? limitPrice : null,
+                        clientOrderId, ct);
                     break;
                 }
-                catch (HttpRequestException ex) when (attempt < maxRetries)
+                catch (HttpRequestException ex)
                 {
+                    lastNetworkException = ex;
+                    if (attempt >= maxRetries)
+                        break;
+
                     var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
                     _logger.LogWarning(ex,
-                        "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试: {Symbol} {Side}",
-                        attempt, maxRetries, delayMs, instrumentSymbol, side);
+                        "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {Side}",
+                        attempt, maxRetries, delayMs, clientOrderId, instrumentSymbol, side);
                     await Task.Delay(delayMs, ct);
                 }
             }
 
             if (response == null)
-                throw new InvalidOperationException("交易所下单响应为空");
+                throw new InvalidOperationException(
+                    $"交易所下单响应为空（已重试 {maxRetries} 次）", lastNetworkException);
 
             var record = new TradeRecord
             {
@@ -232,4 +244,15 @@ public class TradeExecutor
         "REJECTED" or "EXPIRED" => TradeRecordStatus.Failed,
         _ => TradeRecordStatus.Pending
     };
+
+    /// <summary>
+    /// 释放所有 symbol 执行锁资源，避免长期运行后内存泄漏。
+    /// </summary>
+    public void Dispose()
+    {
+        foreach (var kvp in _symbolExecutionLocks)
+            kvp.Value.Dispose();
+        _symbolExecutionLocks.Clear();
+        GC.SuppressFinalize(this);
+    }
 }

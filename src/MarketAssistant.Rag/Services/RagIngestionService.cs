@@ -110,11 +110,19 @@ public class RagIngestionService : IRagIngestionService
                 currentOrder = nextOrder;
                 currentSection = updatedSection;
 
-                // 为所有段落生成文本嵌入并存储
-                foreach (var paragraph in paragraphs)
+                // 批量生成文本嵌入：收集所有段落文本后一次性调用嵌入 API，
+                // 避免逐条 HTTP 往返触发限流，大幅提升大文档摄取性能
+                var paragraphList = paragraphs.ToList();
+                if (paragraphList.Count > 0)
                 {
-                    paragraph.TextEmbedding = await embeddingGenerator.GenerateAsync(paragraph.Text);
-                    await collection.UpsertAsync(paragraph);
+                    var texts = paragraphList.Select(p => p.Text).ToList();
+                    var embeddings = await embeddingGenerator.GenerateAsync(texts);
+
+                    for (int i = 0; i < paragraphList.Count; i++)
+                    {
+                        paragraphList[i].TextEmbedding = embeddings[i];
+                        await collection.UpsertAsync(paragraphList[i]);
+                    }
                 }
             }
             catch (Exception ex)

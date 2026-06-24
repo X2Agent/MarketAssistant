@@ -307,10 +307,16 @@ public class RichTextBlock : UserControl
     }
 
     /// <summary>
-    /// 清理当前查看器
+    /// 清理当前查看器，释放原生资源
     /// </summary>
     private void CleanupCurrentViewer()
     {
+        // WebView 持有原生资源，必须 Dispose 避免内存泄漏
+        if (_webView is IDisposable disposableWebView)
+        {
+            try { disposableWebView.Dispose(); }
+            catch { /* 忽略 Dispose 异常 */ }
+        }
         _webView = null;
         _markdownViewer = null;
         _textBlock = null;

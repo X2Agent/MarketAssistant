@@ -322,6 +322,19 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 取消进行中的分析任务，避免旧市场的分析结果污染新市场
+        _analysisCts?.Cancel();
+        _analysisCts?.Dispose();
+        _analysisCts = null;
+        _lastReport = null;
+
+        // 重置分析状态
+        IsAnalysisInProgress = false;
+        AnalysisStage = "等待开始分析";
+        AnalysisProgressPercent = 0;
+        FailedAnalystsInfo = string.Empty;
+        CanExportReport = false;
+
         OnPropertyChanged(nameof(Title));
     }
 
@@ -335,7 +348,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             UnsubscribeFromMarketChanges(MarketContext);
 
         if (_chatSidebarViewModel != null)
+        {
             _chatSidebarViewModel.PropertyChanged -= OnChatSidebarPropertyChanged;
+            _chatSidebarViewModel.Dispose();
+        }
 
         GC.SuppressFinalize(this);
     }

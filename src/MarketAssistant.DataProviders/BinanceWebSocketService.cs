@@ -9,7 +9,7 @@ namespace MarketAssistant.Services.Data;
 /// <summary>
 /// Binance WebSocket 实时行情服务，通过 mini-ticker 推送价格更新
 /// </summary>
-public sealed class BinanceWebSocketService : IDisposable
+public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 {
     private const string WsBaseUrl = "wss://stream.binance.com:9443/stream?streams=";
     private readonly ILogger<BinanceWebSocketService> _logger;
@@ -125,7 +125,15 @@ public sealed class BinanceWebSocketService : IDisposable
         catch (WebSocketException ex)
         {
             _logger.LogWarning(ex, "Binance WebSocket 断开，将在 5 秒后重连");
-            await Task.Delay(5000, CancellationToken.None);
+            // 使用 ct 而非 CancellationToken.None，确保应用关闭时重连延迟可被取消
+            try
+            {
+                await Task.Delay(5000, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
             if (!ct.IsCancellationRequested)
                 _ = ReconnectAsync();
         }
@@ -156,7 +164,7 @@ public sealed class BinanceWebSocketService : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "解析 WebSocket 消息失败");
+            _logger.LogWarning(ex, "解析 WebSocket 消息失败");
         }
     }
 
@@ -185,6 +193,15 @@ public sealed class BinanceWebSocketService : IDisposable
             _ws.Dispose();
             _ws = null;
         }
+    }
+
+    /// <summary>
+    /// 异步释放资源，避免在 UI 线程上同步等待异步关闭操作造成死锁
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await DisconnectAsync().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
     }
 
     public void Dispose()

@@ -41,6 +41,23 @@ public class MarketMonitor : IDisposable
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _strategyLocks = new();
 
+    /// <summary>
+    /// 已取消的 Token，用于 _cts 为 null 时（未启动或已释放）确保异步操作立即返回而非不可取消地继续执行。
+    /// 使用 CancellationToken.None 会导致操作不可取消，在 StopAsync/Dispose 后仍可能执行交易。
+    /// </summary>
+    private static readonly CancellationToken StoppedToken = new(canceled: true);
+
+    /// <summary>
+    /// 获取当前可用的 CancellationToken：运行中返回 _cts.Token，未运行或已释放返回已取消的 Token。
+    /// </summary>
+    private CancellationToken MonitorToken => _cts?.Token ?? StoppedToken;
+
+    /// <summary>
+    /// 正在执行的策略任务列表，用于 StopAsync 时等待全部完成，避免订单已发送但本地状态未更新
+    /// </summary>
+    private readonly List<Task> _pendingStrategyTasks = [];
+    private readonly object _pendingTasksLock = new();
+
     // 适配 BinanceWebSocketService.PriceUpdated 事件签名（Action<string, decimal, decimal>）
     // 到不含 changePercent 的 OnPriceUpdated 处理方法，需存储委托实例以支持 -= 取消订阅
     private readonly Action<string, decimal, decimal> _priceUpdatedAdapter;
@@ -133,6 +150,24 @@ public class MarketMonitor : IDisposable
                 catch (OperationCanceledException) { }
             }
 
+            // 等待所有正在执行的策略任务完成，避免订单已发送但本地状态未更新
+            Task[] pendingTasks;
+            lock (_pendingTasksLock)
+                pendingTasks = _pendingStrategyTasks.ToArray();
+
+            if (pendingTasks.Length > 0)
+            {
+                _logger.LogInformation("等待 {Count} 个策略任务完成...", pendingTasks.Length);
+                try
+                {
+                    await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex, "等待策略任务完成时超时或出错，部分状态可能未持久化");
+                }
+            }
+
             await _webSocketService.UnsubscribeAllAsync();
 
             _isRunning = false;
@@ -185,7 +220,17 @@ public class MarketMonitor : IDisposable
                 {
                     var triggered = await _strategyEngine.EvaluateAndUpdateStrategiesAsync(symbol, price, ct);
                     foreach (var strategy in triggered)
-                        _ = ExecuteWithStrategyLockAsync(strategy, price, ct);
+                    {
+                        var task = ExecuteWithStrategyLockAsync(strategy, price, ct);
+                        lock (_pendingTasksLock)
+                            _pendingStrategyTasks.Add(task);
+                        // 任务完成后自动从列表移除，避免无限增长
+                        _ = task.ContinueWith(t =>
+                        {
+                            lock (_pendingTasksLock)
+                                _pendingStrategyTasks.Remove(t);
+                        }, TaskScheduler.Default);
+                    }
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
@@ -236,7 +281,7 @@ public class MarketMonitor : IDisposable
             {
                 strategy.Side = strategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
                 var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
-                    strategy, currentPrice, boundaryReasoning, ct: _cts?.Token ?? default);
+                    strategy, currentPrice, boundaryReasoning, ct: MonitorToken);
                 if (boundaryResult.Success && boundaryResult.Record != null)
                     TradeExecuted?.Invoke(boundaryResult.Record);
                 await CheckStrategyCompletionAsync(strategy);
@@ -250,7 +295,7 @@ public class MarketMonitor : IDisposable
             // 网格交易：交易成功后原子地持久化更新后的网格参数，防止计数和参数不一致
             var pendingCustomParams = strategy.Type == StrategyType.GridTrading ? strategy.CustomParams : null;
             var result = await _tradeExecutor.ExecuteTradeAsync(
-                strategy, currentPrice, pendingCustomParams: pendingCustomParams, ct: _cts?.Token ?? default);
+                strategy, currentPrice, pendingCustomParams: pendingCustomParams, ct: MonitorToken);
 
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
@@ -319,7 +364,7 @@ public class MarketMonitor : IDisposable
     /// </summary>
     private async Task<string> BuildAIPromptAsync(TradingStrategy strategy, decimal currentPrice)
     {
-        var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, _cts?.Token ?? default)
+        var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, MonitorToken)
             .ConfigureAwait(false);
         var recentSummary = priorRecords.Count == 0
             ? "（该策略尚无成交记录）"
@@ -336,7 +381,7 @@ public class MarketMonitor : IDisposable
             ? $"止盈价: {strategy.TakeProfitPrice.Value}"
             : "未设置止盈";
         var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
-        var todayStats = await _dataService.GetTodayStatsAsync(_cts?.Token ?? default);
+        var todayStats = await _dataService.GetTodayStatsAsync(MonitorToken);
         var maxDailyTrades = _dataService.LoadRiskConfig().MaxDailyTrades;
         var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
 
@@ -387,7 +432,7 @@ public class MarketMonitor : IDisposable
         };
 
         var response = await agent.RunAsync(messages, session: null, options: null,
-            cancellationToken: _cts?.Token ?? default);
+            cancellationToken: MonitorToken);
         _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
     }
 
@@ -420,14 +465,14 @@ public class MarketMonitor : IDisposable
     {
         try
         {
-            var positions = await _portfolioService.GetCurrentPositionsAsync(_cts?.Token ?? default);
+            var positions = await _portfolioService.GetCurrentPositionsAsync(MonitorToken);
             var symbolPosition = positions.FirstOrDefault(p =>
                 p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
             var positionLine = symbolPosition != null
                 ? $"持仓: 数量 {symbolPosition.Quantity} | 入场均价 {symbolPosition.EntryPrice} | 未实现盈亏 {symbolPosition.UnrealizedPnl:F2} USDT ({symbolPosition.UnrealizedPnlPercent:F1}%)"
                 : "当前无持仓";
 
-            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, _cts?.Token ?? default);
+            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, MonitorToken);
             var siblings = activeStrategies
                 .Where(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))
                 .Select(s => $"{s.Type}(触发价:{s.TriggerPrice})")

@@ -60,7 +60,6 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result, "嵌入结果不应为null");
-        Assert.IsNotNull(result.Vector, "嵌入向量不应为null");
         Assert.AreEqual(1024, result.Vector.Length, "向量维度应为1024");
     }
 
@@ -99,7 +98,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
         // Assert - 应该优雅处理（哈希降级或模型输出）
         Assert.IsNotNull(result, "无效图像应返回降级结果");
-        Assert.IsNotNull(result.Vector, "无效图像应返回降级向量");
+        Assert.IsFalse(result.Vector.IsEmpty, "降级向量不应为空");
         Assert.AreEqual(1024, result.Vector.Length, "降级向量维度应正确");
     }
 

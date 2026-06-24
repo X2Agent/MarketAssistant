@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 
@@ -66,7 +67,7 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤2/3] 投资标的筛选失败");
-            throw new InvalidOperationException($"投资标的筛选失败: {ex.Message}", ex);
+            throw new FriendlyException("投资标的筛选失败，请稍后重试", ex);
         }
     }
 }

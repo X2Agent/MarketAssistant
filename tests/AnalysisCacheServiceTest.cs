@@ -16,11 +16,11 @@ namespace TestMarketAssistant;
 [TestClass]
 public class AnalysisCacheServiceTest
 {
-    private Mock<ILogger<AnalysisCacheService>> _mockLogger;
-    private Mock<IUserSettingService> _mockSettingService;
-    private IMemoryCache _memoryCache;
-    private AnalysisCacheService _cacheService;
-    private MarketContext _marketContext;
+    private Mock<ILogger<AnalysisCacheService>> _mockLogger = null!;
+    private Mock<IUserSettingService> _mockSettingService = null!;
+    private IMemoryCache _memoryCache = null!;
+    private AnalysisCacheService _cacheService = null!;
+    private MarketContext _marketContext = null!;
 
     [TestInitialize]
     public void Setup()

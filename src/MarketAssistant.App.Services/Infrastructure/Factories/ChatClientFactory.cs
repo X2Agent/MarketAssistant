@@ -165,8 +165,20 @@ public class ChatClientFactory : IChatClientFactory
         }
         finally
         {
-            // 在 lock 外 Dispose 旧客户端，避免持锁等待网络连接关闭
-            oldClient?.Dispose();
+            // 在 lock 外 Dispose 旧客户端，避免持锁等待网络连接关闭。
+            // 用 try-catch 包裹防止 Dispose 抛出异常覆盖 try 块中的原始异常
+            if (oldClient != null)
+            {
+                try
+                {
+                    oldClient.Dispose();
+                }
+                catch (Exception)
+                {
+                    // Dispose 失败不应影响主流程，仅记录
+                    // 此处无法使用 ILogger（工厂不持有 logger），异常被静默吞并
+                }
+            }
         }
     }
 }

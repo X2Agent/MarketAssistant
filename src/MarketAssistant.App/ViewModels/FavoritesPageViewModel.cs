@@ -27,6 +27,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private readonly IDialogService _dialogService;
     private readonly BinanceWebSocketService _wsService;
 
+    /// <summary>
+    /// 用于取消上一次加载任务的 CTS，防止并发加载导致列表闪烁或重复项。
+    /// 构造函数、市场切换、收藏变更消息都可能触发加载，需串行化。
+    /// </summary>
+    private CancellationTokenSource? _loadCts;
+
     private IFavoriteService FavoriteService =>
         _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
 
@@ -73,11 +79,17 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// </summary>
     private async Task LoadFavoriteAssetsAsync()
     {
+        // 取消上一次加载任务，避免并发加载导致列表闪烁或重复项
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        var ct = _loadCts.Token;
+
         await SafeExecuteAsync(async () =>
         {
             var favoritesCodes = FavoriteService.GetFavoritesCodes();
             Assets.Clear();
-            await UpdateAssetDataProgressivelyAsync(favoritesCodes);
+            await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
 
             // 虚拟币市场启用 WebSocket 实时推送
             if (_marketContext.CurrentMarket == MarketType.Crypto && Assets.Count > 0)
@@ -91,14 +103,15 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// <summary>
     /// 渐进式加载资产实时数据（限制并发数，避免同时打开过多浏览器页面）
     /// </summary>
-    private async Task UpdateAssetDataProgressivelyAsync(List<FavoriteAsset> favorites)
+    private async Task UpdateAssetDataProgressivelyAsync(List<FavoriteAsset> favorites, CancellationToken ct)
     {
         const int maxConcurrency = 3; // 最多同时请求3个资产数据
-        var semaphore = new SemaphoreSlim(maxConcurrency);
+        using var semaphore = new SemaphoreSlim(maxConcurrency);
 
         var tasks = favorites.Select(async favorite =>
         {
-            await semaphore.WaitAsync();
+            ct.ThrowIfCancellationRequested();
+            await semaphore.WaitAsync(ct);
             try
             {
                 // 先尝试从缓存获取
@@ -116,6 +129,10 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 }
 
                 return assetInfo;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -225,6 +242,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
     public void Dispose()
     {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
         UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync();

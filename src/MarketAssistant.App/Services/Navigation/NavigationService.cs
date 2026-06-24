@@ -187,10 +187,12 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
     /// </summary>
     public void NavigateToRoot(ViewModelBase viewModel, string rootNavigationItemTitle)
     {
-        // 清空并释放所有页面
+        // 清空并释放所有页面：先通知 OnNavigatedFrom 再 Dispose，确保资源正确清理
         while (_navigationStack.Count > 0)
         {
             var item = _navigationStack.Pop();
+            if (item.ViewModel is INavigationAware aware)
+                aware.OnNavigatedFrom();
             DisposeViewModel(item.ViewModel);
         }
 
@@ -210,6 +212,8 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         while (_navigationStack.Count > 0)
         {
             var item = _navigationStack.Pop();
+            if (item.ViewModel is INavigationAware aware)
+                aware.OnNavigatedFrom();
             DisposeViewModel(item.ViewModel);
         }
 

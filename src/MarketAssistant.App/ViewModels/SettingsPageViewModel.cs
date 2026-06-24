@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
@@ -22,7 +23,7 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 设置页ViewModel
 /// </summary>
-public partial class SettingsPageViewModel : ViewModelBase
+public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 {
     private readonly IRagIngestionService _ragIngestionService;
     private readonly INotificationService _notificationService;
@@ -497,7 +498,7 @@ public partial class SettingsPageViewModel : ViewModelBase
         {
             VectorizingProgressText = "向量化失败";
             Logger?.LogError(ex, "向量化过程发生严重错误");
-            _notificationService.ShowError($"向量化失败：{ex.Message}");
+            _notificationService.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "向量化"));
         }
         finally
         {
@@ -629,5 +630,19 @@ public partial class SettingsPageViewModel : ViewModelBase
             System.Diagnostics.Process.Start(psi);
             await Task.CompletedTask;
         }, "打开链接");
+    }
+
+    private bool _disposed;
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        // 取消 UserSetting.PropertyChanged 订阅，避免 Singleton 持有已释放 ViewModel 的引用
+        if (UserSetting is not null)
+            UserSetting.PropertyChanged -= ForwardComputedProperties;
+
+        GC.SuppressFinalize(this);
     }
 }

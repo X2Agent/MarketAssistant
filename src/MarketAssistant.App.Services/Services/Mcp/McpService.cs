@@ -68,6 +68,16 @@ public class McpService : IAsyncDisposable
 
                 var mcpTools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
 
+                // 安全策略：AllowedTools 为空时允许所有工具加载，但发出安全警告，
+                // 提示用户显式配置白名单以实现最小暴露原则。
+                if (config.AllowedTools.Count == 0)
+                {
+                    _logger.LogWarning(
+                        "MCP 服务器 {Name} 未配置 AllowedTools 白名单，将加载全部 {Count} 个工具。" +
+                        "建议在配置中显式指定允许的工具以遵循最小暴露原则。",
+                        config.Name, mcpTools.Count);
+                }
+
                 foreach (var tool in mcpTools.Cast<AITool>())
                 {
                     var toolName = tool.Name;

@@ -47,7 +47,7 @@ public class BinanceAccountService
             _logger.LogInformation("正在获取币安账户信息...");
             using var httpClient = _httpClientFactory.CreateClient("Binance");
             var response = await httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessWithBinanceErrorAsync(response, "获取账户信息", cancellationToken);
 
             var accountInfo = await response.Content.ReadFromJsonAsync<BinanceAccountInfo>(cancellationToken);
 
@@ -80,16 +80,25 @@ public class BinanceAccountService
     /// <param name="type">订单类型：LIMIT、MARKET等</param>
     /// <param name="quantity">数量</param>
     /// <param name="price">价格（限价单需要）</param>
+    /// <param name="clientOrderId">客户端自定义订单 ID，用于幂等性保护</param>
     public async Task<BinanceOrderResponse> PlaceOrderAsync(
         string symbol,
         string side,
         string type,
         decimal quantity,
         decimal? price = null,
+        string? clientOrderId = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
+            // 下单前校验账户交易权限，避免账户被限制时产生无效请求
+            var accountInfo = await GetAccountInfoAsync(cancellationToken);
+            if (!accountInfo.CanTrade)
+            {
+                throw new FriendlyException("账户当前被限制交易，无法下单（可能因违规、KYC 未完成或地区限制）");
+            }
+
             // 1. 构建请求参数
             // 注意：数量/价格必须使用 InvariantCulture 格式化，否则在逗号小数区域（如 de-DE）
             // 会生成 "1,23456789"，币安 API 返回 -1100 非法字符错误。
@@ -100,6 +109,10 @@ public class BinanceAccountService
                 ["type"] = type.ToUpper(),
                 ["quantity"] = quantity.ToString("F8", CultureInfo.InvariantCulture)
             };
+
+            // 幂等性：传入 newClientOrderId 后，币安对同一 ID 的重复请求返回同一订单而非新建
+            if (!string.IsNullOrEmpty(clientOrderId))
+                parameters["newClientOrderId"] = clientOrderId;
 
             // 限价单需要价格和timeInForce
             if (type.ToUpper() == "LIMIT")
@@ -129,7 +142,7 @@ public class BinanceAccountService
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
             var response = await httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessWithBinanceErrorAsync(response, "下单", cancellationToken);
 
             // 6. 解析响应
             var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken);
@@ -172,7 +185,7 @@ public class BinanceAccountService
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
             var response = await httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessWithBinanceErrorAsync(response, "查询订单", cancellationToken);
 
             var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
                 ?? throw new FriendlyException("解析订单信息失败");
@@ -209,7 +222,7 @@ public class BinanceAccountService
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
             var response = await httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessWithBinanceErrorAsync(response, "取消订单", cancellationToken);
 
             var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
                 ?? throw new FriendlyException("解析取消订单响应失败");
@@ -245,7 +258,7 @@ public class BinanceAccountService
 
             using var httpClient = _httpClientFactory.CreateClient("Binance");
             var response = await httpClient.SendAsync(request, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            await EnsureSuccessWithBinanceErrorAsync(response, "查询挂单", cancellationToken);
 
             return await response.Content.ReadFromJsonAsync<List<BinanceOrderResponse>>(cancellationToken) ?? [];
         }
@@ -259,6 +272,45 @@ public class BinanceAccountService
             _logger.LogError(ex, "查询挂单失败");
             throw new FriendlyException($"查询挂单失败: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// 统一的币安响应错误处理：读取响应体并解析币安错误码，
+    /// 抛出包含详细信息的 FriendlyException，而非泛化的 HTTP 状态码错误。
+    /// 币安错误响应格式：{"code":-1013,"msg":"..."}
+    /// </summary>
+    private async Task EnsureSuccessWithBinanceErrorAsync(
+        HttpResponseMessage response, string operation, CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var statusCode = (int)response.StatusCode;
+        string errorDetail;
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var error = JsonSerializer.Deserialize<BinanceApiError>(content);
+            errorDetail = error != null && !string.IsNullOrEmpty(error.Msg)
+                ? $"[{error.Code}] {error.Msg}"
+                : (string.IsNullOrEmpty(content) ? $"HTTP {statusCode}" : content);
+        }
+        catch
+        {
+            errorDetail = $"HTTP {statusCode}";
+        }
+
+        _logger.LogError("{Operation} 失败: {Detail}", operation, errorDetail);
+        throw new FriendlyException($"{operation}失败: {errorDetail}");
+    }
+
+    /// <summary>
+    /// 币安 REST API 错误响应模型
+    /// </summary>
+    private sealed class BinanceApiError
+    {
+        public int Code { get; set; }
+        public string Msg { get; set; } = string.Empty;
     }
 }
 

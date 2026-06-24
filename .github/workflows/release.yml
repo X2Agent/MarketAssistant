@@ -309,7 +309,7 @@ jobs:
 
             请根据操作系统选择对应安装包：
             - **Windows**: `MarketAssistant-Windows-x64.zip`（便携版）或 `MarketAssistant-Setup-<version>.exe`（安装版）
-            - **macOS**: `MarketAssistant-<version>.dmg`
+            - **macOS**: `MarketAssistant-<version>.dmg`（Universal Binary，同时支持 Apple Silicon 和 Intel）
             - **Linux**: `MarketAssistant-<version>-amd64.deb`（Debian/Ubuntu）或 `MarketAssistant-<version>-x86_64.rpm`（Fedora/RHEL）
 
             完整性校验请参考 `SHA256SUMS.txt`。

@@ -402,3 +402,9 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 .idea/
+
+# Secrets and credentials
+.secrets
+.env
+*.pem
+*.key

@@ -1,16 +1,27 @@
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
-/// MCP服务器配置服务，提供对MCPServerConfig的统一访问和管理
+/// MCP服务器配置服务，提供对MCPServerConfig的统一访问和管理。
+/// 所有读写操作通过锁保护，确保 UI 线程与后台线程并发访问时的线程安全。
 /// </summary>
 public class MCPServerConfigService
 {
     private List<MCPServerConfig> _serverConfigs = new();
+    private readonly object _lock = new();
 
     /// <summary>
-    /// 当前所有MCP服务器配置
+    /// 当前所有MCP服务器配置（返回副本，避免外部修改影响内部状态）
     /// </summary>
-    public List<MCPServerConfig> ServerConfigs => _serverConfigs;
+    public List<MCPServerConfig> ServerConfigs
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _serverConfigs.ToList();
+            }
+        }
+    }
 
     // 配置文件路径
     private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName);
@@ -29,10 +40,13 @@ public class MCPServerConfigService
     /// </summary>
     public void LoadConfigs()
     {
-        if (File.Exists(_configFilePath))
+        lock (_lock)
         {
-            string json = File.ReadAllText(_configFilePath);
-            _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(json) ?? new List<MCPServerConfig>();
+            if (File.Exists(_configFilePath))
+            {
+                string json = File.ReadAllText(_configFilePath);
+                _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(json) ?? new List<MCPServerConfig>();
+            }
         }
     }
 
@@ -41,6 +55,12 @@ public class MCPServerConfigService
     /// </summary>
     public void SaveConfigs()
     {
+        List<MCPServerConfig> snapshot;
+        lock (_lock)
+        {
+            snapshot = _serverConfigs.ToList();
+        }
+
         // 确保目录存在
         var directory = Path.GetDirectoryName(_configFilePath);
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -49,7 +69,7 @@ public class MCPServerConfigService
         }
 
         // 序列化配置对象
-        var json = JsonSerializer.Serialize(_serverConfigs, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
 
         // 保存到文件
         File.WriteAllText(_configFilePath, json);
@@ -61,17 +81,20 @@ public class MCPServerConfigService
     /// <param name="config">MCP服务器配置</param>
     public void AddOrUpdateConfig(MCPServerConfig config)
     {
-        // 查找是否已存在相同ID的配置
-        int index = _serverConfigs.FindIndex(c => c.Id == config.Id);
-        if (index >= 0)
+        lock (_lock)
         {
-            // 更新现有配置
-            _serverConfigs[index] = config;
-        }
-        else
-        {
-            // 添加新配置
-            _serverConfigs.Add(config);
+            // 查找是否已存在相同ID的配置
+            int index = _serverConfigs.FindIndex(c => c.Id == config.Id);
+            if (index >= 0)
+            {
+                // 更新现有配置
+                _serverConfigs[index] = config;
+            }
+            else
+            {
+                // 添加新配置
+                _serverConfigs.Add(config);
+            }
         }
 
         // 保存更改
@@ -84,8 +107,11 @@ public class MCPServerConfigService
     /// <param name="id">配置ID</param>
     public void DeleteConfig(string id)
     {
-        // 查找并删除配置
-        _serverConfigs.RemoveAll(c => c.Id == id);
+        lock (_lock)
+        {
+            // 查找并删除配置
+            _serverConfigs.RemoveAll(c => c.Id == id);
+        }
 
         // 保存更改
         SaveConfigs();
@@ -98,6 +124,9 @@ public class MCPServerConfigService
     /// <returns>MCP服务器配置，如果不存在则返回null</returns>
     public MCPServerConfig? GetConfig(string id)
     {
-        return _serverConfigs.FirstOrDefault(c => c.Id == id);
+        lock (_lock)
+        {
+            return _serverConfigs.FirstOrDefault(c => c.Id == id);
+        }
     }
 }

@@ -18,7 +18,7 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 资产详情页ViewModel
 /// </summary>
-public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>
+public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
     public override string Title => "资产详情";
 
@@ -176,9 +176,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            KLineData = new ObservableCollection<KLineData>(kLineDataList);
-
-            CalculatePriceInfo(kLineDataList);
+            // 在 UI 线程上更新 ObservableCollection，避免后台线程修改绑定属性
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                KLineData = new ObservableCollection<KLineData>(kLineDataList);
+                CalculatePriceInfo(kLineDataList);
+            });
         }
         catch (OperationCanceledException)
         {
@@ -287,6 +290,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     {
         _loadingCancellationTokenSource?.Cancel();
         _wsService.PriceUpdated -= OnDetailPriceUpdated;
+    }
+
+    public void Dispose()
+    {
+        _loadingCancellationTokenSource?.Cancel();
+        _loadingCancellationTokenSource?.Dispose();
+        _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        GC.SuppressFinalize(this);
     }
 }
 

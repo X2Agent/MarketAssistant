@@ -11,7 +11,7 @@ namespace MarketAssistant.Applications.Analysis;
 /// 分析编排服务，封装工作流执行、缓存管理和报告归档逻辑，
 /// 将 ViewModel 与工作流实现解耦
 /// </summary>
-public class AnalysisOrchestrationService
+public class AnalysisOrchestrationService : IDisposable
 {
     private readonly MarketAnalysisWorkflow _workflow;
     private readonly IAnalysisCacheService _cacheService;
@@ -112,6 +112,17 @@ public class AnalysisOrchestrationService
         string assetCode, CancellationToken cancellationToken = default)
     {
         return await _archiveService.GetSummariesAsync(assetCode, 20, cancellationToken);
+    }
+
+    /// <summary>
+    /// 释放所有按标的加锁的 SemaphoreSlim 资源，避免长期运行后内存泄漏。
+    /// </summary>
+    public void Dispose()
+    {
+        foreach (var kvp in _perAssetLocks)
+            kvp.Value.Dispose();
+        _perAssetLocks.Clear();
+        GC.SuppressFinalize(this);
     }
 }
 

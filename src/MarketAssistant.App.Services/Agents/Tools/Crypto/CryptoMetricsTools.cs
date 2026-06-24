@@ -247,7 +247,7 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                     TradeId = obj["id"]?.GetValue<long>() ?? 0,
                     Price = price,
                     Quantity = qty,
-                    QuoteQuantity = obj["quoteQty"] != null ? decimal.Parse(obj["quoteQty"].GetValue<string>(), CultureInfo.InvariantCulture) : price * qty,
+                    QuoteQuantity = decimal.Parse(obj["quoteQty"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
                     Timestamp = obj["time"]?.GetValue<long>() ?? 0,
                     IsBuyerMaker = isBuyerMaker
                 });

@@ -28,6 +28,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
     private readonly Dictionary<int, int> _listItemCounters = new();
     private int _imageCounter = 0;
 
+    /// <summary>
+    /// 转换过程串行化锁：实例字段在并发调用时非线程安全，
+    /// 同一 Singleton 实例的并发转换必须串行执行。
+    /// </summary>
+    private readonly SemaphoreSlim _convertLock = new(1, 1);
+
     public DocxMarkdownConverter(IImageStorageService imageStorageService)
     {
         _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
@@ -37,6 +43,20 @@ public class DocxMarkdownConverter : IMarkdownConverter
         filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
     public async Task<string> ConvertToMarkdownAsync(string filePath)
+    {
+        // 串行化转换：实例字段（_numberingFormats 等）在并发调用时非线程安全
+        await _convertLock.WaitAsync();
+        try
+        {
+            return await ConvertCoreAsync(filePath);
+        }
+        finally
+        {
+            _convertLock.Release();
+        }
+    }
+
+    private async Task<string> ConvertCoreAsync(string filePath)
     {
         try
         {

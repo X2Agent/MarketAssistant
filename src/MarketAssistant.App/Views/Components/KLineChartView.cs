@@ -51,7 +51,10 @@ public class KLineChartView : UserControl
         if (change.Property == DataProperty)
         {
             // 当数据源发生变化时，自动更新图表
-            _ = UpdateChartAsync(change.NewValue as IEnumerable<KLineData>);
+            if (change.NewValue is IEnumerable<KLineData> data)
+            {
+                _ = UpdateChartAsync(data);
+            }
         }
     }
 

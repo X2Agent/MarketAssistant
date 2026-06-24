@@ -7,6 +7,24 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MarketAssistant.Services.Market;
 
 /// <summary>
+/// 市场切换事件参数
+/// </summary>
+public class MarketChangedEventArgs : EventArgs
+{
+    /// <summary>切换前的市场</summary>
+    public MarketType PreviousMarket { get; }
+
+    /// <summary>切换后的市场</summary>
+    public MarketType NewMarket { get; }
+
+    public MarketChangedEventArgs(MarketType previousMarket, MarketType newMarket)
+    {
+        PreviousMarket = previousMarket;
+        NewMarket = newMarket;
+    }
+}
+
+/// <summary>
 /// 市场上下文服务，管理当前激活的市场类型
 /// </summary>
 public class MarketContext : INotifyPropertyChanged
@@ -41,15 +59,23 @@ public class MarketContext : INotifyPropertyChanged
         _serviceProvider.GetRequiredKeyedService<IMarketCapability>(CurrentMarket);
 
     /// <summary>
+    /// 市场切换事件，供后端服务订阅以清理状态或暂停后台任务。
+    /// 与 PropertyChanged 不同，此事件携带前后市场信息，且语义明确。
+    /// </summary>
+    public event EventHandler<MarketChangedEventArgs>? MarketChanged;
+
+    /// <summary>
     /// 切换市场
     /// </summary>
     /// <param name="newMarket">新的市场类型</param>
     public void SwitchMarket(MarketType newMarket)
     {
+        MarketType previousMarket;
         lock (_marketLock)
         {
             if (_currentMarket == newMarket)
                 return;
+            previousMarket = _currentMarket;
             _currentMarket = newMarket;
             CurrentMarketType = newMarket;
         }
@@ -57,6 +83,7 @@ public class MarketContext : INotifyPropertyChanged
         _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
         _userSettingService.SaveSettings();
         OnPropertyChanged(nameof(CurrentMarket));
+        MarketChanged?.Invoke(this, new MarketChangedEventArgs(previousMarket, newMarket));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
