@@ -10,22 +10,22 @@ public interface IFavoriteService
     /// <summary>
     /// 添加资产到收藏
     /// </summary>
-    void AddFavorite(string code, string market);
+    Task AddFavoriteAsync(string code, string market, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 从收藏中移除资产
     /// </summary>
-    void RemoveFavorite(string code, string market);
+    Task RemoveFavoriteAsync(string code, string market, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 检查资产是否已收藏
     /// </summary>
-    bool IsFavorite(string code, string market);
+    Task<bool> IsFavoriteAsync(string code, string market, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取所有收藏的资产代码
     /// </summary>
-    List<FavoriteAsset> GetFavoritesCodes();
+    Task<List<FavoriteAsset>> GetFavoritesCodesAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取所有收藏的资产（包含最新数据）
@@ -35,11 +35,5 @@ public interface IFavoriteService
     /// <summary>
     /// 清空所有收藏
     /// </summary>
-    void ClearFavorites();
+    Task ClearFavoritesAsync(CancellationToken cancellationToken = default);
 }
-
-
-
-
-
-

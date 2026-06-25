@@ -290,13 +290,13 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         }
 
         var favoriteService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
-        if (favoriteService.IsFavorite(code, market))
+        if (await favoriteService.IsFavoriteAsync(code, market))
         {
             await _dialogService.ShowMessageAsync("提示", $"{stock.Name} ({stock.Symbol}) 已在自选列表中");
             return;
         }
 
-        favoriteService.AddFavorite(code, market);
+        await favoriteService.AddFavoriteAsync(code, market);
         await _dialogService.ShowMessageAsync("成功", $"已将 {stock.Name} ({stock.Symbol}) 加入自选");
     }
 

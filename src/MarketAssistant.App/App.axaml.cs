@@ -34,8 +34,9 @@ public partial class App : Application
         GlobalExceptionHandler.Initialize(
             ServiceProvider.GetRequiredService<GlobalExceptionHandler>());
 
-        // 激活价格预警服务：触发历史存储迁移 + 启动后台监控
-        ServiceProvider.GetRequiredService<PriceAlertService>();
+        // 激活价格预警服务：异步加载规则 + 启动后台监控
+        var priceAlertService = ServiceProvider.GetRequiredService<PriceAlertService>();
+        _ = priceAlertService.InitializeAsync();
 
         // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();

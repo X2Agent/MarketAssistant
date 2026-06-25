@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
@@ -10,12 +9,12 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Trading;
 
 /// <summary>
-/// 交易数据持久化服务，管理策略、交易记录和日统计的 SQLite 存储
+/// 交易数据持久化服务，管理策略、交易记录和日统计的 SQLite 存储。
 /// </summary>
 public class TradingDataService : SqliteServiceBase
 {
     public TradingDataService(ILogger<TradingDataService> logger)
-        : base("trading.db", logger)
+        : base(logger)
     {
     }
 
@@ -594,13 +593,16 @@ public class TradingDataService : SqliteServiceBase
         return 0;
     }
 
-    public RiskConfig LoadRiskConfig()
+    public async Task<RiskConfig> LoadRiskConfigAsync(CancellationToken ct = default)
     {
-        // 一次性迁移历史单一键到按市场分键存储
-        MigrateLegacyRiskConfigIfNeeded();
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT config_json FROM risk_config WHERE market_type = @marketType";
+        cmd.Parameters.AddWithValue("@marketType", (int)MarketType.Crypto);
 
-        var json = Preferences.Default.Get(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), string.Empty);
-        if (string.IsNullOrEmpty(json))
+        var result = await cmd.ExecuteScalarAsync(ct);
+        if (result is not string json || string.IsNullOrEmpty(json))
             return new RiskConfig();
         try
         {
@@ -613,24 +615,20 @@ public class TradingDataService : SqliteServiceBase
         }
     }
 
-    public void SaveRiskConfig(RiskConfig config)
+    public async Task SaveRiskConfigAsync(RiskConfig config, CancellationToken ct = default)
     {
-        var json = JsonSerializer.Serialize(config);
-        Preferences.Default.Set(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), json);
-    }
-
-    /// <summary>
-    /// 将历史单一存储键 <see cref="PreferenceKeys.TradingRiskConfig"/> 迁移到按市场分键存储，迁移后清除旧键。
-    /// </summary>
-    private void MigrateLegacyRiskConfigIfNeeded()
-    {
-        var legacyJson = Preferences.Default.Get(PreferenceKeys.TradingRiskConfig, string.Empty);
-        if (string.IsNullOrEmpty(legacyJson))
-            return;
-
-        Preferences.Default.Set(PreferenceKeys.GetTradingRiskConfigKey(MarketType.Crypto), legacyJson);
-        Preferences.Default.Remove(PreferenceKeys.TradingRiskConfig);
-        Logger.LogInformation("已将交易风控配置从历史键迁移到按市场分键存储");
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO risk_config (market_type, config_json, updated_at)
+            VALUES (@marketType, @configJson, @updatedAt)
+            ON CONFLICT(market_type) DO UPDATE SET config_json = @configJson, updated_at = @updatedAt
+            """;
+        cmd.Parameters.AddWithValue("@marketType", (int)MarketType.Crypto);
+        cmd.Parameters.AddWithValue("@configJson", JsonSerializer.Serialize(config));
+        cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     #endregion
@@ -712,6 +710,12 @@ public class TradingDataService : SqliteServiceBase
                     date TEXT PRIMARY KEY,
                     total_value_usdt REAL NOT NULL,
                     snapshot_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS risk_config (
+                    market_type INTEGER PRIMARY KEY,
+                    config_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();

@@ -49,11 +49,11 @@ public sealed class HomeAssetService : IHomeAssetService
     public Task<List<HotAsset>> GetHotAssetsAsync()
         => _assetInfoService.GetHotAssetsAsync();
 
-    public List<AssetItem> GetRecentAssets()
-        => _historyService.GetHistory();
+    public Task<List<AssetItem>> GetRecentAssetsAsync(CancellationToken cancellationToken = default)
+        => _historyService.GetHistoryAsync(cancellationToken);
 
-    public void AddToRecentAssets(AssetItem asset)
-        => _historyService.AddHistory(asset);
+    public async Task AddToRecentAssetsAsync(AssetItem asset, CancellationToken cancellationToken = default)
+        => await _historyService.AddHistoryAsync(asset, cancellationToken);
 
     public async Task<bool> AddToFavoriteAsync(object assetParameter)
     {
@@ -67,7 +67,7 @@ public sealed class HomeAssetService : IHomeAssetService
             return false;
         }
 
-        if (_favoriteService.IsFavorite(code, market))
+        if (await _favoriteService.IsFavoriteAsync(code, market))
         {
             var alreadyMsg = _marketType == MarketType.Crypto
                 ? "该虚拟币已在收藏列表中"
@@ -85,7 +85,7 @@ public sealed class HomeAssetService : IHomeAssetService
         if (!confirmed)
             return false;
 
-        _favoriteService.AddFavorite(code, market);
+        await _favoriteService.AddFavoriteAsync(code, market);
         await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
         return true;
     }

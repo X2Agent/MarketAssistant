@@ -87,7 +87,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
         await SafeExecuteAsync(async () =>
         {
-            var favoritesCodes = FavoriteService.GetFavoritesCodes();
+            var favoritesCodes = await FavoriteService.GetFavoritesCodesAsync();
             Assets.Clear();
             await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
 
@@ -207,7 +207,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 }
 
                 // 再从持久化存储中移除
-                FavoriteService.RemoveFavorite(asset.Code, asset.Market);
+                await FavoriteService.RemoveFavoriteAsync(asset.Code, asset.Market);
 
                 Logger?.LogInformation($"已取消收藏资产: {asset.Name}({asset.Code})");
                 await Task.CompletedTask;

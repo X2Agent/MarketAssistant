@@ -11,7 +11,7 @@ namespace MarketAssistant.Services;
 public class ChatSessionPersistenceService : SqliteServiceBase
 {
     public ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger)
-        : base("chat_sessions.db", logger)
+        : base(logger)
     {
     }
 
@@ -223,8 +223,8 @@ public class ChatSessionPersistenceService : SqliteServiceBase
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS idx_sessions_stock ON chat_sessions(stock_code);
-                CREATE INDEX IF NOT EXISTS idx_sessions_updated ON chat_sessions(updated_at);
+                CREATE INDEX IF NOT EXISTS idx_chat_sessions_stock ON chat_sessions(stock_code);
+                CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at);
 
                 CREATE VIRTUAL TABLE IF NOT EXISTS chat_messages_fts USING fts5(
                     session_id UNINDEXED,

@@ -18,8 +18,6 @@ public class AShareKLineService : IKLineService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareKLineService> _logger;
-    private const string ZHITU_API_BASE_URL = "https://api.zhituapi.com/hs/history";
-
     // 支持 API 返回的字符串数值自动转换为 decimal
     private static readonly JsonSerializerOptions KLineJsonOptions = new()
     {
@@ -116,7 +114,7 @@ public class AShareKLineService : IKLineService
     private string BuildZhiTuApiUrl(string symbol, string interval, string adjustType = "n", DateTime? startDate = null, DateTime? endDate = null)
     {
         var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
-        var url = $"{ZHITU_API_BASE_URL}/{symbol}/{interval}/{adjustType}?token={token}";
+        var url = $"/hs/history/{symbol}/{interval}/{adjustType}?token={token}";
 
         // 如果没有指定时间范围，根据不同的interval设置合理的默认时间范围
         DateTime defaultStartDate;
@@ -170,12 +168,22 @@ public class AShareKLineService : IKLineService
     private async Task<List<ZhiTuKLineData>> FetchZhiTuDataAsync(string url, string dataType, string symbol)
     {
         _logger.LogInformation("正在获取股票{DataType}数据: 股票代码: {Symbol}", dataType, symbol);
+        _logger.LogDebug("请求URL: {Url}", url);
 
         try
         {
             using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
             var response = await httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning(
+                    "智图API返回错误 {StatusCode}，股票代码: {Symbol}，响应: {ErrorBody}",
+                    (int)response.StatusCode, symbol, errorBody);
+                throw new FriendlyException(
+                    $"获取{dataType}数据失败: 智图API返回 {(int)response.StatusCode} ({response.StatusCode})，{(string.IsNullOrWhiteSpace(errorBody) ? "请稍后重试" : errorBody)}");
+            }
 
             var jsonContent = await response.Content.ReadAsStringAsync();
             var zhiTuData = JsonSerializer.Deserialize<List<ZhiTuKLineData>>(jsonContent, KLineJsonOptions);
@@ -186,6 +194,10 @@ public class AShareKLineService : IKLineService
             }
 
             return zhiTuData;
+        }
+        catch (FriendlyException)
+        {
+            throw;
         }
         catch (HttpRequestException ex)
         {

@@ -12,7 +12,7 @@ namespace MarketAssistant.Services;
 public class UserKnowledgeGraphService : SqliteServiceBase
 {
     public UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger)
-        : base("knowledge_graph.db", logger)
+        : base(logger)
     {
     }
 
@@ -181,4 +181,3 @@ public record KnowledgeTriple
 
     public bool IsActive => ValidTo is null;
 }
-

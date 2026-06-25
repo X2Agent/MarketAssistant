@@ -1,5 +1,4 @@
 global using MarketAssistant.Infrastructure;
-global using MarketAssistant.Infrastructure.Configuration;
 global using MarketAssistant.Infrastructure.Core;
 global using Microsoft.Extensions.DependencyInjection;
 global using System;

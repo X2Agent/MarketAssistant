@@ -1,4 +1,3 @@
-using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,9 +9,9 @@ namespace MarketAssistant.Services.Settings;
 /// </summary>
 public class UserSettingService : IUserSettingService
 {
-    private const string PreferenceKey = PreferenceKeys.UserSettings;
     private readonly ILogger<UserSettingService> _logger;
     private readonly object _fileLock = new();
+    private readonly string _settingsFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.UserSettingsFileName);
 
     private UserSetting _currentSetting = new();
 
@@ -28,7 +27,7 @@ public class UserSettingService : IUserSettingService
     }
 
     /// <summary>
-    /// 从存储中加载设置
+    /// 从文件加载设置
     /// </summary>
     public void LoadSettings()
     {
@@ -36,11 +35,10 @@ public class UserSettingService : IUserSettingService
         {
             try
             {
-                // 从Preferences加载设置
-                string settingsJson = Preferences.Default.Get(PreferenceKey, string.Empty);
-                if (!string.IsNullOrEmpty(settingsJson))
+                if (File.Exists(_settingsFilePath))
                 {
-                    _currentSetting = JsonSerializer.Deserialize<UserSetting>(settingsJson) ?? new UserSetting();
+                    string json = File.ReadAllText(_settingsFilePath);
+                    _currentSetting = JsonSerializer.Deserialize<UserSetting>(json) ?? new UserSetting();
                 }
                 else
                 {
@@ -56,7 +54,6 @@ public class UserSettingService : IUserSettingService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "加载设置时出错");
-                Preferences.Default.Remove(PreferenceKey);
 
                 // 如果加载失败，使用默认值
                 _currentSetting = new UserSetting();
@@ -65,7 +62,7 @@ public class UserSettingService : IUserSettingService
     }
 
     /// <summary>
-    /// 保存设置到存储
+    /// 保存设置到文件
     /// </summary>
     public void SaveSettings()
     {
@@ -73,11 +70,16 @@ public class UserSettingService : IUserSettingService
         {
             try
             {
-                // 序列化设置对象
-                string json = JsonSerializer.Serialize(_currentSetting);
+                // 确保目录存在
+                var directory = Path.GetDirectoryName(_settingsFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
 
-                // 保存到Preferences
-                Preferences.Default.Set(PreferenceKey, json);
+                // 序列化并保存
+                var json = JsonSerializer.Serialize(_currentSetting, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_settingsFilePath, json);
             }
             catch (Exception ex)
             {

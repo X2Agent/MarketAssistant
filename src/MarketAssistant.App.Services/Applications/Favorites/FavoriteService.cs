@@ -1,37 +1,34 @@
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Applications.Cache;
-using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Applications.Favorites;
 
 /// <summary>
-/// 收藏服务：封装本地存储与最新行情查询的共同行为。
+/// 收藏服务：封装 SQLite 持久化与最新行情查询的共同行为。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public sealed class FavoriteService : IFavoriteService
+public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 {
     private readonly IAssetInfoService _assetInfoService;
     private readonly ILogger<FavoriteService> _logger;
     private readonly MarketType _marketType;
-    private readonly string _preferenceKey;
     private readonly string _marketLabel;
 
     public FavoriteService(
         [ServiceKey] MarketType marketType,
         IServiceProvider serviceProvider,
         ILogger<FavoriteService> logger)
+        : base(logger)
     {
         _marketType = marketType;
         _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
         _logger = logger;
-        _preferenceKey = PreferenceKeys.GetFavoriteAssetsKey(marketType);
         _marketLabel = marketType switch
         {
             MarketType.AShare => "A股",
@@ -40,78 +37,133 @@ public sealed class FavoriteService : IFavoriteService
         };
     }
 
-    public void AddFavorite(string code, string market)
+    protected override async Task InitializeDatabaseAsync()
+    {
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS favorite_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL,
+                market TEXT NOT NULL,
+                market_type INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_fav_code_mt ON favorite_assets(code, market_type);
+            CREATE INDEX IF NOT EXISTS idx_fav_mt ON favorite_assets(market_type);
+            """;
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task AddFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
-        {
             return;
-        }
 
-        var normalizedFavorite = NormalizeFavorite(new FavoriteAsset
+        code = code.Trim();
+        market = market.Trim();
+
+        try
         {
-            Code = code,
-            Market = market
-        });
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT OR IGNORE INTO favorite_assets (code, market, market_type, created_at)
+                VALUES (@code, @market, @marketType, @createdAt)
+                """;
+            cmd.Parameters.AddWithValue("@code", code);
+            cmd.Parameters.AddWithValue("@market", market);
+            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            cmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow.ToString("O"));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
 
-        var favoriteList = GetFavoritesCodes();
-        var existingItem = favoriteList.FirstOrDefault(x => x.Code == normalizedFavorite.Code && x.Market == normalizedFavorite.Market);
-        if (existingItem != null)
-        {
-            return;
+            WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
+            _logger.LogInformation("已添加{Market}到收藏: {Code}", _marketLabel, code);
         }
-
-        favoriteList.Add(normalizedFavorite);
-        SaveFavorites(favoriteList);
-        WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        _logger.LogInformation("已添加{Market}到收藏: {Code}", _marketLabel, normalizedFavorite.Code);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
+        }
     }
 
-    public void RemoveFavorite(string code, string market)
+    public async Task RemoveFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
-        var normalizedFavorite = NormalizeFavorite(new FavoriteAsset
-        {
-            Code = code,
-            Market = market
-        });
+        code = code.Trim();
+        market = market.Trim();
 
-        var favoriteList = GetFavoritesCodes();
-        var itemToRemove = favoriteList.FirstOrDefault(x => x.Code == normalizedFavorite.Code && x.Market == normalizedFavorite.Market);
-
-        if (itemToRemove == null)
+        try
         {
-            return;
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                DELETE FROM favorite_assets WHERE code = @code AND market_type = @marketType
+                """;
+            cmd.Parameters.AddWithValue("@code", code);
+            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            var affected = await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            if (affected > 0)
+            {
+                WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
+                _logger.LogInformation("已从收藏中移除{Market}: {Code}", _marketLabel, code);
+            }
         }
-
-        favoriteList.Remove(itemToRemove);
-        SaveFavorites(favoriteList);
-        WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        _logger.LogInformation("已从收藏中移除{Market}: {Code}", _marketLabel, normalizedFavorite.Code);
-    }
-
-    public bool IsFavorite(string code, string market)
-    {
-        var normalizedFavorite = NormalizeFavorite(new FavoriteAsset
+        catch (Exception ex)
         {
-            Code = code,
-            Market = market
-        });
-
-        var favoriteList = GetFavoritesCodes();
-        return favoriteList.Any(x => x.Code == normalizedFavorite.Code && x.Market == normalizedFavorite.Market);
+            _logger.LogError(ex, "移除收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
+        }
     }
 
-    public List<FavoriteAsset> GetFavoritesCodes()
+    public async Task<bool> IsFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
+    {
+        code = code.Trim();
+        market = market.Trim();
+
+        try
+        {
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT COUNT(1) FROM favorite_assets WHERE code = @code AND market_type = @marketType
+                """;
+            cmd.Parameters.AddWithValue("@code", code);
+            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            return result is long count && count > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "检查收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
+            return false;
+        }
+    }
+
+    public async Task<List<FavoriteAsset>> GetFavoritesCodesAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            var json = Preferences.Default.Get(_preferenceKey, string.Empty);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return [];
-            }
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT code, market FROM favorite_assets WHERE market_type = @marketType ORDER BY created_at
+                """;
+            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
 
-            var favoriteList = JsonSerializer.Deserialize<List<FavoriteAsset>>(json) ?? [];
-            return favoriteList.Select(NormalizeFavorite).ToList();
+            var list = new List<FavoriteAsset>();
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                list.Add(new FavoriteAsset
+                {
+                    Code = reader.GetString(0).Trim(),
+                    Market = reader.GetString(1).Trim()
+                });
+            }
+            return list;
         }
         catch (Exception ex)
         {
@@ -122,11 +174,9 @@ public sealed class FavoriteService : IFavoriteService
 
     public async Task<List<AssetInfo>> GetFavoritesWithLatestDataAsync(CancellationToken cancellationToken = default)
     {
-        var favoritesCodes = GetFavoritesCodes();
+        var favoritesCodes = await GetFavoritesCodesAsync(cancellationToken);
         if (favoritesCodes.Count == 0)
-        {
             return [];
-        }
 
         var tasks = favoritesCodes.Select(async favorite =>
         {
@@ -145,20 +195,24 @@ public sealed class FavoriteService : IFavoriteService
         return results.Where(result => result != null).ToList();
     }
 
-    public void ClearFavorites()
+    public async Task ClearFavoritesAsync(CancellationToken cancellationToken = default)
     {
-        SaveFavorites([]);
-        WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
-        _logger.LogInformation("已清空所有收藏{Market}", _marketLabel);
-    }
-
-    private static FavoriteAsset NormalizeFavorite(FavoriteAsset favorite)
-    {
-        return new FavoriteAsset
+        try
         {
-            Code = favorite.Code.Trim(),
-            Market = favorite.Market.Trim()
-        };
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM favorite_assets WHERE market_type = @marketType";
+            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            WeakReferenceMessenger.Default.Send(new AssetFavoritesChanged());
+            _logger.LogInformation("已清空所有收藏{Market}", _marketLabel);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "清空收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
+        }
     }
 
     /// <summary>
@@ -181,18 +235,5 @@ public sealed class FavoriteService : IFavoriteService
             Name = displayName,
             MarketType = _marketType
         };
-    }
-
-    private void SaveFavorites(List<FavoriteAsset> favoriteList)
-    {
-        try
-        {
-            var json = JsonSerializer.Serialize(favoriteList);
-            Preferences.Default.Set(_preferenceKey, json);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "保存收藏{Market}时出错: {Message}", _marketLabel, ex.Message);
-        }
     }
 }

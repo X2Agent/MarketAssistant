@@ -382,7 +382,7 @@ public class MarketMonitor : IDisposable
             : "未设置止盈";
         var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
         var todayStats = await _dataService.GetTodayStatsAsync(MonitorToken);
-        var maxDailyTrades = _dataService.LoadRiskConfig().MaxDailyTrades;
+        var maxDailyTrades = (await _dataService.LoadRiskConfigAsync()).MaxDailyTrades;
         var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
 
         return $"""

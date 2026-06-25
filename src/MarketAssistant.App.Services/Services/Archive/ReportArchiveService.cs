@@ -8,12 +8,12 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Services.Archive;
 
 /// <summary>
-/// 分析报告存档服务，使用 SQLite 持久化历史报告
+/// 分析报告存档服务，使用 SQLite 持久化历史报告。
 /// </summary>
 public class ReportArchiveService : SqliteServiceBase
 {
     public ReportArchiveService(ILogger<ReportArchiveService> logger)
-        : base("reports.db", logger)
+        : base(logger)
     {
     }
 

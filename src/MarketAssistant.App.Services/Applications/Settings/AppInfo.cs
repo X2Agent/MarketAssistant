@@ -88,9 +88,9 @@ public static class AppInfo
     #region 文件和目录常量
 
     /// <summary>
-    /// 偏好设置文件名
+    /// 用户设置文件名
     /// </summary>
-    public const string PreferencesFileName = "preferences.json";
+    public const string UserSettingsFileName = "usersettings.json";
 
     /// <summary>
     /// MCP服务器配置文件名称

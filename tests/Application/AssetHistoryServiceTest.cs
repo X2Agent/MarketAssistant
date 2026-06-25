@@ -1,7 +1,5 @@
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.History;
-using MarketAssistant.Infrastructure.Configuration;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,9 +18,6 @@ public class AssetHistoryServiceTest
     [TestInitialize]
     public void Setup()
     {
-        Preferences.Default.Clear(PreferenceKeys.GetRecentAssetsKey(MarketType.AShare));
-        Preferences.Default.Clear(PreferenceKeys.GetRecentAssetsKey(MarketType.Crypto));
-
         var services = new ServiceCollection();
         services.AddLogging();
 
@@ -38,23 +33,23 @@ public class AssetHistoryServiceTest
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
         var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
-        aShareService.ClearHistory();
-        cryptoService.ClearHistory();
+        await aShareService.ClearHistoryAsync();
+        await cryptoService.ClearHistoryAsync();
 
         await _serviceProvider.DisposeAsync();
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void AddHistory_AShare_ShouldStoreAsset()
+    public async Task AddHistory_AShare_ShouldStoreAsset()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
         var asset = new AssetItem { Code = "SH600519", Name = "贵州茅台" };
 
         // Act
-        service.AddHistory(asset);
-        var history = service.GetHistory();
+        await service.AddHistoryAsync(asset);
+        var history = await service.GetHistoryAsync();
 
         // Assert
         Assert.IsNotNull(history);
@@ -64,15 +59,15 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void GetHistory_AShare_ShouldReturnRecentAssets()
+    public async Task GetHistory_AShare_ShouldReturnRecentAssets()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        service.AddHistory(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
-        service.AddHistory(new AssetItem { Code = "SH600036", Name = "招商银行" });
+        await service.AddHistoryAsync(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
+        await service.AddHistoryAsync(new AssetItem { Code = "SH600036", Name = "招商银行" });
 
         // Act
-        var history = service.GetHistory();
+        var history = await service.GetHistoryAsync();
 
         // Assert
         Assert.IsNotNull(history);
@@ -82,15 +77,15 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void ClearHistory_AShare_ShouldRemoveAllRecords()
+    public async Task ClearHistory_AShare_ShouldRemoveAllRecords()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        service.AddHistory(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
+        await service.AddHistoryAsync(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
 
         // Act
-        service.ClearHistory();
-        var history = service.GetHistory();
+        await service.ClearHistoryAsync();
+        var history = await service.GetHistoryAsync();
 
         // Assert
         Assert.IsNotNull(history);
@@ -99,15 +94,15 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void AddHistory_Crypto_ShouldStoreAsset()
+    public async Task AddHistory_Crypto_ShouldStoreAsset()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
         var asset = new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" };
 
         // Act
-        service.AddHistory(asset);
-        var history = service.GetHistory();
+        await service.AddHistoryAsync(asset);
+        var history = await service.GetHistoryAsync();
 
         // Assert
         Assert.IsNotNull(history);
@@ -117,15 +112,15 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void GetHistory_Crypto_ShouldReturnRecentAssets()
+    public async Task GetHistory_Crypto_ShouldReturnRecentAssets()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
-        service.AddHistory(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
-        service.AddHistory(new AssetItem { Code = "ETHUSDT", Name = "Ethereum" });
+        await service.AddHistoryAsync(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
+        await service.AddHistoryAsync(new AssetItem { Code = "ETHUSDT", Name = "Ethereum" });
 
         // Act
-        var history = service.GetHistory();
+        var history = await service.GetHistoryAsync();
 
         // Assert
         Assert.IsNotNull(history);
@@ -135,18 +130,18 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void AShareAndCrypto_ShouldHaveSeparateStorage()
+    public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
         var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
         // Act
-        aShareService.AddHistory(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
-        cryptoService.AddHistory(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
+        await aShareService.AddHistoryAsync(new AssetItem { Code = "SH600519", Name = "贵州茅台" });
+        await cryptoService.AddHistoryAsync(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
 
-        var aShareHistory = aShareService.GetHistory();
-        var cryptoHistory = cryptoService.GetHistory();
+        var aShareHistory = await aShareService.GetHistoryAsync();
+        var cryptoHistory = await cryptoService.GetHistoryAsync();
 
         // Assert
         Assert.AreEqual(1, aShareHistory.Count);

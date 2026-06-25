@@ -10,21 +10,15 @@ public interface IAssetHistoryService
     /// <summary>
     /// 添加一条资产访问记录
     /// </summary>
-    void AddHistory(AssetItem asset);
+    Task AddHistoryAsync(AssetItem asset, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 获取历史记录列表
     /// </summary>
-    List<AssetItem> GetHistory();
+    Task<List<AssetItem>> GetHistoryAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 清空历史记录
     /// </summary>
-    void ClearHistory();
+    Task ClearHistoryAsync(CancellationToken cancellationToken = default);
 }
-
-
-
-
-
-

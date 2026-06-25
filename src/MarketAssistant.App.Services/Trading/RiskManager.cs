@@ -35,7 +35,7 @@ public class RiskManager
     {
         const decimal MarketOrderSlippageBuffer = 0.015m; // 市价单预留 1.5% 滑点缓冲
 
-        var config = _dataService.LoadRiskConfig();
+        var config = await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false);
 
         // 市价单使用保守的滑点缓冲价格进行风控计算，防止实际成交额超限
         var effectivePrice = orderType == OrderType.Market

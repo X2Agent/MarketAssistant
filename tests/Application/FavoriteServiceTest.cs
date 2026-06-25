@@ -48,52 +48,52 @@ public class FavoriteServiceTest
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
         var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
-        aShareService.ClearFavorites();
-        cryptoService.ClearFavorites();
+        await aShareService.ClearFavoritesAsync();
+        await cryptoService.ClearFavoritesAsync();
 
         await _serviceProvider.DisposeAsync();
     }
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void AddFavorite_AShare_ShouldStoreAsset()
+    public async Task AddFavorite_AShare_ShouldStoreAsset()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
 
         // Act
-        service.AddFavorite("SH600519", "");
+        await service.AddFavoriteAsync("SH600519", "");
 
         // Assert
-        Assert.IsTrue(service.IsFavorite("SH600519", ""));
+        Assert.IsTrue(await service.IsFavoriteAsync("SH600519", ""));
     }
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void RemoveFavorite_AShare_ShouldRemoveAsset()
+    public async Task RemoveFavorite_AShare_ShouldRemoveAsset()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        service.AddFavorite("SH600519", "");
+        await service.AddFavoriteAsync("SH600519", "");
 
         // Act
-        service.RemoveFavorite("SH600519", "");
+        await service.RemoveFavoriteAsync("SH600519", "");
 
         // Assert
-        Assert.IsFalse(service.IsFavorite("SH600519", ""));
+        Assert.IsFalse(await service.IsFavoriteAsync("SH600519", ""));
     }
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void GetFavoritesCodes_AShare_ShouldReturnList()
+    public async Task GetFavoritesCodes_AShare_ShouldReturnList()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        service.AddFavorite("SH600519", "");
-        service.AddFavorite("SH600036", "");
+        await service.AddFavoriteAsync("SH600519", "");
+        await service.AddFavoriteAsync("SH600036", "");
 
         // Act
-        var favorites = service.GetFavoritesCodes();
+        var favorites = await service.GetFavoritesCodesAsync();
 
         // Assert
         Assert.IsNotNull(favorites);
@@ -106,7 +106,7 @@ public class FavoriteServiceTest
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        service.AddFavorite("SH600519", "");
+        await service.AddFavoriteAsync("SH600519", "");
 
         // Act
         var favoritesWithData = await service.GetFavoritesWithLatestDataAsync();
@@ -119,16 +119,16 @@ public class FavoriteServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void ClearFavorites_AShare_ShouldRemoveAll()
+    public async Task ClearFavorites_AShare_ShouldRemoveAll()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        service.AddFavorite("SH600519", "");
-        service.AddFavorite("SH600036", "");
+        await service.AddFavoriteAsync("SH600519", "");
+        await service.AddFavoriteAsync("SH600036", "");
 
         // Act
-        service.ClearFavorites();
-        var favorites = service.GetFavoritesCodes();
+        await service.ClearFavoritesAsync();
+        var favorites = await service.GetFavoritesCodesAsync();
 
         // Assert
         Assert.IsNotNull(favorites);
@@ -137,32 +137,32 @@ public class FavoriteServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void AddFavorite_Crypto_ShouldStoreAsset()
+    public async Task AddFavorite_Crypto_ShouldStoreAsset()
     {
         // Arrange
         var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         // Act
-        service.AddFavorite("BTCUSDT", "");
+        await service.AddFavoriteAsync("BTCUSDT", "");
 
         // Assert
-        Assert.IsTrue(service.IsFavorite("BTCUSDT", ""));
+        Assert.IsTrue(await service.IsFavoriteAsync("BTCUSDT", ""));
     }
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void AShareAndCrypto_ShouldHaveSeparateStorage()
+    public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
         var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         // Act
-        aShareService.AddFavorite("SH600519", "");
-        cryptoService.AddFavorite("BTCUSDT", "");
+        await aShareService.AddFavoriteAsync("SH600519", "");
+        await cryptoService.AddFavoriteAsync("BTCUSDT", "");
 
-        var aShareFavorites = aShareService.GetFavoritesCodes();
-        var cryptoFavorites = cryptoService.GetFavoritesCodes();
+        var aShareFavorites = await aShareService.GetFavoritesCodesAsync();
+        var cryptoFavorites = await cryptoService.GetFavoritesCodesAsync();
 
         // Assert
         Assert.AreEqual(1, aShareFavorites.Count);

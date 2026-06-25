@@ -47,7 +47,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         SubscribeToMarketChanges(_marketContext);
 
         // 自动加载最近资产
-        LoadRecentAssets();
+        _ = LoadRecentAssetsAsync();
     }
 
     /// <summary>
@@ -55,18 +55,18 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     /// </summary>
     protected override void OnMarketChanged(MarketType newMarket)
     {
-        LoadRecentAssets();
+        _ = LoadRecentAssetsAsync();
     }
 
     /// <summary>
     /// 加载最近查看资产
     /// </summary>
     [RelayCommand]
-    private void LoadRecentAssets()
+    private async Task LoadRecentAssetsAsync()
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
-            var recentAssets = HistoryService.GetHistory();
+            var recentAssets = await HistoryService.GetHistoryAsync();
 
             RecentAssets.Clear();
             foreach (var asset in recentAssets)
@@ -79,12 +79,12 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// 添加资产到最近查看
     /// </summary>
-    public void AddToRecentAssets(AssetItem asset)
+    public async Task AddToRecentAssetsAsync(AssetItem asset)
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
-            HistoryService.AddHistory(asset);
-            LoadRecentAssets(); // 刷新列表
+            await HistoryService.AddHistoryAsync(asset);
+            await LoadRecentAssetsAsync();
         }, "添加到最近查看");
     }
 

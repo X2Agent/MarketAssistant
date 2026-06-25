@@ -81,7 +81,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             TodayStats = await _dataService.GetTodayStatsAsync();
-            RiskConfig = _dataService.LoadRiskConfig();
+            RiskConfig = await _dataService.LoadRiskConfigAsync();
 
             // 计算风控指标
             RemainingDailyTrades = Math.Max(0, RiskConfig.MaxDailyTrades - TodayStats.TradeCount);

@@ -94,7 +94,6 @@ public partial class StrategyConfigViewModel : ViewModelBase
     {
         _dataService = dataService;
         _marketMonitor = marketMonitor;
-        _riskConfig = _dataService.LoadRiskConfig();
         _ = InitializeAsync();
     }
 
@@ -102,6 +101,7 @@ public partial class StrategyConfigViewModel : ViewModelBase
     {
         await SafeExecuteAsync(async () =>
         {
+            RiskConfig = await _dataService.LoadRiskConfigAsync();
             var strategies = await _dataService.GetAllStrategiesAsync();
             Strategies.Clear();
             foreach (var s in strategies)
@@ -236,9 +236,9 @@ public partial class StrategyConfigViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void SaveRiskConfig()
+    private async Task SaveRiskConfigAsync()
     {
-        _dataService.SaveRiskConfig(RiskConfig);
+        await _dataService.SaveRiskConfigAsync(RiskConfig);
     }
 
     [RelayCommand]

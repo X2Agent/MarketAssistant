@@ -15,7 +15,7 @@ public class UserMemoryService : SqliteServiceBase
     public const int MaxTotalChars = 5000;
 
     public UserMemoryService(ILogger<UserMemoryService> logger)
-        : base("user_memory.db", logger)
+        : base(logger)
     {
     }
 
@@ -42,7 +42,7 @@ public class UserMemoryService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO user_memories (category, key, value, priority, updated_at)
+            INSERT INTO memories (category, key, value, priority, updated_at)
             VALUES (@category, @key, @value, 0, @updatedAt)
             ON CONFLICT(category, key) DO UPDATE SET
                 value = excluded.value,
@@ -64,7 +64,7 @@ public class UserMemoryService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT key, value FROM user_memories WHERE category = @category ORDER BY priority DESC, updated_at DESC";
+        cmd.CommandText = "SELECT key, value FROM memories WHERE category = @category ORDER BY priority DESC, updated_at DESC";
         cmd.Parameters.AddWithValue("@category", category);
 
         var result = new Dictionary<string, string>();
@@ -84,7 +84,7 @@ public class UserMemoryService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT category, key, value FROM user_memories ORDER BY priority DESC, category, updated_at DESC";
+        cmd.CommandText = "SELECT category, key, value FROM memories ORDER BY priority DESC, category, updated_at DESC";
 
         var result = new List<(string, string, string)>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -105,7 +105,7 @@ public class UserMemoryService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT category, key, value FROM user_memories
+            SELECT category, key, value FROM memories
             WHERE priority >= @minPriority
             ORDER BY priority DESC, updated_at DESC
             """;
@@ -128,7 +128,7 @@ public class UserMemoryService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE user_memories SET priority = @priority WHERE category = @category AND key = @key";
+        cmd.CommandText = "UPDATE memories SET priority = @priority WHERE category = @category AND key = @key";
         cmd.Parameters.AddWithValue("@priority", priority);
         cmd.Parameters.AddWithValue("@category", category);
         cmd.Parameters.AddWithValue("@key", key);
@@ -143,7 +143,7 @@ public class UserMemoryService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM user_memories WHERE category = @category AND key = @key";
+        cmd.CommandText = "DELETE FROM memories WHERE category = @category AND key = @key";
         cmd.Parameters.AddWithValue("@category", category);
         cmd.Parameters.AddWithValue("@key", key);
         await cmd.ExecuteNonQueryAsync(ct);
@@ -157,7 +157,7 @@ public class UserMemoryService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(LENGTH(value)), 0) FROM user_memories";
+        cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(LENGTH(value)), 0) FROM memories";
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         await reader.ReadAsync(ct);
@@ -174,7 +174,7 @@ public class UserMemoryService : SqliteServiceBase
     {
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT 1 FROM user_memories WHERE category = @category AND key = @key LIMIT 1";
+        cmd.CommandText = "SELECT 1 FROM memories WHERE category = @category AND key = @key LIMIT 1";
         cmd.Parameters.AddWithValue("@category", category);
         cmd.Parameters.AddWithValue("@key", key);
         return await cmd.ExecuteScalarAsync(ct) is not null;
@@ -187,7 +187,7 @@ public class UserMemoryService : SqliteServiceBase
             await using var conn = await OpenConnectionAsync();
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS user_memories (
+                CREATE TABLE IF NOT EXISTS memories (
                     category TEXT NOT NULL,
                     key TEXT NOT NULL,
                     value TEXT NOT NULL,
@@ -195,8 +195,8 @@ public class UserMemoryService : SqliteServiceBase
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY (category, key)
                 );
-                CREATE INDEX IF NOT EXISTS idx_memories_category ON user_memories(category);
-                CREATE INDEX IF NOT EXISTS idx_memories_priority ON user_memories(priority);
+                CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+                CREATE INDEX IF NOT EXISTS idx_memories_priority ON memories(priority);
                 """;
             await cmd.ExecuteNonQueryAsync();
             Logger.LogInformation("用户记忆数据库初始化完成");

@@ -20,12 +20,12 @@ public interface IHomeAssetService
     /// <summary>
     /// 获取最近查看的资产
     /// </summary>
-    List<AssetItem> GetRecentAssets();
+    Task<List<AssetItem>> GetRecentAssetsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 添加到最近查看
     /// </summary>
-    void AddToRecentAssets(AssetItem asset);
+    Task AddToRecentAssetsAsync(AssetItem asset, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 添加到收藏

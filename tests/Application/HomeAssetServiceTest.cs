@@ -59,8 +59,8 @@ public class HomeAssetServiceTest
     [TestCleanup]
     public async Task Cleanup()
     {
-        _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistory();
-        _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistory();
+        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
+        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
 
         if (_serviceProvider != null)
         {
@@ -107,17 +107,17 @@ public class HomeAssetServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void AddToRecentAssets_AShare_ShouldStoreInHistory()
+    public async Task AddToRecentAssets_AShare_ShouldStoreInHistory()
     {
         // Arrange
         _marketContext!.SwitchMarket(MarketType.AShare);
-        _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistory();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
         var service = _serviceProvider!.GetRequiredKeyedService<IHomeAssetService>(MarketType.AShare);
         var asset = new AssetItem { Code = "SH600519", Name = "贵州茅台" };
 
         // Act
-        service.AddToRecentAssets(asset);
-        var recentAssets = service.GetRecentAssets();
+        await service.AddToRecentAssetsAsync(asset);
+        var recentAssets = await service.GetRecentAssetsAsync();
 
         // Assert
         Assert.IsNotNull(recentAssets);
@@ -127,19 +127,19 @@ public class HomeAssetServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void GetRecentAssets_AShare_ShouldReturnHistory()
+    public async Task GetRecentAssets_AShare_ShouldReturnHistory()
     {
         // Arrange
         _marketContext!.SwitchMarket(MarketType.AShare);
-        _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistory();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
         var service = _serviceProvider!.GetRequiredKeyedService<IHomeAssetService>(MarketType.AShare);
         var asset1 = new AssetItem { Code = "SH600519", Name = "贵州茅台" };
         var asset2 = new AssetItem { Code = "SH600036", Name = "招商银行" };
 
         // Act
-        service.AddToRecentAssets(asset1);
-        service.AddToRecentAssets(asset2);
-        var recentAssets = service.GetRecentAssets();
+        await service.AddToRecentAssetsAsync(asset1);
+        await service.AddToRecentAssetsAsync(asset2);
+        var recentAssets = await service.GetRecentAssetsAsync();
 
         // Assert
         Assert.IsNotNull(recentAssets);
@@ -185,17 +185,17 @@ public class HomeAssetServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void AddToRecentAssets_Crypto_ShouldStoreInHistory()
+    public async Task AddToRecentAssets_Crypto_ShouldStoreInHistory()
     {
         // Arrange
         _marketContext!.SwitchMarket(MarketType.Crypto);
-        _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistory();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
         var service = _serviceProvider!.GetRequiredKeyedService<IHomeAssetService>(MarketType.Crypto);
         var asset = new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" };
 
         // Act
-        service.AddToRecentAssets(asset);
-        var recentAssets = service.GetRecentAssets();
+        await service.AddToRecentAssetsAsync(asset);
+        var recentAssets = await service.GetRecentAssetsAsync();
 
         // Assert
         Assert.IsNotNull(recentAssets);

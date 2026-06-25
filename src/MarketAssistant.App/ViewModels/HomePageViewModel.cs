@@ -86,7 +86,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
 
         // 异步添加到最近查看
         var assetItem = new AssetItem { Name = asset.Name, Code = assetCode };
-        _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
+        _ = RecentAssets.AddToRecentAssetsAsync(assetItem);
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         Logger?.LogInformation($"导航到资产详情页: {assetItem.Code}");
 
         // 异步添加到最近查看，不阻塞导航
-        _ = Task.Run(() => RecentAssets.AddToRecentAssets(assetItem));
+        _ = RecentAssets.AddToRecentAssetsAsync(assetItem);
     }
 
     /// <summary>
