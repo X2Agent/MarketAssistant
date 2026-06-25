@@ -80,9 +80,17 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           $version = $env:APP_VERSION
+          # 计算四段数字版本号 (X.X.X.X)，供 VersionInfoVersion 使用
+          # 去掉预发布标识 (如 1.0.0-beta -> 1.0.0)，按点分割并补齐到四段
+          $numericPart = ($version -split '[-+]')[0]
+          $parts = $numericPart -split '\.'
+          while ($parts.Count -lt 4) { $parts += '0' }
+          if ($parts.Count -gt 4) { $parts = $parts[0..3] }
+          $versionInfo = ($parts | ForEach-Object { if ([int]::TryParse($_, [ref]$null)) { [int]::Parse($_) } else { 0 } }) -join '.'
           $issFile = "scripts\windows\MarketAssistant.iss"
           $content = Get-Content $issFile -Raw
           $content = $content -replace '#define MyAppVersion ".*?"', "#define MyAppVersion `"$version`""
+          $content = $content -replace '#define MyAppVersionInfo ".*?"', "#define MyAppVersionInfo `"$versionInfo`""
           Set-Content $issFile -Value $content -NoNewline
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" $issFile
 
