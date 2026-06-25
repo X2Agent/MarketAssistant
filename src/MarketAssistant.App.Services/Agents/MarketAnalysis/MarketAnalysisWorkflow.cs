@@ -222,6 +222,14 @@ public class MarketAnalysisWorkflow
                         }
                         break;
 
+                    // AgentResponseUpdateEvent 继承自 WorkflowOutputEvent，必须在其之前匹配。
+                    // 分析师在 TurnToken(emitEvents: true) 模式下，每个 AgentResponseUpdate 都会
+                    // 通过 YieldOutputAsync 产生 AgentResponseUpdateEvent，这些是中间流式更新，
+                    // 不是工作流的最终输出，应忽略。
+                    case AgentResponseUpdateEvent:
+                        _logger.LogDebug("收到分析师流式更新，忽略（非最终输出）");
+                        break;
+
                     case WorkflowOutputEvent workflowOutput:
                         if (!reportReceived)
                         {

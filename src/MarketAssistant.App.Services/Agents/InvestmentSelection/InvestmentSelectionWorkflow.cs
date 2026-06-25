@@ -126,6 +126,11 @@ public class InvestmentSelectionWorkflow : IDisposable
                 case ExecutorCompletedEvent executorComplete:
                     _logger.LogInformation("步骤完成: {ExecutorId}", executorComplete.ExecutorId);
                     break;
+                // AgentResponseUpdateEvent 继承自 WorkflowOutputEvent，需在其之前匹配以防止误匹配。
+                // 当前 executor 虽然不使用 AIAgent，但作为防御性措施保留。
+                case AgentResponseUpdateEvent:
+                    break;
+
                 case WorkflowOutputEvent workflowOutput:
                     finalResult = workflowOutput.Data as InvestmentSelectionResult;
                     _logger.LogInformation("工作流完成，推荐数量: {Count}",

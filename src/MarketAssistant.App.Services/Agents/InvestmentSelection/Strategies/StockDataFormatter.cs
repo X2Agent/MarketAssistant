@@ -10,53 +10,68 @@ public class StockDataFormatter : IAssetDataFormatter
 {
     public MarketType SupportedMarketType => MarketType.AShare;
 
+    /// <summary>
+    /// 指标字段 → (显示名, 小数位数, 除数)
+    /// </summary>
+    private static readonly (string Field, string DisplayName, int Decimals, decimal Divisor)[] IndicatorConfig =
+    [
+        ("current", "当前价_元", 2, 1),
+        ("pct", "涨跌幅_百分比", 2, 1),
+        ("mc", "总市值_亿元", 2, 100_000_000),
+        ("fmc", "流通市值_亿元", 2, 100_000_000),
+        ("amount", "成交额_亿元", 2, 100_000_000),
+        ("volume", "成交量_万股", 2, 1),
+        ("chgpct", "当日振幅_百分比", 2, 1),
+        ("volume_ratio", "量比", 2, 1),
+        ("tr", "换手率_百分比", 2, 1),
+        ("pettm", "市盈率TTM", 2, 1),
+        ("pelyr", "市盈率LYR", 2, 1),
+        ("pb", "市净率", 2, 1),
+        ("psr", "市销率", 2, 1),
+        ("bps", "每股净资产_元", 2, 1),
+        ("eps", "每股收益_元", 2, 1),
+        ("dy_l", "股息收益率_百分比", 2, 1),
+        ("roediluted", "净资产收益率ROE_百分比", 2, 1),
+        ("niota", "总资产报酬率_百分比", 2, 1),
+        ("netprofit", "净利润_亿元", 2, 100_000_000),
+        ("total_revenue", "营业收入_亿元", 2, 100_000_000),
+        ("npay", "净利润同比增长_百分比", 2, 1),
+        ("oiy", "营收同比增长_百分比", 2, 1),
+        ("pct5", "近5日涨跌幅_百分比", 2, 1),
+        ("pct10", "近10日涨跌幅_百分比", 2, 1),
+        ("pct20", "近20日涨跌幅_百分比", 2, 1),
+        ("pct60", "近60日涨跌幅_百分比", 2, 1),
+        ("pct120", "近120日涨跌幅_百分比", 2, 1),
+        ("pct250", "近250日涨跌幅_百分比", 2, 1),
+        ("pct_current_year", "年初至今涨跌幅_百分比", 2, 1),
+        ("follow", "累计关注人数", 0, 1),
+        ("tweet", "累计讨论次数", 0, 1),
+        ("deal", "累计交易分享数", 0, 1),
+        ("follow7d", "一周新增关注", 0, 1),
+        ("tweet7d", "一周新增讨论数", 0, 1),
+        ("deal7d", "一周新增交易分享数", 0, 1),
+        ("follow7dpct", "一周关注增长率_百分比", 2, 1),
+        ("tweet7dpct", "一周讨论增长率_百分比", 2, 1),
+        ("deal7dpct", "一周交易分享增长率_百分比", 2, 1),
+    ];
+
     public string FormatAssetsForAnalysis(List<ScreenerAssetInfo> assets)
     {
         var simplifiedStocks = assets.OfType<ScreenerStockInfo>().Select(s =>
         {
-            var data = new Dictionary<string, object>();
+            var data = new Dictionary<string, object>
+            {
+                ["名称"] = s.Name,
+                ["代码"] = s.Symbol
+            };
 
-            data["名称"] = s.Name;
-            data["代码"] = s.Symbol;
-
-            data.AddIfNotZero("当前价_元", s.Current);
-            data.AddIfNotZero("涨跌幅_百分比", s.Pct);
-            data.AddIfNotZero("当日振幅_百分比", s.ChgPct);
-            data.AddIfNotZero("总市值_亿元", s.Mc, 2, 100000000);
-            data.AddIfNotZero("流通市值_亿元", s.Fmc, 2, 100000000);
-            data.AddIfNotZero("成交额_亿元", s.Amount, 2, 100000000);
-            data.AddIfNotZero("成交量_万股", s.Volume);
-            data.AddIfNotZero("量比", s.VolumeRatio);
-            data.AddIfNotZero("换手率_百分比", s.Tr);
-            data.AddIfNotZero("市盈率TTM", s.PeTtm);
-            data.AddIfNotZero("市盈率LYR", s.PeLyr);
-            data.AddIfNotZero("市净率", s.Pb);
-            data.AddIfNotZero("市销率", s.Psr);
-            data.AddIfNotZero("每股净资产_元", s.Bps);
-            data.AddIfNotZero("每股收益_元", s.Eps);
-            data.AddIfNotZero("股息收益率_百分比", s.DyL);
-            data.AddIfNotZero("净资产收益率ROE_百分比", s.RoeDiluted);
-            data.AddIfNotZero("总资产报酬率_百分比", s.Niota);
-            data.AddIfNotZero("净利润_亿元", s.NetProfit, 2, 100000000);
-            data.AddIfNotZero("营业收入_亿元", s.TotalRevenue, 2, 100000000);
-            data.AddIfNotZero("净利润同比增长_百分比", s.Npay);
-            data.AddIfNotZero("营收同比增长_百分比", s.Oiy);
-            data.AddIfNotZero("近5日涨跌幅_百分比", s.Pct5);
-            data.AddIfNotZero("近10日涨跌幅_百分比", s.Pct10);
-            data.AddIfNotZero("近20日涨跌幅_百分比", s.Pct20);
-            data.AddIfNotZero("近60日涨跌幅_百分比", s.Pct60);
-            data.AddIfNotZero("近120日涨跌幅_百分比", s.Pct120);
-            data.AddIfNotZero("近250日涨跌幅_百分比", s.Pct250);
-            data.AddIfNotZero("年初至今涨跌幅_百分比", s.PctCurrentYear);
-            data.AddIfNotZero("累计关注人数", s.Follow, 0);
-            data.AddIfNotZero("累计讨论次数", s.Tweet, 0);
-            data.AddIfNotZero("累计交易分享数", s.Deal, 0);
-            data.AddIfNotZero("一周新增关注", s.Follow7d, 0);
-            data.AddIfNotZero("一周新增讨论数", s.Tweet7d, 0);
-            data.AddIfNotZero("一周新增交易分享数", s.Deal7d, 0);
-            data.AddIfNotZero("一周关注增长率_百分比", s.Follow7dPct);
-            data.AddIfNotZero("一周讨论增长率_百分比", s.Tweet7dPct);
-            data.AddIfNotZero("一周交易分享增长率_百分比", s.Deal7dPct);
+            foreach (var (field, displayName, decimals, divisor) in IndicatorConfig)
+            {
+                if (s.Indicators.TryGetValue(field, out var value))
+                {
+                    data.AddIfNotZero(displayName, value, decimals, divisor);
+                }
+            }
 
             return data;
         }).ToList();

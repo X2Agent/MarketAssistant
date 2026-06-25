@@ -64,10 +64,15 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
                 OriginalRequest = originalRequest
             };
         }
+        catch (FriendlyException)
+        {
+            // FriendlyException 已包含用户友好信息，直接抛出避免双重包装丢失原始错误
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤2/3] 投资标的筛选失败");
-            throw new FriendlyException("投资标的筛选失败，请稍后重试", ex);
+            throw new FriendlyException($"投资标的筛选失败: {ex.Message}", ex);
         }
     }
 }

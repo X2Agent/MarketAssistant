@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.AssetScreener;
@@ -9,7 +8,6 @@ namespace MarketAssistant.Applications.AssetScreener;
 /// <summary>
 /// 雪球网股票筛选服务（基于 HTTP API）
 /// API 端点: GET https://xueqiu.com/service/screener/screen
-/// 支持全部 38 个筛选指标（基本 15 + 行情 14 + 雪球社交 9）
 /// </summary>
 public sealed class StockScreenerService : IAssetScreenerService
 {
@@ -20,8 +18,7 @@ public sealed class StockScreenerService : IAssetScreenerService
     private const string ScreenerEndpoint = "/service/screener/screen";
 
     /// <summary>
-    /// 需要拼接报告期日期后缀的财务指标（adj=1）
-    /// 格式：field.YYYYMMDD=min_max
+    /// 需要拼接报告期日期后缀的财务指标（格式：field.YYYYMMDD=min_max）
     /// </summary>
     private static readonly HashSet<string> Adj1Fields = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -30,46 +27,41 @@ public sealed class StockScreenerService : IAssetScreenerService
     };
 
     /// <summary>
-    /// 行业枚举 → 雪球行业代码映射（与雪球网 screener API 的 indcode 参数一致）
+    /// 标识字段和元数据字段，动态解析时跳过（不放入 Indicators 字典）。
+    /// 其余数值字段全部入字典，由 StockDataFormatter 统一做字段名映射和单位转换。
     /// </summary>
+    private static readonly HashSet<string> s_handledFields = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name", "symbol",
+        "exchange", "type", "tick_size", "has_follow", "indcode", "areacode"
+    };
+
     private static readonly Dictionary<IndustryType, string> IndustryCodeMap = new()
     {
-        // 科技类
         { IndustryType.ComputerEquipment, "S7101" },
         { IndustryType.SoftwareDevelopment, "S7104" },
         { IndustryType.Semiconductor, "S2701" },
-        // 新能源类
         { IndustryType.Battery, "S6307" },
         { IndustryType.PhotovoltaicEquipment, "S6305" },
         { IndustryType.WindPowerEquipment, "S6306" },
-        // 医药类
         { IndustryType.ChemicalPharmaceutical, "S3701" },
         { IndustryType.BiologicalProducts, "S3703" },
         { IndustryType.MedicalDevices, "S3705" },
-        // 消费类
         { IndustryType.Liquor, "S3405" },
         { IndustryType.BeveragesDairy, "S3407" },
         { IndustryType.FoodProcessing, "S3404" },
-        // 金融类
         { IndustryType.JointStockBank, "S4803" },
         { IndustryType.StateBanks, "S4802" },
-        // 房地产
         { IndustryType.RealEstateDevelopment, "S4301" },
-        // 汽车类
         { IndustryType.PassengerVehicles, "S2805" },
         { IndustryType.AutoParts, "S2802" },
-        // 通信类
         { IndustryType.CommunicationEquipment, "S7302" },
         { IndustryType.CommunicationServices, "S7301" },
-        // 电力
         { IndustryType.Power, "S4101" },
-        // 化工类
         { IndustryType.ChemicalMaterials, "S2202" },
         { IndustryType.ChemicalProducts, "S2203" },
-        // 机械类
         { IndustryType.ConstructionMachinery, "S6406" },
         { IndustryType.SpecializedEquipment, "S6402" },
-        // 家电类
         { IndustryType.WhiteAppliances, "S3301" },
         { IndustryType.SmallAppliances, "S3303" }
     };
@@ -84,9 +76,6 @@ public sealed class StockScreenerService : IAssetScreenerService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// 根据筛选条件筛选股票
-    /// </summary>
     public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
     {
         if (criteria is not StockCriteria stockCriteria)
@@ -99,15 +88,13 @@ public sealed class StockScreenerService : IAssetScreenerService
 
         try
         {
-            // 确保 Cookie 已就绪（首次请求时访问雪球首页获取 cookiesu/device_id）
             await EnsureCookiesAsync();
 
-            var (queryParams, orderField) = BuildQueryParams(stockCriteria);
-            var stocks = await FetchFromXueqiuAsync(queryParams, orderField, stockCriteria.Limit);
-            var limited = stocks.Take(stockCriteria.Limit).ToList();
+            var queryParams = BuildQueryParams(stockCriteria);
+            var stocks = await FetchFromXueqiuAsync(queryParams);
 
-            _logger.LogInformation("雪球选股完成，结果数量: {Count}", limited.Count);
-            return limited.Cast<ScreenerAssetInfo>().ToList();
+            _logger.LogInformation("雪球选股完成，结果数量: {Count}", stocks.Count);
+            return stocks.Cast<ScreenerAssetInfo>().ToList();
         }
         catch (Exception ex) when (ex is not ArgumentException)
         {
@@ -116,9 +103,6 @@ public sealed class StockScreenerService : IAssetScreenerService
         }
     }
 
-    /// <summary>
-    /// 确保雪球 Cookie 已就绪。若 CookieContainer 中无雪球域名 Cookie，则先访问首页获取
-    /// </summary>
     private async Task EnsureCookiesAsync()
     {
         var cookies = _cookieContainer.GetCookies(new Uri("https://xueqiu.com"));
@@ -130,12 +114,25 @@ public sealed class StockScreenerService : IAssetScreenerService
         _logger.LogDebug("雪球 Cookie 为空，访问首页获取 Cookie");
         using var client = _httpClientFactory.CreateClient("Xueqiu");
         using var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        await client.SendAsync(request);
+        using var response = await client.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("访问雪球首页获取 Cookie 失败，HTTP 状态码: {StatusCode}", (int)response.StatusCode);
+            throw new FriendlyException($"无法连接雪球网（HTTP {(int)response.StatusCode}），请检查网络连接后重试");
+        }
+
+        var cookiesAfter = _cookieContainer.GetCookies(new Uri("https://xueqiu.com"));
+        if (cookiesAfter.Count == 0)
+        {
+            _logger.LogWarning("访问雪球首页成功但未获取到 Cookie，可能被反爬机制拦截");
+            throw new FriendlyException("雪球网未返回有效的 Cookie，可能被反爬机制拦截，请稍后重试");
+        }
     }
 
     /// <summary>
-    /// 获取最新可用财报报告期日期（雪球 adj=1 字段需要的 YYYYMMDD 格式）
-    /// 规则：当前日期减 30 天，取最近一个季度末（0331/0630/0930/1231）
+    /// 获取最新可用财报报告期日期（YYYYMMDD 格式）。
+    /// 当前日期减 30 天，取最近一个已结束的季度末。
     /// </summary>
     private static string GetLatestReportingPeriod()
     {
@@ -148,7 +145,7 @@ public sealed class StockScreenerService : IAssetScreenerService
             >= 10 => 9,
             >= 7 => 6,
             >= 4 => 3,
-            _ => 12 // Q4 属于上一年
+            _ => 12
         };
 
         if (quarterEndMonth == 12)
@@ -161,18 +158,13 @@ public sealed class StockScreenerService : IAssetScreenerService
             3 => "0331",
             6 => "0630",
             9 => "0930",
-            12 => "1231",
-            _ => "0331"
+            _ => "1231"
         };
 
         return $"{year}{day}";
     }
 
-    /// <summary>
-    /// 构建雪球 API 查询参数
-    /// </summary>
-    /// <returns>(查询参数字符串, 排序字段名)</returns>
-    private (string queryParams, string orderField) BuildQueryParams(StockCriteria criteria)
+    private string BuildQueryParams(StockCriteria criteria)
     {
         var exchange = criteria.Market switch
         {
@@ -190,7 +182,6 @@ public sealed class StockScreenerService : IAssetScreenerService
 
         var reportingPeriod = GetLatestReportingPeriod();
 
-        // 构建筛选条件参数（field=min_max 格式）
         var filterParts = new List<string>();
         foreach (var condition in criteria.Criteria)
         {
@@ -205,47 +196,27 @@ public sealed class StockScreenerService : IAssetScreenerService
             filterParts.Add($"{fieldKey}={filterValue}");
         }
 
-        var orderField = DetermineOrderField(criteria);
+        var orderField = criteria.Criteria.Count > 0 ? criteria.Criteria[0].Code : "mc";
+        var orderByParam = Adj1Fields.Contains(orderField)
+            ? $"{orderField}.{reportingPeriod}"
+            : orderField;
+
+        // 确保 mc（总市值）始终包含在查询中，使响应包含市值数据
+        var hasMc = orderByParam.Equals("mc", StringComparison.OrdinalIgnoreCase) ||
+                    criteria.Criteria.Any(c => c.Code.Equals("mc", StringComparison.OrdinalIgnoreCase));
+        if (!hasMc)
+        {
+            filterParts.Add("mc=0_99999999999999");
+        }
+
         var filterString = filterParts.Count > 0 ? "&" + string.Join("&", filterParts) : "";
 
-        var queryParams = $"category=CN&exchange={exchange}&indcode={indcode}" +
-                          $"&order_by={orderField}&order=desc&page=1&size={criteria.Limit}&only_count=0" +
-                          filterString;
-
-        return (queryParams, orderField);
+        return $"category=CN&exchange={exchange}&indcode={indcode}" +
+               $"&order_by={orderByParam}&order=desc&page=1&size={criteria.Limit}&only_count=0" +
+               filterString;
     }
 
-    /// <summary>
-    /// 根据第一个有效筛选条件确定排序字段，默认按总市值排序
-    /// </summary>
-    private static string DetermineOrderField(StockCriteria criteria)
-    {
-        foreach (var condition in criteria.Criteria)
-        {
-            if (Adj1Fields.Contains(condition.Code) ||
-                IsKnownMarketField(condition.Code))
-            {
-                return condition.Code;
-            }
-        }
-        return "mc";
-    }
-
-    private static bool IsKnownMarketField(string code)
-    {
-        return code.ToLowerInvariant() is "pettm" or "pelyr" or "mc" or "fmc" or "pb" or "psr"
-            or "pct" or "pct5" or "pct10" or "pct20" or "pct60" or "pct120" or "pct250"
-            or "amount" or "volume" or "current" or "volume_ratio" or "tr" or "chgpct"
-            or "pct_current_year" or "dy_l" or "eps" or "bps"
-            or "follow" or "tweet" or "deal" or "follow7d" or "tweet7d" or "deal7d"
-            or "follow7dpct" or "tweet7dpct" or "deal7dpct";
-    }
-
-    /// <summary>
-    /// 调用雪球选股 API 获取股票列表
-    /// </summary>
-    private async Task<List<ScreenerStockInfo>> FetchFromXueqiuAsync(
-        string queryParams, string orderField, int limit)
+    private async Task<List<ScreenerStockInfo>> FetchFromXueqiuAsync(string queryParams)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var url = $"{ScreenerEndpoint}?{queryParams}&_={timestamp}";
@@ -255,44 +226,61 @@ public sealed class StockScreenerService : IAssetScreenerService
         using var client = _httpClientFactory.CreateClient("Xueqiu");
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         using var response = await client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("雪球选股 API 返回错误，状态码: {StatusCode}，响应: {Body}",
+                (int)response.StatusCode,
+                json.Length > 500 ? json[..500] : json);
+            throw new FriendlyException($"雪球网选股接口返回错误（HTTP {(int)response.StatusCode}），请稍后重试");
+        }
+
         return ParseResponse(json);
     }
 
-    /// <summary>
-    /// 解析雪球 API 响应 JSON
-    /// </summary>
     private List<ScreenerStockInfo> ParseResponse(string json)
     {
         var stocks = new List<ScreenerStockInfo>();
 
-        using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("data", out var data) ||
-            !data.TryGetProperty("list", out var list) ||
-            list.ValueKind != JsonValueKind.Array)
+        JsonDocument doc;
+        try
         {
-            _logger.LogWarning("雪球 API 返回数据格式异常");
-            return stocks;
+            doc = JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            _logger.LogError("雪球 API 返回非 JSON 格式数据（可能是反爬验证页面），响应前 500 字符: {Body}",
+                json.Length > 500 ? json[..500] : json);
+            throw new FriendlyException("雪球网返回了非预期的数据格式，可能是反爬验证页面，请稍后重试");
         }
 
-        foreach (var item in list.EnumerateArray())
+        using (doc)
         {
-            var stock = ParseStockItem(item);
-            if (stock != null)
+            if (!doc.RootElement.TryGetProperty("data", out var data) ||
+                !data.TryGetProperty("list", out var list) ||
+                list.ValueKind != JsonValueKind.Array)
             {
-                stocks.Add(stock);
+                _logger.LogWarning("雪球 API 返回数据格式异常，响应前 500 字符: {Body}",
+                    json.Length > 500 ? json[..500] : json);
+                return stocks;
+            }
+
+            foreach (var item in list.EnumerateArray())
+            {
+                var stock = ParseStockItem(item);
+                if (stock != null)
+                {
+                    stocks.Add(stock);
+                }
             }
         }
 
         return stocks;
     }
 
-    /// <summary>
-    /// 解析单只股票数据，雪球 JSON 字段名与 ScreenerStockInfo 属性基本一致
-    /// </summary>
-    private ScreenerStockInfo? ParseStockItem(JsonElement item)
+    private static ScreenerStockInfo? ParseStockItem(JsonElement item)
     {
         var name = GetString(item, "name");
         var symbol = GetString(item, "symbol");
@@ -302,53 +290,27 @@ public sealed class StockScreenerService : IAssetScreenerService
             return null;
         }
 
-        return new ScreenerStockInfo
+        var stock = new ScreenerStockInfo { Name = name, Symbol = symbol };
+
+        // 所有数值字段统一放入 Indicators 字典
+        foreach (var prop in item.EnumerateObject())
         {
-            Name = name,
-            Symbol = symbol,
-            // 基础字段（ScreenerAssetInfo）
-            Current = GetDecimal(item, "current"),
-            Pct = GetDecimal(item, "pct"),
-            Amount = GetDecimal(item, "amount"),
-            Mc = GetDecimal(item, "mc"),
-            Fmc = GetDecimal(item, "fmc"),
-            Volume = GetDecimal(item, "volume"),
-            // 基本指标
-            PeTtm = GetDecimal(item, "pettm"),
-            PeLyr = GetDecimal(item, "pelyr"),
-            Pb = GetDecimal(item, "pb"),
-            Psr = GetDecimal(item, "psr"),
-            RoeDiluted = GetDecimal(item, "roediluted"),
-            Bps = GetDecimal(item, "bps"),
-            Eps = GetDecimal(item, "eps"),
-            NetProfit = GetDecimal(item, "netprofit"),
-            TotalRevenue = GetDecimal(item, "total_revenue"),
-            DyL = GetDecimal(item, "dy_l"),
-            Npay = GetDecimal(item, "npay"),
-            Oiy = GetDecimal(item, "oiy"),
-            Niota = GetDecimal(item, "niota"),
-            // 行情指标
-            VolumeRatio = GetDecimal(item, "volume_ratio"),
-            Tr = GetDecimal(item, "tr"),
-            ChgPct = GetDecimal(item, "chgpct"),
-            Pct5 = GetDecimal(item, "pct5"),
-            Pct10 = GetDecimal(item, "pct10"),
-            Pct20 = GetDecimal(item, "pct20"),
-            Pct60 = GetDecimal(item, "pct60"),
-            Pct120 = GetDecimal(item, "pct120"),
-            Pct250 = GetDecimal(item, "pct250"),
-            PctCurrentYear = GetDecimal(item, "pct_current_year"),
-            // 雪球社交指标
-            Follow = GetDecimal(item, "follow"),
-            Tweet = GetDecimal(item, "tweet"),
-            Deal = GetDecimal(item, "deal"),
-            Follow7d = GetDecimal(item, "follow7d"),
-            Tweet7d = GetDecimal(item, "tweet7d"),
-            Deal7d = GetDecimal(item, "deal7d"),
-            Follow7dPct = GetDecimal(item, "follow7dpct"),
-            Tweet7dPct = GetDecimal(item, "tweet7dpct"),
-            Deal7dPct = GetDecimal(item, "deal7dpct")
-        };
+            if (s_handledFields.Contains(prop.Name)) continue;
+            if (prop.Value.ValueKind is JsonValueKind.Number or JsonValueKind.String)
+            {
+                stock.Indicators[prop.Name] = GetDecimal(item, prop.Name);
+            }
+        }
+
+        // 回填基类属性，保持 ScreenerAssetInfo 接口契约
+        if (stock.Indicators.TryGetValue("current", out var current)) stock.Current = current;
+        if (stock.Indicators.TryGetValue("pct", out var pct)) stock.Pct = pct;
+        if (stock.Indicators.TryGetValue("amount", out var amount)) stock.Amount = amount;
+        if (stock.Indicators.TryGetValue("mc", out var mc)) stock.Mc = mc;
+        if (stock.Indicators.TryGetValue("fmc", out var fmc)) stock.Fmc = fmc;
+        if (stock.Indicators.TryGetValue("volume", out var volume)) stock.Volume = volume;
+
+        return stock;
     }
 
     private static string GetString(JsonElement element, string name)
