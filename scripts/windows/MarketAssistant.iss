@@ -4,6 +4,9 @@
 
 #define MyAppName "Market Assistant"
 #define MyAppVersion "1.0.0"
+; VersionInfoVersion / VersionInfoProductVersion 要求严格四段数字格式 X.X.X.X
+; MyAppVersion 可能为三段(1.0.0)或含预发布标识(1.0.0-beta)，此处单独定义四段版本
+#define MyAppVersionInfo "1.0.0.0"
 #define MyAppPublisher "MarketAssistant Team"
 #define MyAppURL "https://github.com/X2Agent/MarketAssistant"
 #define MyAppExeName "MarketAssistant.exe"
@@ -34,12 +37,12 @@ ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 
 ; 版本信息
-VersionInfoVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersionInfo}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Installer
 VersionInfoCopyright=Copyright (C) 2026 {#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
-VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductVersion={#MyAppVersionInfo}
 
 ; UI 配置
 UninstallDisplayIcon={app}\{#MyAppExeName}

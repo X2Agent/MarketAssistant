@@ -56,10 +56,18 @@ Write-Host ""
 $issFile = "scripts\windows\MarketAssistant.iss"
 if ($Version) {
     Write-Host "📝 Updating version to $Version..." -ForegroundColor Yellow
+    # 计算四段数字版本号 (X.X.X.X)，供 VersionInfoVersion 使用
+    # 去掉预发布标识 (如 1.0.0-beta -> 1.0.0)，按点分割并补齐到四段
+    $numericPart = ($Version -split '[-+]')[0]
+    $parts = $numericPart -split '\.'
+    while ($parts.Count -lt 4) { $parts += '0' }
+    if ($parts.Count -gt 4) { $parts = $parts[0..3] }
+    $versionInfo = ($parts | ForEach-Object { if ([int]::TryParse($_, [ref]$null)) { [int]::Parse($_) } else { 0 } }) -join '.'
     $issContent = Get-Content $issFile -Raw
     $issContent = $issContent -replace '#define MyAppVersion ".*?"', "#define MyAppVersion `"$Version`""
+    $issContent = $issContent -replace '#define MyAppVersionInfo ".*?"', "#define MyAppVersionInfo `"$versionInfo`""
     Set-Content $issFile -Value $issContent -NoNewline
-    Write-Host "✓ Version updated" -ForegroundColor Green
+    Write-Host "✓ Version updated (display: $Version, version info: $versionInfo)" -ForegroundColor Green
     Write-Host ""
 }
 
