@@ -16,6 +16,7 @@ public class TextChunkingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Chunk_ShouldSplitTextIntoParagraphs()
     {
         // Arrange
@@ -33,6 +34,7 @@ public class TextChunkingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Chunk_ShouldHandleEmptyString()
     {
         // Arrange
@@ -48,6 +50,7 @@ public class TextChunkingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Chunk_ShouldHandleNullString()
     {
         // Arrange
@@ -63,6 +66,7 @@ public class TextChunkingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Chunk_ShouldGenerateUniqueKeys()
     {
         // Arrange

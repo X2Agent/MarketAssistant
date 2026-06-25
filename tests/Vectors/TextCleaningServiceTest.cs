@@ -16,6 +16,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldRemoveExtraWhitespace()
     {
         // Arrange
@@ -30,6 +31,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldRemoveLeadingAndTrailingWhitespace()
     {
         // Arrange
@@ -44,6 +46,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldHandleEmptyString()
     {
         // Arrange
@@ -58,6 +61,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldHandleNullString()
     {
         // Arrange
@@ -72,6 +76,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldRemovePageNumbers()
     {
         // Arrange
@@ -86,6 +91,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldRemoveUrls()
     {
         // Arrange
@@ -100,6 +106,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Clean_ShouldNormalizeLineEndings()
     {
         // Arrange

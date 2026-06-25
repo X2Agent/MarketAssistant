@@ -102,6 +102,7 @@ public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task TestRetrieveAsync()
     {
         // 验证RetrieveAsync能否正常工作

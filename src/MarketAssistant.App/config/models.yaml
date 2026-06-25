@@ -1,0 +1,7 @@
+# 支持的AI模型配置
+models:
+ # - deepseek-ai/DeepSeek-V4-Pro
+ # - deepseek-ai/DeepSeek-V4-Flash
+ - zai-org/GLM-5.2
+ - Pro/moonshotai/Kimi-K2.6 
+ - nex-agi/Nex-N2-Pro 

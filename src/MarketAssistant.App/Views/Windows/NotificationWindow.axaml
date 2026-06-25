@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        x:Class="MarketAssistant.Views.Windows.NotificationWindow"
+        Width="{StaticResource NotificationWidth}"
+        Height="{StaticResource NotificationHeight}"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        WindowStartupLocation="Manual">
+    
+    <Border Name="NotificationBorder"
+            Background="{StaticResource NotificationDarkBackgroundBrush}"
+            BorderBrush="{StaticResource NotificationDarkBorderBrush}"
+            BorderThickness="{StaticResource DefaultBorderThickness}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource SmallMargin}"
+            BoxShadow="{StaticResource NotificationBoxShadow}">
+        
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            
+            <!-- 图标区域 -->
+            <Border Grid.Column="0"
+                    Width="{StaticResource MediumIconSize}"
+                    Height="{StaticResource MediumIconSize}"
+                    CornerRadius="{StaticResource LargeCornerRadius}"
+                    Background="{StaticResource NotificationIconSuccessBrush}"
+                    VerticalAlignment="Center"
+                    Margin="{StaticResource DefaultMargin}">
+                <TextBlock Text="✓"
+                           FontSize="{StaticResource SubTitleFontSize}"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"/>
+            </Border>
+            
+            <!-- 消息内容 -->
+            <StackPanel Grid.Column="1"
+                        VerticalAlignment="Center">
+                <TextBlock Name="MessageText"
+                           Text="操作成功"
+                           FontSize="{StaticResource LabelFontSize}"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource NotificationTextLightBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+            
+            <!-- 关闭按钮 -->
+            <Button Grid.Column="2"
+                    Name="CloseButton"
+                    Content="✕"
+                    Width="{StaticResource DefaultIconSize}"
+                    Height="{StaticResource DefaultIconSize}"
+                    FontSize="{StaticResource SectionTitleFontSize}"
+                    Foreground="{StaticResource NotificationTextSecondaryBrush}"
+                    Background="Transparent"
+                    BorderThickness="{StaticResource NoBorderThickness}"
+                    VerticalAlignment="Center"
+                    Margin="{StaticResource SmallHorizontalMargin}"
+                    Padding="0"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
+                    HorizontalContentAlignment="Center"
+                    VerticalContentAlignment="Center"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="{StaticResource NotificationDarkHoverBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Background" Value="{StaticResource NotificationDarkPressedBrush}"/>
+                        <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+        </Grid>
+    </Border>
+</Window>
+

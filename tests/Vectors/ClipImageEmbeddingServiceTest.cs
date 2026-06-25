@@ -52,6 +52,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 图像嵌入向量生成测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithValidImage_ShouldReturnVector()
     {
         // Act
@@ -59,11 +60,11 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result, "嵌入结果不应为null");
-        Assert.IsNotNull(result.Vector, "嵌入向量不应为null");
         Assert.AreEqual(1024, result.Vector.Length, "向量维度应为1024");
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithSameImage_ShouldReturnConsistentVector()
     {
         // Arrange
@@ -86,6 +87,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithInvalidImageData_ShouldUseFallback()
     {
         // Arrange - 无效的图像数据
@@ -96,15 +98,16 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
         // Assert - 应该优雅处理（哈希降级或模型输出）
         Assert.IsNotNull(result, "无效图像应返回降级结果");
-        Assert.IsNotNull(result.Vector, "无效图像应返回降级向量");
+        Assert.IsFalse(result.Vector.IsEmpty, "降级向量不应为空");
         Assert.AreEqual(1024, result.Vector.Length, "降级向量维度应正确");
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateAsync_WithCancellation_ShouldComplete()
     {
         // Arrange
-        using         var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel(); // 立即取消
 
         // Act & Assert - 哈希降级不支持取消，但应该快速完成
@@ -117,13 +120,14 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 图像描述生成测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task GenerateCaptionAsync_WithoutChatService_ShouldReturnFallback()
     {
         // Act
         var result = await _service.CaptionAsync(_testImageBytes);
 
         // Assert
-        Assert.AreEqual("(图像内容待解析)", result);
+        Assert.AreEqual("(图像内容生成失败)", result);
     }
 
     #endregion
@@ -131,6 +135,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 资源管理和配置测试
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void Dispose_ShouldReleaseResources()
     {
         // Arrange
@@ -145,6 +150,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task MultipleOperations_ShouldWorkCorrectly()
     {
         // Arrange
@@ -159,7 +165,7 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
         Assert.IsNotNull(embedding, "并发嵌入生成应成功");
         Assert.IsNotNull(caption, "并发描述生成应成功");
         // 默认无Chat服务，返回占位符
-        Assert.AreEqual("(图像内容待解析)", caption);
+        Assert.AreEqual("(图像内容生成失败)", caption);
     }
 
     #endregion

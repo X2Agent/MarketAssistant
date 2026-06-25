@@ -7,11 +7,11 @@
     <key>CFBundleDisplayName</key>
     <string>Market Assistant</string>
     <key>CFBundleIdentifier</key>
-    <string>com.marketassistant.app</string>
+    <string>__BUNDLE_ID__</string>
     <key>CFBundleVersion</key>
-    <string>1.0.0</string>
+    <string>__APP_VERSION__</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>__APP_VERSION__</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -27,11 +27,10 @@
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2025 MarketAssistant. All rights reserved.</string>
+    <string>Copyright © 2026 X2Agent. All rights reserved.</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.finance</string>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
 </dict>
 </plist>
-

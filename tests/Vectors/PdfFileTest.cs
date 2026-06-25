@@ -57,6 +57,7 @@ public class PdfFileTest : BaseAgentTest
     #region Converter Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void PdfMarkdownConverter_ShouldHandlePdfFiles()
     {
         // Arrange & Act & Assert
@@ -66,6 +67,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldConvertRealPdfFile()
     {
         // Act
@@ -84,6 +86,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldHandleDocumentStructure()
     {
         // Act
@@ -107,6 +110,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfMarkdownConverter_ShouldPreserveTextFormatting()
     {
         // Act
@@ -129,6 +133,7 @@ public class PdfFileTest : BaseAgentTest
     #region Reader Tests
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void PdfBlockReader_ShouldHandlePdfFiles()
     {
         // Arrange & Act & Assert
@@ -138,6 +143,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldReadDocumentBlocks()
     {
         // Act
@@ -165,6 +171,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldPreserveBlockOrder()
     {
         // Act
@@ -183,6 +190,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldExtractTextContent()
     {
         // Act
@@ -207,6 +215,7 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldHandleEmptyOrCorruptFile()
     {
         // Arrange
@@ -216,19 +225,21 @@ public class PdfFileTest : BaseAgentTest
             // 创建一个空的或损坏的PDF文件
             await File.WriteAllTextAsync(tempFile, "这不是一个有效的PDF文件");
 
-            // Act & Assert
+            // Act & Assert - 损坏的PDF应返回空块列表或抛出异常
+            var threw = false;
+            List<DocumentBlock> blockList = new();
             try
             {
                 var blocks = await _reader.ReadBlocksAsync(tempFile);
-                // 如果没有抛出异常，检查结果是否为空或合理
-                var blockList = blocks.ToList();
-                Assert.IsTrue(blockList.Count == 0, "损坏的PDF文件应该返回空块列表或抛出异常");
+                blockList = blocks.ToList();
             }
             catch (Exception)
             {
-                // 抛出异常是预期的行为
-                Assert.IsTrue(true, "处理无效PDF文件时抛出异常是正常的");
+                threw = true;
             }
+
+            // 必须满足以下两种情况之一：抛出异常 或 返回空块列表
+            Assert.IsTrue(threw || blockList.Count == 0, "损坏的PDF文件应该返回空块列表或抛出异常");
         }
         finally
         {
@@ -241,22 +252,24 @@ public class PdfFileTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task PdfBlockReader_ShouldHandleNonExistentFile()
     {
         // Arrange
         var nonExistentFile = "non_existent_file.pdf";
 
-        // Act & Assert
+        // Act & Assert - 不存在的文件应抛出异常
+        var threw = false;
         try
         {
             var blocks = await _reader.ReadBlocksAsync(nonExistentFile);
-            Assert.Fail("应该抛出异常处理不存在的文件");
+            _ = blocks.ToList(); // 触发枚举
         }
         catch (Exception)
         {
-            // 抛出异常是预期的行为
-            Assert.IsTrue(true, "处理不存在的文件时抛出异常是正常的");
+            threw = true;
         }
+        Assert.IsTrue(threw, "处理不存在的文件时应抛出异常");
     }
 
     #endregion

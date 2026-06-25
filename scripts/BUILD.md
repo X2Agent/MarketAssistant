@@ -107,7 +107,7 @@ pwsh scripts/build-release.ps1 -Platform macOS  # 或 Linux
 
 ```bash
 # 发布
-dotnet publish src/MarketAssistant.csproj \
+dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj \
   -c Release \
   -r win-x64 \
   --self-contained \
@@ -129,6 +129,8 @@ Compress-Archive -Path ./publish/windows/* -DestinationPath MarketAssistant-Wind
 
 macOS 构建遵循 [Avalonia 官方 macOS 部署指南](https://docs.avaloniaui.net/docs/deployment/macOS)，创建标准的 `.app` bundle 和 `.dmg` 磁盘映像。
 
+构建产物为 **Universal Binary**（同时包含 arm64 和 x86_64 架构），一份 `.dmg` 适用于所有 Mac 设备（Apple Silicon 和 Intel）。脚本内部会分别 publish 两个架构，再用 `lipo` 合并主可执行文件和 `.dylib` 原生库。
+
 #### 使用脚本（推荐）
 
 ```bash
@@ -146,9 +148,9 @@ pwsh scripts/build-release.ps1 -Platform macOS
 #### 配置文件
 
 - **Info.plist** - 应用程序元数据
-  - CFBundleIdentifier: `com.marketassistant.app`
+  - CFBundleIdentifier: `xyz.haoai.market`
   - CFBundleName: `MarketAssistant`
-  - CFBundleVersion: 从 `.csproj` 读取
+  - CFBundleVersion: 从 tag 版本号注入（CI 通过 `-p:Version` 传递）
   
 - **Entitlements** - 应用权限
   - 网络访问（客户端/服务器）
@@ -177,8 +179,8 @@ export NOTARYTOOL_PROFILE="AC_PASSWORD"
 
 #### 输出
 
-- `Release/macOS/MarketAssistant.app` - 应用程序 bundle
-- `Release/macOS/MarketAssistant-1.0.0.dmg` - DMG 磁盘映像
+- `Release/macOS/MarketAssistant.app` - 应用程序 bundle（Universal Binary）
+- `Release/macOS/MarketAssistant-1.0.0.dmg` - DMG 磁盘映像（Universal Binary，支持 arm64 + x86_64）
 
 #### 验证
 
@@ -251,7 +253,7 @@ sudo rpm -ivh Release/Linux/MarketAssistant-1.0.0-x86_64.rpm
 
 ```bash
 # 在任何平台上
-dotnet publish src/MarketAssistant.csproj \
+dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj \
   -c Release \
   -r linux-x64 \
   --self-contained \
@@ -316,7 +318,8 @@ git push origin v1.0.0
 工作流自动生成以下文件并附加到 Release：
 
 - `MarketAssistant-Windows-x64.zip` - Windows 便携版
-- `MarketAssistant-1.0.0.dmg` - macOS 磁盘映像
+- `MarketAssistant-Setup-<version>.exe` - Windows 安装版（Inno Setup）
+- `MarketAssistant-1.0.0.dmg` - macOS 磁盘映像（Universal Binary，支持 arm64 + x86_64）
 - `MarketAssistant_1.0.0_amd64.deb` - Debian/Ubuntu 安装包
 - `MarketAssistant-1.0.0-x86_64.rpm` - Fedora/RHEL 安装包
 - `MarketAssistant-Linux-x64.zip` - Linux 便携版
@@ -395,7 +398,7 @@ dpkg-sig --sign builder MarketAssistant_1.0.0_amd64.deb
 
 ### 启用 Native AOT
 
-在 `MarketAssistant.csproj` 中添加：
+在 `src/MarketAssistant.App/MarketAssistant.App.csproj` 中添加：
 
 ```xml
 <PropertyGroup>
@@ -424,8 +427,7 @@ dpkg-sig --sign builder MarketAssistant_1.0.0_amd64.deb
 ### 平台运行时标识符
 
 - **Windows**: `win-x64`
-- **macOS Intel**: `osx-x64`
-- **macOS Apple Silicon**: `osx-arm64`
+- **macOS**: `osx-arm64` + `osx-x64`（构建为 Universal Binary，一份产物支持所有 Mac）
 - **Linux**: `linux-x64`
 
 ---
@@ -439,17 +441,10 @@ dpkg-sig --sign builder MarketAssistant_1.0.0_amd64.deb
 ```bash
 dotnet restore MarketAssistant.slnx
 dotnet clean MarketAssistant.slnx
-dotnet restore src/MarketAssistant.csproj
+dotnet restore src/MarketAssistant.App/MarketAssistant.App.csproj
 ```
 
-#### 2. Playwright 浏览器未安装
-
-```bash
-dotnet tool update --global Microsoft.Playwright.CLI
-playwright install
-```
-
-#### 3. macOS: "App is damaged and can't be opened"
+#### 2. macOS: "App is damaged and can't be opened"
 
 这通常是因为 Gatekeeper 阻止了未签名的应用。解决方法：
 
@@ -484,7 +479,7 @@ sudo apt-get install libicu70 libssl3
 
 ```bash
 # 详细构建输出
-dotnet publish src/MarketAssistant.csproj -c Release -r win-x64 -v detailed
+dotnet publish src/MarketAssistant.App/MarketAssistant.App.csproj -c Release -r win-x64 -v detailed
 ```
 
 #### GitHub Actions 日志
@@ -536,35 +531,29 @@ dpkg-deb --contents Release/Linux/MarketAssistant_1.0.0_amd64.deb
 
 ## 更新版本号
 
-在发布新版本前，更新以下文件：
+版本号通过 Git tag 统一管理，CI 会自动注入到所有构建产物，**无需手动修改任何文件**。
 
-### 1. 项目文件
+### 发版流程
 
-```xml
-<!-- src/MarketAssistant.csproj -->
-<PropertyGroup>
-  <Version>1.0.0</Version>
-  <CFBundleVersion>1.0.0</CFBundleVersion>
-  <CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
-</PropertyGroup>
+```bash
+# 1. 打 tag（版本号不带 v 前缀也可，CI 会自动去除）
+git tag v1.0.0
+git push origin v1.0.0
+
+# 2. CI 自动触发 release.yml，从 tag 提取版本号并注入：
+#    - dotnet publish -p:Version=<version> -p:InformationalVersion=<version>
+#    - macOS/Linux 脚本通过 APP_VERSION 环境变量接收
+#    - Windows .iss 通过 sed 替换 MyAppVersion
+#    - Info.plist 通过 sed 替换 __APP_VERSION__ 占位符
 ```
 
-### 2. macOS Info.plist
+### 预发布版本
 
-```xml
-<!-- scripts/macos/Info.plist.template -->
-<key>CFBundleVersion</key>
-<string>1.0.0</string>
-<key>CFBundleShortVersionString</key>
-<string>1.0.0</string>
-```
+tag 包含 `-` 即视为预发布（如 `v1.0.0-beta1`），GitHub Release 会自动标记为 prerelease，且正式版用户不会被提示升级到预发布版本。
 
-### 3. 构建脚本
+### 本地开发版本
 
-更新脚本中的 `VERSION` 变量：
-- `scripts/macos/build-app-bundle.sh`
-- `scripts/linux/build-deb.sh`
-- `scripts/linux/build-rpm.sh`
+本地 `dotnet run` 时使用 [csproj](../src/MarketAssistant.App/MarketAssistant.App.csproj) 中的 `<Version>` 默认值（当前为 `1.0.0-beta1`），不影响发布。
 
 ---
 

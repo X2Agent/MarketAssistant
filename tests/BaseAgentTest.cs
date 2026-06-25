@@ -1,15 +1,7 @@
-using MarketAssistant.Agents.MarketAnalysis;
-using MarketAssistant.Agents.MarketAnalysis.Executors;
-using MarketAssistant.Agents.StockSelection;
-using MarketAssistant.Agents.StockSelection.Executors;
-using MarketAssistant.Agents.Tools;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Rag.Extensions;
-using MarketAssistant.Services.Browser;
-using MarketAssistant.Services.Mcp;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Services.StockScreener;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -19,8 +11,8 @@ namespace TestMarketAssistant;
 
 /// <summary>
 /// Agent Framework 测试基类
+/// 环境变量必需：缺失时对应测试失败（不跳过），确保真实场景验证
 /// </summary>
-[TestClass]
 public class BaseAgentTest
 {
     protected ILogger? _logger;
@@ -29,6 +21,11 @@ public class BaseAgentTest
     protected IAnalystAgentFactory _analystAgentFactory = null!;
     protected IHttpClientFactory _httpClientFactory = null!;
     protected IUserSettingService _userSettingService = null!;
+
+    /// <summary>
+    /// 环境中是否配置了真实 LLM API Key
+    /// </summary>
+    protected bool IsLlmAvailable { get; private set; }
 
     [TestInitialize]
     public void BaseInitialize()
@@ -39,7 +36,6 @@ public class BaseAgentTest
         });
         _logger = loggerFactory.CreateLogger<BaseAgentTest>();
 
-        // 初始化测试所需的服务
         _serviceProvider = CreateServiceProvider();
         _chatClientFactory = _serviceProvider.GetRequiredService<IChatClientFactory>();
         _analystAgentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
@@ -47,98 +43,89 @@ public class BaseAgentTest
         _userSettingService = _serviceProvider.GetRequiredService<IUserSettingService>();
     }
 
+    /// <summary>
+    /// 断言真实 LLM API Key 已配置（缺失则测试失败，而非跳过）
+    /// </summary>
+    protected void RequireLlm()
+    {
+        if (!IsLlmAvailable)
+        {
+            Assert.Fail("OPENAI_API_KEY 环境变量未配置，无法调用真实 LLM 进行真实场景验证");
+        }
+    }
+
     protected IServiceProvider CreateServiceProvider()
     {
         var services = new ServiceCollection();
 
-        // 配置日志
         services.AddLogging(builder =>
         {
             builder.SetMinimumLevel(LogLevel.Debug);
         });
 
-        // 从环境变量获取ApiKey
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? throw new InvalidOperationException("OPENAI_API_KEY environment variable is not set");
-        var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? throw new InvalidOperationException("ZHITU_API_TOKEN environment variable is not set");
-        var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? throw new InvalidOperationException("WEB_SEARCH_API_KEY environment variable is not set");
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "";
+        var zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? "";
+        var searchApiKey = Environment.GetEnvironmentVariable("WEB_SEARCH_API_KEY") ?? "";
+        var embeddingApiKey = Environment.GetEnvironmentVariable("JINA_API_KEY") ?? "";
 
-        // 硬编码ModelId和Endpoint
+        IsLlmAvailable = !string.IsNullOrEmpty(apiKey);
+
         var modelId = "deepseek-ai/DeepSeek-V3.2";
         var endpoint = "https://api.siliconflow.cn";
 
-        // 注册依赖服务
-        services.AddSingleton(provider =>
+        services.AddApplicationServices();
+
+        // 必须在 AddApplicationServices 之后注册，覆盖其内部的真实 UserSettingService
+        var testUserSetting = new UserSetting
         {
-            var testUserSetting = new UserSetting
+            ZhiTuApiToken = zhiTuApiToken,
+            ModelId = modelId,
+            EmbeddingModelId = "jina-embeddings-v5-text-small",
+            EmbeddingEndpoint = "https://api.jina.ai",
+            EmbeddingApiKey = embeddingApiKey,
+            Endpoint = endpoint,
+            ApiKey = apiKey,
+            EnabledAnalystRoles = new Dictionary<string, bool>
             {
-                ZhiTuApiToken = zhiTuApiToken,
-                ModelId = modelId,
-                EmbeddingModelId = "BAAI/bge-m3",
-                Endpoint = endpoint,
-                ApiKey = apiKey,
-                EnabledAnalystRoles = new Dictionary<string, bool>
-                {
-                    { "FinancialAnalystAgent", true },
-                    { "MarketSentimentAnalystAgent", false },
-                    { "TechnicalAnalystAgent", false },
-                    { "NewsEventAnalystAgent", true }
-                },
-                EnableWebSearch = true,
-                WebSearchApiKey = searchApiKey,
-                WebSearchProvider = "Tavily",
-                LoadKnowledge = true,
-            };
-            var userSettingServiceMock = new Mock<IUserSettingService>();
-            userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);
-            return userSettingServiceMock.Object;
-        });
+                { "FinancialAnalystAgent", true },
+                { "MarketSentimentAnalystAgent", false },
+                { "TechnicalAnalystAgent", false },
+                { "NewsEventAnalystAgent", true }
+            },
+            EnableWebSearch = !string.IsNullOrEmpty(searchApiKey),
+            WebSearchApiKey = searchApiKey,
+            WebSearchProvider = "Tavily",
+            LoadKnowledge = true,
+        };
+        var userSettingServiceMock = new Mock<IUserSettingService>();
+        userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(testUserSetting);
+        services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
-        // 注册核心服务
-        services.AddHttpClient();
-        services.AddSingleton<PlaywrightService>();
-        services.AddSingleton<StockScreenerService>();
-        services.AddSingleton<McpService>();
-
-        // 注册 Agent Tool 类
-        services.AddSingleton<StockBasicTools>();
-        services.AddSingleton<StockFinancialTools>();
-        services.AddSingleton<StockTechnicalTools>();
-        services.AddSingleton<GroundingSearchTools>();
-        services.AddSingleton<StockNewsTools>();
-        services.AddSingleton<MarketSentimentTools>();
-
-        // 注册 Agent Framework 服务
-        services.AddSingleton<IChatClientFactory, ChatClientFactory>();
-        services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
-
-        // 注册 StockSelection Workflow and Executors
-        services.AddSingleton<GenerateCriteriaExecutor>();
-        services.AddSingleton<ScreenStocksExecutor>();
-        services.AddSingleton<AnalyzeStocksExecutor>();
-        services.AddSingleton<StockSelectionWorkflow>();
-
-        // 注册 MarketAnalysis Workflow and Executors
-        services.AddSingleton<AnalysisDispatcherExecutor>();
-        services.AddSingleton<AnalysisAggregatorExecutor>();
-        services.AddSingleton<CoordinatorExecutor>();
-        services.AddSingleton<MarketAnalysisWorkflow>();
-
-        // 注册 RAG 服务
-        services.AddRagServices();
-
-        // 注册 Embedding Generator
-        services.AddSingleton(serviceProvider =>
+        // 注册 IEmbeddingGenerator（RAG 测试依赖），通过 IEmbeddingFactory 创建
+        // 仅当配置了 Jina EmbeddingApiKey 时注册，避免无密钥场景下工厂构造抛异常
+        if (!string.IsNullOrEmpty(embeddingApiKey))
         {
-            var embeddingFactory = serviceProvider.GetRequiredService<IEmbeddingFactory>();
-            var embeddingGenerator = embeddingFactory.Create();
-            return embeddingGenerator;
-        });
-
-        // 注册 Vector Store
-        var store = Directory.GetCurrentDirectory() + "/vector.sqlite";
-        services.AddSqliteVectorStore(_ => $"Data Source={store}");
+            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp =>
+            {
+                var factory = sp.GetRequiredService<IEmbeddingFactory>();
+                return factory.Create();
+            });
+        }
 
         return services.BuildServiceProvider();
+    }
+
+    [TestCleanup]
+    public async Task BaseCleanupAsync()
+    {
+        switch (_serviceProvider)
+        {
+            case IAsyncDisposable asyncDisposable:
+                await asyncDisposable.DisposeAsync();
+                break;
+            case IDisposable disposable:
+                disposable.Dispose();
+                break;
+        }
     }
 }

@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using Moq;
 using Moq.Protected;
 using System.Net;
@@ -25,10 +26,12 @@ public class GitHubReleaseServiceTest
         httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
         _loggerMock = new Mock<ILogger<GitHubReleaseService>>();
-        _service = new GitHubReleaseService(httpClientFactoryMock.Object, _loggerMock.Object);
+        var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        _service = new GitHubReleaseService(httpClientFactoryMock.Object, memoryCache, _loggerMock.Object);
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_HasNewVersion_ReturnsTrue()
     {
         // Arrange
@@ -67,6 +70,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_NoNewVersion_ReturnsFalse()
     {
         // Arrange
@@ -92,6 +96,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_WithFourPartVersion_WorksCorrectly()
     {
         // Arrange
@@ -118,6 +123,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_ExcludePrerelease_OnlyStableVersions()
     {
         // Arrange
@@ -141,6 +147,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_NetworkError_ThrowsException()
     {
         // Arrange
@@ -158,6 +165,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_RateLimitExceeded_ThrowsException()
     {
         // Arrange
@@ -169,6 +177,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task CheckForUpdateAsync_EmptyVersion_ThrowsException()
     {
         // Act & Assert
@@ -177,6 +186,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_Success_ReturnsFilePath()
     {
         // Arrange
@@ -215,6 +225,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_WithProgress_ReportsProgress()
     {
         // Arrange
@@ -266,6 +277,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_InvalidUrl_ThrowsException()
     {
         // Act & Assert
@@ -274,6 +286,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task DownloadUpdateAsync_HttpError_ThrowsException()
     {
         // Arrange
@@ -293,6 +306,7 @@ public class GitHubReleaseServiceTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ClearCache_ClearsSuccessfully()
     {
         // Act & Assert - 不抛出异常即可
@@ -314,5 +328,116 @@ public class GitHubReleaseServiceTest
                 ItExpr.IsAny<CancellationToken>()
             )
             .ReturnsAsync(response);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task CheckForUpdateAsync_BetaToStable_DetectsUpdate()
+    {
+        // 场景：当前是 beta 版本，GitHub 上发布了正式版
+        var releases = new List<ReleaseInfo>
+        {
+            new ReleaseInfo
+            {
+                TagName = "v1.0.0",
+                Name = "Release 1.0.0",
+                PublishedAt = DateTime.UtcNow,
+                Prerelease = false,
+                Draft = false,
+                Assets = new List<ReleaseAsset>
+                {
+                    new ReleaseAsset
+                    {
+                        Name = "MarketAssistant-Setup-1.0.0.exe",
+                        DownloadUrl = "https://github.com/X2Agent/MarketAssistant/releases/download/v1.0.0/MarketAssistant-Setup-1.0.0.exe",
+                        Size = 50_000_000
+                    },
+                    new ReleaseAsset
+                    {
+                        Name = "MarketAssistant-Windows-x64.zip",
+                        DownloadUrl = "https://github.com/X2Agent/MarketAssistant/releases/download/v1.0.0/MarketAssistant-Windows-x64.zip",
+                        Size = 45_000_000
+                    }
+                }
+            }
+        };
+
+        SetupHttpResponse(HttpStatusCode.OK, releases);
+
+        // 当前版本是 beta
+        var result = await _service.CheckForUpdateAsync("1.0.0-beta1");
+
+        Assert.IsTrue(result.HasNewVersion, "beta1 → stable 应检测到新版本");
+        Assert.AreEqual("v1.0.0", result.LatestRelease!.TagName);
+
+        // 验证资产选择：应优先选 .exe
+        var asset = result.LatestRelease.Assets
+            .FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+        Assert.IsNotNull(asset, "应找到 .exe 安装包");
+        Assert.AreEqual("MarketAssistant-Setup-1.0.0.exe", asset!.Name);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task CheckForUpdateAsync_MultipleReleases_PicksHighestVersion()
+    {
+        // 场景：多个 release，hotfix 发布时间更晚，但 beta 版本号更高
+        var releases = new List<ReleaseInfo>
+        {
+            new ReleaseInfo
+            {
+                TagName = "v1.0.1",
+                Name = "Hotfix 1.0.1",
+                PublishedAt = DateTime.UtcNow,  // 最后发布
+                Prerelease = false,
+                Draft = false
+            },
+            new ReleaseInfo
+            {
+                TagName = "v1.1.0-beta1",
+                Name = "Beta 1.1.0",
+                PublishedAt = DateTime.UtcNow.AddDays(-1),  // 更早发布
+                Prerelease = true,
+                Draft = false
+            },
+            new ReleaseInfo
+            {
+                TagName = "v1.0.0",
+                Name = "Release 1.0.0",
+                PublishedAt = DateTime.UtcNow.AddDays(-7),
+                Prerelease = false,
+                Draft = false
+            }
+        };
+
+        SetupHttpResponse(HttpStatusCode.OK, releases);
+
+        // includePrerelease=true 时应取到 v1.1.0-beta1（版本号最高）
+        var result = await _service.CheckForUpdateAsync("1.0.0", includePrerelease: true);
+        Assert.IsTrue(result.HasNewVersion);
+        Assert.AreEqual("v1.1.0-beta1", result.LatestRelease!.TagName,
+            "应按版本号排序取最高，而非按发布时间");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task CheckForUpdateAsync_SameBetaVersion_NoUpdate()
+    {
+        // 场景：当前版本和最新版本相同
+        var releases = new List<ReleaseInfo>
+        {
+            new ReleaseInfo
+            {
+                TagName = "v1.0.0-beta1",
+                PublishedAt = DateTime.UtcNow,
+                Prerelease = true,
+                Draft = false
+            }
+        };
+
+        SetupHttpResponse(HttpStatusCode.OK, releases);
+
+        var result = await _service.CheckForUpdateAsync("1.0.0-beta1");
+        Assert.IsFalse(result.HasNewVersion, "相同版本不应提示更新");
     }
 }

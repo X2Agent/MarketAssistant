@@ -5,10 +5,13 @@ set -e
 # 遵循 Debian 软件包规范
 
 APP_NAME="marketassistant"
-VERSION="1.0.0"
+# 优先使用 CI 注入的版本号，否则回退到默认值
+VERSION="${APP_VERSION:-1.0.0}"
 ARCH="amd64"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APP_CSProj="$PROJECT_ROOT/src/MarketAssistant.App/MarketAssistant.App.csproj"
+APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/Linux"
 PUBLISH_DIR="$BUILD_DIR/publish"
 DEB_DIR="$BUILD_DIR/deb"
@@ -34,7 +37,7 @@ mkdir -p "$BUILD_DIR"
 echo -e "${YELLOW}📦 Publishing app...${NC}"
 cd "$PROJECT_ROOT"
 
-dotnet publish src/MarketAssistant.csproj \
+dotnet publish "$APP_CSProj" \
     -c Release \
     -r linux-x64 \
     --self-contained \
@@ -44,6 +47,8 @@ dotnet publish src/MarketAssistant.csproj \
     -p:DebugType=None \
     -p:DebugSymbols=false \
     -p:ErrorOnDuplicatePublishOutputFiles=false \
+    -p:Version="$VERSION" \
+    -p:InformationalVersion="$VERSION" \
     -o "$PUBLISH_DIR"
 
 if [ $? -ne 0 ]; then
@@ -78,9 +83,9 @@ echo -e "${YELLOW}📝 Installing desktop entry...${NC}"
 cp "$SCRIPT_DIR/marketassistant.desktop" "$DEB_DIR/$PACKAGE_NAME/usr/share/applications/"
 
 # 6. 复制图标
-if [ -f "$PROJECT_ROOT/src/Assets/logo.png" ]; then
+if [ -f "$APP_ASSETS_DIR/logo.png" ]; then
     echo -e "${YELLOW}🎨 Installing icon...${NC}"
-    cp "$PROJECT_ROOT/src/Assets/logo.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
+    cp "$APP_ASSETS_DIR/logo.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
 fi
 
 # 7. 创建 control 文件
@@ -95,11 +100,11 @@ Priority: optional
 Architecture: $ARCH
 Installed-Size: $INSTALLED_SIZE
 Maintainer: MarketAssistant Team <support@marketassistant.com>
-Homepage: https://github.com/yourusername/MarketAssistant
-Description: AI-powered market analysis assistant
- Market Assistant is a cross-platform desktop application that provides
- AI-powered market analysis and insights. It features real-time data
- analysis, technical indicators, and intelligent recommendations.
+Homepage: https://github.com/X2Agent/MarketAssistant
+Description: AI 智能市场分析助手
+ 市场分析助手是一款跨平台的桌面应用程序，提供
+ AI 智能市场分析与洞察。它具有实时数据分析、
+ 技术指标和智能推荐功能。
 Depends: libicu70 | libicu72, libssl3 | libssl1.1
 EOF
 

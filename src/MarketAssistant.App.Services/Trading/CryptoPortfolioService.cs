@@ -1,0 +1,138 @@
+using MarketAssistant.Services.Data;
+using MarketAssistant.Trading.Abstractions;
+using MarketAssistant.Trading.Models;
+using Microsoft.Extensions.Logging;
+
+namespace MarketAssistant.Trading;
+
+/// <summary>
+/// 统一封装虚拟币账户资产估值与持仓快照，避免在多个调用点重复拼装账户视图。
+/// </summary>
+public class CryptoPortfolioService
+{
+    private readonly IExchangeClient _exchangeClient;
+    private readonly BinanceMarketDataService _marketDataService;
+    private readonly TradingDataService _tradingDataService;
+    private readonly ILogger<CryptoPortfolioService> _logger;
+
+    public CryptoPortfolioService(
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+        BinanceMarketDataService marketDataService,
+        TradingDataService tradingDataService,
+        ILogger<CryptoPortfolioService> logger)
+    {
+        _exchangeClient = exchangeClient;
+        _marketDataService = marketDataService;
+        _tradingDataService = tradingDataService;
+        _logger = logger;
+    }
+
+    public async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default)
+    {
+        var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct);
+        return await BuildBalanceSummaryAsync(accountInfo, ct);
+    }
+
+    public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken ct = default)
+    {
+        var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct);
+        var positions = new List<PositionInfo>();
+
+        foreach (var balance in accountInfo.Balances)
+        {
+            var quantity = balance.Free + balance.Locked;
+            if (quantity <= 0 || balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var position = new PositionInfo
+            {
+                Symbol = $"{balance.Asset}USDT",
+                Quantity = quantity
+            };
+
+            try
+            {
+                var ticker = await _marketDataService.Get24hrTickerAsync(position.Symbol, ct);
+                if (ticker != null)
+                {
+                    position.CurrentPrice = ticker.LastPrice;
+
+                    // 只按未平仓的 FIFO 持仓计算均价，避免已平仓记录污染浮盈显示
+                    var avgEntry = await _tradingDataService.GetOpenPositionAvgEntryPriceAsync(position.Symbol, ct);
+                    position.EntryPrice = avgEntry > 0 ? avgEntry : ticker.LastPrice;
+
+                    if (position.EntryPrice > 0)
+                    {
+                        position.UnrealizedPnl = (position.CurrentPrice - position.EntryPrice) * position.Quantity;
+                        position.UnrealizedPnlPercent = (position.CurrentPrice - position.EntryPrice) / position.EntryPrice * 100;
+                    }
+                }
+            }
+            catch (HttpRequestException)
+            {
+                _logger.LogDebug("获取持仓价格失败，跳过: {Symbol}", position.Symbol);
+            }
+
+            positions.Add(position);
+        }
+
+        return positions;
+    }
+
+    public static decimal GetUsdtBalance(AccountBalanceSummary summary)
+    {
+        return summary.Assets
+            .Where(asset => asset.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
+            .Sum(asset => asset.Free + asset.Locked);
+    }
+
+    private async Task<AccountBalanceSummary> BuildBalanceSummaryAsync(
+        ExchangeAccountInfo accountInfo,
+        CancellationToken ct)
+    {
+        var summary = new AccountBalanceSummary();
+
+        foreach (var balance in accountInfo.Balances)
+        {
+            var totalAmount = balance.Free + balance.Locked;
+            if (totalAmount <= 0)
+            {
+                continue;
+            }
+
+            var assetBalance = new AssetBalance
+            {
+                Asset = balance.Asset,
+                Free = balance.Free,
+                Locked = balance.Locked
+            };
+
+            if (balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
+            {
+                assetBalance.ValueUSDT = totalAmount;
+            }
+            else
+            {
+                try
+                {
+                    var ticker = await _marketDataService.Get24hrTickerAsync($"{balance.Asset}USDT", ct);
+                    if (ticker != null)
+                    {
+                        assetBalance.ValueUSDT = totalAmount * ticker.LastPrice;
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                    _logger.LogDebug("跳过无 USDT 标的行情的资产估值: {Asset}", balance.Asset);
+                }
+            }
+
+            summary.TotalValueUSDT += assetBalance.ValueUSDT;
+            summary.Assets.Add(assetBalance);
+        }
+
+        return summary;
+    }
+}

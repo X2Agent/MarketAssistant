@@ -1,0 +1,241 @@
+using System.Globalization;
+using System.Text.Json;
+using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Core;
+using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging;
+
+namespace MarketAssistant.Services.Archive;
+
+/// <summary>
+/// 分析报告存档服务，使用 SQLite 持久化历史报告。
+/// </summary>
+public class ReportArchiveService : SqliteServiceBase
+{
+    public ReportArchiveService(ILogger<ReportArchiveService> logger)
+        : base(logger)
+    {
+    }
+
+    /// <summary>
+    /// 保存分析报告。失败时抛出异常，调用方可据此决定是否回滚缓存等后续操作。
+    /// </summary>
+    public async Task SaveAsync(MarketAnalysisReport report, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        try
+        {
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO reports (asset_code, score, created_at, report_json)
+                VALUES (@code, @score, @time, @json)
+                """;
+            cmd.Parameters.AddWithValue("@code", report.AssetSymbol);
+            cmd.Parameters.AddWithValue("@score", report.CoordinatorResult.OverallScore);
+            cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
+            cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // 抛出异常而非吞并，让调用方感知归档失败（避免幽灵报告）
+            throw new InvalidOperationException($"保存分析报告失败: {report.AssetSymbol}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 获取某资产的历史报告摘要（按时间倒序）
+    /// </summary>
+    public async Task<List<ReportSummary>> GetSummariesAsync(
+        string assetCode,
+        int limit = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var results = new List<ReportSummary>();
+        try
+        {
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT id, asset_code, score, created_at, report_json
+                FROM reports WHERE asset_code = @code
+                ORDER BY created_at DESC LIMIT @limit
+                """;
+            cmd.Parameters.AddWithValue("@code", assetCode);
+            cmd.Parameters.AddWithValue("@limit", limit);
+
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(new ReportSummary
+                {
+                    Id = reader.GetInt64(0),
+                    AssetCode = reader.GetString(1),
+                    Score = reader.GetDouble(2),
+                    CreatedAt = DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                });
+
+                if (!reader.IsDBNull(4))
+                {
+                    TryFillDimensionScores(results[^1], reader.GetString(4));
+                }
+            }
+
+            ApplyTimelineDeltas(results);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "查询报告摘要失败: {Asset}", assetCode);
+        }
+        return results;
+    }
+
+    /// <summary>
+    /// 根据 ID 加载完整报告
+    /// </summary>
+    public async Task<MarketAnalysisReport?> LoadAsync(long id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT report_json FROM reports WHERE id = @id";
+            cmd.Parameters.AddWithValue("@id", id);
+
+            var json = await cmd.ExecuteScalarAsync(cancellationToken) as string;
+            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<MarketAnalysisReport>(json);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "加载报告失败: id={Id}", id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 删除指定报告
+    /// </summary>
+    public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await EnsureInitializedAsync(InitializeDatabaseAsync);
+            await using var conn = await OpenConnectionAsync(cancellationToken);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM reports WHERE id = @id";
+            cmd.Parameters.AddWithValue("@id", id);
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "删除报告失败: id={Id}", id);
+        }
+    }
+
+    protected override async Task InitializeDatabaseAsync()
+    {
+        try
+        {
+            await using var conn = await OpenConnectionAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    asset_code TEXT NOT NULL,
+                    score REAL NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    report_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_reports_asset ON reports(asset_code);
+                CREATE INDEX IF NOT EXISTS idx_reports_time ON reports(created_at);
+                """;
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch (Exception ex)
+        {
+            // 记录异常并重新抛出：让 _initializeTask 处于 Faulted 状态，
+            // 后续 await _initializeTask 会抛出异常，调用方能感知数据库不可用
+            Logger.LogError(ex, "初始化报告数据库失败");
+            throw;
+        }
+    }
+
+    private static void TryFillDimensionScores(ReportSummary summary, string reportJson)
+    {
+        try
+        {
+            var report = JsonSerializer.Deserialize<MarketAnalysisReport>(reportJson);
+            var scores = report?.CoordinatorResult.DimensionScores;
+            if (scores == null) return;
+
+            summary.FundamentalScore = scores.Fundamental;
+            summary.TechnicalScore = scores.Technical;
+            summary.FinancialScore = scores.Financial;
+            summary.SentimentScore = scores.Sentiment;
+            summary.NewsScore = scores.News;
+        }
+        catch (JsonException)
+        {
+            // 反序列化失败时维度分数保持默认值 0，不影响摘要展示
+        }
+    }
+
+    private static void ApplyTimelineDeltas(List<ReportSummary> summaries)
+    {
+        for (var i = 0; i < summaries.Count; i++)
+        {
+            if (i == summaries.Count - 1)
+            {
+                summaries[i].ScoreDelta = 0;
+                summaries[i].FundamentalDelta = 0;
+                summaries[i].TechnicalDelta = 0;
+                summaries[i].FinancialDelta = 0;
+                continue;
+            }
+
+            var current = summaries[i];
+            var previous = summaries[i + 1];
+
+            current.ScoreDelta = current.Score - previous.Score;
+            current.FundamentalDelta = current.FundamentalScore - previous.FundamentalScore;
+            current.TechnicalDelta = current.TechnicalScore - previous.TechnicalScore;
+            current.FinancialDelta = current.FinancialScore - previous.FinancialScore;
+        }
+    }
+
+}
+
+/// <summary>
+/// 报告摘要（列表展示用，不含完整 JSON）
+/// </summary>
+public class ReportSummary
+{
+    public long Id { get; set; }
+    public string AssetCode { get; set; } = string.Empty;
+    public double Score { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public double FundamentalScore { get; set; }
+    public double TechnicalScore { get; set; }
+    public double FinancialScore { get; set; }
+    public double SentimentScore { get; set; }
+    public double NewsScore { get; set; }
+
+    public double ScoreDelta { get; set; }
+    public double FundamentalDelta { get; set; }
+    public double TechnicalDelta { get; set; }
+    public double FinancialDelta { get; set; }
+
+    public string ScoreTrendText => $"总分 {Score:F1} ({FormatDelta(ScoreDelta)})";
+    public string KeyScoreChangeText =>
+        $"基{FundamentalScore:F1}({FormatDelta(FundamentalDelta)}) 技{TechnicalScore:F1}({FormatDelta(TechnicalDelta)}) 财{FinancialScore:F1}({FormatDelta(FinancialDelta)})";
+
+    private static string FormatDelta(double value)
+    {
+        return value > 0 ? $"+{value:F1}" : $"{value:F1}";
+    }
+}

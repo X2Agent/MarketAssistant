@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels.Trading"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:trading="using:MarketAssistant.Views.Pages.Trading"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.Trading.TradingPageView"
+             x:DataType="vm:TradingPageViewModel">
+
+    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
+        <!-- Tab 按钮组 -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceVariantBrush}"
+                CornerRadius="{StaticResource SmallCornerRadius}"
+                Padding="{StaticResource TinyPadding}"
+                Margin="{StaticResource SmallBottomMargin}"
+                HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="0">
+                <Button Content="策略配置"
+                        Classes="period-button"
+                        Classes.selected="{Binding IsStrategyTabSelected}"
+                        Command="{Binding SelectTabCommand}"
+                        CommandParameter="0"/>
+                <Button Content="交易监控"
+                        Classes="period-button"
+                        Classes.selected="{Binding IsMonitorTabSelected}"
+                        Command="{Binding SelectTabCommand}"
+                        CommandParameter="1"/>
+                <Button Content="交易历史"
+                        Classes="period-button"
+                        Classes.selected="{Binding IsHistoryTabSelected}"
+                        Command="{Binding SelectTabCommand}"
+                        CommandParameter="2"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Tab 内容区域 -->
+        <Panel Grid.Row="1">
+            <trading:StrategyConfigView DataContext="{Binding StrategyConfig}"
+                                        IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsStrategyTabSelected}"/>
+            <trading:TradeMonitorView DataContext="{Binding TradeMonitor}"
+                                     IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsMonitorTabSelected}"/>
+            <trading:TradeHistoryView DataContext="{Binding TradeHistory}"
+                                     IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsHistoryTabSelected}"/>
+        </Panel>
+    </Grid>
+</UserControl>

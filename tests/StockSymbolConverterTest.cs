@@ -7,6 +7,7 @@ namespace Tests;
 public class StockSymbolConverterTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("600000", "sh600000")]
     [DataRow("SH600000", "sh600000")]
     [DataRow("sh600000", "sh600000")]
@@ -22,6 +23,7 @@ public class StockSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("600000", "600000.SH")]
     [DataRow("000001", "000001.SZ")]
     [DataRow("688001", "688001.SH")]
@@ -43,6 +45,7 @@ public class StockSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("sh600000", "600000.SH")]
     [DataRow("sz000001", "000001.SZ")]
     [DataRow("SH688001", "688001.SH")]
@@ -54,6 +57,7 @@ public class StockSymbolConverterTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow("600000.SH", "600000.SH")]
     [DataRow("000001.sz", "000001.SZ")]
     [DataRow("688001.sh", "688001.SH")]

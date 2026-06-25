@@ -20,6 +20,7 @@ public class VectorStoreIntegrationTest : BaseAgentTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task VectorStore_ShouldStoreAndRetrieveTextParagraphs()
     {
         // Arrange

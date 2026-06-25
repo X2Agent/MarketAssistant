@@ -1,0 +1,95 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>MarketAssistant</RootNamespace>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    
+    <!-- 跨平台构建配置 -->
+    <RuntimeIdentifiers>win-x64;osx-x64;osx-arm64;linux-x64</RuntimeIdentifiers>
+    <UseAppHost>true</UseAppHost>
+    
+    <!-- 应用程序信息 -->
+    <AssemblyName>MarketAssistant</AssemblyName>
+	<AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
+    <Version>1.0.0-beta1</Version>
+    <Company>X2Agent</Company>
+    <Product>Market Assistant</Product>
+    <AssemblyTitle>Market Assistant</AssemblyTitle>
+    <Copyright>Copyright © 2026</Copyright>
+    <Description>AI 智能市场分析助手</Description>
+    
+    <!-- macOS 特定配置 -->
+    <CFBundleName>MarketAssistant</CFBundleName>
+    <CFBundleDisplayName>Market Assistant</CFBundleDisplayName>
+    <CFBundleIdentifier>xyz.haoai.market</CFBundleIdentifier>
+    <!-- CFBundle 版本号跟随 <Version> 自动同步，发版时通过 -p:Version 注入 -->
+    <CFBundleVersion>$(Version)</CFBundleVersion>
+    <CFBundleShortVersionString>$(Version)</CFBundleShortVersionString>
+    <CFBundlePackageType>APPL</CFBundlePackageType>
+    <CFBundleSignature>MKAS</CFBundleSignature>
+    <CFBundleExecutable>MarketAssistant</CFBundleExecutable>
+    <CFBundleIconFile>MarketAssistant.icns</CFBundleIconFile>
+    <NSHighResolutionCapable>true</NSHighResolutionCapable>
+    <NSPrincipalClass>NSApplication</NSPrincipalClass>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Agents\MarketAssistant.Agents.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
+    <ProjectReference Include="..\MarketAssistant.DataProviders\MarketAssistant.DataProviders.csproj" />
+    <ProjectReference Include="..\MarketAssistant.App.Services\MarketAssistant.App.Services.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Rag\MarketAssistant.Rag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="config\models.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="config\prompts\*.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="skills\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>skills\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+	<PackageReference Include="AdaptiveCards" />
+	<PackageReference Include="Avalonia" />
+	<PackageReference Include="Avalonia.Desktop" />
+	<PackageReference Include="Avalonia.Themes.Fluent" />
+	<PackageReference Include="Avalonia.Fonts.Inter" />
+	<PackageReference Include="Markdig" />
+	<PackageReference Include="CommunityToolkit.Mvvm" />
+	<PackageReference Include="Svg.Controls.Skia.Avalonia" />
+	<PackageReference Include="Svg.Skia" />
+	<!-- Avalonia 官方 WebView（MIT 开源,无需许可证） -->
+	<PackageReference Include="Avalonia.Controls.WebView" />
+	<PackageReference Include="Markdown.Avalonia" />
+	<PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <!-- macOS 平台特定配置 - 修复 WebView 相关本地库问题 -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
+    <!-- 跳过不存在的本地库检查 -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <!-- 排除可选的本地库文件 -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64' Or '$(RuntimeIdentifier)' == 'osx-arm64'">
+    <Content Remove="**/libEGL.dylib" />
+    <Content Remove="**/libGLESv2.dylib" />
+  </ItemGroup>
+</Project>

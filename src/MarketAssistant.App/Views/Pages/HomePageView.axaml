@@ -1,0 +1,329 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             xmlns:telegrams="using:MarketAssistant.Applications.Telegrams"
+             xmlns:assets="using:MarketAssistant.Applications.Assets.Models"
+             xmlns:converts="using:MarketAssistant.Converters"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Pages.HomePageView"
+             x:DataType="vm:HomePageViewModel">
+
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+        <converts:NumberFormatConverter x:Key="NumberFormatConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
+        
+        <!-- 顶部搜索区域 -->
+        <controls:CardView Grid.Row="0" Margin="{StaticResource BottomMargin}">
+            <Grid ColumnDefinitions="*,Auto">
+                <AutoCompleteBox x:Name="StockSearchBox"
+                                 Grid.Column="0"
+                                 PlaceholderText="输入资产代码或名称"
+                                 MinimumPrefixLength="1"
+                                 ItemsSource="{Binding Search.SearchResults}"
+                                 FilterMode="None"
+                                 Text="{Binding Search.SearchQuery, Mode=TwoWay}"
+                                 IsDropDownOpen="{Binding Search.IsSearchResultVisible, Mode=TwoWay}"
+                                 MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                 Background="Transparent"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 FontSize="{StaticResource SectionTitleFontSize}"
+                                 Padding="{StaticResource SmallCardPadding}">
+                    <AutoCompleteBox.ItemTemplate>
+                        <DataTemplate x:DataType="assets:AssetItem">
+                            <StackPanel Margin="{StaticResource TinyMargin}"
+                                       Background="Transparent"
+                                       Cursor="Hand"
+                                       PointerPressed="SearchResultItem_PointerPressed"
+                                       Tag="{Binding .}">
+                                <TextBlock Text="{Binding Name}" 
+                                           FontWeight="SemiBold"
+                                           FontSize="{StaticResource LabelFontSize}"/>
+                                <TextBlock Text="{Binding Code}" 
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </AutoCompleteBox.ItemTemplate>
+                </AutoCompleteBox>
+                
+                <!-- 搜索加载指示器 -->
+                <Border Grid.Column="1"
+                       IsVisible="{Binding Search.IsSearching}"
+                       Background="{DynamicResource CardBackgroundBrush}"
+                       CornerRadius="{StaticResource DefaultCornerRadius}"
+                       Padding="{StaticResource SmallCardPadding}"
+                       VerticalAlignment="Center"
+                       Margin="{StaticResource SmallLeftMargin}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                        <!-- 搜索图标 -->
+                        <svg:Svg Path="/Assets/Images/search_icon.svg"
+                                Width="{StaticResource TinyIconSize}"
+                                Height="{StaticResource TinyIconSize}"
+                                VerticalAlignment="Center"/>
+
+                        <!-- 三点波浪动画 -->
+                        <controls:LoadingDots DotSize="{StaticResource DotIconSize}" DotSpacing="{StaticResource TinySpacing}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </controls:CardView>
+
+        <!-- 三列布局 -->
+        <Grid Grid.Row="1" 
+              ColumnDefinitions="2*,3*,1*">
+            
+            <!-- 左侧：7*24小时新闻快讯 -->
+            <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" 
+                                   Text="7*24小时快讯" 
+                                   FontSize="{StaticResource SectionTitleFontSize}" 
+                               FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding News.TelegraphRefreshCountdown}"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="{StaticResource SmallLeftMargin}"/>
+                    </Grid>
+                </controls:CardView.Header>
+                
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding News.Telegraphs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="{StaticResource SmallSpacing}"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="telegrams:Telegram">
+                                <Border Classes="news-card"
+                                        Tapped="NewsCard_Tapped"
+                                        Tag="{Binding .}">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <!-- 左侧内容 -->
+                                        <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="{Binding Title}"
+                                                       FontSize="{StaticResource LabelFontSize}" 
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Content}"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextWrapping="Wrap"
+                                                       MaxLines="3"/>
+                                            
+                                            <!-- 关联标的标签 -->
+                                            <ItemsControl ItemsSource="{Binding Symbols}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                                BorderThickness="{StaticResource DefaultBorderThickness}"
+                                                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                                                Padding="{StaticResource TinyPadding}"
+                                                                Margin="{StaticResource TinyMargin}">
+                                                            <TextBlock Text="{Binding .}"
+                                                                       FontSize="{StaticResource SmallFontSize}"
+                                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        
+                                        <!-- 右侧时间 -->
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Time}"
+                                                   FontSize="{StaticResource LabelFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource SmallLeftMargin}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </controls:CardView>
+            
+            <!-- 中间：热门推荐 -->
+            <controls:CardView Grid.Column="1" Margin="{StaticResource SmallRightMargin}">
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="热门推荐"
+                                   FontSize="{StaticResource SectionTitleFontSize}" 
+                                   FontWeight="SemiBold"/>
+                        <svg:Svg Grid.Column="1"
+                                 Path="/Assets/Images/trending_icon.svg"
+                                 Width="{StaticResource SmallIconSize}"
+                                 Height="{StaticResource SmallIconSize}"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
+                </controls:CardView.Header>
+                
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Columns="2" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="assets:HotAsset">
+                                <Border Classes="hot-stock-card" 
+                                        Margin="{StaticResource TinyMargin}" 
+                                        Padding="{StaticResource DefaultCardPadding}"
+                                        Background="{DynamicResource CardBackgroundBrush}"
+                                        CornerRadius="{StaticResource DefaultCornerRadius}"
+                                        Tapped="HotStockCard_Tapped"
+                                        Tag="{Binding .}">
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Cursor="Hand">
+                                        
+                                        <!-- Row 0: Code & Heat Label -->
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="{Binding Market}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding Code}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                                   Text="{Binding MetricLabel}"
+                                                   FontSize="{StaticResource MiniFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 1: Name & Heat/Volume Value -->
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding Name}"
+                                                   FontSize="{StaticResource BodyFontSize}"
+                                                   FontWeight="SemiBold"
+                                                   Margin="{StaticResource TinyVerticalMargin}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                   Text="{Binding FormattedMetric}"
+                                                   FontSize="{StaticResource BodyFontSize}"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource PrimaryBrush}"
+                                                   HorizontalAlignment="Right"/>
+
+                                        <!-- Row 2: Price & Favorite -->
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding CurrentPrice}"
+                                                       FontSize="{StaticResource MediumFontSize}"
+                                                       FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding ChangePercentage}"
+                                                       FontSize="{StaticResource BodyFontSize}"
+                                                       Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                                       VerticalAlignment="Bottom"/>
+                                        </StackPanel>
+                                        
+                                        <Button Grid.Row="2" Grid.Column="1"
+                                                Classes="favorite-button"
+                                                Background="Transparent"
+                                                Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.AddToFavoriteCommand}"
+                                                CommandParameter="{Binding .}"
+                                                Tapped="OnPreventTapped"
+                                                Width="{StaticResource SmallIconSize}"
+                                                Height="{StaticResource SmallIconSize}"
+                                                Padding="0"
+                                                HorizontalAlignment="Right">
+                                            <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                                                     Width="{StaticResource MiniIconSize}"
+                                                     Height="{StaticResource MiniIconSize}"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </controls:CardView>
+            
+            <!-- 右侧：最近查看 -->
+            <controls:CardView Grid.Column="2" Header="最近查看">
+                <ScrollViewer>
+                    <Panel>
+                        <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="{StaticResource SmallSpacing}"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="assets:AssetItem">
+                                    <Border Classes="recent-stock-card" 
+                                            Tapped="RecentStockCard_Tapped"
+                                            Tag="{Binding .}">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                            <TextBlock Grid.Row="0" Grid.Column="0"
+                                                       Text="{Binding Name}"
+                                                       FontSize="{StaticResource LabelFontSize}"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                                       Text="{Binding Code}"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Margin="{StaticResource TinyTopMargin}"/>
+
+                                            <!-- 收藏按钮 -->
+                                            <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                                                    Classes="favorite-button"
+                                                    Background="Transparent"
+                                                    Tapped="OnPreventTapped"
+                                                    Width="{StaticResource DefaultIconSize}"
+                                                    Height="{StaticResource DefaultIconSize}"
+                                                    Padding="0"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                                                         Width="{StaticResource TinyIconSize}"
+                                                         Height="{StaticResource TinyIconSize}"/>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        
+                        <!-- 空视图提示 -->
+                        <StackPanel IsVisible="{Binding !RecentAssets.RecentAssets.Count}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="{StaticResource DefaultSpacing}">
+                            <svg:Svg Path="/Assets/Images/empty_data.svg"
+                                     Width="{StaticResource ExtraLargeIconSize}"
+                                     Height="{StaticResource ExtraLargeIconSize}"
+                                     Opacity="0.6"/>
+                            <TextBlock Text="暂无查看记录"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="搜索或浏览热门资产以添加记录"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Panel>
+                </ScrollViewer>
+            </controls:CardView>
+        </Grid>
+            </Grid>
+</UserControl>
