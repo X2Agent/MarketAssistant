@@ -63,12 +63,12 @@ jobs:
             -p:DebugSymbols=false `
             -p:Version=${{ steps.version.outputs.version }} `
             -p:InformationalVersion=${{ steps.version.outputs.version }} `
-            -o ./publish/windows
+            -o ./Release/Windows-x64
         shell: pwsh
 
       - name: Clean debug files
         run: |
-          Get-ChildItem -Path ./publish/windows -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
+          Get-ChildItem -Path ./Release/Windows-x64 -Include "*.pdb", "*.xml" -Recurse | Remove-Item -Force
         shell: pwsh
 
       - name: Install Inno Setup
@@ -96,7 +96,7 @@ jobs:
 
       - name: Create ZIP archive
         run: |
-          Compress-Archive -Path ./publish/windows/* `
+          Compress-Archive -Path ./Release/Windows-x64/* `
             -DestinationPath ./${{ env.APP_NAME }}-Windows-x64.zip `
             -CompressionLevel Optimal
         shell: pwsh
