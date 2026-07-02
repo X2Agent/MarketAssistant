@@ -45,9 +45,6 @@ function Build-Windows {
         -c $Configuration `
         -r win-x64 `
         --self-contained `
-        -p:PublishReadyToRun=true `
-        -p:PublishSingleFile=false `
-        -p:UseAppHost=true `
         -p:DebugType=None `
         -p:DebugSymbols=false `
         --verbosity quiet `
@@ -131,8 +128,6 @@ function Build-macOS {
             -c $Configuration `
             -r osx-x64 `
             --self-contained `
-            -p:PublishReadyToRun=true `
-            -p:UseAppHost=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
             --verbosity quiet `
@@ -210,8 +205,6 @@ function Build-Linux {
             -c $Configuration `
             -r linux-x64 `
             --self-contained `
-            -p:PublishReadyToRun=true `
-            -p:UseAppHost=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
             --verbosity quiet `

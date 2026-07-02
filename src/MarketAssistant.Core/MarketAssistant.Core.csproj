@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>MarketAssistant</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
+    <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>

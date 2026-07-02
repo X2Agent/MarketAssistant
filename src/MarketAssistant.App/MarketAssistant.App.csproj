@@ -23,6 +23,14 @@
     <Copyright>Copyright © 2026</Copyright>
     <Description>AI 智能市场分析助手</Description>
     
+    <!-- 发布优化：SingleFile + Trimming + R2R（仅在 dotnet publish 时生效，不影响开发构建） -->
+    <!-- partial 模式只裁剪标记了 IsTrimmable 的程序集，未标记的完整保留 -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <PublishReadyToRun>true</PublishReadyToRun>
+
     <!-- macOS 特定配置 -->
     <CFBundleName>MarketAssistant</CFBundleName>
     <CFBundleDisplayName>Market Assistant</CFBundleDisplayName>
@@ -92,4 +100,13 @@
     <Content Remove="**/libEGL.dylib" />
     <Content Remove="**/libGLESv2.dylib" />
   </ItemGroup>
+
+  <!-- 发布时排除原生调试符号和导入库（SkiaSharp/HarfBuzzSharp PDB、ONNX .lib） -->
+  <Target Name="RemoveNativeDebugSymbols" AfterTargets="Publish">
+    <ItemGroup>
+      <_FilesToDelete Include="$(PublishDir)/**/*.pdb" />
+      <_FilesToDelete Include="$(PublishDir)/**/*.lib" />
+    </ItemGroup>
+    <Delete Files="@(_FilesToDelete)" />
+  </Target>
 </Project>
