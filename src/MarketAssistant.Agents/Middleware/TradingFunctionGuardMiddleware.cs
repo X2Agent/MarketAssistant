@@ -23,7 +23,9 @@ public sealed class TradingFunctionGuardMiddleware
 
     private readonly ILogger _logger;
     private readonly int _maxToolCalls;
-    private int _toolCallCount;
+    // 使用 AsyncLocal 实现单次 Agent Run 内的计数隔离：同一个中间件实例服务多次 Run 时，
+    // 每次逻辑流拥有独立计数，避免跨 Run 累积。
+    private readonly AsyncLocal<int> _currentRunCallCount = new();
 
     /// <param name="maxToolCalls">单次 Agent 运行最大工具调用次数，防止无限循环（默认 20）</param>
     public TradingFunctionGuardMiddleware(ILogger<TradingFunctionGuardMiddleware> logger, int maxToolCalls = DefaultMaxToolCalls)
@@ -42,7 +44,7 @@ public sealed class TradingFunctionGuardMiddleware
         CancellationToken cancellationToken)
     {
         var functionName = context.Function.Name;
-        var callIndex = Interlocked.Increment(ref _toolCallCount);
+        var callIndex = ++_currentRunCallCount.Value;
 
         // 1. 调用计数守卫
         if (callIndex > _maxToolCalls)

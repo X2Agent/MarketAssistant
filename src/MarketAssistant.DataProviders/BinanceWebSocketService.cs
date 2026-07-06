@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// Binance WebSocket 实时行情服务，通过 mini-ticker 推送价格更新
@@ -210,18 +210,9 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         _cts?.Dispose();
         _cts = null;
 
-        if (_ws != null)
-        {
-            try
-            {
-                if (_ws.State == WebSocketState.Open || _ws.State == WebSocketState.CloseReceived)
-                    _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None)
-                        .Wait(TimeSpan.FromSeconds(3));
-            }
-            catch { }
-            _ws.Dispose();
-            _ws = null;
-        }
+        // 同步释放底层 WebSocket，不等待异步 CloseOutputAsync
+        _ws?.Dispose();
+        _ws = null;
 
         GC.SuppressFinalize(this);
     }

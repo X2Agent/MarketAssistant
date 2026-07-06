@@ -1,15 +1,10 @@
 using System.Collections.Concurrent;
-using System.Text;
 using System.Threading.Channels;
-using MarketAssistant.Agents.Trading;
-using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Trading.Models;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 后台市场监控器，订阅实时价格并根据策略触发交易。
@@ -20,10 +15,9 @@ public class MarketMonitor : IDisposable
     private readonly BinanceWebSocketService _webSocketService;
     private readonly StrategyEngine _strategyEngine;
     private readonly TradeExecutor _tradeExecutor;
-    private readonly ITradingAgentFactory _agentFactory;
-    private readonly TradingDataService _dataService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly AnalysisReportCache _reportCache;
+    private readonly AISignalStrategyExecutor _aiSignalExecutor;
+    private readonly OrderStateSyncService _orderStateSyncService;
+    private readonly TradingStrategyService _strategyService;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -78,21 +72,20 @@ public class MarketMonitor : IDisposable
         BinanceWebSocketService webSocketService,
         StrategyEngine strategyEngine,
         TradeExecutor tradeExecutor,
-        ITradingAgentFactory agentFactory,
-        TradingDataService dataService,
-        CryptoPortfolioService portfolioService,
-        AnalysisReportCache reportCache,
+        AISignalStrategyExecutor aiSignalExecutor,
+        OrderStateSyncService orderStateSyncService,
+        TradingStrategyService strategyService,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
         _strategyEngine = strategyEngine;
         _tradeExecutor = tradeExecutor;
-        _agentFactory = agentFactory;
-        _dataService = dataService;
-        _portfolioService = portfolioService;
-        _reportCache = reportCache;
+        _aiSignalExecutor = aiSignalExecutor;
+        _orderStateSyncService = orderStateSyncService;
+        _strategyService = strategyService;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
+        _strategyService.StrategiesChanged += OnStrategiesChanged;
     }
 
     /// <summary>
@@ -109,7 +102,7 @@ public class MarketMonitor : IDisposable
             _cts = new CancellationTokenSource();
             _isRunning = true;
 
-            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active);
             var instrumentSymbols = activeStrategies
                 .Select(s => s.Symbol.ToLowerInvariant())
                 .Distinct()
@@ -188,7 +181,7 @@ public class MarketMonitor : IDisposable
         if (!_isRunning)
             return;
 
-        var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+        var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active);
         var newSymbols = activeStrategies
             .Select(s => s.Symbol.ToLowerInvariant())
             .Distinct()
@@ -218,6 +211,7 @@ public class MarketMonitor : IDisposable
             {
                 try
                 {
+                    await _orderStateSyncService.SyncPendingOrdersAsync(symbol, ct: ct);
                     var triggered = await _strategyEngine.EvaluateAndUpdateStrategiesAsync(symbol, price, ct);
                     foreach (var strategy in triggered)
                     {
@@ -242,6 +236,26 @@ public class MarketMonitor : IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogDebug("价格消费者已取消");
+        }
+    }
+
+    private void OnStrategiesChanged(object? sender, EventArgs e)
+    {
+        if (!_isRunning)
+            return;
+
+        _ = RefreshSubscriptionsOnChangeAsync();
+    }
+
+    private async Task RefreshSubscriptionsOnChangeAsync()
+    {
+        try
+        {
+            await RefreshSubscriptionsAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "策略集合变化后刷新订阅失败");
         }
     }
 
@@ -276,19 +290,11 @@ public class MarketMonitor : IDisposable
     {
         if (strategy.Type == StrategyType.AISignal)
         {
-            // 硬性止损/止盈边界检查：存在持仓时无需 AI 决策，直接强制平仓
-            if (TryHandleHardBoundary(strategy, currentPrice, out var boundaryReasoning))
-            {
-                strategy.Side = strategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
-                var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
-                    strategy, currentPrice, boundaryReasoning, ct: MonitorToken);
-                if (boundaryResult.Success && boundaryResult.Record != null)
-                    TradeExecuted?.Invoke(boundaryResult.Record);
-                await CheckStrategyCompletionAsync(strategy);
-                return;
-            }
+            var result = await _aiSignalExecutor.ExecuteAsync(strategy, currentPrice, MonitorToken);
+            if (result.TradeExecuted && result.Record != null)
+                TradeExecuted?.Invoke(result.Record);
 
-            await HandleAISignalAsync(strategy, currentPrice);
+            await CheckStrategyCompletionAsync(strategy);
         }
         else
         {
@@ -304,228 +310,15 @@ public class MarketMonitor : IDisposable
         }
     }
 
-    private static bool TryHandleHardBoundary(TradingStrategy strategy, decimal currentPrice, out string reasoning)
-    {
-        reasoning = string.Empty;
-
-        // 仅在已有成交（存在持仓）时执行硬性边界保护
-        if (strategy.ExecutionCount == 0)
-            return false;
-
-        if (strategy.StopLossPrice.HasValue)
-        {
-            bool stopTriggered = strategy.Side == OrderSide.Buy
-                ? currentPrice <= strategy.StopLossPrice.Value
-                : currentPrice >= strategy.StopLossPrice.Value;
-            if (stopTriggered)
-            {
-                reasoning = $"AISignal 硬性止损触发：当前价 {currentPrice} 已达止损位 {strategy.StopLossPrice.Value}，系统强制平仓";
-                return true;
-            }
-        }
-
-        if (strategy.TakeProfitPrice.HasValue)
-        {
-            bool tpTriggered = strategy.Side == OrderSide.Buy
-                ? currentPrice >= strategy.TakeProfitPrice.Value
-                : currentPrice <= strategy.TakeProfitPrice.Value;
-            if (tpTriggered)
-            {
-                reasoning = $"AISignal 硬性止盈触发：当前价 {currentPrice} 已达止盈位 {strategy.TakeProfitPrice.Value}，系统自动止盈";
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private async Task HandleAISignalAsync(TradingStrategy strategy, decimal currentPrice)
-    {
-        try
-        {
-            TradingContext.CurrentStrategyId = strategy.Id;
-
-            var prompt = await BuildAIPromptAsync(strategy, currentPrice);
-            await InvokeAgentAsync(prompt);
-            await ProcessAgentResponseAsync(strategy);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "AI 信号策略执行失败: {StrategyId}", strategy.Id);
-        }
-        finally
-        {
-            TradingContext.CurrentStrategyId = null;
-        }
-    }
-
-    /// <summary>
-    /// 构建 AI 决策 prompt：聚合历史成交、仓位、分析报告与风险预算
-    /// </summary>
-    private async Task<string> BuildAIPromptAsync(TradingStrategy strategy, decimal currentPrice)
-    {
-        var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, MonitorToken)
-            .ConfigureAwait(false);
-        var recentSummary = priorRecords.Count == 0
-            ? "（该策略尚无成交记录）"
-            : string.Join("\n", priorRecords.Take(5).Select(r =>
-                $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
-
-        var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol);
-        var analysisContext = BuildAnalysisContext(strategy.Symbol);
-
-        var stopLossInfo = strategy.StopLossPrice.HasValue
-            ? $"止损价: {strategy.StopLossPrice.Value}"
-            : "未设置止损";
-        var takeProfitInfo = strategy.TakeProfitPrice.HasValue
-            ? $"止盈价: {strategy.TakeProfitPrice.Value}"
-            : "未设置止盈";
-        var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
-        var todayStats = await _dataService.GetTodayStatsAsync(MonitorToken);
-        var maxDailyTrades = (await _dataService.LoadRiskConfigAsync()).MaxDailyTrades;
-        var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
-
-        return $"""
-            分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
-
-            ## 风险预算（必须严格遵守）
-            - 本次交易后该 symbol 总仓位不得超过账户总值的 {maxPositionPercent:F1}%
-            - 今日已实现盈亏: {todayStats.TotalPnl:F2} USDT
-            - 今日剩余交易次数: {remainingTrades}
-
-            ## 策略配置
-            {strategy.CustomParams ?? "无"}
-            风险边界: {stopLossInfo} | {takeProfitInfo}
-
-            ## 当前仓位状态
-            {positionSummary}
-
-            ## 最新市场分析报告
-            {analysisContext}
-
-            近期该策略成交摘要（最多 5 笔，按时间倒序）:
-            {recentSummary}
-
-            ## 决策要求
-            请输出结构化决策：
-            1. 决策: BUY / SELL / HOLD
-            2. 置信度: 0-100
-            3. 入场逻辑
-            4. 退出计划（止损/止盈具体价位）
-            5. 主要风险因素
-
-            如果置信度低于 60，建议 HOLD。
-            如果决定交易，请调用 PlaceOrder 工具执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
-            如果决定不交易，请说明理由。
-            """;
-    }
-
-    /// <summary>
-    /// 调用 TradingAgent 执行决策
-    /// </summary>
-    private async Task InvokeAgentAsync(string prompt)
-    {
-        var agent = _agentFactory.CreateAgent();
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.User, prompt)
-        };
-
-        var response = await agent.RunAsync(messages, session: null, options: null,
-            cancellationToken: MonitorToken);
-        _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
-    }
-
-    /// <summary>
-    /// 处理 Agent 响应结果：检测是否产生新成交，若产生则更新触发计数
-    /// </summary>
-    private async Task ProcessAgentResponseAsync(TradingStrategy strategy)
-    {
-        // 只在 Agent 实际执行了交易后才更新触发计数
-        var recentRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
-        var hasNewTrade = recentRecords.Any(r =>
-            r.CreatedAt > (strategy.LastTriggeredAt ?? DateTime.MinValue));
-
-        if (hasNewTrade)
-        {
-            await UpdateTriggerCountAsync(strategy);
-        }
-    }
-
-    /// <summary>
-    /// 更新策略触发计数并检查是否达到最大执行次数
-    /// </summary>
-    private async Task UpdateTriggerCountAsync(TradingStrategy strategy)
-    {
-        await _dataService.UpdateStrategyTriggeredAsync(strategy.Id);
-        await CheckStrategyCompletionAsync(strategy);
-    }
-
-    private async Task<string> BuildPositionSummaryAsync(string symbol)
-    {
-        try
-        {
-            var positions = await _portfolioService.GetCurrentPositionsAsync(MonitorToken);
-            var symbolPosition = positions.FirstOrDefault(p =>
-                p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase));
-            var positionLine = symbolPosition != null
-                ? $"持仓: 数量 {symbolPosition.Quantity} | 入场均价 {symbolPosition.EntryPrice} | 未实现盈亏 {symbolPosition.UnrealizedPnl:F2} USDT ({symbolPosition.UnrealizedPnlPercent:F1}%)"
-                : "当前无持仓";
-
-            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, MonitorToken);
-            var siblings = activeStrategies
-                .Where(s => s.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))
-                .Select(s => $"{s.Type}(触发价:{s.TriggerPrice})")
-                .ToList();
-            var siblingsLine = siblings.Count > 0 ? string.Join(", ", siblings) : "无";
-
-            return $"{positionLine}\n同标的活跃策略: {siblingsLine}";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "获取持仓信息失败，略过仓位上下文: {Symbol}", symbol);
-            return "（获取持仓信息失败）";
-        }
-    }
-
-    private string BuildAnalysisContext(string symbol)
-    {
-        var cached = _reportCache.Get(symbol);
-        if (cached == null)
-            return "（暂无分析报告，建议先运行市场分析工作流）";
-
-        var ageMinutes = (int)(DateTime.UtcNow - cached.CachedAt).TotalMinutes;
-        var result = cached.Report.CoordinatorResult;
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"报告时间: {ageMinutes} 分钟前");
-        sb.AppendLine($"综合评级: {result.InvestmentRating} | 综合评分: {result.OverallScore:F1}/10 | 置信度: {result.ConfidencePercentage:F0}%");
-        sb.AppendLine($"目标价区间: {result.TargetPrice} | 预期: {result.PriceChangeExpectation}");
-        sb.AppendLine($"技术面: {result.DimensionScores.Technical:F1} | 情绪面: {result.DimensionScores.Sentiment:F1} | 风险等级: {result.RiskLevel}");
-        sb.AppendLine($"结论: {result.Summary}");
-
-        if (result.OperationSuggestions.Count > 0)
-        {
-            sb.AppendLine("操作建议:");
-            foreach (var suggestion in result.OperationSuggestions.Take(3))
-                sb.AppendLine($"  - {suggestion}");
-        }
-
-        if (result.RiskFactors.Count > 0)
-            sb.AppendLine($"主要风险: {string.Join("; ", result.RiskFactors.Take(2))}");
-
-        return sb.ToString().TrimEnd();
-    }
-
     private async Task CheckStrategyCompletionAsync(TradingStrategy strategy)
     {
         if (!strategy.MaxExecutions.HasValue)
             return;
 
-        var updated = await _dataService.GetStrategyAsync(strategy.Id);
+        var updated = await _strategyService.GetStrategyAsync(strategy.Id);
         if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
         {
-            await _dataService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
         }
@@ -544,6 +337,7 @@ public class MarketMonitor : IDisposable
         TradeExecuted = null;
         StatusChanged = null;
         _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
+        _strategyService.StrategiesChanged -= OnStrategiesChanged;
 
         GC.SuppressFinalize(this);
     }

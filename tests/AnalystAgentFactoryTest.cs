@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Agents.Analysts;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

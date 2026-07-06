@@ -2,7 +2,7 @@ using System.Text.Json;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 策略引擎，管理用户策略并评估触发条件
@@ -10,11 +10,16 @@ namespace MarketAssistant.Trading;
 public class StrategyEngine
 {
     private readonly TradingDataService _dataService;
+    private readonly TradingStrategyService _strategyService;
     private readonly ILogger<StrategyEngine> _logger;
 
-    public StrategyEngine(TradingDataService dataService, ILogger<StrategyEngine> logger)
+    public StrategyEngine(
+        TradingDataService dataService,
+        TradingStrategyService strategyService,
+        ILogger<StrategyEngine> logger)
     {
         _dataService = dataService;
+        _strategyService = strategyService;
         _logger = logger;
     }
 
@@ -33,7 +38,7 @@ public class StrategyEngine
     public async Task<List<TradingStrategy>> EvaluateAndUpdateStrategiesAsync(
         string symbol, decimal currentPrice, CancellationToken ct = default)
     {
-        var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
+        var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
         var triggered = new List<TradingStrategy>();
 
         foreach (var strategy in activeStrategies)
@@ -43,7 +48,7 @@ public class StrategyEngine
 
             if (strategy.MaxExecutions.HasValue && strategy.ExecutionCount >= strategy.MaxExecutions.Value)
             {
-                await _dataService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct);
+                await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct);
                 continue;
             }
 

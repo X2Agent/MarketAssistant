@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.MarketAnalysis.Models;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Analysts;
+namespace MarketAssistant.Services.Agents.Analysts;
 
 /// <summary>
 /// 协调分析师代理

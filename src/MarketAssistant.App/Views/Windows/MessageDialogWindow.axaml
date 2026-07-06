@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:windows="using:MarketAssistant.Views.Windows"
+        x:Class="MarketAssistant.Views.Windows.MessageDialogWindow"
+        Width="{StaticResource DialogWidth}"
+        MinWidth="300"
+        MaxWidth="500"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PageBackgroundBrush}">
+
+    <Border Padding="{StaticResource CardPadding}">
+        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+
+            <!-- 消息内容 -->
+            <TextBlock Name="MessageText"
+                       TextWrapping="Wrap"
+                       FontSize="{StaticResource LabelFontSize}"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       HorizontalAlignment="Center"/>
+
+            <!-- 按钮区域 -->
+            <ItemsControl Name="ButtonItemsControl">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    Spacing="{StaticResource SmallSpacing}"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="windows:MessageDialogWindow+DialogButton">
+                        <Button Content="{Binding Text}"
+                                MinWidth="{StaticResource SmallButtonMinWidth}"
+                                Padding="16,8"
+                                Classes.btn-primary="{Binding IsPrimary}"
+                                Click="OnButtonClick"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</Window>

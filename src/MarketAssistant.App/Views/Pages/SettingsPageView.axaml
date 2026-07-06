@@ -152,6 +152,23 @@
                         <!-- 虚拟币市场API配置 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}" 
                                     IsVisible="{Binding IsCryptoMarket}">
+                            <TextBlock Text="交易环境"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <ComboBox ItemsSource="{Binding CryptoTradingModes}"
+                                      SelectedItem="{Binding UserSetting.CryptoTradingMode}"
+                                      HorizontalAlignment="Stretch">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBlock Text="可在 Binance 实盘与 Binance Spot Testnet 间切换；Testnet 使用独立 API Key，资产为虚拟资产。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+
                             <!-- CoinGecko API密钥 -->
                             <TextBlock Text="CoinGecko API密钥（可选）"
                                        FontSize="{StaticResource LabelFontSize}"
@@ -171,24 +188,71 @@
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                            <!-- Binance API 配置 -->
-                            <TextBlock Text="Binance API Key（交易功能必须）"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,8,0,0"/>
-                            <TextBox Text="{Binding UserSetting.BinanceApiKey}"
-                                     PlaceholderText="请输入 Binance API Key"
-                                     PasswordChar="●"/>
+                            <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                        IsVisible="{Binding IsLiveTradingMode}">
+                                <TextBlock Text="Binance API Key（交易功能必须）"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,8,0,0"/>
+                                <TextBox Text="{Binding UserSetting.BinanceApiKey}"
+                                         PlaceholderText="请输入 Binance API Key"
+                                         PasswordChar="●"/>
 
-                            <TextBlock Text="Binance Secret Key"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
-                                     PlaceholderText="请输入 Binance Secret Key"
-                                     PasswordChar="●"/>
-                            <TextBlock Text="用于自主交易功能。请确保 API Key 仅开启现货交易权限，不要开启提现权限"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource WarningBrush}"/>
+                                <TextBlock Text="Binance Secret Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
+                                         PlaceholderText="请输入 Binance Secret Key"
+                                         PasswordChar="●"/>
+                                <TextBlock Text="实盘现货与实盘合约共用此 API Key。请在 binance.com 确保已开启对应交易权限（现货/合约），不要开启提现权限"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                        IsVisible="{Binding IsTestnetTradingMode}">
+                                <TextBlock Text="Binance Spot Testnet API Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,8,0,0"/>
+                                <TextBox Text="{Binding UserSetting.BinanceTestnetApiKey}"
+                                         PlaceholderText="请输入 Binance Spot Testnet API Key"
+                                         PasswordChar="●"/>
+
+                                <TextBlock Text="Binance Spot Testnet Secret Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.BinanceTestnetSecretKey}"
+                                         PlaceholderText="请输入 Binance Spot Testnet Secret Key"
+                                         PasswordChar="●"/>
+                                <TextBlock Text="请在 testnet.binance.vision 生成独立的 Spot Testnet API Key。Testnet 账户资产和订单会被 Binance 周期性重置。"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                        IsVisible="{Binding IsFuturesTestnetTradingMode}">
+                                <TextBlock Text="Binance Futures Testnet API Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,8,0,0"/>
+                                <TextBox Text="{Binding UserSetting.BinanceFuturesTestnetApiKey}"
+                                         PlaceholderText="请输入 Binance Futures Testnet API Key"
+                                         PasswordChar="●"/>
+
+                                <TextBlock Text="Binance Futures Testnet Secret Key"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.BinanceFuturesTestnetSecretKey}"
+                                         PlaceholderText="请输入 Binance Futures Testnet Secret Key"
+                                         PasswordChar="●"/>
+                                <TextBlock Text="请在 demo-fapi.binance.com 生成独立的 Futures Testnet API Key。合约 Testnet 与现货 Testnet 互不互通，需分别注册。"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>

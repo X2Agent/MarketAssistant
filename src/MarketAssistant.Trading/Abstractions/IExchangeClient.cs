@@ -45,6 +45,12 @@ public interface IExchangeClient
     /// </summary>
     Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
         string? instrumentSymbol = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询当前持仓（合约专用，现货返回空列表）
+    /// </summary>
+    Task<List<ExchangePosition>> GetPositionsAsync(
+        string? instrumentSymbol = null, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -79,6 +85,7 @@ public class ExchangeOrderResult
     public decimal RequestedQty { get; set; }
     public decimal ExecutedQty { get; set; }
     public decimal Price { get; set; }
+    public decimal CumulativeQuoteQty { get; set; }
 
     /// <summary>
     /// 成交手续费（以 <see cref="CommissionAsset"/> 计价）。
@@ -90,4 +97,52 @@ public class ExchangeOrderResult
     /// 手续费币种（如 BNB、USDT、BTC）。交易所未返回时为空。
     /// </summary>
     public string? CommissionAsset { get; set; }
+}
+
+/// <summary>
+/// 交易所持仓信息（合约专用）
+/// </summary>
+public class ExchangePosition
+{
+    public string Symbol { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 持仓方向：BOTH（单向）/ LONG / SHORT（双向）
+    /// </summary>
+    public string PositionSide { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 持仓数量（正为多，负为空）
+    /// </summary>
+    public decimal PositionAmt { get; set; }
+
+    /// <summary>
+    /// 开仓均价
+    /// </summary>
+    public decimal EntryPrice { get; set; }
+
+    /// <summary>
+    /// 标记价格
+    /// </summary>
+    public decimal MarkPrice { get; set; }
+
+    /// <summary>
+    /// 未实现盈亏（USDT 计价）
+    /// </summary>
+    public decimal UnRealizedProfit { get; set; }
+
+    /// <summary>
+    /// 杠杆倍数
+    /// </summary>
+    public decimal Leverage { get; set; }
+
+    /// <summary>
+    /// 保证金模式：isolated（逐仓）/ cross（全仓）
+    /// </summary>
+    public string MarginType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 最大可平数量
+    /// </summary>
+    public decimal MaxQty { get; set; }
 }

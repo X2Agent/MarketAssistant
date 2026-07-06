@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -7,16 +6,13 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// <summary>
 /// 虚拟币筛选条件生成策略
 /// </summary>
-public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<CryptoCriteria>
+public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<CryptoCriteria>
 {
-    private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
-    {
-        PropertyNameCaseInsensitive = true
-    };
+    protected override string AssetTypeLabel => "虚拟币";
 
-    public MarketType SupportedMarketType => MarketType.Crypto;
+    public override MarketType SupportedMarketType => MarketType.Crypto;
 
-    public string BuildUserRequirementSystemPrompt()
+    public override string BuildUserRequirementSystemPrompt()
     {
         return """
 ## 主要任务
@@ -71,7 +67,7 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 """;
     }
 
-    public string BuildNewsAnalysisSystemPrompt()
+    public override string BuildNewsAnalysisSystemPrompt()
     {
         return """
 ## 任务
@@ -127,41 +123,5 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 - volume_24h > 10000000
 - price_change_7d > -20
 """;
-    }
-
-    public string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
-    {
-        if (request.IsNewsAnalysis)
-        {
-            return $"""
-                新闻内容：
-                {request.Content}
-
-                推荐虚拟币数量限制：{request.MaxRecommendations}
-
-                请根据新闻内容生成虚拟币筛选条件。
-                """;
-        }
-        else
-        {
-            return $"""
-                用户需求：
-                {request.Content}
-
-                推荐虚拟币数量限制：{request.MaxRecommendations}
-
-                请根据用户需求生成虚拟币筛选条件。
-                """;
-        }
-    }
-
-    public CryptoCriteria DeserializeCriteria(string json)
-    {
-        var criteria = LlmJsonExtractor.Deserialize<CryptoCriteria>(json, DeserializationOptions);
-        if (criteria == null)
-        {
-            throw new InvalidOperationException("虚拟币筛选条件 JSON 解析失败");
-        }
-        return criteria;
     }
 }

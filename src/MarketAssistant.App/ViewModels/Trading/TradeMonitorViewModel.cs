@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +19,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
     private readonly TradingDataService _dataService;
+    private readonly TradingStrategyService _strategyService;
+    private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradeExecutor _tradeExecutor;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
@@ -58,6 +60,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         CryptoPortfolioService portfolioService,
         [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         TradingDataService dataService,
+        TradingStrategyService strategyService,
+        OrderStateSyncService orderStateSyncService,
         TradeExecutor tradeExecutor,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
@@ -66,6 +70,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _portfolioService = portfolioService;
         _exchangeClient = exchangeClient;
         _dataService = dataService;
+        _strategyService = strategyService;
+        _orderStateSyncService = orderStateSyncService;
         _tradeExecutor = tradeExecutor;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
@@ -80,6 +86,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     {
         await SafeExecuteAsync(async () =>
         {
+            await _orderStateSyncService.SyncPendingOrdersAsync(force: true);
+
             TodayStats = await _dataService.GetTodayStatsAsync();
             RiskConfig = await _dataService.LoadRiskConfigAsync();
 
@@ -143,7 +151,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
             }
 
             // 加载活跃策略
-            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active);
             ActiveStrategies.Clear();
             foreach (var s in activeStrategies)
             {

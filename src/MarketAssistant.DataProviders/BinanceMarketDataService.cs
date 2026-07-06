@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;
 using System.Web;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安市场数据API服务（包含现货和期货公开端点）
@@ -160,7 +160,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
         return exchangeInfo;
     }
@@ -260,7 +260,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, BinanceJsonSerializerOptions);
     }
 
     /// <summary>
@@ -286,7 +286,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceFundingRateResponse>();
     }
 
@@ -307,7 +307,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceLongShortRatioResponse>();
     }
 
@@ -327,7 +327,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceOpenInterestResponse>();
     }
 

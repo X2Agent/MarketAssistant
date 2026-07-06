@@ -6,9 +6,3 @@ namespace MarketAssistant.Infrastructure.Core;
 public class AssetFavoritesChanged
 {
 }
-
-
-
-
-
-

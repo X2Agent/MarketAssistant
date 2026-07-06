@@ -1,3 +1,5 @@
+using MarketAssistant.Applications.Charts;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Navigation;
@@ -6,6 +8,7 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
 using MarketAssistant.ViewModels.Trading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services;
@@ -28,8 +31,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<NavigationService>();
 
+        // AdaptiveCard 转换器（依赖 App.Services 注册的 parsers）
+        services.AddSingleton<AdaptiveCardConverter>();
+
         // 注册全局异常处理器（Singleton，由 DI 创建实例）
         services.AddSingleton<GlobalExceptionHandler>();
+
+        // Keyed Service 委托工厂：避免 ViewModel 使用 IServiceProvider 反模式
+        services.AddSingleton<Func<MarketType, IKLineService>>(
+            sp => marketType => sp.GetRequiredKeyedService<IKLineService>(marketType));
 
         return services;
     }

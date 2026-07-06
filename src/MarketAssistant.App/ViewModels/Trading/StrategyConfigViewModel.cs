@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -10,8 +10,7 @@ namespace MarketAssistant.ViewModels.Trading;
 
 public partial class StrategyConfigViewModel : ViewModelBase
 {
-    private readonly TradingDataService _dataService;
-    private readonly MarketMonitor _marketMonitor;
+    private readonly TradingStrategyService _strategyService;
 
     public ObservableCollection<TradingStrategy> Strategies { get; } = [];
 
@@ -87,13 +86,11 @@ public partial class StrategyConfigViewModel : ViewModelBase
     [ObservableProperty] private RiskConfig _riskConfig = new();
 
     public StrategyConfigViewModel(
-        TradingDataService dataService,
-        MarketMonitor marketMonitor,
+        TradingStrategyService strategyService,
         ILogger<StrategyConfigViewModel> logger)
         : base(logger)
     {
-        _dataService = dataService;
-        _marketMonitor = marketMonitor;
+        _strategyService = strategyService;
         _ = InitializeAsync();
     }
 
@@ -101,8 +98,8 @@ public partial class StrategyConfigViewModel : ViewModelBase
     {
         await SafeExecuteAsync(async () =>
         {
-            RiskConfig = await _dataService.LoadRiskConfigAsync();
-            var strategies = await _dataService.GetAllStrategiesAsync();
+            RiskConfig = await _strategyService.LoadRiskConfigAsync();
+            var strategies = await _strategyService.GetAllStrategiesAsync();
             Strategies.Clear();
             foreach (var s in strategies)
                 Strategies.Add(s);
@@ -193,11 +190,10 @@ public partial class StrategyConfigViewModel : ViewModelBase
                     break;
             }
 
-            await _dataService.SaveStrategyAsync(strategy);
+            await _strategyService.SaveStrategyAsync(strategy);
             Strategies.Insert(0, strategy);
 
             ClearForm();
-            await _marketMonitor.RefreshSubscriptionsAsync();
         }, "创建策略");
     }
 
@@ -210,7 +206,7 @@ public partial class StrategyConfigViewModel : ViewModelBase
                 ? StrategyStatus.Paused
                 : StrategyStatus.Active;
 
-            await _dataService.UpdateStrategyStatusAsync(strategy.Id, newStatus);
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, newStatus);
             strategy.Status = newStatus;
 
             var index = Strategies.IndexOf(strategy);
@@ -219,8 +215,6 @@ public partial class StrategyConfigViewModel : ViewModelBase
                 Strategies.RemoveAt(index);
                 Strategies.Insert(index, strategy);
             }
-
-            await _marketMonitor.RefreshSubscriptionsAsync();
         }, "切换策略状态");
     }
 
@@ -229,16 +223,15 @@ public partial class StrategyConfigViewModel : ViewModelBase
     {
         await SafeExecuteAsync(async () =>
         {
-            await _dataService.DeleteStrategyAsync(strategy.Id);
+            await _strategyService.DeleteStrategyAsync(strategy.Id);
             Strategies.Remove(strategy);
-            await _marketMonitor.RefreshSubscriptionsAsync();
         }, "删除策略");
     }
 
     [RelayCommand]
     private async Task SaveRiskConfigAsync()
     {
-        await _dataService.SaveRiskConfigAsync(RiskConfig);
+        await _strategyService.SaveRiskConfigAsync(RiskConfig);
     }
 
     [RelayCommand]

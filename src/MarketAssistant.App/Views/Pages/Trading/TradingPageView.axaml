@@ -10,31 +10,58 @@
              x:DataType="vm:TradingPageViewModel">
 
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
-        <!-- Tab 按钮组 -->
-        <Border Grid.Row="0"
-                Background="{DynamicResource SurfaceVariantBrush}"
-                CornerRadius="{StaticResource SmallCornerRadius}"
-                Padding="{StaticResource TinyPadding}"
-                Margin="{StaticResource SmallBottomMargin}"
-                HorizontalAlignment="Left">
-            <StackPanel Orientation="Horizontal" Spacing="0">
-                <Button Content="策略配置"
-                        Classes="period-button"
-                        Classes.selected="{Binding IsStrategyTabSelected}"
-                        Command="{Binding SelectTabCommand}"
-                        CommandParameter="0"/>
-                <Button Content="交易监控"
-                        Classes="period-button"
-                        Classes.selected="{Binding IsMonitorTabSelected}"
-                        Command="{Binding SelectTabCommand}"
-                        CommandParameter="1"/>
-                <Button Content="交易历史"
-                        Classes="period-button"
-                        Classes.selected="{Binding IsHistoryTabSelected}"
-                        Command="{Binding SelectTabCommand}"
-                        CommandParameter="2"/>
-            </StackPanel>
-        </Border>
+        <StackPanel Grid.Row="0" Spacing="{StaticResource SmallSpacing}">
+                <Border IsVisible="{Binding IsTestnetTradingMode}"
+                    Background="{DynamicResource CardBackgroundBrush}"
+                    BorderBrush="{DynamicResource WarningBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource SmallCornerRadius}"
+                    Padding="{StaticResource SmallPadding}">
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <TextBlock Text="Binance Spot Testnet 已启用"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource WarningBrush}"/>
+                    <TextBlock Text="{Binding TradingModeDescription}"
+                               FontSize="{StaticResource SmallFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Tab 按钮组 -->
+            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                    CornerRadius="{StaticResource SmallCornerRadius}"
+                    Padding="{StaticResource TinyPadding}"
+                    Margin="{StaticResource SmallBottomMargin}">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0">
+                        <Button Content="策略配置"
+                                Classes="period-button"
+                                Classes.selected="{Binding IsStrategyTabSelected}"
+                                Command="{Binding SelectTabCommand}"
+                                CommandParameter="0"/>
+                        <Button Content="交易监控"
+                                Classes="period-button"
+                                Classes.selected="{Binding IsMonitorTabSelected}"
+                                Command="{Binding SelectTabCommand}"
+                                CommandParameter="1"/>
+                        <Button Content="交易历史"
+                                Classes="period-button"
+                                Classes.selected="{Binding IsHistoryTabSelected}"
+                                Command="{Binding SelectTabCommand}"
+                                CommandParameter="2"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding CurrentTradingModeText}"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{StaticResource SmallFontSize}"
+                               FontWeight="Medium"/>
+                </Grid>
+            </Border>
+        </StackPanel>
 
         <!-- Tab 内容区域 -->
         <Panel Grid.Row="1">

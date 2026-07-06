@@ -6,7 +6,7 @@ using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;

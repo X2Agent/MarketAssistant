@@ -16,17 +16,9 @@ public class AdaptiveCardConverter : IValueConverter
 {
     private readonly List<IJsonToAdaptiveCardParser> _parsers;
 
-    public AdaptiveCardConverter()
+    public AdaptiveCardConverter(IEnumerable<IJsonToAdaptiveCardParser> parsers)
     {
-        _parsers = new List<IJsonToAdaptiveCardParser>
-        {
-            new CoordinatorCardParser(),
-            new FinancialCardParser(),
-            new FundamentalCardParser(),
-            new SentimentCardParser(),
-            new NewsCardParser(),
-            new TechnicalCardParser()
-        };
+        _parsers = new List<IJsonToAdaptiveCardParser>(parsers);
     }
 
     public AdaptiveCard? Convert(string json)

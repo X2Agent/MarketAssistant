@@ -2,21 +2,36 @@ using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 交易数据持久化服务，管理策略、交易记录和日统计的 SQLite 存储。
 /// </summary>
 public class TradingDataService : SqliteServiceBase
 {
-    public TradingDataService(ILogger<TradingDataService> logger)
+    private const string LiveSpotEnvironment = "crypto-live-spot";
+    private const string SpotTestnetEnvironment = "crypto-binance-spot-testnet";
+
+    private readonly TradingEnvironmentService _tradingEnvironmentService;
+
+    public TradingDataService(
+        TradingEnvironmentService tradingEnvironmentService,
+        ILogger<TradingDataService> logger)
         : base(logger)
     {
+        _tradingEnvironmentService = tradingEnvironmentService;
     }
+
+    private string CurrentEnvironmentKey => _tradingEnvironmentService.CurrentMode switch
+    {
+        CryptoTradingMode.BinanceTestnet => SpotTestnetEnvironment,
+        _ => LiveSpotEnvironment
+    };
 
     #region 策略 CRUD
 
@@ -27,15 +42,16 @@ public class TradingDataService : SqliteServiceBase
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT OR REPLACE INTO strategies
-                (id, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
+                (id, environment, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
                  execution_count, max_executions, trailing_peak_price)
             VALUES
-                (@id, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
+                (@id, @environment, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
                  @execCount, @maxExec, @trailingPeak)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@symbol", strategy.Symbol);
         cmd.Parameters.AddWithValue("@type", (int)strategy.Type);
         cmd.Parameters.AddWithValue("@status", (int)strategy.Status);
@@ -59,8 +75,9 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM strategies WHERE id = @id";
+        cmd.CommandText = "SELECT * FROM strategies WHERE id = @id AND environment = @environment";
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         return await reader.ReadAsync(ct) ? ReadStrategy(reader) : null;
     }
@@ -70,7 +87,8 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM strategies WHERE status = @status ORDER BY created_at DESC";
+        cmd.CommandText = "SELECT * FROM strategies WHERE environment = @environment AND status = @status ORDER BY created_at DESC";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@status", (int)status);
         return await ReadStrategiesAsync(cmd, ct);
     }
@@ -80,7 +98,8 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM strategies ORDER BY created_at DESC";
+        cmd.CommandText = "SELECT * FROM strategies WHERE environment = @environment ORDER BY created_at DESC";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         return await ReadStrategiesAsync(cmd, ct);
     }
 
@@ -89,8 +108,9 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE strategies SET status = @status WHERE id = @id";
+        cmd.CommandText = "UPDATE strategies SET status = @status WHERE id = @id AND environment = @environment";
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@status", (int)status);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -100,8 +120,9 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "DELETE FROM strategies WHERE id = @id";
+        cmd.CommandText = "DELETE FROM strategies WHERE id = @id AND environment = @environment";
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -113,9 +134,10 @@ public class TradingDataService : SqliteServiceBase
         cmd.CommandText = """
             UPDATE strategies
             SET last_triggered_at = @time, execution_count = execution_count + 1
-            WHERE id = @id
+            WHERE id = @id AND environment = @environment
             """;
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@time", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -137,9 +159,10 @@ public class TradingDataService : SqliteServiceBase
                 SET last_triggered_at = @time,
                     execution_count = execution_count + 1,
                     custom_params = @customParams
-                WHERE id = @id
+                WHERE id = @id AND environment = @environment
                 """;
             cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
             cmd.Parameters.AddWithValue("@time", DateTime.UtcNow.ToString("O"));
             cmd.Parameters.AddWithValue("@customParams", (object?)customParams ?? DBNull.Value);
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -157,8 +180,9 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE strategies SET custom_params = @customParams WHERE id = @id";
+        cmd.CommandText = "UPDATE strategies SET custom_params = @customParams WHERE id = @id AND environment = @environment";
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@customParams", (object?)customParams ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -171,8 +195,9 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE strategies SET trailing_peak_price = @peak WHERE id = @id";
+        cmd.CommandText = "UPDATE strategies SET trailing_peak_price = @peak WHERE id = @id AND environment = @environment";
         cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@peak", trailingPeakPrice.HasValue ? (object)(double)trailingPeakPrice.Value : DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -188,15 +213,16 @@ public class TradingDataService : SqliteServiceBase
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO trade_records
-                (id, strategy_id, symbol, side, order_type, requested_qty, executed_qty,
+                (id, environment, strategy_id, symbol, side, order_type, requested_qty, executed_qty,
                  requested_price, executed_price, commission, commission_asset, status,
                  binance_order_id, ai_reasoning, created_at, completed_at)
             VALUES
-                (@id, @stratId, @symbol, @side, @orderType, @reqQty, @execQty,
+                (@id, @environment, @stratId, @symbol, @side, @orderType, @reqQty, @execQty,
                  @reqPrice, @execPrice, @commission, @commAsset, @status,
                  @binanceId, @aiReasoning, @createdAt, @completedAt)
             """;
         cmd.Parameters.AddWithValue("@id", record.Id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@stratId", record.StrategyId);
         cmd.Parameters.AddWithValue("@symbol", record.Symbol);
         cmd.Parameters.AddWithValue("@side", (int)record.Side);
@@ -208,7 +234,7 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@commission", (double)record.Commission);
         cmd.Parameters.AddWithValue("@commAsset", (object?)record.CommissionAsset ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@status", (int)record.Status);
-        cmd.Parameters.AddWithValue("@binanceId", record.BinanceOrderId);
+        cmd.Parameters.AddWithValue("@binanceId", record.ExchangeOrderId);
         cmd.Parameters.AddWithValue("@aiReasoning", (object?)record.AIReasoning ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", record.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
@@ -224,6 +250,9 @@ public class TradingDataService : SqliteServiceBase
         await using var cmd = conn.CreateCommand();
 
         var conditions = new List<string>();
+        conditions.Add("environment = @environment");
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+
         if (!string.IsNullOrEmpty(symbol))
         {
             conditions.Add("symbol = @symbol");
@@ -256,7 +285,8 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM trade_records WHERE strategy_id = @stratId ORDER BY created_at DESC";
+        cmd.CommandText = "SELECT * FROM trade_records WHERE environment = @environment AND strategy_id = @stratId ORDER BY created_at DESC";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@stratId", strategyId);
 
         var records = new List<TradeRecord>();
@@ -264,6 +294,105 @@ public class TradingDataService : SqliteServiceBase
         while (await reader.ReadAsync(ct))
             records.Add(ReadTradeRecord(reader));
         return records;
+    }
+
+    public async Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
+        string? symbol = null,
+        CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+
+        var conditions = new List<string>
+        {
+            "environment = @environment",
+            "binance_order_id > 0",
+            "(status = @pending OR status = @partial)"
+        };
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@pending", (int)TradeRecordStatus.Pending);
+        cmd.Parameters.AddWithValue("@partial", (int)TradeRecordStatus.PartiallyFilled);
+
+        if (!string.IsNullOrWhiteSpace(symbol))
+        {
+            conditions.Add("symbol = @symbol");
+            cmd.Parameters.AddWithValue("@symbol", symbol);
+        }
+
+        cmd.CommandText = $"SELECT * FROM trade_records WHERE {string.Join(" AND ", conditions)} ORDER BY created_at ASC";
+
+        var records = new List<TradeRecord>();
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            records.Add(ReadTradeRecord(reader));
+        return records;
+    }
+
+    public async Task<TradeRecord> ReconcileTradeRecordAsync(
+        TradeRecord existingRecord,
+        ExchangeOrderResult latestOrder,
+        CancellationToken ct = default)
+    {
+        var latestStatus = MapTradeRecordStatus(latestOrder.Status);
+        var latestExecutedQty = Math.Max(existingRecord.ExecutedQty, latestOrder.ExecutedQty);
+        var latestExecutedPrice = CalculateEffectiveExecutedPrice(latestOrder, existingRecord.ExecutedPrice);
+        var deltaExecutedQty = latestExecutedQty - existingRecord.ExecutedQty;
+        var deltaCommission = latestOrder.FillCommission > existingRecord.Commission
+            ? latestOrder.FillCommission - existingRecord.Commission
+            : 0;
+        DateTime? completedAt = IsTerminalStatus(latestStatus)
+            ? existingRecord.CompletedAt ?? DateTime.UtcNow
+            : null;
+
+        var hasMeaningfulChange = deltaExecutedQty > 0
+            || deltaCommission > 0
+            || latestStatus != existingRecord.Status
+            || latestExecutedPrice != existingRecord.ExecutedPrice
+            || completedAt != existingRecord.CompletedAt;
+
+        if (!hasMeaningfulChange)
+            return existingRecord;
+
+        decimal realizedPnl = 0;
+        if (deltaExecutedQty > 0)
+        {
+            if (existingRecord.Side == OrderSide.Buy)
+            {
+                await OpenPositionAsync(new Position
+                {
+                    Symbol = existingRecord.Symbol,
+                    Side = PositionSide.Long,
+                    Quantity = deltaExecutedQty,
+                    EntryPrice = latestExecutedPrice,
+                    StrategyId = existingRecord.StrategyId,
+                    OpenedAt = DateTime.UtcNow
+                }, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                realizedPnl = await ClosePositionFifoAsync(
+                    existingRecord.Symbol,
+                    deltaExecutedQty,
+                    latestExecutedPrice,
+                    ct).ConfigureAwait(false);
+            }
+        }
+
+        if (deltaExecutedQty > 0 || deltaCommission > 0)
+            await UpdateDailyStatsAsync(realizedPnl, deltaCommission, ct).ConfigureAwait(false);
+
+        existingRecord.RequestedQty = latestOrder.RequestedQty > 0 ? latestOrder.RequestedQty : existingRecord.RequestedQty;
+        existingRecord.ExecutedQty = latestExecutedQty;
+        existingRecord.ExecutedPrice = latestExecutedPrice;
+        existingRecord.Commission += deltaCommission;
+        if (!string.IsNullOrWhiteSpace(latestOrder.CommissionAsset))
+            existingRecord.CommissionAsset = latestOrder.CommissionAsset!;
+        existingRecord.Status = latestStatus;
+        existingRecord.CompletedAt = completedAt;
+
+        await UpdateTradeRecordAsync(existingRecord, ct).ConfigureAwait(false);
+        return existingRecord;
     }
 
     #endregion
@@ -285,7 +414,8 @@ public class TradingDataService : SqliteServiceBase
         var today = GetTodayDateString();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT * FROM daily_stats WHERE date = @date";
+        cmd.CommandText = "SELECT * FROM daily_stats WHERE environment = @environment AND date = @date";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@date", today);
         await using var reader = await cmd.ExecuteReaderAsync(ct);
 
@@ -310,13 +440,14 @@ public class TradingDataService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO daily_stats (date, trade_count, total_pnl, total_commission)
-            VALUES (@date, 1, @pnl, @comm)
-            ON CONFLICT(date) DO UPDATE SET
+            INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
+            VALUES (@environment, @date, 1, @pnl, @comm)
+            ON CONFLICT(environment, date) DO UPDATE SET
                 trade_count = trade_count + 1,
                 total_pnl = total_pnl + @pnl,
                 total_commission = total_commission + @comm
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@date", today);
         cmd.Parameters.AddWithValue("@pnl", (double)pnl);
         cmd.Parameters.AddWithValue("@comm", (double)commission);
@@ -336,8 +467,9 @@ public class TradingDataService : SqliteServiceBase
                 THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
                 ELSE 0 END
             FROM trade_records
-            WHERE symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
+            WHERE environment = @environment AND symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@symbol", symbol);
         cmd.Parameters.AddWithValue("@side", (int)OrderSide.Buy);
         cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
@@ -361,8 +493,9 @@ public class TradingDataService : SqliteServiceBase
                 THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
                 ELSE 0 END
             FROM trade_records
-            WHERE symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
+            WHERE environment = @environment AND symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@symbol", symbol);
         cmd.Parameters.AddWithValue("@side", (int)OrderSide.Sell);
         cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
@@ -386,10 +519,11 @@ public class TradingDataService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO positions (id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
-            VALUES (@id, @symbol, @side, @qty, @entry, 0, @stratId, @openedAt)
+            INSERT INTO positions (id, environment, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
+            VALUES (@id, @environment, @symbol, @side, @qty, @entry, 0, @stratId, @openedAt)
             """;
         cmd.Parameters.AddWithValue("@id", position.Id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@symbol", position.Symbol);
         cmd.Parameters.AddWithValue("@side", (int)position.Side);
         cmd.Parameters.AddWithValue("@qty", (double)position.Quantity);
@@ -419,9 +553,10 @@ public class TradingDataService : SqliteServiceBase
             cmd.CommandText = """
                 SELECT id, quantity, entry_price, closed_quantity
                 FROM positions
-                WHERE symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+                WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
                 ORDER BY opened_at ASC
                 """;
+            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
             cmd.Parameters.AddWithValue("@symbol", symbol);
             cmd.Parameters.AddWithValue("@side", (int)PositionSide.Long);
 
@@ -432,8 +567,8 @@ public class TradingDataService : SqliteServiceBase
                 {
                     var id = reader.GetString(0);
                     var qty = (decimal)reader.GetDouble(1);
-                    var closed = (decimal)reader.GetDouble(2);
-                    var entry = (decimal)reader.GetDouble(3);
+                    var entry = (decimal)reader.GetDouble(2);
+                    var closed = (decimal)reader.GetDouble(3);
                     toClose.Add((id, qty - closed, entry));
                 }
             }
@@ -486,18 +621,20 @@ public class TradingDataService : SqliteServiceBase
             cmd.CommandText = """
                 SELECT id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at
                 FROM positions
-                WHERE (quantity - closed_quantity) > 0
+                WHERE environment = @environment AND (quantity - closed_quantity) > 0
                 ORDER BY opened_at ASC
                 """;
+            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         }
         else
         {
             cmd.CommandText = """
                 SELECT id, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at
                 FROM positions
-                WHERE symbol = @symbol AND (quantity - closed_quantity) > 0
+                WHERE environment = @environment AND symbol = @symbol AND (quantity - closed_quantity) > 0
                 ORDER BY opened_at ASC
                 """;
+            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
             cmd.Parameters.AddWithValue("@symbol", symbol);
         }
 
@@ -521,8 +658,9 @@ public class TradingDataService : SqliteServiceBase
                 THEN SUM((quantity - closed_quantity) * entry_price) / SUM(quantity - closed_quantity)
                 ELSE 0 END
             FROM positions
-            WHERE symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+            WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@symbol", symbol);
         cmd.Parameters.AddWithValue("@side", (int)PositionSide.Long);
 
@@ -566,12 +704,13 @@ public class TradingDataService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO account_snapshots (date, total_value_usdt, snapshot_at)
-            VALUES (@date, @value, @snapshotAt)
-            ON CONFLICT(date) DO UPDATE SET
+            INSERT INTO account_snapshots (environment, date, total_value_usdt, snapshot_at)
+            VALUES (@environment, @date, @value, @snapshotAt)
+            ON CONFLICT(environment, date) DO UPDATE SET
                 total_value_usdt = @value,
                 snapshot_at = @snapshotAt
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@date", today);
         cmd.Parameters.AddWithValue("@value", (double)totalValueUsdt);
         cmd.Parameters.AddWithValue("@snapshotAt", DateTime.UtcNow.ToString("O"));
@@ -586,7 +725,8 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT MAX(total_value_usdt) FROM account_snapshots";
+        cmd.CommandText = "SELECT MAX(total_value_usdt) FROM account_snapshots WHERE environment = @environment";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
         if (result is double d)
             return (decimal)d;
@@ -598,7 +738,8 @@ public class TradingDataService : SqliteServiceBase
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT config_json FROM risk_config WHERE market_type = @marketType";
+        cmd.CommandText = "SELECT config_json FROM risk_config WHERE environment = @environment AND market_type = @marketType";
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@marketType", (int)MarketType.Crypto);
 
         var result = await cmd.ExecuteScalarAsync(ct);
@@ -621,10 +762,11 @@ public class TradingDataService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO risk_config (market_type, config_json, updated_at)
-            VALUES (@marketType, @configJson, @updatedAt)
-            ON CONFLICT(market_type) DO UPDATE SET config_json = @configJson, updated_at = @updatedAt
+            INSERT INTO risk_config (environment, market_type, config_json, updated_at)
+            VALUES (@environment, @marketType, @configJson, @updatedAt)
+            ON CONFLICT(environment, market_type) DO UPDATE SET config_json = @configJson, updated_at = @updatedAt
             """;
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@marketType", (int)MarketType.Crypto);
         cmd.Parameters.AddWithValue("@configJson", JsonSerializer.Serialize(config));
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
@@ -644,6 +786,7 @@ public class TradingDataService : SqliteServiceBase
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS strategies (
                     id TEXT PRIMARY KEY,
+                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
                     symbol TEXT NOT NULL,
                     type INTEGER NOT NULL,
                     status INTEGER NOT NULL,
@@ -662,9 +805,11 @@ public class TradingDataService : SqliteServiceBase
                 );
                 CREATE INDEX IF NOT EXISTS idx_strategies_symbol ON strategies(symbol);
                 CREATE INDEX IF NOT EXISTS idx_strategies_status ON strategies(status);
+                CREATE INDEX IF NOT EXISTS idx_strategies_environment_status ON strategies(environment, status, created_at);
 
                 CREATE TABLE IF NOT EXISTS trade_records (
                     id TEXT PRIMARY KEY,
+                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
                     strategy_id TEXT NOT NULL,
                     symbol TEXT NOT NULL,
                     side INTEGER NOT NULL,
@@ -685,16 +830,20 @@ public class TradingDataService : SqliteServiceBase
                 CREATE INDEX IF NOT EXISTS idx_records_strategy ON trade_records(strategy_id);
                 CREATE INDEX IF NOT EXISTS idx_records_symbol ON trade_records(symbol);
                 CREATE INDEX IF NOT EXISTS idx_records_created ON trade_records(created_at);
+                CREATE INDEX IF NOT EXISTS idx_records_environment_created ON trade_records(environment, created_at);
 
                 CREATE TABLE IF NOT EXISTS daily_stats (
-                    date TEXT PRIMARY KEY,
+                    environment TEXT NOT NULL,
+                    date TEXT NOT NULL,
                     trade_count INTEGER DEFAULT 0,
                     total_pnl REAL DEFAULT 0,
-                    total_commission REAL DEFAULT 0
+                    total_commission REAL DEFAULT 0,
+                    PRIMARY KEY (environment, date)
                 );
 
                 CREATE TABLE IF NOT EXISTS positions (
                     id TEXT PRIMARY KEY,
+                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
                     symbol TEXT NOT NULL,
                     side INTEGER NOT NULL,
                     quantity REAL NOT NULL,
@@ -705,20 +854,26 @@ public class TradingDataService : SqliteServiceBase
                 );
                 CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
                 CREATE INDEX IF NOT EXISTS idx_positions_side ON positions(symbol, side);
+                CREATE INDEX IF NOT EXISTS idx_positions_environment_symbol ON positions(environment, symbol, side);
 
                 CREATE TABLE IF NOT EXISTS account_snapshots (
-                    date TEXT PRIMARY KEY,
+                    environment TEXT NOT NULL,
+                    date TEXT NOT NULL,
                     total_value_usdt REAL NOT NULL,
-                    snapshot_at TEXT NOT NULL
+                    snapshot_at TEXT NOT NULL,
+                    PRIMARY KEY (environment, date)
                 );
 
                 CREATE TABLE IF NOT EXISTS risk_config (
-                    market_type INTEGER PRIMARY KEY,
+                    environment TEXT NOT NULL,
+                    market_type INTEGER NOT NULL,
                     config_json TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (environment, market_type)
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();
+            await EnsureEnvironmentSchemaAsync(conn).ConfigureAwait(false);
             Logger.LogInformation("交易数据库初始化完成");
         }
         catch (Exception ex)
@@ -781,7 +936,7 @@ public class TradingDataService : SqliteServiceBase
             ExecutedPrice = (decimal)reader.GetDouble(reader.GetOrdinal("executed_price")),
             Commission = (decimal)reader.GetDouble(reader.GetOrdinal("commission")),
             Status = (TradeRecordStatus)reader.GetInt32(reader.GetOrdinal("status")),
-            BinanceOrderId = reader.GetInt64(reader.GetOrdinal("binance_order_id")),
+            ExchangeOrderId = reader.GetInt64(reader.GetOrdinal("binance_order_id")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")), CultureInfo.InvariantCulture)
         };
 
@@ -798,6 +953,207 @@ public class TradingDataService : SqliteServiceBase
         if (!reader.IsDBNull(coOrd)) record.CompletedAt = DateTime.Parse(reader.GetString(coOrd), CultureInfo.InvariantCulture);
 
         return record;
+    }
+
+    private async Task UpdateTradeRecordAsync(TradeRecord record, CancellationToken ct)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE trade_records
+            SET requested_qty = @requestedQty,
+                executed_qty = @executedQty,
+                executed_price = @executedPrice,
+                commission = @commission,
+                commission_asset = @commissionAsset,
+                status = @status,
+                completed_at = @completedAt
+            WHERE id = @id AND environment = @environment
+            """;
+        cmd.Parameters.AddWithValue("@id", record.Id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@requestedQty", (double)record.RequestedQty);
+        cmd.Parameters.AddWithValue("@executedQty", (double)record.ExecutedQty);
+        cmd.Parameters.AddWithValue("@executedPrice", (double)record.ExecutedPrice);
+        cmd.Parameters.AddWithValue("@commission", (double)record.Commission);
+        cmd.Parameters.AddWithValue("@commissionAsset", (object?)record.CommissionAsset ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@status", (int)record.Status);
+        cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    private static decimal CalculateEffectiveExecutedPrice(ExchangeOrderResult latestOrder, decimal fallbackPrice)
+    {
+        if (latestOrder.ExecutedQty > 0 && latestOrder.CumulativeQuoteQty > 0)
+            return latestOrder.CumulativeQuoteQty / latestOrder.ExecutedQty;
+
+        if (latestOrder.Price > 0)
+            return latestOrder.Price;
+
+        return fallbackPrice;
+    }
+
+    private static TradeRecordStatus MapTradeRecordStatus(string exchangeStatus) => exchangeStatus switch
+    {
+        "FILLED" => TradeRecordStatus.Filled,
+        "PARTIALLY_FILLED" => TradeRecordStatus.PartiallyFilled,
+        "CANCELED" or "CANCELLED" => TradeRecordStatus.Cancelled,
+        "REJECTED" or "EXPIRED" => TradeRecordStatus.Failed,
+        _ => TradeRecordStatus.Pending
+    };
+
+    private static bool IsTerminalStatus(TradeRecordStatus status) => status is
+        TradeRecordStatus.Filled or TradeRecordStatus.Cancelled or TradeRecordStatus.Failed;
+
+    private async Task EnsureEnvironmentSchemaAsync(SqliteConnection conn)
+    {
+        await EnsureColumnAsync(conn, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await MigrateDailyStatsAsync(conn).ConfigureAwait(false);
+        await MigrateAccountSnapshotsAsync(conn).ConfigureAwait(false);
+        await MigrateRiskConfigAsync(conn).ConfigureAwait(false);
+    }
+
+    private static async Task EnsureColumnAsync(
+        SqliteConnection conn,
+        string tableName,
+        string columnName,
+        string columnDefinition)
+    {
+        if (await ColumnExistsAsync(conn, tableName, columnName).ConfigureAwait(false))
+            return;
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}";
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+    }
+
+    private async Task MigrateDailyStatsAsync(SqliteConnection conn)
+    {
+        if (await ColumnExistsAsync(conn, "daily_stats", "environment").ConfigureAwait(false))
+            return;
+
+        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = (SqliteTransaction)tx;
+            cmd.CommandText = $"""
+                ALTER TABLE daily_stats RENAME TO daily_stats_legacy;
+
+                CREATE TABLE daily_stats (
+                    environment TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    trade_count INTEGER DEFAULT 0,
+                    total_pnl REAL DEFAULT 0,
+                    total_commission REAL DEFAULT 0,
+                    PRIMARY KEY (environment, date)
+                );
+
+                INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
+                SELECT '{LiveSpotEnvironment}', date, trade_count, total_pnl, total_commission
+                FROM daily_stats_legacy;
+
+                DROP TABLE daily_stats_legacy;
+                """;
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            await tx.RollbackAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task MigrateAccountSnapshotsAsync(SqliteConnection conn)
+    {
+        if (await ColumnExistsAsync(conn, "account_snapshots", "environment").ConfigureAwait(false))
+            return;
+
+        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = (SqliteTransaction)tx;
+            cmd.CommandText = $"""
+                ALTER TABLE account_snapshots RENAME TO account_snapshots_legacy;
+
+                CREATE TABLE account_snapshots (
+                    environment TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    total_value_usdt REAL NOT NULL,
+                    snapshot_at TEXT NOT NULL,
+                    PRIMARY KEY (environment, date)
+                );
+
+                INSERT INTO account_snapshots (environment, date, total_value_usdt, snapshot_at)
+                SELECT '{LiveSpotEnvironment}', date, total_value_usdt, snapshot_at
+                FROM account_snapshots_legacy;
+
+                DROP TABLE account_snapshots_legacy;
+                """;
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            await tx.RollbackAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task MigrateRiskConfigAsync(SqliteConnection conn)
+    {
+        if (await ColumnExistsAsync(conn, "risk_config", "environment").ConfigureAwait(false))
+            return;
+
+        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = (SqliteTransaction)tx;
+            cmd.CommandText = $"""
+                ALTER TABLE risk_config RENAME TO risk_config_legacy;
+
+                CREATE TABLE risk_config (
+                    environment TEXT NOT NULL,
+                    market_type INTEGER NOT NULL,
+                    config_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (environment, market_type)
+                );
+
+                INSERT INTO risk_config (environment, market_type, config_json, updated_at)
+                SELECT '{LiveSpotEnvironment}', market_type, config_json, updated_at
+                FROM risk_config_legacy;
+
+                DROP TABLE risk_config_legacy;
+                """;
+            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await tx.CommitAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            await tx.RollbackAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task<bool> ColumnExistsAsync(SqliteConnection conn, string tableName, string columnName)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({tableName})";
+        await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            if (reader.GetString(1).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static async Task<List<TradingStrategy>> ReadStrategiesAsync(SqliteCommand cmd, CancellationToken ct)

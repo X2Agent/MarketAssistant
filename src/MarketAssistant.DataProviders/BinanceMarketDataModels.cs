@@ -1,4 +1,4 @@
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安24小时价格变动统计数据模型（用于 BinanceMarketDataService）

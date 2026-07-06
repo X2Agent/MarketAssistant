@@ -3,7 +3,7 @@ using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算。
@@ -191,7 +191,7 @@ public class TradeExecutor : IDisposable
                 Commission = response.FillCommission,
                 CommissionAsset = response.CommissionAsset ?? string.Empty,
                 Status = MapStatus(response.Status),
-                BinanceOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
+                ExchangeOrderId = long.TryParse(response.OrderId, out var orderId) ? orderId : 0,
                 AIReasoning = aiReasoning,
                 CompletedAt = response.Status == "FILLED" ? DateTime.UtcNow : null
             };

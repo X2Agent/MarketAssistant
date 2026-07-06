@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ namespace MarketAssistant.ViewModels;
 public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 {
     private readonly MarketChatSession _chatSession;
+    private readonly AdaptiveCardConverter _adaptiveCardConverter;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
 
@@ -37,10 +39,12 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        IMarketChatSessionFactory chatSessionFactory)
+        IMarketChatSessionFactory chatSessionFactory,
+        AdaptiveCardConverter adaptiveCardConverter)
         : base(logger)
     {
         _chatSession = chatSessionFactory.Create();
+        _adaptiveCardConverter = adaptiveCardConverter;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
     }
@@ -67,7 +71,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(UserInput))
             return;
 
-        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" });
+        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" }, _adaptiveCardConverter);
         ChatMessages.Add(userMessage);
 
         var currentInput = UserInput;
@@ -76,7 +80,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         IsProcessing = true;
         SendButtonText = "⏹";
 
-        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" })
+        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" }, _adaptiveCardConverter)
         {
             Status = MessageStatus.Sending
         };
@@ -148,7 +152,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
             ? "欢迎使用智能对话功能！请先选择要分析的股票。"
             : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。";
 
-        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" });
+        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" }, _adaptiveCardConverter);
         ChatMessages.Add(welcomeMessage);
     }
 
@@ -170,7 +174,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         {
             if (string.IsNullOrWhiteSpace(message.Text)) continue;
 
-            ChatMessages.Add(new ChatMessageAdapter(message));
+            ChatMessages.Add(new ChatMessageAdapter(message, _adaptiveCardConverter));
             hasVisibleMessages = true;
         }
 
@@ -182,7 +186,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         {
             var contextMessage = new ChatMessageAdapter(
                 new ChatMessage(ChatRole.System, $"以上是关于 {stockCode} 的分析数据，可基于这些信息继续提问。")
-                { AuthorName = "系统" });
+                { AuthorName = "系统" }, _adaptiveCardConverter);
             ChatMessages.Add(contextMessage);
         }
 

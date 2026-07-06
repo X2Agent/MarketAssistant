@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.Services.Data;
-using MarketAssistant.Trading;
+using MarketAssistant.DataProviders;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.AI;

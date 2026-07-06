@@ -2,32 +2,29 @@ using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
-using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
 /// <summary>
-/// 步骤2: 执行投资标的筛选的 Executor（共用，支持多市场）
+/// 步骤2: 执行投资标的筛选（共用，支持多市场）
 /// 通过 IAssetScreenerService 接口抽象，根据市场类型动态选择筛选服务
 /// </summary>
-public sealed partial class ScreenInvestmentTargetsExecutor : Executor
+public sealed class ScreenInvestmentTargetsExecutor
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ScreenInvestmentTargetsExecutor> _logger;
 
     public ScreenInvestmentTargetsExecutor(
         IServiceProvider serviceProvider,
-        ILogger<ScreenInvestmentTargetsExecutor> logger) : base("ScreenInvestmentTargets")
+        ILogger<ScreenInvestmentTargetsExecutor> logger)
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    [MessageHandler]
-    private async ValueTask<AssetScreeningResult> HandleAsync(
+    public async ValueTask<AssetScreeningResult> HandleAsync(
         CriteriaGenerationResult input,
-        IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[步骤2/3] 执行投资标的筛选");
@@ -76,4 +73,3 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
         }
     }
 }
-

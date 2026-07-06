@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using Microsoft.Data.Sqlite;
