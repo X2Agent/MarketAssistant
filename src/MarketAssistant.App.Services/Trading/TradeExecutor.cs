@@ -145,6 +145,29 @@ public class TradeExecutor : IDisposable
             // 币安限制 newClientOrderId 最长 36 字符，使用 Base36 编码压缩 GUID。
             var clientOrderId = "MA" + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
 
+            // 合约模式：判断本次操作是开仓还是平仓
+            // 平仓 = 持有多头时卖出 / 持有空头时买入，需要 reduceOnly=true
+            var isFutures = _exchangeClient.IsFutures;
+            var reduceOnly = false;
+            if (isFutures)
+            {
+                reduceOnly = await IsClosePositionAsync(instrumentSymbol, side, ct);
+
+                // 合约开仓前设置默认杠杆（10x），避免使用交易所默认的 20x 导致强平风险过高
+                if (!reduceOnly)
+                {
+                    try
+                    {
+                        await _exchangeClient.SetLeverageAsync(instrumentSymbol, DefaultFuturesLeverage, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        // 杠杆设置失败不应阻止下单，使用交易所当前杠杆继续
+                        _logger.LogWarning(ex, "设置合约杠杆失败，使用交易所当前杠杆: {Symbol}", instrumentSymbol);
+                    }
+                }
+            }
+
             // 网络异常重试：最多 3 次，指数退避 1s/2s/4s。
             // 业务错误（如余额不足、风控拒绝）不重试，直接抛出。
             ExchangeOrderResult? response = null;
@@ -157,7 +180,8 @@ public class TradeExecutor : IDisposable
                     response = await _exchangeClient.PlaceOrderAsync(
                         instrumentSymbol, side, type, quantity,
                         type == OrderType.Limit ? limitPrice : null,
-                        clientOrderId, ct);
+                        clientOrderId, reduceOnly,
+                        stopPrice: null, trailingDelta: null, ct: ct);
                     break;
                 }
                 catch (HttpRequestException ex)
@@ -187,7 +211,8 @@ public class TradeExecutor : IDisposable
                 RequestedQty = response.RequestedQty == 0 ? quantity : response.RequestedQty,
                 ExecutedQty = response.ExecutedQty,
                 RequestedPrice = limitPrice,
-                ExecutedPrice = response.Price == 0 ? currentPrice : response.Price,
+                // 市价单 response.Price 通常为 0，优先用成交均价（合约 avgPrice），其次用 cummulativeQuoteQty/executedQty 计算
+                ExecutedPrice = CalculateExecutedPrice(response, currentPrice),
                 Commission = response.FillCommission,
                 CommissionAsset = response.CommissionAsset ?? string.Empty,
                 Status = MapStatus(response.Status),
@@ -198,28 +223,21 @@ public class TradeExecutor : IDisposable
 
             await _dataService.SaveTradeRecordAsync(record, ct);
 
-            // FIFO 持仓追踪：买入开仓，卖出按 FIFO 平仓计算已实现盈亏
+            // 持仓追踪与 PnL 计算：现货用本地 FIFO，合约基于交易所持仓
             decimal pnl = 0;
             if (record.ExecutedQty > 0)
             {
-                if (side == OrderSide.Buy)
+                if (isFutures)
                 {
-                    // 现货买入为开多仓，无已实现盈亏
-                    await _dataService.OpenPositionAsync(new Position
-                    {
-                        Symbol = instrumentSymbol,
-                        Side = PositionSide.Long,
-                        Quantity = record.ExecutedQty,
-                        EntryPrice = record.ExecutedPrice,
-                        StrategyId = strategyId,
-                        OpenedAt = record.CreatedAt
-                    }, ct);
+                    pnl = await UpdateFuturesPositionAsync(
+                        instrumentSymbol, side, record.ExecutedQty, record.ExecutedPrice,
+                        record.Commission, strategyId, record.CreatedAt, reduceOnly, ct);
                 }
                 else
                 {
-                    // 卖出按 FIFO 匹配未平仓多头，计算已实现盈亏
-                    pnl = await _dataService.ClosePositionFifoAsync(
-                        instrumentSymbol, record.ExecutedQty, record.ExecutedPrice, ct);
+                    pnl = await UpdateSpotPositionFifoAsync(
+                        instrumentSymbol, side, record.ExecutedQty, record.ExecutedPrice,
+                        strategyId, record.CreatedAt, ct);
                 }
             }
             await _dataService.UpdateDailyStatsAsync(pnl, record.Commission, ct);
@@ -234,6 +252,142 @@ public class TradeExecutor : IDisposable
             _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             return new TradeResult { Success = false, ErrorMessage = ex.Message };
         }
+    }
+
+    /// <summary>
+    /// 合约默认杠杆倍数。开仓前自动设置，避免使用交易所默认的 20x 导致强平风险过高。
+    /// </summary>
+    private const int DefaultFuturesLeverage = 10;
+
+    /// <summary>
+    /// 判断合约交易方向是否为平仓操作。
+    /// 持有多头（PositionAmt > 0）时卖出 = 平多
+    /// 持有空头（PositionAmt < 0）时买入 = 平空
+    /// </summary>
+    private async Task<bool> IsClosePositionAsync(string symbol, OrderSide side, CancellationToken ct)
+    {
+        try
+        {
+            var positions = await _exchangeClient.GetPositionsAsync(symbol, ct);
+            foreach (var pos in positions)
+            {
+                if (!string.Equals(pos.Symbol, symbol, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var posAmt = pos.PositionAmt;
+                if (posAmt > 0 && side == OrderSide.Sell)
+                    return true; // 平多
+                if (posAmt < 0 && side == OrderSide.Buy)
+                    return true; // 平空
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "查询合约持仓失败，无法判断是否为平仓，默认按开仓处理: {Symbol}", symbol);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 现货 FIFO 持仓追踪：买入开多仓，卖出按 FIFO 平仓计算已实现盈亏。
+    /// </summary>
+    private async Task<decimal> UpdateSpotPositionFifoAsync(
+        string symbol, OrderSide side, decimal executedQty, decimal executedPrice,
+        string strategyId, DateTime openedAt, CancellationToken ct)
+    {
+        if (side == OrderSide.Buy)
+        {
+            await _dataService.OpenPositionAsync(new Position
+            {
+                Symbol = symbol,
+                Side = PositionSide.Long,
+                Quantity = executedQty,
+                EntryPrice = executedPrice,
+                StrategyId = strategyId,
+                OpenedAt = openedAt
+            }, ct);
+            return 0;
+        }
+
+        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
+    }
+
+    /// <summary>
+    /// 合约持仓追踪与 PnL 计算：基于交易所持仓而非本地 FIFO。
+    /// 开仓时记录持仓，平仓时根据交易所返回的持仓信息计算已实现盈亏。
+    /// </summary>
+    private async Task<decimal> UpdateFuturesPositionAsync(
+        string symbol, OrderSide side, decimal executedQty, decimal executedPrice,
+        decimal commission, string strategyId, DateTime openedAt,
+        bool isClose, CancellationToken ct)
+    {
+        if (!isClose)
+        {
+            // 开仓：记录持仓方向（多头买入/空头卖出）
+            var positionSide = side == OrderSide.Buy ? PositionSide.Long : PositionSide.Short;
+            await _dataService.OpenPositionAsync(new Position
+            {
+                Symbol = symbol,
+                Side = positionSide,
+                Quantity = executedQty,
+                EntryPrice = executedPrice,
+                StrategyId = strategyId,
+                OpenedAt = openedAt
+            }, ct);
+            return 0;
+        }
+
+        // 平仓：从交易所获取最新持仓，计算已实现盈亏
+        try
+        {
+            var positions = await _exchangeClient.GetPositionsAsync(symbol, ct);
+            var pos = positions.FirstOrDefault(p =>
+                string.Equals(p.Symbol, symbol, StringComparison.OrdinalIgnoreCase));
+
+            if (pos != null)
+            {
+                // 平仓后持仓量减少的差额即为平仓数量
+                // 已实现盈亏 = 平仓数量 * (平仓价 - 开仓价) * 方向
+                // 合约 PnL 由交易所 positionRisk 的 unRealizedProfit 反映未实现部分，
+                // 已实现部分 = 平仓数量 * 价差 - 手续费
+                var entryPrice = pos.EntryPrice;
+                if (entryPrice > 0)
+                {
+                    var direction = side == OrderSide.Sell ? 1m : -1m; // 平多卖出为正，平空买入为负
+                    var pnl = executedQty * (executedPrice - entryPrice) * direction - commission;
+
+                    // 同步本地持仓记录
+                    var positionSide = side == OrderSide.Sell ? PositionSide.Long : PositionSide.Short;
+                    await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
+
+                    return pnl;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "查询交易所持仓计算合约 PnL 失败，回退到本地 FIFO: {Symbol}", symbol);
+        }
+
+        // 回退：使用本地 FIFO 计算
+        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
+    }
+
+    /// <summary>
+    /// 计算实际成交价：优先用合约 avgPrice，其次用 CumulativeQuoteQty/executedQty，最后用当前价兜底。
+    /// </summary>
+    private static decimal CalculateExecutedPrice(ExchangeOrderResult response, decimal currentPrice)
+    {
+        // 合约订单响应可能包含 avgPrice 字段
+        if (response.AveragePrice > 0)
+            return response.AveragePrice;
+
+        // 从成交金额和成交量计算实际成交均价
+        if (response.CumulativeQuoteQty > 0 && response.ExecutedQty > 0)
+            return response.CumulativeQuoteQty / response.ExecutedQty;
+
+        // 市价单 response.Price 通常为 0，用当前价兜底
+        return response.Price == 0 ? currentPrice : response.Price;
     }
 
     private static TradeRecordStatus MapStatus(string status) => status switch

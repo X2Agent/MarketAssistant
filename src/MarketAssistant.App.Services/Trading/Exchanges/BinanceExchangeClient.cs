@@ -27,6 +27,11 @@ public class BinanceExchangeClient : IExchangeClient
 
     public string ExchangeName => _exchangeName;
 
+    /// <summary>
+    /// 合约模式由 positionSide 是否为 null 决定（合约传 "BOTH"，现货传 null）
+    /// </summary>
+    public bool IsFutures => !string.IsNullOrEmpty(_positionSide);
+
     public async Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
     {
         var info = await _accountService.GetAccountInfoAsync(ct);
@@ -46,11 +51,16 @@ public class BinanceExchangeClient : IExchangeClient
         string symbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
         string? clientOrderId = null,
+        bool reduceOnly = false,
+        string? positionSide = null,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken ct = default)
     {
         var response = await _accountService.PlaceOrderAsync(
             symbol, side.ToString().ToUpper(), type.ToString().ToUpper(),
-            quantity, price, clientOrderId, _positionSide, ct);
+            quantity, price, clientOrderId, _positionSide ?? positionSide, reduceOnly,
+            stopPrice, trailingDelta, ct);
 
         return MapOrderResponse(response);
     }
@@ -84,6 +94,24 @@ public class BinanceExchangeClient : IExchangeClient
         => Task.FromResult<List<ExchangePosition>>([]);
 
     /// <summary>
+    /// 现货无需设置杠杆，为空操作。合约由子类覆写。
+    /// </summary>
+    public virtual Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// 现货无需设置保证金模式，为空操作。合约由子类覆写。
+    /// </summary>
+    public virtual Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// 现货成交明细由子类覆写（如需支持），默认返回空列表。
+    /// </summary>
+    public virtual Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
+        => Task.FromResult<List<ExchangeTradeDetail>>([]);
+
+    /// <summary>
     /// 将币安订单响应映射为统一的 ExchangeOrderResult。
     /// </summary>
     private protected static ExchangeOrderResult MapOrderResponse(BinanceOrderResponse response)
@@ -111,6 +139,7 @@ public class BinanceExchangeClient : IExchangeClient
             RequestedQty = decimal.TryParse(response.OrigQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var rq) ? rq : 0,
             ExecutedQty = decimal.TryParse(response.ExecutedQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var eq) ? eq : 0,
             Price = decimal.TryParse(response.Price, NumberStyles.Number, CultureInfo.InvariantCulture, out var p) ? p : 0,
+            AveragePrice = decimal.TryParse(response.AvgPrice, NumberStyles.Number, CultureInfo.InvariantCulture, out var ap) ? ap : 0,
             CumulativeQuoteQty = decimal.TryParse(response.CummulativeQuoteQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var cq) ? cq : 0,
             FillCommission = totalCommission,
             CommissionAsset = commissionAsset

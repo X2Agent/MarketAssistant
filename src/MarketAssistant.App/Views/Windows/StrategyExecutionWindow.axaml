@@ -1,0 +1,138 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="using:MarketAssistant.Trading.Models"
+        xmlns:converters="using:MarketAssistant.Converters"
+        x:Class="MarketAssistant.Views.Windows.StrategyExecutionWindow"
+        Width="{StaticResource MaxDialogWidth}"
+        MinWidth="400"
+        MaxWidth="700"
+        Height="600"
+        MinHeight="400"
+        MaxHeight="800"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PageBackgroundBrush}">
+
+    <Window.Resources>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+    </Window.Resources>
+
+    <Border Padding="{StaticResource CardPadding}">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+            <!-- 策略概要 -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource SurfaceVariantBrush}"
+                    CornerRadius="{StaticResource SmallCornerRadius}"
+                    Padding="{StaticResource DefaultCardPadding}"
+                    Margin="{StaticResource TinyBottomMargin}">
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Name="SymbolText"
+                                   FontWeight="Bold"
+                                   FontSize="{StaticResource SectionTitleFontSize}"/>
+                        <Border Background="{DynamicResource PrimaryLightBrush}"
+                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                Padding="{StaticResource TagPadding}">
+                            <TextBlock Name="TypeText"
+                                       FontSize="{StaticResource SmallFontSize}"/>
+                        </Border>
+                        <Border Name="StatusBorder"
+                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                Padding="{StaticResource TagPadding}">
+                            <TextBlock Name="StatusText"
+                                       FontSize="{StaticResource SmallFontSize}"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Name="SummaryText"
+                               FontSize="{StaticResource SmallFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 交易记录列表 -->
+            <ScrollViewer Grid.Row="1" Margin="{StaticResource TinyTopMargin}">
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <TextBlock Name="EmptyText"
+                               Text="该策略暂无执行记录"
+                               IsVisible="True"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{StaticResource LabelFontSize}"
+                               HorizontalAlignment="Center"
+                               Margin="{StaticResource DefaultMargin}"/>
+                    <ItemsControl Name="RecordsItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="models:TradeRecord">
+                                <Border Background="{DynamicResource CardBackgroundBrush}"
+                                        CornerRadius="{StaticResource SmallCornerRadius}"
+                                        Padding="{StaticResource DefaultCardPadding}"
+                                        Margin="{StaticResource TinyBottomMargin}">
+                                    <StackPanel Spacing="{StaticResource TinySpacing}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                        Spacing="{StaticResource SmallSpacing}">
+                                                <Border CornerRadius="{StaticResource TinyCornerRadius}"
+                                                        Padding="{StaticResource TagPadding}">
+                                                    <TextBlock Text="{Binding Side, Converter={StaticResource EnumDescriptionConverter}}"
+                                                               FontSize="{StaticResource SmallFontSize}"/>
+                                                </Border>
+                                                <Border CornerRadius="{StaticResource TinyCornerRadius}"
+                                                        Padding="{StaticResource TagPadding}">
+                                                    <TextBlock Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
+                                                               FontSize="{StaticResource SmallFontSize}"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" VerticalAlignment="Center"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="{}{0:yyyy-MM-dd HH:mm:ss}">
+                                                        <Binding Path="CreatedAt"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </Grid>
+                                        <TextBlock FontSize="{StaticResource SmallFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="请求: {0:F6} | 成交: {1:F6} @ {2:F4} | 手续费: {3:F6} {4}">
+                                                    <Binding Path="RequestedQty"/>
+                                                    <Binding Path="ExecutedQty"/>
+                                                    <Binding Path="ExecutedPrice"/>
+                                                    <Binding Path="Commission"/>
+                                                    <Binding Path="CommissionAsset"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <Expander Header="AI 决策推理"
+                                                  IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                  Padding="0">
+                                            <TextBlock Text="{Binding AIReasoning}" TextWrapping="Wrap"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Margin="{StaticResource SmallCardPadding}"/>
+                                        </Expander>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 底部关闭按钮 -->
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="{StaticResource SmallSpacing}"
+                        Margin="{StaticResource TinyTopMargin}">
+                <Button Content="关闭"
+                        Click="OnCloseClick"
+                        MinWidth="{StaticResource SmallButtonMinWidth}"
+                        Padding="16,8"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

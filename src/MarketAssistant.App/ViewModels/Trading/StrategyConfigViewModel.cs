@@ -1,16 +1,27 @@
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Extensions;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
+using MarketAssistant.Views.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;
 
-public partial class StrategyConfigViewModel : ViewModelBase
+public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
 {
     private readonly TradingStrategyService _strategyService;
+    private readonly TradingDataService _dataService;
+    private readonly MarketMonitor _marketMonitor;
+    private readonly IDialogService _dialogService;
+    private bool _disposed;
 
     public ObservableCollection<TradingStrategy> Strategies { get; } = [];
 
@@ -85,13 +96,32 @@ public partial class StrategyConfigViewModel : ViewModelBase
     // 风控配置
     [ObservableProperty] private RiskConfig _riskConfig = new();
 
+    /// <summary>
+    /// MarketMonitor 是否正在运行。策略标为 Active 后，只有监控运行中才会真正触发交易。
+    /// </summary>
+    [ObservableProperty] private bool _isMonitorRunning;
+
     public StrategyConfigViewModel(
         TradingStrategyService strategyService,
+        TradingDataService dataService,
+        MarketMonitor marketMonitor,
+        IDialogService dialogService,
         ILogger<StrategyConfigViewModel> logger)
         : base(logger)
     {
         _strategyService = strategyService;
+        _dataService = dataService;
+        _marketMonitor = marketMonitor;
+        _dialogService = dialogService;
+        IsMonitorRunning = _marketMonitor.IsRunning;
+        _marketMonitor.StatusChanged += OnMonitorStatusChanged;
         _ = InitializeAsync();
+    }
+
+    private void OnMonitorStatusChanged(bool isRunning)
+    {
+        // StatusChanged 由后台线程触发，需切回 UI 线程更新绑定属性
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => IsMonitorRunning = isRunning);
     }
 
     private async Task InitializeAsync()
@@ -202,6 +232,12 @@ public partial class StrategyConfigViewModel : ViewModelBase
     {
         await SafeExecuteAsync(async () =>
         {
+            // 已完成或失败的策略不直接切换状态，避免误启动已结束的策略
+            if (strategy.Status is StrategyStatus.Completed or StrategyStatus.Failed)
+            {
+                throw new FriendlyException($"策略当前状态为「{strategy.Status.GetDescription()}」，无法直接切换，请删除后重新创建");
+            }
+
             var newStatus = strategy.Status == StrategyStatus.Active
                 ? StrategyStatus.Paused
                 : StrategyStatus.Active;
@@ -215,6 +251,15 @@ public partial class StrategyConfigViewModel : ViewModelBase
                 Strategies.RemoveAt(index);
                 Strategies.Insert(index, strategy);
             }
+
+            // 启动策略后若监控未运行，提示用户需在交易监控页启动监控才会自动交易
+            if (newStatus == StrategyStatus.Active && !_marketMonitor.IsRunning)
+            {
+                await _dialogService.ShowMessageAsync(
+                    "策略已启动",
+                    "策略已标记为运行中，但市场监控未启动，暂不会自动交易。请到「交易监控」页面点击「启动监控」后才会根据实时价格触发交易。",
+                    "知道了");
+            }
         }, "切换策略状态");
     }
 
@@ -226,6 +271,37 @@ public partial class StrategyConfigViewModel : ViewModelBase
             await _strategyService.DeleteStrategyAsync(strategy.Id);
             Strategies.Remove(strategy);
         }, "删除策略");
+    }
+
+    [RelayCommand]
+    private async Task ViewHistoryAsync(TradingStrategy strategy)
+    {
+        await SafeExecuteAsync(async () =>
+        {
+            var records = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
+
+            // 刷新策略最新状态（执行次数可能已被后台引擎更新）
+            var latest = await _strategyService.GetStrategyAsync(strategy.Id);
+            if (latest != null)
+            {
+                strategy.ExecutionCount = latest.ExecutionCount;
+                strategy.Status = latest.Status;
+                strategy.LastTriggeredAt = latest.LastTriggeredAt;
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                    return;
+
+                var owner = desktop.Windows.FirstOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+                if (owner == null) return;
+
+                var window = new StrategyExecutionWindow();
+                window.SetContent(strategy, records);
+                await window.ShowDialog(owner);
+            });
+        }, "查看策略执行历史");
     }
 
     [RelayCommand]
@@ -258,5 +334,13 @@ public partial class StrategyConfigViewModel : ViewModelBase
         DcaDoubleBuyBelowPrice = string.Empty;
         ValidationError = string.Empty;
         IsCreating = false;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _marketMonitor.StatusChanged -= OnMonitorStatusChanged;
+        GC.SuppressFinalize(this);
     }
 }

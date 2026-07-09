@@ -94,6 +94,15 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
             // 计算风控指标
             RemainingDailyTrades = Math.Max(0, RiskConfig.MaxDailyTrades - TodayStats.TradeCount);
 
+            // 本地 SQLite 数据不依赖币安 API，独立加载避免被 API 异常连带跳过
+            var positions = await _dataService.GetOpenPositionsAsync();
+            Positions.Clear();
+            foreach (var p in positions)
+            {
+                Positions.Add(p);
+            }
+
+            // 以下为币安 HTTP 调用，API 未配置或网络异常时降级处理
             try
             {
                 var summary = await _portfolioService.GetAccountBalanceSummaryAsync();
@@ -132,22 +141,23 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
                 IsPositionHigh = RiskConfig.MaxTotalPositionPercent > 0
                                  && TotalPositionPercent / RiskConfig.MaxTotalPositionPercent >= RiskWarningThreshold;
 
-                // 加载 FIFO 持仓
-                var positions = await _dataService.GetOpenPositionsAsync();
-                Positions.Clear();
-                foreach (var p in positions)
-                {
-                    Positions.Add(p);
-                }
-
                 var orders = await _exchangeClient.GetOpenOrdersAsync();
                 OpenOrders.Clear();
                 foreach (var o in orders)
                     OpenOrders.Add(o);
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException ||
+                                       ex.InnerException is InvalidOperationException)
             {
-                Logger?.LogWarning("Binance API 未配置，跳过账户数据加载");
+                // API 未配置场景：BinanceAuthService.EnsureConfigured 抛 InvalidOperationException
+                // 被 BinanceAccountServiceBase 包装为 FriendlyException(InnerException = InvalidOperationException)
+                Logger?.LogWarning("Binance API 未配置，跳过账户余额与未完成订单加载");
+            }
+            catch (Exception ex) when (ex is FriendlyException ||
+                                       ex.InnerException is HttpRequestException)
+            {
+                // API 已配置但网络/请求失败：保留本地数据，仅记录日志
+                Logger?.LogWarning(ex, "Binance API 调用失败，账户余额与未完成订单未刷新");
             }
 
             // 加载活跃策略

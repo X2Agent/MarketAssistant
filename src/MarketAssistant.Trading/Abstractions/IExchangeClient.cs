@@ -14,6 +14,11 @@ public interface IExchangeClient
     string ExchangeName { get; }
 
     /// <summary>
+    /// 当前是否为合约模式（合约需要 reduceOnly、杠杆等特殊处理）
+    /// </summary>
+    bool IsFutures { get; }
+
+    /// <summary>
     /// 获取账户余额
     /// </summary>
     Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default);
@@ -22,10 +27,18 @@ public interface IExchangeClient
     /// 对交易标的下单
     /// </summary>
     /// <param name="clientOrderId">客户端自定义订单 ID，用于网络重试时实现幂等性，避免重复下单</param>
+    /// <param name="reduceOnly">合约平仓时传 true，确保只平仓不开新仓（仅合约有效）</param>
+    /// <param name="positionSide">持仓方向（合约双向模式：LONG/SHORT；单向模式/null：BOTH）</param>
+    /// <param name="stopPrice">条件单触发价（StopMarket/TakeProfitMarket 必填）</param>
+    /// <param name="trailingDelta">追踪止损回调比例（基点，1%=100，TrailingStopMarket 必填）</param>
     Task<ExchangeOrderResult> PlaceOrderAsync(
         string instrumentSymbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
         string? clientOrderId = null,
+        bool reduceOnly = false,
+        string? positionSide = null,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken ct = default);
 
     /// <summary>
@@ -51,6 +64,22 @@ public interface IExchangeClient
     /// </summary>
     Task<List<ExchangePosition>> GetPositionsAsync(
         string? instrumentSymbol = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 设置合约杠杆倍数（合约专用，现货为空操作）
+    /// </summary>
+    Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default);
+
+    /// <summary>
+    /// 设置合约保证金模式（合约专用，现货为空操作）
+    /// </summary>
+    /// <param name="marginType">"ISOLATED"（逐仓）或 "CROSSED"（全仓）</param>
+    Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default);
+
+    /// <summary>
+    /// 查询成交明细（合约专用，现货返回空列表）
+    /// </summary>
+    Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -86,6 +115,11 @@ public class ExchangeOrderResult
     public decimal ExecutedQty { get; set; }
     public decimal Price { get; set; }
     public decimal CumulativeQuoteQty { get; set; }
+
+    /// <summary>
+    /// 成交均价（合约 avgPrice 字段）。市价单 Price 为 0 时可用此值作为实际成交价。
+    /// </summary>
+    public decimal AveragePrice { get; set; }
 
     /// <summary>
     /// 成交手续费（以 <see cref="CommissionAsset"/> 计价）。
@@ -145,4 +179,59 @@ public class ExchangePosition
     /// 最大可平数量
     /// </summary>
     public decimal MaxQty { get; set; }
+}
+
+/// <summary>
+/// 成交明细（合约专用）
+/// </summary>
+public class ExchangeTradeDetail
+{
+    public string Symbol { get; set; } = string.Empty;
+    public long TradeId { get; set; }
+    public long OrderId { get; set; }
+
+    /// <summary>
+    /// 成交方向：BUY / SELL
+    /// </summary>
+    public string Side { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 持仓方向：BOTH / LONG / SHORT
+    /// </summary>
+    public string PositionSide { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 成交价格
+    /// </summary>
+    public decimal Price { get; set; }
+
+    /// <summary>
+    /// 成交数量
+    /// </summary>
+    public decimal Quantity { get; set; }
+
+    /// <summary>
+    /// 成交金额（Price × Quantity）
+    /// </summary>
+    public decimal QuoteQuantity { get; set; }
+
+    /// <summary>
+    /// 手续费
+    /// </summary>
+    public decimal Commission { get; set; }
+
+    /// <summary>
+    /// 手续费币种
+    /// </summary>
+    public string CommissionAsset { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 是否为平仓成交
+    /// </summary>
+    public bool IsBuyer { get; set; }
+
+    /// <summary>
+    /// 成交时间（Unix 毫秒）
+    /// </summary>
+    public long Time { get; set; }
 }

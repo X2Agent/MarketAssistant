@@ -1,14 +1,15 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
-using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.Trading;
+using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Crypto;
 
 /// <summary>
-/// 币安API鉴权配置（运行时快照，由 BinanceAuthService 每次从设置动态读取）
+/// 币安API鉴权配置（运行时快照，由 BinanceAuthService 每次从加密存储动态读取）
 /// </summary>
 public class BinanceAuthConfig
 {
@@ -44,8 +45,8 @@ public interface IBinanceAuthService
 
 /// <summary>
 /// 币安API鉴权服务（HMAC-SHA256签名）
-/// 通过 keySelector 参数化密钥来源，支持现货实盘/Testnet、合约实盘/Testnet 共用同一实现。
-/// 每次操作时从 IUserSettingService 动态读取密钥，以支持运行时更改。
+/// 通过 ITradingCredentialStore 按交易模式读取加密存储的密钥，
+/// 支持现货实盘/Testnet/Demo、合约实盘/Testnet 共用同一实现。
 /// 签名时自动与币安服务器时间同步，避免本地系统时间偏差导致 -1021 错误。
 /// </summary>
 public sealed class BinanceAuthService : IBinanceAuthService
@@ -57,8 +58,8 @@ public sealed class BinanceAuthService : IBinanceAuthService
     /// </summary>
     private static readonly TimeSpan ServerTimeSyncInterval = TimeSpan.FromMinutes(30);
 
-    private readonly IUserSettingService _userSettingService;
-    private readonly Func<UserSetting, (string ApiKey, string SecretKey)> _keySelector;
+    private readonly ITradingCredentialStore _credentialStore;
+    private readonly CryptoTradingMode _mode;
     private readonly string _keyName;
 
     /// <summary>
@@ -79,24 +80,24 @@ public sealed class BinanceAuthService : IBinanceAuthService
     private readonly SemaphoreSlim _syncLock = new(1, 1);
     private readonly ILogger? _logger;
 
-    /// <param name="userSettingService">用户设置服务</param>
-    /// <param name="keySelector">从 UserSetting 中选取 (ApiKey, SecretKey) 的函数</param>
+    /// <param name="credentialStore">交易凭证加密存储</param>
+    /// <param name="mode">交易模式，决定从存储中读取哪套密钥</param>
     /// <param name="keyName">密钥名称，用于错误提示（如 "Binance"、"Binance Spot Testnet"）</param>
     /// <param name="httpClientFactory">用于服务器时间同步的 HttpClient 工厂（可选）</param>
     /// <param name="httpClientName">时间同步使用的 HttpClient 名称（可选，与账户服务一致）</param>
     /// <param name="timeEndpoint">时间同步端点：现货 "/api/v3/time"，合约 "/fapi/v1/time"（可选）</param>
     /// <param name="logger">日志器（可选）</param>
     public BinanceAuthService(
-        IUserSettingService userSettingService,
-        Func<UserSetting, (string ApiKey, string SecretKey)> keySelector,
+        ITradingCredentialStore credentialStore,
+        CryptoTradingMode mode,
         string keyName,
         IHttpClientFactory? httpClientFactory = null,
         string? httpClientName = null,
         string? timeEndpoint = null,
         ILogger? logger = null)
     {
-        _userSettingService = userSettingService;
-        _keySelector = keySelector;
+        _credentialStore = credentialStore;
+        _mode = mode;
         _keyName = keyName;
         _httpClientFactory = httpClientFactory;
         _httpClientName = httpClientName;
@@ -108,7 +109,7 @@ public sealed class BinanceAuthService : IBinanceAuthService
     {
         get
         {
-            var (apiKey, secretKey) = _keySelector(_userSettingService.CurrentSetting);
+            var (apiKey, secretKey) = _credentialStore.GetCredentials(_mode);
             return new BinanceAuthConfig
             {
                 ApiKey = apiKey,
@@ -252,10 +253,10 @@ public sealed class BinanceAuthService : IBinanceAuthService
     private void EnsureConfigured(BinanceAuthConfig config)
     {
         if (string.IsNullOrEmpty(config.ApiKey))
-            throw new InvalidOperationException($"{_keyName} API Key 未配置，请在设置页面配置");
+            throw new InvalidOperationException($"{_keyName} API Key 未配置，请在交易页面的 API 密钥配置中设置");
 
         if (string.IsNullOrEmpty(config.SecretKey))
-            throw new InvalidOperationException($"{_keyName} Secret Key 未配置，请在设置页面配置");
+            throw new InvalidOperationException($"{_keyName} Secret Key 未配置，请在交易页面的 API 密钥配置中设置");
     }
 
     /// <summary>

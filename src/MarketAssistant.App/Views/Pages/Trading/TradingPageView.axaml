@@ -35,9 +35,9 @@
                     Margin="{StaticResource SmallBottomMargin}">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0">
-                        <Button Content="策略配置"
+                        <Button Content="交易配置"
                                 Classes="period-button"
-                                Classes.selected="{Binding IsStrategyTabSelected}"
+                                Classes.selected="{Binding IsConfigTabSelected}"
                                 Command="{Binding SelectTabCommand}"
                                 CommandParameter="0"/>
                         <Button Content="交易监控"
@@ -65,12 +65,20 @@
 
         <!-- Tab 内容区域 -->
         <Panel Grid.Row="1">
-            <trading:StrategyConfigView DataContext="{Binding StrategyConfig}"
-                                        IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsStrategyTabSelected}"/>
+            <!-- 交易配置：策略配置（左）+ API 密钥（右）-->
+            <Grid IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsConfigTabSelected}"
+                  ColumnDefinitions="*,400"
+                  ColumnSpacing="{StaticResource DefaultSpacing}">
+                <trading:StrategyConfigView Grid.Column="0"
+                                            DataContext="{Binding StrategyConfig}"/>
+                <trading:ApiKeyConfigView Grid.Column="1"
+                                         DataContext="{Binding ApiKeyConfig}"/>
+            </Grid>
+
             <trading:TradeMonitorView DataContext="{Binding TradeMonitor}"
-                                     IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsMonitorTabSelected}"/>
+                                      IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsMonitorTabSelected}"/>
             <trading:TradeHistoryView DataContext="{Binding TradeHistory}"
-                                     IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsHistoryTabSelected}"/>
+                                      IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsHistoryTabSelected}"/>
         </Panel>
     </Grid>
 </UserControl>

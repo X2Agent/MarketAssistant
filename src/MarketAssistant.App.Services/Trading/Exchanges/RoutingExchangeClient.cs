@@ -4,32 +4,28 @@ using MarketAssistant.Trading.Models;
 namespace MarketAssistant.Services.Trading.Exchanges;
 
 /// <summary>
-/// 根据当前交易模式在实盘/模拟盘/合约客户端之间路由。
-/// 支持 4 种模式：现货实盘、现货 Testnet、合约实盘、合约 Testnet。
+/// 根据当前交易模式在实盘/模拟盘/Demo/合约客户端之间路由。
+/// 通过字典查找活跃客户端，新增模式只需在字典中注册，无需修改路由逻辑。
 /// </summary>
 public sealed class RoutingExchangeClient : IExchangeClient
 {
     private readonly TradingEnvironmentService _environmentService;
-    private readonly BinanceExchangeClient _spotLiveClient;
-    private readonly BinanceExchangeClient _spotTestnetClient;
-    private readonly BinanceFuturesExchangeClient _futuresLiveClient;
-    private readonly BinanceFuturesExchangeClient _futuresTestnetClient;
+    private readonly IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> _clients;
 
     public RoutingExchangeClient(
         TradingEnvironmentService environmentService,
-        BinanceExchangeClient spotLiveClient,
-        BinanceExchangeClient spotTestnetClient,
-        BinanceFuturesExchangeClient futuresLiveClient,
-        BinanceFuturesExchangeClient futuresTestnetClient)
+        IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> clients)
     {
         _environmentService = environmentService;
-        _spotLiveClient = spotLiveClient;
-        _spotTestnetClient = spotTestnetClient;
-        _futuresLiveClient = futuresLiveClient;
-        _futuresTestnetClient = futuresTestnetClient;
+        _clients = clients;
     }
 
     public string ExchangeName => GetActiveClient().ExchangeName;
+
+    /// <summary>
+    /// 当前是否为合约模式，由底层活跃客户端决定。
+    /// </summary>
+    public bool IsFutures => GetActiveClient().IsFutures;
 
     public Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
         => GetActiveClient().GetAccountInfoAsync(ct);
@@ -41,8 +37,12 @@ public sealed class RoutingExchangeClient : IExchangeClient
         decimal quantity,
         decimal? price = null,
         string? clientOrderId = null,
+        bool reduceOnly = false,
+        string? positionSide = null,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken ct = default)
-        => GetActiveClient().PlaceOrderAsync(instrumentSymbol, side, type, quantity, price, clientOrderId, ct);
+        => GetActiveClient().PlaceOrderAsync(instrumentSymbol, side, type, quantity, price, clientOrderId, reduceOnly, positionSide, stopPrice, trailingDelta, ct);
 
     public Task<ExchangeOrderResult> GetOrderAsync(
         string instrumentSymbol,
@@ -66,11 +66,21 @@ public sealed class RoutingExchangeClient : IExchangeClient
         CancellationToken ct = default)
         => GetActiveClient().GetPositionsAsync(instrumentSymbol, ct);
 
-    private IExchangeClient GetActiveClient() => _environmentService.CurrentMode switch
+    public Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default)
+        => GetActiveClient().SetLeverageAsync(instrumentSymbol, leverage, ct);
+
+    public Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default)
+        => GetActiveClient().SetMarginTypeAsync(instrumentSymbol, marginType, ct);
+
+    public Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
+        => GetActiveClient().GetUserTradesAsync(instrumentSymbol, ct);
+
+    private IExchangeClient GetActiveClient()
     {
-        CryptoTradingMode.BinanceTestnet => _spotTestnetClient,
-        CryptoTradingMode.LiveFutures => _futuresLiveClient,
-        CryptoTradingMode.BinanceFuturesTestnet => _futuresTestnetClient,
-        _ => _spotLiveClient
-    };
+        if (_clients.TryGetValue(_environmentService.CurrentMode, out var client))
+            return client;
+
+        throw new InvalidOperationException(
+            $"交易模式 {_environmentService.CurrentMode} 未配置对应的交易所客户端");
+    }
 }

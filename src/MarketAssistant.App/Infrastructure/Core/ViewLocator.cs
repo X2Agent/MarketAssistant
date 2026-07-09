@@ -21,6 +21,7 @@ public class ViewLocator : IDataTemplate
         {
             HomePageViewModel => new HomePageView { DataContext = data },
             FavoritesPageViewModel => new FavoritesPageView { DataContext = data },
+            PriceAlertPageViewModel => new PriceAlertPageView { DataContext = data },
             AssetSelectionPageViewModel => new AssetSelectionPageView { DataContext = data },
             SettingsPageViewModel => new SettingsPageView { DataContext = data },
             AboutPageViewModel => new AboutPageView { DataContext = data },

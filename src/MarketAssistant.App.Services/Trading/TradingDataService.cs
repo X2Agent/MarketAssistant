@@ -16,6 +16,9 @@ public class TradingDataService : SqliteServiceBase
 {
     private const string LiveSpotEnvironment = "crypto-live-spot";
     private const string SpotTestnetEnvironment = "crypto-binance-spot-testnet";
+    private const string LiveFuturesEnvironment = "crypto-live-futures";
+    private const string FuturesTestnetEnvironment = "crypto-binance-futures-testnet";
+    private const string SpotDemoEnvironment = "crypto-binance-spot-demo";
 
     private readonly TradingEnvironmentService _tradingEnvironmentService;
 
@@ -27,9 +30,16 @@ public class TradingDataService : SqliteServiceBase
         _tradingEnvironmentService = tradingEnvironmentService;
     }
 
+    /// <summary>
+    /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Testnet、合约实盘、合约 Testnet
+    /// 的策略、交易记录、持仓、风控配置互不混淆。
+    /// </summary>
     private string CurrentEnvironmentKey => _tradingEnvironmentService.CurrentMode switch
     {
         CryptoTradingMode.BinanceTestnet => SpotTestnetEnvironment,
+        CryptoTradingMode.LiveFutures => LiveFuturesEnvironment,
+        CryptoTradingMode.BinanceFuturesTestnet => FuturesTestnetEnvironment,
+        CryptoTradingMode.BinanceSpotDemo => SpotDemoEnvironment,
         _ => LiveSpotEnvironment
     };
 
@@ -44,11 +54,11 @@ public class TradingDataService : SqliteServiceBase
             INSERT OR REPLACE INTO strategies
                 (id, environment, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
-                 execution_count, max_executions, trailing_peak_price)
+                 execution_count, max_executions, trailing_peak_price, native_order_id)
             VALUES
                 (@id, @environment, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
-                 @execCount, @maxExec, @trailingPeak)
+                 @execCount, @maxExec, @trailingPeak, @nativeOrderId)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -67,6 +77,7 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
         cmd.Parameters.AddWithValue("@trailingPeak", strategy.TrailingPeakPrice.HasValue ? (object)(double)strategy.TrailingPeakPrice.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)strategy.NativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -199,6 +210,21 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@peak", trailingPeakPrice.HasValue ? (object)(double)trailingPeakPrice.Value : DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 更新策略的原生条件单订单 ID（提交原生条件单后调用）
+    /// </summary>
+    public async Task UpdateStrategyNativeOrderIdAsync(string id, string? nativeOrderId, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE strategies SET native_order_id = @nativeOrderId WHERE id = @id AND environment = @environment";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)nativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -801,7 +827,8 @@ public class TradingDataService : SqliteServiceBase
                     last_triggered_at TEXT,
                     execution_count INTEGER DEFAULT 0,
                     max_executions INTEGER,
-                    trailing_peak_price REAL
+                    trailing_peak_price REAL,
+                    native_order_id TEXT
                 );
                 CREATE INDEX IF NOT EXISTS idx_strategies_symbol ON strategies(symbol);
                 CREATE INDEX IF NOT EXISTS idx_strategies_status ON strategies(status);
@@ -919,6 +946,9 @@ public class TradingDataService : SqliteServiceBase
         var trailingOrd = reader.GetOrdinal("trailing_peak_price");
         if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = (decimal)reader.GetDouble(trailingOrd);
 
+        var nativeOrd = reader.GetOrdinal("native_order_id");
+        if (!reader.IsDBNull(nativeOrd)) strategy.NativeOrderId = reader.GetString(nativeOrd);
+
         return strategy;
     }
 
@@ -1009,6 +1039,7 @@ public class TradingDataService : SqliteServiceBase
     private async Task EnsureEnvironmentSchemaAsync(SqliteConnection conn)
     {
         await EnsureColumnAsync(conn, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, "strategies", "native_order_id", "TEXT").ConfigureAwait(false);
         await EnsureColumnAsync(conn, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
         await EnsureColumnAsync(conn, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn).ConfigureAwait(false);

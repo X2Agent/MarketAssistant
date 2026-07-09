@@ -48,4 +48,36 @@ public class BinanceSymbolInfo
     public string Status { get; set; } = string.Empty;
     public string BaseAsset { get; set; } = string.Empty;
     public string QuoteAsset { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 交易对过滤器列表（PRICE_FILTER、LOT_SIZE 等）
+    /// </summary>
+    public List<BinanceSymbolFilter>? Filters { get; set; }
+}
+
+/// <summary>
+/// 币安交易对过滤器
+/// 不同 filterType 对应不同字段，未使用的字段为 null。
+/// </summary>
+public class BinanceSymbolFilter
+{
+    /// <summary>
+    /// 过滤器类型（PRICE_FILTER、LOT_SIZE、MIN_NOTIONAL 等）
+    /// </summary>
+    public string FilterType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 最小价格（PRICE_FILTER）
+    /// </summary>
+    public decimal? MinPrice { get; set; }
+
+    /// <summary>
+    /// 最大价格（PRICE_FILTER）
+    /// </summary>
+    public decimal? MaxPrice { get; set; }
+
+    /// <summary>
+    /// 价格步长（PRICE_FILTER）
+    /// </summary>
+    public decimal? TickSize { get; set; }
 }

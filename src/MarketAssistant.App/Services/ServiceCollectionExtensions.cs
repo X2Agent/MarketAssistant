@@ -55,6 +55,7 @@ public static class ServiceCollectionExtensions
         // 注册主要页面 ViewModels
         services.AddTransient<HomePageViewModel>();
         services.AddTransient<FavoritesPageViewModel>();
+        services.AddTransient<PriceAlertPageViewModel>();
         services.AddTransient<AssetSelectionPageViewModel>();
         services.AddTransient<SettingsPageViewModel>();
         services.AddTransient<AboutPageViewModel>();
@@ -77,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<StrategyConfigViewModel>();
         services.AddTransient<TradeMonitorViewModel>();
         services.AddTransient<TradeHistoryViewModel>();
+        services.AddTransient<ApiKeyConfigViewModel>();
 
         return services;
     }

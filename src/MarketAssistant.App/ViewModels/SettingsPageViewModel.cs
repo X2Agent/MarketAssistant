@@ -10,6 +10,7 @@ using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Agents.Analysts;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
@@ -35,6 +36,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly VectorStore _vectorStore;
     private readonly Services.Market.MarketContext _marketContext;
     private readonly TradingEnvironmentService _tradingEnvironmentService;
+    private readonly MarketMonitor _marketMonitor;
+    private readonly IDialogService _dialogService;
     private IStorageProvider? _storageProvider;
 
     // UserSetting对象，包含所有用户设置
@@ -301,6 +304,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         VectorStore vectorStore,
         Services.Market.MarketContext marketContext,
         TradingEnvironmentService tradingEnvironmentService,
+        MarketMonitor marketMonitor,
+        IDialogService dialogService,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
         _ragIngestionService = ragIngestionService;
@@ -310,6 +315,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _vectorStore = vectorStore;
         _marketContext = marketContext;
         _tradingEnvironmentService = tradingEnvironmentService;
+        _marketMonitor = marketMonitor;
+        _dialogService = dialogService;
         _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
     }
 
@@ -557,14 +564,32 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 保存设置
     /// </summary>
     [RelayCommand]
-    private void Save()
+    private async Task SaveAsync()
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
             // 同步分析师角色设置
             foreach (var role in AnalystRoles)
             {
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
+            }
+
+            // 切换到实盘模式时若监控正在运行，弹窗警告（运行中切换会立即对实盘账户下单）
+            var targetMode = UserSetting.CryptoTradingMode;
+            var isLiveTarget = targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
+            if (isLiveTarget && targetMode != _tradingEnvironmentService.CurrentMode && _marketMonitor.IsRunning)
+            {
+                var confirmed = await _dialogService.ShowConfirmationAsync(
+                    "切换到实盘模式",
+                    "⚠️ 市场监控正在运行中！保存设置后将切换到实盘模式，后续触发的交易将立即对真实账户下单。\n\n请确认是否继续？",
+                    "确认切换",
+                    "取消");
+
+                if (!confirmed)
+                {
+                    _notificationService.ShowInfo("已取消保存设置");
+                    return;
+                }
             }
 
             // 同步市场类型到MarketContext

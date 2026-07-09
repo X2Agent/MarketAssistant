@@ -11,6 +11,8 @@
     <Thickness x:Key="SmallCardPadding">8</Thickness>
     <Thickness x:Key="TagPadding">4,2</Thickness>
     <Thickness x:Key="TinyPadding">4</Thickness>
+    <Thickness x:Key="SmallPadding">8</Thickness>
+    <Thickness x:Key="DefaultPadding">12</Thickness>
     
     <!-- Margin 定义 -->
     <Thickness x:Key="DefaultMargin">12</Thickness>

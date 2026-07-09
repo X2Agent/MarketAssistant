@@ -1,25 +1,35 @@
 using System.Text.Json;
+using MarketAssistant.Services.Trading.Exchanges;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Trading;
 
 /// <summary>
-/// 策略引擎，管理用户策略并评估触发条件
+/// 策略引擎，管理用户策略并评估触发条件。
+/// 合约模式下支持将止损/止盈/追踪止损提交为交易所原生条件单，
+/// 由交易所服务端监控触发，无需客户端持续轮询价格。
 /// </summary>
 public class StrategyEngine
 {
     private readonly TradingDataService _dataService;
     private readonly TradingStrategyService _strategyService;
+    private readonly RoutingExchangeClient _exchangeClient;
+    private readonly TradingEnvironmentService _environmentService;
     private readonly ILogger<StrategyEngine> _logger;
 
     public StrategyEngine(
         TradingDataService dataService,
         TradingStrategyService strategyService,
+        RoutingExchangeClient exchangeClient,
+        TradingEnvironmentService environmentService,
         ILogger<StrategyEngine> logger)
     {
         _dataService = dataService;
         _strategyService = strategyService;
+        _exchangeClient = exchangeClient;
+        _environmentService = environmentService;
         _logger = logger;
     }
 
@@ -354,6 +364,109 @@ public class StrategyEngine
         {
             _logger.LogWarning(ex, "解析 DCA 参数失败: {StrategyId}", strategy.Id);
             return (false, strategy.Side, strategy.Quantity);
+        }
+    }
+
+    /// <summary>
+    /// 当前交易模式是否支持原生条件单（仅合约模式支持）。
+    /// </summary>
+    public bool IsNativeConditionalOrderSupported => _exchangeClient.IsFutures;
+
+    /// <summary>
+    /// 尝试将止损/止盈/追踪止损策略提交为交易所原生条件单。
+    /// 仅合约模式支持；现货模式返回 null，调用方应回退到客户端轮询评估。
+    /// </summary>
+    /// <returns>交易所返回的订单 ID；不支持或失败时返回 null</returns>
+    public async Task<string?> TryPlaceNativeConditionalOrderAsync(
+        TradingStrategy strategy, CancellationToken ct = default)
+    {
+        if (!_exchangeClient.IsFutures)
+            return null;
+
+        try
+        {
+            var orderType = strategy.Type switch
+            {
+                StrategyType.StopLoss => OrderType.StopMarket,
+                StrategyType.TakeProfit => OrderType.TakeProfitMarket,
+                StrategyType.TrailingStop => OrderType.TrailingStopMarket,
+                _ => (OrderType?)null
+            };
+
+            if (!orderType.HasValue)
+                return null;
+
+            // 条件单均以 reduceOnly=true 提交，确保只平仓不开新仓
+            decimal? stopPrice = null;
+            int? trailingDelta = null;
+
+            if (strategy.Type == StrategyType.TrailingStop)
+            {
+                // 从 CustomParams 解析回调比例（百分比转基点：1% = 100）
+                if (!string.IsNullOrEmpty(strategy.CustomParams))
+                {
+                    using var doc = JsonDocument.Parse(strategy.CustomParams);
+                    if (doc.RootElement.TryGetProperty("trailingPercent", out var tpEl))
+                    {
+                        var percent = tpEl.GetDecimal();
+                        trailingDelta = (int)(percent * 100);
+                    }
+                }
+                if (!trailingDelta.HasValue || trailingDelta.Value <= 0)
+                {
+                    _logger.LogWarning("追踪止损策略 {StrategyId} 缺少 trailingPercent 参数，无法提交原生条件单", strategy.Id);
+                    return null;
+                }
+            }
+            else
+            {
+                stopPrice = strategy.TriggerPrice;
+            }
+
+            var result = await _exchangeClient.PlaceOrderAsync(
+                strategy.Symbol,
+                strategy.Side,
+                orderType.Value,
+                strategy.Quantity,
+                stopPrice: stopPrice,
+                reduceOnly: true,
+                trailingDelta: trailingDelta,
+                ct: ct);
+
+            _logger.LogInformation(
+                "策略 {StrategyId} 已提交为原生条件单：{Type} {Side} {Symbol} 订单ID={OrderId}",
+                strategy.Id, orderType.Value, strategy.Side, strategy.Symbol, result.OrderId);
+
+            return result.OrderId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "策略 {StrategyId} 提交原生条件单失败，将回退到客户端评估", strategy.Id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 取消交易所上的原生条件单（策略完成或删除时调用）。
+    /// </summary>
+    public async Task<bool> TryCancelNativeConditionalOrderAsync(
+        string symbol, string orderId, CancellationToken ct = default)
+    {
+        if (!_exchangeClient.IsFutures || string.IsNullOrEmpty(orderId))
+            return false;
+
+        try
+        {
+            await _exchangeClient.CancelOrderAsync(symbol, orderId, ct);
+            _logger.LogInformation("已取消原生条件单：{Symbol} 订单ID={OrderId}", symbol, orderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "取消原生条件单失败：{Symbol} 订单ID={OrderId}", symbol, orderId);
+            return false;
         }
     }
 }

@@ -3,27 +3,38 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
-             xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:models="using:MarketAssistant.Trading.Models"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradeHistoryView"
              x:DataType="vm:TradeHistoryViewModel">
 
     <Grid RowDefinitions="Auto,*">
-        <!-- 筛选区域 -->
-        <controls:CardView Grid.Row="0" Header="筛选" Margin="{StaticResource SmallBottomMargin}">
-            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                <TextBox Text="{Binding FilterSymbol}"
+        <!-- 筛选工具栏 -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource SmallCornerRadius}"
+                Padding="{StaticResource SmallPadding}"
+                Margin="{StaticResource SmallBottomMargin}">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding FilterSymbol}"
                          PlaceholderText="按交易对筛选（如 BTCUSDT）"
-                         Width="250"/>
-                <Button Content="筛选" Command="{Binding FilterCommand}"
-                        Background="{DynamicResource PrimaryBrush}"
-                        Foreground="White"/>
-                <Button Content="清除" Command="{Binding ClearFilterCommand}"/>
-
-                <TextBlock VerticalAlignment="Center"
-                           Margin="{StaticResource SmallLeftMargin}"
-                           Foreground="{DynamicResource TextSecondaryBrush}">
+                         Width="220"/>
+                <Button Grid.Column="1"
+                        Content="筛选"
+                        Command="{Binding FilterCommand}"
+                        Classes="btn-primary"
+                        Margin="{StaticResource SmallLeftMargin}"/>
+                <Button Grid.Column="2"
+                        Content="清除"
+                        Command="{Binding ClearFilterCommand}"
+                        Margin="{StaticResource TinyLeftMargin}"/>
+                <TextBlock Grid.Column="4"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="{StaticResource SmallFontSize}">
                     <TextBlock.Text>
                         <MultiBinding StringFormat="今日: {0}笔 | 盈亏: {1:F2} USDT">
                             <Binding Path="TodayStats.TradeCount"/>
@@ -31,8 +42,8 @@
                         </MultiBinding>
                     </TextBlock.Text>
                 </TextBlock>
-            </StackPanel>
-        </controls:CardView>
+            </Grid>
+        </Border>
 
         <!-- 记录列表 -->
         <ScrollViewer Grid.Row="1">

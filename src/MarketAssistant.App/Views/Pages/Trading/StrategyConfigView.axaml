@@ -1,13 +1,18 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converters="using:MarketAssistant.Converters"
              xmlns:models="using:MarketAssistant.Trading.Models"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.StrategyConfigView"
              x:DataType="vm:StrategyConfigViewModel">
+
+    <UserControl.Resources>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+    </UserControl.Resources>
 
     <ScrollViewer>
         <StackPanel Spacing="{StaticResource DefaultSpacing}">
@@ -16,11 +21,34 @@
             <controls:CardView>
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
-                        <TextBlock Text="策略列表"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                    Spacing="{StaticResource SmallSpacing}"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="策略列表"
+                                       FontSize="{StaticResource SectionTitleFontSize}"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <!-- 监控运行状态指示 -->
+                            <Border Background="{DynamicResource SuccessBrush}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource TagPadding}"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding IsMonitorRunning}">
+                                <TextBlock Text="● 监控运行中"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="White"/>
+                            </Border>
+                            <Border Background="{DynamicResource WarningBrush}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource TagPadding}"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding !IsMonitorRunning}">
+                                <TextBlock Text="○ 监控未启动"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="White"/>
+                            </Border>
+                        </StackPanel>
                         <Button Grid.Column="1"
                                 Command="{Binding ToggleCreateFormCommand}"
                                 Background="{DynamicResource PrimaryBrush}"
@@ -193,13 +221,13 @@
                                                 <Border Background="{DynamicResource PrimaryLightBrush}"
                                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                                         Padding="{StaticResource TagPadding}">
-                                                    <TextBlock Text="{Binding Type}"
+                                                    <TextBlock Text="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}"
                                                                FontSize="{StaticResource SmallFontSize}"/>
                                                 </Border>
                                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                                         Padding="{StaticResource TagPadding}">
-                                                    <TextBlock Text="{Binding Status}"
+                                                    <TextBlock Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
                                                                FontSize="{StaticResource SmallFontSize}"/>
                                                 </Border>
                                             </StackPanel>
@@ -208,7 +236,7 @@
                                                            Foreground="{DynamicResource TextSecondaryBrush}">
                                                     <TextBlock.Text>
                                                         <MultiBinding StringFormat="方向: {0} | 触发价: {1:F4} | {2}">
-                                                            <Binding Path="Side"/>
+                                                            <Binding Path="Side" Converter="{StaticResource EnumDescriptionConverter}"/>
                                                             <Binding Path="TriggerPrice"/>
                                                             <Binding Path="QuantityLabel"/>
                                                         </MultiBinding>
@@ -227,8 +255,31 @@
                                         <StackPanel Grid.Column="1" Orientation="Horizontal"
                                                     Spacing="{StaticResource TinySpacing}"
                                                     VerticalAlignment="Center">
-                                            <Button Content="暂停/启动"
+                                            <!-- Active 状态：显示「暂停」操作 -->
+                                            <Button Content="暂停"
+                                                    Classes="btn-secondary"
+                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Active}}"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ToggleStrategyCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                            <!-- Paused 状态：显示「启动」操作 -->
+                                            <Button Content="启动"
+                                                    Classes="btn-primary"
+                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Paused}}"
+                                                    Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ToggleStrategyCommand}"
+                                                    CommandParameter="{Binding}"/>
+                                            <!-- Completed 状态：禁用，提示不可操作 -->
+                                            <Button Content="已完成"
+                                                    Classes="btn-secondary"
+                                                    IsEnabled="False"
+                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Completed}}"/>
+                                            <!-- Failed 状态：禁用，标红提示 -->
+                                            <Button Content="失败"
+                                                    Classes="btn-danger"
+                                                    IsEnabled="False"
+                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Failed}}"/>
+                                            <Button Content="历史"
+                                                    Classes="btn-secondary"
+                                                    Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ViewHistoryCommand}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="删除"
                                                     Foreground="{DynamicResource ErrorBrush}"

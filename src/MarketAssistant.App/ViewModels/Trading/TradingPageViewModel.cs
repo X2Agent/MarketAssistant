@@ -15,6 +15,7 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
     public StrategyConfigViewModel StrategyConfig { get; }
     public TradeMonitorViewModel TradeMonitor { get; }
     public TradeHistoryViewModel TradeHistory { get; }
+    public ApiKeyConfigViewModel ApiKeyConfig { get; }
 
     [ObservableProperty]
     private int _selectedTabIndex;
@@ -25,7 +26,7 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _tradingModeDescription = string.Empty;
 
-    public bool IsStrategyTabSelected => SelectedTabIndex == 0;
+    public bool IsConfigTabSelected => SelectedTabIndex == 0;
     public bool IsMonitorTabSelected => SelectedTabIndex == 1;
     public bool IsHistoryTabSelected => SelectedTabIndex == 2;
     public bool IsTestnetTradingMode => _tradingEnvironmentService.IsTestnetMode;
@@ -34,6 +35,7 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
         StrategyConfigViewModel strategyConfig,
         TradeMonitorViewModel tradeMonitor,
         TradeHistoryViewModel tradeHistory,
+        ApiKeyConfigViewModel apiKeyConfig,
         TradingEnvironmentService tradingEnvironmentService,
         ILogger<TradingPageViewModel> logger)
         : base(logger)
@@ -42,6 +44,7 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
         StrategyConfig = strategyConfig;
         TradeMonitor = tradeMonitor;
         TradeHistory = tradeHistory;
+        ApiKeyConfig = apiKeyConfig;
         _tradingEnvironmentService.ModeChanged += OnTradingModeChanged;
         UpdateTradingModeState(_tradingEnvironmentService.CurrentMode);
     }
@@ -55,7 +58,7 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedTabIndexChanged(int value)
     {
-        OnPropertyChanged(nameof(IsStrategyTabSelected));
+        OnPropertyChanged(nameof(IsConfigTabSelected));
         OnPropertyChanged(nameof(IsMonitorTabSelected));
         OnPropertyChanged(nameof(IsHistoryTabSelected));
 

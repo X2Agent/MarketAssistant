@@ -111,6 +111,9 @@ public abstract class BinanceAccountServiceBase
     /// <summary>
     /// 下单。先校验账户可交易，再按现货/合约端点签名调用。子类通过 <see cref="AppendPlaceOrderParameters"/> 注入特定参数。
     /// </summary>
+    /// <param name="reduceOnly">合约平仓时传 true，确保只平仓不开新仓（仅合约有效，现货忽略）</param>
+    /// <param name="stopPrice">条件单触发价（STOP_MARKET/TAKE_PROFIT_MARKET 必填）</param>
+    /// <param name="trailingDelta">追踪止损回调比例（基点，1%=100，TRAILING_STOP_MARKET 必填）</param>
     public async Task<BinanceOrderResponse> PlaceOrderAsync(
         string symbol,
         string side,
@@ -119,6 +122,9 @@ public abstract class BinanceAccountServiceBase
         decimal? price = null,
         string? clientOrderId = null,
         string? positionSide = null,
+        bool reduceOnly = false,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -142,6 +148,10 @@ public abstract class BinanceAccountServiceBase
 
             AppendPlaceOrderParameters(parameters, positionSide);
 
+            // 合约平仓时传入 reduceOnly=true，确保订单只减少持仓而不会开新仓
+            if (reduceOnly)
+                parameters["reduceOnly"] = "true";
+
             if (type.ToUpper() == "LIMIT")
             {
                 if (!price.HasValue)
@@ -150,6 +160,18 @@ public abstract class BinanceAccountServiceBase
                 }
                 parameters["price"] = price.Value.ToString("F8", CultureInfo.InvariantCulture);
                 parameters["timeInForce"] = "GTC";
+            }
+
+            // 条件单参数
+            var typeUpper = type.ToUpper();
+            if (stopPrice.HasValue && (typeUpper == "STOP_MARKET" || typeUpper == "TAKE_PROFIT_MARKET"))
+            {
+                parameters["stopPrice"] = stopPrice.Value.ToString("F8", CultureInfo.InvariantCulture);
+            }
+
+            if (trailingDelta.HasValue && typeUpper == "TRAILING_STOP_MARKET")
+            {
+                parameters["trailingDelta"] = trailingDelta.Value.ToString(CultureInfo.InvariantCulture);
             }
 
             var queryString = string.Join("&",
@@ -398,6 +420,12 @@ public class BinanceOrderResponse
     public string ClientOrderId { get; set; } = string.Empty;
     public long TransactTime { get; set; }
     public string Price { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 成交均价（合约 avgPrice 字段）。市价单 Price 为 0 时可用此值作为实际成交价。
+    /// </summary>
+    public string AvgPrice { get; set; } = string.Empty;
+
     public string OrigQty { get; set; } = string.Empty;
     public string ExecutedQty { get; set; } = string.Empty;
     public string CummulativeQuoteQty { get; set; } = string.Empty;
