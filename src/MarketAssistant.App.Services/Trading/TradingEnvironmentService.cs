@@ -26,8 +26,7 @@ public sealed class TradingEnvironmentService
 
     public CryptoTradingMode CurrentMode => _currentMode;
 
-    public bool IsTestnetMode => _currentMode is CryptoTradingMode.BinanceTestnet
-        or CryptoTradingMode.BinanceFuturesTestnet
+    public bool IsTestnetMode => _currentMode is CryptoTradingMode.BinanceFuturesTestnet
         or CryptoTradingMode.BinanceSpotDemo;
 
     public string CurrentModeDisplayName => GetModeDisplayName(_currentMode);
@@ -54,7 +53,6 @@ public sealed class TradingEnvironmentService
     public static string GetModeDisplayName(CryptoTradingMode mode) => mode switch
     {
         CryptoTradingMode.LiveSpot => "Binance 实盘现货",
-        CryptoTradingMode.BinanceTestnet => "Binance Spot Testnet",
         CryptoTradingMode.LiveFutures => "Binance 实盘合约",
         CryptoTradingMode.BinanceFuturesTestnet => "Binance Futures Testnet",
         CryptoTradingMode.BinanceSpotDemo => "Binance 现货 Demo",
@@ -64,7 +62,6 @@ public sealed class TradingEnvironmentService
     public static string GetModeDescription(CryptoTradingMode mode) => mode switch
     {
         CryptoTradingMode.LiveSpot => "订单会直接发送到 Binance 现货账户，请确认 API Key 权限与账户余额。",
-        CryptoTradingMode.BinanceTestnet => "订单会发送到 Binance Spot Testnet。资产为虚拟资产，远端会周期性重置。",
         CryptoTradingMode.LiveFutures => "订单会直接发送到 Binance U本位合约账户，支持双向持仓与杠杆。请确认 API Key 已开启合约权限。",
         CryptoTradingMode.BinanceFuturesTestnet => "订单会发送到 Binance Futures Testnet (demo-fapi.binance.com)。资产为虚拟资产，用于合约策略验证。",
         CryptoTradingMode.BinanceSpotDemo => "订单会发送到 Binance 现货 Demo 环境 (demo-api.binance.com)。使用实盘账户的虚拟余额，适合策略验证。",

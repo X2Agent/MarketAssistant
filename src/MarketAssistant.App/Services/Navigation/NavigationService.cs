@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.ViewModels;
+using MarketAssistant.ViewModels.Trading;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Navigation;
@@ -50,6 +51,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         RegisterRoute<MCPConfigPageViewModel>("MCPConfig");
         RegisterRoute<AssetPageViewModel>("Asset");
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
+        RegisterRoute<BalanceDetailPageViewModel>("BalanceDetail");
 
         // 注册导航消息监听
         WeakReferenceMessenger.Default.Register(this);

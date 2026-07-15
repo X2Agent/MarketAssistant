@@ -4,54 +4,54 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- MAF / Agents -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.10.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.10.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.10.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.13.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.13.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.13.0" />
     <!-- MAF Evaluation -->
-    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.7.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.8.0" />
     <!-- Microsoft.Extensions.* -->
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <!-- Data / docs / parsing -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="Markdig" Version="1.3.2" />
-    <PackageVersion Include="PdfPig" Version="0.1.14" />
+    <PackageVersion Include="PdfPig" Version="0.1.15" />
     <PackageVersion Include="SmartReader" Version="0.11.0" />
-    <PackageVersion Include="YamlDotNet" Version="18.0.0" />
-    <PackageVersion Include="System.ServiceModel.Syndication" Version="10.0.9" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+    <PackageVersion Include="System.ServiceModel.Syndication" Version="10.0.10" />
     <!-- ML / indicators -->
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
-    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
-    <PackageVersion Include="Skender.Stock.Indicators" Version="2.7.2" />
+    <PackageVersion Include="Microsoft.ML.OnnxRuntime" Version="1.27.1" />
+    <PackageVersion Include="Skender.Stock.Indicators" Version="2.7.3" />
     <!-- SK / MCP -->
     <PackageVersion Include="Microsoft.SemanticKernel.Connectors.SqliteVec" Version="1.74.0-preview" />
     <PackageVersion Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.77.0-alpha" />
-    <PackageVersion Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.4.1" />
     <!-- Logging -->
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <!-- UI -->
-    <PackageVersion Include="Avalonia" Version="12.0.4" />
-    <PackageVersion Include="Avalonia.Desktop" Version="12.0.4" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.0.4" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.0.4" />
+    <PackageVersion Include="Avalonia" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
     <PackageVersion Include="Avalonia.Controls.WebView" Version="12.0.1" />
     <PackageVersion Include="Markdown.Avalonia" Version="12.0.0-a3" />
     <PackageVersion Include="AdaptiveCards" Version="3.1.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.13" />
     <PackageVersion Include="Svg.Skia" Version="5.1.1" />
-    <PackageVersion Include="SkiaSharp" Version="3.119.4" />
+    <PackageVersion Include="SkiaSharp" Version="4.150.1" />
     <!-- Tests -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Moq" Version="4.20.72" />
-    <PackageVersion Include="MSTest" Version="4.2.3" />
+    <PackageVersion Include="MSTest" Version="4.3.2" />
   </ItemGroup>
 </Project>

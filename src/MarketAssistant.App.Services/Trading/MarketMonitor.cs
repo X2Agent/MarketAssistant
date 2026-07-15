@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ namespace MarketAssistant.Services.Trading;
 public class MarketMonitor : IDisposable
 {
     private readonly BinanceWebSocketService _webSocketService;
+    private readonly BinanceUserDataStreamService _userDataStreamService;
     private readonly StrategyEngine _strategyEngine;
     private readonly TradeExecutor _tradeExecutor;
     private readonly AISignalStrategyExecutor _aiSignalExecutor;
@@ -75,6 +77,7 @@ public class MarketMonitor : IDisposable
         AISignalStrategyExecutor aiSignalExecutor,
         OrderStateSyncService orderStateSyncService,
         TradingStrategyService strategyService,
+        BinanceUserDataStreamService userDataStreamService,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -83,6 +86,7 @@ public class MarketMonitor : IDisposable
         _aiSignalExecutor = aiSignalExecutor;
         _orderStateSyncService = orderStateSyncService;
         _strategyService = strategyService;
+        _userDataStreamService = userDataStreamService;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
         _strategyService.StrategiesChanged += OnStrategiesChanged;
@@ -114,6 +118,9 @@ public class MarketMonitor : IDisposable
             _webSocketService.PriceUpdated += _priceUpdatedAdapter;
             _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
+            _userDataStreamService.OrderUpdate += OnOrderUpdate;
+            await _userDataStreamService.StartAsync();
+
             _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
             StatusChanged?.Invoke(true);
         }
@@ -135,6 +142,8 @@ public class MarketMonitor : IDisposable
                 return;
 
             _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
+            _userDataStreamService.OrderUpdate -= OnOrderUpdate;
+            await _userDataStreamService.StopAsync();
             _cts?.Cancel();
 
             if (_consumerTask != null)
@@ -198,6 +207,33 @@ public class MarketMonitor : IDisposable
     private void OnPriceUpdated(string symbol, decimal lastPrice)
     {
         _priceChannel.Writer.TryWrite((symbol, lastPrice));
+    }
+
+    /// <summary>
+    /// 用户数据流订单回报：仅终态/部分成交触发同步，复用 OrderStateSyncService 现有对账逻辑。
+    /// fire-and-forget 避免阻塞 WS 接收循环。
+    /// </summary>
+    private void OnOrderUpdate(ExecutionReport report)
+    {
+        // 仅终态/部分成交需触发同步；NEW/TRADE 中间态由现有轮询覆盖
+        if (report.OrderStatus is not ("FILLED" or "PARTIALLY_FILLED" or "CANCELED"))
+            return;
+
+        _ = OnOrderUpdateAsync(report);
+    }
+
+    private async Task OnOrderUpdateAsync(ExecutionReport report)
+    {
+        try
+        {
+            await _orderStateSyncService.SyncPendingOrdersAsync(
+                report.Symbol, force: true, ct: MonitorToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "用户数据流触发订单同步失败: {Symbol} {ClientOrderId}",
+                report.Symbol, report.ClientOrderId);
+        }
     }
 
     /// <summary>
@@ -337,6 +373,7 @@ public class MarketMonitor : IDisposable
         TradeExecuted = null;
         StatusChanged = null;
         _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
+        _userDataStreamService.OrderUpdate -= OnOrderUpdate;
         _strategyService.StrategiesChanged -= OnStrategiesChanged;
 
         GC.SuppressFinalize(this);

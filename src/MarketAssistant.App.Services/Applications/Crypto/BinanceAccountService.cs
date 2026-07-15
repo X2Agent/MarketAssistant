@@ -22,8 +22,8 @@ public abstract class BinanceAccountServiceBase
     /// <param name="httpClientFactory">HttpClient 工厂</param>
     /// <param name="logger">日志器</param>
     /// <param name="authService">鉴权服务（决定实盘/Testnet 密钥来源）</param>
-    /// <param name="httpClientName">HttpClient 名称（"Binance" / "BinanceSpotTestnet" / "BinanceFutures" / "BinanceFuturesTestnet"）</param>
-    /// <param name="label">错误提示前缀（"" / "Testnet "）</param>
+    /// <param name="httpClientName">HttpClient 名称（"Binance" / "BinanceSpotDemo" / "BinanceFutures" / "BinanceFuturesTestnet"）</param>
+    /// <param name="label">错误提示前缀（"" / "Demo " / "Testnet "）</param>
     protected BinanceAccountServiceBase(
         IHttpClientFactory httpClientFactory,
         ILogger logger,

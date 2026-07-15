@@ -29,6 +29,7 @@ public class ViewLocator : IDataTemplate
             AssetPageViewModel => new AssetPageView { DataContext = data },
             AgentAnalysisViewModel => new AgentAnalysisPageView { DataContext = data },
             TradingPageViewModel => new TradingPageView { DataContext = data },
+            BalanceDetailPageViewModel => new BalanceDetailPageView { DataContext = data },
             _ => new TextBlock { Text = $"未找到视图: {data.GetType().Name}" }
         };
     }

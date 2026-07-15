@@ -72,7 +72,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             case nameof(UserSetting.CryptoTradingMode):
                 OnPropertyChanged(nameof(IsLiveSpotTradingMode));
                 OnPropertyChanged(nameof(IsLiveTradingMode));
-                OnPropertyChanged(nameof(IsTestnetTradingMode));
                 OnPropertyChanged(nameof(IsLiveFuturesTradingMode));
                 OnPropertyChanged(nameof(IsFuturesTestnetTradingMode));
                 OnPropertyChanged(nameof(IsFuturesTradingMode));
@@ -233,11 +232,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 是否为实盘模式（现货或合约，共用同一套 API Key）
     /// </summary>
     public bool IsLiveTradingMode => IsLiveSpotTradingMode || IsLiveFuturesTradingMode;
-
-    /// <summary>
-    /// 是否为 Binance Spot Testnet 模式
-    /// </summary>
-    public bool IsTestnetTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.BinanceTestnet;
 
     /// <summary>
     /// 是否为 Binance 实盘合约模式

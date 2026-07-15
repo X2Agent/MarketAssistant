@@ -61,6 +61,9 @@
                         <StackPanel Grid.Column="4" Orientation="Horizontal"
                                     Spacing="{StaticResource SmallSpacing}"
                                     VerticalAlignment="Center">
+                            <Button Content="余额详情" Command="{Binding ShowBalanceDetailCommand}"
+                                    Classes="btn-secondary"
+                                    MinWidth="{StaticResource SmallButtonMinWidth}"/>
                             <Button Command="{Binding ToggleMonitorCommand}"
                                     Classes="btn-primary"
                                     MinWidth="{StaticResource SmallButtonMinWidth}">
@@ -79,7 +82,7 @@
                 <!-- ===== 双栏主体 ===== -->
                 <Grid ColumnDefinitions="*,12,*">
 
-                    <!-- ===== 左栏 ===== -->
+                    <!-- ===== 左栏：风控与持仓 ===== -->
                     <StackPanel Grid.Column="0" Spacing="{StaticResource DefaultSpacing}">
 
                         <!-- 风控指标 -->
@@ -196,7 +199,7 @@
                         </controls:CardView>
                     </StackPanel>
 
-                    <!-- ===== 右栏 ===== -->
+                    <!-- ===== 右栏：策略、订单与余额 ===== -->
                     <StackPanel Grid.Column="2" Spacing="{StaticResource DefaultSpacing}">
 
                         <!-- 活跃策略 -->
@@ -332,55 +335,6 @@
                         </controls:CardView>
                     </StackPanel>
                 </Grid>
-
-                <!-- ===== 底部：账户余额 ===== -->
-                <controls:CardView>
-                    <controls:CardView.Header>
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="账户余额" Classes="h6"/>
-                            <TextBlock Classes="caption" VerticalAlignment="Center"
-                                       Text="{Binding TotalValueUSDT, StringFormat=合计 {0:F2} USDT}"/>
-                        </StackPanel>
-                    </controls:CardView.Header>
-                    <StackPanel Spacing="{StaticResource TinySpacing}">
-                        <TextBlock Text="未配置 Binance API 或暂无余额数据"
-                                   IsVisible="{Binding !Balances.Count}"
-                                   Classes="caption"
-                                   HorizontalAlignment="Center"
-                                   Margin="{StaticResource DefaultMargin}"/>
-
-                        <ItemsControl ItemsSource="{Binding Balances}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="models:AssetBalance">
-                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                            Padding="{StaticResource SmallCardPadding}"
-                                            Margin="{StaticResource TinyBottomMargin}">
-                                        <Grid ColumnDefinitions="64,*,Auto">
-                                            <TextBlock Grid.Column="0" Text="{Binding Asset}"
-                                                       FontWeight="Bold"
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       VerticalAlignment="Center"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                                        Spacing="8" VerticalAlignment="Center">
-                                                <TextBlock Classes="data-sm"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           Text="{Binding Free, StringFormat=可用 {0:F8}}"/>
-                                                <TextBlock Classes="caption-sm"
-                                                           Text="{Binding Locked, StringFormat=锁定 {0:F8}}"/>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Classes="data-sm"
-                                                       VerticalAlignment="Center"
-                                                       Margin="{StaticResource SmallLeftMargin}"
-                                                       FontWeight="Bold"
-                                                       Text="{Binding ValueUSDT, StringFormat={}{0:F2} USDT}"/>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </controls:CardView>
             </StackPanel>
         </ScrollViewer>
 

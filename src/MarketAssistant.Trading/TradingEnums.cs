@@ -59,19 +59,16 @@ public enum OrderType
 public enum CryptoTradingMode
 {
     [Description("Binance 实盘现货")]
-    LiveSpot,
-
-    [Description("Binance Spot Testnet")]
-    BinanceTestnet,
+    LiveSpot = 0,
 
     [Description("Binance 实盘合约")]
-    LiveFutures,
+    LiveFutures = 2,
 
     [Description("Binance Futures Testnet")]
-    BinanceFuturesTestnet,
+    BinanceFuturesTestnet = 3,
 
     [Description("Binance 现货 Demo")]
-    BinanceSpotDemo
+    BinanceSpotDemo = 4
 }
 
 public enum TradeRecordStatus

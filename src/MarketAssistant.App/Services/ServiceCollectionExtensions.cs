@@ -77,6 +77,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<TradingPageViewModel>();
         services.AddTransient<StrategyConfigViewModel>();
         services.AddTransient<TradeMonitorViewModel>();
+        services.AddTransient<BalanceDetailPageViewModel>();
         services.AddTransient<TradeHistoryViewModel>();
         services.AddTransient<ApiKeyConfigViewModel>();
 

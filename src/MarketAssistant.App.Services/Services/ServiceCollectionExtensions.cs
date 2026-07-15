@@ -99,15 +99,6 @@ public static class BusinessServiceCollectionExtensions
             ConfigureBinanceRateLimiter(options);
         });
 
-        services.AddHttpClient("BinanceSpotTestnet", client =>
-        {
-            client.BaseAddress = new Uri("https://testnet.binance.vision");
-            client.Timeout = TimeSpan.FromSeconds(30);
-        }).AddStandardResilienceHandler(options =>
-        {
-            ConfigureBinanceRateLimiter(options);
-        });
-
         services.AddHttpClient("BinanceFutures", client =>
         {
             client.BaseAddress = new Uri("https://fapi.binance.com");
@@ -343,6 +334,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
+        services.AddSingleton<BinanceUserDataStreamService>();
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -377,7 +369,7 @@ public static class BusinessServiceCollectionExtensions
     /// <summary>
     /// 创建 RoutingExchangeClient，通过 ITradingCredentialStore 加密读取密钥，
     /// 为每种交易模式构建独立的鉴权/账户/客户端实例，注册到字典中路由。
-    /// 支持现货实盘、现货 Testnet、现货 Demo、合约实盘、合约 Testnet 共 5 种模式。
+    /// 支持现货实盘、现货 Demo、合约实盘、合约 Testnet 共 4 种模式。
     /// 实盘合约复用现货实盘 API Key（同一账户，需在 binance.com 开启合约权限）。
     /// </summary>
     private static RoutingExchangeClient CreateRoutingExchangeClient(IServiceProvider sp)
@@ -394,9 +386,6 @@ public static class BusinessServiceCollectionExtensions
         var spotLiveAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.LiveSpot,
             "Binance", httpClientFactory, "Binance", "/api/v3/time",
             loggerFactory.CreateLogger<BinanceAuthService>());
-        var spotTestnetAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.BinanceTestnet,
-            "Binance Spot Testnet", httpClientFactory, "BinanceSpotTestnet", "/api/v3/time",
-            loggerFactory.CreateLogger<BinanceAuthService>());
         var spotDemoAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.BinanceSpotDemo,
             "Binance Spot Demo", httpClientFactory, "BinanceSpotDemo", "/api/v3/time",
             loggerFactory.CreateLogger<BinanceAuthService>());
@@ -409,7 +398,6 @@ public static class BusinessServiceCollectionExtensions
 
         // 账户服务（HttpClient 名与标签不同）
         var spotLiveAccount = new BinanceSpotAccountService(httpClientFactory, spotLogger, spotLiveAuth, "Binance", "");
-        var spotTestnetAccount = new BinanceSpotAccountService(httpClientFactory, spotLogger, spotTestnetAuth, "BinanceSpotTestnet", "Testnet ");
         var spotDemoAccount = new BinanceSpotAccountService(httpClientFactory, spotLogger, spotDemoAuth, "BinanceSpotDemo", "Demo ");
         var futuresLiveAccount = new BinanceFuturesAccountService(httpClientFactory, futuresLogger, futuresLiveAuth, "BinanceFutures", "");
         var futuresTestnetAccount = new BinanceFuturesAccountService(httpClientFactory, futuresLogger, futuresTestnetAuth, "BinanceFuturesTestnet", "Testnet ");
@@ -418,7 +406,6 @@ public static class BusinessServiceCollectionExtensions
         var clients = new Dictionary<CryptoTradingMode, IExchangeClient>
         {
             [CryptoTradingMode.LiveSpot] = new BinanceExchangeClient(spotLiveAccount, "Binance"),
-            [CryptoTradingMode.BinanceTestnet] = new BinanceExchangeClient(spotTestnetAccount, "Binance Spot Testnet"),
             [CryptoTradingMode.BinanceSpotDemo] = new BinanceExchangeClient(spotDemoAccount, "Binance Spot Demo"),
             [CryptoTradingMode.LiveFutures] = new BinanceFuturesExchangeClient(futuresLiveAccount, "Binance Futures"),
             [CryptoTradingMode.BinanceFuturesTestnet] = new BinanceFuturesExchangeClient(futuresTestnetAccount, "Binance Futures Testnet"),

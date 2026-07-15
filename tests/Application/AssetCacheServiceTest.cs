@@ -36,12 +36,12 @@ public class AssetCacheServiceTest
     {
         // 清理缓存
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetCacheService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.Crypto);
 
         aShareService.Clear();
         cryptoService.Clear();
 
-        await _serviceProvider.DisposeAsync();
+        await _serviceProvider!.DisposeAsync();
     }
 
     [TestMethod]
@@ -127,7 +127,7 @@ public class AssetCacheServiceTest
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetCacheService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.Crypto);
 
         var aShareAsset = new AssetInfo { Code = "SH600519", Name = "贵州茅台", CurrentPrice = "1800" };
         var cryptoAsset = new AssetInfo { Code = "BTCUSDT", Name = "Bitcoin", CurrentPrice = "45000" };

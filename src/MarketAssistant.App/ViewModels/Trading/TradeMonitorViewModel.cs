@@ -5,8 +5,10 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
+using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace MarketAssistant.ViewModels.Trading;
 
@@ -168,6 +170,12 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
                 ActiveStrategies.Add(s);
             }
         }, "刷新交易监控");
+    }
+
+    [RelayCommand]
+    private void ShowBalanceDetail()
+    {
+        WeakReferenceMessenger.Default.Send(new NavigationMessage("BalanceDetail"));
     }
 
     [RelayCommand]

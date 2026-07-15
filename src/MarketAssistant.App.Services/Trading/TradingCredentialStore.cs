@@ -89,13 +89,6 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
                 migrated = true;
             }
 
-            // Spot Testnet
-            if (!string.IsNullOrEmpty(setting.BinanceTestnetApiKey) && !string.IsNullOrEmpty(setting.BinanceTestnetSecretKey))
-            {
-                _cache[CryptoTradingMode.BinanceTestnet] = new CredentialEntry(setting.BinanceTestnetApiKey, setting.BinanceTestnetSecretKey);
-                migrated = true;
-            }
-
             // Futures Testnet
             if (!string.IsNullOrEmpty(setting.BinanceFuturesTestnetApiKey) && !string.IsNullOrEmpty(setting.BinanceFuturesTestnetSecretKey))
             {

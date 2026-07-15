@@ -68,7 +68,7 @@ public sealed class BinanceAuthService : IBinanceAuthService
     /// </summary>
     private readonly IHttpClientFactory? _httpClientFactory;
 
-    /// <summary>时间同步使用的 HttpClient 名称（如 "Binance" / "BinanceSpotTestnet"）</summary>
+    /// <summary>时间同步使用的 HttpClient 名称（如 "Binance" / "BinanceSpotDemo" / "BinanceFutures"）</summary>
     private readonly string? _httpClientName;
 
     /// <summary>时间同步端点（现货 "/api/v3/time"，合约 "/fapi/v1/time"）</summary>

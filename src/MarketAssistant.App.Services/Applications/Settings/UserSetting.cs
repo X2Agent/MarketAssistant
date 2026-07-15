@@ -90,16 +90,6 @@ public class UserSetting : INotifyPropertyChanged
     public string BinanceSecretKey { get; set; } = "";
 
     /// <summary>
-    /// Binance Spot Testnet API Key
-    /// </summary>
-    public string BinanceTestnetApiKey { get; set; } = "";
-
-    /// <summary>
-    /// Binance Spot Testnet Secret Key
-    /// </summary>
-    public string BinanceTestnetSecretKey { get; set; } = "";
-
-    /// <summary>
     /// Binance Futures Testnet API Key（在 demo-fapi.binance.com 生成）
     /// </summary>
     public string BinanceFuturesTestnetApiKey { get; set; } = "";

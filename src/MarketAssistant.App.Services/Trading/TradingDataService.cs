@@ -15,7 +15,6 @@ namespace MarketAssistant.Services.Trading;
 public class TradingDataService : SqliteServiceBase
 {
     private const string LiveSpotEnvironment = "crypto-live-spot";
-    private const string SpotTestnetEnvironment = "crypto-binance-spot-testnet";
     private const string LiveFuturesEnvironment = "crypto-live-futures";
     private const string FuturesTestnetEnvironment = "crypto-binance-futures-testnet";
     private const string SpotDemoEnvironment = "crypto-binance-spot-demo";
@@ -31,12 +30,11 @@ public class TradingDataService : SqliteServiceBase
     }
 
     /// <summary>
-    /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Testnet、合约实盘、合约 Testnet
+    /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Demo、合约实盘、合约 Testnet
     /// 的策略、交易记录、持仓、风控配置互不混淆。
     /// </summary>
     private string CurrentEnvironmentKey => _tradingEnvironmentService.CurrentMode switch
     {
-        CryptoTradingMode.BinanceTestnet => SpotTestnetEnvironment,
         CryptoTradingMode.LiveFutures => LiveFuturesEnvironment,
         CryptoTradingMode.BinanceFuturesTestnet => FuturesTestnetEnvironment,
         CryptoTradingMode.BinanceSpotDemo => SpotDemoEnvironment,

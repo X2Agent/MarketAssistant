@@ -59,8 +59,8 @@ public class HomeAssetServiceTest
     [TestCleanup]
     public async Task Cleanup()
     {
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
 
         if (_serviceProvider != null)
         {
