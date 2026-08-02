@@ -44,6 +44,7 @@ using System.Net;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.VectorData;
 using Polly.RateLimiting;
 using Serilog;
 using System.Threading.RateLimiting;
@@ -277,6 +278,8 @@ public static class BusinessServiceCollectionExtensions
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
+        // 延迟工厂：仅在向量化等真实场景解析，避免浏览设置页时构造嵌入/向量存储链路
+        services.AddSingleton<Func<IEmbeddingFactory>>(sp => sp.GetRequiredService<IEmbeddingFactory>);
         services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
@@ -320,6 +323,7 @@ public static class BusinessServiceCollectionExtensions
             AppInfo.AppName,
             "vector.sqlite");
         services.AddSqliteVectorStore(_ => $"Data Source={store}");
+        services.AddSingleton<Func<VectorStore>>(sp => sp.GetRequiredService<VectorStore>);
 
         return services;
     }

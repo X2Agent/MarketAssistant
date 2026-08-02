@@ -29,14 +29,16 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 {
-    private readonly IRagIngestionService _ragIngestionService;
+    // RAG 与交易重依赖通过工厂延迟解析：仅在向量化/保存时实例化，
+    // 避免首次进入设置页触发整条交易与 RAG 单例链的同步构造
+    private readonly Func<IRagIngestionService> _ragIngestionServiceFactory;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
-    private readonly IEmbeddingFactory _embeddingFactory;
-    private readonly VectorStore _vectorStore;
+    private readonly Func<IEmbeddingFactory> _embeddingFactoryFactory;
+    private readonly Func<VectorStore> _vectorStoreFactory;
     private readonly Services.Market.MarketContext _marketContext;
     private readonly TradingEnvironmentService _tradingEnvironmentService;
-    private readonly MarketMonitor _marketMonitor;
+    private readonly Func<MarketMonitor> _marketMonitorFactory;
     private readonly IDialogService _dialogService;
     private IStorageProvider? _storageProvider;
 
@@ -291,25 +293,25 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 构造函数（使用依赖注入）
     /// </summary>
     public SettingsPageViewModel(
-        IRagIngestionService ragIngestionService,
+        Func<IRagIngestionService> ragIngestionServiceFactory,
         INotificationService notificationService,
         IUserSettingService userSettingService,
-        IEmbeddingFactory embeddingFactory,
-        VectorStore vectorStore,
+        Func<IEmbeddingFactory> embeddingFactoryFactory,
+        Func<VectorStore> vectorStoreFactory,
         Services.Market.MarketContext marketContext,
         TradingEnvironmentService tradingEnvironmentService,
-        MarketMonitor marketMonitor,
+        Func<MarketMonitor> marketMonitorFactory,
         IDialogService dialogService,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
-        _ragIngestionService = ragIngestionService;
+        _ragIngestionServiceFactory = ragIngestionServiceFactory;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
-        _embeddingFactory = embeddingFactory;
-        _vectorStore = vectorStore;
+        _embeddingFactoryFactory = embeddingFactoryFactory;
+        _vectorStoreFactory = vectorStoreFactory;
         _marketContext = marketContext;
         _tradingEnvironmentService = tradingEnvironmentService;
-        _marketMonitor = marketMonitor;
+        _marketMonitorFactory = marketMonitorFactory;
         _dialogService = dialogService;
         _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
     }
@@ -454,11 +456,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("开始向量化知识库目录: {Directory}", UserSetting.KnowledgeFileDirectory);
 
             // 创建嵌入生成器（只在实际需要时创建）
-            var embeddingGenerator = _embeddingFactory.Create();
+            var embeddingGenerator = _embeddingFactoryFactory().Create();
 
             // 使用 UserSetting 中定义的集合名称
             var collectionName = UserSetting.VectorCollectionName;
-            var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
+            var collection = _vectorStoreFactory().GetCollection<string, TextParagraph>(collectionName);
             await collection.EnsureCollectionExistsAsync();
             Logger?.LogInformation("使用向量集合: {CollectionName}", collectionName);
 
@@ -481,6 +483,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("找到 {Count} 个文档需要向量化", totalFiles);
             _notificationService.ShowInfo($"开始向量化 {totalFiles} 个文档...");
 
+            var ragIngestionService = _ragIngestionServiceFactory();
             var successCount = 0;
             var failedCount = 0;
             var failedFiles = new List<string>();
@@ -503,7 +506,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                         currentIndex, totalFiles, fileName, fileExtension);
 
                     // 执行向量化
-                    await _ragIngestionService.IngestFileAsync(collection, file, embeddingGenerator);
+                    await ragIngestionService.IngestFileAsync(collection, file, embeddingGenerator);
 
                     successCount++;
                     Logger?.LogInformation("✓ 成功向量化: {FileName}", fileName);
@@ -571,7 +574,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             // 切换到实盘模式时若监控正在运行，弹窗警告（运行中切换会立即对实盘账户下单）
             var targetMode = UserSetting.CryptoTradingMode;
             var isLiveTarget = targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
-            if (isLiveTarget && targetMode != _tradingEnvironmentService.CurrentMode && _marketMonitor.IsRunning)
+            if (isLiveTarget && targetMode != _tradingEnvironmentService.CurrentMode && _marketMonitorFactory().IsRunning)
             {
                 var confirmed = await _dialogService.ShowConfirmationAsync(
                     "切换到实盘模式",

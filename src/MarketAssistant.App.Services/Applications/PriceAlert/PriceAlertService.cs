@@ -203,7 +203,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             if (!ruleSymbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            TryTriggerRule(rule.Id, lastPrice);
+            TryTriggerRule(rule.Id, lastPrice, changePercent);
         }
     }
 
@@ -226,9 +226,9 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
 
                 foreach (var rule in rules)
                 {
-                    var latestPrice = await GetAShareLatestPriceAsync(rule.AssetCode, cancellationToken);
-                    if (latestPrice.HasValue)
-                        TryTriggerRule(rule.Id, latestPrice.Value);
+                    var quote = await GetAShareLatestQuoteAsync(rule.AssetCode, cancellationToken);
+                    if (quote is not null)
+                        TryTriggerRule(rule.Id, quote.Value.Price, quote.Value.ChangePercent);
                 }
             }
         }
@@ -241,7 +241,11 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
 
-    private async Task<decimal?> GetAShareLatestPriceAsync(string assetCode, CancellationToken cancellationToken)
+    /// <summary>
+    /// 获取A股实时行情（财联社 CLS 行情接口，与搜索/详情数据源一致）。
+    /// 注意 CLS 的 change 为小数比率（如 -0.0082 表示 -0.82%）。
+    /// </summary>
+    private async Task<(decimal Price, decimal? ChangePercent)?> GetAShareLatestQuoteAsync(string assetCode, CancellationToken cancellationToken)
     {
         try
         {
@@ -250,7 +254,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
                 return null;
 
             var url =
-                $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px&app=CailianpressWeb&os=web&sv=8.4.6";
+                $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px,change&app=CailianpressWeb&os=web&sv=8.4.6";
 
             using var httpClient = _httpClientFactory.CreateClient("Cls");
             using var response = await httpClient.GetAsync(url, cancellationToken);
@@ -262,17 +266,33 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             if (!jsonDocument.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
                 return null;
 
-            if (!data.TryGetProperty("last_px", out var priceElement))
-                return null;
+            decimal? price = null;
+            if (data.TryGetProperty("last_px", out var priceElement))
+            {
+                if (priceElement.ValueKind == JsonValueKind.Number && priceElement.TryGetDecimal(out var numberPrice))
+                    price = numberPrice;
+                else if (priceElement.ValueKind == JsonValueKind.String &&
+                         decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
+                    price = stringPrice;
+            }
 
-            if (priceElement.ValueKind == JsonValueKind.Number && priceElement.TryGetDecimal(out var price))
-                return price;
+            decimal? changePercent = null;
+            if (data.TryGetProperty("change", out var changeElement))
+            {
+                var changeText = changeElement.ToString();
+                if (changeText.EndsWith('%') &&
+                    decimal.TryParse(changeText.TrimEnd('%'), NumberStyles.Number, CultureInfo.InvariantCulture, out var percentValue))
+                {
+                    changePercent = percentValue;
+                }
+                else if (decimal.TryParse(changeText, NumberStyles.Number, CultureInfo.InvariantCulture, out var ratio))
+                {
+                    // CLS 返回小数比率，换算为百分比
+                    changePercent = ratio * 100;
+                }
+            }
 
-            if (priceElement.ValueKind == JsonValueKind.String &&
-                decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
-                return stringPrice;
-
-            return null;
+            return price.HasValue ? (price.Value, changePercent) : null;
         }
         catch (OperationCanceledException)
         {
@@ -285,7 +305,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
 
-    private void TryTriggerRule(string ruleId, decimal lastPrice)
+    private void TryTriggerRule(string ruleId, decimal lastPrice, decimal? changePercent = null)
     {
         PriceAlertRule? rule;
         lock (_syncRoot)
@@ -297,6 +317,8 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             {
                 AlertCondition.PriceAbove => lastPrice >= rule.TargetPrice,
                 AlertCondition.PriceBelow => lastPrice <= rule.TargetPrice,
+                AlertCondition.ChangePercentAbove => changePercent.HasValue && changePercent.Value >= rule.TargetPrice,
+                AlertCondition.ChangePercentBelow => changePercent.HasValue && changePercent.Value <= rule.TargetPrice,
                 _ => false
             };
 
@@ -311,9 +333,18 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
 
         if (IsNotificationEnabled())
         {
-            var direction = rule.Condition == AlertCondition.PriceAbove ? "突破上方" : "跌破下方";
+            var targetText = rule.IsPercentCondition ? $"{rule.TargetPrice:N2}%" : rule.TargetPrice.ToString("N2");
+            var valueText = rule.IsPercentCondition && changePercent.HasValue ? $"{changePercent.Value:N2}%" : lastPrice.ToString("N2");
+            var direction = rule.Condition switch
+            {
+                AlertCondition.PriceAbove => "涨破",
+                AlertCondition.PriceBelow => "跌破",
+                AlertCondition.ChangePercentAbove => "涨幅超过",
+                AlertCondition.ChangePercentBelow => "跌幅超过",
+                _ => "达到"
+            };
             _notificationService.ShowWarning(
-                $"🔔 {rule.AssetName}({rule.AssetCode}) 当前价 {lastPrice}，已{direction}预警价 {rule.TargetPrice}",
+                $"🔔 {rule.AssetName}({rule.AssetCode}) 当前{valueText}，已{direction}目标 {targetText}",
                 durationMs: 10000);
         }
 
