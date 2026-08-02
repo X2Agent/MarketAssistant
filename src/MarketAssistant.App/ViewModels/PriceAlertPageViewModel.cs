@@ -13,6 +13,16 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
+/// 价格告警列表的市场筛选
+/// </summary>
+public enum AlertMarketFilter
+{
+    All,
+    AShare,
+    Crypto
+}
+
+/// <summary>
 /// 价格告警页面 ViewModel，提供告警规则的增删改查和启停管理。
 /// </summary>
 public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
@@ -98,6 +108,29 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     public MarketType NewRuleMarketType => _marketContext.CurrentMarket;
 
     /// <summary>
+    /// 规则列表市场筛选
+    /// </summary>
+    [ObservableProperty]
+    private AlertMarketFilter _marketFilter = AlertMarketFilter.All;
+
+    /// <summary>筛选是否为"全部"</summary>
+    public bool IsFilterAll => MarketFilter == AlertMarketFilter.All;
+
+    /// <summary>筛选是否为"A股"</summary>
+    public bool IsFilterAShare => MarketFilter == AlertMarketFilter.AShare;
+
+    /// <summary>筛选是否为"虚拟币"</summary>
+    public bool IsFilterCrypto => MarketFilter == AlertMarketFilter.Crypto;
+
+    partial void OnMarketFilterChanged(AlertMarketFilter value)
+    {
+        OnPropertyChanged(nameof(IsFilterAll));
+        OnPropertyChanged(nameof(IsFilterAShare));
+        OnPropertyChanged(nameof(IsFilterCrypto));
+        _ = LoadRulesAsync();
+    }
+
+    /// <summary>
     /// 当前是否为虚拟币市场（控制 UI 显示）
     /// </summary>
     public bool IsCryptoMarket => _marketContext.CurrentMarket == MarketType.Crypto;
@@ -106,6 +139,13 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// 表单校验错误信息
     /// </summary>
     public string ValidationError { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 空列表提示文本（区分"无任何规则"与"当前筛选下无规则"）
+    /// </summary>
+    public string EmptyHintText => _alertService.Rules.Count == 0
+        ? "在上方添加价格告警规则，系统将自动监听并在价格触发时通知你"
+        : "当前市场筛选下暂无告警规则，可点击右上角切换查看其他市场";
 
     public PriceAlertPageViewModel(
         PriceAlertService alertService,
@@ -119,6 +159,9 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
         _alertService.RulesChanged += OnRulesChanged;
         SubscribeToMarketChanges(_marketContext);
+        MarketFilter = _marketContext.CurrentMarket == MarketType.Crypto
+            ? AlertMarketFilter.Crypto
+            : AlertMarketFilter.AShare;
         _ = LoadRulesAsync();
     }
 
@@ -126,6 +169,9 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(IsCryptoMarket));
         OnPropertyChanged(nameof(NewRuleMarketType));
+        MarketFilter = newMarket == MarketType.Crypto
+            ? AlertMarketFilter.Crypto
+            : AlertMarketFilter.AShare;
     }
 
     /// <summary>
@@ -195,7 +241,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 加载所有告警规则到 UI 列表
+    /// 加载所有告警规则到 UI 列表（按当前市场筛选）
     /// </summary>
     private async Task LoadRulesAsync()
     {
@@ -203,8 +249,28 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         {
             Rules.Clear();
             foreach (var rule in _alertService.Rules)
-                Rules.Add(rule);
+            {
+                if (MatchesFilter(rule))
+                    Rules.Add(rule);
+            }
+            OnPropertyChanged(nameof(EmptyHintText));
         }, "加载告警规则");
+    }
+
+    private bool MatchesFilter(PriceAlertRule rule) => MarketFilter switch
+    {
+        AlertMarketFilter.AShare => rule.MarketType == MarketType.AShare,
+        AlertMarketFilter.Crypto => rule.MarketType == MarketType.Crypto,
+        _ => true
+    };
+
+    /// <summary>
+    /// 切换市场筛选
+    /// </summary>
+    [RelayCommand]
+    private void SetMarketFilter(AlertMarketFilter filter)
+    {
+        MarketFilter = filter;
     }
 
     /// <summary>

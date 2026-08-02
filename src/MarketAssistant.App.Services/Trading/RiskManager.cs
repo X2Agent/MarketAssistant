@@ -178,8 +178,8 @@ public class RiskManager
             return RiskCheckResult.RequireConfirmation(
                 $"订单金额 {orderValueUSDT:F2} USDT 超过确认阈值 {config.ConfirmationThreshold} USDT，需人工确认");
 
-        // 风控通过后顺带刷新账户快照，供最大回撤熔断使用。
-        // 每笔交易必经风控，无需单独的定时器即可保证快照新鲜。
+        // 风控通过后顺带刷新账户快照；另有 OrderStateSyncService 以 2 分钟周期
+        // 在监控运行期间持续刷新，共同保证回撤熔断的峰值数据新鲜。
         if (totalUSDT > 0)
         {
             try

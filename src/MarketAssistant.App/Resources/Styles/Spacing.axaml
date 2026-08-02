@@ -177,6 +177,10 @@
     <!-- ========== 窗口尺寸约束 ========== -->
     <x:Double x:Key="MainWindowMinWidth">800</x:Double>
     <x:Double x:Key="MainWindowMinHeight">600</x:Double>
+
+    <!-- ========== 导航栏尺寸 ========== -->
+    <GridLength x:Key="NavRailWidth">72</GridLength>
+    <Thickness x:Key="MarketLabelMargin">0,4,0,8</Thickness>
     
     <!-- ========== 动画时长定义 ========== -->
     <x:Double x:Key="FastAnimationSeconds">0.15</x:Double>

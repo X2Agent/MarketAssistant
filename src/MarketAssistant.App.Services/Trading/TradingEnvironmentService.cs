@@ -6,18 +6,23 @@ namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 统一维护当前虚拟币交易环境，避免未保存的设置直接影响运行中的交易链路。
+/// 切换模式前会先停止正在运行的 <see cref="MarketMonitor"/>，防止在途订单、价格订阅
+/// 与账户数据在切换瞬间被路由到新环境造成状态错乱。
 /// </summary>
 public sealed class TradingEnvironmentService
 {
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<TradingEnvironmentService> _logger;
+    private readonly Func<MarketMonitor> _marketMonitorFactory;
     private CryptoTradingMode _currentMode;
 
     public TradingEnvironmentService(
         IUserSettingService userSettingService,
+        Func<MarketMonitor> marketMonitorFactory,
         ILogger<TradingEnvironmentService> logger)
     {
         _userSettingService = userSettingService;
+        _marketMonitorFactory = marketMonitorFactory;
         _logger = logger;
         _currentMode = userSettingService.CurrentSetting.CryptoTradingMode;
     }
@@ -33,11 +38,22 @@ public sealed class TradingEnvironmentService
 
     public string CurrentModeDescription => GetModeDescription(_currentMode);
 
-    public void ApplyMode(CryptoTradingMode mode)
+    /// <summary>
+    /// 切换交易模式。若监控正在运行，先等待其完全停止（最长 10 秒）再切换，
+    /// 避免切换瞬间在途策略任务或订单状态同步访问新环境的账户与数据。
+    /// </summary>
+    public async Task ApplyModeAsync(CryptoTradingMode mode)
     {
         if (_currentMode == mode)
         {
             return;
+        }
+
+        var monitor = _marketMonitorFactory();
+        if (monitor.IsRunning)
+        {
+            _logger.LogInformation("切换交易模式前停止市场监控: {OldMode} → {NewMode}", _currentMode, mode);
+            await monitor.StopAsync();
         }
 
         _currentMode = mode;

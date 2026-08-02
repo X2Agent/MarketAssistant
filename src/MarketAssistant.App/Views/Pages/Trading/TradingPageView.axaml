@@ -13,14 +13,14 @@
         <StackPanel Grid.Row="0" Spacing="{StaticResource SmallSpacing}">
                 <Border IsVisible="{Binding IsTestnetTradingMode}"
                     Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource WarningBrush}"
-                    BorderThickness="1"
+                    BorderBrush="{StaticResource WarningBrush}"
+                    BorderThickness="{StaticResource DefaultBorderThickness}"
                     CornerRadius="{StaticResource SmallCornerRadius}"
                     Padding="{StaticResource SmallPadding}">
                 <StackPanel Spacing="{StaticResource TinySpacing}">
                     <TextBlock Text="Binance Spot Testnet 已启用"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource WarningBrush}"/>
+                               Foreground="{StaticResource WarningBrush}"/>
                     <TextBlock Text="{Binding TradingModeDescription}"
                                FontSize="{StaticResource SmallFontSize}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
@@ -34,7 +34,7 @@
                     Padding="{StaticResource TinyPadding}"
                     Margin="{StaticResource SmallBottomMargin}">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="0">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal">
                         <Button Content="交易配置"
                                 Classes="period-button"
                                 Classes.selected="{Binding IsConfigTabSelected}"

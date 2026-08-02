@@ -176,7 +176,7 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
                 }
             }
 
-            _tradingEnvironmentService.ApplyMode(SelectedMode);
+            await _tradingEnvironmentService.ApplyModeAsync(SelectedMode);
             _notificationService.ShowSuccess($"已切换到 {TradingEnvironmentService.GetModeDisplayName(SelectedMode)}");
         }, "切换交易模式");
     }

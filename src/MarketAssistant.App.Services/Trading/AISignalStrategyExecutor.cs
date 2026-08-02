@@ -50,6 +50,7 @@ public sealed class AISignalStrategyExecutor
                 strategy,
                 currentPrice,
                 boundaryReasoning,
+                requireClose: true,
                 ct: ct).ConfigureAwait(false);
 
             return new AISignalExecutionResult(boundaryResult.Success ? boundaryResult.Record : null);

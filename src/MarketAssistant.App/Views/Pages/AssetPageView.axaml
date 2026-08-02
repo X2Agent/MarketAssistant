@@ -21,7 +21,7 @@
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
         
         <!-- 资产基本信息卡片 -->
-        <controls:CardView Grid.Row="0" Padding="{StaticResource CardPadding}">
+        <controls:CardView Grid.Row="0">
             <Grid ColumnDefinitions="*,Auto">
                 
                 <!-- 左侧：资产信息（Grid布局优化） -->
@@ -35,7 +35,7 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
                         
-                        <Border Background="{DynamicResource InfoBrush}" 
+                        <Border Background="{StaticResource InfoBrush}" 
                                 CornerRadius="{StaticResource TinyCornerRadius}" 
                                 Padding="{StaticResource TinyPadding}"
                                 VerticalAlignment="Center">
@@ -122,7 +122,7 @@
                                 Spacing="{StaticResource DefaultSpacing}"
                                 VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource SuccessBrush}" 
+                            <Border Background="{StaticResource SuccessBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -132,7 +132,7 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource ErrorBrush}" 
+                            <Border Background="{StaticResource ErrorBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -236,11 +236,11 @@
                 <TextBlock Text="数据加载失败" 
                            FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{StaticResource ErrorBrush}"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding ErrorMessage}" 
                            FontSize="{StaticResource LabelFontSize}"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{StaticResource ErrorBrush}"
                            HorizontalAlignment="Center" 
                            TextAlignment="Center"
                            MaxWidth="{StaticResource MaxDialogWidth}"

@@ -26,7 +26,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Spacing="{StaticResource SmallSpacing}"
-                        Margin="0,4,0,0">
+                        Margin="{StaticResource TinyTopMargin}">
                 <Button Name="OkButton"
                         Content="确定"
                         Classes="btn-primary"

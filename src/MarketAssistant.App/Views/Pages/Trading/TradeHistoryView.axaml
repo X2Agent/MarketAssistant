@@ -8,12 +8,16 @@
              x:Class="MarketAssistant.Views.Pages.Trading.TradeHistoryView"
              x:DataType="vm:TradeHistoryViewModel">
 
+    <UserControl.Resources>
+        <x:Double x:Key="FilterComboWidth">220</x:Double>
+    </UserControl.Resources>
+
     <Grid RowDefinitions="Auto,*">
         <!-- 筛选工具栏 -->
         <Border Grid.Row="0"
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="1"
+                BorderThickness="{StaticResource DefaultBorderThickness}"
                 CornerRadius="{StaticResource SmallCornerRadius}"
                 Padding="{StaticResource SmallPadding}"
                 Margin="{StaticResource SmallBottomMargin}">
@@ -21,7 +25,7 @@
                 <TextBox Grid.Column="0"
                          Text="{Binding FilterSymbol}"
                          PlaceholderText="按交易对筛选（如 BTCUSDT）"
-                         Width="220"/>
+                         Width="{StaticResource FilterComboWidth}"/>
                 <Button Grid.Column="1"
                         Content="筛选"
                         Command="{Binding FilterCommand}"

@@ -173,9 +173,7 @@ public class MarketAnalysisWorkflow
         await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             assetSymbol,
-            checkpointManager: null,
-            sessionId: null,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         try
         {

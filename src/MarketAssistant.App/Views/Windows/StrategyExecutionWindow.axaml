@@ -32,7 +32,7 @@
                         <TextBlock Name="SymbolText"
                                    FontWeight="Bold"
                                    FontSize="{StaticResource SectionTitleFontSize}"/>
-                        <Border Background="{DynamicResource PrimaryLightBrush}"
+                        <Border Background="{StaticResource PrimaryLightBrush}"
                                 CornerRadius="{StaticResource TinyCornerRadius}"
                                 Padding="{StaticResource TagPadding}">
                             <TextBlock Name="TypeText"

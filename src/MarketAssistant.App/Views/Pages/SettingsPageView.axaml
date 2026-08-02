@@ -11,6 +11,7 @@
 
     <UserControl.Resources>
         <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <Thickness x:Key="GridItemMargin">0,0,8,16</Thickness>
     </UserControl.Resources>
 
     <Design.DataContext>
@@ -84,18 +85,18 @@
                                      PlaceholderText="嵌入服务API端点"/>
                         </StackPanel>
 
-                        <!-- API密鑰 -->
+                        <!-- API密钥 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="API密鑰"
+                            <TextBlock Text="API密钥"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.EmbeddingApiKey}"
-                                         PlaceholderText="请输入嵌入服务API密鑰"
+                                         PlaceholderText="请输入嵌入服务API密钥"
                                          PasswordChar="&#9679;"/>
                                 <Button Grid.Column="1"
-                                        Content="获取密鑰"
+                                        Content="获取密钥"
                                         Classes="btn-info"
                                         Command="{Binding OpenEmbeddingApiWebsiteCommand}"
                                         Margin="{StaticResource SmallLeftMargin}"/>
@@ -164,7 +165,7 @@
                             <TextBlock Text="CoinGecko API密钥（可选）"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,8,0,0"/>
+                                       Margin="{StaticResource SmallTopMargin}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.CoinGeckoApiKey}"
@@ -261,7 +262,7 @@
                                     <PathIcon Data="{StaticResource LoadingIcon}"
                                               Width="{StaticResource DefaultIconSize}"
                                               Height="{StaticResource DefaultIconSize}"
-                                              Foreground="{DynamicResource PrimaryBrush}"
+                                              Foreground="{StaticResource PrimaryBrush}"
                                               IsVisible="{Binding IsVectorizing}"/>
                                 </StackPanel>
                                 
@@ -272,7 +273,7 @@
                                                  Height="{StaticResource ProgressBarHeight}"/>
                                     <TextBlock Text="{Binding VectorizingProgressText}"
                                                FontSize="{StaticResource BodyFontSize}"
-                                               Foreground="{DynamicResource PrimaryBrush}"
+                                               Foreground="{StaticResource PrimaryBrush}"
                                                FontWeight="Medium"/>
                                 </StackPanel>
                                 
@@ -294,7 +295,7 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBlock Text="注意：启用的角色越多，消耗的Token越多"
                                        FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{Binding AnalystRoles}">
@@ -307,7 +308,7 @@
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="Auto,*" 
                                           RowDefinitions="Auto,Auto" 
-                                          Margin="0,0,8,16">
+                                          Margin="{StaticResource GridItemMargin}">
                                         <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
                                                   IsChecked="{Binding IsEnabled}"
                                                   IsEnabled="{Binding !IsRequired}"
@@ -394,7 +395,7 @@
                             
                             <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
                                        FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>

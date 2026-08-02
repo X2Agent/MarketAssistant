@@ -590,7 +590,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
 
             _userSettingService.UpdateSettings(UserSetting);
-            _tradingEnvironmentService.ApplyMode(UserSetting.CryptoTradingMode);
+            await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             _notificationService.ShowSuccess("设置已保存");
             Logger?.LogInformation("保存设置，市场类型：{MarketType}，交易模式：{TradingMode}",
                 UserSetting.CurrentMarketType,
@@ -602,15 +602,15 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 重置设置为默认值
     /// </summary>
     [RelayCommand]
-    private void Reset()
+    private async Task Reset()
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
             _userSettingService.ResetSettings();
             UserSetting = _userSettingService.CurrentSetting;
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
             ApplyTheme(UserSetting.ThemeMode);
-            _tradingEnvironmentService.ApplyMode(UserSetting.CryptoTradingMode);
+            await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             LoadAnalystRoles(); // 重新加载角色
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");

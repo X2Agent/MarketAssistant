@@ -16,35 +16,35 @@
                 <Grid ColumnDefinitions="*,*,*,*">
 
                     <!-- 总资产 -->
-                    <StackPanel Grid.Column="0" Spacing="0">
+                    <StackPanel Grid.Column="0">
                         <TextBlock Text="总资产" Classes="caption"/>
-                        <TextBlock Classes="data-lg" Margin="0,2,0,0"
+                        <TextBlock Classes="data-lg" Margin="{StaticResource TinyTopMargin}"
                                    Text="{Binding TotalValueUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 可用 USDT -->
-                    <StackPanel Grid.Column="1" Spacing="0"
+                    <StackPanel Grid.Column="1"
                                 Margin="{StaticResource LeftMargin}">
                         <TextBlock Text="可用 USDT" Classes="caption"/>
-                        <TextBlock Classes="data" Margin="0,2,0,0"
+                        <TextBlock Classes="data" Margin="{StaticResource TinyTopMargin}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{Binding AvailableUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 冻结资产 -->
-                    <StackPanel Grid.Column="2" Spacing="0"
+                    <StackPanel Grid.Column="2"
                                 Margin="{StaticResource LeftMargin}">
                         <TextBlock Text="冻结资产" Classes="caption"/>
-                        <TextBlock Classes="data" Margin="0,2,0,0"
+                        <TextBlock Classes="data" Margin="{StaticResource TinyTopMargin}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{Binding LockedValueUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 持仓占比 -->
-                    <StackPanel Grid.Column="3" Spacing="0"
+                    <StackPanel Grid.Column="3"
                                 Margin="{StaticResource LeftMargin}">
                         <TextBlock Text="持仓占比" Classes="caption"/>
-                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource TinyTopMargin}">
                             <TextBlock Classes="data"
                                        Text="{Binding PositionValueUSDT, StringFormat={}{0:F2} USDT}"/>
                             <TextBlock VerticalAlignment="Bottom"

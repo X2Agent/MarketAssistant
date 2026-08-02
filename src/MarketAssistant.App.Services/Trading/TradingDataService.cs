@@ -41,6 +41,12 @@ public class TradingDataService : SqliteServiceBase
         _ => LiveSpotEnvironment
     };
 
+    /// <summary>
+    /// 当前是否为合约模式（合约买卖方向需结合持仓判断开平仓）
+    /// </summary>
+    private bool IsFuturesMode => _tradingEnvironmentService.CurrentMode is
+        CryptoTradingMode.LiveFutures or CryptoTradingMode.BinanceFuturesTestnet;
+
     #region 策略 CRUD
 
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
@@ -143,6 +149,26 @@ public class TradingDataService : SqliteServiceBase
         cmd.CommandText = """
             UPDATE strategies
             SET last_triggered_at = @time, execution_count = execution_count + 1
+            WHERE id = @id AND environment = @environment
+            """;
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@time", DateTime.UtcNow.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 仅更新策略的最后评估时间（不增加执行计数），用于 AI 信号策略的评估节流：
+    /// 无论 Agent 是否实际成交，一次评估后都记入冷却期，避免未成交时每个价格 tick 重复调用 LLM。
+    /// </summary>
+    public async Task UpdateStrategyLastTriggeredAtAsync(string id, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE strategies
+            SET last_triggered_at = @time
             WHERE id = @id AND environment = @environment
             """;
         cmd.Parameters.AddWithValue("@id", id);
@@ -381,7 +407,55 @@ public class TradingDataService : SqliteServiceBase
         decimal realizedPnl = 0;
         if (deltaExecutedQty > 0)
         {
-            if (existingRecord.Side == OrderSide.Buy)
+            // 合约模式下买卖方向无法单独确定开平仓，需结合本地持仓判断：
+            // 买入 = 平空（若存在空头持仓）否则开多；卖出 = 平多（若存在多头持仓）否则开空。
+            if (IsFuturesMode)
+            {
+                var positions = await GetOpenPositionsAsync(existingRecord.Symbol, ct).ConfigureAwait(false);
+                if (existingRecord.Side == OrderSide.Buy)
+                {
+                    if (positions.Any(p => p.Side == PositionSide.Short))
+                    {
+                        realizedPnl = await ClosePositionFifoAsync(
+                            existingRecord.Symbol, deltaExecutedQty, latestExecutedPrice, ct, PositionSide.Short)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await OpenPositionAsync(new Position
+                        {
+                            Symbol = existingRecord.Symbol,
+                            Side = PositionSide.Long,
+                            Quantity = deltaExecutedQty,
+                            EntryPrice = latestExecutedPrice,
+                            StrategyId = existingRecord.StrategyId,
+                            OpenedAt = DateTime.UtcNow
+                        }, ct).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    if (positions.Any(p => p.Side == PositionSide.Long))
+                    {
+                        realizedPnl = await ClosePositionFifoAsync(
+                            existingRecord.Symbol, deltaExecutedQty, latestExecutedPrice, ct, PositionSide.Long)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await OpenPositionAsync(new Position
+                        {
+                            Symbol = existingRecord.Symbol,
+                            Side = PositionSide.Short,
+                            Quantity = deltaExecutedQty,
+                            EntryPrice = latestExecutedPrice,
+                            StrategyId = existingRecord.StrategyId,
+                            OpenedAt = DateTime.UtcNow
+                        }, ct).ConfigureAwait(false);
+                    }
+                }
+            }
+            else if (existingRecord.Side == OrderSide.Buy)
             {
                 await OpenPositionAsync(new Position
                 {
@@ -558,10 +632,12 @@ public class TradingDataService : SqliteServiceBase
     }
 
     /// <summary>
-    /// 平仓：按 FIFO 顺序匹配持仓，更新 closed_quantity，返回已实现盈亏。
+    /// 平仓：按 FIFO 顺序匹配指定方向的持仓，更新 closed_quantity，返回已实现盈亏。
+    /// 多头盈亏 = (平仓价 - 开仓价) × 数量；空头盈亏 = (开仓价 - 平仓价) × 数量。
     /// </summary>
     public async Task<decimal> ClosePositionFifoAsync(
-        string symbol, decimal closeQty, decimal closePrice, CancellationToken ct = default)
+        string symbol, decimal closeQty, decimal closePrice,
+        CancellationToken ct = default, PositionSide side = PositionSide.Long)
     {
         if (closeQty <= 0)
             return 0;
@@ -582,7 +658,7 @@ public class TradingDataService : SqliteServiceBase
                 """;
             cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
             cmd.Parameters.AddWithValue("@symbol", symbol);
-            cmd.Parameters.AddWithValue("@side", (int)PositionSide.Long);
+            cmd.Parameters.AddWithValue("@side", (int)side);
 
             var toClose = new List<(string id, decimal available, decimal entryPrice)>();
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
@@ -606,7 +682,10 @@ public class TradingDataService : SqliteServiceBase
                     break;
 
                 var closeThis = Math.Min(remaining, available);
-                realizedPnl += (closePrice - entry) * closeThis;
+                // 空头平仓时开仓价高于平仓价才盈利，与多头相反
+                realizedPnl += side == PositionSide.Long
+                    ? (closePrice - entry) * closeThis
+                    : (entry - closePrice) * closeThis;
 
                 await using var updateCmd = conn.CreateCommand();
                 updateCmd.Transaction = (Microsoft.Data.Sqlite.SqliteTransaction)tx;

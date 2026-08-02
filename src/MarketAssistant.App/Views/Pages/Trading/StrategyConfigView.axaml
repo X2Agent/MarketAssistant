@@ -12,6 +12,8 @@
 
     <UserControl.Resources>
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <Thickness x:Key="CompactButtonPadding">12,4</Thickness>
+        <x:Double x:Key="FormFieldMinWidth">200</x:Double>
     </UserControl.Resources>
 
     <ScrollViewer>
@@ -30,7 +32,7 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        VerticalAlignment="Center"/>
                             <!-- 监控运行状态指示 -->
-                            <Border Background="{DynamicResource SuccessBrush}"
+                            <Border Background="{StaticResource SuccessBrush}"
                                     CornerRadius="{StaticResource TinyCornerRadius}"
                                     Padding="{StaticResource TagPadding}"
                                     VerticalAlignment="Center"
@@ -39,7 +41,7 @@
                                            FontSize="{StaticResource SmallFontSize}"
                                            Foreground="White"/>
                             </Border>
-                            <Border Background="{DynamicResource WarningBrush}"
+                            <Border Background="{StaticResource WarningBrush}"
                                     CornerRadius="{StaticResource TinyCornerRadius}"
                                     Padding="{StaticResource TagPadding}"
                                     VerticalAlignment="Center"
@@ -51,10 +53,10 @@
                         </StackPanel>
                         <Button Grid.Column="1"
                                 Command="{Binding ToggleCreateFormCommand}"
-                                Background="{DynamicResource PrimaryBrush}"
+                                Background="{StaticResource PrimaryBrush}"
                                 Foreground="White"
                                 VerticalAlignment="Center"
-                                Padding="12,4">
+                                Padding="{StaticResource CompactButtonPadding}">
                             <Panel>
                                 <TextBlock Text="+ 新建策略" IsVisible="{Binding !IsCreating}"/>
                                 <TextBlock Text="取消" IsVisible="{Binding IsCreating}"/>
@@ -89,7 +91,7 @@
                                           HorizontalAlignment="Stretch"/>
                                 <TextBlock Text="{Binding SideHintText}"
                                            IsVisible="{Binding SideHintText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                           Foreground="{DynamicResource WarningBrush}"
+                                           Foreground="{StaticResource WarningBrush}"
                                            FontSize="{StaticResource SmallFontSize}"
                                            TextWrapping="Wrap"/>
                             </StackPanel>
@@ -118,7 +120,7 @@
                             <TextBlock Text="止盈价（可选）" FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBox Text="{Binding NewTakeProfitPrice}" PlaceholderText="止盈价格"
-                                     HorizontalAlignment="Left" MinWidth="200"/>
+                                     HorizontalAlignment="Left" MinWidth="{StaticResource FormFieldMinWidth}"/>
                         </StackPanel>
 
                         <!-- 网格交易参数 -->
@@ -186,13 +188,13 @@
                         <!-- 校验错误提示 -->
                         <TextBlock Text="{Binding ValidationError}"
                                    IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Foreground="{DynamicResource ErrorBrush}"
+                                   Foreground="{StaticResource ErrorBrush}"
                                    FontSize="{StaticResource LabelFontSize}"
                                    TextWrapping="Wrap"/>
 
                         <Button Content="创建策略"
                                 Command="{Binding CreateStrategyCommand}"
-                                Background="{DynamicResource PrimaryBrush}"
+                                Background="{StaticResource PrimaryBrush}"
                                 Foreground="White"
                                 HorizontalAlignment="Left"
                                 Margin="{StaticResource TinyTopMargin}"/>
@@ -218,7 +220,7 @@
                                                 <TextBlock Text="{Binding Symbol}"
                                                            FontWeight="Bold"
                                                            FontSize="{StaticResource SectionTitleFontSize}"/>
-                                                <Border Background="{DynamicResource PrimaryLightBrush}"
+                                                <Border Background="{StaticResource PrimaryLightBrush}"
                                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                                         Padding="{StaticResource TagPadding}">
                                                     <TextBlock Text="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}"
@@ -282,7 +284,7 @@
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ViewHistoryCommand}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="删除"
-                                                    Foreground="{DynamicResource ErrorBrush}"
+                                                    Foreground="{StaticResource ErrorBrush}"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).DeleteStrategyCommand}"
                                                     CommandParameter="{Binding}"/>
                                         </StackPanel>
@@ -336,7 +338,7 @@
 
                     <Button Content="保存风控设置"
                             Command="{Binding SaveRiskConfigCommand}"
-                            Background="{DynamicResource PrimaryBrush}"
+                            Background="{StaticResource PrimaryBrush}"
                             Foreground="White"
                             HorizontalAlignment="Left"
                             Margin="{StaticResource TinyTopMargin}"/>

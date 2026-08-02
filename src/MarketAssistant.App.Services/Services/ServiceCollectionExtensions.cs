@@ -277,7 +277,7 @@ public static class BusinessServiceCollectionExtensions
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
+        services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
@@ -352,6 +352,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AnalysisReportCache>();
         services.AddSingleton<TradingDataService>();
         services.AddSingleton<TradingEnvironmentService>();
+        // 打破 TradingEnvironmentService → MarketMonitor → BinanceUserDataStreamService → TradingEnvironmentService 的循环依赖
+        services.AddSingleton<Func<MarketMonitor>>(sp => () => sp.GetRequiredService<MarketMonitor>());
         services.AddSingleton<RoutingExchangeClient>(CreateRoutingExchangeClient);
         services.AddSingleton<TradingStrategyService>();
         services.AddSingleton<RiskManager>();

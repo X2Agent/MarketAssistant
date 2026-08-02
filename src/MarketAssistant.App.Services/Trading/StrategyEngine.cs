@@ -86,13 +86,19 @@ public class StrategyEngine
             StrategyType.StopLoss => (EvaluateStopLoss(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TakeProfit => (EvaluateTakeProfit(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TrailingStop => (await EvaluateAndUpdateTrailingStopAsync(strategy, currentPrice, ct), strategy.Side, strategy.Quantity),
-            StrategyType.AISignal => (EvaluateAISignal(strategy), strategy.Side, strategy.Quantity),
+            StrategyType.AISignal => (await EvaluateAndUpdateAISignalAsync(strategy, ct).ConfigureAwait(false), strategy.Side, strategy.Quantity),
             StrategyType.GridTrading => EvaluateAndUpdateGridTrading(strategy, currentPrice, out var gs, out var gq) ? (true, gs, gq) : (false, strategy.Side, strategy.Quantity),
             StrategyType.DCA => await EvaluateDCAAsync(strategy, currentPrice, ct),
             _ => (false, strategy.Side, strategy.Quantity)
         };
     }
 
+    /// <summary>
+    /// 止损触发评估。
+    /// 注意 Side 在此处表示"持仓方向"而非执行动作：Sell 侧 = 持有多头（跌破触发价卖出止损），
+    /// Buy 侧 = 持有空头（涨破触发价买入止损）。该语义与 <see cref="EvaluateTakeProfit"/> 中的
+    /// Buy 侧（跌至触发价买入建仓）不同，两者是刻意区分的设计。
+    /// </summary>
     private static bool EvaluateStopLoss(TradingStrategy strategy, decimal currentPrice)
     {
         // Side 表示触发时要执行的操作方向
@@ -103,6 +109,11 @@ public class StrategyEngine
         return currentPrice >= strategy.TriggerPrice;
     }
 
+    /// <summary>
+    /// 止盈触发评估。
+    /// Sell 侧 = 持有多头，涨至触发价卖出止盈（真止盈）；
+    /// Buy 侧 = 尚未建仓，跌至触发价买入，语义上等价于"限价买入"（并非止盈，为历史命名保留）。
+    /// </summary>
     private static bool EvaluateTakeProfit(TradingStrategy strategy, decimal currentPrice)
     {
         // Sell 侧止盈：持有多头仓位，价格涨至触发价时卖出止盈
@@ -182,7 +193,14 @@ public class StrategyEngine
     // 未配置时的安全默认值，防止每个价格 tick 都触发 AI 调用
     private const int DefaultAISignalIntervalSeconds = 60;
 
-    private bool EvaluateAISignal(TradingStrategy strategy)
+    /// <summary>
+    /// AI 信号策略的评估节流：满足间隔条件时触发，并在触发时立即持久化评估时间，
+    /// 保证 Agent 决定 HOLD 或被风控拒绝等未成交场景同样进入冷却期，
+    /// 避免无成交时每个价格 tick 都重复调用 LLM（高成本）。
+    /// 注意：会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.LastTriggeredAt"/> 字段。
+    /// </summary>
+    private async Task<bool> EvaluateAndUpdateAISignalAsync(
+        TradingStrategy strategy, CancellationToken ct)
     {
         var intervalSeconds = DefaultAISignalIntervalSeconds;
 
@@ -205,9 +223,13 @@ public class StrategyEngine
         if (strategy.LastTriggeredAt.HasValue)
         {
             var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
-            return elapsed >= intervalSeconds;
+            if (elapsed < intervalSeconds)
+                return false;
         }
 
+        // 触发即记入冷却期：无论后续 Agent 是否实际成交，本次评估都消耗一次节流窗口
+        strategy.LastTriggeredAt = DateTime.UtcNow;
+        await _dataService.UpdateStrategyLastTriggeredAtAsync(strategy.Id, ct).ConfigureAwait(false);
         return true;
     }
 
@@ -249,10 +271,11 @@ public class StrategyEngine
             }
             if (currentPrice > gridParams.UpperPrice)
             {
-                // 价格涨破网格上界：检查破网止盈
+                // 价格涨破网格上界：检查破网止盈。网格在上涨中逐线卖出，突破上界时应卖出剩余库存清仓，
+                // 与破网止损方向对称；若反向买入会在高点开出全网格量多头。
                 if (gridParams.TakeProfitPrice.HasValue && currentPrice >= gridParams.TakeProfitPrice.Value)
                 {
-                    effectiveSide = OrderSide.Buy;
+                    effectiveSide = OrderSide.Sell;
                     effectiveQty = gridParams.QuantityPerGrid * gridParams.GridCount;
                     _logger.LogWarning(
                         "网格破网止盈触发: {StrategyId} 价格 {Price} >= 止盈位 {TakeProfit}，清仓 {Qty}",

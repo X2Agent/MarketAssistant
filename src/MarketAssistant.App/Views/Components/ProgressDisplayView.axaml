@@ -54,7 +54,7 @@
                        FontSize="{StaticResource LargeFontSize}"
                        FontWeight="Bold"
                        HorizontalAlignment="Center"
-                       Foreground="{DynamicResource PrimaryBrush}"/>
+                       Foreground="{StaticResource PrimaryBrush}"/>
 
             <!-- 进度指示器区域 -->
             <StackPanel Spacing="{StaticResource LargeSpacing}" HorizontalAlignment="Center">
@@ -67,15 +67,15 @@
                     <!-- 外圆 - 脉动效果 -->
                     <Ellipse Width="{StaticResource ProgressCircleSize}" 
                              Height="{StaticResource ProgressCircleSize}"
-                             Fill="{DynamicResource PrimaryBrush}"
+                             Fill="{StaticResource PrimaryBrush}"
                              Opacity="0.1"
                              Classes="Pulse"/>
                     
                     <!-- 旋转的 Loading 图标 -->
                     <Path Classes="Spin"
-                          Width="32" Height="32"
+                          Width="{StaticResource MediumIconSize}" Height="{StaticResource MediumIconSize}"
                           Data="M16,4 A12,12 0 1,1 4,16"
-                          Stroke="{DynamicResource PrimaryBrush}"
+                          Stroke="{StaticResource PrimaryBrush}"
                           StrokeThickness="4"
                           StrokeLineCap="Round"
                           RenderTransformOrigin="50%,50%"/>
@@ -86,9 +86,9 @@
             <StackPanel Spacing="{StaticResource TinySpacing}">
                 <ProgressBar Value="{Binding #Root.ProgressPercent}" 
                              Maximum="100" 
-                             Height="8" 
-                             CornerRadius="4"
-                             Foreground="{DynamicResource PrimaryBrush}"
+                             Height="{StaticResource ProgressBarHeight}" 
+                             CornerRadius="{StaticResource TinyCornerRadius}"
+                             Foreground="{StaticResource PrimaryBrush}"
                              Background="{DynamicResource SurfaceVariantBrush}"
                              Width="{StaticResource ProgressBarWidth}"/>
                 <TextBlock Text="{Binding #Root.ProgressPercent, StringFormat='{}{0}%'}"
@@ -107,14 +107,14 @@
             </StackPanel>
 
             <!-- 失败分析师提示 -->
-            <Border Background="{DynamicResource DangerLightBrush}"
+            <Border Background="{StaticResource DangerLightBrush}"
                     CornerRadius="{StaticResource SmallCornerRadius}"
                     Padding="{StaticResource CompactCardPadding}"
                     IsVisible="{Binding #Root.FailedAnalystsInfo, 
                         Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Text="{Binding #Root.FailedAnalystsInfo}"
                            FontSize="{StaticResource SmallFontSize}"
-                           Foreground="{DynamicResource DangerTextBrush}"
+                           Foreground="{StaticResource DangerTextBrush}"
                            HorizontalAlignment="Center"
                            TextWrapping="Wrap"/>
             </Border>

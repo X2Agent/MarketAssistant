@@ -40,14 +40,18 @@ public class TradeExecutor : IDisposable
     }
 
     /// <summary>
-    /// 执行策略触发的交易（委托给通用下单方法）
+    /// 执行策略触发的交易（委托给通用下单方法）。
+    /// <paramref name="requireClose"/> 表示该触发语义为"平仓退出"（如止损、追踪止损、网格破网、AI 硬性边界）：
+    /// 合约模式下若交易所不存在对应方向的持仓则拒绝下单，防止退出型触发在无持仓时反向开出新仓。
     /// </summary>
     public async Task<TradeResult> ExecuteTradeAsync(
         TradingStrategy strategy, decimal currentPrice, string? aiReasoning = null,
         string? pendingCustomParams = null,
+        bool requireClose = false,
         CancellationToken ct = default)
     {
         _logger.LogInformation("开始执行交易: {StrategyId} {Symbol} {Side} 数量:{Qty}",
+
             strategy.Id, strategy.Symbol, strategy.Side, strategy.Quantity);
 
         // 限价单基于当前价计算滑点保护价
@@ -64,7 +68,7 @@ public class TradeExecutor : IDisposable
         var result = await ExecuteOrderAsync(
             strategy.Symbol, strategy.Side, orderType, strategy.Quantity,
             currentPrice, limitPrice: limitPrice, strategyId: strategy.Id,
-            aiReasoning: aiReasoning, ct: ct);
+            aiReasoning: aiReasoning, requireClose: requireClose, ct: ct);
 
         if (result.Success)
         {
@@ -80,11 +84,14 @@ public class TradeExecutor : IDisposable
     /// <summary>
     /// 通用下单方法，所有交易路径（策略触发、AI Agent、手动）的统一入口。
     /// 风控检查和人工确认在 symbol 锁之外执行，避免等待用户输入时锁死后续交易。
+    /// <paramref name="requireClose"/> 表示调用方要求本笔交易必须是平仓（无对应持仓时拒绝），
+    /// 用于止损、追踪止损、网格破网、AI 硬性边界等退出型触发，防止合约模式反向开仓。
     /// </summary>
     public async Task<TradeResult> ExecuteOrderAsync(
         string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice = null,
         string strategyId = "manual", string? aiReasoning = null,
+        bool requireClose = false,
         CancellationToken ct = default)
     {
         // 风控校验和人工确认在 symbol 锁外完成，防止 ConfirmationCallback 等待期间
@@ -124,7 +131,7 @@ public class TradeExecutor : IDisposable
         {
             return await ExecuteApprovedOrderAsync(
                 instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
-                strategyId, aiReasoning, ct).ConfigureAwait(false);
+                strategyId, aiReasoning, requireClose, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -135,7 +142,7 @@ public class TradeExecutor : IDisposable
     private async Task<TradeResult> ExecuteApprovedOrderAsync(
         string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice,
-        string strategyId, string? aiReasoning,
+        string strategyId, string? aiReasoning, bool requireClose,
         CancellationToken ct)
     {
         try
@@ -152,6 +159,20 @@ public class TradeExecutor : IDisposable
             if (isFutures)
             {
                 reduceOnly = await IsClosePositionAsync(instrumentSymbol, side, ct);
+
+                // 退出型触发要求本笔为平仓：交易所无对应方向持仓时拒绝，
+                // 防止止损/追踪止损/网格破网/AI 硬性边界在持仓已平后反向开出新仓。
+                if (requireClose && !reduceOnly)
+                {
+                    _logger.LogWarning(
+                        "退出型触发要求平仓但 {Symbol} 无对应方向持仓，拒绝下单以免反向开仓: {Side} {Qty}",
+                        instrumentSymbol, side, quantity);
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"策略要求平仓但 {instrumentSymbol} 无对应方向持仓，拒绝下单"
+                    };
+                }
 
                 // 合约开仓前设置默认杠杆（10x），避免使用交易所默认的 20x 导致强平风险过高
                 if (!reduceOnly)
@@ -231,7 +252,7 @@ public class TradeExecutor : IDisposable
                 {
                     pnl = await UpdateFuturesPositionAsync(
                         instrumentSymbol, side, record.ExecutedQty, record.ExecutedPrice,
-                        record.Commission, strategyId, record.CreatedAt, reduceOnly, ct);
+                        strategyId, record.CreatedAt, reduceOnly, ct);
                 }
                 else
                 {
@@ -313,12 +334,14 @@ public class TradeExecutor : IDisposable
     }
 
     /// <summary>
-    /// 合约持仓追踪与 PnL 计算：基于交易所持仓而非本地 FIFO。
-    /// 开仓时记录持仓，平仓时根据交易所返回的持仓信息计算已实现盈亏。
+    /// 合约持仓追踪与 PnL 计算。
+    /// 开仓时记录本地持仓；平仓时按 FIFO 逐笔匹配开仓记录计算已实现盈亏。
+    /// 相比查询交易所剩余持仓均价（分批开仓时部分平仓会失真），
+    /// 本地 FIFO 能精确匹配每笔开仓价格；手续费单独计入日统计，不在 PnL 中重复扣减。
     /// </summary>
     private async Task<decimal> UpdateFuturesPositionAsync(
         string symbol, OrderSide side, decimal executedQty, decimal executedPrice,
-        decimal commission, string strategyId, DateTime openedAt,
+        string strategyId, DateTime openedAt,
         bool isClose, CancellationToken ct)
     {
         if (!isClose)
@@ -337,40 +360,9 @@ public class TradeExecutor : IDisposable
             return 0;
         }
 
-        // 平仓：从交易所获取最新持仓，计算已实现盈亏
-        try
-        {
-            var positions = await _exchangeClient.GetPositionsAsync(symbol, ct);
-            var pos = positions.FirstOrDefault(p =>
-                string.Equals(p.Symbol, symbol, StringComparison.OrdinalIgnoreCase));
-
-            if (pos != null)
-            {
-                // 平仓后持仓量减少的差额即为平仓数量
-                // 已实现盈亏 = 平仓数量 * (平仓价 - 开仓价) * 方向
-                // 合约 PnL 由交易所 positionRisk 的 unRealizedProfit 反映未实现部分，
-                // 已实现部分 = 平仓数量 * 价差 - 手续费
-                var entryPrice = pos.EntryPrice;
-                if (entryPrice > 0)
-                {
-                    var direction = side == OrderSide.Sell ? 1m : -1m; // 平多卖出为正，平空买入为负
-                    var pnl = executedQty * (executedPrice - entryPrice) * direction - commission;
-
-                    // 同步本地持仓记录
-                    var positionSide = side == OrderSide.Sell ? PositionSide.Long : PositionSide.Short;
-                    await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
-
-                    return pnl;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "查询交易所持仓计算合约 PnL 失败，回退到本地 FIFO: {Symbol}", symbol);
-        }
-
-        // 回退：使用本地 FIFO 计算
-        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct);
+        // 平仓：卖出平多匹配多头持仓，买入平空匹配空头持仓
+        var closeSide = side == OrderSide.Sell ? PositionSide.Long : PositionSide.Short;
+        return await _dataService.ClosePositionFifoAsync(symbol, executedQty, executedPrice, ct, closeSide);
     }
 
     /// <summary>

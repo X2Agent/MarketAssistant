@@ -219,7 +219,7 @@
                                                    Text="{Binding FormattedMetric}"
                                                    FontSize="{StaticResource BodyFontSize}"
                                                    FontWeight="Bold"
-                                                   Foreground="{DynamicResource PrimaryBrush}"
+                                                   Foreground="{StaticResource PrimaryBrush}"
                                                    HorizontalAlignment="Right"/>
 
                                         <!-- Row 2: Price & Favorite -->
@@ -287,6 +287,8 @@
                                             <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
                                                     Classes="favorite-button"
                                                     Background="Transparent"
+                                                    Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentAssets.AddToFavoriteCommand}"
+                                                    CommandParameter="{Binding .}"
                                                     Tapped="OnPreventTapped"
                                                     Width="{StaticResource DefaultIconSize}"
                                                     Height="{StaticResource DefaultIconSize}"

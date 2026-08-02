@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using System.Threading.Channels;
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
@@ -337,12 +338,61 @@ public class MarketMonitor : IDisposable
             // 网格交易：交易成功后原子地持久化更新后的网格参数，防止计数和参数不一致
             var pendingCustomParams = strategy.Type == StrategyType.GridTrading ? strategy.CustomParams : null;
             var result = await _tradeExecutor.ExecuteTradeAsync(
-                strategy, currentPrice, pendingCustomParams: pendingCustomParams, ct: MonitorToken);
+                strategy, currentPrice,
+                pendingCustomParams: pendingCustomParams,
+                requireClose: IsExitOnlyStrategy(strategy, currentPrice),
+                ct: MonitorToken);
 
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
             await CheckStrategyCompletionAsync(strategy);
+        }
+    }
+
+    /// <summary>
+    /// 判定策略本次触发是否为"平仓退出"语义：无对应持仓时应在执行器层拒绝下单，
+    /// 防止合约模式下退出型触发在持仓已平后反向开出新仓。
+    /// 止损/追踪止损为纯退出；止盈仅 Sell 侧为退出（Buy 侧语义为限价建仓）；
+    /// 网格仅破网（价格突破网格边界且触及止损/止盈位）为清仓退出，普通网格线买卖仍是开平仓组合。
+    /// </summary>
+    private static bool IsExitOnlyStrategy(TradingStrategy strategy, decimal currentPrice)
+    {
+        return strategy.Type switch
+        {
+            StrategyType.StopLoss => true,
+            StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
+            StrategyType.TrailingStop => true,
+            StrategyType.GridTrading => IsGridBreakOut(strategy, currentPrice),
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// 网格破网判定：价格跌破下界且触及破网止损，或涨破上界且触及破网止盈。
+    /// </summary>
+    private static bool IsGridBreakOut(TradingStrategy strategy, decimal currentPrice)
+    {
+        if (string.IsNullOrEmpty(strategy.CustomParams))
+            return false;
+
+        try
+        {
+            var gridParams = JsonSerializer.Deserialize<GridTradingParams>(strategy.CustomParams);
+            if (gridParams == null || gridParams.GridCount <= 1 || gridParams.UpperPrice <= gridParams.LowerPrice)
+                return false;
+
+            if (currentPrice < gridParams.LowerPrice)
+                return gridParams.StopLossPrice.HasValue && currentPrice <= gridParams.StopLossPrice.Value;
+
+            if (currentPrice > gridParams.UpperPrice)
+                return gridParams.TakeProfitPrice.HasValue && currentPrice >= gridParams.TakeProfitPrice.Value;
+
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 
