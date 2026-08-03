@@ -41,9 +41,9 @@
     <!-- ===== 搜索框 ===== -->
     <Style Selector="TextBox.search-input">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
     </Style>
 
@@ -109,21 +109,21 @@
         <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Setter Property="Margin" Value="{StaticResource TinyBottomMargin}"/>
     </Style>
 
     <!-- ===== 表单辅助文本 ===== -->
     <Style Selector="TextBlock.form-hint">
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 
     <!-- ===== 表单错误文本 ===== -->
     <Style Selector="TextBlock.form-error">
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 
 </Styles>

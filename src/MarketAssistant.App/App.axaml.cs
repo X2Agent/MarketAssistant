@@ -34,7 +34,7 @@ public partial class App : Application
         GlobalExceptionHandler.Initialize(
             ServiceProvider.GetRequiredService<GlobalExceptionHandler>());
 
-        // 激活价格预警服务：异步加载规则 + 启动后台监控
+        // 激活价格预警服务：后台完成规则加载和行情订阅；服务内部会让后续写操作等待初始化完成
         var priceAlertService = ServiceProvider.GetRequiredService<PriceAlertService>();
         _ = priceAlertService.InitializeAsync();
 

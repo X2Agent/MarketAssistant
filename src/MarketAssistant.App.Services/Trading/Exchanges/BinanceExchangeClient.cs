@@ -3,21 +3,34 @@ using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using System.Globalization;
 
-namespace MarketAssistant.Trading.Exchanges;
+namespace MarketAssistant.Services.Trading.Exchanges;
 
 /// <summary>
-/// Binance 交易所适配器，将 BinanceAccountService 包装为统一的 IExchangeClient 接口
+/// Binance 交易所适配器，将 BinanceAccountServiceBase 包装为统一的 IExchangeClient 接口。
+/// 通过构造参数注入不同的账户服务（现货实盘/Testnet/合约实盘/Testnet）与名称，消除重复实现。
 /// </summary>
 public class BinanceExchangeClient : IExchangeClient
 {
-    private readonly BinanceAccountService _accountService;
+    private readonly BinanceAccountServiceBase _accountService;
+    private readonly string _exchangeName;
+    private readonly string? _positionSide;
 
-    public string ExchangeName => "Binance";
-
-    public BinanceExchangeClient(BinanceAccountService accountService)
+    /// <param name="accountService">账户服务（现货或合约）</param>
+    /// <param name="exchangeName">交易所显示名（"Binance" / "Binance Spot Testnet" / "Binance Futures" / "Binance Futures Testnet"）</param>
+    /// <param name="positionSide">合约单向模式下默认持仓方向（"BOTH"），现货传 null</param>
+    public BinanceExchangeClient(BinanceAccountServiceBase accountService, string exchangeName, string? positionSide = null)
     {
         _accountService = accountService;
+        _exchangeName = exchangeName;
+        _positionSide = positionSide;
     }
+
+    public string ExchangeName => _exchangeName;
+
+    /// <summary>
+    /// 合约模式由 positionSide 是否为 null 决定（合约传 "BOTH"，现货传 null）
+    /// </summary>
+    public bool IsFutures => !string.IsNullOrEmpty(_positionSide);
 
     public async Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
     {
@@ -38,11 +51,16 @@ public class BinanceExchangeClient : IExchangeClient
         string symbol, OrderSide side, OrderType type,
         decimal quantity, decimal? price = null,
         string? clientOrderId = null,
+        bool reduceOnly = false,
+        string? positionSide = null,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken ct = default)
     {
         var response = await _accountService.PlaceOrderAsync(
             symbol, side.ToString().ToUpper(), type.ToString().ToUpper(),
-            quantity, price, clientOrderId, ct);
+            quantity, price, clientOrderId, _positionSide ?? positionSide, reduceOnly,
+            stopPrice, trailingDelta, ct);
 
         return MapOrderResponse(response);
     }
@@ -68,9 +86,37 @@ public class BinanceExchangeClient : IExchangeClient
         return orders.Select(MapOrderResponse).ToList();
     }
 
-    private static ExchangeOrderResult MapOrderResponse(BinanceOrderResponse response)
+    /// <summary>
+    /// 现货无持仓概念，返回空列表。合约持仓由 BinanceFuturesExchangeClient 覆写。
+    /// </summary>
+    public virtual Task<List<ExchangePosition>> GetPositionsAsync(
+        string? instrumentSymbol = null, CancellationToken ct = default)
+        => Task.FromResult<List<ExchangePosition>>([]);
+
+    /// <summary>
+    /// 现货无需设置杠杆，为空操作。合约由子类覆写。
+    /// </summary>
+    public virtual Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// 现货无需设置保证金模式，为空操作。合约由子类覆写。
+    /// </summary>
+    public virtual Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    /// <summary>
+    /// 现货成交明细由子类覆写（如需支持），默认返回空列表。
+    /// </summary>
+    public virtual Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
+        => Task.FromResult<List<ExchangeTradeDetail>>([]);
+
+    /// <summary>
+    /// 将币安订单响应映射为统一的 ExchangeOrderResult。
+    /// </summary>
+    private protected static ExchangeOrderResult MapOrderResponse(BinanceOrderResponse response)
     {
-        // 汇总所有 fills 的手续费（仅下单响应包含 fills，查询/撤单响应不包含）
+        // 汇总所有 fills 的手续费（仅现货下单响应包含 fills，合约/查询/撤单响应不包含）
         decimal totalCommission = 0;
         string? commissionAsset = null;
         if (response.Fills.Count > 0)
@@ -93,6 +139,8 @@ public class BinanceExchangeClient : IExchangeClient
             RequestedQty = decimal.TryParse(response.OrigQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var rq) ? rq : 0,
             ExecutedQty = decimal.TryParse(response.ExecutedQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var eq) ? eq : 0,
             Price = decimal.TryParse(response.Price, NumberStyles.Number, CultureInfo.InvariantCulture, out var p) ? p : 0,
+            AveragePrice = decimal.TryParse(response.AvgPrice, NumberStyles.Number, CultureInfo.InvariantCulture, out var ap) ? ap : 0,
+            CumulativeQuoteQty = decimal.TryParse(response.CummulativeQuoteQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var cq) ? cq : 0,
             FillCommission = totalCommission,
             CommissionAsset = commissionAsset
         };

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安溢价指数 API 响应模型

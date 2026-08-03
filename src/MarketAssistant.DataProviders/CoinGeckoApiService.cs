@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// CoinGecko API服务（含客户端限流，免费版 30 次/分钟）
@@ -130,7 +130,7 @@ public sealed class CoinGeckoApiService
         return await ThrottledExecuteAsync(async httpClient =>
             await httpClient.GetFromJsonAsync<CoinGeckoTickersResponse>(
                 url,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                CoinGeckoJsonOptions,
                 cancellationToken),
             cancellationToken);
     }
@@ -149,7 +149,7 @@ public sealed class CoinGeckoApiService
         {
             var response = await httpClient.GetFromJsonAsync<CoinGeckoSearchResponse>(
                 url,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                CoinGeckoJsonOptions,
                 cancellationToken);
 
             _logger.LogInformation("CoinGecko搜索结果: {Count}个币种", response?.Coins?.Count ?? 0);
@@ -347,28 +347,73 @@ public class CoinGeckoMarket
     public string Symbol { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Image { get; set; } = string.Empty;
-    public decimal? Current_Price { get; set; }
-    public decimal? Market_Cap { get; set; }
-    public int? Market_Cap_Rank { get; set; }
-    public decimal? Fully_Diluted_Valuation { get; set; }
-    public decimal? Total_Volume { get; set; }
-    public decimal? High_24h { get; set; }
-    public decimal? Low_24h { get; set; }
-    public decimal? Price_Change_24h { get; set; }
-    public decimal? Price_Change_Percentage_24h { get; set; }
-    public decimal? Market_Cap_Change_24h { get; set; }
-    public decimal? Market_Cap_Change_Percentage_24h { get; set; }
-    public decimal? Circulating_Supply { get; set; }
-    public decimal? Total_Supply { get; set; }
-    public decimal? Max_Supply { get; set; }
-    public decimal? Ath { get; set; }
-    public decimal? Ath_Change_Percentage { get; set; }
-    public DateTime? Ath_Date { get; set; }
-    public decimal? Atl { get; set; }
-    public decimal? Atl_Change_Percentage { get; set; }
-    public DateTime? Atl_Date { get; set; }
-    public DateTime? Last_Updated { get; set; }
 
-    public decimal? Price_Change_Percentage_7d_In_Currency { get; set; }
-    public decimal? Price_Change_Percentage_30d_In_Currency { get; set; }
+    [JsonPropertyName("current_price")]
+    public decimal? CurrentPrice { get; set; }
+
+    [JsonPropertyName("market_cap")]
+    public decimal? MarketCap { get; set; }
+
+    [JsonPropertyName("market_cap_rank")]
+    public int? MarketCapRank { get; set; }
+
+    [JsonPropertyName("fully_diluted_valuation")]
+    public decimal? FullyDilutedValuation { get; set; }
+
+    [JsonPropertyName("total_volume")]
+    public decimal? TotalVolume { get; set; }
+
+    [JsonPropertyName("high_24h")]
+    public decimal? High24h { get; set; }
+
+    [JsonPropertyName("low_24h")]
+    public decimal? Low24h { get; set; }
+
+    [JsonPropertyName("price_change_24h")]
+    public decimal? PriceChange24h { get; set; }
+
+    [JsonPropertyName("price_change_percentage_24h")]
+    public decimal? PriceChangePercentage24h { get; set; }
+
+    [JsonPropertyName("market_cap_change_24h")]
+    public decimal? MarketCapChange24h { get; set; }
+
+    [JsonPropertyName("market_cap_change_percentage_24h")]
+    public decimal? MarketCapChangePercentage24h { get; set; }
+
+    [JsonPropertyName("circulating_supply")]
+    public decimal? CirculatingSupply { get; set; }
+
+    [JsonPropertyName("total_supply")]
+    public decimal? TotalSupply { get; set; }
+
+    [JsonPropertyName("max_supply")]
+    public decimal? MaxSupply { get; set; }
+
+    [JsonPropertyName("ath")]
+    public decimal? Ath { get; set; }
+
+    [JsonPropertyName("ath_change_percentage")]
+    public decimal? AthChangePercentage { get; set; }
+
+    [JsonPropertyName("ath_date")]
+    public DateTime? AthDate { get; set; }
+
+    [JsonPropertyName("atl")]
+    public decimal? Atl { get; set; }
+
+    [JsonPropertyName("atl_change_percentage")]
+    public decimal? AtlChangePercentage { get; set; }
+
+    [JsonPropertyName("atl_date")]
+    public DateTime? AtlDate { get; set; }
+
+    [JsonPropertyName("last_updated")]
+    public DateTime? LastUpdated { get; set; }
+
+    [JsonPropertyName("price_change_percentage_7d_in_currency")]
+    public decimal? PriceChangePercentage7dInCurrency { get; set; }
+
+    [JsonPropertyName("price_change_percentage_30d_in_currency")]
+    public decimal? PriceChangePercentage30dInCurrency { get; set; }
 }

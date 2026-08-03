@@ -11,6 +11,8 @@
     <Thickness x:Key="SmallCardPadding">8</Thickness>
     <Thickness x:Key="TagPadding">4,2</Thickness>
     <Thickness x:Key="TinyPadding">4</Thickness>
+    <Thickness x:Key="SmallPadding">8</Thickness>
+    <Thickness x:Key="DefaultPadding">12</Thickness>
     
     <!-- Margin 定义 -->
     <Thickness x:Key="DefaultMargin">12</Thickness>
@@ -175,6 +177,10 @@
     <!-- ========== 窗口尺寸约束 ========== -->
     <x:Double x:Key="MainWindowMinWidth">800</x:Double>
     <x:Double x:Key="MainWindowMinHeight">600</x:Double>
+
+    <!-- ========== 导航栏尺寸 ========== -->
+    <GridLength x:Key="NavRailWidth">72</GridLength>
+    <Thickness x:Key="MarketLabelMargin">0,4,0,8</Thickness>
     
     <!-- ========== 动画时长定义 ========== -->
     <x:Double x:Key="FastAnimationSeconds">0.15</x:Double>

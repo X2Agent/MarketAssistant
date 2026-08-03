@@ -12,13 +12,20 @@
 
     <UserControl.Resources>
         <converts:RadioButtonEqualityConverter x:Key="RadioButtonEqualityConverter"/>
+        <x:Double x:Key="ServerListWidth">320</x:Double>
+        <Thickness x:Key="ChipPadding">4,0</Thickness>
+        <Thickness x:Key="EditorBottomMargin">0,0,0,80</Thickness>
     </UserControl.Resources>
 
     <Design.DataContext>
         <vm:MCPConfigPageViewModel/>
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="320,*">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{StaticResource ServerListWidth}"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
         <!-- 左侧服务器列表 -->
         <Border Grid.Column="0" 
                 Background="{DynamicResource ItemBackgroundBrush}"
@@ -34,7 +41,7 @@
                     <Button Content="添加服务器" 
                             Command="{Binding AddServerCommand}" 
                             Classes="action-button"
-                            Background="{DynamicResource SuccessBrush}"
+                            Background="{StaticResource SuccessBrush}"
                             Foreground="White"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"/>
@@ -69,11 +76,11 @@
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                         CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource TinyHorizontalMargin}"
+                                                        Padding="{StaticResource ChipPadding}"
                                                         IsVisible="{Binding IsEnabled}">
                                                     <TextBlock Text="启用" 
                                                                FontSize="{StaticResource MiniFontSize}" 
-                                                               Foreground="{DynamicResource SuccessBrush}"/>
+                                                               Foreground="{StaticResource SuccessBrush}"/>
                                                 </Border>
                                             </Grid>
                                             
@@ -86,7 +93,7 @@
                                             <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                     HorizontalAlignment="Left"
                                                     CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TinyHorizontalMargin}">
+                                                    Padding="{StaticResource ChipPadding}">
                                                 <TextBlock Text="{Binding TransportType}" 
                                                            FontSize="{StaticResource MiniFontSize}" 
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -120,19 +127,19 @@
         <Grid Grid.Column="1" RowDefinitions="*,Auto">
             <!-- 编辑表单区域 -->
             <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Padding="{StaticResource PagePadding}">
-                <StackPanel IsVisible="{Binding IsEditing}" Spacing="{StaticResource LargeSpacing}" Margin="0,0,0,80">
+                <StackPanel IsVisible="{Binding IsEditing}" Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource EditorBottomMargin}">
                     <!-- 基本信息 -->
                     <controls:CardView Header="基本信息" Padding="{StaticResource CardPadding}">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <!-- 服务器名称 -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
+                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="名称"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Name}" 
                                          PlaceholderText="请输入服务器名称"
-                                         Classes="clearButton"/>
+                                         />
                             </StackPanel>
 
                             <!-- 服务器描述 -->
@@ -143,13 +150,13 @@
                                          Height="{StaticResource TextAreaHeight}"
                                          AcceptsReturn="True"
                                          TextWrapping="Wrap"
-                                         Classes="clearButton"/>
+                                         />
                             </StackPanel>
 
                             <!-- 服务器类型 -->
                             <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
+                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="类型"/>
                                 </TextBlock>
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource LargeSpacing}">
@@ -168,7 +175,7 @@
                             <!-- 命令/URL配置 (stdio) -->
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}">
                                 <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
+                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="命令"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" PlaceholderText="请输入命令，如 npx"/>
@@ -177,7 +184,7 @@
                             <!-- 命令/URL配置 (sse) -->
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}">
                                 <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
+                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" PlaceholderText="请输入 URL，如 http://localhost:3000/sse"/>
@@ -189,7 +196,7 @@
                             <!-- 命令/URL配置 (streamableHttp) -->
                             <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}">
                                 <TextBlock FontSize="{StaticResource LabelFontSize}" Foreground="{DynamicResource TextSecondaryBrush}">
-                                    <Run Text="*" Foreground="{DynamicResource ErrorBrush}"/>
+                                    <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="URL"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding Command}" PlaceholderText="请输入 URL，如 http://localhost:3000/mcp"/>
@@ -256,7 +263,7 @@
                     
                     <TextBlock Grid.Column="0"
                                Text="{Binding TestStatus}"
-                               Foreground="{DynamicResource SuccessBrush}"
+                               Foreground="{StaticResource SuccessBrush}"
                                VerticalAlignment="Center"
                                IsVisible="{Binding !IsTesting}"/>
                     
@@ -272,7 +279,7 @@
                         <Button Content="删除" 
                                 Command="{Binding DeleteServerCommand}"
                                 Classes="action-button"
-                                Background="{DynamicResource ErrorBrush}"
+                                Background="{StaticResource ErrorBrush}"
                                 Foreground="White"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
                                 IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
@@ -281,7 +288,7 @@
                                 Command="{Binding TestConnectionCommand}"
                                 IsEnabled="{Binding !IsTesting}"
                                 Classes="action-button"
-                                Background="{DynamicResource InfoBrush}"
+                                Background="{StaticResource InfoBrush}"
                                 Foreground="White"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"/>
                         
@@ -289,7 +296,7 @@
                                 Command="{Binding SaveServerCommand}"
                                 IsEnabled="{Binding !IsTesting}"
                                 Classes="action-button"
-                                Background="{DynamicResource PrimaryBrush}"
+                                Background="{StaticResource PrimaryBrush}"
                                 Foreground="White"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"/>
                     </StackPanel>

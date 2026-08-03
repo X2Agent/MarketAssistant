@@ -1,6 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Globalization;

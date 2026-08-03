@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -137,12 +138,21 @@ public class AShareAssetInfoService : IAssetInfoService
             if (data.TryGetProperty("last_px", out var priceEl))
                 assetInfo.CurrentPrice = priceEl.ToString();
 
-            // 涨跌幅
+            // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%；部分场景可能返回带%文本）
             if (data.TryGetProperty("change", out var changeEl))
             {
                 var changeText = changeEl.ToString();
                 if (!string.IsNullOrEmpty(changeText))
-                    assetInfo.ChangePercentage = changeText.Contains('%') ? changeText : $"{changeText}%";
+                {
+                    if (changeText.EndsWith('%'))
+                    {
+                        assetInfo.ChangePercentage = changeText;
+                    }
+                    else if (decimal.TryParse(changeText, NumberStyles.Number, CultureInfo.InvariantCulture, out var ratio))
+                    {
+                        assetInfo.ChangePercentage = $"{ratio * 100:+0.00;-0.00;0.00}%";
+                    }
+                }
             }
         }
         catch (Exception ex)

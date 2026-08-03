@@ -20,18 +20,18 @@ namespace MarketAssistant.Agents.Tools;
 public class GroundingSearchTools : IToolsProvider
 {
     private readonly IRetrievalOrchestrator _orchestrator;
-    private readonly IWebTextSearchFactory _webTextSearchFactory;
+    private readonly IWebSearchService _webSearchService;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<GroundingSearchTools> _logger;
 
     public GroundingSearchTools(
         IRetrievalOrchestrator orchestrator,
-        IWebTextSearchFactory webTextSearchFactory,
+        IWebSearchService webSearchService,
         IUserSettingService userSettingService,
         ILogger<GroundingSearchTools> logger)
     {
         _orchestrator = orchestrator;
-        _webTextSearchFactory = webTextSearchFactory;
+        _webSearchService = webSearchService;
         _userSettingService = userSettingService;
         _logger = logger;
     }
@@ -132,35 +132,9 @@ public class GroundingSearchTools : IToolsProvider
     /// <summary>
     /// 执行网络搜索
     /// </summary>
-    private async Task<IReadOnlyList<TextSearchResult>> ExecuteWebSearch(string query, int top)
+    private Task<IReadOnlyList<TextSearchResult>> ExecuteWebSearch(string query, int top)
     {
-        var textSearch = _webTextSearchFactory.Create();
-        if (textSearch is null)
-        {
-            _logger.LogWarning("网络搜索服务不可用");
-            return new List<TextSearchResult>();
-        }
-
-        try
-        {
-            var testSearchResults = await textSearch.GetTextSearchResultsAsync(query, new TextSearchOptions
-            {
-                Top = top
-            });
-            var results = new List<TextSearchResult>();
-            await foreach (var r in testSearchResults.Results)
-            {
-                results.Add(r);
-            }
-
-            return results;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "网络搜索失败: {Query}", query);
-        }
-
-        return new List<TextSearchResult>();
+        return _webSearchService.SearchAsync(query, top);
     }
 
     /// <summary>

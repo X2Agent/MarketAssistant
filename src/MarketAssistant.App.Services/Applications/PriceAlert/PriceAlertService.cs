@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using Microsoft.Data.Sqlite;
@@ -25,9 +25,13 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
     private readonly IHttpClientFactory _httpClientFactory;
 
     private readonly object _syncRoot = new();
+    private readonly object _initializationLock = new();
+    private Task? _initializationTask;
     private List<PriceAlertRule> _rules = [];
     private readonly CancellationTokenSource _pollingCts = new();
+    private readonly SemaphoreSlim _subscriptionLock = new(1, 1);
     private Task? _pollingTask;
+    private Task? _subscriptionTask;
 
     public IReadOnlyList<PriceAlertRule> Rules
     {
@@ -40,6 +44,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
     public event Action? RulesChanged;
+    public event Action<PriceAlertRule>? RuleQuoteUpdated;
 
     public PriceAlertService(
         BinanceWebSocketService wsService,
@@ -62,11 +67,23 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
     /// 从数据库异步加载规则到内存，并订阅活跃的虚拟币规则。
     /// 应在应用启动时调用。
     /// </summary>
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        lock (_initializationLock)
+        {
+            _initializationTask ??= InitializeCoreAsync(cancellationToken);
+            return _initializationTask;
+        }
+    }
+
+    private async Task InitializeCoreAsync(CancellationToken cancellationToken)
     {
         await LoadRulesAsync(cancellationToken);
-        SubscribeActiveCryptoRules();
+        await RefreshCryptoSubscriptionSafeAsync();
     }
+
+    private Task EnsureServiceInitializedAsync(CancellationToken cancellationToken) =>
+        InitializeAsync(cancellationToken);
 
     protected override async Task InitializeDatabaseAsync()
     {
@@ -80,6 +97,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
                 market_type INTEGER NOT NULL,
                 condition INTEGER NOT NULL,
                 target_price REAL NOT NULL,
+                is_one_time INTEGER NOT NULL DEFAULT 0,
                 triggered INTEGER NOT NULL DEFAULT 0,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL
@@ -88,112 +106,131 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             CREATE INDEX IF NOT EXISTS idx_alert_enabled ON price_alert_rules(enabled, market_type);
             """;
         await cmd.ExecuteNonQueryAsync();
+
+        // 兼容旧库：早期版本没有 is_one_time 列，此处补齐，旧规则默认按持续告警处理
+        await using var checkCmd = conn.CreateCommand();
+        checkCmd.CommandText = "PRAGMA table_info(price_alert_rules)";
+        await using var reader = await checkCmd.ExecuteReaderAsync();
+        var hasOneTimeColumn = false;
+        while (await reader.ReadAsync())
+        {
+            if (string.Equals(reader.GetString(1), "is_one_time", StringComparison.OrdinalIgnoreCase))
+            {
+                hasOneTimeColumn = true;
+                break;
+            }
+        }
+
+        if (!hasOneTimeColumn)
+        {
+            await using var alterCmd = conn.CreateCommand();
+            alterCmd.CommandText = "ALTER TABLE price_alert_rules ADD COLUMN is_one_time INTEGER NOT NULL DEFAULT 0";
+            await alterCmd.ExecuteNonQueryAsync();
+        }
     }
 
     public async Task AddRuleAsync(PriceAlertRule rule, CancellationToken cancellationToken = default)
     {
+        await EnsureServiceInitializedAsync(cancellationToken);
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO price_alert_rules (id, asset_code, asset_name, market_type, condition, target_price, is_one_time, triggered, enabled, created_at)
+            VALUES (@id, @assetCode, @assetName, @marketType, @condition, @targetPrice, @isOneTime, @triggered, @enabled, @createdAt)
+            """;
+        cmd.Parameters.AddWithValue("@id", rule.Id);
+        cmd.Parameters.AddWithValue("@assetCode", rule.AssetCode);
+        cmd.Parameters.AddWithValue("@assetName", rule.AssetName);
+        cmd.Parameters.AddWithValue("@marketType", (int)rule.MarketType);
+        cmd.Parameters.AddWithValue("@condition", (int)rule.Condition);
+        cmd.Parameters.AddWithValue("@targetPrice", (double)rule.TargetPrice);
+        cmd.Parameters.AddWithValue("@isOneTime", rule.IsOneTime ? 1 : 0);
+        cmd.Parameters.AddWithValue("@triggered", rule.Triggered ? 1 : 0);
+        cmd.Parameters.AddWithValue("@enabled", rule.Enabled ? 1 : 0);
+        cmd.Parameters.AddWithValue("@createdAt", rule.CreatedAt.ToString("O"));
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+
         lock (_syncRoot)
         {
             _rules.Add(rule);
         }
 
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                INSERT INTO price_alert_rules (id, asset_code, asset_name, market_type, condition, target_price, triggered, enabled, created_at)
-                VALUES (@id, @assetCode, @assetName, @marketType, @condition, @targetPrice, @triggered, @enabled, @createdAt)
-                """;
-            cmd.Parameters.AddWithValue("@id", rule.Id);
-            cmd.Parameters.AddWithValue("@assetCode", rule.AssetCode);
-            cmd.Parameters.AddWithValue("@assetName", rule.AssetName);
-            cmd.Parameters.AddWithValue("@marketType", (int)rule.MarketType);
-            cmd.Parameters.AddWithValue("@condition", (int)rule.Condition);
-            cmd.Parameters.AddWithValue("@targetPrice", (double)rule.TargetPrice);
-            cmd.Parameters.AddWithValue("@triggered", rule.Triggered ? 1 : 0);
-            cmd.Parameters.AddWithValue("@enabled", rule.Enabled ? 1 : 0);
-            cmd.Parameters.AddWithValue("@createdAt", rule.CreatedAt.ToString("O"));
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "保存价格预警规则失败");
-        }
-
         RulesChanged?.Invoke();
-
-        if (rule.Enabled && rule.MarketType == MarketType.Crypto)
-            _ = SubscribeSafeAsync([ToBinanceFormat(rule.AssetCode)]);
+        QueueCryptoSubscriptionRefresh();
     }
 
     public async Task RemoveRuleAsync(string ruleId, CancellationToken cancellationToken = default)
     {
+        await EnsureServiceInitializedAsync(cancellationToken);
+
+        PriceAlertRule? rule;
+        lock (_syncRoot)
+        {
+            rule = _rules.FirstOrDefault(r => r.Id == ruleId);
+        }
+
+        if (rule == null)
+            return;
+
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM price_alert_rules WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", ruleId);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+
         lock (_syncRoot)
         {
             _rules.RemoveAll(r => r.Id == ruleId);
         }
 
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM price_alert_rules WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", ruleId);
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "删除价格预警规则失败");
-        }
-
         RulesChanged?.Invoke();
+        QueueCryptoSubscriptionRefresh();
     }
 
     public async Task ToggleRuleAsync(string ruleId, CancellationToken cancellationToken = default)
     {
+        await EnsureServiceInitializedAsync(cancellationToken);
+
         PriceAlertRule? rule;
+        bool newEnabled;
         lock (_syncRoot)
         {
             rule = _rules.FirstOrDefault(r => r.Id == ruleId);
             if (rule == null) return;
 
-            rule.Enabled = !rule.Enabled;
+            newEnabled = !rule.Enabled;
+        }
+
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE price_alert_rules SET enabled = @enabled, triggered = 0 WHERE id = @id";
+        cmd.Parameters.AddWithValue("@enabled", newEnabled ? 1 : 0);
+        cmd.Parameters.AddWithValue("@id", ruleId);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+        lock (_syncRoot)
+        {
+            rule = _rules.FirstOrDefault(r => r.Id == ruleId);
+            if (rule == null) return;
+
+            rule.Enabled = newEnabled;
             rule.Triggered = false;
         }
 
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "UPDATE price_alert_rules SET enabled = @enabled, triggered = 0 WHERE id = @id";
-            cmd.Parameters.AddWithValue("@enabled", rule.Enabled ? 1 : 0);
-            cmd.Parameters.AddWithValue("@id", ruleId);
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "更新价格预警规则失败");
-        }
-
         RulesChanged?.Invoke();
-
-        if (rule.Enabled && rule.MarketType == MarketType.Crypto)
-            _ = SubscribeSafeAsync([ToBinanceFormat(rule.AssetCode)]);
+        QueueCryptoSubscriptionRefresh();
     }
 
     private void OnCryptoPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
     {
-        if (!IsNotificationEnabled()) return;
-
         List<PriceAlertRule> rules;
         lock (_syncRoot)
         {
             rules = _rules
-                .Where(r => r.MarketType == MarketType.Crypto && r.Enabled && !r.Triggered)
+                .Where(r => r.MarketType == MarketType.Crypto && r.Enabled)
                 .ToList();
         }
 
@@ -203,7 +240,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             if (!ruleSymbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            TryTriggerRule(rule.Id, lastPrice);
+            UpdateRuleQuoteAndEvaluate(rule.Id, lastPrice, changePercent);
         }
     }
 
@@ -214,21 +251,19 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             using var timer = new PeriodicTimer(ASharePollingInterval);
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                if (!IsNotificationEnabled()) continue;
-
                 List<PriceAlertRule> rules;
                 lock (_syncRoot)
                 {
                     rules = _rules
-                        .Where(r => r.MarketType == MarketType.AShare && r.Enabled && !r.Triggered)
+                        .Where(r => r.MarketType == MarketType.AShare && r.Enabled)
                         .ToList();
                 }
 
                 foreach (var rule in rules)
                 {
-                    var latestPrice = await GetAShareLatestPriceAsync(rule.AssetCode, cancellationToken);
-                    if (latestPrice.HasValue)
-                        TryTriggerRule(rule.Id, latestPrice.Value);
+                    var quote = await GetAShareLatestQuoteAsync(rule.AssetCode, cancellationToken);
+                    if (quote is not null)
+                        UpdateRuleQuoteAndEvaluate(rule.Id, quote.Value.Price, quote.Value.ChangePercent);
                 }
             }
         }
@@ -241,7 +276,11 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
 
-    private async Task<decimal?> GetAShareLatestPriceAsync(string assetCode, CancellationToken cancellationToken)
+    /// <summary>
+    /// 获取A股实时行情（财联社 CLS 行情接口，与搜索/详情数据源一致）。
+    /// 注意 CLS 的 change 为小数比率（如 -0.0082 表示 -0.82%）。
+    /// </summary>
+    private async Task<(decimal Price, decimal? ChangePercent)?> GetAShareLatestQuoteAsync(string assetCode, CancellationToken cancellationToken)
     {
         try
         {
@@ -250,7 +289,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
                 return null;
 
             var url =
-                $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px&app=CailianpressWeb&os=web&sv=8.4.6";
+                $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px,change&app=CailianpressWeb&os=web&sv=8.4.6";
 
             using var httpClient = _httpClientFactory.CreateClient("Cls");
             using var response = await httpClient.GetAsync(url, cancellationToken);
@@ -262,17 +301,33 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             if (!jsonDocument.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
                 return null;
 
-            if (!data.TryGetProperty("last_px", out var priceElement))
-                return null;
+            decimal? price = null;
+            if (data.TryGetProperty("last_px", out var priceElement))
+            {
+                if (priceElement.ValueKind == JsonValueKind.Number && priceElement.TryGetDecimal(out var numberPrice))
+                    price = numberPrice;
+                else if (priceElement.ValueKind == JsonValueKind.String &&
+                         decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
+                    price = stringPrice;
+            }
 
-            if (priceElement.ValueKind == JsonValueKind.Number && priceElement.TryGetDecimal(out var price))
-                return price;
+            decimal? changePercent = null;
+            if (data.TryGetProperty("change", out var changeElement))
+            {
+                var changeText = changeElement.ToString();
+                if (changeText.EndsWith('%') &&
+                    decimal.TryParse(changeText.TrimEnd('%'), NumberStyles.Number, CultureInfo.InvariantCulture, out var percentValue))
+                {
+                    changePercent = percentValue;
+                }
+                else if (decimal.TryParse(changeText, NumberStyles.Number, CultureInfo.InvariantCulture, out var ratio))
+                {
+                    // CLS 返回小数比率，换算为百分比
+                    changePercent = ratio * 100;
+                }
+            }
 
-            if (priceElement.ValueKind == JsonValueKind.String &&
-                decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
-                return stringPrice;
-
-            return null;
+            return price.HasValue ? (price.Value, changePercent) : null;
         }
         catch (OperationCanceledException)
         {
@@ -285,87 +340,112 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
 
-    private void TryTriggerRule(string ruleId, decimal lastPrice)
+    private void UpdateRuleQuoteAndEvaluate(string ruleId, decimal lastPrice, decimal? changePercent = null)
     {
         PriceAlertRule? rule;
+        bool shouldNotify;
+        bool autoDisabled;
         lock (_syncRoot)
         {
-            rule = _rules.FirstOrDefault(r => r.Id == ruleId && r.Enabled && !r.Triggered);
+            rule = _rules.FirstOrDefault(r => r.Id == ruleId && r.Enabled);
             if (rule == null) return;
 
-            var triggered = rule.Condition switch
-            {
-                AlertCondition.PriceAbove => lastPrice >= rule.TargetPrice,
-                AlertCondition.PriceBelow => lastPrice <= rule.TargetPrice,
-                _ => false
-            };
+            rule.UpdateQuote(lastPrice, changePercent, DateTime.UtcNow);
+            shouldNotify = rule.UpdateTriggerState(lastPrice, changePercent);
 
-            if (!triggered) return;
-
-            rule.Triggered = true;
-            rule.Enabled = false;
+            // 一次性告警首次触发后自动停用；重新启用需用户手动操作开关
+            autoDisabled = shouldNotify && rule.IsOneTime;
+            if (autoDisabled)
+                rule.Enabled = false;
         }
 
-        // 异步持久化触发状态，不阻塞通知流程
-        _ = PersistRuleTriggeredAsync(ruleId);
+        RuleQuoteUpdated?.Invoke(rule);
+
+        if (autoDisabled)
+        {
+            _ = PersistRuleDisabledAsync(ruleId);
+            QueueCryptoSubscriptionRefresh();
+        }
+
+        if (!shouldNotify)
+            return;
 
         if (IsNotificationEnabled())
         {
-            var direction = rule.Condition == AlertCondition.PriceAbove ? "突破上方" : "跌破下方";
+            var targetText = rule.IsPercentCondition ? $"{rule.TargetPrice:N2}%" : rule.TargetPrice.ToString("N2");
+            var valueText = rule.IsPercentCondition && changePercent.HasValue ? $"{changePercent.Value:N2}%" : lastPrice.ToString("N2");
+            var direction = rule.Condition switch
+            {
+                AlertCondition.PriceAbove => "涨破",
+                AlertCondition.PriceBelow => "跌破",
+                AlertCondition.ChangePercentAbove => "涨幅超过",
+                AlertCondition.ChangePercentBelow => "跌幅超过",
+                _ => "达到"
+            };
             _notificationService.ShowWarning(
-                $"🔔 {rule.AssetName}({rule.AssetCode}) 当前价 {lastPrice}，已{direction}预警价 {rule.TargetPrice}",
+                $"🔔 {rule.AssetName}({rule.AssetCode}) 当前{valueText}，已{direction}目标 {targetText}",
                 durationMs: 10000);
         }
 
         RulesChanged?.Invoke();
     }
 
-    private async Task PersistRuleTriggeredAsync(string ruleId)
+    private void QueueCryptoSubscriptionRefresh()
+    {
+        var nextTask = RefreshCryptoSubscriptionSafeAsync();
+        lock (_syncRoot)
+        {
+            _subscriptionTask = nextTask;
+        }
+    }
+
+    private async Task RefreshCryptoSubscriptionSafeAsync()
+    {
+        await _subscriptionLock.WaitAsync(_pollingCts.Token);
+        try
+        {
+            List<string> symbols;
+            lock (_syncRoot)
+            {
+                symbols = _rules
+                    .Where(r => r.MarketType == MarketType.Crypto && r.Enabled)
+                    .Select(r => ToBinanceFormat(r.AssetCode))
+                    .Distinct()
+                    .ToList();
+            }
+
+            await _wsService.SubscribeAsync(WebSocketSubscriberKeys.PriceAlerts, symbols);
+        }
+        catch (OperationCanceledException) when (_pollingCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "WebSocket 订阅失败，价格预警可能无法实时推送");
+        }
+        finally
+        {
+            _subscriptionLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 一次性告警触发后持久化停用状态，避免应用重启后规则再次生效。
+    /// </summary>
+    private async Task PersistRuleDisabledAsync(string ruleId)
     {
         try
         {
             await EnsureInitializedAsync(InitializeDatabaseAsync);
             await using var conn = await OpenConnectionAsync();
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "UPDATE price_alert_rules SET triggered = 1, enabled = 0 WHERE id = @id";
+            cmd.CommandText = "UPDATE price_alert_rules SET enabled = 0, triggered = 1 WHERE id = @id";
             cmd.Parameters.AddWithValue("@id", ruleId);
             await cmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "持久化预警触发状态失败: {RuleId}", ruleId);
-        }
-    }
-
-    private void SubscribeActiveCryptoRules()
-    {
-        List<string> symbols;
-        lock (_syncRoot)
-        {
-            symbols = _rules
-                .Where(r => r.MarketType == MarketType.Crypto && r.Enabled && !r.Triggered)
-                .Select(r => ToBinanceFormat(r.AssetCode))
-                .Distinct()
-                .ToList();
-        }
-
-        if (symbols.Count > 0)
-            _ = SubscribeSafeAsync(symbols);
-    }
-
-    /// <summary>
-    /// 安全的 WebSocket 订阅封装：捕获并记录异常，避免 fire-and-forget 调用吞掉错误。
-    /// </summary>
-    private async Task SubscribeSafeAsync(IReadOnlyCollection<string> symbols)
-    {
-        try
-        {
-            await _wsService.SubscribeAsync(symbols);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "WebSocket 订阅失败，价格预警可能无法实时推送: {Symbols}",
-                string.Join(", ", symbols));
+            Logger.LogWarning(ex, "持久化一次性预警停用状态失败: {RuleId}", ruleId);
         }
     }
 
@@ -377,7 +457,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                SELECT id, asset_code, asset_name, market_type, condition, target_price, triggered, enabled, created_at
+                SELECT id, asset_code, asset_name, market_type, condition, target_price, is_one_time, triggered, enabled, created_at
                 FROM price_alert_rules
                 """;
 
@@ -393,9 +473,10 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
                     MarketType = (MarketType)reader.GetInt32(3),
                     Condition = (AlertCondition)reader.GetInt32(4),
                     TargetPrice = (decimal)reader.GetDouble(5),
-                    Triggered = reader.GetInt32(6) != 0,
-                    Enabled = reader.GetInt32(7) != 0,
-                    CreatedAt = DateTime.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                    IsOneTime = reader.GetInt32(6) != 0,
+                    Triggered = false,
+                    Enabled = reader.GetInt32(8) != 0,
+                    CreatedAt = DateTime.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
                 });
             }
 
@@ -417,15 +498,18 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
     public void Dispose()
     {
         _wsService.PriceUpdated -= OnCryptoPriceUpdated;
+        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.PriceAlerts);
         _pollingCts.Cancel();
         try
         {
-            _pollingTask?.Wait(TimeSpan.FromSeconds(5));
+            Task.WhenAll(_pollingTask ?? Task.CompletedTask, _subscriptionTask ?? Task.CompletedTask)
+                .Wait(TimeSpan.FromSeconds(5));
         }
         catch (AggregateException ex)
         {
             ex.Handle(e => e is OperationCanceledException);
         }
+        _subscriptionLock.Dispose();
         _pollingCts.Dispose();
     }
 

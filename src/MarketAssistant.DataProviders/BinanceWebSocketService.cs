@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// Binance WebSocket 实时行情服务，通过 mini-ticker 推送价格更新
@@ -15,7 +15,19 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     private readonly ILogger<BinanceWebSocketService> _logger;
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
-    private readonly HashSet<string> _subscribedSymbols = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 各订阅方（价格告警、交易监控、收藏页、资产详情）独立维护的交易对集合。
+    /// 实际订阅集为所有订阅方的并集，任一订阅方退订只影响自己的集合，
+    /// 避免某模块取消订阅时把其他模块的行情订阅一并清空。
+    /// </summary>
+    private readonly Dictionary<string, HashSet<string>> _subscriberSymbols = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 当前实际连接的交易对集合（所有订阅方并集，小写），供 ReconnectAsync 使用。
+    /// </summary>
+    private HashSet<string> _subscribedSymbols = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly Lock _lock = new();
 
     /// <summary>
@@ -29,34 +41,64 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// 订阅指定交易对的实时行情
+    /// 以指定订阅方身份订阅实时行情。同一订阅方重复调用会整体替换其交易对集合，
+    /// 因此调用方应在此传入该订阅方当前需要的完整集合。
     /// </summary>
+    /// <param name="subscriberKey">订阅方标识（见 <see cref="WebSocketSubscriberKeys"/>）</param>
     /// <param name="symbols">Binance 格式的交易对列表，如 ["BTCUSDT","ETHUSDT"]</param>
-    public async Task SubscribeAsync(IEnumerable<string> symbols)
+    public async Task SubscribeAsync(string subscriberKey, IEnumerable<string> symbols)
     {
-        var symbolList = symbols.Select(s => s.ToLowerInvariant()).Distinct().ToList();
-        if (symbolList.Count == 0) return;
+        var symbolSet = symbols.Select(s => s.ToLowerInvariant()).Distinct().ToHashSet();
 
+        bool changed;
         lock (_lock)
         {
-            foreach (var s in symbolList)
-                _subscribedSymbols.Add(s);
+            _subscriberSymbols[subscriberKey] = symbolSet;
+            changed = RecomputeSubscribedSymbolsLocked();
         }
 
-        await ReconnectAsync();
+        if (!changed) return;
+
+        if (_subscribedSymbols.Count == 0)
+            await DisconnectAsync();
+        else
+            await ReconnectAsync();
     }
 
     /// <summary>
-    /// 取消订阅并断开连接
+    /// 取消指定订阅方的全部订阅。仅移除该订阅方自身的交易对集合，
+    /// 不会影响其他订阅方的订阅；并集为空时断开连接。
     /// </summary>
-    public async Task UnsubscribeAllAsync()
+    public async Task UnsubscribeAllAsync(string subscriberKey)
     {
+        bool changed;
         lock (_lock)
         {
-            _subscribedSymbols.Clear();
+            changed = _subscriberSymbols.Remove(subscriberKey) && RecomputeSubscribedSymbolsLocked();
         }
 
-        await DisconnectAsync();
+        if (!changed) return;
+
+        if (_subscribedSymbols.Count == 0)
+            await DisconnectAsync();
+        else
+            await ReconnectAsync();
+    }
+
+    /// <summary>
+    /// 在 _lock 内重算所有订阅方的并集；返回并集是否发生变化，调用方据此决定是否重连。
+    /// </summary>
+    private bool RecomputeSubscribedSymbolsLocked()
+    {
+        var union = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var symbols in _subscriberSymbols.Values)
+            union.UnionWith(symbols);
+
+        if (union.SetEquals(_subscribedSymbols))
+            return false;
+
+        _subscribedSymbols = union;
+        return true;
     }
 
     private async Task ReconnectAsync()
@@ -210,19 +252,21 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         _cts?.Dispose();
         _cts = null;
 
-        if (_ws != null)
-        {
-            try
-            {
-                if (_ws.State == WebSocketState.Open || _ws.State == WebSocketState.CloseReceived)
-                    _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "dispose", CancellationToken.None)
-                        .Wait(TimeSpan.FromSeconds(3));
-            }
-            catch { }
-            _ws.Dispose();
-            _ws = null;
-        }
+        // 同步释放底层 WebSocket，不等待异步 CloseOutputAsync
+        _ws?.Dispose();
+        _ws = null;
 
         GC.SuppressFinalize(this);
     }
+}
+
+/// <summary>
+/// 预定义订阅方标识，保证各模块退订时使用与订阅时一致的 key。
+/// </summary>
+public static class WebSocketSubscriberKeys
+{
+    public const string PriceAlerts = "price-alerts";
+    public const string MarketMonitor = "market-monitor";
+    public const string Favorites = "favorites";
+    public const string AssetDetail = "asset-detail";
 }

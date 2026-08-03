@@ -1,4 +1,5 @@
 using MarketAssistant.Views.Windows;
+using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Notification;
 
@@ -8,6 +9,11 @@ namespace MarketAssistant.Services.Notification;
 public class NotificationService : INotificationService
 {
     private const int DefaultDuration = 5000;
+
+    public NotificationService(ILogger<NotificationService> logger)
+    {
+        _logger = logger;
+    }
 
     public void ShowSuccess(string message, int durationMs = DefaultDuration)
     {
@@ -44,7 +50,7 @@ public class NotificationService : INotificationService
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"显示通知失败: {ex.Message}");
+                _logger.LogError(ex, "显示桌面通知失败");
             }
         });
     }

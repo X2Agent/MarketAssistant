@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
+using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace MarketAssistant.ViewModels.Trading;
 
@@ -19,6 +21,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
     private readonly TradingDataService _dataService;
+    private readonly TradingStrategyService _strategyService;
+    private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradeExecutor _tradeExecutor;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
@@ -58,6 +62,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         CryptoPortfolioService portfolioService,
         [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         TradingDataService dataService,
+        TradingStrategyService strategyService,
+        OrderStateSyncService orderStateSyncService,
         TradeExecutor tradeExecutor,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
@@ -66,6 +72,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _portfolioService = portfolioService;
         _exchangeClient = exchangeClient;
         _dataService = dataService;
+        _strategyService = strategyService;
+        _orderStateSyncService = orderStateSyncService;
         _tradeExecutor = tradeExecutor;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
@@ -80,12 +88,23 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     {
         await SafeExecuteAsync(async () =>
         {
+            await _orderStateSyncService.SyncPendingOrdersAsync(force: true);
+
             TodayStats = await _dataService.GetTodayStatsAsync();
             RiskConfig = await _dataService.LoadRiskConfigAsync();
 
             // 计算风控指标
             RemainingDailyTrades = Math.Max(0, RiskConfig.MaxDailyTrades - TodayStats.TradeCount);
 
+            // 本地 SQLite 数据不依赖币安 API，独立加载避免被 API 异常连带跳过
+            var positions = await _dataService.GetOpenPositionsAsync();
+            Positions.Clear();
+            foreach (var p in positions)
+            {
+                Positions.Add(p);
+            }
+
+            // 以下为币安 HTTP 调用，API 未配置或网络异常时降级处理
             try
             {
                 var summary = await _portfolioService.GetAccountBalanceSummaryAsync();
@@ -124,32 +143,39 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
                 IsPositionHigh = RiskConfig.MaxTotalPositionPercent > 0
                                  && TotalPositionPercent / RiskConfig.MaxTotalPositionPercent >= RiskWarningThreshold;
 
-                // 加载 FIFO 持仓
-                var positions = await _dataService.GetOpenPositionsAsync();
-                Positions.Clear();
-                foreach (var p in positions)
-                {
-                    Positions.Add(p);
-                }
-
                 var orders = await _exchangeClient.GetOpenOrdersAsync();
                 OpenOrders.Clear();
                 foreach (var o in orders)
                     OpenOrders.Add(o);
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException ||
+                                       ex.InnerException is InvalidOperationException)
             {
-                Logger?.LogWarning("Binance API 未配置，跳过账户数据加载");
+                // API 未配置场景：BinanceAuthService.EnsureConfigured 抛 InvalidOperationException
+                // 被 BinanceAccountServiceBase 包装为 FriendlyException(InnerException = InvalidOperationException)
+                Logger?.LogWarning("Binance API 未配置，跳过账户余额与未完成订单加载");
+            }
+            catch (Exception ex) when (ex is FriendlyException ||
+                                       ex.InnerException is HttpRequestException)
+            {
+                // API 已配置但网络/请求失败：保留本地数据，仅记录日志
+                Logger?.LogWarning(ex, "Binance API 调用失败，账户余额与未完成订单未刷新");
             }
 
             // 加载活跃策略
-            var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active);
             ActiveStrategies.Clear();
             foreach (var s in activeStrategies)
             {
                 ActiveStrategies.Add(s);
             }
         }, "刷新交易监控");
+    }
+
+    [RelayCommand]
+    private void ShowBalanceDetail()
+    {
+        WeakReferenceMessenger.Default.Send(new NavigationMessage("BalanceDetail"));
     }
 
     [RelayCommand]

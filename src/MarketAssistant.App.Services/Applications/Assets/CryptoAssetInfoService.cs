@@ -1,6 +1,6 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;

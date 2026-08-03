@@ -5,13 +5,14 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
+
 
 namespace MarketAssistant.ViewModels;
 
@@ -22,7 +23,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 {
     public override string Title => "资产详情";
 
-    private readonly IServiceProvider _serviceProvider;
+    private readonly Func<MarketType, IKLineService> _klineServiceResolver;
     private readonly MarketContext _marketContext;
     private readonly BinanceWebSocketService _wsService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
@@ -67,11 +68,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
-        IServiceProvider serviceProvider,
+        Func<MarketType, IKLineService> klineServiceResolver,
         MarketContext marketContext,
         BinanceWebSocketService wsService) : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _klineServiceResolver = klineServiceResolver ?? throw new ArgumentNullException(nameof(klineServiceResolver));
         _marketContext = marketContext;
         _wsService = wsService;
 
@@ -171,7 +172,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(_marketContext.CurrentMarket);
+            var klineService = _klineServiceResolver(_marketContext.CurrentMarket);
             var kLineDataList = await klineService.GetKLineDataAsync(assetCode, CurrentKLineType);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -262,12 +263,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                 _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
 
                 // 5. 虚拟币市场订阅 WebSocket 实时价格
-                if (_marketContext.CurrentMarket == MarketType.Crypto)
+                // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
+                var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
+                if (effectiveMarket == MarketType.Crypto)
                 {
                     // 订阅前先取消订阅，防止重复
                     _wsService.PriceUpdated -= OnDetailPriceUpdated;
                     _wsService.PriceUpdated += OnDetailPriceUpdated;
-                    _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+                    _ = _wsService.SubscribeAsync(WebSocketSubscriberKeys.AssetDetail, [ToBinanceFormat(parameter.Code)]);
                 }
             }
         }
@@ -297,6 +300,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         _loadingCancellationTokenSource?.Cancel();
         _loadingCancellationTokenSource?.Dispose();
         _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.AssetDetail);
         GC.SuppressFinalize(this);
     }
 }

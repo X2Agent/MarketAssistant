@@ -1,6 +1,6 @@
 # MarketAssistant.Trading — AGENTS.md
 
-遗留交易抽象项目，定义交易所客户端统一接口。**当前目录仍存在，但已不在主解决方案引用链中**；活跃的交易编排与执行实现位于 `MarketAssistant.App.Services`。
+共享交易契约项目，定义交易所统一接口、交易模型与跨层共享 DTO。活跃的交易编排与执行实现位于 `MarketAssistant.App.Services`；当前目录负责稳定契约边界，而非运行时编排。
 
 ---
 
@@ -8,9 +8,15 @@
 
 ```
 MarketAssistant.Trading/
-├── TradingModels.cs          ← 遗留交易模型
-└── Abstractions/
-    └── IExchangeClient.cs   ← 交易所客户端接口 + 相关 DTO
+├── TradingEnums.cs           ← 跨层共享枚举（StrategyType / OrderSide / CryptoTradingMode 等）
+├── TradingStrategy.cs        ← 交易策略配置（持久化模型）
+├── TradeRecord.cs            ← 交易执行记录（持久化模型）
+├── RiskModels.cs             ← RiskConfig / RiskCheckResult / DailyStats
+├── StrategyParams.cs         ← GridTradingParams / DCAParams 策略参数
+├── TradingViewModels.cs      ← Agent 视图 DTO + Position + TradingContext
+├── Abstractions/
+│   └── IExchangeClient.cs   ← 交易所客户端契约 + 相关 DTO
+└── MarketAssistant.Trading.csproj
 ```
 
 ---
@@ -26,12 +32,12 @@ MarketAssistant.Trading/
 
 ---
 
-## 当前状态
+## 当前定位
 
-- 本项目不是当前主线开发入口；不要继续在这里新增交易实现。
-- 新增交易 Agent、策略工具、执行工具、风控与持久化实现，放在 `MarketAssistant.App.Services/Trading/` 或 `MarketAssistant.App.Services/Agents/Tools/Crypto/`。
-- 若未来决定恢复独立交易抽象层，应先同步更新根目录 `AGENTS.md`、解决方案文件和项目引用，再恢复在本项目扩展。
-- 在未恢复主线引用前，这里的文件仅视为遗留代码，不作为架构边界依据。
+- 本项目是主线引用中的共享契约层，由 `App`、`App.Services`、`Agents` 等项目共同引用。
+- 这里只放稳定接口、跨层共享模型、轻量上下文对象；不要放交易流程编排、风控实现、持久化、Agent 决策或 UI 逻辑。
+- 新增交易运行时能力，放在 `MarketAssistant.App.Services/Trading/` 或 `MarketAssistant.App.Services/Agents/Tools/Crypto/`。
+- 若后续需要进一步收敛边界，优先把契约继续稳定在此层，而不是把实现回填进来。
 
 ---
 

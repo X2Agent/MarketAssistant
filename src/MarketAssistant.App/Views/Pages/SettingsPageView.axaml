@@ -11,6 +11,7 @@
 
     <UserControl.Resources>
         <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <Thickness x:Key="GridItemMargin">0,0,8,16</Thickness>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -159,18 +160,18 @@
                                      PlaceholderText="嵌入服务API端点"/>
                         </StackPanel>
 
-                        <!-- API密鑰 -->
+                        <!-- API密钥 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="API密鑰"
+                            <TextBlock Text="API密钥"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.EmbeddingApiKey}"
-                                         PlaceholderText="请输入嵌入服务API密鑰"
+                                         PlaceholderText="请输入嵌入服务API密钥"
                                          PasswordChar="&#9679;"/>
                                 <Button Grid.Column="1"
-                                        Content="获取密鑰"
+                                        Content="获取密钥"
                                         Classes="btn-info"
                                         Command="{Binding OpenEmbeddingApiWebsiteCommand}"
                                         Margin="{StaticResource SmallLeftMargin}"/>
@@ -227,10 +228,19 @@
                         <!-- 虚拟币市场API配置 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}" 
                                     IsVisible="{Binding IsCryptoMarket}">
+                            <TextBlock Text="交易环境与 API 密钥"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="交易模式切换与 Binance API 密钥配置已移至交易页面的「API 密钥」标签页，密钥使用 AES-GCM 加密独立存储。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+
                             <!-- CoinGecko API密钥 -->
                             <TextBlock Text="CoinGecko API密钥（可选）"
                                        FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="{StaticResource SmallTopMargin}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.CoinGeckoApiKey}"
@@ -245,25 +255,6 @@
                             <TextBlock Text="用于获取代币市值、供应量等数据。免费版有限额但无需API Key"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-
-                            <!-- Binance API 配置 -->
-                            <TextBlock Text="Binance API Key（交易功能必须）"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,8,0,0"/>
-                            <TextBox Text="{Binding UserSetting.BinanceApiKey}"
-                                     PlaceholderText="请输入 Binance API Key"
-                                     PasswordChar="●"/>
-
-                            <TextBlock Text="Binance Secret Key"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
-                                     PlaceholderText="请输入 Binance Secret Key"
-                                     PasswordChar="●"/>
-                            <TextBlock Text="用于自主交易功能。请确保 API Key 仅开启现货交易权限，不要开启提现权限"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource WarningBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>
@@ -346,7 +337,7 @@
                                     <PathIcon Data="{StaticResource LoadingIcon}"
                                               Width="{StaticResource DefaultIconSize}"
                                               Height="{StaticResource DefaultIconSize}"
-                                              Foreground="{DynamicResource PrimaryBrush}"
+                                              Foreground="{StaticResource PrimaryBrush}"
                                               IsVisible="{Binding IsVectorizing}"/>
                                 </StackPanel>
                                 
@@ -357,7 +348,7 @@
                                                  Height="{StaticResource ProgressBarHeight}"/>
                                     <TextBlock Text="{Binding VectorizingProgressText}"
                                                FontSize="{StaticResource BodyFontSize}"
-                                               Foreground="{DynamicResource PrimaryBrush}"
+                                               Foreground="{StaticResource PrimaryBrush}"
                                                FontWeight="Medium"/>
                                 </StackPanel>
                                 
@@ -379,7 +370,7 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBlock Text="注意：启用的角色越多，消耗的Token越多"
                                        FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{Binding AnalystRoles}">
@@ -392,7 +383,7 @@
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="Auto,*" 
                                           RowDefinitions="Auto,Auto" 
-                                          Margin="0,0,8,16">
+                                          Margin="{StaticResource GridItemMargin}">
                                         <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
                                                   IsChecked="{Binding IsEnabled}"
                                                   IsEnabled="{Binding !IsRequired}"
@@ -479,7 +470,7 @@
                             
                             <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
                                        FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>

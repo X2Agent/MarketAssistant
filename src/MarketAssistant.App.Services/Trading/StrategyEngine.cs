@@ -1,20 +1,35 @@
 using System.Text.Json;
+using MarketAssistant.Services.Trading.Exchanges;
+using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
-/// 策略引擎，管理用户策略并评估触发条件
+/// 策略引擎，管理用户策略并评估触发条件。
+/// 合约模式下支持将止损/止盈/追踪止损提交为交易所原生条件单，
+/// 由交易所服务端监控触发，无需客户端持续轮询价格。
 /// </summary>
 public class StrategyEngine
 {
     private readonly TradingDataService _dataService;
+    private readonly TradingStrategyService _strategyService;
+    private readonly RoutingExchangeClient _exchangeClient;
+    private readonly TradingEnvironmentService _environmentService;
     private readonly ILogger<StrategyEngine> _logger;
 
-    public StrategyEngine(TradingDataService dataService, ILogger<StrategyEngine> logger)
+    public StrategyEngine(
+        TradingDataService dataService,
+        TradingStrategyService strategyService,
+        RoutingExchangeClient exchangeClient,
+        TradingEnvironmentService environmentService,
+        ILogger<StrategyEngine> logger)
     {
         _dataService = dataService;
+        _strategyService = strategyService;
+        _exchangeClient = exchangeClient;
+        _environmentService = environmentService;
         _logger = logger;
     }
 
@@ -33,7 +48,7 @@ public class StrategyEngine
     public async Task<List<TradingStrategy>> EvaluateAndUpdateStrategiesAsync(
         string symbol, decimal currentPrice, CancellationToken ct = default)
     {
-        var activeStrategies = await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
+        var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
         var triggered = new List<TradingStrategy>();
 
         foreach (var strategy in activeStrategies)
@@ -43,7 +58,7 @@ public class StrategyEngine
 
             if (strategy.MaxExecutions.HasValue && strategy.ExecutionCount >= strategy.MaxExecutions.Value)
             {
-                await _dataService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct);
+                await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct);
                 continue;
             }
 
@@ -71,13 +86,19 @@ public class StrategyEngine
             StrategyType.StopLoss => (EvaluateStopLoss(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TakeProfit => (EvaluateTakeProfit(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TrailingStop => (await EvaluateAndUpdateTrailingStopAsync(strategy, currentPrice, ct), strategy.Side, strategy.Quantity),
-            StrategyType.AISignal => (EvaluateAISignal(strategy), strategy.Side, strategy.Quantity),
+            StrategyType.AISignal => (await EvaluateAndUpdateAISignalAsync(strategy, ct).ConfigureAwait(false), strategy.Side, strategy.Quantity),
             StrategyType.GridTrading => EvaluateAndUpdateGridTrading(strategy, currentPrice, out var gs, out var gq) ? (true, gs, gq) : (false, strategy.Side, strategy.Quantity),
             StrategyType.DCA => await EvaluateDCAAsync(strategy, currentPrice, ct),
             _ => (false, strategy.Side, strategy.Quantity)
         };
     }
 
+    /// <summary>
+    /// 止损触发评估。
+    /// 注意 Side 在此处表示"持仓方向"而非执行动作：Sell 侧 = 持有多头（跌破触发价卖出止损），
+    /// Buy 侧 = 持有空头（涨破触发价买入止损）。该语义与 <see cref="EvaluateTakeProfit"/> 中的
+    /// Buy 侧（跌至触发价买入建仓）不同，两者是刻意区分的设计。
+    /// </summary>
     private static bool EvaluateStopLoss(TradingStrategy strategy, decimal currentPrice)
     {
         // Side 表示触发时要执行的操作方向
@@ -88,6 +109,11 @@ public class StrategyEngine
         return currentPrice >= strategy.TriggerPrice;
     }
 
+    /// <summary>
+    /// 止盈触发评估。
+    /// Sell 侧 = 持有多头，涨至触发价卖出止盈（真止盈）；
+    /// Buy 侧 = 尚未建仓，跌至触发价买入，语义上等价于"限价买入"（并非止盈，为历史命名保留）。
+    /// </summary>
     private static bool EvaluateTakeProfit(TradingStrategy strategy, decimal currentPrice)
     {
         // Sell 侧止盈：持有多头仓位，价格涨至触发价时卖出止盈
@@ -167,7 +193,14 @@ public class StrategyEngine
     // 未配置时的安全默认值，防止每个价格 tick 都触发 AI 调用
     private const int DefaultAISignalIntervalSeconds = 60;
 
-    private bool EvaluateAISignal(TradingStrategy strategy)
+    /// <summary>
+    /// AI 信号策略的评估节流：满足间隔条件时触发，并在触发时立即持久化评估时间，
+    /// 保证 Agent 决定 HOLD 或被风控拒绝等未成交场景同样进入冷却期，
+    /// 避免无成交时每个价格 tick 都重复调用 LLM（高成本）。
+    /// 注意：会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.LastTriggeredAt"/> 字段。
+    /// </summary>
+    private async Task<bool> EvaluateAndUpdateAISignalAsync(
+        TradingStrategy strategy, CancellationToken ct)
     {
         var intervalSeconds = DefaultAISignalIntervalSeconds;
 
@@ -190,9 +223,13 @@ public class StrategyEngine
         if (strategy.LastTriggeredAt.HasValue)
         {
             var elapsed = (DateTime.UtcNow - strategy.LastTriggeredAt.Value).TotalSeconds;
-            return elapsed >= intervalSeconds;
+            if (elapsed < intervalSeconds)
+                return false;
         }
 
+        // 触发即记入冷却期：无论后续 Agent 是否实际成交，本次评估都消耗一次节流窗口
+        strategy.LastTriggeredAt = DateTime.UtcNow;
+        await _dataService.UpdateStrategyLastTriggeredAtAsync(strategy.Id, ct).ConfigureAwait(false);
         return true;
     }
 
@@ -234,10 +271,11 @@ public class StrategyEngine
             }
             if (currentPrice > gridParams.UpperPrice)
             {
-                // 价格涨破网格上界：检查破网止盈
+                // 价格涨破网格上界：检查破网止盈。网格在上涨中逐线卖出，突破上界时应卖出剩余库存清仓，
+                // 与破网止损方向对称；若反向买入会在高点开出全网格量多头。
                 if (gridParams.TakeProfitPrice.HasValue && currentPrice >= gridParams.TakeProfitPrice.Value)
                 {
-                    effectiveSide = OrderSide.Buy;
+                    effectiveSide = OrderSide.Sell;
                     effectiveQty = gridParams.QuantityPerGrid * gridParams.GridCount;
                     _logger.LogWarning(
                         "网格破网止盈触发: {StrategyId} 价格 {Price} >= 止盈位 {TakeProfit}，清仓 {Qty}",
@@ -349,6 +387,109 @@ public class StrategyEngine
         {
             _logger.LogWarning(ex, "解析 DCA 参数失败: {StrategyId}", strategy.Id);
             return (false, strategy.Side, strategy.Quantity);
+        }
+    }
+
+    /// <summary>
+    /// 当前交易模式是否支持原生条件单（仅合约模式支持）。
+    /// </summary>
+    public bool IsNativeConditionalOrderSupported => _exchangeClient.IsFutures;
+
+    /// <summary>
+    /// 尝试将止损/止盈/追踪止损策略提交为交易所原生条件单。
+    /// 仅合约模式支持；现货模式返回 null，调用方应回退到客户端轮询评估。
+    /// </summary>
+    /// <returns>交易所返回的订单 ID；不支持或失败时返回 null</returns>
+    public async Task<string?> TryPlaceNativeConditionalOrderAsync(
+        TradingStrategy strategy, CancellationToken ct = default)
+    {
+        if (!_exchangeClient.IsFutures)
+            return null;
+
+        try
+        {
+            var orderType = strategy.Type switch
+            {
+                StrategyType.StopLoss => OrderType.StopMarket,
+                StrategyType.TakeProfit => OrderType.TakeProfitMarket,
+                StrategyType.TrailingStop => OrderType.TrailingStopMarket,
+                _ => (OrderType?)null
+            };
+
+            if (!orderType.HasValue)
+                return null;
+
+            // 条件单均以 reduceOnly=true 提交，确保只平仓不开新仓
+            decimal? stopPrice = null;
+            int? trailingDelta = null;
+
+            if (strategy.Type == StrategyType.TrailingStop)
+            {
+                // 从 CustomParams 解析回调比例（百分比转基点：1% = 100）
+                if (!string.IsNullOrEmpty(strategy.CustomParams))
+                {
+                    using var doc = JsonDocument.Parse(strategy.CustomParams);
+                    if (doc.RootElement.TryGetProperty("trailingPercent", out var tpEl))
+                    {
+                        var percent = tpEl.GetDecimal();
+                        trailingDelta = (int)(percent * 100);
+                    }
+                }
+                if (!trailingDelta.HasValue || trailingDelta.Value <= 0)
+                {
+                    _logger.LogWarning("追踪止损策略 {StrategyId} 缺少 trailingPercent 参数，无法提交原生条件单", strategy.Id);
+                    return null;
+                }
+            }
+            else
+            {
+                stopPrice = strategy.TriggerPrice;
+            }
+
+            var result = await _exchangeClient.PlaceOrderAsync(
+                strategy.Symbol,
+                strategy.Side,
+                orderType.Value,
+                strategy.Quantity,
+                stopPrice: stopPrice,
+                reduceOnly: true,
+                trailingDelta: trailingDelta,
+                ct: ct);
+
+            _logger.LogInformation(
+                "策略 {StrategyId} 已提交为原生条件单：{Type} {Side} {Symbol} 订单ID={OrderId}",
+                strategy.Id, orderType.Value, strategy.Side, strategy.Symbol, result.OrderId);
+
+            return result.OrderId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "策略 {StrategyId} 提交原生条件单失败，将回退到客户端评估", strategy.Id);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 取消交易所上的原生条件单（策略完成或删除时调用）。
+    /// </summary>
+    public async Task<bool> TryCancelNativeConditionalOrderAsync(
+        string symbol, string orderId, CancellationToken ct = default)
+    {
+        if (!_exchangeClient.IsFutures || string.IsNullOrEmpty(orderId))
+            return false;
+
+        try
+        {
+            await _exchangeClient.CancelOrderAsync(symbol, orderId, ct);
+            _logger.LogInformation("已取消原生条件单：{Symbol} 订单ID={OrderId}", symbol, orderId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "取消原生条件单失败：{Symbol} 订单ID={OrderId}", symbol, orderId);
+            return false;
         }
     }
 }

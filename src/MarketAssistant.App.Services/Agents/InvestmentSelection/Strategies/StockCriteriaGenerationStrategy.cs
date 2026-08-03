@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -7,7 +6,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// <summary>
 /// 股票筛选条件生成策略
 /// </summary>
-public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<StockCriteria>
+public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<StockCriteria>
 {
     private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -23,9 +22,9 @@ public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Stock
         PropertyNameCaseInsensitive = true
     };
 
-    public MarketType SupportedMarketType => MarketType.AShare;
+    public override MarketType SupportedMarketType => MarketType.AShare;
 
-    public string BuildUserRequirementSystemPrompt()
+    public override string BuildUserRequirementSystemPrompt()
     {
         return """
 ## 主要任务
@@ -143,7 +142,7 @@ public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Stock
 """;
     }
 
-    public string BuildNewsAnalysisSystemPrompt()
+    public override string BuildNewsAnalysisSystemPrompt()
     {
         return """
 ## 任务

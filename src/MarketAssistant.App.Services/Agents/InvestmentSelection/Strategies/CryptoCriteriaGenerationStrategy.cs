@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -7,7 +6,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// <summary>
 /// 虚拟币筛选条件生成策略
 /// </summary>
-public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<CryptoCriteria>
+public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<CryptoCriteria>
 {
     private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -25,9 +24,9 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
         PropertyNameCaseInsensitive = true
     };
 
-    public MarketType SupportedMarketType => MarketType.Crypto;
+    public override MarketType SupportedMarketType => MarketType.Crypto;
 
-    public string BuildUserRequirementSystemPrompt()
+    public override string BuildUserRequirementSystemPrompt()
     {
         return """
 ## 主要任务
@@ -82,7 +81,7 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
 """;
     }
 
-    public string BuildNewsAnalysisSystemPrompt()
+    public override string BuildNewsAnalysisSystemPrompt()
     {
         return """
 ## 任务

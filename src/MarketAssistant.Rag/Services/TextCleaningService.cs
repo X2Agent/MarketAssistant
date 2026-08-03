@@ -43,7 +43,7 @@ public class TextCleaningService : ITextCleaningService
     {
     }
 
-    public string Clean(string text)
+    public string Clean(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
