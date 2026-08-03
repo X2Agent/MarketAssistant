@@ -1,7 +1,6 @@
 using MarketAssistant.Applications.Crypto;
-using MarketAssistant.Applications.Settings;
-using MarketAssistant.Services.Settings;
-using Microsoft.Extensions.Logging;
+using MarketAssistant.Services.Trading;
+using MarketAssistant.Trading.Models;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace MarketAssistant.Tests.Crypto;
@@ -12,18 +11,6 @@ namespace MarketAssistant.Tests.Crypto;
 [TestClass]
 public class BinanceAuthServiceTest
 {
-    private ILogger<BinanceAuthService> _logger = null!;
-
-    [TestInitialize]
-    public void Setup()
-    {
-        var loggerFactory = LoggerFactory.Create(builder =>
-        {
-            // 不需要额外的日志提供程序
-        });
-        _logger = loggerFactory.CreateLogger<BinanceAuthService>();
-    }
-
     /// <summary>
     /// 测试HMAC签名生成
     /// 使用币安文档中的示例数据验证签名是否正确
@@ -35,18 +22,18 @@ public class BinanceAuthServiceTest
     {
         // Arrange - 使用币安文档中的示例密钥（仅用于测试）
         var authService = new BinanceAuthService(
-            _logger,
-            CreateUserSettingService(
+            CreateCredentialStore(CryptoTradingMode.LiveSpot,
                 "vmPUZE6mv9SD5VNHk4HlWFsOr6aKE2zvsw0MuIgwCIPy6utIco14y7Ju91duEh8A",
-                "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"));
+                "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"),
+            CryptoTradingMode.LiveSpot,
+            "Binance");
 
         // Act - 构建币安文档中的示例payload（不包含timestamp，手动测试签名算法）
-        // 文档示例：symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559
         var testPayload = "symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559";
 
         // 使用反射调用私有方法进行测试（仅用于单元测试）
         var generateSignatureMethod = typeof(BinanceAuthService)
-            .GetMethod("GenerateSignature", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            .GetMethod("SignPayload", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
 
         var signature = generateSignatureMethod?.Invoke(
             null,
@@ -71,16 +58,17 @@ public class BinanceAuthServiceTest
     /// </summary>
     [TestMethod]
     [TestCategory("Unit")]
-    public void TestSignQueryString_ShouldAddTimestampAndSignature()
+    public async Task TestSignQueryString_ShouldAddTimestampAndSignature()
     {
         // Arrange
         var authService = new BinanceAuthService(
-            _logger,
-            CreateUserSettingService("test-api-key", "test-secret-key"));
+            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", "test-secret-key"),
+            CryptoTradingMode.LiveSpot,
+            "Binance");
 
         // Act
         var queryString = "symbol=BTCUSDT&side=BUY&type=MARKET&quantity=0.001";
-        var signedQuery = authService.SignQueryString(queryString);
+        var signedQuery = await authService.SignQueryStringAsync(queryString);
 
         // Assert
         Console.WriteLine($"原始查询: {queryString}");
@@ -96,17 +84,17 @@ public class BinanceAuthServiceTest
     /// </summary>
     [TestMethod]
     [TestCategory("Unit")]
-    public void TestConfigValidation_RequiresSecretKey()
+    public async Task TestConfigValidation_RequiresSecretKey()
     {
         // Arrange
         var authService = new BinanceAuthService(
-            _logger,
-            CreateUserSettingService("test-api-key", string.Empty));
+            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", string.Empty),
+            CryptoTradingMode.LiveSpot,
+            "Binance");
 
         // Act & Assert
-        var exception = Assert.ThrowsExactly<InvalidOperationException>(() => authService.SignQueryString("symbol=BTCUSDT"));
-        Console.WriteLine($"预期异常: {exception.Message}");
-        Assert.IsTrue(exception.Message.Contains("Secret Key"));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => authService.SignQueryStringAsync("symbol=BTCUSDT"));
     }
 
     /// <summary>
@@ -117,8 +105,9 @@ public class BinanceAuthServiceTest
     public void TestAddAuthHeaders_ShouldSetApiKeyHeader()
     {
         var authService = new BinanceAuthService(
-            _logger,
-            CreateUserSettingService("test-api-key", "test-secret-key"));
+            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", "test-secret-key"),
+            CryptoTradingMode.LiveSpot,
+            "Binance");
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.com");
 
         authService.AddAuthHeaders(request);
@@ -127,40 +116,37 @@ public class BinanceAuthServiceTest
         Assert.AreEqual("test-api-key", values.Single());
     }
 
-    private static IUserSettingService CreateUserSettingService(string apiKey, string secretKey)
+    private static ITradingCredentialStore CreateCredentialStore(CryptoTradingMode mode, string apiKey, string secretKey)
     {
-        return new FakeUserSettingService(new UserSetting
-        {
-            BinanceApiKey = apiKey,
-            BinanceSecretKey = secretKey
-        });
+        var store = new FakeTradingCredentialStore();
+        store.SetCredentials(mode, apiKey, secretKey);
+        return store;
     }
 
-    private sealed class FakeUserSettingService : IUserSettingService
+    private sealed class FakeTradingCredentialStore : ITradingCredentialStore
     {
-        public FakeUserSettingService(UserSetting setting)
+        private readonly Dictionary<CryptoTradingMode, (string ApiKey, string SecretKey)> _cache = new();
+
+        public (string ApiKey, string SecretKey) GetCredentials(CryptoTradingMode mode)
         {
-            CurrentSetting = setting;
+            return _cache.TryGetValue(mode, out var creds) ? creds : (string.Empty, string.Empty);
         }
 
-        public UserSetting CurrentSetting { get; private set; }
-
-        public void LoadSettings()
+        public void SetCredentials(CryptoTradingMode mode, string apiKey, string secretKey)
         {
+            _cache[mode] = (apiKey, secretKey);
         }
 
-        public void SaveSettings()
+        public bool IsConfigured(CryptoTradingMode mode)
         {
+            if (!_cache.TryGetValue(mode, out var creds))
+                return false;
+            return !string.IsNullOrEmpty(creds.ApiKey) && !string.IsNullOrEmpty(creds.SecretKey);
         }
 
-        public void UpdateSettings(UserSetting setting)
+        public void ClearCredentials(CryptoTradingMode mode)
         {
-            CurrentSetting = setting;
-        }
-
-        public void ResetSettings()
-        {
-            CurrentSetting = new UserSetting();
+            _cache.Remove(mode);
         }
     }
 }

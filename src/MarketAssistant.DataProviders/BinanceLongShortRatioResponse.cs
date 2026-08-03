@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安多空比 API 响应模型

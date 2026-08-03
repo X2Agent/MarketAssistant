@@ -1,4 +1,3 @@
-using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -7,16 +6,13 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// <summary>
 /// 股票筛选条件生成策略
 /// </summary>
-public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<StockCriteria>
+public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<StockCriteria>
 {
-    private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
-    {
-        PropertyNameCaseInsensitive = true
-    };
+    protected override string AssetTypeLabel => "股票";
 
-    public MarketType SupportedMarketType => MarketType.AShare;
+    public override MarketType SupportedMarketType => MarketType.AShare;
 
-    public string BuildUserRequirementSystemPrompt()
+    public override string BuildUserRequirementSystemPrompt()
     {
         return """
 ## 主要任务
@@ -134,7 +130,7 @@ public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Stock
 """;
     }
 
-    public string BuildNewsAnalysisSystemPrompt()
+    public override string BuildNewsAnalysisSystemPrompt()
     {
         return """
 ## 任务
@@ -206,41 +202,5 @@ public class StockCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Stock
 - pb < 2  
 - roediluted > 8  
 """;
-    }
-
-    public string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
-    {
-        if (request.IsNewsAnalysis)
-        {
-            return $"""
-                新闻内容：
-                {request.Content}
-
-                推荐股票数量限制：{request.MaxRecommendations}
-
-                请根据新闻内容生成股票筛选条件。
-                """;
-        }
-        else
-        {
-            return $"""
-                用户需求：
-                {request.Content}
-
-                推荐股票数量限制：{request.MaxRecommendations}
-
-                请根据用户需求生成股票筛选条件。
-                """;
-        }
-    }
-
-    public StockCriteria DeserializeCriteria(string json)
-    {
-        var criteria = LlmJsonExtractor.Deserialize<StockCriteria>(json, DeserializationOptions);
-        if (criteria == null)
-        {
-            throw new InvalidOperationException("股票筛选条件 JSON 解析失败");
-        }
-        return criteria;
     }
 }

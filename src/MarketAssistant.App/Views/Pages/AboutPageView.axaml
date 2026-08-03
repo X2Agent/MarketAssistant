@@ -81,7 +81,7 @@
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"/>
                         </Border>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="{Binding Company}"
                                        FontSize="{StaticResource TinyFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>

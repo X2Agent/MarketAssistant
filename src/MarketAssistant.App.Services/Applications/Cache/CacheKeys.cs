@@ -1,4 +1,5 @@
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Applications.Cache;
 
@@ -26,6 +27,11 @@ public static class CacheKeys
     public const string CryptoSymbols = "AssetSymbols_Crypto_All";
 
     /// <summary>
+    /// 虚拟币账户余额概览缓存键的业务前缀（不含交易模式部分）。
+    /// </summary>
+    private const string CryptoAccountSummaryPrefix = "CryptoAccountSummary";
+
+    /// <summary>
     /// GitHub Release 缓存键。
     /// 与市场无关的应用更新检查缓存，无需市场前缀。
     /// </summary>
@@ -51,4 +57,11 @@ public static class CacheKeys
     /// </summary>
     public static string GetTradingAnalysisReportKey(MarketType market, string symbol)
         => $"{market}:{symbol}";
+
+    /// <summary>
+    /// 生成虚拟币账户余额概览缓存键（含交易模式，避免切换模式后读到旧环境账户数据）。
+    /// 供 <c>Trading.CryptoPortfolioService</c> 使用。
+    /// </summary>
+    public static string GetCryptoAccountSummaryKey(CryptoTradingMode mode)
+        => $"{CryptoAccountSummaryPrefix}_{mode}";
 }

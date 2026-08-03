@@ -31,12 +31,12 @@ public class AssetHistoryServiceTest
     public async Task Cleanup()
     {
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
         await aShareService.ClearHistoryAsync();
         await cryptoService.ClearHistoryAsync();
 
-        await _serviceProvider.DisposeAsync();
+        await _serviceProvider!.DisposeAsync();
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public class AssetHistoryServiceTest
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
         // Act
         await aShareService.AddHistoryAsync(new AssetItem { Code = "SH600519", Name = "贵州茅台" });

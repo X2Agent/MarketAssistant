@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.ViewModels;
+using MarketAssistant.ViewModels.Trading;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Navigation;
@@ -32,10 +33,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
     private readonly Stack<NavigationItem> _navigationStack = new();
     private readonly Dictionary<string, Type> _routes = new();
 
-    // 保持事件兼容性，但建议使用属性绑定
-    public event EventHandler<NavigationItem>? Navigated;
-    public event EventHandler? CanGoBackChanged;
-
     [ObservableProperty]
     private bool _canGoBack;
 
@@ -54,6 +51,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         RegisterRoute<MCPConfigPageViewModel>("MCPConfig");
         RegisterRoute<AssetPageViewModel>("Asset");
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
+        RegisterRoute<BalanceDetailPageViewModel>("BalanceDetail");
 
         // 注册导航消息监听
         WeakReferenceMessenger.Default.Register(this);
@@ -127,9 +125,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
 
         // 3. 更新状态（触发UI变更）
         UpdateState();
-
-        Navigated?.Invoke(this, navigationItem);
-        CanGoBackChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
@@ -170,15 +165,12 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
 
             // 3. 更新状态（触发UI变更）
             UpdateState();
-
-            Navigated?.Invoke(this, currentItem);
         }
         else
         {
             UpdateState();
         }
 
-        CanGoBackChanged?.Invoke(this, EventArgs.Empty);
         return true;
     }
 
@@ -218,7 +210,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         }
 
         UpdateState();
-        CanGoBackChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void UpdateState()

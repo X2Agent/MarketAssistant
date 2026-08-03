@@ -3,7 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// CoinDesk API服务

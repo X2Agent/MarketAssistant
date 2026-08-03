@@ -6,14 +6,12 @@ namespace MarketAssistant.Applications.InvestmentSelection;
 
 /// <summary>
 /// AI投资选择服务 - 业务逻辑层，负责对外API和业务规则
-/// 使用 Agent Framework Workflows 实现确定性投资选择流程
-/// 支持股票和虚拟币市场
+/// 使用确定性投资选择工作流支持股票和虚拟币市场
 /// </summary>
-public class InvestmentSelectionService : IDisposable
+public class InvestmentSelectionService
 {
     private readonly InvestmentSelectionWorkflow _selectionWorkflow;
     private readonly ILogger<InvestmentSelectionService> _logger;
-    private bool _disposed = false;
 
     public InvestmentSelectionService(
         InvestmentSelectionWorkflow selectionWorkflow,
@@ -389,25 +387,6 @@ public class InvestmentSelectionService : IDisposable
             "moderate" or "稳健" or "中等风险" or "中风险" => "moderate",
             _ => "moderate"
         };
-    }
-
-    #endregion
-
-    #region 资源管理
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposed && disposing)
-        {
-            _selectionWorkflow?.Dispose();
-            _disposed = true;
-        }
     }
 
     #endregion

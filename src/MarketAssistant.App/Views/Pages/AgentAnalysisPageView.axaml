@@ -39,7 +39,7 @@
                         Height="48"
                         Background="Transparent"
                         BorderBrush="{DynamicResource DividerBrush}"
-                        BorderThickness="0,0,0,1"
+                        BorderThickness="{StaticResource BottomBorderThickness}"
                         Padding="8,0">
                     <Button HorizontalAlignment="Right"
                             VerticalAlignment="Center"
@@ -47,7 +47,7 @@
                             Height="{StaticResource SmallIconButtonSize}"
                             CornerRadius="{StaticResource SmallCornerRadius}"
                             Background="Transparent"
-                            BorderThickness="0"
+                            BorderThickness="{StaticResource NoBorderThickness}"
                             Padding="0"
                             FontSize="{StaticResource LargeFontSize}"
                             Content="⋮"
@@ -87,21 +87,21 @@
                                         <Button HorizontalAlignment="Stretch"
                                                 HorizontalContentAlignment="Left"
                                                 Background="Transparent"
-                                                BorderThickness="0"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
                                                 Padding="{StaticResource CompactCardPadding}"
                                                 Margin="{StaticResource TinyBottomMargin}"
                                                 Command="{Binding ExportReportCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
-                                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                                 <TextBlock Text="📄" FontSize="{StaticResource LabelFontSize}" VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
                                         <!-- 分隔线 -->
-                                        <Border Height="1"
+                                        <Border Height="{StaticResource DividerHeight}"
                                                 Background="{DynamicResource DividerBrush}"
-                                                Margin="0,4"
+                                                Margin="{StaticResource TinyVerticalMargin}"
                                                 IsVisible="{Binding HasReportHistory}"/>
 
                                         <!-- 历史报告标题 -->
@@ -123,12 +123,12 @@
                                                         <Button HorizontalAlignment="Stretch"
                                                                 HorizontalContentAlignment="Left"
                                                                 Background="Transparent"
-                                                                BorderThickness="0"
-                                                                Padding="8,6"
-                                                                Margin="0,0,0,2"
+                                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                                Padding="8,4"
+                                                                Margin="{StaticResource TinyBottomMargin}"
                                                                 Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
                                                                 CommandParameter="{Binding}">
-                                                            <StackPanel Spacing="2">
+                                                            <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                                 <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
                                                                            FontSize="{StaticResource SmallFontSize}"
                                                                            FontWeight="SemiBold"/>
@@ -191,9 +191,9 @@
                             Width="{StaticResource FABSize}"
                             Height="{StaticResource FABSize}"
                             CornerRadius="{StaticResource FABCornerRadius}"
-                            Background="{DynamicResource PrimaryBrush}"
+                            Background="{StaticResource PrimaryBrush}"
                             Foreground="White"
-                            BorderThickness="0"
+                            BorderThickness="{StaticResource NoBorderThickness}"
                             Padding="0"
                             Command="{Binding ToggleChatSidebarCommand}"
                             ToolTip.Tip="智能对话"
@@ -201,10 +201,10 @@
                             VerticalContentAlignment="Center">
                         <Button.Styles>
                             <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
                             </Style>
                             <Style Selector="Button:pressed /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
                             </Style>
                         </Button.Styles>
                     </Button>

@@ -1,9 +1,10 @@
 using MarketAssistant.Infrastructure.Core;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Nodes;
 using System.Web;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安市场数据API服务（包含现货和期货公开端点）
@@ -12,6 +13,12 @@ public sealed class BinanceMarketDataService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BinanceMarketDataService> _logger;
+    private readonly IMemoryCache _memoryCache;
+
+    /// <summary>
+    /// 交易所信息缓存键
+    /// </summary>
+    private const string ExchangeInfoCacheKey = "BinanceExchangeInfo";
 
     private static readonly JsonSerializerOptions BinanceJsonSerializerOptions = new()
     {
@@ -21,10 +28,12 @@ public sealed class BinanceMarketDataService
 
     public BinanceMarketDataService(
         IHttpClientFactory httpClientFactory,
-        ILogger<BinanceMarketDataService> logger)
+        ILogger<BinanceMarketDataService> logger,
+        IMemoryCache memoryCache)
     {
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
     }
 
     /// <summary>
@@ -148,11 +157,18 @@ public sealed class BinanceMarketDataService
     #region 交易所信息
 
     /// <summary>
-    /// 获取交易所信息（仅返回 TRADING 状态的交易对）
+    /// 获取交易所信息（仅返回 TRADING 状态的交易对，使用 IMemoryCache 缓存1小时）
     /// </summary>
     public async Task<BinanceExchangeInfo?> GetExchangeInfoAsync(
         CancellationToken cancellationToken = default)
     {
+        // 尝试从缓存获取
+        if (_memoryCache.TryGetValue(ExchangeInfoCacheKey, out BinanceExchangeInfo? cachedInfo) && cachedInfo != null)
+        {
+            _logger.LogDebug("从缓存获取交易所信息，交易对数量: {Count}", cachedInfo.Symbols?.Count ?? 0);
+            return cachedInfo;
+        }
+
         var url = "/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false";
         _logger.LogDebug("调用币安交易所信息API");
 
@@ -160,9 +176,76 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, BinanceJsonSerializerOptions);
         _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
+
+        // 设置缓存（1小时过期）
+        if (exchangeInfo != null)
+        {
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+            };
+            _memoryCache.Set(ExchangeInfoCacheKey, exchangeInfo, cacheOptions);
+        }
+
         return exchangeInfo;
+    }
+
+    /// <summary>
+    /// 验证价格是否符合交易对的过滤器要求
+    /// </summary>
+    /// <param name="symbol">交易对符号（如 BTCUSDT）</param>
+    /// <param name="price">待验证的价格</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>验证结果与错误信息，验证通过时 ErrorMessage 为 null</returns>
+    public async Task<(bool IsValid, string? ErrorMessage)> ValidatePriceFilterAsync(
+        string symbol,
+        decimal price,
+        CancellationToken ct = default)
+    {
+        var exchangeInfo = await GetExchangeInfoAsync(ct);
+        if (exchangeInfo?.Symbols == null)
+        {
+            return (false, "获取交易所信息失败");
+        }
+
+        var symbolInfo = exchangeInfo.Symbols.FirstOrDefault(s =>
+            string.Equals(s.Symbol, symbol, StringComparison.OrdinalIgnoreCase));
+        if (symbolInfo == null)
+        {
+            return (false, "交易对不存在");
+        }
+
+        var priceFilter = symbolInfo.Filters?.FirstOrDefault(f =>
+            string.Equals(f.FilterType, "PRICE_FILTER", StringComparison.OrdinalIgnoreCase));
+        if (priceFilter == null)
+        {
+            // 无价格过滤器约束，视为有效
+            return (true, null);
+        }
+
+        if (priceFilter.MinPrice.HasValue && price < priceFilter.MinPrice.Value)
+        {
+            return (false, $"价格 {price} 低于最小价格限制 {priceFilter.MinPrice.Value}");
+        }
+
+        if (priceFilter.MaxPrice.HasValue && price > priceFilter.MaxPrice.Value)
+        {
+            return (false, $"价格 {price} 超过最大价格限制 {priceFilter.MaxPrice.Value}");
+        }
+
+        if (priceFilter.TickSize.HasValue && priceFilter.TickSize.Value > 0)
+        {
+            var tickSize = priceFilter.TickSize.Value;
+            var remainder = price % tickSize;
+            if (remainder != 0)
+            {
+                return (false, $"价格 {price} 不符合价格步长 {tickSize} 的要求");
+            }
+        }
+
+        return (true, null);
     }
 
     #endregion
@@ -260,7 +343,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, BinanceJsonSerializerOptions);
     }
 
     /// <summary>
@@ -286,7 +369,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceFundingRateResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceFundingRateResponse>();
     }
 
@@ -307,7 +390,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceLongShortRatioResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceLongShortRatioResponse>();
     }
 
@@ -327,7 +410,7 @@ public sealed class BinanceMarketDataService
         var response = await httpClient.GetAsync(url, cancellationToken);
         var content = await CheckAndReadResponseAsync(response, cancellationToken);
 
-        return JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+        return JsonSerializer.Deserialize<List<BinanceOpenInterestResponse>>(content, BinanceJsonSerializerOptions)
                ?? new List<BinanceOpenInterestResponse>();
     }
 

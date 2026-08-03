@@ -7,80 +7,113 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Applications.Crypto;
 
 /// <summary>
-/// 币安账户服务（需要鉴权）
-/// 示例：如何使用BinanceAuthService进行鉴权调用
+/// 币安账户服务基类，封装现货/合约共用的 HTTP 调用、签名、错误处理与双层 catch 模板。
+/// 子类只需提供端点前缀与响应映射逻辑。
+/// positionSide 参数仅在合约下单时使用，现货下单忽略。
 /// </summary>
-public class BinanceAccountService
+public abstract class BinanceAccountServiceBase
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<BinanceAccountService> _logger;
-    private readonly BinanceAuthService _authService;
-    public BinanceAccountService(
+    protected readonly IHttpClientFactory HttpClientFactory;
+    protected readonly ILogger Logger;
+    protected readonly IBinanceAuthService AuthService;
+    protected readonly string HttpClientName;
+    protected readonly string Label;
+
+    /// <param name="httpClientFactory">HttpClient 工厂</param>
+    /// <param name="logger">日志器</param>
+    /// <param name="authService">鉴权服务（决定实盘/Testnet 密钥来源）</param>
+    /// <param name="httpClientName">HttpClient 名称（"Binance" / "BinanceSpotDemo" / "BinanceFutures" / "BinanceFuturesTestnet"）</param>
+    /// <param name="label">错误提示前缀（"" / "Demo " / "Testnet "）</param>
+    protected BinanceAccountServiceBase(
         IHttpClientFactory httpClientFactory,
-        ILogger<BinanceAccountService> logger,
-        BinanceAuthService authService)
+        ILogger logger,
+        IBinanceAuthService authService,
+        string httpClientName,
+        string label)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _logger = logger;
-        _authService = authService;
+        HttpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        Logger = logger;
+        AuthService = authService;
+        HttpClientName = httpClientName;
+        Label = label;
     }
 
     /// <summary>
-    /// 获取账户信息（需要USER_DATA权限）
-    /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/account-endpoints#account-information-user_data
+    /// 账户信息端点（如 /api/v3/account、/fapi/v2/account）
+    /// </summary>
+    protected abstract string AccountEndpoint { get; }
+
+    /// <summary>
+    /// 订单端点（如 /api/v3/order、/fapi/v1/order）
+    /// </summary>
+    protected abstract string OrderEndpoint { get; }
+
+    /// <summary>
+    /// 挂单端点（如 /api/v3/openOrders、/fapi/v1/openOrders）
+    /// </summary>
+    protected abstract string OpenOrdersEndpoint { get; }
+
+    /// <summary>
+    /// 解析账户信息响应。子类负责将合约/现货特定结构映射为统一的 <see cref="BinanceAccountInfo"/>。
+    /// </summary>
+    protected abstract Task<BinanceAccountInfo> ParseAccountInfoAsync(HttpContent content, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 解析订单响应。子类负责将合约/现货特定结构映射为统一的 <see cref="BinanceOrderResponse"/>。
+    /// </summary>
+    protected abstract Task<BinanceOrderResponse> ParseOrderResponseAsync(HttpContent content, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 解析订单列表响应。
+    /// </summary>
+    protected abstract Task<List<BinanceOrderResponse>> ParseOrderListResponseAsync(HttpContent content, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 下单时附加特定参数（如合约的 positionSide）。默认无操作。
+    /// </summary>
+    protected virtual void AppendPlaceOrderParameters(Dictionary<string, string> parameters, string? positionSide)
+    {
+        // 现货无需额外参数；合约子类重写以添加 positionSide
+    }
+
+    /// <summary>
+    /// 获取账户信息。子类通过 <see cref="ParseAccountInfoAsync"/> 提供响应解析。
     /// </summary>
     public async Task<BinanceAccountInfo> GetAccountInfoAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            // 1. 准备请求参数（本接口无额外参数，只需要签名）
-            var signedQuery = _authService.SignQueryString("");
+            var signedQuery = await AuthService.SignQueryStringAsync("", cancellationToken);
+            var url = $"{AccountEndpoint}?{signedQuery}";
 
-            // 2. 构建完整URL
-            var url = $"/api/v3/account?{signedQuery}";
-
-            // 3. 创建HTTP请求并添加鉴权Header
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            _authService.AddAuthHeaders(request);
+            AuthService.AddAuthHeaders(request);
 
-            // 4. 发送请求
-            _logger.LogInformation("正在获取币安账户信息...");
-            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            Logger.LogInformation("正在获取{Label}账户信息...", Label);
+            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, "获取账户信息", cancellationToken);
+            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}获取账户信息", cancellationToken);
 
-            var accountInfo = await response.Content.ReadFromJsonAsync<BinanceAccountInfo>(cancellationToken);
-
-            if (accountInfo == null)
-            {
-                throw new FriendlyException("解析账户信息失败");
-            }
-
-            _logger.LogInformation("成功获取账户信息，账户类型: {AccountType}", accountInfo.AccountType);
-            return accountInfo;
+            return await ParseAccountInfoAsync(response.Content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "获取账户信息失败 - 网络错误");
-            throw new FriendlyException("获取账户信息失败: 网络连接错误", ex);
+            Logger.LogError(ex, "{Label}获取账户信息失败 - 网络错误", Label);
+            throw new FriendlyException($"{Label}获取账户信息失败: 网络连接错误", ex);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "获取账户信息失败");
-            throw new FriendlyException($"获取账户信息失败: {ex.Message}", ex);
+            Logger.LogError(ex, "{Label}获取账户信息失败", Label);
+            throw new FriendlyException($"{Label}获取账户信息失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 下单示例（需要TRADE权限）
-    /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/market-data-endpoints#place-new-order-trade
+    /// 下单。先校验账户可交易，再按现货/合约端点签名调用。子类通过 <see cref="AppendPlaceOrderParameters"/> 注入特定参数。
     /// </summary>
-    /// <param name="symbol">交易对，如BTCUSDT</param>
-    /// <param name="side">买卖方向：BUY或SELL</param>
-    /// <param name="type">订单类型：LIMIT、MARKET等</param>
-    /// <param name="quantity">数量</param>
-    /// <param name="price">价格（限价单需要）</param>
-    /// <param name="clientOrderId">客户端自定义订单 ID，用于幂等性保护</param>
+    /// <param name="reduceOnly">合约平仓时传 true，确保只平仓不开新仓（仅合约有效，现货忽略）</param>
+    /// <param name="stopPrice">条件单触发价（STOP_MARKET/TAKE_PROFIT_MARKET 必填）</param>
+    /// <param name="trailingDelta">追踪止损回调比例（基点，1%=100，TRAILING_STOP_MARKET 必填）</param>
     public async Task<BinanceOrderResponse> PlaceOrderAsync(
         string symbol,
         string side,
@@ -88,20 +121,20 @@ public class BinanceAccountService
         decimal quantity,
         decimal? price = null,
         string? clientOrderId = null,
+        string? positionSide = null,
+        bool reduceOnly = false,
+        decimal? stopPrice = null,
+        int? trailingDelta = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            // 下单前校验账户交易权限，避免账户被限制时产生无效请求
             var accountInfo = await GetAccountInfoAsync(cancellationToken);
             if (!accountInfo.CanTrade)
             {
-                throw new FriendlyException("账户当前被限制交易，无法下单（可能因违规、KYC 未完成或地区限制）");
+                throw new FriendlyException($"{Label}账户当前被限制交易，无法下单（可能因违规、KYC 未完成或地区限制）");
             }
 
-            // 1. 构建请求参数
-            // 注意：数量/价格必须使用 InvariantCulture 格式化，否则在逗号小数区域（如 de-DE）
-            // 会生成 "1,23456789"，币安 API 返回 -1100 非法字符错误。
             var parameters = new Dictionary<string, string>
             {
                 ["symbol"] = symbol.ToUpper(),
@@ -110,11 +143,15 @@ public class BinanceAccountService
                 ["quantity"] = quantity.ToString("F8", CultureInfo.InvariantCulture)
             };
 
-            // 幂等性：传入 newClientOrderId 后，币安对同一 ID 的重复请求返回同一订单而非新建
             if (!string.IsNullOrEmpty(clientOrderId))
                 parameters["newClientOrderId"] = clientOrderId;
 
-            // 限价单需要价格和timeInForce
+            AppendPlaceOrderParameters(parameters, positionSide);
+
+            // 合约平仓时传入 reduceOnly=true，确保订单只减少持仓而不会开新仓
+            if (reduceOnly)
+                parameters["reduceOnly"] = "true";
+
             if (type.ToUpper() == "LIMIT")
             {
                 if (!price.HasValue)
@@ -122,155 +159,152 @@ public class BinanceAccountService
                     throw new ArgumentException("限价单必须指定价格");
                 }
                 parameters["price"] = price.Value.ToString("F8", CultureInfo.InvariantCulture);
-                parameters["timeInForce"] = "GTC"; // Good Till Cancel
+                parameters["timeInForce"] = "GTC";
             }
 
-            // 2. 将参数转换为query string格式
+            // 条件单参数
+            var typeUpper = type.ToUpper();
+            if (stopPrice.HasValue && (typeUpper == "STOP_MARKET" || typeUpper == "TAKE_PROFIT_MARKET"))
+            {
+                parameters["stopPrice"] = stopPrice.Value.ToString("F8", CultureInfo.InvariantCulture);
+            }
+
+            if (trailingDelta.HasValue && typeUpper == "TRAILING_STOP_MARKET")
+            {
+                parameters["trailingDelta"] = trailingDelta.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
             var queryString = string.Join("&",
                 parameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
-
-            // 3. 签名
-            var signedQuery = _authService.SignQueryString(queryString);
-
-            // 4. 构建请求
-            var url = $"/api/v3/order?{signedQuery}";
+            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
+            var url = $"{OrderEndpoint}?{signedQuery}";
             var request = new HttpRequestMessage(HttpMethod.Post, url);
-            _authService.AddAuthHeaders(request);
+            AuthService.AddAuthHeaders(request);
 
-            _logger.LogInformation("正在下单: {Symbol} {Side} {Type} 数量:{Quantity}",
-                symbol, side, type, quantity);
+            Logger.LogInformation("正在{Label}下单: {Symbol} {Side} {Type} 数量:{Quantity}",
+                Label, symbol, side, type, quantity);
 
-            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, "下单", cancellationToken);
+            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}下单", cancellationToken);
 
-            // 6. 解析响应
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken);
+            var orderResponse = await ParseOrderResponseAsync(response.Content, cancellationToken);
 
-            if (orderResponse == null)
-            {
-                throw new FriendlyException("解析订单响应失败");
-            }
-
-            _logger.LogInformation("下单成功，订单ID: {OrderId}, 状态: {Status}",
-                orderResponse.OrderId, orderResponse.Status);
+            Logger.LogInformation("{Label}下单成功，订单ID: {OrderId}, 状态: {Status}",
+                Label, orderResponse.OrderId, orderResponse.Status);
 
             return orderResponse;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "下单失败 - 网络错误");
-            throw new FriendlyException("下单失败: 网络连接错误", ex);
+            Logger.LogError(ex, "{Label}下单失败 - 网络错误", Label);
+            throw new FriendlyException($"{Label}下单失败: 网络连接错误", ex);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "下单失败");
-            throw new FriendlyException($"下单失败: {ex.Message}", ex);
+            Logger.LogError(ex, "{Label}下单失败", Label);
+            throw new FriendlyException($"{Label}下单失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 查询订单状态（需要USER_DATA权限）
+    /// 查询订单状态。
     /// </summary>
     public async Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
     {
         try
         {
             var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
-            var signedQuery = _authService.SignQueryString(queryString);
-            var url = $"/api/v3/order?{signedQuery}";
+            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
+            var url = $"{OrderEndpoint}?{signedQuery}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            _authService.AddAuthHeaders(request);
+            AuthService.AddAuthHeaders(request);
 
-            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, "查询订单", cancellationToken);
+            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}查询订单", cancellationToken);
 
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
-                ?? throw new FriendlyException("解析订单信息失败");
-
-            return orderResponse;
+            return await ParseOrderResponseAsync(response.Content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "查询订单失败 - 网络错误");
-            throw new FriendlyException("查询订单失败: 网络连接错误", ex);
+            Logger.LogError(ex, "{Label}查询订单失败 - 网络错误", Label);
+            throw new FriendlyException($"{Label}查询订单失败: 网络连接错误", ex);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "查询订单失败");
-            throw new FriendlyException($"查询订单失败: {ex.Message}", ex);
+            Logger.LogError(ex, "{Label}查询订单失败", Label);
+            throw new FriendlyException($"{Label}查询订单失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 取消订单（需要TRADE权限）
+    /// 撤销订单。
     /// </summary>
     public async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
     {
         try
         {
             var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
-            var signedQuery = _authService.SignQueryString(queryString);
-            var url = $"/api/v3/order?{signedQuery}";
+            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
+            var url = $"{OrderEndpoint}?{signedQuery}";
 
             var request = new HttpRequestMessage(HttpMethod.Delete, url);
-            _authService.AddAuthHeaders(request);
+            AuthService.AddAuthHeaders(request);
 
-            _logger.LogInformation("正在取消订单: {Symbol} OrderId:{OrderId}", symbol, orderId);
+            Logger.LogInformation("正在{Label}取消订单: {Symbol} OrderId:{OrderId}", Label, symbol, orderId);
 
-            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, "取消订单", cancellationToken);
+            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}取消订单", cancellationToken);
 
-            var orderResponse = await response.Content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken)
-                ?? throw new FriendlyException("解析取消订单响应失败");
+            var orderResponse = await ParseOrderResponseAsync(response.Content, cancellationToken);
 
-            _logger.LogInformation("取消订单成功，订单ID: {OrderId}", orderId);
+            Logger.LogInformation("{Label}取消订单成功，订单ID: {OrderId}", Label, orderId);
             return orderResponse;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "取消订单失败 - 网络错误");
-            throw new FriendlyException("取消订单失败: 网络连接错误", ex);
+            Logger.LogError(ex, "{Label}取消订单失败 - 网络错误", Label);
+            throw new FriendlyException($"{Label}取消订单失败: 网络连接错误", ex);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "取消订单失败");
-            throw new FriendlyException($"取消订单失败: {ex.Message}", ex);
+            Logger.LogError(ex, "{Label}取消订单失败", Label);
+            throw new FriendlyException($"{Label}取消订单失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 查询当前挂单（需要USER_DATA权限）
+    /// 查询当前挂单。
     /// </summary>
     public async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null, CancellationToken cancellationToken = default)
     {
         try
         {
             var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpper()}";
-            var signedQuery = _authService.SignQueryString(queryString);
-            var url = $"/api/v3/openOrders?{signedQuery}";
+            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
+            var url = $"{OpenOrdersEndpoint}?{signedQuery}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            _authService.AddAuthHeaders(request);
+            AuthService.AddAuthHeaders(request);
 
-            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
             var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, "查询挂单", cancellationToken);
+            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}查询挂单", cancellationToken);
 
-            return await response.Content.ReadFromJsonAsync<List<BinanceOrderResponse>>(cancellationToken) ?? [];
+            return await ParseOrderListResponseAsync(response.Content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "查询挂单失败 - 网络错误");
-            throw new FriendlyException("查询挂单失败: 网络连接错误", ex);
+            Logger.LogError(ex, "{Label}查询挂单失败 - 网络错误", Label);
+            throw new FriendlyException($"{Label}查询挂单失败: 网络连接错误", ex);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
-            _logger.LogError(ex, "查询挂单失败");
-            throw new FriendlyException($"查询挂单失败: {ex.Message}", ex);
+            Logger.LogError(ex, "{Label}查询挂单失败", Label);
+            throw new FriendlyException($"{Label}查询挂单失败: {ex.Message}", ex);
         }
     }
 
@@ -279,7 +313,7 @@ public class BinanceAccountService
     /// 抛出包含详细信息的 FriendlyException，而非泛化的 HTTP 状态码错误。
     /// 币安错误响应格式：{"code":-1013,"msg":"..."}
     /// </summary>
-    private async Task EnsureSuccessWithBinanceErrorAsync(
+    internal static async Task EnsureSuccessWithBinanceErrorAsync(
         HttpResponseMessage response, string operation, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
@@ -300,13 +334,9 @@ public class BinanceAccountService
             errorDetail = $"HTTP {statusCode}";
         }
 
-        _logger.LogError("{Operation} 失败: {Detail}", operation, errorDetail);
         throw new FriendlyException($"{operation}失败: {errorDetail}");
     }
 
-    /// <summary>
-    /// 币安 REST API 错误响应模型
-    /// </summary>
     private sealed class BinanceApiError
     {
         public int Code { get; set; }
@@ -314,10 +344,47 @@ public class BinanceAccountService
     }
 }
 
+/// <summary>
+/// 币安现货账户服务（实盘/Testnet 共用，通过 httpClientName 与 label 参数化）。
+/// 端点：/api/v3/account、/api/v3/order、/api/v3/openOrders
+/// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/account-endpoints
+/// </summary>
+public sealed class BinanceSpotAccountService : BinanceAccountServiceBase
+{
+    public BinanceSpotAccountService(
+        IHttpClientFactory httpClientFactory,
+        ILogger<BinanceSpotAccountService> logger,
+        IBinanceAuthService authService,
+        string httpClientName,
+        string label)
+        : base(httpClientFactory, logger, authService, httpClientName, label)
+    {
+    }
+
+    protected override string AccountEndpoint => "/api/v3/account";
+    protected override string OrderEndpoint => "/api/v3/order";
+    protected override string OpenOrdersEndpoint => "/api/v3/openOrders";
+
+    protected override async Task<BinanceAccountInfo> ParseAccountInfoAsync(HttpContent content, CancellationToken cancellationToken)
+    {
+        var result = await content.ReadFromJsonAsync<BinanceAccountInfo>(cancellationToken);
+        return result ?? throw new FriendlyException($"解析{Label}账户信息失败");
+    }
+
+    protected override async Task<BinanceOrderResponse> ParseOrderResponseAsync(HttpContent content, CancellationToken cancellationToken)
+    {
+        var result = await content.ReadFromJsonAsync<BinanceOrderResponse>(cancellationToken);
+        return result ?? throw new FriendlyException($"解析{Label}订单响应失败");
+    }
+
+    protected override async Task<List<BinanceOrderResponse>> ParseOrderListResponseAsync(HttpContent content, CancellationToken cancellationToken)
+        => await content.ReadFromJsonAsync<List<BinanceOrderResponse>>(cancellationToken) ?? [];
+}
+
 #region 响应模型
 
 /// <summary>
-/// 币安账户信息
+/// 币安账户信息（现货结构）
 /// </summary>
 public class BinanceAccountInfo
 {
@@ -353,6 +420,12 @@ public class BinanceOrderResponse
     public string ClientOrderId { get; set; } = string.Empty;
     public long TransactTime { get; set; }
     public string Price { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 成交均价（合约 avgPrice 字段）。市价单 Price 为 0 时可用此值作为实际成交价。
+    /// </summary>
+    public string AvgPrice { get; set; } = string.Empty;
+
     public string OrigQty { get; set; } = string.Empty;
     public string ExecutedQty { get; set; } = string.Empty;
     public string CummulativeQuoteQty { get; set; } = string.Empty;

@@ -18,12 +18,12 @@ public static class ErrorMessageMapper
             // 友好异常直接返回消息
             FriendlyException => exception.Message,
 
-            // 取消相关异常：区分网络超时与用户主动取消
-            TaskCanceledException tce when tce.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
-                => "AI 模型响应超时，可能是模型服务繁忙或网络不稳定，请稍后重试",
+            // 取消相关异常：通过 CancellationToken 区分用户主动取消与超时
             TaskCanceledException tce when !tce.CancellationToken.IsCancellationRequested
                 => "AI 模型响应超时，可能是模型服务繁忙或网络不稳定，请稍后重试",
             TaskCanceledException => "请求超时，请稍后重试",
+            OperationCanceledException oce when !oce.CancellationToken.IsCancellationRequested
+                => "操作超时，请稍后重试",
             OperationCanceledException => "操作已取消",
 
             // 网络相关异常
@@ -59,8 +59,9 @@ public static class ErrorMessageMapper
             OutOfMemoryException => "内存不足，请关闭其他应用后重试",
             StackOverflowException => "程序错误，请重启应用",
 
-            // 数据库相关异常
-            Microsoft.Data.Sqlite.SqliteException => "数据库错误，数据可能已损坏",
+            // 数据库相关异常：通过类型名匹配，避免 Core 直接依赖 SQLite 包
+            Exception ex when ex.GetType().Name.Contains("Sqlite", StringComparison.Ordinal)
+                => "数据库错误，数据可能已损坏",
 
             InvalidCastException => "数据类型转换失败",
             NullReferenceException => "数据访问错误，请刷新后重试",

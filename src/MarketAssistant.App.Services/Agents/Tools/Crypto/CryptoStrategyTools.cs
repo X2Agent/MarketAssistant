@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -13,12 +13,14 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// </summary>
 public class CryptoStrategyTools : IStrategyTools
 {
-    private readonly TradingDataService _dataService;
+    private readonly TradingStrategyService _strategyService;
     private readonly ILogger<CryptoStrategyTools> _logger;
 
-    public CryptoStrategyTools(TradingDataService dataService, ILogger<CryptoStrategyTools> logger)
+    public CryptoStrategyTools(
+        TradingStrategyService strategyService,
+        ILogger<CryptoStrategyTools> logger)
     {
-        _dataService = dataService;
+        _strategyService = strategyService;
         _logger = logger;
     }
 
@@ -27,7 +29,7 @@ public class CryptoStrategyTools : IStrategyTools
     {
         try
         {
-            return await _dataService.GetStrategiesByStatusAsync(StrategyStatus.Active);
+            return await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active, cancellationToken);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -43,7 +45,7 @@ public class CryptoStrategyTools : IStrategyTools
     {
         try
         {
-            return await _dataService.GetStrategyAsync(strategyId);
+            return await _strategyService.GetStrategyAsync(strategyId, cancellationToken);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -60,7 +62,7 @@ public class CryptoStrategyTools : IStrategyTools
     {
         try
         {
-            await _dataService.UpdateStrategyStatusAsync(strategyId, status);
+            await _strategyService.UpdateStrategyStatusAsync(strategyId, status, cancellationToken);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

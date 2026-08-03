@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 public class CoinGeckoSearchResponse
 {

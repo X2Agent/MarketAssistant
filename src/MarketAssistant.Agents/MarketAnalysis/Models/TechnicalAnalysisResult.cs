@@ -31,7 +31,7 @@ public sealed class TechnicalAnalysisResult
     /// 交易策略建议
     /// </summary>
     [Description("交易策略建议，包括技术面评级、操作方向、目标价位、止损位置和持仓周期")]
-    public TradingStrategy Strategy { get; set; } = new();
+    public TradingStrategyRecommendation Strategy { get; set; } = new();
 }
 
 /// <summary>
@@ -203,10 +203,10 @@ public sealed class TechnicalIndicators
 }
 
 /// <summary>
-/// 交易策略建议
+/// 交易策略建议（LLM 分析产出的推荐结果，区别于 Trading.Models.TradingStrategy 持久化策略配置）
 /// </summary>
 [Description("交易策略建议")]
-public sealed class TradingStrategy
+public sealed class TradingStrategyRecommendation
 {
     /// <summary>
     /// 技术面评级

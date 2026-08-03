@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Applications.Settings;
 
@@ -38,7 +39,10 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _knowledgeFileDirectory, value);
     }
 
-    public bool Notification { get; set; }
+    /// <summary>
+    /// 是否显示桌面通知。默认开启，避免新安装用户创建告警后无感知。
+    /// </summary>
+    public bool Notification { get; set; } = true;
 
     public string ZhiTuApiToken { get; set; } = "";
 
@@ -63,6 +67,16 @@ public class UserSetting : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 虚拟币交易模式
+    /// </summary>
+    private CryptoTradingMode _cryptoTradingMode = CryptoTradingMode.LiveSpot;
+    public CryptoTradingMode CryptoTradingMode
+    {
+        get => _cryptoTradingMode;
+        set => SetProperty(ref _cryptoTradingMode, value);
+    }
+
+    /// <summary>
     /// CoinGecko API 密钥（Demo 版免费，需在 https://www.coingecko.com/api/dashboard 注册获取）
     /// /coins/markets 等端点现要求携带 Demo Key，留空可能导致虚拟币筛选失败
     /// </summary>
@@ -77,6 +91,16 @@ public class UserSetting : INotifyPropertyChanged
     /// Binance Secret Key（交易功能必须）
     /// </summary>
     public string BinanceSecretKey { get; set; } = "";
+
+    /// <summary>
+    /// Binance Futures Testnet API Key（在 demo-fapi.binance.com 生成）
+    /// </summary>
+    public string BinanceFuturesTestnetApiKey { get; set; } = "";
+
+    /// <summary>
+    /// Binance Futures Testnet Secret Key
+    /// </summary>
+    public string BinanceFuturesTestnetSecretKey { get; set; } = "";
 
     /// <summary>
     /// 日志文件路径

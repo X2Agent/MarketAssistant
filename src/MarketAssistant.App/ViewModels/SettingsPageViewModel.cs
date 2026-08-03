@@ -9,8 +9,12 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Services.Agents.Analysts;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.Trading;
+using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
@@ -25,12 +29,17 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 {
-    private readonly IRagIngestionService _ragIngestionService;
+    // RAG 与交易重依赖通过工厂延迟解析：仅在向量化/保存时实例化，
+    // 避免首次进入设置页触发整条交易与 RAG 单例链的同步构造
+    private readonly Func<IRagIngestionService> _ragIngestionServiceFactory;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
-    private readonly IEmbeddingFactory _embeddingFactory;
-    private readonly VectorStore _vectorStore;
+    private readonly Func<IEmbeddingFactory> _embeddingFactoryFactory;
+    private readonly Func<VectorStore> _vectorStoreFactory;
     private readonly Services.Market.MarketContext _marketContext;
+    private readonly TradingEnvironmentService _tradingEnvironmentService;
+    private readonly Func<MarketMonitor> _marketMonitorFactory;
+    private readonly IDialogService _dialogService;
     private IStorageProvider? _storageProvider;
 
     // UserSetting对象，包含所有用户设置
@@ -61,6 +70,13 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             case nameof(UserSetting.CurrentMarketType):
                 OnPropertyChanged(nameof(IsAShareMarket));
                 OnPropertyChanged(nameof(IsCryptoMarket));
+                break;
+            case nameof(UserSetting.CryptoTradingMode):
+                OnPropertyChanged(nameof(IsLiveSpotTradingMode));
+                OnPropertyChanged(nameof(IsLiveTradingMode));
+                OnPropertyChanged(nameof(IsLiveFuturesTradingMode));
+                OnPropertyChanged(nameof(IsFuturesTestnetTradingMode));
+                OnPropertyChanged(nameof(IsFuturesTradingMode));
                 break;
             case nameof(UserSetting.WebSearchProvider):
                 OnPropertyChanged(nameof(IsBingProvider));
@@ -104,6 +120,9 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     // 投资期限选项
     public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
+
+    // 虚拟币交易模式选项
+    public List<CryptoTradingMode> CryptoTradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
 
     // API密钥获取URL
     public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
@@ -207,6 +226,31 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// 是否为 Binance 实盘现货模式
+    /// </summary>
+    public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveSpot;
+
+    /// <summary>
+    /// 是否为实盘模式（现货或合约，共用同一套 API Key）
+    /// </summary>
+    public bool IsLiveTradingMode => IsLiveSpotTradingMode || IsLiveFuturesTradingMode;
+
+    /// <summary>
+    /// 是否为 Binance 实盘合约模式
+    /// </summary>
+    public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveFutures;
+
+    /// <summary>
+    /// 是否为 Binance Futures Testnet 模式
+    /// </summary>
+    public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.BinanceFuturesTestnet;
+
+    /// <summary>
+    /// 是否为合约模式（实盘或 Testnet）
+    /// </summary>
+    public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
+
+    /// <summary>
     /// 是否为Bing搜索平台
     /// </summary>
     public bool IsBingProvider
@@ -249,20 +293,26 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 构造函数（使用依赖注入）
     /// </summary>
     public SettingsPageViewModel(
-        IRagIngestionService ragIngestionService,
+        Func<IRagIngestionService> ragIngestionServiceFactory,
         INotificationService notificationService,
         IUserSettingService userSettingService,
-        IEmbeddingFactory embeddingFactory,
-        VectorStore vectorStore,
+        Func<IEmbeddingFactory> embeddingFactoryFactory,
+        Func<VectorStore> vectorStoreFactory,
         Services.Market.MarketContext marketContext,
+        TradingEnvironmentService tradingEnvironmentService,
+        Func<MarketMonitor> marketMonitorFactory,
+        IDialogService dialogService,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
-        _ragIngestionService = ragIngestionService;
+        _ragIngestionServiceFactory = ragIngestionServiceFactory;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
-        _embeddingFactory = embeddingFactory;
-        _vectorStore = vectorStore;
+        _embeddingFactoryFactory = embeddingFactoryFactory;
+        _vectorStoreFactory = vectorStoreFactory;
         _marketContext = marketContext;
+        _tradingEnvironmentService = tradingEnvironmentService;
+        _marketMonitorFactory = marketMonitorFactory;
+        _dialogService = dialogService;
         _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
     }
 
@@ -406,11 +456,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("开始向量化知识库目录: {Directory}", UserSetting.KnowledgeFileDirectory);
 
             // 创建嵌入生成器（只在实际需要时创建）
-            var embeddingGenerator = _embeddingFactory.Create();
+            var embeddingGenerator = _embeddingFactoryFactory().Create();
 
             // 使用 UserSetting 中定义的集合名称
             var collectionName = UserSetting.VectorCollectionName;
-            var collection = _vectorStore.GetCollection<string, TextParagraph>(collectionName);
+            var collection = _vectorStoreFactory().GetCollection<string, TextParagraph>(collectionName);
             await collection.EnsureCollectionExistsAsync();
             Logger?.LogInformation("使用向量集合: {CollectionName}", collectionName);
 
@@ -433,6 +483,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("找到 {Count} 个文档需要向量化", totalFiles);
             _notificationService.ShowInfo($"开始向量化 {totalFiles} 个文档...");
 
+            var ragIngestionService = _ragIngestionServiceFactory();
             var successCount = 0;
             var failedCount = 0;
             var failedFiles = new List<string>();
@@ -455,7 +506,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                         currentIndex, totalFiles, fileName, fileExtension);
 
                     // 执行向量化
-                    await _ragIngestionService.IngestFileAsync(collection, file, embeddingGenerator);
+                    await ragIngestionService.IngestFileAsync(collection, file, embeddingGenerator);
 
                     successCount++;
                     Logger?.LogInformation("✓ 成功向量化: {FileName}", fileName);
@@ -510,9 +561,9 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 保存设置
     /// </summary>
     [RelayCommand]
-    private void Save()
+    private async Task SaveAsync()
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
             // 同步分析师角色设置
             foreach (var role in AnalystRoles)
@@ -520,12 +571,33 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
             }
 
+            // 切换到实盘模式时若监控正在运行，弹窗警告（运行中切换会立即对实盘账户下单）
+            var targetMode = UserSetting.CryptoTradingMode;
+            var isLiveTarget = targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
+            if (isLiveTarget && targetMode != _tradingEnvironmentService.CurrentMode && _marketMonitorFactory().IsRunning)
+            {
+                var confirmed = await _dialogService.ShowConfirmationAsync(
+                    "切换到实盘模式",
+                    "⚠️ 市场监控正在运行中！保存设置后将切换到实盘模式，后续触发的交易将立即对真实账户下单。\n\n请确认是否继续？",
+                    "确认切换",
+                    "取消");
+
+                if (!confirmed)
+                {
+                    _notificationService.ShowInfo("已取消保存设置");
+                    return;
+                }
+            }
+
             // 同步市场类型到MarketContext
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
 
             _userSettingService.UpdateSettings(UserSetting);
+            await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             _notificationService.ShowSuccess("设置已保存");
-            Logger?.LogInformation("保存设置，市场类型：{MarketType}", UserSetting.CurrentMarketType);
+            Logger?.LogInformation("保存设置，市场类型：{MarketType}，交易模式：{TradingMode}",
+                UserSetting.CurrentMarketType,
+                UserSetting.CryptoTradingMode);
         }, "保存设置");
     }
 
@@ -533,12 +605,15 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 重置设置为默认值
     /// </summary>
     [RelayCommand]
-    private void Reset()
+    private async Task Reset()
     {
-        SafeExecute(() =>
+        await SafeExecuteAsync(async () =>
         {
             _userSettingService.ResetSettings();
             UserSetting = _userSettingService.CurrentSetting;
+            _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
+            ApplyTheme(UserSetting.ThemeMode);
+            await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             LoadAnalystRoles(); // 重新加载角色
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");

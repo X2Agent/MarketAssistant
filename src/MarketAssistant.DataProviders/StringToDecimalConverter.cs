@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 将字符串格式的数字转换为 decimal（币安等加密货币 API 返回的价格字段通常是字符串）。

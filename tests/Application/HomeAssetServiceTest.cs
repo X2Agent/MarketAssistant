@@ -4,7 +4,7 @@ using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
@@ -59,8 +59,8 @@ public class HomeAssetServiceTest
     [TestCleanup]
     public async Task Cleanup()
     {
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
 
         if (_serviceProvider != null)
         {

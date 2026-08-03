@@ -1,7 +1,7 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,12 +46,12 @@ public class FavoriteServiceTest
     {
         // 清理收藏
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         await aShareService.ClearFavoritesAsync();
         await cryptoService.ClearFavoritesAsync();
 
-        await _serviceProvider.DisposeAsync();
+        await _serviceProvider!.DisposeAsync();
     }
 
     [TestMethod]
@@ -155,7 +155,7 @@ public class FavoriteServiceTest
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         // Act
         await aShareService.AddFavoriteAsync("SH600519", "");

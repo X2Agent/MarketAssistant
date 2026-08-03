@@ -13,7 +13,7 @@ using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Trading.Abstractions;
-using MarketAssistant.Trading.Exchanges;
+using MarketAssistant.Services.Trading.Exchanges;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -66,6 +66,8 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddSingleton<GenerateCriteriaExecutor<CryptoCriteria>>();
 
         // 交易所客户端
-        services.AddKeyedSingleton<IExchangeClient, BinanceExchangeClient>(MarketType.Crypto);
+        services.AddKeyedSingleton<IExchangeClient>(
+            MarketType.Crypto,
+            (sp, _) => sp.GetRequiredService<RoutingExchangeClient>());
     }
 }

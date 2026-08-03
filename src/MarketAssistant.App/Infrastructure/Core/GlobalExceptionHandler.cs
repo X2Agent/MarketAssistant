@@ -196,7 +196,6 @@ public sealed class GlobalExceptionHandler
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
-            // 用户主动取消，不显示错误对话框，仅记录信息日志
             logger?.LogInformation("'{Operation}' 被用户取消", operationName ?? "未知操作");
         }
         catch (Exception ex)
@@ -213,7 +212,7 @@ public sealed class GlobalExceptionHandler
             }
             else
             {
-                // 处理器尚未初始化（应用启动早期）：将异常传递给链上扫调程序
+                // 处理器尚未初始化（应用启动早期）：将异常传递给上层调用程序
                 logger?.LogError(ex, "执行 '{Operation}' 时发生错误（全局处理器未就绪）", operationName ?? "未知操作");
                 throw;
             }
@@ -241,7 +240,6 @@ public sealed class GlobalExceptionHandler
         }
         catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
         {
-            // 用户主动取消，不显示错误对话框，仅记录信息日志
             logger?.LogInformation("'{Operation}' 被用户取消", operationName ?? "未知操作");
             return default;
         }
@@ -286,6 +284,10 @@ public sealed class GlobalExceptionHandler
         {
             operation();
         }
+        catch (OperationCanceledException ex) when (ex.CancellationToken.IsCancellationRequested)
+        {
+            logger?.LogInformation("'{Operation}' 被用户取消", operationName ?? "未知操作");
+        }
         catch (Exception ex)
         {
             if (_instance != null)
@@ -293,7 +295,6 @@ public sealed class GlobalExceptionHandler
                 var message = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, operationName ?? "操作");
                 (logger ?? _instance._logger).LogError(ex, "执行 '{Operation}' 时发生错误", operationName ?? "未知操作");
 
-                // 使用 Post 而不是 InvokeAsync，避免阻塞当前线程
                 Dispatcher.UIThread.Post(async () =>
                 {
                     await _instance.ShowErrorAsync("操作失败", message);

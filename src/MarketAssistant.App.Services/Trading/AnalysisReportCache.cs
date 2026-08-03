@@ -4,7 +4,7 @@ using MarketAssistant.Applications.Cache;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 分析报告内存缓存：线程安全地存储最近一次市场分析结果，

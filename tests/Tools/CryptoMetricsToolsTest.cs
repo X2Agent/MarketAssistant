@@ -6,7 +6,7 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

@@ -1,12 +1,7 @@
-using System.Reflection;
-using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.Middleware;
-using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -24,13 +19,9 @@ public interface ITradingAgentFactory
 /// 交易 Agent 工厂实现。<see cref="MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
 /// 自主交易与工具解析<strong>始终</strong>使用 <see cref="MarketType.Crypto"/> 的 Keyed 注册（现货 Binance），与当前所选市场无关。
 /// </summary>
-public class TradingAgentFactory : ITradingAgentFactory
+public class TradingAgentFactory : AgentFactoryBase, ITradingAgentFactory
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly TokenTrackingMiddleware _tokenTracking;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<TradingAgentFactory> _logger;
 
     /// <summary>
     /// Human-in-the-Loop 确认回调。
@@ -45,12 +36,9 @@ public class TradingAgentFactory : ITradingAgentFactory
         TokenTrackingMiddleware tokenTracking,
         ILoggerFactory loggerFactory,
         ILogger<TradingAgentFactory> logger)
+        : base(serviceProvider, chatClientFactory, tokenTracking, logger)
     {
-        _serviceProvider = serviceProvider;
-        _chatClientFactory = chatClientFactory;
-        _tokenTracking = tokenTracking;
         _loggerFactory = loggerFactory;
-        _logger = logger;
     }
 
     /// <summary>
@@ -60,11 +48,11 @@ public class TradingAgentFactory : ITradingAgentFactory
     {
         try
         {
-            var chatClient = _chatClientFactory.CreateClient();
-            var tools = ResolveToolParameters();
+            var chatClient = CreateChatClient();
+            var tools = ResolveToolsFor(typeof(TradingAgent), MarketType.Crypto);
 
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(
-                _serviceProvider, typeof(TradingAgent), chatClient, tools);
+                ServiceProvider, typeof(TradingAgent), chatClient, tools);
 
             // 创建 Function Calling 守卫中间件（每次 CreateAgent 新建实例以重置调用计数）
             var guardMiddleware = new TradingFunctionGuardMiddleware(
@@ -75,40 +63,26 @@ public class TradingAgentFactory : ITradingAgentFactory
             var middlewareAgent = agent
                 .AsBuilder()
                 .Use(
-                    runFunc: _tokenTracking.InvokeAsync,
-                    runStreamingFunc: _tokenTracking.InvokeStreamingAsync)
+                    runFunc: TokenTracking.InvokeAsync,
+                    runStreamingFunc: TokenTracking.InvokeStreamingAsync)
                 .Use(guardMiddleware.InvokeAsync)
                 .Build();
 
-            _logger.LogInformation("成功创建 TradingAgent（已附加 Token 追踪 + 交易守卫中间件）");
+            Logger.LogInformation("成功创建 TradingAgent（已附加 Token 追踪 + 交易守卫中间件）");
             return middlewareAgent;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "创建 TradingAgent 失败");
+            Logger.LogError(ex, "创建 TradingAgent 失败");
             throw;
         }
     }
 
-    private IList<AITool> ResolveToolParameters()
+    /// <inheritdoc />
+    protected override void OnToolMissing(Type agentType, Type toolInterfaceType, MarketType marketType)
     {
-        var toolAttributes = typeof(TradingAgent).GetCustomAttributes<RequiresToolsAttribute>().ToList();
-        var tools = new List<AITool>();
-
-        foreach (var attr in toolAttributes)
-        {
-            var toolService = _serviceProvider.GetKeyedService(attr.ToolInterfaceType, MarketType.Crypto);
-            if (toolService is IToolsProvider provider)
-            {
-                tools.AddRange(provider.GetFunctions());
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"TradingAgent 所需的工具 {attr.ToolInterfaceType.Name} 未注册（MarketType.Crypto）");
-            }
-        }
-
-        return tools;
+        // 交易 Agent 工具缺失视为致命错误，直接抛异常
+        throw new InvalidOperationException(
+            $"{agentType.Name} 所需的工具 {toolInterfaceType.Name} 未注册（{marketType}）");
     }
 }

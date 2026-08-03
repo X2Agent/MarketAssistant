@@ -1,18 +1,18 @@
+using System.Text.Json;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Factories;
-using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
 /// <summary>
-/// 泛型筛选条件生成 Executor
+/// 泛型筛选条件生成器
 /// 将用户需求或新闻内容转换为结构化的筛选条件
 /// </summary>
-public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>
+public sealed class GenerateCriteriaExecutor<TCriteria>
     where TCriteria : IScreeningCriteria
 {
     private readonly IChatClientFactory _chatClientFactory;
@@ -28,16 +28,14 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
         IChatClientFactory chatClientFactory,
         ICriteriaGenerationStrategy<TCriteria> strategy,
         ILogger<GenerateCriteriaExecutor<TCriteria>> logger)
-        : base($"GenerateCriteria_{strategy.SupportedMarketType}")
     {
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public override async ValueTask<CriteriaGenerationResult> HandleAsync(
+    public async ValueTask<CriteriaGenerationResult> HandleAsync(
         InvestmentSelectionWorkflowRequest input,
-        IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
         if (input.MarketType != _strategy.SupportedMarketType)

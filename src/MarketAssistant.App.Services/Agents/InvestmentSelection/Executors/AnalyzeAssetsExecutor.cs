@@ -1,9 +1,9 @@
+using System.Text.Json;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
-using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +13,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 统一的资产分析 Executor
 /// 对筛选出的资产进行深度分析并生成推荐报告
 /// </summary>
-public sealed partial class AnalyzeAssetsExecutor : Executor
+public sealed class AnalyzeAssetsExecutor
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -27,17 +27,15 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
     public AnalyzeAssetsExecutor(
         IChatClientFactory chatClientFactory,
         IServiceProvider serviceProvider,
-        ILogger<AnalyzeAssetsExecutor> logger) : base("AnalyzeAssets")
+        ILogger<AnalyzeAssetsExecutor> logger)
     {
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    [MessageHandler]
-    private async ValueTask<InvestmentSelectionResult> HandleAsync(
+    public async ValueTask<InvestmentSelectionResult> HandleAsync(
         AssetScreeningResult input,
-        IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
         var originalRequest = input.OriginalRequest;

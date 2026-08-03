@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Agents.Analysts;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;

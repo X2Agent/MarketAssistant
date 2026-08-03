@@ -14,4 +14,3 @@ public class NavigationMessage
         Parameter = parameter;
     }
 }
-

@@ -96,6 +96,7 @@
     <SolidColorBrush x:Key="PrimaryDarkBrush" Color="{StaticResource PrimaryDark}"/>
     <SolidColorBrush x:Key="PrimaryLightBrush" Color="{StaticResource PrimaryLight}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
+    <SolidColorBrush x:Key="SecondaryLightBrush" Color="{StaticResource SecondaryLight}"/>
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}"/>
 
     <!-- 功能性画刷 -->

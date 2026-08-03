@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
@@ -6,7 +7,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Analysts;
+namespace MarketAssistant.Services.Agents.Analysts;
 
 /// <summary>
 /// 新闻事件分析师代理

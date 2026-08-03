@@ -1,5 +1,5 @@
 using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.AssetScreener;
@@ -113,33 +113,33 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             filtered = condition.Code.ToLowerInvariant() switch
             {
                 "market_cap" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Market_Cap >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Market_Cap <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.MarketCap >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.MarketCap <= condition.MaxValue)),
 
                 "market_cap_rank" => filtered.Where(m =>
-                    m.Market_Cap_Rank.HasValue &&
-                    (!condition.MinValue.HasValue || m.Market_Cap_Rank >= (int)condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Market_Cap_Rank <= (int)condition.MaxValue)),
+                    m.MarketCapRank.HasValue &&
+                    (!condition.MinValue.HasValue || m.MarketCapRank >= (int)condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.MarketCapRank <= (int)condition.MaxValue)),
 
                 "volume_24h" or "total_volume" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Total_Volume >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Total_Volume <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.TotalVolume >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.TotalVolume <= condition.MaxValue)),
 
                 "price_change_24h" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_24h >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_24h <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage24h >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage24h <= condition.MaxValue)),
 
                 "price_change_7d" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_7d_In_Currency >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_7d_In_Currency <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage7dInCurrency >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage7dInCurrency <= condition.MaxValue)),
 
                 "price_change_30d" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_30d_In_Currency >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_30d_In_Currency <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage30dInCurrency >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage30dInCurrency <= condition.MaxValue)),
 
                 "current_price" or "price" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Current_Price >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Current_Price <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.CurrentPrice >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.CurrentPrice <= condition.MaxValue)),
 
                 _ => filtered
             };
@@ -154,18 +154,18 @@ public sealed class CryptoScreenerService : IAssetScreenerService
         {
             Name = m.Name,
             Symbol = m.Symbol.ToUpperInvariant(),
-            Current = m.Current_Price ?? 0,
-            Pct = m.Price_Change_Percentage_24h ?? 0,
-            Amount = m.Total_Volume ?? 0,
-            Mc = m.Market_Cap ?? 0,
-            Fmc = m.Fully_Diluted_Valuation ?? 0,
-            Volume = m.Total_Volume ?? 0,
-            MarketCapRank = m.Market_Cap_Rank ?? 0,
-            PriceChange7d = m.Price_Change_Percentage_7d_In_Currency ?? 0,
-            PriceChange30d = m.Price_Change_Percentage_30d_In_Currency ?? 0,
-            CirculatingSupply = m.Circulating_Supply ?? 0,
-            TotalSupply = m.Total_Supply ?? 0,
-            MaxSupply = m.Max_Supply
+            Current = m.CurrentPrice ?? 0,
+            Pct = m.PriceChangePercentage24h ?? 0,
+            Amount = m.TotalVolume ?? 0,
+            Mc = m.MarketCap ?? 0,
+            Fmc = m.FullyDilutedValuation ?? 0,
+            Volume = m.TotalVolume ?? 0,
+            MarketCapRank = m.MarketCapRank ?? 0,
+            PriceChange7d = m.PriceChangePercentage7dInCurrency ?? 0,
+            PriceChange30d = m.PriceChangePercentage30dInCurrency ?? 0,
+            CirculatingSupply = m.CirculatingSupply ?? 0,
+            TotalSupply = m.TotalSupply ?? 0,
+            MaxSupply = m.MaxSupply
         }).ToList();
     }
 

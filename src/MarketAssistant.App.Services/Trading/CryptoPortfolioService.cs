@@ -1,36 +1,56 @@
-using MarketAssistant.Services.Data;
+using MarketAssistant.Applications.Cache;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace MarketAssistant.Trading;
+namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 统一封装虚拟币账户资产估值与持仓快照，避免在多个调用点重复拼装账户视图。
 /// </summary>
 public class CryptoPortfolioService
 {
+    /// <summary>
+    /// 账户概览缓存时长。风控与 AI 决策高频调用估值，3 秒内的陈旧数据对
+    /// 仓位校验精度影响可忽略，却能显著降低网格等高频策略的账户查询压力。
+    /// </summary>
+    private static readonly TimeSpan AccountSummaryCacheTtl = TimeSpan.FromSeconds(3);
+
     private readonly IExchangeClient _exchangeClient;
     private readonly BinanceMarketDataService _marketDataService;
     private readonly TradingDataService _tradingDataService;
+    private readonly TradingEnvironmentService _environmentService;
+    private readonly IMemoryCache _memoryCache;
     private readonly ILogger<CryptoPortfolioService> _logger;
 
     public CryptoPortfolioService(
         [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         BinanceMarketDataService marketDataService,
         TradingDataService tradingDataService,
+        TradingEnvironmentService environmentService,
+        IMemoryCache memoryCache,
         ILogger<CryptoPortfolioService> logger)
     {
         _exchangeClient = exchangeClient;
         _marketDataService = marketDataService;
         _tradingDataService = tradingDataService;
+        _environmentService = environmentService;
+        _memoryCache = memoryCache;
         _logger = logger;
     }
 
     public async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default)
     {
+        var cacheKey = CacheKeys.GetCryptoAccountSummaryKey(_environmentService.CurrentMode);
+        if (_memoryCache.TryGetValue(cacheKey, out AccountBalanceSummary? cached) && cached != null)
+            return cached;
+
         var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct);
-        return await BuildBalanceSummaryAsync(accountInfo, ct);
+        var summary = await BuildBalanceSummaryAsync(accountInfo, ct);
+        _memoryCache.Set(cacheKey, summary, AccountSummaryCacheTtl);
+        return summary;
     }
 
     public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken ct = default)
