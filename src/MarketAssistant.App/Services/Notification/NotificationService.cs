@@ -7,7 +7,7 @@ namespace MarketAssistant.Services.Notification;
 /// </summary>
 public class NotificationService : INotificationService
 {
-    private const int DefaultDuration = 3000;
+    private const int DefaultDuration = 5000;
 
     public void ShowSuccess(string message, int durationMs = DefaultDuration)
     {

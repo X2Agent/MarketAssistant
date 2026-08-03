@@ -71,8 +71,8 @@ public sealed class McpToolContextProvider : AIContextProvider
 
             if (_invalidated)
             {
-                // 释放旧连接后重新加载
-                await _mcpService.ResetConnectionsAsync();
+                // 仅使活动连接映射失效。旧 Agent 工具仍持有底层 Client，不能在刷新时立即释放。
+                await _mcpService.ResetConnectionsAsync(cancellationToken);
                 _invalidated = false;
             }
 

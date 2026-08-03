@@ -2,6 +2,7 @@ using Avalonia;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services;
 using MarketAssistant.Services.Settings;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace MarketAssistant
@@ -29,13 +30,15 @@ namespace MarketAssistant
         {
             var services = new ServiceCollection();
 
-            // ConfigureLogging 只需要在启动时读取一次日志路径，直接实例化即可，
-            // 避免构建临时容器（捕获依赖问题）。
-            // IUserSettingService 的正式 Singleton 由 AddAgentTools() 内部负责注册。
-            services.AddLogging(builder => builder.ConfigureLogging(new UserSettingService()));
+            // 日志配置与业务层复用同一个设置实例，避免同一进程重复打开安全存储
+            // 或并行写入同一设置文件。后续同类型注册覆盖 AddBusinessServices 的默认注册。
+            var userSettingService = new UserSettingService();
+            services.AddLogging(builder => builder.ConfigureLogging(userSettingService));
 
-            // 注册应用程序业务服务
+            // 注册应用程序业务服务，并用启动期实例替换默认设置服务注册。
             services.AddApplicationServices();
+            services.RemoveAll<IUserSettingService>();
+            services.AddSingleton<IUserSettingService>(userSettingService);
 
             // 注册ViewModels
             services.AddViewModels();

@@ -49,4 +49,29 @@ public class TokenTrackingMiddlewareTest
         Assert.AreEqual(150, input);
         Assert.AreEqual(75, output);
     }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task LogAndAccumulate_ConcurrentUpdates_ShouldNotLoseCounts()
+    {
+        var chatClient = new Mock<IChatClient>().Object;
+        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "TestAgent" });
+        var session = await agent.CreateSessionAsync();
+        var middleware = new TokenTrackingMiddleware(
+            NullLogger<TokenTrackingMiddleware>.Instance);
+
+        const int updateCount = 1_000;
+        await Task.WhenAll(Enumerable.Range(0, updateCount).Select(_ => Task.Run(() =>
+            middleware.LogAndAccumulate(
+                session,
+                inputTokens: 2,
+                outputTokens: 3,
+                agentName: "TestAgent",
+                isPrecise: true))));
+
+        var (input, output) = TokenTrackingMiddleware.GetCumulativeTokens(session);
+
+        Assert.AreEqual(updateCount * 2L, input);
+        Assert.AreEqual(updateCount * 3L, output);
+    }
 }

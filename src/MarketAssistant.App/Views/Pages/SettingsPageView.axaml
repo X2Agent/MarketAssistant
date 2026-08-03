@@ -13,6 +13,21 @@
         <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <Style Selector="Path.Spin">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
+
     <Design.DataContext>
         <vm:SettingsPageViewModel/>
     </Design.DataContext>
@@ -43,30 +58,90 @@
                 </controls:CardView>
 
                 <!-- 模型设置区域 -->
-                <controls:CardView Header="模型设置(硅基流动)">
+                <controls:CardView Header="模型设置">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <!-- 模型选择 -->
-                        <ComboBox ItemsSource="{Binding Models}"
-                                  SelectedItem="{Binding UserSetting.ModelId}"
-                                  PlaceholderText="模型选择"
-                                  HorizontalAlignment="Stretch"
-                                  IsEnabled="{Binding Models.Count}"/>
+                        <!-- 服务商选择 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="服务商"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <ComboBox ItemsSource="{Binding Providers}"
+                                      SelectedItem="{Binding SelectedProvider}"
+                                      DisplayMemberBinding="{Binding DisplayName}"
+                                      PlaceholderText="选择服务商"
+                                      HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+
+                        <!-- 自定义端点（仅 Custom / Ollama / LMStudio 显示） -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                    IsVisible="{Binding CanOverrideEndpoint}">
+                            <TextBlock Text="API端点"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding UserSetting.Endpoint}"
+                                     PlaceholderText="自定义 API 端点"/>
+                        </StackPanel>
 
                         <!-- API密钥 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                    IsVisible="{Binding RequiresApiKey}">
                             <TextBlock Text="API密钥"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
-                                         Text="{Binding UserSetting.ApiKey}"
+                                         Text="{Binding ApiKey}"
                                          PlaceholderText="请输入API密钥"
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
                                         Content="获取密钥"
                                         Classes="btn-primary"
                                         Command="{Binding OpenModelApiWebsiteCommand}"
+                                        IsVisible="{Binding ProviderApiKeyUrl, Converter={x:Static ObjectConverters.IsNotNull}}"
                                         Margin="{StaticResource SmallLeftMargin}"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock Text="免费模型不等于免鉴权：是否需要 API Key 由服务商接口决定；本地服务或明确支持匿名调用的模型才可留空。"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                        <!-- 模型选择 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="模型"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <!-- 无模型列表时手动输入 -->
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding UserSetting.ModelId}"
+                                         PlaceholderText="输入模型 ID"
+                                         HorizontalAlignment="Stretch"
+                                         IsVisible="{Binding !Models.Count}"/>
+                                <!-- 有模型列表时替换为下拉选择 -->
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding Models}"
+                                          SelectedItem="{Binding UserSetting.ModelId}"
+                                          PlaceholderText="选择模型"
+                                          HorizontalAlignment="Stretch"
+                                          IsVisible="{Binding Models.Count}"/>
+                                <!-- 获取按钮（加载时隐藏，由旋转图标替代） -->
+                                <Button Grid.Column="1"
+                                        Content="获取"
+                                        Classes="btn-info"
+                                        Command="{Binding FetchModelsCommand}"
+                                        IsVisible="{Binding CanShowFetchButton}"
+                                        Margin="{StaticResource SmallLeftMargin}"/>
+                                <!-- 加载旋转图标 -->
+                                <Path Grid.Column="1"
+                                      Data="{StaticResource LoadingIcon}"
+                                      Fill="{DynamicResource PrimaryBrush}"
+                                      Width="16" Height="16"
+                                      IsVisible="{Binding IsLoadingModels}"
+                                      Margin="{StaticResource SmallLeftMargin}"
+                                      Classes="Spin"
+                                      RenderTransformOrigin="50%,50%"/>
                             </Grid>
                         </StackPanel>
                     </StackPanel>

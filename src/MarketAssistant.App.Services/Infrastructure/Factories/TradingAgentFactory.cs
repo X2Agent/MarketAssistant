@@ -17,7 +17,9 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// </summary>
 public interface ITradingAgentFactory
 {
-    AIAgent CreateAgent();
+    AIAgent CreateAgent(
+        TradingAuthorizationMode authorizationMode = TradingAuthorizationMode.Disabled,
+        Func<string, string, Task<bool>>? confirmationCallback = null);
 }
 
 /// <summary>
@@ -31,13 +33,6 @@ public class TradingAgentFactory : ITradingAgentFactory
     private readonly TokenTrackingMiddleware _tokenTracking;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TradingAgentFactory> _logger;
-
-    /// <summary>
-    /// Human-in-the-Loop 确认回调。
-    /// 参数: (functionName, argsDescription) → true=放行 false=拒绝。
-    /// UI 层可在创建工厂后设置此属性以接入用户确认对话框。
-    /// </summary>
-    public Func<string, string, Task<bool>>? TradeConfirmationCallback { get; set; }
 
     public TradingAgentFactory(
         IServiceProvider serviceProvider,
@@ -56,7 +51,9 @@ public class TradingAgentFactory : ITradingAgentFactory
     /// <summary>
     /// 创建包装中间件后的 <see cref="TradingAgent"/>；工具一律从 <see cref="MarketType.Crypto"/> 解析。
     /// </summary>
-    public AIAgent CreateAgent()
+    public AIAgent CreateAgent(
+        TradingAuthorizationMode authorizationMode = TradingAuthorizationMode.Disabled,
+        Func<string, string, Task<bool>>? confirmationCallback = null)
     {
         try
         {
@@ -66,14 +63,18 @@ public class TradingAgentFactory : ITradingAgentFactory
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(
                 _serviceProvider, typeof(TradingAgent), chatClient, tools);
 
-            // 创建 Function Calling 守卫中间件（每次 CreateAgent 新建实例以重置调用计数）
+            // 每个 Agent 使用独立守卫，授权模式由调用方显式选择；默认禁止真实交易。
             var guardMiddleware = new TradingFunctionGuardMiddleware(
-                _loggerFactory.CreateLogger<TradingFunctionGuardMiddleware>());
-            guardMiddleware.ConfirmationCallback = TradeConfirmationCallback;
+                _loggerFactory.CreateLogger<TradingFunctionGuardMiddleware>(),
+                authorizationMode,
+                confirmationCallback);
 
             // 通过 MAF Builder 模式附加中间件链：Token 追踪 + Function Calling 守卫
             var middlewareAgent = agent
                 .AsBuilder()
+                .Use(
+                    runFunc: guardMiddleware.InvokeRunAsync,
+                    runStreamingFunc: guardMiddleware.InvokeRunStreamingAsync)
                 .Use(
                     runFunc: _tokenTracking.InvokeAsync,
                     runStreamingFunc: _tokenTracking.InvokeStreamingAsync)

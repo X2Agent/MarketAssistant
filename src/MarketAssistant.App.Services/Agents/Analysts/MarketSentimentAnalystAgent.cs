@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
@@ -18,14 +19,6 @@ namespace MarketAssistant.Agents.Analysts;
 [RequiresTools(typeof(ISentimentTools))]
 public class MarketSentimentAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(MarketSentimentAnalysisResult),
-        schemaDescription: "市场情绪分析师的结构化分析结果，包含市场情绪、资金流向、投资者行为和短期策略"
-    );
-
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
@@ -34,8 +27,8 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
         AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("MarketSentimentAnalyst"),
-            ResponseFormat,
+            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("MarketSentimentAnalyst"), typeof(MarketSentimentAnalysisResult)),
+            ChatResponseFormat.Json,
             tools,
             aiContextProviders,
             skillsProvider)

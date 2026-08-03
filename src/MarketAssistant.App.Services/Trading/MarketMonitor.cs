@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Threading.Channels;
+using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Data;
@@ -425,7 +426,9 @@ public class MarketMonitor : IDisposable
     /// </summary>
     private async Task InvokeAgentAsync(string prompt)
     {
-        var agent = _agentFactory.CreateAgent();
+        // 到达此处前，策略状态、硬性止盈止损、日交易次数和仓位预算已完成校验。
+        // 后台任务必须显式声明预授权，禁止依赖空确认回调的隐式放行。
+        var agent = _agentFactory.CreateAgent(TradingAuthorizationMode.PreAuthorizedAutomation);
         var messages = new List<ChatMessage>
         {
             new(ChatRole.User, prompt)
@@ -433,7 +436,9 @@ public class MarketMonitor : IDisposable
 
         var response = await agent.RunAsync(messages, session: null, options: null,
             cancellationToken: MonitorToken);
-        _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
+        _logger.LogDebug(
+            "TradingAgent 调用完成，响应长度: {ResponseLength}",
+            response.Text?.Length ?? 0);
     }
 
     /// <summary>

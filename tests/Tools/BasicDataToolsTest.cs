@@ -64,11 +64,12 @@ public class BasicDataToolsTest
         // 通过 Mock 注入带真实密钥的 UserSetting（避免依赖本地 Preferences 存储）
         var userSetting = new UserSetting
         {
+            ProviderId = "SiliconFlow",
             ZhiTuApiToken = _zhiTuApiToken ?? "",
             EmbeddingApiKey = _jinaApiKey ?? "",
             EmbeddingEndpoint = "https://api.jina.ai",
             EmbeddingModelId = "jina-embeddings-v5-text-small",
-            ApiKey = _siliconFlowApiKey ?? "",
+            ProviderApiKeys = new Dictionary<string, string> { ["SiliconFlow"] = _siliconFlowApiKey ?? "" },
             Endpoint = "https://api.siliconflow.cn",
             ModelId = "deepseek-ai/DeepSeek-V3.2"
         };

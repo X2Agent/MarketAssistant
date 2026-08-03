@@ -13,7 +13,10 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 {
-    private readonly MarketChatSession _chatSession;
+    private readonly IMarketChatSessionFactory _chatSessionFactory;
+    private MarketChatSession? _chatSession;
+    private string? _pendingContextStockCode;
+    private List<ChatMessage>? _pendingAnalysisMessages;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
 
@@ -40,7 +43,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         IMarketChatSessionFactory chatSessionFactory)
         : base(logger)
     {
-        _chatSession = chatSessionFactory.Create();
+        _chatSessionFactory = chatSessionFactory;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
     }
@@ -84,11 +87,12 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
         try
         {
+            EnsureChatSession();
             _currentCancellationTokenSource = new CancellationTokenSource();
             var contentBuilder = new System.Text.StringBuilder();
             bool hasReceivedContent = false;
 
-            await foreach (var chunk in _chatSession.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
+            await foreach (var chunk in _chatSession!.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
                 if (!string.IsNullOrEmpty(chunk))
                 {
@@ -139,6 +143,21 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void EnsureChatSession()
+    {
+        if (_chatSession is not null)
+            return;
+
+        _chatSession = _chatSessionFactory.Create(_pendingContextStockCode ?? StockCode);
+
+        if (_pendingContextStockCode is not null && _pendingAnalysisMessages is not null)
+        {
+            _chatSession!.InjectAnalysisContext(_pendingContextStockCode, _pendingAnalysisMessages);
+            _pendingContextStockCode = null;
+            _pendingAnalysisMessages = null;
+        }
+    }
+
     /// <summary>
     /// 添加欢迎消息
     /// </summary>
@@ -161,7 +180,15 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         StockCode = stockCode;
 
         var messages = analysisMessages.ToList();
-        _chatSession.InjectAnalysisContext(stockCode, messages);
+        if (_chatSession is not null)
+        {
+            _chatSession.InjectAnalysisContext(stockCode, messages);
+        }
+        else
+        {
+            _pendingContextStockCode = stockCode;
+            _pendingAnalysisMessages = messages;
+        }
 
         ChatMessages.Clear();
 
@@ -203,7 +230,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _chatSession.Dispose();
+        _chatSession?.Dispose();
         _currentCancellationTokenSource?.Cancel();
         _currentCancellationTokenSource?.Dispose();
         _currentCancellationTokenSource = null;

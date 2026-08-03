@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -31,18 +32,12 @@ public sealed partial class CoordinatorExecutor : Executor
     };
 
     public CoordinatorExecutor(
-        IAnalystAgentFactory analystAgentFactory,
+        AIAgent coordinatorAgent,
         ILogger<CoordinatorExecutor> logger)
         : base("Coordinator")
     {
-        ArgumentNullException.ThrowIfNull(analystAgentFactory);
+        _coordinatorAgent = coordinatorAgent ?? throw new ArgumentNullException(nameof(coordinatorAgent));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // 在构造函数中创建 Agent（确保 tools 配置正确）
-        // 使用非泛型方法：CreateAnalyst 返回的是中间件包装后的 AIAgent，无法强制转换为具体类型
-        _coordinatorAgent = analystAgentFactory.CreateAnalyst(typeof(CoordinatorAnalystAgent));
-
-        _logger.LogInformation("协调分析师 Agent 已创建（支持工具调用 + 结构化输出）");
     }
 
     [MessageHandler]
@@ -116,7 +111,7 @@ public sealed partial class CoordinatorExecutor : Executor
             }
 
             // 从协调分析师的回复文本中反序列化结构化结果
-            // 某些 LLM 即使指定了 ForJsonSchema 也可能在 JSON 前后输出多余文本（前缀词、markdown 代码块等），
+            // 部分兼容模型即使启用 JsonObject 仍可能在 JSON 前后输出多余文本，
             // 使用 LlmJsonExtractor 进行多层兜底解析（直接解析 → 剥离 markdown → Utf8JsonReader 精确定位）
             var rawText = coordinatorMessage.Text ?? string.Empty;
 
@@ -137,6 +132,13 @@ public sealed partial class CoordinatorExecutor : Executor
             if (coordinatorResult == null)
             {
                 throw new InvalidOperationException("协调分析师未能返回结构化数据");
+            }
+
+            var validationErrors = StructuredOutputValidator.Validate(coordinatorResult);
+            if (validationErrors.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"协调分析师返回的数据不符合约束: {string.Join("; ", validationErrors)}");
             }
 
             _logger.LogInformation(

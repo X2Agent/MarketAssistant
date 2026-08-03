@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
@@ -6,100 +9,112 @@ using ModelContextProtocol.Client;
 namespace MarketAssistant.Services.Mcp;
 
 /// <summary>
-/// MCP（Model Context Protocol）服务
-/// 统一处理 MCP 客户端的创建、连接和工具加载
+/// MCP（Model Context Protocol）服务。
+/// 按连接配置指纹复用客户端，并保留已向 Agent 暴露过工具的旧客户端，直至应用退出。
 /// </summary>
-public class McpService : IAsyncDisposable
+public sealed class McpService : IAsyncDisposable
 {
+    private const int MaxRetainedRuntimes = 32;
+
     private readonly ILogger<McpService> _logger;
     private readonly McpToolAuditLogger _auditLogger;
     private readonly MCPServerConfigService _configService;
-    private readonly List<McpClient> _mcpClients = new();
-    private readonly object _clientsLock = new();
+    private readonly IMcpClientSessionFactory _clientFactory;
+    private readonly SemaphoreSlim _runtimeGate = new(1, 1);
+    private readonly Dictionary<string, McpRuntime> _activeRuntimes = new(StringComparer.Ordinal);
+    private readonly List<McpRuntime> _retainedRuntimes = [];
+
     private bool _disposed;
 
     /// <summary>
-    /// 已连接的 MCP 服务器数量
+    /// 当前活动配置对应的 MCP 连接数量。
+    /// 配置刷新后，旧连接会保留到服务释放，但不计入活动连接。
     /// </summary>
     public int ActiveConnectionCount
     {
-        get { lock (_clientsLock) return _mcpClients.Count; }
+        get
+        {
+            _runtimeGate.Wait();
+            try
+            {
+                return _activeRuntimes.Count;
+            }
+            finally
+            {
+                _runtimeGate.Release();
+            }
+        }
     }
 
-    /// <summary>
-    /// 创建 MCP 服务
-    /// </summary>
     public McpService(
         ILogger<McpService> logger,
         McpToolAuditLogger auditLogger,
         MCPServerConfigService configService)
+        : this(logger, auditLogger, configService, new McpClientSessionFactory())
+    {
+    }
+
+    internal McpService(
+        ILogger<McpService> logger,
+        McpToolAuditLogger auditLogger,
+        MCPServerConfigService configService,
+        IMcpClientSessionFactory clientFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
     }
 
     /// <summary>
-    /// 获取 MCP 工具作为 AITool 列表
+    /// 获取 MCP 工具作为 AITool 列表。
+    /// 相同连接配置复用已建立的客户端；工具白名单在每次读取时重新应用。
     /// </summary>
-    /// <param name="configs">MCP 服务器配置列表</param>
-    /// <returns>AITool 列表</returns>
     public async Task<List<AITool>> GetAIToolsAsync(
-        IEnumerable<MCPServerConfig> configs)
+        IEnumerable<MCPServerConfig> configs,
+        CancellationToken cancellationToken = default)
     {
-        var tools = new List<AITool>();
+        ArgumentNullException.ThrowIfNull(configs);
 
+        var tools = new List<AITool>();
         foreach (var config in configs)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var activity = MarketAssistantDiagnostics.StartActivity("mcp.tools.load");
+            activity?.SetTag("server.address", config.Name);
+            activity?.SetTag("network.transport", config.TransportType);
+            activity?.SetTag("marketassistant.mcp.category", config.Category);
+
             try
             {
-                var clientTransport = CreateClientTransport(config);
-                var options = new McpClientOptions
-                {
-                    ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
-                };
-
-                var mcpClient = await McpClient.CreateAsync(clientTransport, options);
-
-                lock (_clientsLock)
-                {
-                    _mcpClients.Add(mcpClient);
-                }
-
-                var mcpTools = await mcpClient.ListToolsAsync().ConfigureAwait(false);
-
-                // 安全策略：AllowedTools 为空时允许所有工具加载，但发出安全警告，
-                // 提示用户显式配置白名单以实现最小暴露原则。
-                if (config.AllowedTools.Count == 0)
-                {
-                    _logger.LogWarning(
-                        "MCP 服务器 {Name} 未配置 AllowedTools 白名单，将加载全部 {Count} 个工具。" +
-                        "建议在配置中显式指定允许的工具以遵循最小暴露原则。",
-                        config.Name, mcpTools.Count);
-                }
-
-                foreach (var tool in mcpTools.Cast<AITool>())
-                {
-                    var toolName = tool.Name;
-
-                    if (config.AllowedTools.Count > 0 &&
-                        !config.AllowedTools.Contains(toolName, StringComparer.OrdinalIgnoreCase))
-                    {
-                        _auditLogger.LogToolFiltered(config.Name, toolName,
-                            "不在允许列表中");
-                        continue;
-                    }
-
-                    _auditLogger.LogToolLoaded(config.Name, toolName, config.Category);
-                    tools.Add(tool);
-                }
+                var runtime = await GetOrCreateRuntimeAsync(config, cancellationToken)
+                    .ConfigureAwait(false);
+                var loadedForServer = AddAllowedTools(config, runtime.Tools, tools);
+                activity?.SetTag("marketassistant.mcp.tools.available_count", runtime.Tools.Count);
+                activity?.SetTag("marketassistant.mcp.tools.loaded_count", loadedForServer);
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
 
                 _logger.LogInformation(
-                    "成功连接到 MCP 服务器 {Name} (分类: {Category})，加载 {Count}/{Total} 个工具",
-                    config.Name, config.Category, tools.Count, mcpTools.Count);
+                    "成功连接到 MCP 服务器 {Name} (分类: {Category})，加载 {LoadedCount}/{TotalCount} 个工具",
+                    config.Name,
+                    config.Category,
+                    loadedForServer,
+                    runtime.Tools.Count);
+            }
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+            {
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, "cancelled");
+                activity?.SetTag("error.type", ex.GetType().FullName);
+                throw;
+            }
+            catch (ObjectDisposedException ex)
+            {
+                MarketAssistantDiagnostics.RecordException(activity, ex);
+                throw;
             }
             catch (Exception ex)
             {
+                MarketAssistantDiagnostics.RecordException(activity, ex);
                 _logger.LogWarning(ex, "连接到 MCP 服务器 {Name} 失败", config.Name);
             }
         }
@@ -108,23 +123,21 @@ public class McpService : IAsyncDisposable
     }
 
     /// <summary>
-    /// 获取所有启用的 MCP 服务器配置
+    /// 获取所有启用的 MCP 服务器配置。
     /// </summary>
-    /// <returns>启用的配置列表</returns>
     public List<MCPServerConfig> GetEnabledConfigs()
     {
-        return _configService.ServerConfigs.Where(c => c.IsEnabled).ToList();
+        return _configService.ServerConfigs.Where(config => config.IsEnabled).ToList();
     }
 
     /// <summary>
-    /// 创建客户端传输
+    /// 创建客户端传输。
     /// </summary>
-    /// <param name="config">MCP 服务器配置</param>
-    /// <returns>客户端传输实例</returns>
-    /// <exception cref="NotSupportedException">不支持的传输类型</exception>
     public static IClientTransport CreateClientTransport(MCPServerConfig config)
     {
-        return config.TransportType.ToLower() switch
+        ArgumentNullException.ThrowIfNull(config);
+
+        return config.TransportType.ToLowerInvariant() switch
         {
             "stdio" => CreateStdioTransport(config),
             "sse" => CreateSseTransport(config),
@@ -134,15 +147,180 @@ public class McpService : IAsyncDisposable
     }
 
     /// <summary>
-    /// 创建 Stdio 传输
+    /// 使当前活动连接映射失效。
+    /// 已向 Agent 暴露的工具持有底层客户端引用，因此旧客户端不能在刷新时立即释放。
     /// </summary>
+    public async Task ResetConnectionsAsync(CancellationToken cancellationToken = default)
+    {
+        await _runtimeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+            var invalidatedCount = _activeRuntimes.Count;
+            _activeRuntimes.Clear();
+
+            _logger.LogInformation(
+                "已使 {Count} 个 MCP 活动连接失效；旧连接将保留到应用退出，以保证已注入工具仍可调用",
+                invalidatedCount);
+        }
+        finally
+        {
+            _runtimeGate.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        List<McpRuntime> runtimesToDispose;
+
+        await _runtimeGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            runtimesToDispose = [.. _retainedRuntimes];
+            _activeRuntimes.Clear();
+            _retainedRuntimes.Clear();
+        }
+        finally
+        {
+            _runtimeGate.Release();
+        }
+
+        foreach (var runtime in runtimesToDispose)
+        {
+            try
+            {
+                await runtime.Session.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "释放 MCP 客户端时发生错误: {Name}", runtime.ServerName);
+            }
+        }
+
+        _runtimeGate.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    internal static string ComputeConfigurationFingerprint(MCPServerConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        var canonical = new StringBuilder()
+            .Append(config.Name.Trim()).Append('\n')
+            .Append(config.TransportType.Trim().ToLowerInvariant()).Append('\n')
+            .Append(config.Command.Trim()).Append('\n')
+            .Append(config.Arguments.Trim()).Append('\n');
+
+        foreach (var variable in config.EnvironmentVariables.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            canonical
+                .Append(variable.Key)
+                .Append('=')
+                .Append(variable.Value)
+                .Append('\n');
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
+    }
+
+    private async Task<McpRuntime> GetOrCreateRuntimeAsync(
+        MCPServerConfig config,
+        CancellationToken cancellationToken)
+    {
+        var fingerprint = ComputeConfigurationFingerprint(config);
+
+        await _runtimeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            ThrowIfDisposed();
+
+            if (_activeRuntimes.TryGetValue(fingerprint, out var existingRuntime))
+                return existingRuntime;
+
+            if (_retainedRuntimes.Count >= MaxRetainedRuntimes)
+            {
+                throw new InvalidOperationException(
+                    $"MCP Runtime 已达到安全上限 {MaxRetainedRuntimes}。" +
+                    "为避免释放仍被 Agent 工具引用的客户端，本次连接被拒绝；请重启应用后重试。");
+            }
+
+            var runtime = await CreateRuntimeAsync(config, fingerprint, cancellationToken)
+                .ConfigureAwait(false);
+            _activeRuntimes.Add(fingerprint, runtime);
+            _retainedRuntimes.Add(runtime);
+            return runtime;
+        }
+        finally
+        {
+            _runtimeGate.Release();
+        }
+    }
+
+    private async Task<McpRuntime> CreateRuntimeAsync(
+        MCPServerConfig config,
+        string fingerprint,
+        CancellationToken cancellationToken)
+    {
+        IMcpClientSession? session = null;
+        try
+        {
+            session = await _clientFactory.CreateAsync(config, cancellationToken).ConfigureAwait(false);
+            var runtimeTools = await session.ListToolsAsync(cancellationToken).ConfigureAwait(false);
+            return new McpRuntime(config.Name, fingerprint, session, runtimeTools);
+        }
+        catch
+        {
+            if (session is not null)
+                await session.DisposeAsync().ConfigureAwait(false);
+
+            throw;
+        }
+    }
+
+    private int AddAllowedTools(
+        MCPServerConfig config,
+        IReadOnlyList<AITool> availableTools,
+        List<AITool> destination)
+    {
+        if (config.AllowedTools.Count == 0)
+        {
+            _logger.LogWarning(
+                "MCP 服务器 {Name} 未配置 AllowedTools 白名单，将加载全部 {Count} 个工具。" +
+                "建议在配置中显式指定允许的工具以遵循最小暴露原则。",
+                config.Name,
+                availableTools.Count);
+        }
+
+        var loadedCount = 0;
+        foreach (var tool in availableTools)
+        {
+            var toolName = tool.Name;
+            if (config.AllowedTools.Count > 0 &&
+                !config.AllowedTools.Contains(toolName, StringComparer.OrdinalIgnoreCase))
+            {
+                _auditLogger.LogToolFiltered(config.Name, toolName, "不在允许列表中");
+                continue;
+            }
+
+            _auditLogger.LogToolLoaded(config.Name, toolName, config.Category);
+            destination.Add(tool);
+            loadedCount++;
+        }
+
+        return loadedCount;
+    }
+
     private static IClientTransport CreateStdioTransport(MCPServerConfig config)
     {
         var arguments = string.IsNullOrEmpty(config.Arguments)
             ? Array.Empty<string>()
             : config.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-        return new StdioClientTransport(new()
+        return new StdioClientTransport(new StdioClientTransportOptions
         {
             Name = config.Name,
             Command = config.Command,
@@ -151,12 +329,9 @@ public class McpService : IAsyncDisposable
         });
     }
 
-    /// <summary>
-    /// 创建 SSE 传输
-    /// </summary>
     private static IClientTransport CreateSseTransport(MCPServerConfig config)
     {
-        return new HttpClientTransport(new()
+        return new HttpClientTransport(new HttpClientTransportOptions
         {
             Name = config.Name,
             TransportMode = HttpTransportMode.AutoDetect,
@@ -164,12 +339,9 @@ public class McpService : IAsyncDisposable
         });
     }
 
-    /// <summary>
-    /// 创建 Streamable HTTP 传输
-    /// </summary>
     private static IClientTransport CreateStreamableHttpTransport(MCPServerConfig config)
     {
-        return new HttpClientTransport(new()
+        return new HttpClientTransport(new HttpClientTransportOptions
         {
             Name = config.Name,
             TransportMode = HttpTransportMode.StreamableHttp,
@@ -177,63 +349,61 @@ public class McpService : IAsyncDisposable
         });
     }
 
-    /// <summary>
-    /// 断开所有现有 MCP 连接，释放资源。
-    /// 用于配置变更后重建连接。
-    /// </summary>
-    public async Task ResetConnectionsAsync()
+    private void ThrowIfDisposed()
     {
-        List<McpClient> clientsToDispose;
-        lock (_clientsLock)
-        {
-            clientsToDispose = [.. _mcpClients];
-            _mcpClients.Clear();
-        }
-
-        foreach (var client in clientsToDispose)
-        {
-            try
-            {
-                await client.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "重置 MCP 连接时释放客户端出错");
-            }
-        }
-
-        _logger.LogInformation("已重置 {Count} 个 MCP 连接", clientsToDispose.Count);
+        ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
-    /// <summary>
-    /// 释放资源
-    /// </summary>
-    public async ValueTask DisposeAsync()
+    private sealed record McpRuntime(
+        string ServerName,
+        string Fingerprint,
+        IMcpClientSession Session,
+        IReadOnlyList<AITool> Tools);
+}
+
+internal interface IMcpClientSessionFactory
+{
+    Task<IMcpClientSession> CreateAsync(
+        MCPServerConfig config,
+        CancellationToken cancellationToken);
+}
+
+internal interface IMcpClientSession : IAsyncDisposable
+{
+    Task<IReadOnlyList<AITool>> ListToolsAsync(CancellationToken cancellationToken);
+}
+
+internal sealed class McpClientSessionFactory : IMcpClientSessionFactory
+{
+    public async Task<IMcpClientSession> CreateAsync(
+        MCPServerConfig config,
+        CancellationToken cancellationToken)
     {
-        if (_disposed)
-            return;
-
-        List<McpClient> clientsToDispose;
-        lock (_clientsLock)
+        var transport = McpService.CreateClientTransport(config);
+        var options = new McpClientOptions
         {
-            clientsToDispose = [.. _mcpClients];
-            _mcpClients.Clear();
-        }
-
-        foreach (var mcpClient in clientsToDispose)
-        {
-            try
-            {
-                await mcpClient.DisposeAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "释放 MCP 客户端时发生错误");
-            }
-        }
-
-        _disposed = true;
-        GC.SuppressFinalize(this);
+            ClientInfo = new() { Name = config.Name, Version = "1.0.0" }
+        };
+        var client = await McpClient.CreateAsync(
+                transport,
+                options,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return new McpClientSession(client);
     }
 }
 
+internal sealed class McpClientSession(McpClient client) : IMcpClientSession
+{
+    public async Task<IReadOnlyList<AITool>> ListToolsAsync(CancellationToken cancellationToken)
+    {
+        var tools = await client.ListToolsAsync(cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return tools.Cast<AITool>().ToList();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return client.DisposeAsync();
+    }
+}

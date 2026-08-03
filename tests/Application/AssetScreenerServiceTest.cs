@@ -32,9 +32,10 @@ public sealed class AssetScreenerServiceTest
         mockUserSettingService.Setup(s => s.CurrentSetting)
             .Returns(new UserSetting
             {
+                ProviderId = "Custom",
                 ModelId = "test-model",
                 Endpoint = "http://localhost",
-                ApiKey = "test-key"
+                ProviderApiKeys = new Dictionary<string, string> { ["Custom"] = "test-key" }
             });
         services.AddSingleton(mockUserSettingService.Object);
         services.AddLogging();

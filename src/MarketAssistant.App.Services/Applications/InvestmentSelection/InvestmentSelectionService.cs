@@ -279,7 +279,7 @@ public class InvestmentSelectionService : IDisposable
             InvestmentHorizon = request.InvestmentHorizon,
             PreferredSectors = request.PreferredSectors,
             ExcludedSectors = request.ExcludedSectors,
-            MaxRecommendations = request.MaxRecommendations
+            MaxRecommendations = Math.Clamp(request.MaxRecommendations, 1, 10)
         };
 
         if (string.IsNullOrWhiteSpace(normalized.RiskPreference))

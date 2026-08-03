@@ -52,9 +52,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="config\models.yaml">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="config\prompts\*.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

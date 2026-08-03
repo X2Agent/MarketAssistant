@@ -54,6 +54,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     private MarketAnalysisReport? _lastReport;
     private IStorageProvider? _storageProvider;
     private CancellationTokenSource? _analysisCts;
+    private Guid? _activeAnalysisRunId;
 
     /// <summary>
     /// 供 View 在 AttachedToVisualTree 时注入
@@ -165,6 +166,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     private void OnAnalysisProgressChanged(object? sender, AnalysisProgressEventArgs e)
     {
+        if (_activeAnalysisRunId != e.RunId ||
+            !string.Equals(StockCode, e.AssetSymbol, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             IsAnalysisInProgress = e.IsInProgress;
@@ -204,9 +211,16 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             await RefreshHistoryAsync(StockCode);
 
             _analysisCts?.Cancel();
+            _analysisCts?.Dispose();
             _analysisCts = new CancellationTokenSource();
+            var runId = Guid.NewGuid();
+            _activeAnalysisRunId = runId;
+            var assetCode = StockCode;
 
-            var result = await _orchestrationService.AnalyzeAsync(StockCode, _analysisCts.Token);
+            var result = await _orchestrationService.AnalyzeAsync(
+                assetCode,
+                runId,
+                _analysisCts.Token);
             var report = result.Report;
 
             _lastReport = report;
@@ -326,6 +340,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
         _analysisCts = null;
+        _activeAnalysisRunId = null;
         _lastReport = null;
 
         // 重置分析状态
@@ -343,6 +358,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
+        _activeAnalysisRunId = null;
 
         if (MarketContext != null)
             UnsubscribeFromMarketChanges(MarketContext);

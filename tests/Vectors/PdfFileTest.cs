@@ -28,30 +28,8 @@ public class PdfFileTest : BaseAgentTest
         // 获取PDF读取器
         _reader = _readerFactory.GetReader("test.pdf")!;
 
-        // 获取测试项目根目录
-        var testProjectDir = GetTestProjectDirectory();
-        _testPdfFile = Path.Combine(testProjectDir, "demo.pdf");
-
-        // 确保测试文件存在
+        _testPdfFile = Path.Combine(AppContext.BaseDirectory, "demo.pdf");
         Assert.IsTrue(File.Exists(_testPdfFile), $"测试文件不存在: {_testPdfFile}");
-    }
-
-    private static string GetTestProjectDirectory()
-    {
-        // 从当前执行目录向上查找，直到找到包含demo.pdf的目录
-        var currentDir = Directory.GetCurrentDirectory();
-        var dir = new DirectoryInfo(currentDir);
-
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "demo.pdf")))
-            {
-                return dir.FullName;
-            }
-            dir = dir.Parent;
-        }
-
-        throw new FileNotFoundException("无法找到包含demo.pdf的测试项目目录。请确保demo.pdf文件存在于TestMarketAssistant项目目录中。");
     }
 
     #region Converter Tests

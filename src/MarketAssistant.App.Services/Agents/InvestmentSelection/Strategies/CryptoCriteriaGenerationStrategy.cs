@@ -9,6 +9,17 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// </summary>
 public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<CryptoCriteria>
 {
+    private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "market_cap",
+        "volume_24h",
+        "price",
+        "market_cap_rank",
+        "price_change_24h",
+        "price_change_7d",
+        "price_change_30d"
+    };
+
     private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -155,13 +166,49 @@ public class CryptoCriteriaGenerationStrategy : ICriteriaGenerationStrategy<Cryp
         }
     }
 
-    public CryptoCriteria DeserializeCriteria(string json)
+    public CryptoCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
     {
         var criteria = LlmJsonExtractor.Deserialize<CryptoCriteria>(json, DeserializationOptions);
         if (criteria == null)
         {
             throw new InvalidOperationException("虚拟币筛选条件 JSON 解析失败");
         }
+
+        if (criteria.Criteria is null)
+        {
+            throw new InvalidOperationException("虚拟币筛选条件列表不能为空");
+        }
+
+        for (var index = 0; index < criteria.Criteria.Count; index++)
+        {
+            var condition = criteria.Criteria[index];
+            ValidateCondition(condition.Code, condition.MinValue, condition.MaxValue, index);
+        }
+
+        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
         return criteria;
+    }
+
+    private static void ValidateCondition(
+        string code,
+        decimal? minValue,
+        decimal? maxValue,
+        int index)
+    {
+        if (string.IsNullOrWhiteSpace(code) || !SupportedIndicatorCodes.Contains(code))
+        {
+            throw new InvalidOperationException($"虚拟币筛选条件[{index}]包含不支持的指标: {code}");
+        }
+
+        if (minValue is null && maxValue is null)
+        {
+            throw new InvalidOperationException($"虚拟币筛选条件[{index}]必须至少指定最小值或最大值");
+        }
+
+        if (minValue > maxValue)
+        {
+            throw new InvalidOperationException(
+                $"虚拟币筛选条件[{index}]最小值 {minValue} 不能大于最大值 {maxValue}");
+        }
     }
 }

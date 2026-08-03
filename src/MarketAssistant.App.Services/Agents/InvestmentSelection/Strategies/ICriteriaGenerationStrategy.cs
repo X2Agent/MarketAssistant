@@ -31,7 +31,7 @@ public interface ICriteriaGenerationStrategy<TCriteria> where TCriteria : IScree
     string BuildUserPrompt(InvestmentSelectionWorkflowRequest request);
 
     /// <summary>
-    /// 反序列化筛选条件
+    /// 反序列化并验证筛选条件，使用请求中的数量上限覆盖模型输出。
     /// </summary>
-    TCriteria DeserializeCriteria(string json);
+    TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request);
 }

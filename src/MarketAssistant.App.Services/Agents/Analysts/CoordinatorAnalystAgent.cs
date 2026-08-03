@@ -3,6 +3,7 @@ using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -21,12 +22,6 @@ namespace MarketAssistant.Agents.Analysts;
 
 public class CoordinatorAnalystAgent : AnalystAgentBase
 {
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: AIJsonUtilities.CreateJsonSchema(typeof(CoordinatorResult)),
-        schemaName: nameof(CoordinatorResult),
-        schemaDescription: "协调分析师的综合分析结果，包含投资建议、评分、风险评估等结构化数据"
-    );
-
     public CoordinatorAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
@@ -38,8 +33,8 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
         AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("CoordinatorAnalyst"),
-            ResponseFormat,
+            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("CoordinatorAnalyst"), typeof(CoordinatorResult)),
+            ChatResponseFormat.Json,
             [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],
             [
                 new InvestmentPreferenceContextProvider(

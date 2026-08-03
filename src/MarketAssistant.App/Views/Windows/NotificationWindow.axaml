@@ -43,12 +43,17 @@
             <!-- 消息内容 -->
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center">
-                <TextBlock Name="MessageText"
-                           Text="操作成功"
-                           FontSize="{StaticResource LabelFontSize}"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource NotificationTextLightBrush}"
-                           TextWrapping="Wrap"/>
+                <ScrollViewer MaxHeight="88"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Name="MessageText"
+                               Text="操作成功"
+                               FontSize="{StaticResource LabelFontSize}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource NotificationTextLightBrush}"
+                               TextWrapping="Wrap"
+                               LineHeight="20"/>
+                </ScrollViewer>
             </StackPanel>
             
             <!-- 关闭按钮 -->

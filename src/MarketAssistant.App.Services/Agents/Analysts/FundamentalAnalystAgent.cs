@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
@@ -18,14 +19,6 @@ namespace MarketAssistant.Agents.Analysts;
 [RequiresTools(typeof(IBasicDataTools))]
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(FundamentalAnalysisResult),
-        schemaDescription: "基本面分析师的结构化分析结果，包含公司基本面、行业竞争和投资价值评估"
-    );
-
     public FundamentalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
@@ -34,8 +27,8 @@ public class FundamentalAnalystAgent : AnalystAgentBase
         AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("FundamentalAnalyst"),
-            ResponseFormat,
+            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("FundamentalAnalyst"), typeof(FundamentalAnalysisResult)),
+            ChatResponseFormat.Json,
             tools,
             aiContextProviders,
             skillsProvider)

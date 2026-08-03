@@ -78,13 +78,14 @@ public class BaseAgentTest
         // 必须在 AddApplicationServices 之后注册，覆盖其内部的真实 UserSettingService
         var testUserSetting = new UserSetting
         {
+            ProviderId = "SiliconFlow",
             ZhiTuApiToken = zhiTuApiToken,
             ModelId = modelId,
             EmbeddingModelId = "jina-embeddings-v5-text-small",
             EmbeddingEndpoint = "https://api.jina.ai",
             EmbeddingApiKey = embeddingApiKey,
             Endpoint = endpoint,
-            ApiKey = apiKey,
+            ProviderApiKeys = new Dictionary<string, string> { ["SiliconFlow"] = apiKey },
             EnabledAnalystRoles = new Dictionary<string, bool>
             {
                 { "FinancialAnalystAgent", true },

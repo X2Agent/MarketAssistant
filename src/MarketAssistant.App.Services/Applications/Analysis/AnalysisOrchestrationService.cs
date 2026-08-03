@@ -48,9 +48,24 @@ public class AnalysisOrchestrationService : IDisposable
     /// 执行分析：优先读缓存，缓存未命中则执行工作流。
     /// 使用按标的加锁防止缓存击穿，同一标的并发请求只执行一次工作流。
     /// </summary>
-    public async Task<AnalysisResult> AnalyzeAsync(
-        string assetCode, CancellationToken cancellationToken = default)
+    public Task<AnalysisResult> AnalyzeAsync(
+        string assetCode,
+        CancellationToken cancellationToken = default)
     {
+        return AnalyzeAsync(assetCode, Guid.NewGuid(), cancellationToken);
+    }
+
+    /// <summary>
+    /// 使用调用方分配的 Run ID 执行分析，供 UI 精确筛选并发进度事件。
+    /// </summary>
+    public async Task<AnalysisResult> AnalyzeAsync(
+        string assetCode,
+        Guid runId,
+        CancellationToken cancellationToken = default)
+    {
+        if (runId == Guid.Empty)
+            throw new ArgumentException("Run ID 不能为空", nameof(runId));
+
         var cached = await _cacheService.GetCachedAnalysisAsync(assetCode);
         if (cached != null)
         {
@@ -72,7 +87,7 @@ public class AnalysisOrchestrationService : IDisposable
             }
 
             _logger.LogInformation("开始新的分析: {AssetCode}", assetCode);
-            var report = await _workflow.AnalyzeAsync(assetCode, cancellationToken);
+            var report = await _workflow.AnalyzeAsync(assetCode, runId, cancellationToken);
 
             // 先归档再缓存：归档失败时不缓存，避免"缓存命中但历史缺失"的幽灵报告
             // 归档失败会抛异常，此时不缓存，让用户下次重试

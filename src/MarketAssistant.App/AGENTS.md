@@ -9,7 +9,6 @@
 ```
 MarketAssistant.App/
 ├── config/
-│   ├── models.yaml                ← AI 模型与供应商配置
 │   └── prompts/                   ← 分析师提示词配置（每个分析师一个 yaml 文件）
 │       ├── FundamentalAnalyst.yaml
 │       ├── FinancialAnalyst.yaml
@@ -91,7 +90,6 @@ MarketAssistant.App/
 ## 配置文件
 
 - `config/prompts/*.yaml`：分析师提示词配置，每个分析师一个独立文件（如 `FundamentalAnalyst.yaml`），含 `name`、`displayName`、`temperature`、`topP`、`topK`、`instructions` 字段，运行时热加载。
-- `config/models.yaml`：AI 模型与供应商配置。
 
 ---
 

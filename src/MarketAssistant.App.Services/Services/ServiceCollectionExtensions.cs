@@ -28,6 +28,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
@@ -208,6 +209,13 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
+        services.AddHttpClient("ModelDiscovery", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+        }).AddStandardResilienceHandler();
+
         return services;
     }
 
@@ -254,18 +262,16 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
+        services.AddSingleton<IModelProviderAdapterFactory, ModelProviderAdapterFactory>();
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
 
-        // MAF 中间件
+        // MAF 中间件与会话级 Context Provider 工厂
         services.AddSingleton<TokenTrackingMiddleware>();
-        services.AddSingleton<ConversationCompressionMiddleware>(sp =>
-            new ConversationCompressionMiddleware(
-                () => sp.GetRequiredService<IChatClientFactory>().CreateClient(),
-                sp.GetRequiredService<ILogger<ConversationCompressionMiddleware>>()));
+        services.AddSingleton<ConversationCompactionProviderFactory>();
 
         services.AddSingleton(sp =>
             new AgentSkillsProvider(
@@ -343,9 +349,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 
-        // 市场分析工作流
-        services.AddSingleton<AnalysisAggregatorExecutor>();
-        services.AddSingleton<CoordinatorExecutor>();
+        // 市场分析工作流；Executor 在每次 Run 内创建，避免共享可变状态和模型固化。
         services.AddSingleton<MarketAnalysisWorkflow>();
         services.AddSingleton<AnalysisOrchestrationService>();
 

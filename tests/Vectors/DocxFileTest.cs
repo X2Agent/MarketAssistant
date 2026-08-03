@@ -28,30 +28,8 @@ public class DocxFileTest : BaseAgentTest
         // 获取DOCX读取器
         _reader = _readerFactory.GetReader("test.docx")!;
 
-        // 获取测试项目根目录
-        var testProjectDir = GetTestProjectDirectory();
-        _testDocxFile = Path.Combine(testProjectDir, "demo.docx");
-
-        // 确保测试文件存在
+        _testDocxFile = Path.Combine(AppContext.BaseDirectory, "demo.docx");
         Assert.IsTrue(File.Exists(_testDocxFile), $"测试文件不存在: {_testDocxFile}");
-    }
-
-    private static string GetTestProjectDirectory()
-    {
-        // 从当前执行目录向上查找，直到找到包含demo.docx的目录
-        var currentDir = Directory.GetCurrentDirectory();
-        var dir = new DirectoryInfo(currentDir);
-
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "demo.docx")))
-            {
-                return dir.FullName;
-            }
-            dir = dir.Parent;
-        }
-
-        throw new FileNotFoundException("无法找到包含demo.docx的测试项目目录。请确保demo.docx文件存在于TestMarketAssistant项目目录中。");
     }
 
     #region Converter Tests

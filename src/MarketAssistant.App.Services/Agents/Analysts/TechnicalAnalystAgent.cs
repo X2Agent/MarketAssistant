@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
@@ -17,14 +18,6 @@ namespace MarketAssistant.Agents.Analysts;
 [RequiresTools(typeof(ITechnicalDataTools))]
 public class TechnicalAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(TechnicalAnalysisResult),
-        schemaDescription: "技术分析师的结构化分析结果，包含图表形态、关键价位、技术指标和交易策略"
-    );
-
     public TechnicalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
@@ -33,8 +26,8 @@ public class TechnicalAnalystAgent : AnalystAgentBase
         AgentSkillsProvider? skillsProvider = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("TechnicalAnalyst"),
-            ResponseFormat,
+            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("TechnicalAnalyst"), typeof(TechnicalAnalysisResult)),
+            ChatResponseFormat.Json,
             tools,
             aiContextProviders,
             skillsProvider)

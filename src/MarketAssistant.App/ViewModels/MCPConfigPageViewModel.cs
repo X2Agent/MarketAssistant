@@ -249,7 +249,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
 
             try
             {
-                var tools = await _mcpService.GetAIToolsAsync([testConfig]).WaitAsync(cts.Token);
+                var tools = await _mcpService.GetAIToolsAsync([testConfig], cts.Token);
                 var toolCount = tools.Count;
 
                 if (toolCount > 0)

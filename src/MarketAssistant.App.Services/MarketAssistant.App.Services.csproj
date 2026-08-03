@@ -5,8 +5,11 @@
     <RootNamespace>MarketAssistant</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);MAAI001</NoWarn>
-    <InternalsVisibleTo>TestMarketAssistant</InternalsVisibleTo>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TestMarketAssistant" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
@@ -23,6 +26,7 @@
 
   <ItemGroup>
     <PackageReference Include="AdaptiveCards" />
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Agents.AI" />
@@ -33,9 +37,11 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
     <PackageReference Include="ModelContextProtocol" />

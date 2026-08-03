@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -26,6 +27,14 @@ public interface IAnalystAgentFactory
     /// 根据类型创建代理，附加额外的 AIContextProvider（如共享市场快照）
     /// </summary>
     AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders);
+
+    /// <summary>
+    /// 使用调用方提供的不可变 Runtime Client 创建代理，确保同一次工作流模型配置一致。
+    /// </summary>
+    AIAgent CreateAnalyst(
+        Type agentType,
+        IChatClient chatClient,
+        AIContextProvider[]? additionalProviders = null);
 }
 
 /// <summary>
@@ -64,16 +73,23 @@ public class AnalystAgentFactory : IAnalystAgentFactory
     /// </summary>
     public AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders)
     {
+        return CreateAnalyst(agentType, _chatClientFactory.CreateClient(), additionalProviders);
+    }
+
+    public AIAgent CreateAnalyst(
+        Type agentType,
+        IChatClient chatClient,
+        AIContextProvider[]? additionalProviders = null)
+    {
         try
         {
+            ArgumentNullException.ThrowIfNull(chatClient);
+
             // 严格限制必须是 AnalystAgentBase 的子类
             if (!typeof(AnalystAgentBase).IsAssignableFrom(agentType))
             {
                 throw new ArgumentException($"Type {agentType.Name} must inherit from AnalystAgentBase", nameof(agentType));
             }
-
-            // 创建 ChatClient
-            var chatClient = _chatClientFactory.CreateClient();
 
             // 根据当前市场类型获取对应的工具实现
             var currentMarket = _marketContext.CurrentMarket;

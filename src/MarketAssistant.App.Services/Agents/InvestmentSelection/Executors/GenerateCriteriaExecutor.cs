@@ -2,6 +2,7 @@ using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -18,11 +19,6 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ICriteriaGenerationStrategy<TCriteria> _strategy;
     private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger;
-
-    private static readonly JsonSerializerOptions SchemaOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public GenerateCriteriaExecutor(
         IChatClientFactory chatClientFactory,
@@ -60,14 +56,12 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
 
             var chatClient = _chatClientFactory.CreateClient();
 
-            var schema = AIJsonUtilities.CreateJsonSchema(typeof(TCriteria), serializerOptions: SchemaOptions);
+            var schemaPrompt = StructuredOutputHelper.BuildSchemaPromptSection(typeof(TCriteria), typeof(TCriteria).Name);
+            systemPrompt = systemPrompt + "\n\n" + schemaPrompt;
 
             var chatOptions = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(
-                    schema: schema,
-                    schemaName: typeof(TCriteria).Name,
-                    schemaDescription: $"包含筛选条件的{_strategy.SupportedMarketType}筛选参数"),
+                ResponseFormat = ChatResponseFormat.Json,
                 Temperature = 0.1f,
                 MaxOutputTokens = input.IsNewsAnalysis ? 3500 : 2000
             };
@@ -80,7 +74,7 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
                     chatOptions,
                     cancellationToken);
 
-            var criteria = _strategy.DeserializeCriteria(response.Text);
+            var criteria = _strategy.DeserializeCriteria(response.Text, input);
 
             _logger.LogInformation("[步骤1/3-{MarketType}] 筛选条件生成完成，包含 {Count} 个条件",
                 _strategy.SupportedMarketType,

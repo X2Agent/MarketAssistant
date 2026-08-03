@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Middleware;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -10,52 +11,67 @@ public class ConversationCompressionMiddlewareTest
 {
     [TestMethod]
     [TestCategory("Unit")]
-    public void Constructor_ShouldSetDefaults()
+    public void Create_ShouldReturnIndependentProviders()
     {
-        var middleware = CreateMiddleware();
+        var factory = new ConversationCompactionProviderFactory(NullLoggerFactory.Instance);
+        var chatClient = new Mock<IChatClient>().Object;
 
-        Assert.AreEqual(8000, middleware.MaxTokens);
-        Assert.AreEqual(4, middleware.ReserveRecentCount);
+        var first = factory.Create(chatClient);
+        var second = factory.Create(chatClient);
+
+        Assert.IsInstanceOfType(first, typeof(AIContextProvider));
+        Assert.IsInstanceOfType(second, typeof(AIContextProvider));
+        Assert.AreNotSame(first, second);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void MaxTokens_CanBeChanged()
+    public void Create_NonPositiveMaxTokens_ShouldThrow()
     {
-        var middleware = CreateMiddleware();
+        var factory = new ConversationCompactionProviderFactory(NullLoggerFactory.Instance);
+        var chatClient = new Mock<IChatClient>().Object;
 
-        middleware.MaxTokens = 4000;
-
-        Assert.AreEqual(4000, middleware.MaxTokens);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            factory.Create(chatClient, maxTokens: 0));
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void ReserveRecentCount_CanBeChanged()
+    public void Create_NonPositivePreservedGroups_ShouldThrow()
     {
-        var middleware = CreateMiddleware();
+        var factory = new ConversationCompactionProviderFactory(NullLoggerFactory.Instance);
+        var chatClient = new Mock<IChatClient>().Object;
 
-        middleware.ReserveRecentCount = 6;
-
-        Assert.AreEqual(6, middleware.ReserveRecentCount);
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            factory.Create(chatClient, minimumPreservedGroups: 0));
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void PreCompressHook_DefaultNull()
+    public void CalculateMaxTokens_UnknownContextWindow_ShouldUseConservativeDefault()
     {
-        var middleware = CreateMiddleware();
-
-        Assert.IsNull(middleware.PreCompressHook);
+        Assert.AreEqual(
+            ConversationCompactionProviderFactory.DefaultMaxTokens,
+            ConversationCompactionProviderFactory.CalculateMaxTokens(null));
     }
 
-    private static ConversationCompressionMiddleware CreateMiddleware()
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CalculateMaxTokens_KnownContextWindow_ShouldReserveTwentyFivePercent()
     {
-        var chatClientFactory = new Mock<Func<IChatClient>>();
-        chatClientFactory.Setup(f => f()).Returns(new Mock<IChatClient>().Object);
+        Assert.AreEqual(
+            96_000,
+            ConversationCompactionProviderFactory.CalculateMaxTokens(128_000));
+        Assert.AreEqual(
+            750_000,
+            ConversationCompactionProviderFactory.CalculateMaxTokens(1_000_000));
+    }
 
-        return new ConversationCompressionMiddleware(
-            chatClientFactory.Object,
-            NullLogger<ConversationCompressionMiddleware>.Instance);
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CalculateMaxTokens_NonPositiveContextWindow_ShouldThrow()
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
+            ConversationCompactionProviderFactory.CalculateMaxTokens(0));
     }
 }

@@ -111,7 +111,9 @@ public class InvestmentSelectionWorkflow : IDisposable
 
         // 执行工作流
         await using Run run = await InProcessExecution.RunAsync(
-            workflow, request, checkpointManager: null, sessionId: null, cancellationToken);
+            workflow,
+            request,
+            cancellationToken: cancellationToken);
 
         InvestmentSelectionResult? finalResult = null;
 
