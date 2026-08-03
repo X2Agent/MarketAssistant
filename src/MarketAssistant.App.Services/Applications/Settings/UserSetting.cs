@@ -39,7 +39,10 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _knowledgeFileDirectory, value);
     }
 
-    public bool Notification { get; set; }
+    /// <summary>
+    /// 是否显示桌面通知。默认开启，避免新安装用户创建告警后无感知。
+    /// </summary>
+    public bool Notification { get; set; } = true;
 
     public string ZhiTuApiToken { get; set; } = "";
 

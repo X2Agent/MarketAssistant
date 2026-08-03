@@ -138,10 +138,12 @@ public class RiskManager
                     else
                     {
                         // 现货模式：使用本地 FIFO 持仓追踪校验
+                        // 注意用剩余未平仓数量（Quantity - ClosedQuantity）而非原始开仓量，
+                        // 否则部分平仓后仍按全额校验，会允许超出实际可卖数量的超卖
                         var positions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
                         var availableQty = positions
                             .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
-                            .Sum(p => p.Quantity);
+                            .Sum(p => p.RemainingQuantity);
                         if (quantity > availableQty)
                             return RiskCheckResult.Reject(
                                 $"卖出数量 {quantity} 超过可用持仓 {availableQty}（含部分成交未同步的偏差）");

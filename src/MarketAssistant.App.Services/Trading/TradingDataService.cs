@@ -477,8 +477,11 @@ public class TradingDataService : SqliteServiceBase
             }
         }
 
+        // 交易次数仅在订单从未成交变为首次成交（existingRecord.ExecutedQty == 0）时增加一次；
+        // 下单时已计数或对账增量补充过的订单不再重复计数
         if (deltaExecutedQty > 0 || deltaCommission > 0)
-            await UpdateDailyStatsAsync(realizedPnl, deltaCommission, ct).ConfigureAwait(false);
+            await UpdateDailyStatsAsync(realizedPnl, deltaCommission,
+                countTrade: existingRecord.ExecutedQty == 0 && deltaExecutedQty > 0, ct).ConfigureAwait(false);
 
         existingRecord.RequestedQty = latestOrder.RequestedQty > 0 ? latestOrder.RequestedQty : existingRecord.RequestedQty;
         existingRecord.ExecutedQty = latestExecutedQty;
@@ -531,7 +534,12 @@ public class TradingDataService : SqliteServiceBase
         return new DailyStats { Date = today };
     }
 
-    public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, CancellationToken ct = default)
+    /// <summary>
+    /// 更新今日统计：累计已实现盈亏与手续费，并按需增加交易次数。
+    /// <paramref name="countTrade"/> 仅在订单首次实际成交（executed_qty 从 0 变为 >0）时为 true，
+    /// 避免未成交订单被计数、以及下单与对账重复计数。
+    /// </summary>
+    public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, bool countTrade = true, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
@@ -539,14 +547,15 @@ public class TradingDataService : SqliteServiceBase
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
-            VALUES (@environment, @date, 1, @pnl, @comm)
+            VALUES (@environment, @date, @countTrade, @pnl, @comm)
             ON CONFLICT(environment, date) DO UPDATE SET
-                trade_count = trade_count + 1,
+                trade_count = trade_count + @countTrade,
                 total_pnl = total_pnl + @pnl,
                 total_commission = total_commission + @comm
             """;
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@date", today);
+        cmd.Parameters.AddWithValue("@countTrade", countTrade ? 1 : 0);
         cmd.Parameters.AddWithValue("@pnl", (double)pnl);
         cmd.Parameters.AddWithValue("@comm", (double)commission);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
@@ -885,99 +894,7 @@ public class TradingDataService : SqliteServiceBase
         try
         {
             await using var conn = await OpenConnectionAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS strategies (
-                    id TEXT PRIMARY KEY,
-                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
-                    symbol TEXT NOT NULL,
-                    type INTEGER NOT NULL,
-                    status INTEGER NOT NULL,
-                    side INTEGER NOT NULL,
-                    trigger_price REAL NOT NULL,
-                    stop_loss_price REAL,
-                    take_profit_price REAL,
-                    quantity REAL NOT NULL,
-                    max_position_percent REAL,
-                    custom_params TEXT,
-                    created_at TEXT NOT NULL,
-                    last_triggered_at TEXT,
-                    execution_count INTEGER DEFAULT 0,
-                    max_executions INTEGER,
-                    trailing_peak_price REAL,
-                    native_order_id TEXT
-                );
-                CREATE INDEX IF NOT EXISTS idx_strategies_symbol ON strategies(symbol);
-                CREATE INDEX IF NOT EXISTS idx_strategies_status ON strategies(status);
-                CREATE INDEX IF NOT EXISTS idx_strategies_environment_status ON strategies(environment, status, created_at);
-
-                CREATE TABLE IF NOT EXISTS trade_records (
-                    id TEXT PRIMARY KEY,
-                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
-                    strategy_id TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    side INTEGER NOT NULL,
-                    order_type INTEGER NOT NULL,
-                    requested_qty REAL NOT NULL,
-                    executed_qty REAL NOT NULL,
-                    requested_price REAL,
-                    executed_price REAL NOT NULL,
-                    commission REAL DEFAULT 0,
-                    commission_asset TEXT,
-                    status INTEGER NOT NULL,
-                    binance_order_id INTEGER,
-                    ai_reasoning TEXT,
-                    created_at TEXT NOT NULL,
-                    completed_at TEXT,
-                    FOREIGN KEY (strategy_id) REFERENCES strategies(id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_records_strategy ON trade_records(strategy_id);
-                CREATE INDEX IF NOT EXISTS idx_records_symbol ON trade_records(symbol);
-                CREATE INDEX IF NOT EXISTS idx_records_created ON trade_records(created_at);
-                CREATE INDEX IF NOT EXISTS idx_records_environment_created ON trade_records(environment, created_at);
-
-                CREATE TABLE IF NOT EXISTS daily_stats (
-                    environment TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    trade_count INTEGER DEFAULT 0,
-                    total_pnl REAL DEFAULT 0,
-                    total_commission REAL DEFAULT 0,
-                    PRIMARY KEY (environment, date)
-                );
-
-                CREATE TABLE IF NOT EXISTS positions (
-                    id TEXT PRIMARY KEY,
-                    environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
-                    symbol TEXT NOT NULL,
-                    side INTEGER NOT NULL,
-                    quantity REAL NOT NULL,
-                    entry_price REAL NOT NULL,
-                    closed_quantity REAL DEFAULT 0,
-                    strategy_id TEXT,
-                    opened_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
-                CREATE INDEX IF NOT EXISTS idx_positions_side ON positions(symbol, side);
-                CREATE INDEX IF NOT EXISTS idx_positions_environment_symbol ON positions(environment, symbol, side);
-
-                CREATE TABLE IF NOT EXISTS account_snapshots (
-                    environment TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    total_value_usdt REAL NOT NULL,
-                    snapshot_at TEXT NOT NULL,
-                    PRIMARY KEY (environment, date)
-                );
-
-                CREATE TABLE IF NOT EXISTS risk_config (
-                    environment TEXT NOT NULL,
-                    market_type INTEGER NOT NULL,
-                    config_json TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (environment, market_type)
-                );
-                """;
-            await cmd.ExecuteNonQueryAsync();
-            await EnsureEnvironmentSchemaAsync(conn).ConfigureAwait(false);
+            await MigrateDatabaseSchemaAsync(conn).ConfigureAwait(false);
             Logger.LogInformation("交易数据库初始化完成");
         }
         catch (Exception ex)
@@ -985,6 +902,132 @@ public class TradingDataService : SqliteServiceBase
             Logger.LogError(ex, "初始化交易数据库失败");
             throw new InvalidOperationException("交易数据库初始化失败，应用无法继续运行", ex);
         }
+    }
+
+    /// <summary>
+    /// 在同一事务内完成建表、旧结构迁移和索引创建，保证升级失败时不会留下半迁移状态。
+    /// </summary>
+    internal static async Task MigrateDatabaseSchemaAsync(SqliteConnection conn)
+    {
+        await using var transaction = (SqliteTransaction)await conn.BeginTransactionAsync().ConfigureAwait(false);
+        try
+        {
+            await CreateTablesAsync(conn, transaction).ConfigureAwait(false);
+            await EnsureEnvironmentSchemaAsync(conn, transaction).ConfigureAwait(false);
+            await CreateIndexesAsync(conn, transaction).ConfigureAwait(false);
+            await transaction.CommitAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task CreateTablesAsync(SqliteConnection conn, SqliteTransaction transaction)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS strategies (
+                id TEXT PRIMARY KEY,
+                environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
+                symbol TEXT NOT NULL,
+                type INTEGER NOT NULL,
+                status INTEGER NOT NULL,
+                side INTEGER NOT NULL,
+                trigger_price REAL NOT NULL,
+                stop_loss_price REAL,
+                take_profit_price REAL,
+                quantity REAL NOT NULL,
+                max_position_percent REAL,
+                custom_params TEXT,
+                created_at TEXT NOT NULL,
+                last_triggered_at TEXT,
+                execution_count INTEGER DEFAULT 0,
+                max_executions INTEGER,
+                trailing_peak_price REAL,
+                native_order_id TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS trade_records (
+                id TEXT PRIMARY KEY,
+                environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
+                strategy_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                side INTEGER NOT NULL,
+                order_type INTEGER NOT NULL,
+                requested_qty REAL NOT NULL,
+                executed_qty REAL NOT NULL,
+                requested_price REAL,
+                executed_price REAL NOT NULL,
+                commission REAL DEFAULT 0,
+                commission_asset TEXT,
+                status INTEGER NOT NULL,
+                binance_order_id INTEGER,
+                ai_reasoning TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS daily_stats (
+                environment TEXT NOT NULL,
+                date TEXT NOT NULL,
+                trade_count INTEGER DEFAULT 0,
+                total_pnl REAL DEFAULT 0,
+                total_commission REAL DEFAULT 0,
+                PRIMARY KEY (environment, date)
+            );
+
+            CREATE TABLE IF NOT EXISTS positions (
+                id TEXT PRIMARY KEY,
+                environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
+                symbol TEXT NOT NULL,
+                side INTEGER NOT NULL,
+                quantity REAL NOT NULL,
+                entry_price REAL NOT NULL,
+                closed_quantity REAL DEFAULT 0,
+                strategy_id TEXT,
+                opened_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS account_snapshots (
+                environment TEXT NOT NULL,
+                date TEXT NOT NULL,
+                total_value_usdt REAL NOT NULL,
+                snapshot_at TEXT NOT NULL,
+                PRIMARY KEY (environment, date)
+            );
+
+            CREATE TABLE IF NOT EXISTS risk_config (
+                environment TEXT NOT NULL,
+                market_type INTEGER NOT NULL,
+                config_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (environment, market_type)
+            );
+            """;
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+    }
+
+    private static async Task CreateIndexesAsync(SqliteConnection conn, SqliteTransaction transaction)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = """
+            CREATE INDEX IF NOT EXISTS idx_strategies_symbol ON strategies(symbol);
+            CREATE INDEX IF NOT EXISTS idx_strategies_status ON strategies(status);
+            CREATE INDEX IF NOT EXISTS idx_strategies_environment_status ON strategies(environment, status, created_at);
+            CREATE INDEX IF NOT EXISTS idx_records_strategy ON trade_records(strategy_id);
+            CREATE INDEX IF NOT EXISTS idx_records_symbol ON trade_records(symbol);
+            CREATE INDEX IF NOT EXISTS idx_records_created ON trade_records(created_at);
+            CREATE INDEX IF NOT EXISTS idx_records_environment_created ON trade_records(environment, created_at);
+            CREATE INDEX IF NOT EXISTS idx_positions_symbol ON positions(symbol);
+            CREATE INDEX IF NOT EXISTS idx_positions_side ON positions(symbol, side);
+            CREATE INDEX IF NOT EXISTS idx_positions_environment_symbol ON positions(environment, symbol, side);
+            """;
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
     private static TradingStrategy ReadStrategy(SqliteDataReader reader)
@@ -1113,146 +1156,131 @@ public class TradingDataService : SqliteServiceBase
     private static bool IsTerminalStatus(TradeRecordStatus status) => status is
         TradeRecordStatus.Filled or TradeRecordStatus.Cancelled or TradeRecordStatus.Failed;
 
-    private async Task EnsureEnvironmentSchemaAsync(SqliteConnection conn)
+    private static async Task EnsureEnvironmentSchemaAsync(
+        SqliteConnection conn,
+        SqliteTransaction transaction)
     {
-        await EnsureColumnAsync(conn, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
-        await EnsureColumnAsync(conn, "strategies", "native_order_id", "TEXT").ConfigureAwait(false);
-        await EnsureColumnAsync(conn, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
-        await EnsureColumnAsync(conn, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
-        await MigrateDailyStatsAsync(conn).ConfigureAwait(false);
-        await MigrateAccountSnapshotsAsync(conn).ConfigureAwait(false);
-        await MigrateRiskConfigAsync(conn).ConfigureAwait(false);
+        await EnsureColumnAsync(conn, transaction, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, transaction, "strategies", "native_order_id", "TEXT").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, transaction, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, transaction, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);
+        await MigrateAccountSnapshotsAsync(conn, transaction).ConfigureAwait(false);
+        await MigrateRiskConfigAsync(conn, transaction).ConfigureAwait(false);
     }
 
     private static async Task EnsureColumnAsync(
         SqliteConnection conn,
+        SqliteTransaction transaction,
         string tableName,
         string columnName,
         string columnDefinition)
     {
-        if (await ColumnExistsAsync(conn, tableName, columnName).ConfigureAwait(false))
+        if (await ColumnExistsAsync(conn, transaction, tableName, columnName).ConfigureAwait(false))
             return;
 
         await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition}";
         await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
-    private async Task MigrateDailyStatsAsync(SqliteConnection conn)
+    private static async Task MigrateDailyStatsAsync(
+        SqliteConnection conn,
+        SqliteTransaction transaction)
     {
-        if (await ColumnExistsAsync(conn, "daily_stats", "environment").ConfigureAwait(false))
+        if (await ColumnExistsAsync(conn, transaction, "daily_stats", "environment").ConfigureAwait(false))
             return;
 
-        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.Transaction = (SqliteTransaction)tx;
-            cmd.CommandText = $"""
-                ALTER TABLE daily_stats RENAME TO daily_stats_legacy;
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = $"""
+            ALTER TABLE daily_stats RENAME TO daily_stats_legacy;
 
-                CREATE TABLE daily_stats (
-                    environment TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    trade_count INTEGER DEFAULT 0,
-                    total_pnl REAL DEFAULT 0,
-                    total_commission REAL DEFAULT 0,
-                    PRIMARY KEY (environment, date)
-                );
+            CREATE TABLE daily_stats (
+                environment TEXT NOT NULL,
+                date TEXT NOT NULL,
+                trade_count INTEGER DEFAULT 0,
+                total_pnl REAL DEFAULT 0,
+                total_commission REAL DEFAULT 0,
+                PRIMARY KEY (environment, date)
+            );
 
-                INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
-                SELECT '{LiveSpotEnvironment}', date, trade_count, total_pnl, total_commission
-                FROM daily_stats_legacy;
+            INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
+            SELECT '{LiveSpotEnvironment}', date, trade_count, total_pnl, total_commission
+            FROM daily_stats_legacy;
 
-                DROP TABLE daily_stats_legacy;
-                """;
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            await tx.CommitAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            await tx.RollbackAsync().ConfigureAwait(false);
-            throw;
-        }
+            DROP TABLE daily_stats_legacy;
+            """;
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
-    private async Task MigrateAccountSnapshotsAsync(SqliteConnection conn)
+    private static async Task MigrateAccountSnapshotsAsync(
+        SqliteConnection conn,
+        SqliteTransaction transaction)
     {
-        if (await ColumnExistsAsync(conn, "account_snapshots", "environment").ConfigureAwait(false))
+        if (await ColumnExistsAsync(conn, transaction, "account_snapshots", "environment").ConfigureAwait(false))
             return;
 
-        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.Transaction = (SqliteTransaction)tx;
-            cmd.CommandText = $"""
-                ALTER TABLE account_snapshots RENAME TO account_snapshots_legacy;
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = $"""
+            ALTER TABLE account_snapshots RENAME TO account_snapshots_legacy;
 
-                CREATE TABLE account_snapshots (
-                    environment TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    total_value_usdt REAL NOT NULL,
-                    snapshot_at TEXT NOT NULL,
-                    PRIMARY KEY (environment, date)
-                );
+            CREATE TABLE account_snapshots (
+                environment TEXT NOT NULL,
+                date TEXT NOT NULL,
+                total_value_usdt REAL NOT NULL,
+                snapshot_at TEXT NOT NULL,
+                PRIMARY KEY (environment, date)
+            );
 
-                INSERT INTO account_snapshots (environment, date, total_value_usdt, snapshot_at)
-                SELECT '{LiveSpotEnvironment}', date, total_value_usdt, snapshot_at
-                FROM account_snapshots_legacy;
+            INSERT INTO account_snapshots (environment, date, total_value_usdt, snapshot_at)
+            SELECT '{LiveSpotEnvironment}', date, total_value_usdt, snapshot_at
+            FROM account_snapshots_legacy;
 
-                DROP TABLE account_snapshots_legacy;
-                """;
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            await tx.CommitAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            await tx.RollbackAsync().ConfigureAwait(false);
-            throw;
-        }
+            DROP TABLE account_snapshots_legacy;
+            """;
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
-    private async Task MigrateRiskConfigAsync(SqliteConnection conn)
+    private static async Task MigrateRiskConfigAsync(
+        SqliteConnection conn,
+        SqliteTransaction transaction)
     {
-        if (await ColumnExistsAsync(conn, "risk_config", "environment").ConfigureAwait(false))
+        if (await ColumnExistsAsync(conn, transaction, "risk_config", "environment").ConfigureAwait(false))
             return;
 
-        await using var tx = await conn.BeginTransactionAsync().ConfigureAwait(false);
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.Transaction = (SqliteTransaction)tx;
-            cmd.CommandText = $"""
-                ALTER TABLE risk_config RENAME TO risk_config_legacy;
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
+        cmd.CommandText = $"""
+            ALTER TABLE risk_config RENAME TO risk_config_legacy;
 
-                CREATE TABLE risk_config (
-                    environment TEXT NOT NULL,
-                    market_type INTEGER NOT NULL,
-                    config_json TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY (environment, market_type)
-                );
+            CREATE TABLE risk_config (
+                environment TEXT NOT NULL,
+                market_type INTEGER NOT NULL,
+                config_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (environment, market_type)
+            );
 
-                INSERT INTO risk_config (environment, market_type, config_json, updated_at)
-                SELECT '{LiveSpotEnvironment}', market_type, config_json, updated_at
-                FROM risk_config_legacy;
+            INSERT INTO risk_config (environment, market_type, config_json, updated_at)
+            SELECT '{LiveSpotEnvironment}', market_type, config_json, updated_at
+            FROM risk_config_legacy;
 
-                DROP TABLE risk_config_legacy;
-                """;
-            await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-            await tx.CommitAsync().ConfigureAwait(false);
-        }
-        catch
-        {
-            await tx.RollbackAsync().ConfigureAwait(false);
-            throw;
-        }
+            DROP TABLE risk_config_legacy;
+            """;
+        await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }
 
-    private static async Task<bool> ColumnExistsAsync(SqliteConnection conn, string tableName, string columnName)
+    private static async Task<bool> ColumnExistsAsync(
+        SqliteConnection conn,
+        SqliteTransaction transaction,
+        string tableName,
+        string columnName)
     {
         await using var cmd = conn.CreateCommand();
+        cmd.Transaction = transaction;
         cmd.CommandText = $"PRAGMA table_info({tableName})";
         await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
         while (await reader.ReadAsync().ConfigureAwait(false))

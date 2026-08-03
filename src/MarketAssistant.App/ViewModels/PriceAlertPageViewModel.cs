@@ -4,14 +4,16 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.PriceAlert;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels;
 
 /// <summary>
-/// 交易对下拉选项
+/// 资产下拉选项（名称 + 代码）
 /// </summary>
 public sealed class AssetOption
 {
@@ -35,6 +37,8 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private readonly PriceAlertService _alertService;
     private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
+    private readonly IDialogService _dialogService;
+    private readonly IUserSettingService _userSettingService;
 
     /// <summary>
     /// 资产下拉列表加载取消令牌，避免快速切换市场时竞态覆盖。
@@ -63,16 +67,22 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     public List<AlertCondition> ConditionOptions { get; } = Enum.GetValues<AlertCondition>().ToList();
 
     /// <summary>
-    /// 新规则 - 交易对搜索输入（AutoCompleteBox 文本）
+    /// 新规则 - 资产搜索输入（下拉文本框）
     /// </summary>
     [ObservableProperty]
     private string _newRuleAssetText = string.Empty;
 
     /// <summary>
-    /// 新规则 - 选中交易对
+    /// 新规则 - 选中资产
     /// </summary>
     [ObservableProperty]
     private AssetOption? _newRuleSelectedAsset;
+
+    /// <summary>
+    /// 新规则 - 资产下拉是否展开
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAssetDropDownOpen;
 
     /// <summary>
     /// 新规则 - 触发条件
@@ -85,6 +95,12 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty]
     private string _newRuleTargetValue = string.Empty;
+
+    /// <summary>
+    /// 新规则 - 是否一次性告警。触发一次后自动停用，可手动重新启用；默认持续告警（离开区间自动复位）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _newRuleIsOneTime;
 
     /// <summary>
     /// 新规则 - 市场类型（跟随当前市场）
@@ -113,26 +129,51 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     public bool IsCryptoMarket => _marketContext.CurrentMarket == MarketType.Crypto;
 
     /// <summary>
+    /// 资产选择字段标签（虚拟币市场为交易对，A股市场为股票名）
+    /// </summary>
+    public string AssetLabelText =>
+        IsCryptoMarket ? "交易对" : "股票名";
+
+    /// <summary>
+    /// 资产选择字段占位文本（跟随市场）
+    /// </summary>
+    public string AssetPlaceholderText =>
+        IsCryptoMarket
+            ? "选择或搜索交易对，如 BTC"
+            : "选择或搜索股票，如 贵州茅台";
+
+    /// <summary>
     /// 表单校验错误信息
     /// </summary>
-    public string ValidationError { get; set; } = string.Empty;
+    [ObservableProperty]
+    private string _validationError = string.Empty;
 
     /// <summary>
     /// 空列表提示文本
     /// </summary>
-    public string EmptyHintText => "在上方添加价格告警规则，系统将自动监听并在价格触发时通知你";
+    public string EmptyHintText => "在上方添加价格告警规则：持续告警进入目标区间提醒一次、离开后自动复位；一次性告警触发后自动停用";
+
+    /// <summary>
+    /// 桌面通知是否已开启。关闭时告警仍会触发并保留状态，但不会显示弹窗。
+    /// </summary>
+    public bool IsNotificationEnabled => _userSettingService.CurrentSetting.Notification;
 
     public PriceAlertPageViewModel(
         PriceAlertService alertService,
         IServiceProvider serviceProvider,
         MarketContext marketContext,
+        IDialogService dialogService,
+        IUserSettingService userSettingService,
         ILogger<PriceAlertPageViewModel> logger)
         : base(logger)
     {
         _alertService = alertService;
         _serviceProvider = serviceProvider;
         _marketContext = marketContext;
+        _dialogService = dialogService;
+        _userSettingService = userSettingService;
         _alertService.RulesChanged += OnRulesChanged;
+        _alertService.RuleQuoteUpdated += OnRuleQuoteUpdated;
         SubscribeToMarketChanges(_marketContext);
         _ = LoadRulesAsync();
     }
@@ -144,7 +185,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 交易对文本变化时触发防抖搜索
+    /// 资产文本变化时触发防抖搜索
     /// </summary>
     partial void OnNewRuleAssetTextChanged(string value)
     {
@@ -155,6 +196,8 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(IsCryptoMarket));
         OnPropertyChanged(nameof(NewRuleMarketType));
+        OnPropertyChanged(nameof(AssetLabelText));
+        OnPropertyChanged(nameof(AssetPlaceholderText));
         NewRuleSelectedAsset = null;
         NewRuleAssetText = string.Empty;
         NewRuleCondition = AlertCondition.PriceAbove;
@@ -175,9 +218,18 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         {
             await Task.Delay(SearchDebounceDelay, cancellationToken);
 
+            // 下拉选中项回填文本（如 "BTC (BTCUSDT)"）不触发重复搜索
+            if (NewRuleSelectedAsset?.Display.Equals(keyword, StringComparison.OrdinalIgnoreCase) == true)
+                return;
+
+            // 空关键字清空候选，等待用户输入后再搜索
             if (keyword.Length == 0)
             {
-                await Dispatcher.UIThread.InvokeAsync(() => AssetOptions.Clear());
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    AssetOptions.Clear();
+                    IsAssetDropDownOpen = false;
+                });
                 return;
             }
 
@@ -190,6 +242,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
                 {
                     AssetOptions.Add(new AssetOption { Name = name, Code = code });
                 }
+                IsAssetDropDownOpen = AssetOptions.Count > 0;
             });
         }
         catch (OperationCanceledException)
@@ -213,10 +266,38 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             foreach (var rule in _alertService.Rules)
             {
                 if (rule.MarketType == _marketContext.CurrentMarket)
-                    Rules.Add(rule);
+                    Rules.Add(CreateDisplayRule(rule));
             }
             OnPropertyChanged(nameof(EmptyHintText));
+            OnPropertyChanged(nameof(IsNotificationEnabled));
         }, "加载告警规则");
+    }
+
+    private static PriceAlertRule CreateDisplayRule(PriceAlertRule source)
+    {
+        var displayRule = new PriceAlertRule
+        {
+            Id = source.Id,
+            AssetCode = source.AssetCode,
+            AssetName = source.AssetName,
+            MarketType = source.MarketType,
+            Condition = source.Condition,
+            TargetPrice = source.TargetPrice,
+            IsOneTime = source.IsOneTime,
+            Triggered = source.Triggered,
+            Enabled = source.Enabled,
+            CreatedAt = source.CreatedAt
+        };
+
+        if (source.CurrentPrice.HasValue)
+        {
+            displayRule.UpdateQuote(
+                source.CurrentPrice.Value,
+                source.CurrentChangePercent,
+                source.LastUpdatedAt ?? DateTime.UtcNow);
+        }
+
+        return displayRule;
     }
 
     /// <summary>
@@ -224,7 +305,31 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OnRulesChanged()
     {
-        Dispatcher.UIThread.InvokeAsync(() => _ = LoadRulesAsync());
+        Dispatcher.UIThread.Post(() => _ = LoadRulesAsync());
+    }
+
+    /// <summary>
+    /// 行情更新时规则对象自身已发出属性通知；这里只负责把跨线程通知切回 UI 线程。
+    /// </summary>
+    private void OnRuleQuoteUpdated(PriceAlertRule rule)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var visibleRule = Rules.FirstOrDefault(item => item.Id == rule.Id);
+            if (visibleRule == null)
+                return;
+
+            if (rule.CurrentPrice.HasValue)
+            {
+                visibleRule.UpdateQuote(
+                    rule.CurrentPrice.Value,
+                    rule.CurrentChangePercent,
+                    rule.LastUpdatedAt ?? DateTime.UtcNow);
+            }
+
+            visibleRule.Enabled = rule.Enabled;
+            visibleRule.Triggered = rule.Triggered;
+        });
     }
 
     /// <summary>
@@ -235,12 +340,11 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     {
         ValidationError = string.Empty;
 
-        // 校验交易对：优先按当前输入文本精确匹配，未命中时取下拉选中项
+        // 校验资产：优先按当前输入文本精确匹配，未命中时取下拉选中项
         var asset = ResolveAssetByText(NewRuleAssetText.Trim()) ?? NewRuleSelectedAsset;
         if (asset == null)
         {
-            ValidationError = "请从下拉列表中选择或搜索交易对";
-            OnPropertyChanged(nameof(ValidationError));
+            ValidationError = "请从下拉列表中选择资产";
             return;
         }
 
@@ -248,7 +352,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         if (!decimal.TryParse(NewRuleTargetValue.Trim(), out var targetValue) || targetValue <= 0)
         {
             ValidationError = "请输入有效的目标值（正数）";
-            OnPropertyChanged(nameof(ValidationError));
             return;
         }
 
@@ -261,6 +364,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
                 MarketType = NewRuleMarketType,
                 Condition = NewRuleCondition,
                 TargetPrice = targetValue,
+                IsOneTime = NewRuleIsOneTime,
                 Enabled = true
             };
 
@@ -290,12 +394,22 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 删除告警规则
+    /// 删除告警规则（带确认提示）
     /// </summary>
     [RelayCommand]
     private async Task RemoveRuleAsync(string? ruleId)
     {
         if (string.IsNullOrEmpty(ruleId)) return;
+
+        var rule = _alertService.Rules.FirstOrDefault(r => r.Id == ruleId);
+        if (rule == null) return;
+
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "删除告警",
+            $"确定要删除 {rule.AssetName}({rule.AssetCode}) 的告警规则吗？",
+            "删除",
+            "取消");
+        if (!confirmed) return;
 
         await SafeExecuteAsync(async () =>
         {
@@ -331,6 +445,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _assetLoadCts?.Dispose();
         _assetLoadCts = null;
         _alertService.RulesChanged -= OnRulesChanged;
+        _alertService.RuleQuoteUpdated -= OnRuleQuoteUpdated;
         UnsubscribeFromMarketChanges(_marketContext);
         GC.SuppressFinalize(this);
     }

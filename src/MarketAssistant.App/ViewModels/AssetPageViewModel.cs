@@ -270,7 +270,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                     // 订阅前先取消订阅，防止重复
                     _wsService.PriceUpdated -= OnDetailPriceUpdated;
                     _wsService.PriceUpdated += OnDetailPriceUpdated;
-                    _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+                    _ = _wsService.SubscribeAsync(WebSocketSubscriberKeys.AssetDetail, [ToBinanceFormat(parameter.Code)]);
                 }
             }
         }
@@ -300,6 +300,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         _loadingCancellationTokenSource?.Cancel();
         _loadingCancellationTokenSource?.Dispose();
         _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.AssetDetail);
         GC.SuppressFinalize(this);
     }
 }

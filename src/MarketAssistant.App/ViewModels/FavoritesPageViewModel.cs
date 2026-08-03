@@ -66,11 +66,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     }
 
     /// <summary>
-    /// 市场切换时重新加载收藏列表
+    /// 市场切换时重新加载收藏列表。
+    /// 收藏页的订阅以完整集合替换，无需在此手动退订，加载时会自动更新订阅集。
     /// </summary>
     protected override void OnMarketChanged(MarketType newMarket)
     {
-        _ = _wsService.UnsubscribeAllAsync();
         _ = LoadFavoriteAssetsAsync();
     }
 
@@ -91,12 +91,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             Assets.Clear();
             await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
 
-            // 虚拟币市场启用 WebSocket 实时推送
-            if (_marketContext.CurrentMarket == MarketType.Crypto && Assets.Count > 0)
-            {
-                var symbols = Assets.Select(a => ToBinanceFormat(a.Code)).ToList();
-                _ = _wsService.SubscribeAsync(symbols);
-            }
+            // 以完整集合替换收藏页订阅：虚拟币市场订阅自选交易对；
+            // 其他市场传空集合，确保切换市场后不残留上一市场的订阅
+            var symbols = _marketContext.CurrentMarket == MarketType.Crypto
+                ? Assets.Select(a => ToBinanceFormat(a.Code)).ToList()
+                : [];
+            _ = _wsService.SubscribeAsync(WebSocketSubscriberKeys.Favorites, symbols);
         }, "加载收藏列表");
     }
 
@@ -246,7 +246,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _loadCts?.Dispose();
         UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
-        _ = _wsService.UnsubscribeAllAsync();
+        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.Favorites);
         WeakReferenceMessenger.Default.UnregisterAll(this);
         GC.SuppressFinalize(this);
     }

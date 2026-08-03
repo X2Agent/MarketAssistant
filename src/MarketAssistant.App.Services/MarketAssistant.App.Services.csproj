@@ -7,8 +7,11 @@
     <!-- SK 搜索连接器（Plugins.Web）及泛型 ITextSearch 接口均为实验性 API（SKEXP0001/0050）且无稳定替代，
          官方已确认 SK 进入维护模式，等待 MAF 生态补齐搜索能力，期间按需抑制 -->
     <NoWarn>$(NoWarn);MAAI001;SKEXP0001;SKEXP0050</NoWarn>
-    <InternalsVisibleTo>TestMarketAssistant</InternalsVisibleTo>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TestMarketAssistant" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />

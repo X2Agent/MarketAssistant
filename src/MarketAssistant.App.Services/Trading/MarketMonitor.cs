@@ -39,6 +39,18 @@ public class MarketMonitor : IDisposable
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _strategyLocks = new();
 
     /// <summary>
+    /// 策略执行失败的冷却期。止损/止盈/追踪止损/网格/DCA 等策略触发评估是纯价格/状态比较，
+    /// 若执行失败（网络异常、风控拒绝、超时等）且不记录任何状态，会在每个价格 tick 重复触发重试
+    /// （miniTicker 约每秒一次），形成请求风暴。失败后冷却一段时间，把重试频率限制到可控范围。
+    /// </summary>
+    private static readonly TimeSpan StrategyFailureCooldown = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// 各策略最近一次执行失败的冷却截止时间（UTC）
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTime> _strategyFailureCooldowns = new();
+
+    /// <summary>
     /// 已取消的 Token，用于 _cts 为 null 时（未启动或已释放）确保异步操作立即返回而非不可取消地继续执行。
     /// 使用 CancellationToken.None 会导致操作不可取消，在 StopAsync/Dispose 后仍可能执行交易。
     /// </summary>
@@ -114,7 +126,7 @@ public class MarketMonitor : IDisposable
                 .ToList();
 
             if (instrumentSymbols.Count > 0)
-                await _webSocketService.SubscribeAsync(instrumentSymbols);
+                await _webSocketService.SubscribeAsync(WebSocketSubscriberKeys.MarketMonitor, instrumentSymbols);
 
             _webSocketService.PriceUpdated += _priceUpdatedAdapter;
             _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
@@ -171,7 +183,7 @@ public class MarketMonitor : IDisposable
                 }
             }
 
-            await _webSocketService.UnsubscribeAllAsync();
+            await _webSocketService.UnsubscribeAllAsync(WebSocketSubscriberKeys.MarketMonitor);
 
             _isRunning = false;
             _logger.LogInformation("MarketMonitor 已停止");
@@ -195,12 +207,10 @@ public class MarketMonitor : IDisposable
         var newSymbols = activeStrategies
             .Select(s => s.Symbol.ToLowerInvariant())
             .Distinct()
-            .ToHashSet();
+            .ToList();
 
-        await _webSocketService.UnsubscribeAllAsync();
-
-        if (newSymbols.Count > 0)
-            await _webSocketService.SubscribeAsync(newSymbols.ToList());
+        // 以完整集合替换监控方的订阅；不再先整体清空，避免误伤其他模块的订阅
+        await _webSocketService.SubscribeAsync(WebSocketSubscriberKeys.MarketMonitor, newSymbols);
 
         _logger.LogInformation("已刷新监控列表: {Count} 个交易标的", newSymbols.Count);
     }
@@ -252,6 +262,10 @@ public class MarketMonitor : IDisposable
                     var triggered = await _strategyEngine.EvaluateAndUpdateStrategiesAsync(symbol, price, ct);
                     foreach (var strategy in triggered)
                     {
+                        // 执行失败后处于冷却期的策略跳过，防止每 tick 重复触发请求风暴
+                        if (IsInFailureCooldown(strategy.Id))
+                            continue;
+
                         var task = ExecuteWithStrategyLockAsync(strategy, price, ct);
                         lock (_pendingTasksLock)
                             _pendingStrategyTasks.Add(task);
@@ -316,11 +330,36 @@ public class MarketMonitor : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "策略执行异常: {StrategyId}", strategy.Id);
+            RecordStrategyFailureCooldown(strategy.Id);
         }
         finally
         {
             strategyLock.Release();
         }
+    }
+
+    /// <summary>
+    /// 记录策略执行失败的冷却截止时间
+    /// </summary>
+    private void RecordStrategyFailureCooldown(string strategyId)
+        => _strategyFailureCooldowns[strategyId] = DateTime.UtcNow.Add(StrategyFailureCooldown);
+
+    /// <summary>
+    /// 判断策略是否处于执行失败冷却期内；冷却期结束后自动清理记录
+    /// </summary>
+    private bool IsInFailureCooldown(string strategyId)
+    {
+        if (!_strategyFailureCooldowns.TryGetValue(strategyId, out var until))
+            return false;
+
+        if (DateTime.UtcNow >= until)
+        {
+            _strategyFailureCooldowns.TryRemove(strategyId, out _);
+            return false;
+        }
+
+        _logger.LogDebug("策略 {StrategyId} 处于失败冷却中，跳过本次触发", strategyId);
+        return true;
     }
 
     private async Task HandleTriggeredStrategyAsync(TradingStrategy strategy, decimal currentPrice)
@@ -330,6 +369,11 @@ public class MarketMonitor : IDisposable
             var result = await _aiSignalExecutor.ExecuteAsync(strategy, currentPrice, MonitorToken);
             if (result.TradeExecuted && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
+
+            if (result.TradeExecuted)
+                _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            else
+                RecordStrategyFailureCooldown(strategy.Id);
 
             await CheckStrategyCompletionAsync(strategy);
         }
@@ -345,6 +389,12 @@ public class MarketMonitor : IDisposable
 
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
+
+            // 执行成功清除失败冷却记录；失败则进入冷却期，避免下一 tick 立即重复触发
+            if (result.Success)
+                _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            else
+                RecordStrategyFailureCooldown(strategy.Id);
 
             await CheckStrategyCompletionAsync(strategy);
         }
@@ -407,6 +457,7 @@ public class MarketMonitor : IDisposable
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
         }
     }
 
@@ -418,6 +469,7 @@ public class MarketMonitor : IDisposable
         foreach (var kvp in _strategyLocks)
             kvp.Value.Dispose();
         _strategyLocks.Clear();
+        _strategyFailureCooldowns.Clear();
         _lifecycleLock.Dispose();
 
         TradeExecuted = null;

@@ -17,10 +17,10 @@
 
     <UserControl.Resources>
         <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- 规则状态圆点：默认绿色（启用），停用时灰色，已触发时橙色优先 -->
         <Style Selector="Ellipse.rule-dot">
             <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
         </Style>
@@ -29,6 +29,9 @@
         </Style>
         <Style Selector="Ellipse.rule-dot.triggered">
             <Setter Property="Fill" Value="{StaticResource WarningBrush}"/>
+        </Style>
+        <Style Selector="Border.alert-rule-card:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         </Style>
     </UserControl.Styles>
 
@@ -42,89 +45,172 @@
                                 VerticalAlignment="Center">
                         <svg:Svg Path="/Assets/Images/tab_alert.svg"
                                  Width="{StaticResource DefaultIconSize}"
-                                 Height="{StaticResource DefaultIconSize}"
-                                 VerticalAlignment="Center"/>
-                        <TextBlock Text="价格告警"
-                                   FontSize="{StaticResource LargeFontSize}"
-                                   FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                   VerticalAlignment="Center"/>
+                                 Height="{StaticResource DefaultIconSize}"/>
+                        <StackPanel Spacing="{StaticResource CompactSpacing}">
+                            <TextBlock Text="价格告警"
+                                       FontSize="{StaticResource LargeFontSize}"
+                                       FontWeight="Bold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="持续跟踪目标价格与涨跌幅，行情更新后自动判定"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <Button Grid.Column="1"
-                            Content="刷新"
+                            Content="刷新列表"
                             Command="{Binding RefreshCommand}"
                             Classes="btn-secondary"
                             VerticalAlignment="Center"/>
                 </Grid>
             </controls:CardView.Header>
 
-            <Grid RowDefinitions="Auto,Auto,*">
-
-                <!-- 添加告警规则表单 -->
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
                 <Border Grid.Row="0"
-                        Background="{DynamicResource SurfaceVariantBrush}"
-                        CornerRadius="{StaticResource DefaultCornerRadius}"
-                        Padding="{StaticResource DefaultPadding}"
+                        Background="{DynamicResource SelectedBackgroundBrush}"
+                        BorderBrush="{StaticResource PrimaryBrush}"
+                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        CornerRadius="{StaticResource CardCornerRadius}"
+                        Padding="{StaticResource DefaultCardPadding}"
                         Margin="{StaticResource BottomMargin}">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <Grid ColumnDefinitions="210,150,150,Auto"
-                              ColumnSpacing="{StaticResource SmallSpacing}">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
+                        <Border Grid.Column="0"
+                                Width="48"
+                                Height="48"
+                                Background="{StaticResource PrimaryBrush}"
+                                CornerRadius="{StaticResource CardCornerRadius}"
+                                VerticalAlignment="Top">
+                            <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
+                                      Width="{StaticResource DefaultIconSize}"
+                                      Height="{StaticResource DefaultIconSize}"
+                                      Foreground="White"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
 
-                            <!-- 交易对搜索下拉 -->
-                            <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="交易对" Classes="form-label"/>
-                                <AutoCompleteBox Text="{Binding NewRuleAssetText, Mode=TwoWay}"
-                                                 ItemsSource="{Binding AssetOptions}"
-                                                 SelectedItem="{Binding NewRuleSelectedAsset}"
-                                                 PlaceholderText="搜索并选择交易对，如 BTC / 茅台"
-                                                 FilterMode="Contains"
-                                                 MinimumPrefixLength="1"
-                                                 MaxDropDownHeight="320"/>
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource DefaultSpacing}">
+                            <StackPanel Spacing="{StaticResource CompactSpacing}">
+                                <TextBlock Text="创建告警规则"
+                                           FontSize="{StaticResource SectionTitleFontSize}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Text="持续告警进入目标区间提醒一次、离开后自动复位；勾选“仅提醒一次”则触发后自动停用，可手动重新启用。"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
 
-                            <!-- 触发条件 -->
-                            <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="触发条件" Classes="form-label"/>
-                                <ComboBox ItemsSource="{Binding ConditionOptions}"
+                            <Grid ColumnDefinitions="Auto,2*,Auto,*,Auto,*,Auto,Auto"
+                                  ColumnSpacing="{StaticResource SmallSpacing}">
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding AssetLabelText}"
+                                           Classes="form-label"
+                                           VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="1"
+                                          IsEditable="True"
+                                          ItemsSource="{Binding AssetOptions}"
+                                          SelectedItem="{Binding NewRuleSelectedAsset}"
+                                          Text="{Binding NewRuleAssetText, Mode=TwoWay}"
+                                          IsDropDownOpen="{Binding IsAssetDropDownOpen, Mode=TwoWay}"
+                                          PlaceholderText="{Binding AssetPlaceholderText}"
+                                          MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                          MinHeight="{StaticResource InputHeight}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:AssetOption">
+                                            <StackPanel Spacing="{StaticResource CompactSpacing}"
+                                                        Margin="{StaticResource TinyMargin}">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="{StaticResource LabelFontSize}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock Text="{Binding Code}"
+                                                           FontSize="{StaticResource SmallFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="2"
+                                           Text="触发条件"
+                                           Classes="form-label"
+                                           VerticalAlignment="Center"/>
+                                <ComboBox Grid.Column="3"
+                                          ItemsSource="{Binding ConditionOptions}"
                                           SelectedItem="{Binding NewRuleCondition}"
-                                          MinHeight="{StaticResource InputHeight}"
-                                          VerticalAlignment="Center">
+                                          MinHeight="{StaticResource InputHeight}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
-                            </StackPanel>
 
-                            <!-- 目标值（价格或涨跌幅） -->
-                            <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="{Binding TargetLabelText}" Classes="form-label"/>
-                                <TextBox Text="{Binding NewRuleTargetValue}"
-                                         PlaceholderText="{Binding TargetPlaceholderText}"/>
-                            </StackPanel>
+                                <TextBlock Grid.Column="4"
+                                           Text="{Binding TargetLabelText}"
+                                           Classes="form-label"
+                                           VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="5"
+                                         Text="{Binding NewRuleTargetValue}"
+                                         PlaceholderText="{Binding TargetPlaceholderText}"
+                                         MinHeight="{StaticResource InputHeight}"/>
 
-                            <!-- 添加按钮 -->
-                            <StackPanel Grid.Column="3"
-                                        VerticalAlignment="Bottom"
-                                        Spacing="{StaticResource TinySpacing}">
-                                <Button Content="添加"
+                                <CheckBox Grid.Column="6"
+                                          Content="仅提醒一次"
+                                          IsChecked="{Binding NewRuleIsOneTime}"
+                                          VerticalAlignment="Center"
+                                          ToolTip.Tip="触发一次后自动停用；可手动重新启用。默认持续告警，离开目标区间后自动复位。"/>
+
+                                <Button Grid.Column="7"
+                                        Content="创建告警"
                                         Command="{Binding AddRuleCommand}"
                                         Classes="btn-primary"
-                                        MinWidth="{StaticResource SmallButtonMinWidth}"/>
-                            </StackPanel>
-                        </Grid>
+                                        MinWidth="{StaticResource MediumButtonMinWidth}"
+                                        MinHeight="{StaticResource InputHeight}"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
 
-                        <!-- 校验错误提示 -->
-                        <TextBlock Text="{Binding ValidationError}"
-                                   Classes="form-error"
-                                   IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                    </StackPanel>
+                            <TextBlock Text="{Binding ValidationError}"
+                                       Classes="form-error"
+                                       IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource SmallCardPadding}"
+                                    IsVisible="{Binding !IsNotificationEnabled}">
+                                <TextBlock Text="桌面通知已关闭：告警触发状态仍会记录，但不会显示弹窗。请在“设置 → 通知设置”中开启通知。"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{StaticResource WarningBrush}"
+                                           TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <!-- 加载指示器 -->
-                <StackPanel Grid.Row="1"
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,Auto"
+                      Margin="{StaticResource SmallBottomMargin}">
+                    <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
+                        <TextBlock Text="告警规则"
+                                   FontSize="{StaticResource SectionTitleFontSize}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock Text="浮动值 = 当前告警值 - 实际阈值（跌幅目标 3% 的实际阈值为 -3%）"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource SurfaceVariantBrush}"
+                            CornerRadius="{StaticResource TinyCornerRadius}"
+                            Padding="{StaticResource TagPadding}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Rules.Count, StringFormat='{}{0} 条'}"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </Border>
+                </Grid>
+
+                <StackPanel Grid.Row="2"
                             IsVisible="{Binding IsBusy}"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
@@ -136,10 +222,7 @@
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
 
-                <!-- 规则列表 -->
-                <Grid Grid.Row="2" IsVisible="{Binding !IsBusy}">
-
-                    <!-- 空视图 -->
+                <Grid Grid.Row="3" IsVisible="{Binding !IsBusy}">
                     <StackPanel IsVisible="{Binding !Rules.Count}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -159,7 +242,6 @@
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
 
-                    <!-- 规则列表 -->
                     <ItemsControl ItemsSource="{Binding Rules}"
                                   IsVisible="{Binding Rules.Count}">
                         <ItemsControl.ItemsPanel>
@@ -169,130 +251,122 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="alert:PriceAlertRule">
-                                <Border Background="{DynamicResource ItemBackgroundBrush}"
+                                <Border Classes="alert-rule-card"
+                                        Background="{DynamicResource ItemBackgroundBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="{StaticResource DefaultBorderThickness}"
                                         CornerRadius="{StaticResource CardCornerRadius}"
                                         Padding="{StaticResource DefaultPadding}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto"
-                                          ColumnSpacing="{StaticResource SmallSpacing}">
+                                    <Grid ColumnDefinitions="2*,1.2*,1.2*,1.6*,Auto,Auto"
+                                          ColumnSpacing="{StaticResource DefaultSpacing}">
+                                        <Grid Grid.Column="0" ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SmallSpacing}">
+                                            <Ellipse Grid.Column="0"
+                                                     Classes="rule-dot"
+                                                     Classes.disabled="{Binding !Enabled}"
+                                                     Classes.triggered="{Binding Triggered}"
+                                                     Width="{StaticResource DotIconSize}"
+                                                     Height="{StaticResource DotIconSize}"
+                                                     VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding AssetName}"
+                                                           FontSize="{StaticResource LabelFontSize}"
+                                                           FontWeight="Bold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <StackPanel Orientation="Horizontal"
+                                                            Spacing="{StaticResource TinySpacing}"
+                                                            Margin="{StaticResource TinyTopMargin}">
+                                                    <TextBlock Text="{Binding AssetCode}"
+                                                               FontSize="{StaticResource SmallFontSize}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                            CornerRadius="{StaticResource TinyCornerRadius}"
+                                                            Padding="{StaticResource TagPadding}">
+                                                        <TextBlock Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"
+                                                                   FontSize="{StaticResource TinyFontSize}"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Border Background="{StaticResource WarningBrush}"
+                                                            CornerRadius="{StaticResource TinyCornerRadius}"
+                                                            Padding="{StaticResource TagPadding}"
+                                                            IsVisible="{Binding IsOneTime}">
+                                                        <TextBlock Text="一次性" FontSize="{StaticResource TinyFontSize}" Foreground="White"/>
+                                                    </Border>
+                                                    <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                            CornerRadius="{StaticResource TinyCornerRadius}"
+                                                            Padding="{StaticResource TagPadding}"
+                                                            IsVisible="{Binding !IsOneTime}">
+                                                        <TextBlock Text="持续" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Border Background="{StaticResource WarningBrush}"
+                                                            CornerRadius="{StaticResource TinyCornerRadius}"
+                                                            Padding="{StaticResource TagPadding}"
+                                                            IsVisible="{Binding Triggered}">
+                                                        <TextBlock Text="已触发" FontSize="{StaticResource TinyFontSize}" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
 
-                                        <!-- 状态圆点 -->
-                                        <Ellipse Grid.Column="0"
-                                                 Classes="rule-dot"
-                                                 Classes.disabled="{Binding !Enabled}"
-                                                 Classes.triggered="{Binding Triggered}"
-                                                 Width="{StaticResource DotIconSize}"
-                                                 Height="{StaticResource DotIconSize}"
-                                                 VerticalAlignment="Center"/>
-
-                                        <!-- 资产信息 -->
-                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding AssetName}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                                       TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="告警条件" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <StackPanel Orientation="Horizontal"
                                                         Spacing="{StaticResource TinySpacing}"
-                                                        Margin="{StaticResource TinyTopMargin}">
-                                                <TextBlock Text="{Binding AssetCode}"
-                                                           FontSize="{StaticResource SmallFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource TagPadding}">
-                                                    <TextBlock Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"
-                                                               FontSize="{StaticResource TinyFontSize}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                                </Border>
-                                                <Border Background="{StaticResource WarningBrush}"
-                                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource TagPadding}"
-                                                        IsVisible="{Binding Triggered}">
-                                                    <TextBlock Text="已触发"
-                                                               FontSize="{StaticResource TinyFontSize}"
-                                                               Foreground="White"/>
-                                                </Border>
+                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceAbove}}">
+                                                <TextBlock Text="↑ 涨破" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}" FontWeight="Bold"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="{StaticResource TinySpacing}"
+                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceBelow}}">
+                                                <TextBlock Text="↓ 跌破" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}" FontWeight="Bold"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="{StaticResource TinySpacing}"
+                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentAbove}}">
+                                                <TextBlock Text="↑ 涨幅超" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}" FontWeight="Bold"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal"
+                                                        Spacing="{StaticResource TinySpacing}"
+                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentBelow}}">
+                                                <TextBlock Text="↓ 跌幅超" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}" FontWeight="Bold"/>
                                             </StackPanel>
                                         </StackPanel>
 
-                                        <!-- 触发条件与目标价：涨破（红） -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="{StaticResource TinySpacing}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceAbove}}">
-                                            <TextBlock Text="↑ 涨破"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BullishBrush}"/>
-                                            <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                       FontSize="{StaticResource BodyFontSize}"
+                                        <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="实时价格" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding CurrentPriceText}"
+                                                       FontSize="{StaticResource LabelFontSize}"
                                                        FontWeight="Bold"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding QuoteDisplayValue}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{Binding CurrentChangePercent, Converter={StaticResource PriceChangeColorConverter}}"/>
                                         </StackPanel>
 
-                                        <!-- 触发条件与目标价：跌破（绿） -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="{StaticResource TinySpacing}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceBelow}}">
-                                            <TextBlock Text="↓ 跌破"
+                                        <StackPanel Grid.Column="3" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="当前浮动值" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding FloatingValueText}"
                                                        FontSize="{StaticResource BodyFontSize}"
                                                        FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BearishBrush}"/>
-                                            <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                       Foreground="{Binding FloatingValue, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                            <TextBlock Text="{Binding QuoteStatusText}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </StackPanel>
 
-                                        <!-- 触发条件与目标值：涨幅超（红） -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="{StaticResource TinySpacing}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentAbove}}">
-                                            <TextBlock Text="↑ 涨幅超"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BullishBrush}"/>
-                                            <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        </StackPanel>
-
-                                        <!-- 触发条件与目标值：跌幅超（绿） -->
-                                        <StackPanel Grid.Column="2"
-                                                    Orientation="Horizontal"
-                                                    Spacing="{StaticResource TinySpacing}"
-                                                    VerticalAlignment="Center"
-                                                    IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentBelow}}">
-                                            <TextBlock Text="↓ 跌幅超"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BearishBrush}"/>
-                                            <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        </StackPanel>
-
-                                        <!-- 启停开关 -->
-                                        <ToggleSwitch Grid.Column="3"
+                                        <ToggleSwitch Grid.Column="4"
                                                       Width="48"
                                                       VerticalAlignment="Center"
-                                                      IsChecked="{Binding Enabled}"
-                                                      IsEnabled="{Binding !Triggered}"
+                                                      IsChecked="{Binding Enabled, Mode=OneWay}"
                                                       Command="{Binding $parent[UserControl].((vm:PriceAlertPageViewModel)DataContext).ToggleRuleCommand}"
                                                       CommandParameter="{Binding Id}"
-                                                      ToolTip.Tip="启用/禁用"/>
+                                                      ToolTip.Tip="{Binding StatusText}"/>
 
-                                        <!-- 删除按钮 -->
-                                        <Button Grid.Column="4"
+                                        <Button Grid.Column="5"
                                                 Classes="btn-icon-sm"
                                                 Command="{Binding $parent[UserControl].((vm:PriceAlertPageViewModel)DataContext).RemoveRuleCommand}"
                                                 CommandParameter="{Binding Id}"

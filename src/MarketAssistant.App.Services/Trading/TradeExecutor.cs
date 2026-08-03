@@ -261,7 +261,10 @@ public class TradeExecutor : IDisposable
                         strategyId, record.CreatedAt, ct);
                 }
             }
-            await _dataService.UpdateDailyStatsAsync(pnl, record.Commission, ct);
+            // 仅在实际有成交（首次填单）时计入交易次数；未成交订单不计，
+            // 后续部分成交增量由对账路径补充统计，避免同一订单重复计数
+            await _dataService.UpdateDailyStatsAsync(pnl, record.Commission,
+                countTrade: record.ExecutedQty > 0, ct);
 
             _logger.LogInformation("交易执行成功: {StrategyId} 订单ID:{OrderId} 状态:{Status} PnL:{Pnl}",
                 strategyId, response.OrderId, response.Status, pnl);
