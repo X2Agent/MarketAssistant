@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.VisualTree;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.ViewModels;
 
@@ -27,6 +26,20 @@ public partial class FavoritesPageView : UserControl
     /// 资产项点击事件
     /// </summary>
     private void OnStockItemTapped(object? sender, TappedEventArgs e)
+    {
+        ActivateAsset(sender);
+    }
+
+    private void OnStockItemKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Space)
+        {
+            ActivateAsset(sender);
+            e.Handled = true;
+        }
+    }
+
+    private void ActivateAsset(object? sender)
     {
         if (sender is Border border &&
             border.Tag is AssetInfo asset &&

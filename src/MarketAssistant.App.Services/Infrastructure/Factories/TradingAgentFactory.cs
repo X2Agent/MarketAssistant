@@ -64,8 +64,8 @@ public class TradingAgentFactory : AgentFactoryBase, ITradingAgentFactory
                     runFunc: guardMiddleware.InvokeRunAsync,
                     runStreamingFunc: guardMiddleware.InvokeRunStreamingAsync)
                 .Use(
-                    runFunc: _tokenTracking.InvokeAsync,
-                    runStreamingFunc: _tokenTracking.InvokeStreamingAsync)
+                    runFunc: TokenTracking.InvokeAsync,
+                    runStreamingFunc: TokenTracking.InvokeStreamingAsync)
                 .Use(guardMiddleware.InvokeAsync)
                 .Build();
 

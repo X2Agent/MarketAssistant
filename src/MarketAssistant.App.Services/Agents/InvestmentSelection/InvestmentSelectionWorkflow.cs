@@ -3,22 +3,23 @@ using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.InvestmentSelection;
 
 /// <summary>
-/// AI投资选择工作流，确定性三步骤流程：
-/// 第1步: 生成筛选条件 → 第2步: 执行筛选 → 第3步: AI分析结果
-/// 根据市场类型（股票/虚拟币）选择对应的条件生成 Executor
+/// AI 投资选择工作流，使用 Agent Framework Workflows 实现确定性三步骤流程：
+/// 生成筛选条件 → 执行筛选 → AI 分析结果。
 /// </summary>
-public class InvestmentSelectionWorkflow
+public class InvestmentSelectionWorkflow : IDisposable
 {
     private readonly GenerateCriteriaExecutor<StockCriteria> _generateStockCriteriaExecutor;
     private readonly GenerateCriteriaExecutor<CryptoCriteria> _generateCryptoCriteriaExecutor;
     private readonly ScreenInvestmentTargetsExecutor _screenTargetsExecutor;
     private readonly AnalyzeAssetsExecutor _analyzeAssetsExecutor;
     private readonly ILogger<InvestmentSelectionWorkflow> _logger;
+    private bool _disposed;
 
     public InvestmentSelectionWorkflow(
         GenerateCriteriaExecutor<StockCriteria> generateStockCriteriaExecutor,
@@ -35,7 +36,7 @@ public class InvestmentSelectionWorkflow
     }
 
     /// <summary>
-    /// 执行基于用户需求的AI投资分析
+    /// 执行基于用户需求的 AI 投资分析。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeUserRequirementAsync(
         InvestmentRecommendationRequest request,
@@ -58,7 +59,7 @@ public class InvestmentSelectionWorkflow
     }
 
     /// <summary>
-    /// 执行基于新闻内容的AI投资分析
+    /// 执行基于新闻内容的 AI 投资分析。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeNewsHotspotAsync(
         NewsBasedInvestmentRequest request,
@@ -75,53 +76,104 @@ public class InvestmentSelectionWorkflow
         return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
     }
 
-    /// <summary>
-    /// 执行完整的投资选择工作流（确定性三步骤）
-    /// </summary>
     private async Task<InvestmentSelectionResult> ExecuteWorkflowAsync(
         InvestmentSelectionWorkflowRequest request,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("开始执行投资选择工作流，市场类型: {MarketType}，分析类型: {Type}",
+        _logger.LogInformation(
+            "开始执行投资选择工作流，市场类型: {MarketType}，分析类型: {Type}",
             request.MarketType,
             request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
-        // 步骤1: 根据市场类型选择对应的条件生成器
-        CriteriaGenerationResult criteriaResult = request.MarketType switch
+        WorkflowBuilder workflowBuilder = request.MarketType switch
         {
-            MarketType.AShare => await _generateStockCriteriaExecutor.HandleAsync(request, cancellationToken),
-            MarketType.Crypto => await _generateCryptoCriteriaExecutor.HandleAsync(request, cancellationToken),
+            MarketType.AShare => new WorkflowBuilder(_generateStockCriteriaExecutor)
+                .AddEdge(_generateStockCriteriaExecutor, _screenTargetsExecutor)
+                .AddEdge(_screenTargetsExecutor, _analyzeAssetsExecutor)
+                .WithOutputFrom(_analyzeAssetsExecutor),
+
+            MarketType.Crypto => new WorkflowBuilder(_generateCryptoCriteriaExecutor)
+                .AddEdge(_generateCryptoCriteriaExecutor, _screenTargetsExecutor)
+                .AddEdge(_screenTargetsExecutor, _analyzeAssetsExecutor)
+                .WithOutputFrom(_analyzeAssetsExecutor),
+
             _ => throw new NotSupportedException($"不支持的市场类型: {request.MarketType}")
         };
 
-        // 构建工作流
         var workflow = workflowBuilder.Build();
-
-        // 执行工作流
         await using Run run = await InProcessExecution.RunAsync(
             workflow,
             request,
             cancellationToken: cancellationToken);
 
-        // 步骤3: AI 分析
-        var finalResult = await _analyzeAssetsExecutor.HandleAsync(screeningResult, cancellationToken);
+        InvestmentSelectionResult? finalResult = null;
 
-        _logger.LogInformation("工作流完成，推荐数量: {Count}",
-            finalResult?.Recommendations?.Count ?? 0);
+        foreach (WorkflowEvent evt in run.NewEvents)
+        {
+            switch (evt)
+            {
+                case ExecutorInvokedEvent executorInvoked:
+                    _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                    break;
+                case ExecutorCompletedEvent executorCompleted:
+                    _logger.LogInformation("步骤完成: {ExecutorId}", executorCompleted.ExecutorId);
+                    break;
+                case AgentResponseUpdateEvent:
+                    break;
+                case WorkflowOutputEvent workflowOutput:
+                    finalResult = workflowOutput.Data as InvestmentSelectionResult;
+                    _logger.LogInformation(
+                        "工作流完成，推荐数量: {Count}",
+                        finalResult?.Recommendations?.Count ?? 0);
+                    break;
+                case ExecutorFailedEvent executorFailed:
+                    var failedMessage = executorFailed.Data?.Message ?? "未知错误";
+                    _logger.LogError(
+                        executorFailed.Data,
+                        "步骤失败: {ExecutorId}, 错误: {Error}",
+                        executorFailed.ExecutorId,
+                        failedMessage);
+                    throw new FriendlyException(failedMessage);
+                case WorkflowErrorEvent workflowError:
+                    var workflowErrorMessage = workflowError.Exception?.Message ?? "工作流内部发生未知错误";
+                    _logger.LogError(
+                        workflowError.Exception,
+                        "投资选择工作流发生严重错误: {Message}",
+                        workflowErrorMessage);
+                    throw new FriendlyException(workflowErrorMessage);
+                case WorkflowWarningEvent workflowWarning:
+                    _logger.LogWarning("投资选择工作流警告: {Warning}", workflowWarning.Data);
+                    break;
+            }
+        }
 
         return finalResult ?? CreateDefaultResult("工作流未返回结果");
     }
 
-    private InvestmentSelectionResult CreateDefaultResult(string? problem = null)
+    private static InvestmentSelectionResult CreateDefaultResult(string? problem = null)
     {
         return new InvestmentSelectionResult
         {
-            Recommendations = new List<InvestmentRecommendation>(),
+            Recommendations = [],
             ConfidenceScore = 0,
             AnalysisSummary = problem ?? "分析过程中遇到问题，请稍后重试。",
             MarketEnvironmentAnalysis = "无可用分析",
             InvestmentAdvice = "建议稍后重试",
-            RiskWarnings = new List<string> { "系统异常，请联系技术支持" }
+            RiskWarnings = ["系统异常，请联系技术支持"]
         };
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            _disposed = true;
+        }
     }
 }

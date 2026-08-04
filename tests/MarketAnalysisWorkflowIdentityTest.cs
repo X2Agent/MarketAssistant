@@ -4,7 +4,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 

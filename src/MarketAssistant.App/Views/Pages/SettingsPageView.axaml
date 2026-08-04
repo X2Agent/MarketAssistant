@@ -35,8 +35,8 @@
 
     <Grid RowDefinitions="*,Auto">
         <!-- 主内容区域 -->
-        <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource CardBackgroundBrush}">
-            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource ImmersivePageMargin}">
+        <ScrollViewer Grid.Row="0" Background="{DynamicResource CardBackgroundBrush}">
+            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
 
                 <!-- 外观设置 -->
                 <controls:CardView Header="外观设置">

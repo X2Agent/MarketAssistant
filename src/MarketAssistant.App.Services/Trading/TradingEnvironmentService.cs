@@ -39,6 +39,19 @@ public sealed class TradingEnvironmentService
     public string CurrentModeDescription => GetModeDescription(_currentMode);
 
     /// <summary>
+    /// 判断运行中的市场监控切换到实盘环境时是否必须二次确认。
+    /// </summary>
+    public static bool RequiresLiveModeConfirmation(
+        CryptoTradingMode currentMode,
+        CryptoTradingMode targetMode,
+        bool isMonitorRunning)
+    {
+        return isMonitorRunning &&
+               targetMode != currentMode &&
+               targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
+    }
+
+    /// <summary>
     /// 切换交易模式。若监控正在运行，先等待其完全停止（最长 10 秒）再切换，
     /// 避免切换瞬间在途策略任务或订单状态同步访问新环境的账户与数据。
     /// </summary>

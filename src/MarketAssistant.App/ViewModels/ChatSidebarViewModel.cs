@@ -15,6 +15,7 @@ namespace MarketAssistant.ViewModels;
 public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 {
     private readonly IMarketChatSessionFactory _chatSessionFactory;
+    private readonly AdaptiveCardConverter _adaptiveCardConverter;
     private MarketChatSession? _chatSession;
     private string? _pendingContextStockCode;
     private List<ChatMessage>? _pendingAnalysisMessages;
@@ -46,6 +47,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         : base(logger)
     {
         _chatSessionFactory = chatSessionFactory;
+        _adaptiveCardConverter = adaptiveCardConverter;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
     }

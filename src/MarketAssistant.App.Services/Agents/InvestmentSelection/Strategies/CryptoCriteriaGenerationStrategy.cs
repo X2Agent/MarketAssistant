@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -8,6 +9,8 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// </summary>
 public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<CryptoCriteria>
 {
+    protected override string AssetTypeLabel => "虚拟币";
+
     private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "market_cap",
@@ -139,7 +142,7 @@ public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<C
 """;
     }
 
-    public string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
+    public override string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
     {
         if (request.IsNewsAnalysis)
         {
@@ -165,7 +168,7 @@ public class CryptoCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<C
         }
     }
 
-    public CryptoCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    public override CryptoCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
     {
         var criteria = LlmJsonExtractor.Deserialize<CryptoCriteria>(json, DeserializationOptions);
         if (criteria == null)

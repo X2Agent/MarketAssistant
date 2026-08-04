@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Threading.Channels;
-using MarketAssistant.Agents.Middleware;
-using MarketAssistant.Agents.Trading;
-using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Data;
+using MarketAssistant.Applications.Crypto;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -410,10 +408,7 @@ public class MarketMonitor : IDisposable
     /// </summary>
     private static bool IsExitOnlyStrategy(TradingStrategy strategy, decimal currentPrice)
     {
-        // 到达此处前，策略状态、硬性止盈止损、日交易次数和仓位预算已完成校验。
-        // 后台任务必须显式声明预授权，禁止依赖空确认回调的隐式放行。
-        var agent = _agentFactory.CreateAgent(TradingAuthorizationMode.PreAuthorizedAutomation);
-        var messages = new List<ChatMessage>
+        return strategy.Type switch
         {
             StrategyType.StopLoss => true,
             StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
@@ -421,28 +416,6 @@ public class MarketMonitor : IDisposable
             StrategyType.GridTrading => IsGridBreakOut(strategy, currentPrice),
             _ => false
         };
-
-        var response = await agent.RunAsync(messages, session: null, options: null,
-            cancellationToken: MonitorToken);
-        _logger.LogDebug(
-            "TradingAgent 调用完成，响应长度: {ResponseLength}",
-            response.Text?.Length ?? 0);
-    }
-
-    /// <summary>
-    /// 处理 Agent 响应结果：检测是否产生新成交，若产生则更新触发计数
-    /// </summary>
-    private async Task ProcessAgentResponseAsync(TradingStrategy strategy)
-    {
-        // 只在 Agent 实际执行了交易后才更新触发计数
-        var recentRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
-        var hasNewTrade = recentRecords.Any(r =>
-            r.CreatedAt > (strategy.LastTriggeredAt ?? DateTime.MinValue));
-
-        if (hasNewTrade)
-        {
-            await UpdateTriggerCountAsync(strategy);
-        }
     }
 
     /// <summary>

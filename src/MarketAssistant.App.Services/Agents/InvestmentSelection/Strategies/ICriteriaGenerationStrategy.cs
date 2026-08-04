@@ -75,13 +75,15 @@ public abstract class CriteriaGenerationStrategyBase<TCriteria> : ICriteriaGener
             """;
     }
 
-    public TCriteria DeserializeCriteria(string json)
+    public virtual TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
     {
         var criteria = LlmJsonExtractor.Deserialize<TCriteria>(json, DeserializationOptions);
         if (criteria == null)
         {
             throw new InvalidOperationException($"{AssetTypeLabel}筛选条件 JSON 解析失败");
         }
+
+        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
         return criteria;
     }
 }

@@ -1,12 +1,11 @@
 using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace TestMarketAssistant.Application;

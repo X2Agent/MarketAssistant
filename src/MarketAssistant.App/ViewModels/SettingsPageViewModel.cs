@@ -35,8 +35,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
     private readonly IModelProviderAdapterFactory _adapterFactory;
-    private readonly IEmbeddingFactory _embeddingFactory;
-    private readonly VectorStore _vectorStore;
+    private readonly Func<IEmbeddingFactory> _embeddingFactoryFactory;
+    private readonly Func<VectorStore> _vectorStoreFactory;
     private readonly Services.Market.MarketContext _marketContext;
     private readonly TradingEnvironmentService _tradingEnvironmentService;
     private readonly Func<MarketMonitor> _marketMonitorFactory;
@@ -380,8 +380,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         INotificationService notificationService,
         IUserSettingService userSettingService,
         IModelProviderAdapterFactory adapterFactory,
-        IEmbeddingFactory embeddingFactory,
-        VectorStore vectorStore,
+        Func<IEmbeddingFactory> embeddingFactoryFactory,
+        Func<VectorStore> vectorStoreFactory,
         Services.Market.MarketContext marketContext,
         TradingEnvironmentService tradingEnvironmentService,
         Func<MarketMonitor> marketMonitorFactory,
@@ -392,8 +392,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _notificationService = notificationService;
         _userSettingService = userSettingService;
         _adapterFactory = adapterFactory;
-        _embeddingFactory = embeddingFactory;
-        _vectorStore = vectorStore;
+        _embeddingFactoryFactory = embeddingFactoryFactory;
+        _vectorStoreFactory = vectorStoreFactory;
         _marketContext = marketContext;
         _tradingEnvironmentService = tradingEnvironmentService;
         _marketMonitorFactory = marketMonitorFactory;
@@ -680,6 +680,26 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             {
                 UserSetting.ProviderModelIds[UserSetting.ProviderId] = UserSetting.ModelId;
                 UserSetting.ProviderEndpoints[UserSetting.ProviderId] = UserSetting.Endpoint;
+            }
+
+            // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。
+            var targetMode = UserSetting.CryptoTradingMode;
+            if (TradingEnvironmentService.RequiresLiveModeConfirmation(
+                    _tradingEnvironmentService.CurrentMode,
+                    targetMode,
+                    _marketMonitorFactory().IsRunning))
+            {
+                var confirmed = await _dialogService.ShowConfirmationAsync(
+                    "切换到实盘模式",
+                    "市场监控正在运行。保存后会先停止监控并切换到实盘模式，后续触发的交易将发送到真实账户。\n\n请确认是否继续？",
+                    "确认切换",
+                    "取消");
+
+                if (!confirmed)
+                {
+                    _notificationService.ShowInfo("已取消保存设置");
+                    return;
+                }
             }
 
             // 同步市场类型到MarketContext

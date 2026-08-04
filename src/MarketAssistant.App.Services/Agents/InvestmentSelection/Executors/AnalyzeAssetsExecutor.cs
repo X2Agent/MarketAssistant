@@ -15,7 +15,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 统一的资产分析 Executor
 /// 对筛选出的资产进行深度分析并生成推荐报告
 /// </summary>
-public sealed class AnalyzeAssetsExecutor
+public sealed partial class AnalyzeAssetsExecutor : Executor
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -30,14 +30,17 @@ public sealed class AnalyzeAssetsExecutor
         IChatClientFactory chatClientFactory,
         IServiceProvider serviceProvider,
         ILogger<AnalyzeAssetsExecutor> logger)
+        : base("AnalyzeAssets")
     {
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async ValueTask<InvestmentSelectionResult> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<InvestmentSelectionResult> HandleAsync(
         AssetScreeningResult input,
+        IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
         var originalRequest = input.OriginalRequest;

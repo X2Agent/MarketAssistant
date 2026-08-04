@@ -4,6 +4,7 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -58,7 +59,7 @@ public class AnalystAgentFactory : AgentFactoryBase, IAnalystAgentFactory
     /// <inheritdoc />
     public AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders)
     {
-        return CreateAnalyst(agentType, _chatClientFactory.CreateClient(), additionalProviders);
+        return CreateAnalyst(agentType, CreateChatClient(), additionalProviders);
     }
 
     public AIAgent CreateAnalyst(

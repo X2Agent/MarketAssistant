@@ -12,9 +12,8 @@
 
     <UserControl.Resources>
         <converts:RadioButtonEqualityConverter x:Key="RadioButtonEqualityConverter"/>
-        <x:Double x:Key="ServerListWidth">320</x:Double>
+        <x:Double x:Key="ServerListWidth">280</x:Double>
         <Thickness x:Key="ChipPadding">4,0</Thickness>
-        <Thickness x:Key="EditorBottomMargin">0,0,0,80</Thickness>
     </UserControl.Resources>
 
     <Design.DataContext>
@@ -23,8 +22,8 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="{StaticResource ServerListWidth}"/>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="{StaticResource ServerListWidth}" MinWidth="240"/>
+            <ColumnDefinition Width="*" MinWidth="400"/>
         </Grid.ColumnDefinitions>
         <!-- 左侧服务器列表 -->
         <Border Grid.Column="0" 
@@ -61,10 +60,17 @@
                                             Margin="{StaticResource TinyBottomMargin}"
                                             Cursor="Hand"
                                             Tapped="OnServerItemTapped"
+                                            KeyDown="OnServerItemKeyDown"
+                                            Focusable="True"
+                                            AutomationProperties.Name="{Binding Name}"
                                             Tag="{Binding .}">
                                         <Border.Styles>
                                             <Style Selector="Border:pointerover">
                                                 <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+                                            </Style>
+                                            <Style Selector="Border:focus">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+                                                <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
                                             </Style>
                                         </Border.Styles>
 
@@ -126,8 +132,8 @@
         <!-- 右侧配置详情 -->
         <Grid Grid.Column="1" RowDefinitions="*,Auto">
             <!-- 编辑表单区域 -->
-            <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Padding="{StaticResource PagePadding}">
-                <StackPanel IsVisible="{Binding IsEditing}" Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource EditorBottomMargin}">
+            <ScrollViewer Grid.Row="0" Padding="{StaticResource PagePadding}">
+                <StackPanel IsVisible="{Binding IsEditing}" Spacing="{StaticResource LargeSpacing}">
                     <!-- 基本信息 -->
                     <controls:CardView Header="基本信息" Padding="{StaticResource CardPadding}">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
@@ -159,17 +165,19 @@
                                     <Run Text="*" Foreground="{StaticResource ErrorBrush}"/>
                                     <Run Text="类型"/>
                                 </TextBlock>
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource LargeSpacing}">
-                                    <RadioButton GroupName="transportType" 
+                                <WrapPanel Orientation="Horizontal">
+                                    <RadioButton GroupName="transportType"
+                                                 Margin="{StaticResource SmallRightMargin}"
                                                  Content="标准输入/输出(stdio)"
                                                  IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=stdio}"/>
-                                    <RadioButton GroupName="transportType" 
+                                    <RadioButton GroupName="transportType"
+                                                 Margin="{StaticResource SmallRightMargin}"
                                                  Content="服务器发送事件(sse)"
                                                  IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=sse}"/>
                                     <RadioButton GroupName="transportType" 
                                                  Content="可流式传输的HTTP(streamableHttp)"
                                                  IsChecked="{Binding TransportType, Converter={StaticResource RadioButtonEqualityConverter}, ConverterParameter=streamableHttp}"/>
-                                </StackPanel>
+                                </WrapPanel>
                             </StackPanel>
 
                             <!-- 命令/URL配置 (stdio) -->
@@ -268,13 +276,14 @@
                                IsVisible="{Binding !IsTesting}"/>
                     
                     <!-- 按钮组 -->
-                    <StackPanel Grid.Column="1" 
-                                Orientation="Horizontal" 
-                                Spacing="{StaticResource DefaultSpacing}">
+                    <WrapPanel Grid.Column="1"
+                               Orientation="Horizontal"
+                               HorizontalAlignment="Right">
                         <Button Content="取消" 
                                 Command="{Binding CancelEditCommand}"
                                 Classes="action-button"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
+                                MinWidth="{StaticResource MediumButtonMinWidth}"
+                                Margin="{StaticResource TinyLeftMargin}"/>
                         
                         <Button Content="删除" 
                                 Command="{Binding DeleteServerCommand}"
@@ -282,6 +291,7 @@
                                 Background="{StaticResource ErrorBrush}"
                                 Foreground="White"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
+                                Margin="{StaticResource TinyLeftMargin}"
                                 IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
                         
                         <Button Content="测试连接" 
@@ -290,7 +300,8 @@
                                 Classes="action-button"
                                 Background="{StaticResource InfoBrush}"
                                 Foreground="White"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
+                                MinWidth="{StaticResource MediumButtonMinWidth}"
+                                Margin="{StaticResource TinyLeftMargin}"/>
                         
                         <Button Content="保存" 
                                 Command="{Binding SaveServerCommand}"
@@ -298,8 +309,9 @@
                                 Classes="action-button"
                                 Background="{StaticResource PrimaryBrush}"
                                 Foreground="White"
-                                MinWidth="{StaticResource MediumButtonMinWidth}"/>
-                    </StackPanel>
+                                MinWidth="{StaticResource MediumButtonMinWidth}"
+                                Margin="{StaticResource TinyLeftMargin}"/>
+                    </WrapPanel>
                 </Grid>
             </Border>
 

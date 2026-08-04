@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -8,6 +9,8 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// </summary>
 public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<StockCriteria>
 {
+    protected override string AssetTypeLabel => "股票";
+
     private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "mc", "fmc", "pettm", "pelyr", "pb", "psr", "roediluted", "bps", "eps",
@@ -216,7 +219,7 @@ public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<St
 """;
     }
 
-    public string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
+    public override string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
     {
         if (request.IsNewsAnalysis)
         {
@@ -242,7 +245,7 @@ public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<St
         }
     }
 
-    public StockCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    public override StockCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
     {
         var criteria = LlmJsonExtractor.Deserialize<StockCriteria>(json, DeserializationOptions);
         if (criteria == null)

@@ -24,7 +24,6 @@
             <!-- 进度显示区域 - 仅在分析时显示 -->
             <views:ProgressDisplayView 
                 IsVisible="{Binding IsBusy}"
-                IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
                 AnalysisStage="{Binding AnalysisStage}"
                 ProgressPercent="{Binding AnalysisProgressPercent}"
                 FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
@@ -216,6 +215,7 @@
         <Border Background="#80000000"
                 IsVisible="{Binding IsChatSidebarVisible}"
                 ZIndex="1500"
+                Focusable="False"
                 Tapped="OnOverlayTapped"/>
 
         <!-- 聊天侧边栏（浮层，右对齐） -->

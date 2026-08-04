@@ -8,9 +8,6 @@ namespace MarketAssistant.Views.Components;
 /// </summary>
 public partial class ProgressDisplayView : UserControl
 {
-    public static readonly StyledProperty<bool> IsAnalysisInProgressProperty =
-        AvaloniaProperty.Register<ProgressDisplayView, bool>(nameof(IsAnalysisInProgress), false);
-
     public static readonly StyledProperty<string> AnalysisStageProperty =
         AvaloniaProperty.Register<ProgressDisplayView, string>(nameof(AnalysisStage), string.Empty);
 
@@ -22,12 +19,6 @@ public partial class ProgressDisplayView : UserControl
 
     public static readonly StyledProperty<System.Windows.Input.ICommand?> CancelCommandProperty =
         AvaloniaProperty.Register<ProgressDisplayView, System.Windows.Input.ICommand?>(nameof(CancelCommand));
-
-    public bool IsAnalysisInProgress
-    {
-        get => GetValue(IsAnalysisInProgressProperty);
-        set => SetValue(IsAnalysisInProgressProperty, value);
-    }
 
     public string AnalysisStage
     {

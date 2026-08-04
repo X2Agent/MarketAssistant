@@ -1,7 +1,14 @@
+using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Providers;
+using MarketAssistant.Services;
+using MarketAssistant.Services.Trading;
+using MarketAssistant.Trading.Models;
+using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.DependencyInjection;
 using System.ComponentModel.DataAnnotations;
 
 namespace TestMarketAssistant;
@@ -102,6 +109,58 @@ public sealed class StructuredOutputTest
             () => strategy.DeserializeCriteria(json, request));
 
         StringAssert.Contains(exception.Message, "不能大于最大值");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void InvestmentSelectionExecutors_ShouldRemainMafWorkflowExecutors()
+    {
+        Assert.IsTrue(typeof(Executor).IsAssignableFrom(typeof(GenerateCriteriaExecutor<StockCriteria>)));
+        Assert.IsTrue(typeof(Executor).IsAssignableFrom(typeof(ScreenInvestmentTargetsExecutor)));
+        Assert.IsTrue(typeof(Executor).IsAssignableFrom(typeof(AnalyzeAssetsExecutor)));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void AddBusinessServices_ShouldRegisterAllAdaptiveCardParsers()
+    {
+        var services = new ServiceCollection();
+
+        services.AddBusinessServices();
+
+        var parserRegistrations = services
+            .Where(descriptor => descriptor.ServiceType == typeof(IJsonToAdaptiveCardParser))
+            .Select(descriptor => descriptor.ImplementationType)
+            .ToHashSet();
+
+        Assert.HasCount(6, parserRegistrations);
+        Assert.IsTrue(parserRegistrations.Contains(typeof(CoordinatorCardParser)));
+        Assert.IsTrue(parserRegistrations.Contains(typeof(FinancialCardParser)));
+        Assert.IsTrue(parserRegistrations.Contains(typeof(FundamentalCardParser)));
+        Assert.IsTrue(parserRegistrations.Contains(typeof(SentimentCardParser)));
+        Assert.IsTrue(parserRegistrations.Contains(typeof(NewsCardParser)));
+        Assert.IsTrue(parserRegistrations.Contains(typeof(TechnicalCardParser)));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow(CryptoTradingMode.BinanceSpotDemo, CryptoTradingMode.LiveSpot, true, true)]
+    [DataRow(CryptoTradingMode.BinanceFuturesTestnet, CryptoTradingMode.LiveFutures, true, true)]
+    [DataRow(CryptoTradingMode.BinanceSpotDemo, CryptoTradingMode.LiveSpot, false, false)]
+    [DataRow(CryptoTradingMode.LiveSpot, CryptoTradingMode.LiveSpot, true, false)]
+    [DataRow(CryptoTradingMode.LiveSpot, CryptoTradingMode.BinanceSpotDemo, true, false)]
+    public void TradingEnvironment_ShouldRequireConfirmationOnlyWhenRunningMonitorSwitchesToLive(
+        CryptoTradingMode currentMode,
+        CryptoTradingMode targetMode,
+        bool isMonitorRunning,
+        bool expected)
+    {
+        var actual = TradingEnvironmentService.RequiresLiveModeConfirmation(
+            currentMode,
+            targetMode,
+            isMonitorRunning);
+
+        Assert.AreEqual(expected, actual);
     }
 
     private sealed class ValidationRoot
