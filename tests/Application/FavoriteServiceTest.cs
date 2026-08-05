@@ -139,20 +139,6 @@ public class FavoriteServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public async Task AddFavorite_Crypto_ShouldStoreAsset()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
-
-        // Act
-        await service.AddFavoriteAsync("BTCUSDT", "");
-
-        // Assert
-        Assert.IsTrue(await service.IsFavoriteAsync("BTCUSDT", ""));
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
     public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange

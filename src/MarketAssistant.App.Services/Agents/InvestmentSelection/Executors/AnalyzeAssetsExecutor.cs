@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.InvestmentSelection.Models;
@@ -70,18 +71,23 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
             var systemPrompt = formatter.GetAnalysisInstructions(originalRequest.IsNewsAnalysis);
             var userPrompt = BuildAnalysisPrompt(originalRequest, assetsDataText);
 
-            var chatClient = _chatClientFactory.CreateClient();
-
-            var schemaPrompt = StructuredOutputHelper.BuildSchemaPromptSection(typeof(InvestmentSelectionResult), "InvestmentSelectionResult");
-            systemPrompt = systemPrompt + "\n\n" + schemaPrompt;
+            var runtime = _chatClientFactory.CreateRuntime();
+            systemPrompt = StructuredOutputOptions.AppendSchemaInstructions(
+                systemPrompt,
+                typeof(InvestmentSelectionResult),
+                runtime.StructuredOutputMode,
+                JsonOptions);
 
             var options = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.Json,
+                ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
+                    typeof(InvestmentSelectionResult),
+                    runtime.StructuredOutputMode,
+                    JsonOptions),
                 Temperature = 0.2f,
                 MaxOutputTokens = 8000
             };
-            var response = await chatClient.GetResponseAsync(
+            var response = await runtime.Client.GetResponseAsync(
                     [
                         new ChatMessage(ChatRole.System, systemPrompt),
                         new ChatMessage(ChatRole.User, userPrompt)

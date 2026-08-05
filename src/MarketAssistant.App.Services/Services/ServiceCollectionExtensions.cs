@@ -232,12 +232,13 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
-        services.AddHttpClient("ModelDiscovery", client =>
+        // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
+        services.AddHttpClient("AnonymousOpenAI", client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = TimeSpan.FromMinutes(3);
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
-        }).AddStandardResilienceHandler();
+        });
 
         return services;
     }
@@ -285,8 +286,8 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
-        services.AddSingleton<IModelProviderAdapterFactory, ModelProviderAdapterFactory>();
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
+        services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
         // 延迟工厂：仅在向量化等真实场景解析，避免浏览设置页时构造嵌入/向量存储链路
         services.AddSingleton<Func<IEmbeddingFactory>>(sp => sp.GetRequiredService<IEmbeddingFactory>);
         services.AddSingleton<IWebSearchService, WebSearchService>();
@@ -308,7 +309,13 @@ public static class BusinessServiceCollectionExtensions
 
         services.AddSingleton(sp =>
             new AgentSkillsProvider(
-                skillPath: Path.Combine(AppContext.BaseDirectory, "skills")));
+                skillPath: Path.Combine(AppContext.BaseDirectory, "skills"),
+                options: new AgentSkillsProviderOptions
+                {
+                    DisableLoadSkillApproval = true,
+                    DisableReadSkillResourceApproval = true,
+                    DisableRunSkillScriptApproval = true
+                }));
 
         services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();

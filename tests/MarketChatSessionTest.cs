@@ -100,7 +100,7 @@ public class MarketChatSessionTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Agent")]
-    public async Task TestContextWindowManagementAsync()
+    public async Task TestMultiTurnHistoryAccumulationAsync()
     {
         _chatSession.SetCurrentStock("sz002594");
 
@@ -110,7 +110,7 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count > 0);
+        Assert.IsTrue(history.Count > 0, "多轮对话后历史不应为空");
         Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
     }
 
@@ -153,7 +153,7 @@ public class MarketChatSessionTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Agent")]
-    public async Task TestCancellationAsync()
+    public async Task TestStopCurrentRequest_OnIdleSession_IsSafeAsync()
     {
         Assert.IsFalse(_chatSession.IsProcessing, "新会话初始不应处于处理中状态");
 

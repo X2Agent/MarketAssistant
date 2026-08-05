@@ -16,18 +16,6 @@ public class RerankerServiceTest : BaseAgentTest
         _rerankerService = _serviceProvider.GetRequiredService<IRerankerService>();
     }
 
-    #region Service Resolution Tests
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void Service_ShouldBeResolvedFromContainer()
-    {
-        // Assert
-        Assert.IsNotNull(_rerankerService);
-    }
-
-    #endregion
-
     #region Core Functionality Tests
 
     [TestMethod]
@@ -100,7 +88,7 @@ public class RerankerServiceTest : BaseAgentTest
     [TestCategory("Unit")]
     public void Rerank_WithRelevantQuery_ShouldPrioritizeRelevantContent()
     {
-        // Arrange
+        // Arrange - result2 与查询语义最相关，result4 与查询无关
         var query = "新能源汽车投资";
         var items = new List<ScoredSearchResult>
         {
@@ -117,6 +105,14 @@ public class RerankerServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.AreEqual(4, result.Count);
 
+        // 相关内容（result2）应排在无关内容（result4）之前
+        var resultList = result.ToList();
+        var relevantIndex = resultList.FindIndex(r => r.Name == "result2");
+        var irrelevantIndex = resultList.FindIndex(r => r.Name == "result4");
+        Assert.IsTrue(relevantIndex >= 0 && irrelevantIndex >= 0, "结果应包含所有输入项");
+        Assert.IsTrue(relevantIndex < irrelevantIndex,
+            $"相关内容 result2 应排在无关内容 result4 之前，实际顺序: {string.Join(", ", result.Select(r => r.Name))}");
+
         Console.WriteLine($"Reranked results for '{query}':");
         for (int i = 0; i < result.Count; i++)
         {
@@ -126,9 +122,9 @@ public class RerankerServiceTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Rerank_WithLargeDataset_ShouldHandleEfficiently()
+    public void Rerank_WithLargeDataset_ShouldPreserveAllItemsAndPreferRelevantOnes()
     {
-        // Arrange
+        // Arrange - 相关项（i % 3 == 0）拥有更高向量分数
         var query = "芯片半导体";
         var items = new List<ScoredSearchResult>();
 
@@ -138,7 +134,6 @@ public class RerankerServiceTest : BaseAgentTest
             var content = isRelevant
                 ? $"芯片半导体技术发展报告第{i}部分"
                 : $"一般性市场分析报告第{i}部分";
-            // 相关项给更高向量分数
             var score = isRelevant ? 0.8f + i * 0.01f : 0.3f + i * 0.01f;
             items.Add(CreateScoredResult($"result{i}", content, $"https://example.com/{i}", score));
         }
@@ -150,8 +145,27 @@ public class RerankerServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.AreEqual(15, result.Count);
 
+        // 所有输入项应保留
+        var originalNames = items.Select(i => i.Item.Name).OrderBy(n => n).ToArray();
+        var resultNames = result.Select(r => r.Name).OrderBy(n => n).ToArray();
+        CollectionAssert.AreEquivalent(originalNames, resultNames);
+
+        // 相关项（result3/6/9/12/15）整体排名应优于无关项的中位排名
+        var relevantRanks = result
+            .Select((r, idx) => (r.Name, Rank: idx))
+            .Where(t => t.Name is "result3" or "result6" or "result9" or "result12" or "result15")
+            .Select(t => t.Rank)
+            .ToList();
+        var irrelevantRanks = result
+            .Select((r, idx) => (r.Name, Rank: idx))
+            .Where(t => t.Name is "result1" or "result2" or "result4" or "result5" or "result7")
+            .Select(t => t.Rank)
+            .ToList();
+        Assert.IsTrue(relevantRanks.Average() < irrelevantRanks.Average(),
+            $"相关项平均排名应优于无关项，相关项平均: {relevantRanks.Average():F2}，无关项平均: {irrelevantRanks.Average():F2}");
+
         Console.WriteLine($"Reranked large dataset for '{query}':");
-        for (int i = 0; i < Math.Min(5, result.Count); i++)
+        for (int i = 0; i < result.Count; i++)
         {
             Console.WriteLine($"{i + 1}. {result[i].Name}: {result[i].Value}");
         }

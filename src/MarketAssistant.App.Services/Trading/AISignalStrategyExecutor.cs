@@ -189,7 +189,7 @@ public sealed class AISignalStrategyExecutor
 
     private async Task InvokeAgentAsync(string prompt, CancellationToken ct)
     {
-        var agent = _agentFactory.CreateAgent();
+        var agent = _agentFactory.CreateAutomationAgent();
         var messages = new List<ChatMessage>
         {
             new(ChatRole.User, prompt)

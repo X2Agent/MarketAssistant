@@ -1,9 +1,12 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
+using Microsoft.Extensions.AI;
 using MarketAssistant.Services;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
@@ -17,17 +20,80 @@ namespace TestMarketAssistant;
 public sealed class StructuredOutputTest
 {
     [TestMethod]
-    public void BuildSchemaPromptSection_ShouldRequireSingleJsonObject()
+    public void ForJsonSchema_ShouldUseOfficialStructuredOutputFormat()
     {
-        var prompt = StructuredOutputHelper.BuildSchemaPromptSection(
-            typeof(StockCriteria),
-            nameof(StockCriteria));
+        var format = ChatResponseFormat.ForJsonSchema<StockCriteria>();
 
-        StringAssert.Contains(prompt, "仅返回一个");
-        StringAssert.Contains(prompt, "合法 JSON 对象");
-        StringAssert.Contains(prompt, "不得输出 JSON 对象之外的任何内容");
-        StringAssert.Contains(prompt, "JSON Schema");
-        StringAssert.Contains(prompt, "Criteria");
+        Assert.IsInstanceOfType<ChatResponseFormatJson>(format);
+        Assert.IsTrue(format.Schema.HasValue);
+        Assert.AreEqual(nameof(StockCriteria), format.SchemaName);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void Text_ShouldUseSchemaPromptWithoutResponseFormat()
+    {
+        var format = StructuredOutputOptions.CreateResponseFormat(
+            typeof(StockCriteria),
+            StructuredOutputMode.Text);
+        var instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            "base instructions",
+            typeof(StockCriteria),
+            StructuredOutputMode.Text);
+
+        Assert.IsNull(format);
+        StringAssert.Contains(instructions, "JSON Schema");
+        StringAssert.Contains(instructions, "criteria");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void JsonObject_ShouldUseJsonFormatAndSchemaPrompt()
+    {
+        var format = StructuredOutputOptions.CreateResponseFormat(
+            typeof(StockCriteria),
+            StructuredOutputMode.JsonObject);
+        var instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            "base instructions",
+            typeof(StockCriteria),
+            StructuredOutputMode.JsonObject);
+
+        Assert.AreSame(ChatResponseFormat.Json, format);
+        StringAssert.Contains(instructions, "JSON Schema");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CryptoCriteria_JsonObjectMode_ShouldKeepSchemaConstraints()
+    {
+        var format = StructuredOutputOptions.CreateResponseFormat(
+            typeof(CryptoCriteria),
+            StructuredOutputMode.JsonObject);
+        var instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            "crypto instructions",
+            typeof(CryptoCriteria),
+            StructuredOutputMode.JsonObject);
+
+        Assert.AreSame(ChatResponseFormat.Json, format);
+        StringAssert.Contains(instructions, "JSON Schema");
+        StringAssert.Contains(instructions, "criteria");
+        StringAssert.Contains(instructions, "quoteCurrency");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void JsonSchema_ShouldUseOfficialFormatWithoutPromptDuplication()
+    {
+        var format = StructuredOutputOptions.CreateResponseFormat(
+            typeof(StockCriteria),
+            StructuredOutputMode.JsonSchema);
+        var instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            "base instructions",
+            typeof(StockCriteria),
+            StructuredOutputMode.JsonSchema);
+
+        Assert.IsInstanceOfType<ChatResponseFormatJson>(format);
+        Assert.AreEqual("base instructions", instructions);
     }
 
     [TestMethod]

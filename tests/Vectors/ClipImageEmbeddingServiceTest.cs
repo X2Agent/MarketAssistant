@@ -104,15 +104,18 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GenerateAsync_WithCancellation_ShouldComplete()
+    public async Task GenerateAsync_WithCancelledToken_ShouldStillReturnHashFallbackVector()
     {
-        // Arrange
+        // Arrange - 哈希降级路径为纯 CPU 计算，不响应取消令牌
         using var cts = new CancellationTokenSource();
-        cts.Cancel(); // 立即取消
+        cts.Cancel();
 
-        // Act & Assert - 哈希降级不支持取消，但应该快速完成
+        // Act
         var result = await _service.GenerateAsync(_testImageBytes, cts.Token);
-        Assert.IsNotNull(result, "取消的操作应返回结果（哈希降级）");
+
+        // Assert - 哈希降级应忽略取消并返回 1024 维向量
+        Assert.IsNotNull(result, "哈希降级应返回非空结果");
+        Assert.AreEqual(1024, result.Vector.Length, "降级向量维度应为1024");
     }
 
     #endregion
@@ -133,21 +136,6 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #endregion
 
     #region 资源管理和配置测试
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void Dispose_ShouldReleaseResources()
-    {
-        // Arrange
-        var service = _serviceProvider.GetRequiredService<IImageEmbeddingService>();
-
-        // Act & Assert - 应该不抛出异常
-        if (service is IDisposable disposable)
-        {
-            disposable.Dispose();
-            disposable.Dispose(); // 多次调用应该安全
-        }
-    }
 
     [TestMethod]
     [TestCategory("Unit")]

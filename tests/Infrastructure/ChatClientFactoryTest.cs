@@ -24,10 +24,12 @@ public class ChatClientFactoryTest
         Assert.AreSame(first.Client, second.Client);
         Assert.AreEqual(first.ConfigurationFingerprint, second.ConfigurationFingerprint);
         Assert.IsNull(first.ContextWindowTokens);
-        fixture.AdapterFactory.Verify(x => x.Create(It.IsAny<ModelProvider>()), Times.Once);
-        fixture.Adapter.Verify(
-            x => x.CreateChatClient("secret-1", "model-a", "https://api.deepseek.com"),
-            Times.Once);
+        Assert.AreEqual(StructuredOutputMode.JsonObject, first.StructuredOutputMode);
+        Assert.AreEqual(first.StructuredOutputMode, second.StructuredOutputMode);
+        Assert.HasCount(1, fixture.Factory.CreatedRequests);
+        Assert.AreEqual(
+            new ClientCreationRequest("DeepSeek", "model-a", "secret-1", "https://api.deepseek.com"),
+            fixture.Factory.CreatedRequests[0]);
     }
 
     [TestMethod]
@@ -43,13 +45,13 @@ public class ChatClientFactoryTest
 
         Assert.AreNotSame(first.Client, second.Client);
         Assert.AreNotEqual(first.ConfigurationFingerprint, second.ConfigurationFingerprint);
-        fixture.CreatedClients[0].Verify(x => x.Dispose(), Times.Never);
-        fixture.CreatedClients[1].Verify(x => x.Dispose(), Times.Never);
+        fixture.Factory.CreatedClients[0].Verify(x => x.Dispose(), Times.Never);
+        fixture.Factory.CreatedClients[1].Verify(x => x.Dispose(), Times.Never);
 
         factory.Dispose();
 
-        fixture.CreatedClients[0].Verify(x => x.Dispose(), Times.Once);
-        fixture.CreatedClients[1].Verify(x => x.Dispose(), Times.Once);
+        fixture.Factory.CreatedClients[0].Verify(x => x.Dispose(), Times.Once);
+        fixture.Factory.CreatedClients[1].Verify(x => x.Dispose(), Times.Once);
     }
 
     [TestMethod]
@@ -95,6 +97,54 @@ public class ChatClientFactoryTest
         StringAssert.Contains(exception.Message, "DeepSeek");
         StringAssert.Contains(exception.Message, "model-a");
         StringAssert.Contains(exception.Message, "API Key");
+        Assert.HasCount(0, fixture.Factory.CreatedRequests);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_OpenCodeZenFreeModelWithoutApiKey_ShouldCreateAnonymousClient()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "OpenCodeZen";
+        fixture.Setting.ModelId = "deepseek-v4-flash-free";
+        fixture.Setting.ProviderApiKeys.Clear();
+        using var factory = fixture.Factory;
+
+        var runtime = factory.CreateRuntime();
+
+        Assert.AreEqual("OpenCodeZen", runtime.ProviderId);
+        Assert.AreEqual(string.Empty, fixture.Factory.CreatedRequests.Single().ApiKey);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_OpenCodeZenFreeModelWithStoredKey_ShouldInjectKey()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "OpenCodeZen";
+        fixture.Setting.ModelId = "deepseek-v4-flash-free";
+        fixture.Setting.ProviderApiKeys["OpenCodeZen"] = "configured-key";
+        using var factory = fixture.Factory;
+
+        factory.CreateRuntime();
+
+        Assert.AreEqual("configured-key", fixture.Factory.CreatedRequests.Single().ApiKey);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_UnsupportedOpenCodeZenProtocol_ShouldFailBeforeClientCreation()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "OpenCodeZen";
+        fixture.Setting.ModelId = "gpt-5.6-sol";
+        fixture.Setting.ProviderApiKeys["OpenCodeZen"] = "secret";
+        using var factory = fixture.Factory;
+
+        var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
+
+        StringAssert.Contains(exception.Message, "API 协议尚未接入");
+        Assert.HasCount(0, fixture.Factory.CreatedRequests);
     }
 
     [TestMethod]
@@ -124,9 +174,91 @@ public class ChatClientFactoryTest
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
         StringAssert.Contains(exception.Message, "16");
-        Assert.AreEqual(16, fixture.CreatedClients.Count);
-        foreach (var client in fixture.CreatedClients)
+        Assert.HasCount(16, fixture.Factory.CreatedClients);
+        foreach (var client in fixture.Factory.CreatedClients)
             client.Verify(x => x.Dispose(), Times.Never);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_FixedEndpointProviderWithStoredOverride_ShouldIgnoreOverride()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.Endpoint = "https://proxy.example.com/v1/";
+        using var factory = fixture.Factory;
+
+        factory.CreateRuntime();
+
+        Assert.AreEqual(
+            "https://api.deepseek.com",
+            fixture.Factory.CreatedRequests.Single().Endpoint);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_OllamaWithoutConfiguredEndpoint_ShouldUseOfficialDefaultEndpoint()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "Ollama";
+        fixture.Setting.ModelId = "qwen3:8b";
+        fixture.Setting.Endpoint = string.Empty;
+        fixture.Setting.ProviderApiKeys.Clear();
+        using var factory = fixture.Factory;
+
+        factory.CreateRuntime();
+
+        Assert.AreEqual(
+            "http://localhost:11434",
+            fixture.Factory.CreatedRequests.Single().Endpoint);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_CustomProviderWithoutEndpoint_ShouldReturnFriendlyConfigurationError()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "Custom";
+        fixture.Setting.ModelId = "model-a";
+        fixture.Setting.Endpoint = string.Empty;
+        fixture.Setting.ProviderApiKeys["Custom"] = "secret";
+        using var factory = fixture.Factory;
+
+        var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
+
+        StringAssert.Contains(exception.Message, "API Base URL");
+        Assert.HasCount(0, fixture.Factory.CreatedRequests);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_OpenAIModernModel_ShouldExposeJsonSchemaMode()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "OpenAI";
+        fixture.Setting.ModelId = "gpt-4o-mini";
+        fixture.Setting.Endpoint = "https://api.openai.com/v1";
+        fixture.Setting.ProviderApiKeys["OpenAI"] = "secret";
+        using var factory = fixture.Factory;
+
+        var runtime = factory.CreateRuntime();
+
+        Assert.AreEqual(StructuredOutputMode.JsonSchema, runtime.StructuredOutputMode);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_CustomEndpoint_ShouldExposeTextMode()
+    {
+        var fixture = CreateFixture();
+        fixture.Setting.ProviderId = "Custom";
+        fixture.Setting.ModelId = "unknown-model";
+        fixture.Setting.Endpoint = "https://custom.example.com/v1";
+        fixture.Setting.ProviderApiKeys["Custom"] = "secret";
+        using var factory = fixture.Factory;
+
+        var runtime = factory.CreateRuntime();
+
+        Assert.AreEqual(StructuredOutputMode.Text, runtime.StructuredOutputMode);
     }
 
     [TestMethod]
@@ -144,9 +276,10 @@ public class ChatClientFactoryTest
 
         Assert.AreEqual("Ollama", runtime.ProviderId);
         Assert.AreEqual("qwen3:8b", runtime.ModelId);
-        fixture.Adapter.Verify(
-            x => x.CreateChatClient(string.Empty, "qwen3:8b", "http://localhost:11434"),
-            Times.Once);
+        Assert.AreEqual(StructuredOutputMode.JsonObject, runtime.StructuredOutputMode);
+        Assert.AreEqual(
+            new ClientCreationRequest("Ollama", "qwen3:8b", string.Empty, "http://localhost:11434"),
+            fixture.Factory.CreatedRequests.Single());
     }
 
     private static Fixture CreateFixture()
@@ -164,38 +297,40 @@ public class ChatClientFactoryTest
 
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(x => x.CurrentSetting).Returns(setting);
-
-        var createdClients = new List<Mock<IChatClient>>();
-        var adapter = new Mock<IModelProviderAdapter>();
-        adapter
-            .Setup(x => x.CreateChatClient(
-                It.IsAny<string?>(),
-                It.IsAny<string>(),
-                It.IsAny<string?>()))
-            .Returns(() =>
-            {
-                var client = new Mock<IChatClient>();
-                createdClients.Add(client);
-                return client.Object;
-            });
-
-        var adapterFactory = new Mock<IModelProviderAdapterFactory>();
-        adapterFactory
-            .Setup(x => x.Create(It.IsAny<ModelProvider>()))
-            .Returns(adapter.Object);
+        var httpClientFactory = new Mock<IHttpClientFactory>();
+        httpClientFactory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
 
         return new Fixture(
-            new ChatClientFactory(settingService.Object, adapterFactory.Object),
-            setting,
-            adapterFactory,
-            adapter,
-            createdClients);
+            new TestableChatClientFactory(settingService.Object, httpClientFactory.Object),
+            setting);
     }
 
-    private sealed record Fixture(
-        ChatClientFactory Factory,
-        UserSetting Setting,
-        Mock<IModelProviderAdapterFactory> AdapterFactory,
-        Mock<IModelProviderAdapter> Adapter,
-        List<Mock<IChatClient>> CreatedClients);
+    private sealed record Fixture(TestableChatClientFactory Factory, UserSetting Setting);
+
+    private sealed class TestableChatClientFactory(
+        IUserSettingService userSettingService,
+        IHttpClientFactory httpClientFactory)
+        : ChatClientFactory(userSettingService, httpClientFactory)
+    {
+        public List<ClientCreationRequest> CreatedRequests { get; } = [];
+        public List<Mock<IChatClient>> CreatedClients { get; } = [];
+
+        protected override IChatClient CreateClient(
+            ModelProvider provider,
+            string modelId,
+            string apiKey,
+            string endpoint)
+        {
+            CreatedRequests.Add(new ClientCreationRequest(provider.Id, modelId, apiKey, endpoint));
+            var client = new Mock<IChatClient>();
+            CreatedClients.Add(client);
+            return client.Object;
+        }
+    }
 }
+
+internal sealed record ClientCreationRequest(
+    string ProviderId,
+    string ModelId,
+    string ApiKey,
+    string Endpoint);

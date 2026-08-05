@@ -241,7 +241,7 @@ public class AShareKLineServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GetKLineDataAsync_EmptyCode_ShouldThrowArgumentException()
+    public async Task GetKLineDataAsync_EmptyCode_ShouldThrowFriendlyException()
     {
         // Arrange
         var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);

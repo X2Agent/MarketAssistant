@@ -1,10 +1,12 @@
+using System.ClientModel;
 using System.Security.Cryptography;
 using System.Text;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
-using Polly;
-using Polly.Retry;
+using OllamaSharp;
+using OpenAI;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
@@ -34,39 +36,20 @@ public sealed record ChatClientRuntime(
     string ModelId,
     string Endpoint,
     string ConfigurationFingerprint,
-    int? ContextWindowTokens);
+    int? ContextWindowTokens,
+    StructuredOutputMode StructuredOutputMode);
 
 /// <summary>
 /// ChatClient 工厂实现
-/// 根据用户配置的服务商创建对应的 IChatClient，并附加 LLM 瞬态错误重试管道
+/// 根据用户配置创建并缓存官方 SDK 提供的 IChatClient。
 /// </summary>
 public class ChatClientFactory : IChatClientFactory
 {
     private const int MaxCachedRuntimes = 16;
     private static readonly TimeSpan ErrorCooldown = TimeSpan.FromSeconds(30);
 
-    private static readonly ResiliencePipeline LlmRetryPipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 2,
-            BackoffType = DelayBackoffType.Exponential,
-            UseJitter = true,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = new PredicateBuilder()
-                .Handle<HttpRequestException>()
-                .Handle<TaskCanceledException>(ex => IsNetworkTimeout(ex))
-        })
-        .Build();
-
-    private static bool IsNetworkTimeout(TaskCanceledException ex)
-    {
-        if (ex.InnerException is TimeoutException) return true;
-        if (ex.CancellationToken.IsCancellationRequested) return false;
-        return ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase);
-    }
-
     private readonly IUserSettingService _userSettingService;
-    private readonly IModelProviderAdapterFactory _adapterFactory;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
     private readonly Dictionary<ModelRuntimeKey, CachedError> _errors = [];
@@ -74,10 +57,10 @@ public class ChatClientFactory : IChatClientFactory
 
     public ChatClientFactory(
         IUserSettingService userSettingService,
-        IModelProviderAdapterFactory adapterFactory)
+        IHttpClientFactory httpClientFactory)
     {
         _userSettingService = userSettingService;
-        _adapterFactory = adapterFactory;
+        _httpClientFactory = httpClientFactory;
     }
 
     public IChatClient CreateClient() => CreateRuntime().Client;
@@ -93,9 +76,16 @@ public class ChatClientFactory : IChatClientFactory
             var modelId = userSetting.ModelId;
             var provider = ModelProviderCatalog.GetProvider(providerId)
                 ?? throw new FriendlyException($"未知的服务商: {providerId}");
-            var apiKey = userSetting.ProviderApiKeys.TryGetValue(providerId, out var key) ? key : string.Empty;
-            var endpoint = ResolveEndpoint(provider, userSetting.Endpoint);
-            var runtimeKey = new ModelRuntimeKey(providerId, modelId, endpoint, ComputeSecretFingerprint(apiKey));
+            var configuredApiKey = userSetting.ProviderApiKeys.TryGetValue(providerId, out var key) ? key : string.Empty;
+            var apiKey = provider.RequiresApiKey ? configuredApiKey : string.Empty;
+            var endpointOverride = provider.AllowsEndpointOverride ? userSetting.Endpoint : string.Empty;
+            var endpoint = ResolveEndpoint(provider, endpointOverride);
+            var structuredOutputMode = provider.StructuredOutputMode;
+            var runtimeKey = new ModelRuntimeKey(
+                providerId,
+                modelId,
+                endpoint,
+                ComputeSecretFingerprint(apiKey));
             var configurationFingerprint = ComputeConfigurationFingerprint(runtimeKey);
 
             if (_clients.TryGetValue(runtimeKey, out var cachedClient))
@@ -106,7 +96,8 @@ public class ChatClientFactory : IChatClientFactory
                     modelId,
                     endpoint,
                     configurationFingerprint,
-                    provider.GetContextWindowTokens(modelId));
+                    provider.GetContextWindowTokens(modelId),
+                    structuredOutputMode);
             }
 
             if (_errors.TryGetValue(runtimeKey, out var cachedError) &&
@@ -120,10 +111,10 @@ public class ChatClientFactory : IChatClientFactory
                 if (string.IsNullOrWhiteSpace(modelId))
                     throw new FriendlyException("AI 功能未配置:请先在设置页面选择 AI 模型");
 
-                if (!provider.IsModelSupported(modelId))
+                if (provider.GetProtocol(modelId) == ModelApiProtocol.Unsupported)
                 {
                     throw new FriendlyException(
-                        $"模型 {modelId} 不兼容 {provider.DisplayName} 当前使用的协议适配器");
+                        $"模型 {modelId} 当前使用的 API 协议尚未接入 {provider.DisplayName}");
                 }
 
                 if (provider.RequiresApiKeyForModel(modelId) && string.IsNullOrWhiteSpace(apiKey))
@@ -139,18 +130,17 @@ public class ChatClientFactory : IChatClientFactory
                         "为避免释放仍被会话引用的客户端，请重启应用后再切换新配置");
                 }
 
-                var adapter = _adapterFactory.Create(provider);
-                var rawClient = adapter.CreateChatClient(apiKey, modelId, endpoint);
-                var resilientClient = new ResilientChatClient(rawClient, LlmRetryPipeline);
-                _clients.Add(runtimeKey, resilientClient);
+                var client = CreateClient(provider, modelId, apiKey, endpoint);
+                _clients.Add(runtimeKey, client);
                 _errors.Remove(runtimeKey);
                 return new ChatClientRuntime(
-                    resilientClient,
+                    client,
                     providerId,
                     modelId,
                     endpoint,
                     configurationFingerprint,
-                    provider.GetContextWindowTokens(modelId));
+                    provider.GetContextWindowTokens(modelId),
+                    structuredOutputMode);
             }
             catch (FriendlyException)
             {
@@ -162,6 +152,40 @@ public class ChatClientFactory : IChatClientFactory
                 throw new FriendlyException($"创建 AI 客户端失败: {ex.Message}", ex);
             }
         }
+    }
+
+    protected virtual IChatClient CreateClient(
+        ModelProvider provider,
+        string modelId,
+        string apiKey,
+        string endpoint)
+    {
+        return provider.GetProtocol(modelId) switch
+        {
+            ModelApiProtocol.Ollama => new OllamaApiClient(new Uri(endpoint), modelId),
+            ModelApiProtocol.OpenAIChatCompletions => CreateOpenAIClient(apiKey, endpoint)
+                .GetChatClient(modelId)
+                .AsIChatClient(),
+            _ => throw new FriendlyException($"模型 {modelId} 的 API 协议暂不受支持")
+        };
+    }
+
+    private OpenAIClient CreateOpenAIClient(string apiKey, string endpoint)
+    {
+        var options = new OpenAIClientOptions
+        {
+            Endpoint = new Uri(endpoint),
+            NetworkTimeout = TimeSpan.FromMinutes(3)
+        };
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            options.Transport = new AnonymousHttpClientPipelineTransport(
+                _httpClientFactory.CreateClient("AnonymousOpenAI"));
+            return new OpenAIClient(new ApiKeyCredential("anonymous"), options);
+        }
+
+        return new OpenAIClient(new ApiKeyCredential(apiKey), options);
     }
 
     public void Dispose()
@@ -184,10 +208,16 @@ public class ChatClientFactory : IChatClientFactory
 
     private static string ResolveEndpoint(ModelProvider provider, string configuredEndpoint)
     {
-        if (string.IsNullOrWhiteSpace(provider.DefaultEndpoint))
+        if (!string.IsNullOrWhiteSpace(configuredEndpoint))
             return configuredEndpoint.Trim().TrimEnd('/');
 
-        return provider.DefaultEndpoint.Trim().TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(provider.DefaultEndpoint))
+            return provider.DefaultEndpoint.Trim().TrimEnd('/');
+
+        if (provider.Protocol == ModelApiProtocol.Ollama)
+            return "http://localhost:11434";
+
+        throw new FriendlyException($"AI 功能未配置：服务商 {provider.DisplayName} 需要配置 API Base URL");
     }
 
     private static string ComputeSecretFingerprint(string secret)

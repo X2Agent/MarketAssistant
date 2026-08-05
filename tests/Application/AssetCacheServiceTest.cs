@@ -100,29 +100,6 @@ public class AssetCacheServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task CacheAssetInfo_Crypto_ShouldStore()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetCacheService>(MarketType.Crypto);
-        var assetInfo = new AssetInfo
-        {
-            Code = "BTCUSDT",
-            Name = "Bitcoin",
-            CurrentPrice = "45000.00"
-        };
-
-        // Act
-        service.CacheAssetInfo("BTCUSDT", assetInfo);
-        var cached = await service.GetCachedAssetInfoAsync("BTCUSDT");
-
-        // Assert
-        Assert.IsNotNull(cached);
-        Assert.AreEqual("BTCUSDT", cached.Code);
-        Assert.AreEqual("45000.00", cached.CurrentPrice);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public async Task AShareAndCrypto_ShouldHaveSeparateCache()
     {
         // Arrange

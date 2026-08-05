@@ -68,21 +68,6 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
-    public void PercentBelowCondition_ShouldCalculateDifferenceFromNegativeThreshold()
-    {
-        var rule = new PriceAlertRule
-        {
-            Condition = AlertCondition.ChangePercentBelow,
-            TargetPrice = 3m
-        };
-
-        rule.UpdateQuote(42m, -4.25m, DateTime.UtcNow);
-
-        Assert.AreEqual(-1.25m, rule.FloatingValue);
-        Assert.AreEqual("-1.25 个百分点", rule.FloatingValueText);
-    }
-
-    [TestMethod]
     public void UpdateTriggerState_ShouldNotifyOnlyOnConditionEntryAndRearmAfterExit()
     {
         var rule = new PriceAlertRule

@@ -66,18 +66,6 @@ public sealed class AssetScreenerServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public void Constructor_AShare_ShouldCreateInstance()
-    {
-        // Arrange & Act
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetScreenerService>(MarketType.AShare);
-
-        // Assert
-        Assert.IsNotNull(service);
-    }
-
-
-    [TestMethod]
-    [TestCategory("Integration")]
     public async Task ScreenAsync_AShare_WithDefaultCriteria_ShouldReturnStocks()
     {
         // Arrange
@@ -133,6 +121,8 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "市值50-250亿筛选应返回至少一只股票");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
+        Assert.IsTrue(result.All(r => r.Mc >= 5_000_000_000m && r.Mc <= 25_000_000_000m),
+            $"所有返回股票的市值应在 50-250 亿区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
 
         Console.WriteLine($"A股单条件筛选（市值50-250亿） - 返回股票数量: {result.Count}");
     }
@@ -175,6 +165,8 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "市值500亿-1万亿+PE 5-50 筛选应返回至少一只股票");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
+        Assert.IsTrue(result.All(r => r.Mc >= 50_000_000_000m && r.Mc <= 1_000_000_000_000m),
+            $"所有返回股票的市值应在 500 亿-1 万亿区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
 
         Console.WriteLine($"A股多条件筛选（市值+PE） - 返回股票数量: {result.Count}");
     }
@@ -182,17 +174,6 @@ public sealed class AssetScreenerServiceTest
     #endregion
 
     #region 虚拟币筛选测试
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public void Constructor_Crypto_ShouldCreateInstance()
-    {
-        // Arrange & Act
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetScreenerService>(MarketType.Crypto);
-
-        // Assert
-        Assert.IsNotNull(service);
-    }
 
     [TestMethod]
     [TestCategory("Integration")]
@@ -246,6 +227,13 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "市值10-500亿美元筛选应返回至少一条记录");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+        // CoinGecko 路径在客户端 ApplyFilters 中过滤，返回项市值应满足区间；
+        // Binance 兜底路径 Mc=0，跳过市值校验
+        if (result.Any(r => r.Mc > 0))
+        {
+            Assert.IsTrue(result.All(r => r.Mc >= 1_000_000_000m && r.Mc <= 50_000_000_000m),
+                $"所有返回虚拟币的市值应在 10-500 亿美元区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
+        }
 
         Console.WriteLine($"虚拟币市值筛选（10-500亿美元） - 返回数量: {result.Count}");
     }
@@ -278,6 +266,8 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "价格变化筛选应返回至少一条记录");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+        Assert.IsTrue(result.All(r => r.Pct >= -10m && r.Pct <= 50m),
+            $"所有返回虚拟币的 24h 涨跌幅应在 -10% ~ +50% 区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Pct}%"))}");
 
         Console.WriteLine($"虚拟币价格变化筛选（-10% ~ +50%） - 返回数量: {result.Count}");
     }
@@ -315,6 +305,13 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "市值+交易量组合筛选应返回至少一条记录");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+        if (result.Any(r => r.Mc > 0))
+        {
+            Assert.IsTrue(result.All(r => r.Mc >= 5_000_000_000m && r.Mc <= 100_000_000_000m),
+                $"所有返回虚拟币的市值应在 50-1000 亿美元区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
+        }
+        Assert.IsTrue(result.All(r => r.Volume >= 100_000_000m),
+            $"所有返回虚拟币的 24h 成交量应 >= 1 亿美元，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Volume}"))}");
 
         Console.WriteLine($"虚拟币多条件筛选（市值+交易量） - 返回数量: {result.Count}");
     }
@@ -347,6 +344,13 @@ public sealed class AssetScreenerServiceTest
         Assert.IsTrue(result.Count > 0, "市值排名前50筛选应返回至少一条记录");
         Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
+        // CoinGecko 路径返回 MarketCapRank，验证排名在 1-50；Binance 兜底路径 MarketCapRank=0，跳过校验
+        var cryptoResults = result.OfType<ScreenerCryptoInfo>().ToList();
+        if (cryptoResults.Any(r => r.MarketCapRank > 0))
+        {
+            Assert.IsTrue(cryptoResults.All(r => r.MarketCapRank >= 1 && r.MarketCapRank <= 50),
+                $"所有返回虚拟币的市值排名应在 1-50，实际: {string.Join(", ", cryptoResults.Select(r => $"{r.Symbol}={r.MarketCapRank}"))}");
+        }
 
         Console.WriteLine($"虚拟币市值排名筛选（前50名） - 返回数量: {result.Count}");
     }

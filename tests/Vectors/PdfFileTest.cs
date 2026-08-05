@@ -73,12 +73,6 @@ public class PdfFileTest : BaseAgentTest
         // Assert - 验证基本的Markdown结构
         Assert.IsNotNull(result);
 
-        // 如果文档包含标题，应该有#符号
-        if (result.Contains("#"))
-        {
-            Assert.IsTrue(result.Contains("#"), "应该包含Markdown标题标记");
-        }
-
         // 验证文档不是完全空白
         var trimmedResult = result.Trim();
         Assert.IsTrue(trimmedResult.Length > 0, "转换后的文档不应为空");

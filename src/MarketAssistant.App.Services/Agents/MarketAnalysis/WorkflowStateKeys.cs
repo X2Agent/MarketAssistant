@@ -20,4 +20,9 @@ internal static class WorkflowStateKeys
     /// 预期分析师数量的状态键
     /// </summary>
     public const string ExpectedAnalystCount = nameof(ExpectedAnalystCount);
+
+    /// <summary>
+    /// Fan-In 已收集的最终分析师文本消息。
+    /// </summary>
+    public const string AggregatedAnalystMessages = nameof(AggregatedAnalystMessages);
 }

@@ -1,3 +1,5 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Infrastructure.Providers;
 
 /// <summary>
@@ -7,54 +9,52 @@ namespace MarketAssistant.Infrastructure.Providers;
 /// <param name="DisplayName">UI 显示名称</param>
 /// <param name="DefaultEndpoint">最终 API Base URL，不再由适配器隐式追加版本后缀</param>
 /// <param name="ApiKeyUrl">API Key 获取链接</param>
-/// <param name="RequiresApiKey">是否需要 API Key（本地部署如 Ollama 设为 false）</param>
+/// <param name="RequiresApiKey">服务商是否支持 API Key 配置；模型级是否强制由策略判断</param>
+/// <param name="AllowsEndpointOverride">是否允许用户覆盖 API Base URL，仅本地或自定义部署开启</param>
 /// <param name="SupportsModelListing">是否支持通过标准端点获取模型列表</param>
-/// <param name="AdapterKind">适配器类型，决定创建 IChatClient 的方式</param>
-/// <param name="SupportedModelIdPrefixes">模型发现结果的可选白名单前缀，用于过滤同一网关中的非兼容协议模型</param>
+/// <param name="Protocol">服务商默认模型协议</param>
 /// <param name="DefaultContextWindowTokens">服务商所有模型均可保证的上下文窗口；无法保证时必须为 null</param>
 /// <param name="ModelContextWindowTokens">模型级上下文窗口，优先于服务商默认值</param>
-/// <param name="ApiKeyOptionalModelIds">已明确确认服务端匿名可用的模型 ID；模型“免费”但仍需鉴权时不要加入</param>
+/// <param name="ModelListingRequiresApiKey">模型列表端点是否需要 API Key，可与模型调用鉴权规则不同</param>
+/// <param name="StructuredOutputMode">结构化任务使用的服务商级响应格式能力</param>
+/// <param name="Policy">可选服务商特殊策略；单协议服务商使用默认策略</param>
 public record ModelProvider(
     string Id,
     string DisplayName,
     string DefaultEndpoint,
     string? ApiKeyUrl,
     bool RequiresApiKey = true,
+    bool AllowsEndpointOverride = false,
     bool SupportsModelListing = true,
-    ProviderAdapterKind AdapterKind = ProviderAdapterKind.OpenAICompatible,
-    IReadOnlyList<string>? SupportedModelIdPrefixes = null,
+    ModelApiProtocol Protocol = ModelApiProtocol.OpenAIChatCompletions,
     int? DefaultContextWindowTokens = null,
     IReadOnlyDictionary<string, int>? ModelContextWindowTokens = null,
-    IReadOnlyList<string>? ApiKeyOptionalModelIds = null)
+    bool ModelListingRequiresApiKey = true,
+    StructuredOutputMode StructuredOutputMode = StructuredOutputMode.JsonObject,
+    IModelProviderPolicy? Policy = null)
 {
-    /// <summary>
-    /// 判断模型是否兼容当前服务商适配器。
-    /// </summary>
-    public bool IsModelSupported(string modelId)
-    {
-        if (SupportedModelIdPrefixes is not { Count: > 0 })
-            return true;
+    private IModelProviderPolicy EffectivePolicy => Policy ?? DefaultModelProviderPolicy.Instance;
 
-        return SupportedModelIdPrefixes.Any(prefix =>
-            modelId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-    }
+    /// <summary>
+    /// 获取指定模型使用的 API 协议。
+    /// </summary>
+    public ModelApiProtocol GetProtocol(string modelId) => EffectivePolicy.GetProtocol(this, modelId);
+
+    /// <summary>
+    /// 判断当前凭据是否允许访问模型列表。
+    /// </summary>
+    public bool CanListModels(string? apiKey) =>
+        SupportsModelListing &&
+        (!ModelListingRequiresApiKey || !string.IsNullOrWhiteSpace(apiKey));
 
     /// <summary>
     /// 判断指定模型是否需要 API Key。
     /// </summary>
     /// <remarks>
-    /// “免费模型”不等于“匿名接口”。只有服务商或模型目录明确确认无需鉴权时，才允许留空 API Key。
+    /// “免费模型”不等于“匿名接口”。只有服务商通过模型目录或稳定命名约定明确确认无需鉴权时，才允许留空 API Key。
     /// </remarks>
-    public bool RequiresApiKeyForModel(string? modelId)
-    {
-        if (!RequiresApiKey)
-            return false;
-
-        if (string.IsNullOrWhiteSpace(modelId))
-            return true;
-
-        return ApiKeyOptionalModelIds?.Contains(modelId, StringComparer.OrdinalIgnoreCase) != true;
-    }
+    public bool RequiresApiKeyForModel(string? modelId) =>
+        EffectivePolicy.RequiresApiKeyForModel(this, modelId);
 
     /// <summary>
     /// 获取模型上下文窗口。模型级显式配置优先，未知模型仅在服务商可保证统一下限时使用默认值。
@@ -69,17 +69,11 @@ public record ModelProvider(
 }
 
 /// <summary>
-/// 适配器种类，决定 <see cref="IModelProviderAdapter"/> 的具体实现
+/// 模型 API 协议。客户端创建直接使用对应官方 SDK。
 /// </summary>
-public enum ProviderAdapterKind
+public enum ModelApiProtocol
 {
-    /// <summary>
-    /// OpenAI 兼容协议（覆盖绝大多数国内服务商 + OpenAI）
-    /// </summary>
-    OpenAICompatible,
-
-    /// <summary>
-    /// Ollama 原生协议（使用 OllamaSharp SDK）
-    /// </summary>
+    OpenAIChatCompletions,
     Ollama,
+    Unsupported,
 }

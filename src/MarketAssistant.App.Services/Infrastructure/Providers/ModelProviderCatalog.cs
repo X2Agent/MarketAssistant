@@ -1,3 +1,5 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Infrastructure.Providers;
 
 /// <summary>
@@ -78,25 +80,14 @@ public static class ModelProviderCatalog
             DisplayName: "OpenCode Zen",
             DefaultEndpoint: "https://opencode.ai/zen/v1",
             ApiKeyUrl: "https://opencode.ai/auth",
-            SupportedModelIdPrefixes:
-            [
-                "grok-",
-                "deepseek-",
-                "glm-",
-                "minimax-",
-                "kimi-",
-                "big-pickle",
-                "mimo-",
-                "ling-",
-                "nemotron-",
-                "north-",
-                "laguna-"
-            ]),
+            ModelListingRequiresApiKey: false,
+            Policy: OpenCodeZenModelPolicy.Instance),
         new(
             Id: "OpenAI",
             DisplayName: "OpenAI",
             DefaultEndpoint: "https://api.openai.com/v1",
-            ApiKeyUrl: "https://platform.openai.com/api-keys"),
+            ApiKeyUrl: "https://platform.openai.com/api-keys",
+            StructuredOutputMode: StructuredOutputMode.JsonSchema),
         new(
             Id: "OpenRouter",
             DisplayName: "OpenRouter",
@@ -128,20 +119,24 @@ public static class ModelProviderCatalog
             DefaultEndpoint: "https://api.perplexity.ai",
             ApiKeyUrl: "https://www.perplexity.ai/settings/api"),
 
-        // 本地部署 — DefaultEndpoint 留空，由适配器或用户输入提供
+        // 本地部署
         new(
             Id: "Ollama",
             DisplayName: "Ollama (本地)",
-            DefaultEndpoint: string.Empty,
+            DefaultEndpoint: "http://localhost:11434",
             ApiKeyUrl: null,
             RequiresApiKey: false,
-            AdapterKind: ProviderAdapterKind.Ollama),
+            AllowsEndpointOverride: true,
+            ModelListingRequiresApiKey: false,
+            Protocol: ModelApiProtocol.Ollama),
         new(
             Id: "LMStudio",
             DisplayName: "LM Studio (本地)",
-            DefaultEndpoint: string.Empty,
+            DefaultEndpoint: "http://localhost:1234/v1",
             ApiKeyUrl: null,
-            RequiresApiKey: false),
+            RequiresApiKey: false,
+            AllowsEndpointOverride: true,
+            ModelListingRequiresApiKey: false),
 
         // 自定义 OpenAI 兼容服务
         new(
@@ -149,7 +144,9 @@ public static class ModelProviderCatalog
             DisplayName: "自定义",
             DefaultEndpoint: string.Empty,
             ApiKeyUrl: null,
-            SupportsModelListing: false),
+            AllowsEndpointOverride: true,
+            SupportsModelListing: false,
+            StructuredOutputMode: StructuredOutputMode.Text),
     ];
 
     /// <summary>
@@ -160,6 +157,6 @@ public static class ModelProviderCatalog
         if (string.IsNullOrWhiteSpace(id))
             return null;
 
-        return Providers.FirstOrDefault(p => p.Id == id);
+        return Providers.FirstOrDefault(p => p.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
     }
 }

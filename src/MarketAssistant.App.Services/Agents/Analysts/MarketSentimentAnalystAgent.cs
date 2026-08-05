@@ -3,7 +3,6 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
@@ -24,15 +23,15 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
         IChatClient chatClient,
         IList<AITool> tools,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("MarketSentimentAnalyst"), typeof(MarketSentimentAnalysisResult)),
-            ChatResponseFormat.Json,
+            promptLoader.GetConfig("MarketSentimentAnalyst"),
+            typeof(MarketSentimentAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
 }

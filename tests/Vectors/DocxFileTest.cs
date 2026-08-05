@@ -73,12 +73,6 @@ public class DocxFileTest : BaseAgentTest
         // Assert - 验证基本的Markdown结构
         Assert.IsNotNull(result);
 
-        // 如果文档包含标题，应该有#符号
-        if (result.Contains("#"))
-        {
-            Assert.IsTrue(result.Contains("#"), "应该包含Markdown标题标记");
-        }
-
         // 验证文档不是完全空白
         var trimmedResult = result.Trim();
         Assert.IsTrue(trimmedResult.Length > 0, "转换后的文档不应为空");
@@ -194,8 +188,9 @@ public class DocxFileTest : BaseAgentTest
             Console.WriteLine($"{kvp.Key}: {kvp.Value} 个");
         }
 
-        // 验证至少有一种块类型
-        Assert.IsTrue(blockTypeCount.Count > 0, "应该至少有一种块类型");
+        // 验证 demo.docx 含多种块类型（标题/正文/列表/表格等）
+        Assert.IsTrue(blockTypeCount.Count >= 2,
+            $"demo.docx 应至少包含 2 种块类型以验证多类型解析，实际: {string.Join(", ", blockTypeCount.Keys)}");
     }
 
     [TestMethod]

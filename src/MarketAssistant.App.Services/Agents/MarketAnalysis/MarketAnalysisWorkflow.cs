@@ -9,9 +9,9 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace MarketAssistant.Agents.MarketAnalysis;
@@ -115,7 +115,7 @@ public class MarketAnalysisWorkflow
             activity?.SetTag("gen_ai.provider.name", runtime.ProviderId);
             activity?.SetTag("gen_ai.request.model", runtime.ModelId);
             activity?.SetTag("marketassistant.analyst.requested_count", enabledAnalysts.Count);
-            var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot, runtime.Client);
+            var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot, runtime);
             var failedAnalystNames = analystAgents.FailedTypes
                 .Select(GetAnalystDisplayNameFromType)
                 .ToList();
@@ -129,7 +129,7 @@ public class MarketAnalysisWorkflow
             // 同一次 Run 的分析师与 Coordinator 绑定同一个 Runtime Client。
             var coordinatorAgent = _analystAgentFactory.CreateAnalyst(
                 typeof(CoordinatorAnalystAgent),
-                runtime.Client);
+                runtime);
             var coordinatorExecutor = new CoordinatorExecutor(
                 coordinatorAgent,
                 _loggerFactory.CreateLogger<CoordinatorExecutor>());
@@ -212,6 +212,7 @@ public class MarketAnalysisWorkflow
         string? lastCompletedStep = null;
         // 追踪当前正在运行的 Executor，超时时用于定位卡住的分析师
         var activeExecutors = new HashSet<string>();
+        var executorStartedAt = new Dictionary<string, long>(StringComparer.Ordinal);
 
         // 执行工作流（流式处理）
         // 初始输入 assetSymbol 会触发 Dispatcher，Dispatcher 再通过 context.SendMessageAsync
@@ -229,7 +230,11 @@ public class MarketAnalysisWorkflow
                 {
                     case ExecutorInvokedEvent executorInvoked:
                         activeExecutors.Add(executorInvoked.ExecutorId);
-                        _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                        executorStartedAt[executorInvoked.ExecutorId] = Stopwatch.GetTimestamp();
+                        _logger.LogInformation(
+                            "工作流步骤开始: {ExecutorId}, 输入类型: {InputType}",
+                            executorInvoked.ExecutorId,
+                            executorInvoked.Data?.GetType().FullName ?? "null");
 
                         string stageName = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
                         {
@@ -251,7 +256,14 @@ public class MarketAnalysisWorkflow
                     case ExecutorCompletedEvent executorComplete:
                         activeExecutors.Remove(executorComplete.ExecutorId);
                         lastCompletedStep = GetDisplayNameForExecutorId(executorComplete.ExecutorId, agentNameToDisplayName);
-                        _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
+                        var elapsed = executorStartedAt.Remove(executorComplete.ExecutorId, out var startedAt)
+                            ? Stopwatch.GetElapsedTime(startedAt)
+                            : TimeSpan.Zero;
+                        _logger.LogInformation(
+                            "工作流步骤完成: {ExecutorId}, 耗时: {ElapsedMs} ms, 结果类型: {ResultType}",
+                            executorComplete.ExecutorId,
+                            elapsed.TotalMilliseconds,
+                            executorComplete.Data?.GetType().FullName ?? "null");
 
                         if (IsAnalystExecutor(executorComplete.ExecutorId))
                         {
@@ -473,7 +485,7 @@ public class MarketAnalysisWorkflow
         IReadOnlyDictionary<string, string> NameToDisplayName) CreateAnalystAgents(
         List<Type> analystTypes,
         MarketSnapshotContextProvider marketSnapshot,
-        IChatClient chatClient)
+        ChatClientRuntime runtime)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
 
@@ -486,7 +498,7 @@ public class MarketAnalysisWorkflow
         {
             try
             {
-                var agent = _analystAgentFactory.CreateAnalyst(type, chatClient, sharedProviders);
+                var agent = _analystAgentFactory.CreateAnalyst(type, runtime, sharedProviders);
                 createdAgents.Add(agent);
 
                 // 创建时即建立 Name → DisplayName 映射。

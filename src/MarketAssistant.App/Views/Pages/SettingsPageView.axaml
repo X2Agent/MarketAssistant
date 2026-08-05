@@ -58,14 +58,12 @@
                     </StackPanel>
                 </controls:CardView>
 
-                <!-- 模型设置区域 -->
-                <controls:CardView Header="模型设置">
+                <!-- 模型服务配置 -->
+                <controls:CardView Header="模型服务">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <!-- 服务商选择 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="服务商"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                       Classes="form-label"/>
                             <ComboBox ItemsSource="{Binding Providers}"
                                       SelectedItem="{Binding SelectedProvider}"
                                       DisplayMemberBinding="{Binding DisplayName}"
@@ -73,77 +71,81 @@
                                       HorizontalAlignment="Stretch"/>
                         </StackPanel>
 
-                        <!-- 自定义端点（仅 Custom / Ollama / LMStudio 显示） -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}"
-                                    IsVisible="{Binding CanOverrideEndpoint}">
-                            <TextBlock Text="API端点"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.Endpoint}"
-                                     PlaceholderText="自定义 API 端点"/>
-                        </StackPanel>
-
-                        <!-- API密钥 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}"
-                                    IsVisible="{Binding RequiresApiKey}">
-                            <TextBlock Text="API密钥"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <Grid ColumnDefinitions="*,Auto">
+                                    IsVisible="{Binding SupportsApiKeyConfiguration}">
+                            <TextBlock Text="API Key"
+                                       Classes="form-label"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="{StaticResource SmallSpacing}">
                                 <TextBox Grid.Column="0"
-                                         Text="{Binding ApiKey}"
-                                         PlaceholderText="请输入API密钥"
+                                         Text="{Binding ApiKey, Mode=TwoWay}"
+                                         PlaceholderText="输入服务商 API Key"
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
-                                        Content="获取密钥"
-                                        Classes="btn-primary"
+                                        Content="申请"
+                                        Classes="btn-secondary"
                                         Command="{Binding OpenModelApiWebsiteCommand}"
                                         IsVisible="{Binding ProviderApiKeyUrl, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                        Margin="{StaticResource SmallLeftMargin}"/>
+                                        ToolTip.Tip="打开服务商 API Key 页面"/>
                             </Grid>
+                            <TextBlock Text="{Binding ApiKeyHint}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <TextBlock Text="免费模型不等于免鉴权：是否需要 API Key 由服务商接口决定；本地服务或明确支持匿名调用的模型才可留空。"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                    IsVisible="{Binding CanOverrideEndpoint}">
+                            <TextBlock Text="API Base URL"
+                                       Classes="form-label"/>
+                            <TextBox Text="{Binding Endpoint, Mode=TwoWay}"
+                                     PlaceholderText="{Binding EndpointPlaceholder}"
+                                     ToolTip.Tip="留空使用服务商默认地址；填写后可连接代理或私有部署"/>
+                            <TextBlock Text="{Binding EffectiveEndpoint, StringFormat='当前连接地址：{0}'}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
 
-                        <!-- 模型选择 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="模型"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <Grid ColumnDefinitions="*,Auto">
-                                <!-- 无模型列表时手动输入 -->
-                                <TextBox Grid.Column="0"
-                                         Text="{Binding UserSetting.ModelId}"
-                                         PlaceholderText="输入模型 ID"
-                                         HorizontalAlignment="Stretch"
-                                         IsVisible="{Binding !Models.Count}"/>
-                                <!-- 有模型列表时替换为下拉选择 -->
+                            <TextBlock Text="模型 ID"
+                                       Classes="form-label"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="{StaticResource SmallSpacing}">
                                 <ComboBox Grid.Column="0"
+                                          IsEditable="True"
                                           ItemsSource="{Binding Models}"
-                                          SelectedItem="{Binding UserSetting.ModelId}"
-                                          PlaceholderText="选择模型"
-                                          HorizontalAlignment="Stretch"
-                                          IsVisible="{Binding Models.Count}"/>
-                                <!-- 获取按钮（加载时隐藏，由旋转图标替代） -->
+                                          Text="{Binding UserSetting.ModelId, Mode=TwoWay}"
+                                          PlaceholderText="选择或输入模型 ID"
+                                          MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                          HorizontalAlignment="Stretch"/>
                                 <Button Grid.Column="1"
-                                        Content="获取"
                                         Classes="btn-info"
                                         Command="{Binding FetchModelsCommand}"
-                                        IsVisible="{Binding CanShowFetchButton}"
-                                        Margin="{StaticResource SmallLeftMargin}"/>
-                                <!-- 加载旋转图标 -->
-                                <Path Grid.Column="1"
-                                      Data="{StaticResource LoadingIcon}"
-                                      Fill="{DynamicResource PrimaryBrush}"
-                                      Width="16" Height="16"
-                                      IsVisible="{Binding IsLoadingModels}"
-                                      Margin="{StaticResource SmallLeftMargin}"
-                                      Classes="Spin"
-                                      RenderTransformOrigin="50%,50%"/>
+                                        MinWidth="{StaticResource MediumButtonMinWidth}"
+                                        ToolTip.Tip="从当前服务商刷新模型目录">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="{StaticResource SmallSpacing}">
+                                        <PathIcon Data="{StaticResource RefreshIcon}"
+                                                  Width="{StaticResource TinyIconSize}"
+                                                  Height="{StaticResource TinyIconSize}"
+                                                  IsVisible="{Binding !IsLoadingModels}"/>
+                                        <Path Data="{StaticResource LoadingIcon}"
+                                              Fill="White"
+                                              Width="{StaticResource TinyIconSize}"
+                                              Height="{StaticResource TinyIconSize}"
+                                              Classes="Spin"
+                                              RenderTransformOrigin="50%,50%"
+                                              IsVisible="{Binding IsLoadingModels}"/>
+                                        <TextBlock Text="刷新模型"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </Grid>
+                            <TextBlock Text="{Binding ModelDiscoveryHint}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
                 </controls:CardView>

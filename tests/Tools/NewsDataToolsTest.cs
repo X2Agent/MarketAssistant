@@ -5,7 +5,6 @@ using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +32,6 @@ public class NewsDataToolsTest
 
         // 注册依赖服务
         services.AddSingleton<IUserSettingService, UserSettingService>();
-        services.AddSingleton<IModelProviderAdapterFactory, ModelProviderAdapterFactory>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddHttpClient();
         services.AddTestMarketDataHttpClients();

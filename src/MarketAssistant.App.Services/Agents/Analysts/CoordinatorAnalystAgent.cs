@@ -4,7 +4,7 @@ using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools;
-using MarketAssistant.Infrastructure.Providers;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -30,20 +30,20 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
         IUserSettingService userSettingService,
         ILoggerFactory loggerFactory,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            StructuredOutputHelper.MergeSchemaPrompt(promptLoader.GetConfig("CoordinatorAnalyst"), typeof(CoordinatorResult)),
-            ChatResponseFormat.Json,
+            promptLoader.GetConfig("CoordinatorAnalyst"),
+            typeof(CoordinatorResult),
+            structuredOutputMode,
             [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],
             [
                 new InvestmentPreferenceContextProvider(
                     userSettingService.CurrentSetting.InvestmentPreference,
                     loggerFactory.CreateLogger<InvestmentPreferenceContextProvider>()),
                 .. (aiContextProviders ?? [])
-            ],
-            skillsProvider)
+            ])
     {
     }
 }

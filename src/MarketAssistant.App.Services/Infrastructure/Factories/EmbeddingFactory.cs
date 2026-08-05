@@ -1,20 +1,17 @@
-using MarketAssistant.Infrastructure.Providers;
+using System.ClientModel;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
+using OpenAI;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
 public class EmbeddingFactory : IEmbeddingFactory
 {
     private readonly IUserSettingService _userSettingService;
-    private readonly IModelProviderAdapterFactory _adapterFactory;
 
-    public EmbeddingFactory(
-        IUserSettingService userSettingService,
-        IModelProviderAdapterFactory adapterFactory)
+    public EmbeddingFactory(IUserSettingService userSettingService)
     {
         _userSettingService = userSettingService;
-        _adapterFactory = adapterFactory;
     }
 
     public IEmbeddingGenerator<string, Embedding<float>> Create()
@@ -29,16 +26,15 @@ public class EmbeddingFactory : IEmbeddingFactory
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new FriendlyException("嵌入API密钥不能为空");
 
-        // Embedding 使用独立的端点和密钥配置，默认通过 OpenAI 兼容协议接入
-        var provider = new ModelProvider(
-            Id: "Embedding",
-            DisplayName: "Embedding Service",
-            DefaultEndpoint: endpoint,
-            ApiKeyUrl: null,
-            RequiresApiKey: true
-        );
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri) ||
+            endpointUri.Scheme is not ("http" or "https"))
+        {
+            throw new FriendlyException("嵌入服务 Endpoint 无效");
+        }
 
-        var adapter = _adapterFactory.Create(provider);
-        return adapter.CreateEmbeddingGenerator(apiKey, modelId, endpoint)!;
+        var client = new OpenAIClient(
+            new ApiKeyCredential(apiKey),
+            new OpenAIClientOptions { Endpoint = endpointUri });
+        return client.GetEmbeddingClient(modelId).AsIEmbeddingGenerator();
     }
 }

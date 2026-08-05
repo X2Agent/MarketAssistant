@@ -7,6 +7,7 @@ using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Executors;
@@ -70,11 +71,19 @@ public sealed partial class CoordinatorExecutor : Executor
 
         try
         {
+            LogMessageDiagnostics("协调分析师收到上游消息", analystMessages);
+
             // 过滤消息：移除包含工具调用(FunctionCallContent)和结果(FunctionResultContent)的消息
             // 这样可以显著减少 Token 消耗，并避免 Coordinator 被中间过程干扰
             var filteredMessages = analystMessages
                 .Where(m => !m.Contents.Any(c => c is FunctionCallContent or FunctionResultContent))
                 .ToList();
+
+            _logger.LogInformation(
+                "协调分析师输入过滤完成，原始消息: {OriginalCount}，保留消息: {FilteredCount}",
+                analystMessages.Count,
+                filteredMessages.Count);
+            LogMessageDiagnostics("协调分析师过滤后输入", filteredMessages);
 
             // 所有分析师均无文本输出（仅产生工具调用）时，无法生成有意义的综合报告
             if (filteredMessages.Count == 0)
@@ -92,14 +101,27 @@ public sealed partial class CoordinatorExecutor : Executor
                 $"请基于以上所有分析师的专业意见，为标的 {assetSymbol} 生成一份综合分析报告。")
             };
 
-            // 使用带结构化输出的 ChatClientAgent 运行
-            // 重试由 ResilientChatClient 装饰器统一提供，此处无需额外重试管道
-            // session: null — 无状态一次性调用，无需会话累积
+            _logger.LogInformation(
+                "调用协调分析师，输入消息: {MessageCount}，输入文本总长度: {TextLength}",
+                messages.Count,
+                messages.Sum(message => message.Text?.Length ?? 0));
+
+            // 使用带结构化输出的 ChatClientAgent 运行。
+            // session: null — 无状态一次性调用，无需会话累积。
+            var startedAt = Stopwatch.GetTimestamp();
             var agentResponse = await _coordinatorAgent.RunAsync(
                 messages,
                 session: null,
                 options: null,
                 cancellationToken);
+            var elapsed = Stopwatch.GetElapsedTime(startedAt);
+
+            _logger.LogInformation(
+                "协调分析师调用完成，耗时: {ElapsedMs} ms，响应消息: {MessageCount}，聚合文本长度: {TextLength}",
+                elapsed.TotalMilliseconds,
+                agentResponse.Messages.Count,
+                agentResponse.Text?.Length ?? 0);
+            LogMessageDiagnostics("协调分析师原始响应", agentResponse.Messages);
 
             // 提取协调分析师的回复（最后一条 Assistant 消息）
             var coordinatorMessage = agentResponse.Messages
@@ -114,6 +136,13 @@ public sealed partial class CoordinatorExecutor : Executor
             // 部分兼容模型即使启用 JsonObject 仍可能在 JSON 前后输出多余文本，
             // 使用 LlmJsonExtractor 进行多层兜底解析（直接解析 → 剥离 markdown → Utf8JsonReader 精确定位）
             var rawText = coordinatorMessage.Text ?? string.Empty;
+            _logger.LogInformation(
+                "准备解析协调分析师最后一条 Assistant 消息，文本长度: {TextLength}，Content 类型: [{ContentTypes}]",
+                rawText.Length,
+                string.Join(", ", coordinatorMessage.Contents.Select(content => content.GetType().Name)));
+            _logger.LogDebug(
+                "协调分析师最后一条 Assistant 消息预览: {Preview}",
+                CreatePreview(rawText));
 
             CoordinatorResult? coordinatorResult;
             try
@@ -123,14 +152,19 @@ public sealed partial class CoordinatorExecutor : Executor
             catch (JsonException jsonEx)
             {
                 _logger.LogError(jsonEx,
-                    "协调分析师 JSON 解析失败，原始文本前 500 字符: {Preview}",
-                    rawText.Length > 500 ? rawText[..500] : rawText);
+                    "协调分析师 JSON 解析失败，原始文本长度: {TextLength}，前 500 字符: {Preview}",
+                    rawText.Length,
+                    CreatePreview(rawText));
                 throw new InvalidOperationException(
                     $"协调分析师返回的数据无法解析为结构化结果: {jsonEx.Message}", jsonEx);
             }
 
             if (coordinatorResult == null)
             {
+                _logger.LogError(
+                    "协调分析师结构化解析结果为空，最后一条 Assistant 文本长度: {TextLength}，响应总消息数: {MessageCount}",
+                    rawText.Length,
+                    agentResponse.Messages.Count);
                 throw new InvalidOperationException("协调分析师未能返回结构化数据");
             }
 
@@ -177,6 +211,41 @@ public sealed partial class CoordinatorExecutor : Executor
                 await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, WorkflowStateKeys.Scope, cancellationToken) ?? "未知");
             throw;
         }
+    }
+
+    private void LogMessageDiagnostics(string stage, IEnumerable<ChatMessage> messages)
+    {
+        var messageList = messages as IList<ChatMessage> ?? messages.ToList();
+        for (var index = 0; index < messageList.Count; index++)
+        {
+            var message = messageList[index];
+            var text = message.Text ?? string.Empty;
+            var contentTypes = string.Join(", ", message.Contents.Select(content => content.GetType().Name));
+            _logger.LogInformation(
+                "{Stage} [{Index}/{Count}] Role: {Role}, Author: {Author}, TextLength: {TextLength}, ContentTypes: [{ContentTypes}]",
+                stage,
+                index + 1,
+                messageList.Count,
+                message.Role,
+                message.AuthorName ?? "null",
+                text.Length,
+                contentTypes);
+            _logger.LogDebug(
+                "{Stage} [{Index}/{Count}] 文本预览: {Preview}",
+                stage,
+                index + 1,
+                messageList.Count,
+                CreatePreview(text));
+        }
+    }
+
+    private static string CreatePreview(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return "<empty>";
+
+        var normalized = text.ReplaceLineEndings(" ");
+        return normalized.Length > 500 ? normalized[..500] : normalized;
     }
 
 }

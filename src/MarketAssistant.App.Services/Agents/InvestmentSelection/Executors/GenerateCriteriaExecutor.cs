@@ -1,9 +1,8 @@
-using System.Text.Json;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Infrastructure.Providers;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -56,19 +55,22 @@ public sealed class GenerateCriteriaExecutor<TCriteria>
 
             string userPrompt = _strategy.BuildUserPrompt(input);
 
-            var chatClient = _chatClientFactory.CreateClient();
-
-            var schemaPrompt = StructuredOutputHelper.BuildSchemaPromptSection(typeof(TCriteria), typeof(TCriteria).Name);
-            systemPrompt = systemPrompt + "\n\n" + schemaPrompt;
+            var runtime = _chatClientFactory.CreateRuntime();
+            systemPrompt = StructuredOutputOptions.AppendSchemaInstructions(
+                systemPrompt,
+                typeof(TCriteria),
+                runtime.StructuredOutputMode);
 
             var chatOptions = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.Json,
+                ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
+                    typeof(TCriteria),
+                    runtime.StructuredOutputMode),
                 Temperature = 0.1f,
                 MaxOutputTokens = input.IsNewsAnalysis ? 3500 : 2000
             };
 
-            var response = await chatClient.GetResponseAsync(
+            var response = await runtime.Client.GetResponseAsync(
                     [
                         new ChatMessage(ChatRole.System, systemPrompt),
                         new ChatMessage(ChatRole.User, userPrompt)

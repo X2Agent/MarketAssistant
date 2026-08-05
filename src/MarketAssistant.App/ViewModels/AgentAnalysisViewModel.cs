@@ -299,6 +299,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     public void OnNavigatedFrom()
     {
+        _analysisCts?.Cancel();
+        _activeAnalysisRunId = null;
+        IsChatSidebarVisible = false;
     }
 
     private async Task RefreshHistoryAsync(string assetCode)

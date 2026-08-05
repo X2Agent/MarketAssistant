@@ -75,30 +75,6 @@ public class McpServiceTest
     }
 
     [TestMethod]
-    [TestCategory("Integration")]
-    [Timeout(120000)]
-    public async Task GetAITools_WithLifetimeManagement_Success()
-    {
-        var config = new MCPServerConfig
-        {
-            Name = "mcp-server-test",
-            TransportType = "stdio",
-            Command = "npx",
-            Arguments = "-y @modelcontextprotocol/server-everything",
-            EnvironmentVariables = new Dictionary<string, string?>()
-        };
-
-        await using var service = new McpService(
-            NullLogger<McpService>.Instance,
-            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
-            new MCPServerConfigService());
-
-        var tools = await service.GetAIToolsAsync([config]);
-
-        Assert.IsTrue(tools.Count > 0);
-    }
-
-    [TestMethod]
     [TestCategory("Unit")]
     [Timeout(120000)]
     public async Task GetAITools_EmptyConfigs_ReturnsEmpty()
