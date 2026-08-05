@@ -51,7 +51,7 @@ public static class ModelProviderCatalog
         new(
             Id: "MiniMax",
             DisplayName: "MiniMax",
-            DefaultEndpoint: "https://api.minimax.chat/v1",
+            DefaultEndpoint: "https://api.minimax.io/v1",
             ApiKeyUrl: "https://platform.minimaxi.com/user-center/basic-information/interface-key"),
         new(
             Id: "Doubao",
@@ -68,12 +68,6 @@ public static class ModelProviderCatalog
             DisplayName: "PPIO 派欧云",
             DefaultEndpoint: "https://api.ppio.com/openai/v1",
             ApiKeyUrl: "https://console.ppinfra.com/user/token"),
-        new(
-            Id: "HuaweiCloud",
-            DisplayName: "华为云",
-            DefaultEndpoint: "https://infer-models.cn-southwest-2.myhuaweicloud.com/v1",
-            ApiKeyUrl: "https://console.huaweicloud.com/maas/management/key"),
-
         // 国外服务商
         new(
             Id: "OpenCodeZen",
@@ -113,12 +107,6 @@ public static class ModelProviderCatalog
             DisplayName: "Together AI",
             DefaultEndpoint: "https://api.together.xyz/v1",
             ApiKeyUrl: "https://api.together.ai/settings/api-keys"),
-        new(
-            Id: "Perplexity",
-            DisplayName: "Perplexity",
-            DefaultEndpoint: "https://api.perplexity.ai",
-            ApiKeyUrl: "https://www.perplexity.ai/settings/api"),
-
         // 本地部署
         new(
             Id: "Ollama",
@@ -128,6 +116,7 @@ public static class ModelProviderCatalog
             RequiresApiKey: false,
             AllowsEndpointOverride: true,
             ModelListingRequiresApiKey: false,
+            ModelListingUrlPath: "/api/tags",
             Protocol: ModelApiProtocol.Ollama),
         new(
             Id: "LMStudio",

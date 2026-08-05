@@ -14,7 +14,7 @@ public class ModelDiscoveryServiceTest
 {
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task ListModelsAsync_AnonymousProvider_ShouldRemoveAuthorizationAndFilterUnsupportedProtocols()
+    public async Task ListModelsAsync_AnonymousProvider_ShouldReturnCompleteDirectoryWithoutAuthorization()
     {
         var handler = new RecordingHandler(
             """
@@ -35,7 +35,7 @@ public class ModelDiscoveryServiceTest
         var models = await service.ListModelsAsync(provider, null);
 
         CollectionAssert.AreEqual(
-            new[] { "deepseek-v4-flash-free", "kimi-k3" },
+            new[] { "deepseek-v4-flash-free", "future-unknown-model", "gpt-5.6-sol", "kimi-k3" },
             models.ToArray());
         Assert.IsNotNull(handler.Request);
         Assert.IsNull(handler.Request.Headers.Authorization);
@@ -125,6 +125,92 @@ public class ModelDiscoveryServiceTest
         Assert.AreEqual("http://localhost:1234/v1/models", handler.Request?.RequestUri?.AbsoluteUri);
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ListModelsAsync_BearerProvider_ShouldAddAuthorizationHeader()
+    {
+        var handler = new RecordingHandler(
+            """
+            { "object": "list", "data": [{ "id": "deepseek-v4-flash", "object": "model" }] }
+            """);
+        var service = new ModelDiscoveryService(CreateHttpClientFactory(handler).Object);
+        var provider = ModelProviderCatalog.GetProvider("DeepSeek")!;
+
+        var models = await service.ListModelsAsync(provider, "sk-test");
+
+        CollectionAssert.AreEqual(new[] { "deepseek-v4-flash" }, models.ToArray());
+        Assert.AreEqual("Bearer sk-test", handler.Request?.Headers.Authorization?.ToString());
+        Assert.AreEqual("https://api.deepseek.com/models", handler.Request?.RequestUri?.AbsoluteUri);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ListModelsAsync_AnonymousProviderWithApiKey_ShouldStillSendBearer()
+    {
+        var handler = new RecordingHandler(
+            """
+            { "object": "list", "data": [{ "id": "deepseek-v4-flash-free", "object": "model" }] }
+            """);
+        var service = new ModelDiscoveryService(CreateHttpClientFactory(handler).Object);
+        var provider = ModelProviderCatalog.GetProvider("OpenCodeZen")!;
+
+        var models = await service.ListModelsAsync(provider, "sk-optional");
+
+        CollectionAssert.AreEqual(new[] { "deepseek-v4-flash-free" }, models.ToArray());
+        Assert.AreEqual("Bearer sk-optional", handler.Request?.Headers.Authorization?.ToString());
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ListModelsAsync_Ollama_ShouldUseTagsEndpointWithoutAuth()
+    {
+        var handler = new RecordingHandler(
+            """
+            { "models": [ { "name": "llama3.2", "model": "llama3.2:latest" } ] }
+            """);
+        var service = new ModelDiscoveryService(CreateHttpClientFactory(handler).Object);
+        var provider = ModelProviderCatalog.GetProvider("Ollama")!;
+
+        var models = await service.ListModelsAsync(provider, null);
+
+        CollectionAssert.AreEqual(new[] { "llama3.2" }, models.ToArray());
+        Assert.IsNull(handler.Request?.Headers.Authorization);
+        Assert.AreEqual("http://localhost:11434/api/tags", handler.Request?.RequestUri?.AbsoluteUri);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ListModelsAsync_ShouldSupportCommonModelDirectoryShapes()
+    {
+        var handler = new RecordingHandler(
+            """
+            ["root-model", { "model": "model-field" }, { "name": "name-field" }, { "id": "id-field" }]
+            """
+        );
+        var service = new ModelDiscoveryService(CreateHttpClientFactory(handler).Object);
+        var provider = ModelProviderCatalog.GetProvider("OpenAI")!;
+
+        var models = await service.ListModelsAsync(provider, "sk-test");
+
+        CollectionAssert.AreEqual(
+            new[] { "id-field", "model-field", "name-field", "root-model" },
+            models.ToArray());
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ListModelsAsync_Unauthorized_ShouldThrowHttpRequestExceptionWithStatusCode()
+    {
+        var handler = new ErrorStatusHandler(HttpStatusCode.Unauthorized);
+        var service = new ModelDiscoveryService(CreateHttpClientFactory(handler).Object);
+        var provider = ModelProviderCatalog.GetProvider("DeepSeek")!;
+
+        var exception = await Assert.ThrowsExactlyAsync<HttpRequestException>(
+            () => service.ListModelsAsync(provider, "sk-invalid"));
+
+        Assert.AreEqual(HttpStatusCode.Unauthorized, exception.StatusCode);
+    }
+
     private static Mock<IHttpClientFactory> CreateHttpClientFactory(HttpMessageHandler handler)
     {
         var factory = new Mock<IHttpClientFactory>();
@@ -166,6 +252,17 @@ public class ModelDiscoveryServiceTest
                 RequestMessage = request
             });
         }
+    }
+
+    private sealed class ErrorStatusHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                RequestMessage = request
+            });
     }
 
     private sealed class RecordingHandler(string responseJson) : HttpMessageHandler

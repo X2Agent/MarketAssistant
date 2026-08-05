@@ -18,7 +18,6 @@ using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
-using System.ClientModel;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
@@ -883,13 +882,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
             Logger?.LogDebug("已取消服务商 {ProviderId} 的模型列表请求", requestedProviderId);
-        }
-        catch (ClientResultException ex) when (ex.Status is 401 or 403)
-        {
-            HandleModelDiscoveryFailure(
-                requestedProviderId,
-                ex,
-                $"{provider.DisplayName} 拒绝访问，请检查 API Key");
         }
         catch (HttpRequestException ex) when (
             ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)

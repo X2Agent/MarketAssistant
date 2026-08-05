@@ -108,9 +108,18 @@ public class ModelProviderCatalogTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Ppio_ShouldUseDocumentedV1BaseEndpoint()
+    public void DocumentedProviderEndpoints_ShouldRemainCurrent()
     {
         Assert.AreEqual("https://api.ppio.com/openai/v1", GetProvider("PPIO").DefaultEndpoint);
+        Assert.AreEqual("https://api.minimax.io/v1", GetProvider("MiniMax").DefaultEndpoint);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void UnsupportedProviders_ShouldNotBeRegistered()
+    {
+        Assert.IsNull(ModelProviderCatalog.GetProvider("Perplexity"));
+        Assert.IsNull(ModelProviderCatalog.GetProvider("HuaweiCloud"));
     }
 
     [TestMethod]

@@ -16,6 +16,7 @@ namespace MarketAssistant.Infrastructure.Providers;
 /// <param name="DefaultContextWindowTokens">服务商所有模型均可保证的上下文窗口；无法保证时必须为 null</param>
 /// <param name="ModelContextWindowTokens">模型级上下文窗口，优先于服务商默认值</param>
 /// <param name="ModelListingRequiresApiKey">模型列表端点是否需要 API Key，可与模型调用鉴权规则不同</param>
+/// <param name="ModelListingUrlPath">模型列表相对路径，拼在 API Base URL 之后；默认 /models</param>
 /// <param name="StructuredOutputMode">结构化任务使用的服务商级响应格式能力</param>
 /// <param name="Policy">可选服务商特殊策略；单协议服务商使用默认策略</param>
 public record ModelProvider(
@@ -30,6 +31,7 @@ public record ModelProvider(
     int? DefaultContextWindowTokens = null,
     IReadOnlyDictionary<string, int>? ModelContextWindowTokens = null,
     bool ModelListingRequiresApiKey = true,
+    string ModelListingUrlPath = "/models",
     StructuredOutputMode StructuredOutputMode = StructuredOutputMode.JsonObject,
     IModelProviderPolicy? Policy = null)
 {
