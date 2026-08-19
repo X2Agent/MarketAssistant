@@ -41,7 +41,7 @@ public class CryptoPortfolioService
         _logger = logger;
     }
 
-    public async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default)
+    public virtual async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default)
     {
         var cacheKey = CacheKeys.GetCryptoAccountSummaryKey(_environmentService.CurrentMode);
         if (_memoryCache.TryGetValue(cacheKey, out AccountBalanceSummary? cached) && cached != null)
@@ -53,7 +53,8 @@ public class CryptoPortfolioService
         return summary;
     }
 
-    public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换（AISignal 硬性边界行为测试）。</remarks>
+    public virtual async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken ct = default)
     {
         var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct);
         var positions = new List<PositionInfo>();

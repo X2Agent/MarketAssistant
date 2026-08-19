@@ -43,7 +43,8 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
         if (provider.ModelListingRequiresApiKey && string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException($"服务商 {provider.DisplayName} 的模型列表接口需要 API Key");
 
-        var endpoint = ResolveEndpoint(provider, endpointOverride);
+        var effectiveOverride = provider.AllowsEndpointOverride ? endpointOverride : null;
+        var endpoint = provider.ResolveEndpoint(effectiveOverride);
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{endpoint}{provider.ModelListingUrlPath}");
         if (!string.IsNullOrWhiteSpace(apiKey))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -115,20 +116,4 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
         return false;
     }
 
-    private static string ResolveEndpoint(ModelProvider provider, string? endpointOverride)
-    {
-        var endpoint = provider.AllowsEndpointOverride && !string.IsNullOrWhiteSpace(endpointOverride)
-            ? endpointOverride
-            : provider.DefaultEndpoint;
-        if (string.IsNullOrWhiteSpace(endpoint) && provider.Protocol == ModelApiProtocol.Ollama)
-            endpoint = "http://localhost:11434";
-
-        if (!Uri.TryCreate(endpoint?.Trim().TrimEnd('/'), UriKind.Absolute, out var endpointUri) ||
-            endpointUri.Scheme is not ("http" or "https"))
-        {
-            throw new InvalidOperationException($"服务商 {provider.DisplayName} 的 API Base URL 无效");
-        }
-
-        return endpointUri.AbsoluteUri.TrimEnd('/');
     }
-}

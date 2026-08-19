@@ -68,7 +68,6 @@ public class UserSettingService : IUserSettingService
                     _currentSetting = new UserSetting();
                 }
 
-                MigrateProviderSettings(_currentSetting);
                 var migratedLegacySecrets = LoadSecrets(_currentSetting, legacyJson);
                 if (migratedLegacySecrets)
                     SaveSettings();
@@ -133,29 +132,26 @@ public class UserSettingService : IUserSettingService
     /// <param name="setting">新的用户设置</param>
     public void UpdateSettings(UserSetting setting)
     {
-        _currentSetting = setting;
-        SaveSettings();
+        ArgumentNullException.ThrowIfNull(setting);
+
+        lock (_fileLock)
+        {
+            _currentSetting = setting;
+            SaveSettings();
+        }
     }
 
-    private static void MigrateProviderSettings(UserSetting setting)
+    /// <inheritdoc />
+    public void UpdateSetting(Action<UserSetting> mutate)
     {
-        setting.ProviderApiKeys ??= [];
-        setting.ProviderModelIds ??= [];
-        setting.ProviderEndpoints ??= [];
+        ArgumentNullException.ThrowIfNull(mutate);
 
-        if (string.IsNullOrWhiteSpace(setting.ProviderId))
-            return;
-
-        if (!string.IsNullOrWhiteSpace(setting.ModelId) &&
-            !setting.ProviderModelIds.ContainsKey(setting.ProviderId))
+        // Monitor 对同一线程可重入：变更与保存共用 _fileLock，
+        // 保证跨线程变更不会与序列化/文件替换交错
+        lock (_fileLock)
         {
-            setting.ProviderModelIds[setting.ProviderId] = setting.ModelId;
-        }
-
-        if (!string.IsNullOrWhiteSpace(setting.Endpoint) &&
-            !setting.ProviderEndpoints.ContainsKey(setting.ProviderId))
-        {
-            setting.ProviderEndpoints[setting.ProviderId] = setting.Endpoint;
+            mutate(_currentSetting);
+            SaveSettings();
         }
     }
 
@@ -253,7 +249,10 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void ResetSettings()
     {
-        _currentSetting = new UserSetting();
-        SaveSettings();
+        lock (_fileLock)
+        {
+            _currentSetting = new UserSetting();
+            SaveSettings();
+        }
     }
 }

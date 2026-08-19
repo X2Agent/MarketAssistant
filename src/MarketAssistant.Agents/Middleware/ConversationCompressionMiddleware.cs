@@ -11,8 +11,11 @@ namespace MarketAssistant.Agents.Middleware;
 /// </summary>
 public sealed class ConversationCompactionProviderFactory
 {
-    public const int DefaultMaxTokens = 8_000;
-    public const double ContextWindowTriggerRatio = 0.75;
+    /// <summary>
+    /// 统一压缩阈值。按主流 128K 上下文档位设定；真实窗口更小的模型在超长对话中可能先触发
+    /// API 上下文超限，属已知取舍。
+    /// </summary>
+    public const int DefaultMaxTokens = 128_000;
     public const int DefaultMinimumPreservedGroups = 8;
     public const string StateKey = "market-chat:compaction";
 
@@ -38,31 +41,5 @@ public sealed class ConversationCompactionProviderFactory
             minimumPreservedGroups);
 
         return new CompactionProvider(strategy, StateKey, _loggerFactory);
-    }
-
-    /// <summary>
-    /// 根据模型上下文窗口创建 Provider。未知窗口使用保守默认阈值；已知窗口在 75% 时触发压缩，
-    /// 为系统提示、工具调用和模型输出保留至少 25% 的空间。
-    /// </summary>
-    public AIContextProvider CreateForContextWindow(
-        IChatClient chatClient,
-        int? contextWindowTokens,
-        int minimumPreservedGroups = DefaultMinimumPreservedGroups)
-    {
-        return Create(
-            chatClient,
-            CalculateMaxTokens(contextWindowTokens),
-            minimumPreservedGroups);
-    }
-
-    public static int CalculateMaxTokens(int? contextWindowTokens)
-    {
-        if (contextWindowTokens is null)
-            return DefaultMaxTokens;
-
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(contextWindowTokens.Value);
-
-        var calculatedThreshold = (long)Math.Floor(contextWindowTokens.Value * ContextWindowTriggerRatio);
-        return checked((int)Math.Clamp(calculatedThreshold, 1, int.MaxValue));
     }
 }

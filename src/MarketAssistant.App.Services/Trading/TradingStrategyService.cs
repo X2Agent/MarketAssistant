@@ -5,7 +5,7 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 策略编排服务：统一封装策略增删改，并广播策略集合变化。
 /// </summary>
-public sealed class TradingStrategyService
+public class TradingStrategyService
 {
     private readonly TradingDataService _dataService;
 
@@ -39,7 +39,8 @@ public sealed class TradingStrategyService
         RaiseStrategiesChanged();
     }
 
-    public async Task UpdateStrategyStatusAsync(
+    /// <remarks>virtual 供单元测试替换（AISignal 硬性边界行为测试）。</remarks>
+    public virtual async Task UpdateStrategyStatusAsync(
         string strategyId,
         StrategyStatus status,
         CancellationToken ct = default)

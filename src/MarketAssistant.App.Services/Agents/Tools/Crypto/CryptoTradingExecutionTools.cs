@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
@@ -22,7 +24,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
 
     public CryptoTradingExecutionTools(
         CryptoPortfolioService portfolioService,
-        IExchangeClient exchangeClient,
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         BinanceMarketDataService marketDataService,
         TradeExecutor tradeExecutor,
         ILogger<CryptoTradingExecutionTools> logger)

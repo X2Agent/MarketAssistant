@@ -89,10 +89,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             case nameof(UserSetting.KnowledgeFileDirectory):
                 OnPropertyChanged(nameof(IsKnowledgeDirectoryValid));
                 break;
-            case nameof(UserSetting.ModelId):
-                OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
-                OnPropertyChanged(nameof(ApiKeyHint));
-                break;
         }
     }
 
@@ -129,7 +125,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     // 当前模型是否强制要求 API Key，用于提示而不是控制输入框可见性。
     public bool IsApiKeyRequiredForSelectedModel =>
-        SelectedProvider?.RequiresApiKeyForModel(UserSetting.ModelId) ?? false;
+        SelectedProvider?.RequiresApiKeyForModel(ModelId) ?? false;
 
     public string ApiKeyHint => IsApiKeyRequiredForSelectedModel
         ? "当前模型需要 API Key"
@@ -140,16 +136,36 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     public bool CanOverrideEndpoint => SelectedProvider?.AllowsEndpointOverride ?? false;
 
-    // 仅本地部署和自定义服务允许覆盖默认端点。
-    public string Endpoint
+    // 当前服务商的活动模型 ID（按服务商存储于 ProviderModelIds）。
+    public string ModelId
     {
-        get => UserSetting.Endpoint;
+        get => UserSetting.ProviderModelIds.GetValueOrDefault(UserSetting.ProviderId, string.Empty);
         set
         {
-            if (UserSetting.Endpoint == value)
+            if (string.IsNullOrWhiteSpace(UserSetting.ProviderId))
+                return;
+            if (ModelId == value)
                 return;
 
-            UserSetting.Endpoint = value;
+            UserSetting.ProviderModelIds[UserSetting.ProviderId] = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
+            OnPropertyChanged(nameof(ApiKeyHint));
+        }
+    }
+
+    // 仅本地部署和自定义服务允许覆盖默认端点。按服务商存储于 ProviderEndpoints。
+    public string Endpoint
+    {
+        get => UserSetting.ProviderEndpoints.GetValueOrDefault(UserSetting.ProviderId, string.Empty);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(UserSetting.ProviderId))
+                return;
+            if (Endpoint == value)
+                return;
+
+            UserSetting.ProviderEndpoints[UserSetting.ProviderId] = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(EffectiveEndpoint));
         }
@@ -209,49 +225,38 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedProviderChanged(ModelProvider? oldValue, ModelProvider? newValue)
     {
-        if (newValue != null)
+        if (newValue is null)
+            return;
+
+        UserSetting.ProviderId = newValue.Id;
+
+        _modelFetchCancellationTokenSource?.Cancel();
+        Models.Clear();
+        ModelDiscoveryStatus = string.Empty;
+
+        // ModelId/Endpoint 按服务商存储于字典，切换后通知绑定重新读取即可。
+        OnPropertyChanged(nameof(ApiKey));
+        OnPropertyChanged(nameof(ModelId));
+        OnPropertyChanged(nameof(Endpoint));
+        OnPropertyChanged(nameof(SupportsApiKeyConfiguration));
+        OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
+        OnPropertyChanged(nameof(ApiKeyHint));
+        OnPropertyChanged(nameof(ProviderApiKeyUrl));
+        OnPropertyChanged(nameof(CanOverrideEndpoint));
+        OnPropertyChanged(nameof(EndpointPlaceholder));
+        OnPropertyChanged(nameof(EffectiveEndpoint));
+        OnPropertyChanged(nameof(SupportsModelListing));
+        OnPropertyChanged(nameof(CanFetchModels));
+        OnPropertyChanged(nameof(ModelDiscoveryHint));
+        FetchModelsCommand.NotifyCanExecuteChanged();
+
+        if (!_isInitializingProvider)
         {
-            UserSetting.ProviderId = newValue.Id;
-
-            _modelFetchCancellationTokenSource?.Cancel();
-            Models.Clear();
-            ModelDiscoveryStatus = string.Empty;
-
-            if (!_isInitializingProvider && oldValue is not null)
+            // 模型列表鉴权与具体模型调用鉴权彼此独立。
+            var currentKey = UserSetting.ProviderApiKeys.TryGetValue(newValue.Id, out var key) ? key : "";
+            if (newValue.CanListModels(currentKey))
             {
-                UserSetting.ProviderModelIds[oldValue.Id] = UserSetting.ModelId;
-                if (oldValue.AllowsEndpointOverride)
-                    UserSetting.ProviderEndpoints[oldValue.Id] = UserSetting.Endpoint;
-            }
-
-            UserSetting.ModelId = UserSetting.ProviderModelIds.GetValueOrDefault(newValue.Id, string.Empty);
-            UserSetting.Endpoint = newValue.AllowsEndpointOverride
-                ? UserSetting.ProviderEndpoints.GetValueOrDefault(newValue.Id, string.Empty)
-                : string.Empty;
-
-            // 触发关联属性通知
-            OnPropertyChanged(nameof(ApiKey));
-            OnPropertyChanged(nameof(Endpoint));
-            OnPropertyChanged(nameof(SupportsApiKeyConfiguration));
-            OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
-            OnPropertyChanged(nameof(ApiKeyHint));
-            OnPropertyChanged(nameof(ProviderApiKeyUrl));
-            OnPropertyChanged(nameof(CanOverrideEndpoint));
-            OnPropertyChanged(nameof(EndpointPlaceholder));
-            OnPropertyChanged(nameof(EffectiveEndpoint));
-            OnPropertyChanged(nameof(SupportsModelListing));
-            OnPropertyChanged(nameof(CanFetchModels));
-            OnPropertyChanged(nameof(ModelDiscoveryHint));
-            FetchModelsCommand.NotifyCanExecuteChanged();
-
-            if (!_isInitializingProvider)
-            {
-                // 模型列表鉴权与具体模型调用鉴权彼此独立。
-                var currentKey = UserSetting.ProviderApiKeys.TryGetValue(newValue.Id, out var key) ? key : "";
-                if (newValue.CanListModels(currentKey))
-                {
-                    _ = FetchModels();
-                }
+                _ = FetchModels();
             }
         }
     }
@@ -754,15 +759,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
             }
 
-            if (!string.IsNullOrWhiteSpace(UserSetting.ProviderId))
-            {
-                UserSetting.ProviderModelIds[UserSetting.ProviderId] = UserSetting.ModelId;
-                if (SelectedProvider?.AllowsEndpointOverride == true)
-                    UserSetting.ProviderEndpoints[UserSetting.ProviderId] = UserSetting.Endpoint;
-                else
-                    UserSetting.ProviderEndpoints.Remove(UserSetting.ProviderId);
-            }
-
             // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。
             var targetMode = UserSetting.CryptoTradingMode;
             if (TradingEnvironmentService.RequiresLiveModeConfirmation(
@@ -858,8 +854,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         try
         {
             var apiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey;
-            var endpoint = provider.AllowsEndpointOverride && !string.IsNullOrWhiteSpace(UserSetting.Endpoint)
-                ? UserSetting.Endpoint
+            var endpoint = provider.AllowsEndpointOverride && !string.IsNullOrWhiteSpace(Endpoint)
+                ? Endpoint
                 : null;
             var models = await _modelDiscoveryService.ListModelsAsync(
                 provider,

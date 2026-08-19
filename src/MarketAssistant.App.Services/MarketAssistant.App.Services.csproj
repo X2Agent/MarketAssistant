@@ -37,6 +37,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 覆盖 Microsoft.Data.Sqlite 传递引入的 SQLitePCLRaw 2.1.11（CVE-2025-6965） -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />

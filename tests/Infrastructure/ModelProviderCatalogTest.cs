@@ -112,6 +112,7 @@ public class ModelProviderCatalogTest
     {
         Assert.AreEqual("https://api.ppio.com/openai/v1", GetProvider("PPIO").DefaultEndpoint);
         Assert.AreEqual("https://api.minimax.io/v1", GetProvider("MiniMax").DefaultEndpoint);
+        Assert.AreEqual("https://token.sensenova.cn/v1", GetProvider("SenseNova").DefaultEndpoint);
     }
 
     [TestMethod]
@@ -180,17 +181,6 @@ public class ModelProviderCatalogTest
     {
         Assert.IsFalse(GetProvider("Custom").SupportsModelListing);
         Assert.AreEqual(StructuredOutputMode.Text, GetProvider("Custom").StructuredOutputMode);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void DeepSeek_ShouldExposeVerifiedModelContextWindowsOnly()
-    {
-        var provider = GetProvider("DeepSeek");
-
-        Assert.AreEqual(1_000_000, provider.GetContextWindowTokens("deepseek-v4-flash"));
-        Assert.AreEqual(1_000_000, provider.GetContextWindowTokens("DEEPSEEK-V4-PRO"));
-        Assert.IsNull(provider.GetContextWindowTokens("unverified-model"));
     }
 
     private static ModelProvider GetProvider(string id)

@@ -115,7 +115,7 @@
                                 <ComboBox Grid.Column="0"
                                           IsEditable="True"
                                           ItemsSource="{Binding Models}"
-                                          Text="{Binding UserSetting.ModelId, Mode=TwoWay}"
+                                          Text="{Binding ModelId, Mode=TwoWay}"
                                           PlaceholderText="选择或输入模型 ID"
                                           MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
                                           HorizontalAlignment="Stretch"/>

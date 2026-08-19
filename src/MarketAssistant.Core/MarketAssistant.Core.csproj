@@ -9,5 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 覆盖 Microsoft.Data.Sqlite 传递引入的 SQLitePCLRaw 2.1.11（CVE-2025-6965） -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
   </ItemGroup>
 </Project>

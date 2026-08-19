@@ -5,6 +5,7 @@ using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.ViewModels;
 using MarketAssistant.ViewModels.Home;
 using MarketAssistant.ViewModels.Trading;
@@ -36,6 +37,10 @@ public static class ServiceCollectionExtensions
 
         // 注册全局异常处理器（Singleton，由 DI 创建实例）
         services.AddSingleton<GlobalExceptionHandler>();
+
+        // 应用级交易确认：订阅 TradeExecutor.ConfirmationRequested 并弹全局对话框，
+        // 使 HITL 确认不依赖交易监控页存活（单例构造即接管订阅）
+        services.AddSingleton<TradeConfirmationService>();
 
         // Keyed Service 委托工厂：避免 ViewModel 使用 IServiceProvider 反模式
         services.AddSingleton<Func<MarketType, IKLineService>>(

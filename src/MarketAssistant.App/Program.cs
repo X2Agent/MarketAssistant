@@ -43,7 +43,13 @@ namespace MarketAssistant
             // 注册ViewModels
             services.AddViewModels();
 
-            return services.BuildServiceProvider();
+            // ValidateOnBuild：启动时即暴露错误的单例注册（fail-fast，避免运行期才爆炸）
+            // ValidateScopes：桌面应用虽无请求作用域，仍防范误把 scoped 服务注入单例
+            return services.BuildServiceProvider(new ServiceProviderOptions
+            {
+                ValidateOnBuild = true,
+                ValidateScopes = true
+            });
         }
     }
 }

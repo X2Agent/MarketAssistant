@@ -30,6 +30,7 @@ namespace TestMarketAssistant.Tools;
 /// - OPENAI_API_KEY：SiliconFlow LLM 密钥（写入 UserSetting，IBasicDataTools 不直接使用）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class BasicDataToolsTest
 {
     private ServiceProvider? _serviceProvider;
@@ -70,8 +71,7 @@ public class BasicDataToolsTest
             EmbeddingEndpoint = "https://api.jina.ai",
             EmbeddingModelId = "jina-embeddings-v5-text-small",
             ProviderApiKeys = new Dictionary<string, string> { ["SiliconFlow"] = _siliconFlowApiKey ?? "" },
-            Endpoint = "https://api.siliconflow.cn",
-            ModelId = "deepseek-ai/DeepSeek-V3.2"
+            ProviderModelIds = new Dictionary<string, string> { ["SiliconFlow"] = "deepseek-ai/DeepSeek-V3.2" }
         };
         var userSettingServiceMock = new Mock<IUserSettingService>();
         userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(userSetting);

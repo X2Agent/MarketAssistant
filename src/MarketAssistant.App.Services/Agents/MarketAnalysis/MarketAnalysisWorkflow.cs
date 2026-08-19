@@ -115,11 +115,42 @@ public class MarketAnalysisWorkflow
             activity?.SetTag("gen_ai.provider.name", runtime.ProviderId);
             activity?.SetTag("gen_ai.request.model", runtime.ModelId);
             activity?.SetTag("marketassistant.analyst.requested_count", enabledAnalysts.Count);
-            var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot, runtime);
+
+            // 运行期降级记录：失败隔离包装器在分析师运行失败时回调，
+            // 这里维护已降级名单并向 UI 发布进度事件（与聚合器的失败计数相互独立）
+            var degradedAnalysts = new List<string>();
+            var degradationGate = new object();
+            var totalForProgress = 0;
+
+            var analystAgents = CreateAnalystAgents(
+                enabledAnalysts,
+                marketSnapshot,
+                runtime,
+                onAnalystDegraded: (analystType, exception) =>
+                {
+                    var displayName = GetAnalystDisplayNameFromType(analystType);
+                    List<string> failedSnapshot;
+                    lock (degradationGate)
+                    {
+                        if (!degradedAnalysts.Contains(displayName))
+                            degradedAnalysts.Add(displayName);
+                        failedSnapshot = [.. degradedAnalysts];
+                    }
+
+                    _logger.LogWarning(exception, "分析师执行失败，降级继续其余分析师: {Analyst}", displayName);
+                    OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
+                    {
+                        StageDescription = $"{displayName} 分析失败，继续其他分析",
+                        IsInProgress = true,
+                        TotalAnalysts = totalForProgress,
+                        FailedAnalysts = failedSnapshot
+                    });
+                });
             var failedAnalystNames = analystAgents.FailedTypes
                 .Select(GetAnalystDisplayNameFromType)
                 .ToList();
             var createdAgents = analystAgents.Agents;
+            totalForProgress = createdAgents.Count;
 
             if (createdAgents.Count == 0)
             {
@@ -134,12 +165,12 @@ public class MarketAnalysisWorkflow
                 coordinatorAgent,
                 _loggerFactory.CreateLogger<CoordinatorExecutor>());
             var aggregatorExecutor = new AnalysisAggregatorExecutor(
+                createdAgents.Count,
                 _loggerFactory.CreateLogger<AnalysisAggregatorExecutor>());
 
             // 构建工作流（所有 Executor 均为 Run 局部实例）
             var agentNameToDisplayName = analystAgents.NameToDisplayName;
             var workflow = BuildWorkflow(
-                createdAgents.Count,
                 createdAgents,
                 aggregatorExecutor,
                 coordinatorExecutor);
@@ -159,6 +190,7 @@ public class MarketAnalysisWorkflow
                 assetSymbol,
                 createdAgents.Count,
                 agentNameToDisplayName,
+                degradedAnalysts,
                 cancellationToken);
 
             // 缓存分析结果，供交易决策模块使用
@@ -202,6 +234,7 @@ public class MarketAnalysisWorkflow
         string assetSymbol,
         int analystCount,
         IReadOnlyDictionary<string, string> agentNameToDisplayName,
+        List<string> degradedAnalysts,
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
@@ -385,6 +418,19 @@ public class MarketAnalysisWorkflow
             return finalReport;
         }
 
+        // 全部分析师被失败隔离包装器降级：聚合器不会派发 Coordinator，事件流自然结束。
+        // Fan-In barrier 目标执行器的异常不会以 ExecutorFailedEvent 暴露，因此由这里终局判定。
+        if (degradedAnalysts.Count >= analystCount && analystCount > 0)
+        {
+            _logger.LogError(
+                "全部分析师均执行失败，标的: {AssetSymbol}，失败名单: [{DegradedAnalysts}]",
+                assetSymbol,
+                string.Join(", ", degradedAnalysts));
+
+            throw new FriendlyException(
+                $"所有分析师均执行失败，无法生成综合报告: {string.Join("；", degradedAnalysts)}");
+        }
+
         // 工作流正常结束但未收到 WorkflowOutputEvent，构建详细诊断信息
         _logger.LogError(
             "工作流事件流已结束但未收到 WorkflowOutputEvent，标的: {AssetSymbol}，已完成分析师: {Completed}/{Total}，失败步骤: [{FailedSteps}]，最后完成步骤: {LastStep}",
@@ -477,7 +523,8 @@ public class MarketAnalysisWorkflow
     }
 
     /// <summary>
-    /// 创建分析师代理（使用 Factory 模式），返回成功创建的 Agent 列表及失败的类型列表
+    /// 创建分析师代理（使用 Factory 模式），返回成功创建的 Agent 列表及失败的类型列表。
+    /// 每位成功创建的分析师都会附加失败隔离包装，保证 Fan-In 聚合器总能收齐消息。
     /// </summary>
     private (
         List<AIAgent> Agents,
@@ -485,7 +532,8 @@ public class MarketAnalysisWorkflow
         IReadOnlyDictionary<string, string> NameToDisplayName) CreateAnalystAgents(
         List<Type> analystTypes,
         MarketSnapshotContextProvider marketSnapshot,
-        ChatClientRuntime runtime)
+        ChatClientRuntime runtime,
+        Action<Type, Exception>? onAnalystDegraded = null)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
 
@@ -498,7 +546,8 @@ public class MarketAnalysisWorkflow
         {
             try
             {
-                var agent = _analystAgentFactory.CreateAnalyst(type, runtime, sharedProviders);
+                var agent = _analystAgentFactory.CreateAnalyst(type, runtime, sharedProviders)
+                    .WithFailureIsolation(exception => onAnalystDegraded?.Invoke(type, exception));
                 createdAgents.Add(agent);
 
                 // 创建时即建立 Name → DisplayName 映射。
@@ -591,7 +640,6 @@ public class MarketAnalysisWorkflow
     /// [Dispatcher] → [并发分析师团队] → [Aggregator] → [Coordinator]
     /// </summary>
     private Workflow BuildWorkflow(
-        int analystCount,
         List<AIAgent> analystAgents,
         AnalysisAggregatorExecutor aggregatorExecutor,
         CoordinatorExecutor coordinatorExecutor)
@@ -606,9 +654,8 @@ public class MarketAnalysisWorkflow
         //      ↓
         // [Coordinator] List<ChatMessage> → MarketAnalysisReport (输出)
 
-        // 1. 动态创建 Dispatcher（需要知道分析师数量）
+        // 1. 创建 Dispatcher（作为入口节点）
         var dispatcher = new AnalysisDispatcherExecutor(
-            analystCount,
             _loggerFactory.CreateLogger<AnalysisDispatcherExecutor>());
 
         // 2. 创建工作流，Dispatcher 作为入口节点

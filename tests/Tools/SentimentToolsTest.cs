@@ -16,6 +16,7 @@ namespace TestMarketAssistant.Tools;
 /// ISentimentTools 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class SentimentToolsTest
 {
     private ServiceProvider? _serviceProvider;

@@ -11,6 +11,7 @@ using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
@@ -32,6 +33,24 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// 构造函数、市场切换、收藏变更消息都可能触发加载，需串行化。
     /// </summary>
     private CancellationTokenSource? _loadCts;
+
+    /// <summary>
+    /// WebSocket 标的（Binance 格式）→ 展示对象的索引。
+    /// tick 回调在后台线程先查索引：非本页标的直接返回，避免无谓的 UI 线程派发与逐项扫描。
+    /// </summary>
+    private readonly ConcurrentDictionary<string, AssetInfo> _assetIndex = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 待刷新的价格更新（按标的去重，只保留最新值），由 <see cref="_priceFlushTimer"/> 节流批量刷 UI。
+    /// </summary>
+    private readonly ConcurrentDictionary<string, (decimal Price, decimal Change)> _pendingPriceUpdates =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 价格刷新节流定时器（250ms）。将每 tick 一次的 UI 派发合并为每秒 4 次批量更新。
+    /// 惰性创建于 UI 线程，Dispose 时停止。
+    /// </summary>
+    private DispatcherTimer? _priceFlushTimer;
 
     private IFavoriteService FavoriteService =>
         _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
@@ -90,6 +109,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             var favoritesCodes = await FavoriteService.GetFavoritesCodesAsync();
             Assets.Clear();
             await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
+
+            RebuildAssetIndex();
 
             // 以完整集合替换收藏页订阅：虚拟币市场订阅自选交易对；
             // 其他市场传空集合，确保切换市场后不残留上一市场的订阅
@@ -204,6 +225,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 if (assetToRemove != null)
                 {
                     Assets.Remove(assetToRemove);
+                    _assetIndex.TryRemove(ToBinanceFormat(assetToRemove.Code), out _);
+                    _pendingPriceUpdates.TryRemove(ToBinanceFormat(assetToRemove.Code), out _);
                 }
 
                 // 再从持久化存储中移除
@@ -216,20 +239,70 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     }
 
     /// <summary>
-    /// WebSocket 实时价格更新回调
+    /// WebSocket 实时价格更新回调（后台线程）。
+    /// 索引未命中（非本页标的）直接返回，不产生任何 UI 线程派发；
+    /// 命中则暂存最新值，由 250ms 节流定时器批量刷新，避免高频 tick 逐条打 UI。
     /// </summary>
     private void OnWebSocketPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
     {
-        Dispatcher.UIThread.InvokeAsync(() =>
+        if (!_assetIndex.ContainsKey(symbol))
+            return;
+
+        _pendingPriceUpdates[symbol] = (lastPrice, changePercent);
+        EnsurePriceFlushTimer();
+    }
+
+    /// <summary>
+    /// 重建标的索引（列表加载完成后调用）。
+    /// </summary>
+    private void RebuildAssetIndex()
+    {
+        _assetIndex.Clear();
+        foreach (var asset in Assets)
         {
-            var asset = Assets.FirstOrDefault(a =>
-                ToBinanceFormat(a.Code).Equals(symbol, StringComparison.OrdinalIgnoreCase));
+            _assetIndex[ToBinanceFormat(asset.Code)] = asset;
+        }
+    }
 
-            if (asset == null) return;
+    /// <summary>
+    /// 惰性创建节流定时器。DispatcherTimer 必须在 UI 线程构造，
+    /// 故先快检再 Post；Post 内二次判空防重复创建。
+    /// </summary>
+    private void EnsurePriceFlushTimer()
+    {
+        if (_priceFlushTimer != null)
+            return;
 
-            asset.CurrentPrice = lastPrice.ToString("G");
-            asset.ChangePercentage = $"{changePercent:F2}%";
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_priceFlushTimer != null)
+                return;
+
+            _priceFlushTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            _priceFlushTimer.Tick += (_, _) => FlushPendingPriceUpdates();
+            _priceFlushTimer.Start();
         });
+    }
+
+    /// <summary>
+    /// 批量应用暂存的价格更新到展示对象（UI 线程，每 250ms 至多一次）。
+    /// </summary>
+    private void FlushPendingPriceUpdates()
+    {
+        foreach (var symbol in _pendingPriceUpdates.Keys.ToList())
+        {
+            if (!_pendingPriceUpdates.TryRemove(symbol, out var update))
+                continue;
+
+            if (_assetIndex.TryGetValue(symbol, out var asset))
+            {
+                asset.CurrentPrice = update.Price.ToString("G");
+                asset.ChangePercentage = $"{update.Change:F2}%";
+            }
+        }
     }
 
     /// <summary>
@@ -244,6 +317,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     {
         _loadCts?.Cancel();
         _loadCts?.Dispose();
+        _priceFlushTimer?.Stop();
+        _priceFlushTimer = null;
         UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.Favorites);

@@ -32,8 +32,8 @@ public sealed class AssetScreenerServiceTest
             .Returns(new UserSetting
             {
                 ProviderId = "Custom",
-                ModelId = "test-model",
-                Endpoint = "http://localhost",
+                ProviderModelIds = new Dictionary<string, string> { ["Custom"] = "test-model" },
+                ProviderEndpoints = new Dictionary<string, string> { ["Custom"] = "http://localhost" },
                 ProviderApiKeys = new Dictionary<string, string> { ["Custom"] = "test-key" }
             });
         services.AddSingleton(mockUserSettingService.Object);

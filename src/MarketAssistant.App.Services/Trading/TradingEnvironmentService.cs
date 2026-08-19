@@ -71,9 +71,9 @@ public sealed class TradingEnvironmentService
 
         _currentMode = mode;
 
-        // 持久化到用户设置，确保重启后保持一致
-        _userSettingService.CurrentSetting.CryptoTradingMode = mode;
-        _userSettingService.SaveSettings();
+        // 持久化到用户设置，确保重启后保持一致；
+        // 与持久化共用同步边界，避免与其它线程的设置保存交错
+        _userSettingService.UpdateSetting(setting => setting.CryptoTradingMode = mode);
 
         _logger.LogInformation("虚拟币交易模式已切换为 {Mode} 并已持久化", mode);
         ModeChanged?.Invoke(mode);

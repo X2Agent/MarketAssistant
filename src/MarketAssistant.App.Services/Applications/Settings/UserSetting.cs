@@ -16,16 +16,6 @@ public class UserSetting : INotifyPropertyChanged
     public string ProviderId { get; set; } = "";
 
     /// <summary>
-    /// 当前服务商的活动模型 ID。保留该字段用于兼容旧配置。
-    /// </summary>
-    private string _modelId = "";
-    public string ModelId
-    {
-        get => _modelId;
-        set => SetProperty(ref _modelId, value);
-    }
-
-    /// <summary>
     /// 按服务商保存模型 ID，切换服务商时恢复各自选择。
     /// </summary>
     public Dictionary<string, string> ProviderModelIds { get; set; } = new();
@@ -36,11 +26,6 @@ public class UserSetting : INotifyPropertyChanged
 
     [JsonIgnore]
     public string EmbeddingApiKey { get; set; } = "";
-
-    /// <summary>
-    /// API 端点。为空时使用服务商默认端点。
-    /// </summary>
-    public string Endpoint { get; set; } = "";
 
     /// <summary>
     /// 按服务商保存自定义 Endpoint，空值表示使用目录默认地址。

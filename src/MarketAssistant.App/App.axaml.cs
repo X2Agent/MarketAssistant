@@ -77,6 +77,12 @@ public partial class App : Application
             // 清理全局异常处理器
             GlobalExceptionHandler.Cleanup();
 
+            // 释放根 DI 容器：触发容器创建的全部 IDisposable 单例的释放
+            // （ChatClientFactory 缓存的 IChatClient、限流器、SQLite 服务等）。
+            // 必须在关闭日志之前执行，保证释放过程中仍可写日志。
+            (ServiceProvider as IDisposable)?.Dispose();
+            ServiceProvider = null;
+
             // 刷新并关闭日志
             Log.CloseAndFlush();
         }

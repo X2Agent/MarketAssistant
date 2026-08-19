@@ -16,6 +16,7 @@ namespace TestMarketAssistant.Tools;
 /// IShareFinancialTools 接口测试(仅测试 A股 实现,虚拟币已改用 ICryptoMetricsTools)
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class FinancialDataToolsTest
 {
     private ServiceProvider? _serviceProvider;

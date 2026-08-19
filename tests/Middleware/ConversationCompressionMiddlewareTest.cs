@@ -45,33 +45,4 @@ public class ConversationCompressionMiddlewareTest
         Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
             factory.Create(chatClient, minimumPreservedGroups: 0));
     }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void CalculateMaxTokens_UnknownContextWindow_ShouldUseConservativeDefault()
-    {
-        Assert.AreEqual(
-            ConversationCompactionProviderFactory.DefaultMaxTokens,
-            ConversationCompactionProviderFactory.CalculateMaxTokens(null));
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void CalculateMaxTokens_KnownContextWindow_ShouldReserveTwentyFivePercent()
-    {
-        Assert.AreEqual(
-            96_000,
-            ConversationCompactionProviderFactory.CalculateMaxTokens(128_000));
-        Assert.AreEqual(
-            750_000,
-            ConversationCompactionProviderFactory.CalculateMaxTokens(1_000_000));
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void CalculateMaxTokens_NonPositiveContextWindow_ShouldThrow()
-    {
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
-            ConversationCompactionProviderFactory.CalculateMaxTokens(0));
-    }
 }

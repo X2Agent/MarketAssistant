@@ -256,7 +256,7 @@ public class TradingDataService : SqliteServiceBase
 
     #region 交易记录
 
-    public async Task SaveTradeRecordAsync(TradeRecord record, CancellationToken ct = default)
+    public virtual async Task SaveTradeRecordAsync(TradeRecord record, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -509,7 +509,7 @@ public class TradingDataService : SqliteServiceBase
     /// </summary>
     private static string GetTodayDateString() => DateTime.Now.ToString("yyyy-MM-dd");
 
-    public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
+    public virtual async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
@@ -539,7 +539,7 @@ public class TradingDataService : SqliteServiceBase
     /// <paramref name="countTrade"/> 仅在订单首次实际成交（executed_qty 从 0 变为 >0）时为 true，
     /// 避免未成交订单被计数、以及下单与对账重复计数。
     /// </summary>
-    public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, bool countTrade = true, CancellationToken ct = default)
+    public virtual async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, bool countTrade = true, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         var today = GetTodayDateString();
@@ -644,7 +644,7 @@ public class TradingDataService : SqliteServiceBase
     /// 平仓：按 FIFO 顺序匹配指定方向的持仓，更新 closed_quantity，返回已实现盈亏。
     /// 多头盈亏 = (平仓价 - 开仓价) × 数量；空头盈亏 = (开仓价 - 平仓价) × 数量。
     /// </summary>
-    public async Task<decimal> ClosePositionFifoAsync(
+    public virtual async Task<decimal> ClosePositionFifoAsync(
         string symbol, decimal closeQty, decimal closePrice,
         CancellationToken ct = default, PositionSide side = PositionSide.Long)
     {
@@ -722,7 +722,7 @@ public class TradingDataService : SqliteServiceBase
     /// <summary>
     /// 获取指定 symbol 的当前未平仓多头持仓（用于 UI 展示与风控）
     /// </summary>
-    public async Task<List<Position>> GetOpenPositionsAsync(string? symbol = null, CancellationToken ct = default)
+    public virtual async Task<List<Position>> GetOpenPositionsAsync(string? symbol = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -845,7 +845,7 @@ public class TradingDataService : SqliteServiceBase
         return 0;
     }
 
-    public async Task<RiskConfig> LoadRiskConfigAsync(CancellationToken ct = default)
+    public virtual async Task<RiskConfig> LoadRiskConfigAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);

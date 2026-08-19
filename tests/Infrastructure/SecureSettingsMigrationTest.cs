@@ -84,7 +84,7 @@ public sealed class SecureSettingsMigrationTest
         {
             for (var i = 0; i < 50; i++)
             {
-                first.CurrentSetting.ModelId = $"first-{i}";
+                first.CurrentSetting.ProviderModelIds["DeepSeek"] = $"first-{i}";
                 first.SaveSettings();
             }
         });
@@ -92,7 +92,7 @@ public sealed class SecureSettingsMigrationTest
         {
             for (var i = 0; i < 50; i++)
             {
-                second.CurrentSetting.ModelId = $"second-{i}";
+                second.CurrentSetting.ProviderModelIds["DeepSeek"] = $"second-{i}";
                 second.SaveSettings();
             }
         });
@@ -101,7 +101,8 @@ public sealed class SecureSettingsMigrationTest
 
         Assert.IsFalse(File.Exists(settingsPath + ".tmp"));
         using var document = JsonDocument.Parse(File.ReadAllText(settingsPath));
-        Assert.IsTrue(document.RootElement.GetProperty("ModelId").GetString() is { Length: > 0 });
+        Assert.IsTrue(
+            document.RootElement.GetProperty("ProviderModelIds").GetProperty("DeepSeek").GetString() is { Length: > 0 });
     }
 
     [TestMethod]

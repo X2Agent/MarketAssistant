@@ -23,7 +23,6 @@ public class ChatClientFactoryTest
 
         Assert.AreSame(first.Client, second.Client);
         Assert.AreEqual(first.ConfigurationFingerprint, second.ConfigurationFingerprint);
-        Assert.IsNull(first.ContextWindowTokens);
         Assert.AreEqual(StructuredOutputMode.JsonObject, first.StructuredOutputMode);
         Assert.AreEqual(first.StructuredOutputMode, second.StructuredOutputMode);
         Assert.HasCount(1, fixture.Factory.CreatedRequests);
@@ -40,7 +39,7 @@ public class ChatClientFactoryTest
         var factory = fixture.Factory;
 
         var first = factory.CreateRuntime();
-        fixture.Setting.ModelId = "model-b";
+        fixture.Setting.ProviderModelIds["DeepSeek"] = "model-b";
         var second = factory.CreateRuntime();
 
         Assert.AreNotSame(first.Client, second.Client);
@@ -73,19 +72,6 @@ public class ChatClientFactoryTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void CreateRuntime_VerifiedModel_ShouldExposeContextWindow()
-    {
-        var fixture = CreateFixture();
-        using var factory = fixture.Factory;
-        fixture.Setting.ModelId = "deepseek-v4-flash";
-
-        var runtime = factory.CreateRuntime();
-
-        Assert.AreEqual(1_000_000, runtime.ContextWindowTokens);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public void CreateRuntime_RemoteModelWithoutApiKey_ShouldExplainProviderAndModelRequirement()
     {
         var fixture = CreateFixture();
@@ -106,7 +92,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "OpenCodeZen";
-        fixture.Setting.ModelId = "deepseek-v4-flash-free";
+        fixture.Setting.ProviderModelIds["OpenCodeZen"] = "deepseek-v4-flash-free";
         fixture.Setting.ProviderApiKeys.Clear();
         using var factory = fixture.Factory;
 
@@ -122,7 +108,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "OpenCodeZen";
-        fixture.Setting.ModelId = "deepseek-v4-flash-free";
+        fixture.Setting.ProviderModelIds["OpenCodeZen"] = "deepseek-v4-flash-free";
         fixture.Setting.ProviderApiKeys["OpenCodeZen"] = "configured-key";
         using var factory = fixture.Factory;
 
@@ -137,7 +123,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "OpenCodeZen";
-        fixture.Setting.ModelId = "gpt-5.6-sol";
+        fixture.Setting.ProviderModelIds["OpenCodeZen"] = "gpt-5.6-sol";
         fixture.Setting.ProviderApiKeys["OpenCodeZen"] = "secret";
         using var factory = fixture.Factory;
 
@@ -166,11 +152,11 @@ public class ChatClientFactoryTest
 
         for (var index = 0; index < 16; index++)
         {
-            fixture.Setting.ModelId = $"model-{index}";
+            fixture.Setting.ProviderModelIds["DeepSeek"] = $"model-{index}";
             factory.CreateRuntime();
         }
 
-        fixture.Setting.ModelId = "model-16";
+        fixture.Setting.ProviderModelIds["DeepSeek"] = "model-16";
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
         StringAssert.Contains(exception.Message, "16");
@@ -184,7 +170,7 @@ public class ChatClientFactoryTest
     public void CreateRuntime_FixedEndpointProviderWithStoredOverride_ShouldIgnoreOverride()
     {
         var fixture = CreateFixture();
-        fixture.Setting.Endpoint = "https://proxy.example.com/v1/";
+        fixture.Setting.ProviderEndpoints["DeepSeek"] = "https://proxy.example.com/v1/";
         using var factory = fixture.Factory;
 
         factory.CreateRuntime();
@@ -200,8 +186,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "Ollama";
-        fixture.Setting.ModelId = "qwen3:8b";
-        fixture.Setting.Endpoint = string.Empty;
+        fixture.Setting.ProviderModelIds["Ollama"] = "qwen3:8b";
         fixture.Setting.ProviderApiKeys.Clear();
         using var factory = fixture.Factory;
 
@@ -218,8 +203,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "Custom";
-        fixture.Setting.ModelId = "model-a";
-        fixture.Setting.Endpoint = string.Empty;
+        fixture.Setting.ProviderModelIds["Custom"] = "model-a";
         fixture.Setting.ProviderApiKeys["Custom"] = "secret";
         using var factory = fixture.Factory;
 
@@ -235,8 +219,7 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "OpenAI";
-        fixture.Setting.ModelId = "gpt-4o-mini";
-        fixture.Setting.Endpoint = "https://api.openai.com/v1";
+        fixture.Setting.ProviderModelIds["OpenAI"] = "gpt-4o-mini";
         fixture.Setting.ProviderApiKeys["OpenAI"] = "secret";
         using var factory = fixture.Factory;
 
@@ -251,8 +234,8 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "Custom";
-        fixture.Setting.ModelId = "unknown-model";
-        fixture.Setting.Endpoint = "https://custom.example.com/v1";
+        fixture.Setting.ProviderModelIds["Custom"] = "unknown-model";
+        fixture.Setting.ProviderEndpoints["Custom"] = "https://custom.example.com/v1";
         fixture.Setting.ProviderApiKeys["Custom"] = "secret";
         using var factory = fixture.Factory;
 
@@ -267,8 +250,8 @@ public class ChatClientFactoryTest
     {
         var fixture = CreateFixture();
         fixture.Setting.ProviderId = "Ollama";
-        fixture.Setting.ModelId = "qwen3:8b";
-        fixture.Setting.Endpoint = "http://localhost:11434";
+        fixture.Setting.ProviderModelIds["Ollama"] = "qwen3:8b";
+        fixture.Setting.ProviderEndpoints["Ollama"] = "http://localhost:11434";
         fixture.Setting.ProviderApiKeys.Clear();
         using var factory = fixture.Factory;
 
@@ -287,12 +270,9 @@ public class ChatClientFactoryTest
         var setting = new UserSetting
         {
             ProviderId = "DeepSeek",
-            ModelId = "model-a",
-            Endpoint = "https://api.deepseek.com",
-            ProviderApiKeys = new Dictionary<string, string>
-            {
-                ["DeepSeek"] = "secret-1"
-            }
+            ProviderModelIds = new Dictionary<string, string> { ["DeepSeek"] = "model-a" },
+            ProviderEndpoints = new Dictionary<string, string> { ["DeepSeek"] = "https://api.deepseek.com" },
+            ProviderApiKeys = new Dictionary<string, string> { ["DeepSeek"] = "secret-1" }
         };
 
         var settingService = new Mock<IUserSettingService>();

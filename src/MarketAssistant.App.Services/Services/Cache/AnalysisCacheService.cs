@@ -132,7 +132,8 @@ public class AnalysisCacheService : IAnalysisCacheService
             .Where(kv => kv.Value)
             .Select(kv => kv.Key)
             .OrderBy(s => s);
-        return $"{setting.ModelId}|{string.Join(",", enabledRoles)}";
+        var activeModelId = setting.ProviderModelIds.GetValueOrDefault(setting.ProviderId, string.Empty);
+        return $"{activeModelId}|{string.Join(",", enabledRoles)}";
     }
 
     /// <summary>

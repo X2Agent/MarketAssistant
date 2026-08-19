@@ -80,8 +80,8 @@ public class MarketContext : INotifyPropertyChanged
             CurrentMarketType = newMarket;
         }
 
-        _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
-        _userSettingService.SaveSettings();
+        // 与持久化共用同步边界，避免与其它线程的设置保存交错
+        _userSettingService.UpdateSetting(setting => setting.CurrentMarketType = newMarket);
         OnPropertyChanged(nameof(CurrentMarket));
         MarketChanged?.Invoke(this, new MarketChangedEventArgs(previousMarket, newMarket));
     }

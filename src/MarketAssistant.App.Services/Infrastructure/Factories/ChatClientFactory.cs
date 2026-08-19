@@ -5,8 +5,10 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Http.Resilience;
 using OllamaSharp;
 using OpenAI;
+using Polly;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
@@ -36,7 +38,6 @@ public sealed record ChatClientRuntime(
     string ModelId,
     string Endpoint,
     string ConfigurationFingerprint,
-    int? ContextWindowTokens,
     StructuredOutputMode StructuredOutputMode);
 
 /// <summary>
@@ -46,13 +47,11 @@ public sealed record ChatClientRuntime(
 public class ChatClientFactory : IChatClientFactory
 {
     private const int MaxCachedRuntimes = 16;
-    private static readonly TimeSpan ErrorCooldown = TimeSpan.FromSeconds(30);
 
     private readonly IUserSettingService _userSettingService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
-    private readonly Dictionary<ModelRuntimeKey, CachedError> _errors = [];
     private bool _disposed;
 
     public ChatClientFactory(
@@ -73,13 +72,15 @@ public class ChatClientFactory : IChatClientFactory
 
             var userSetting = _userSettingService.CurrentSetting;
             var providerId = userSetting.ProviderId;
-            var modelId = userSetting.ModelId;
+            var modelId = userSetting.ProviderModelIds.GetValueOrDefault(providerId, string.Empty);
             var provider = ModelProviderCatalog.GetProvider(providerId)
                 ?? throw new FriendlyException($"未知的服务商: {providerId}");
             var configuredApiKey = userSetting.ProviderApiKeys.TryGetValue(providerId, out var key) ? key : string.Empty;
             var apiKey = provider.RequiresApiKey ? configuredApiKey : string.Empty;
-            var endpointOverride = provider.AllowsEndpointOverride ? userSetting.Endpoint : string.Empty;
-            var endpoint = ResolveEndpoint(provider, endpointOverride);
+            var endpointOverride = provider.AllowsEndpointOverride
+                ? userSetting.ProviderEndpoints.GetValueOrDefault(providerId, string.Empty)
+                : string.Empty;
+            var endpoint = provider.ResolveEndpoint(endpointOverride);
             var structuredOutputMode = provider.StructuredOutputMode;
             var runtimeKey = new ModelRuntimeKey(
                 providerId,
@@ -96,14 +97,7 @@ public class ChatClientFactory : IChatClientFactory
                     modelId,
                     endpoint,
                     configurationFingerprint,
-                    provider.GetContextWindowTokens(modelId),
                     structuredOutputMode);
-            }
-
-            if (_errors.TryGetValue(runtimeKey, out var cachedError) &&
-                DateTime.UtcNow - cachedError.Timestamp < ErrorCooldown)
-            {
-                throw new FriendlyException(cachedError.Message);
             }
 
             try
@@ -132,14 +126,12 @@ public class ChatClientFactory : IChatClientFactory
 
                 var client = CreateClient(provider, modelId, apiKey, endpoint);
                 _clients.Add(runtimeKey, client);
-                _errors.Remove(runtimeKey);
                 return new ChatClientRuntime(
                     client,
                     providerId,
                     modelId,
                     endpoint,
                     configurationFingerprint,
-                    provider.GetContextWindowTokens(modelId),
                     structuredOutputMode);
             }
             catch (FriendlyException)
@@ -148,7 +140,6 @@ public class ChatClientFactory : IChatClientFactory
             }
             catch (Exception ex)
             {
-                _errors[runtimeKey] = new CachedError(ex.Message, DateTime.UtcNow);
                 throw new FriendlyException($"创建 AI 客户端失败: {ex.Message}", ex);
             }
         }
@@ -162,12 +153,37 @@ public class ChatClientFactory : IChatClientFactory
     {
         return provider.GetProtocol(modelId) switch
         {
-            ModelApiProtocol.Ollama => new OllamaApiClient(new Uri(endpoint), modelId),
+            ModelApiProtocol.Ollama => CreateOllamaClient(endpoint, modelId),
             ModelApiProtocol.OpenAIChatCompletions => CreateOpenAIClient(apiKey, endpoint)
                 .GetChatClient(modelId)
                 .AsIChatClient(),
             _ => throw new FriendlyException($"模型 {modelId} 的 API 协议暂不受支持")
         };
+    }
+
+    /// <summary>
+    /// OllamaSharp 不自带重试；用 Microsoft.Extensions.Http.Resilience 的标准重试管道
+    /// 补齐与 OpenAI 协议（SDK 内建重试）对齐的弹性能力，并统一 3 分钟网络超时。
+    /// </summary>
+    private static OllamaApiClient CreateOllamaClient(string endpoint, string modelId)
+    {
+        var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new HttpRetryStrategyOptions
+            {
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(1),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true
+            })
+            .Build();
+
+        var httpClient = new HttpClient(new ResilienceHandler(pipeline))
+        {
+            BaseAddress = new Uri(endpoint),
+            Timeout = TimeSpan.FromMinutes(3)
+        };
+
+        return new OllamaApiClient(httpClient, modelId);
     }
 
     private OpenAIClient CreateOpenAIClient(string apiKey, string endpoint)
@@ -199,25 +215,10 @@ public class ChatClientFactory : IChatClientFactory
                 client.Dispose();
 
             _clients.Clear();
-            _errors.Clear();
             _disposed = true;
         }
 
         GC.SuppressFinalize(this);
-    }
-
-    private static string ResolveEndpoint(ModelProvider provider, string configuredEndpoint)
-    {
-        if (!string.IsNullOrWhiteSpace(configuredEndpoint))
-            return configuredEndpoint.Trim().TrimEnd('/');
-
-        if (!string.IsNullOrWhiteSpace(provider.DefaultEndpoint))
-            return provider.DefaultEndpoint.Trim().TrimEnd('/');
-
-        if (provider.Protocol == ModelApiProtocol.Ollama)
-            return "http://localhost:11434";
-
-        throw new FriendlyException($"AI 功能未配置：服务商 {provider.DisplayName} 需要配置 API Base URL");
     }
 
     private static string ComputeSecretFingerprint(string secret)
@@ -244,6 +245,4 @@ public class ChatClientFactory : IChatClientFactory
         string ModelId,
         string Endpoint,
         string ApiKeyFingerprint);
-
-    private sealed record CachedError(string Message, DateTime Timestamp);
 }

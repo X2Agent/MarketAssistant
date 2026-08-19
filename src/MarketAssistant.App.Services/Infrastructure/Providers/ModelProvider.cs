@@ -13,8 +13,6 @@ namespace MarketAssistant.Infrastructure.Providers;
 /// <param name="AllowsEndpointOverride">是否允许用户覆盖 API Base URL，仅本地或自定义部署开启</param>
 /// <param name="SupportsModelListing">是否支持通过标准端点获取模型列表</param>
 /// <param name="Protocol">服务商默认模型协议</param>
-/// <param name="DefaultContextWindowTokens">服务商所有模型均可保证的上下文窗口；无法保证时必须为 null</param>
-/// <param name="ModelContextWindowTokens">模型级上下文窗口，优先于服务商默认值</param>
 /// <param name="ModelListingRequiresApiKey">模型列表端点是否需要 API Key，可与模型调用鉴权规则不同</param>
 /// <param name="ModelListingUrlPath">模型列表相对路径，拼在 API Base URL 之后；默认 /models</param>
 /// <param name="StructuredOutputMode">结构化任务使用的服务商级响应格式能力</param>
@@ -28,8 +26,6 @@ public record ModelProvider(
     bool AllowsEndpointOverride = false,
     bool SupportsModelListing = true,
     ModelApiProtocol Protocol = ModelApiProtocol.OpenAIChatCompletions,
-    int? DefaultContextWindowTokens = null,
-    IReadOnlyDictionary<string, int>? ModelContextWindowTokens = null,
     bool ModelListingRequiresApiKey = true,
     string ModelListingUrlPath = "/models",
     StructuredOutputMode StructuredOutputMode = StructuredOutputMode.JsonObject,
@@ -59,14 +55,27 @@ public record ModelProvider(
         EffectivePolicy.RequiresApiKeyForModel(this, modelId);
 
     /// <summary>
-    /// 获取模型上下文窗口。模型级显式配置优先，未知模型仅在服务商可保证统一下限时使用默认值。
+    /// 解析当前服务商实际使用的 API Base URL：优先用户覆盖值，其次默认端点，
+    /// Ollama 兜底本地地址，并统一校验与去除尾部斜杠。
     /// </summary>
-    public int? GetContextWindowTokens(string modelId)
+    public string ResolveEndpoint(string? configuredEndpoint)
     {
-        if (ModelContextWindowTokens?.TryGetValue(modelId, out var modelContextWindow) == true)
-            return modelContextWindow > 0 ? modelContextWindow : null;
+        var endpoint = !string.IsNullOrWhiteSpace(configuredEndpoint)
+            ? configuredEndpoint
+            : string.IsNullOrWhiteSpace(DefaultEndpoint) && Protocol == ModelApiProtocol.Ollama
+                ? "http://localhost:11434"
+                : DefaultEndpoint;
 
-        return DefaultContextWindowTokens is > 0 ? DefaultContextWindowTokens : null;
+        if (string.IsNullOrWhiteSpace(endpoint))
+            throw new FriendlyException($"AI 功能未配置：服务商 {DisplayName} 需要配置 API Base URL");
+
+        if (!Uri.TryCreate(endpoint.Trim().TrimEnd('/'), UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https"))
+        {
+            throw new FriendlyException($"服务商 {DisplayName} 的 API Base URL 无效");
+        }
+
+        return uri.AbsoluteUri.TrimEnd('/');
     }
 }
 

@@ -19,6 +19,7 @@ namespace TestMarketAssistant.Tools;
 /// ITechnicalDataTools 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class TechnicalDataToolsTest
 {
     private ServiceProvider? _serviceProvider;

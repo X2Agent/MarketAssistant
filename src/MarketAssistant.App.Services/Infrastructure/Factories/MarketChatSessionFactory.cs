@@ -73,9 +73,7 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
     {
         var runtime = _chatClientFactory.CreateRuntime();
         var logger = _loggerFactory.CreateLogger<MarketChatSession>();
-        var compactionProvider = _compactionProviderFactory.CreateForContextWindow(
-            runtime.Client,
-            runtime.ContextWindowTokens);
+        var compactionProvider = _compactionProviderFactory.Create(runtime.Client);
 
         return new MarketChatSession(
             runtime.Client,

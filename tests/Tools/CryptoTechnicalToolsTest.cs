@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace TestMarketAssistant.Tools;
 
 [TestClass]
+[TestCategory("Integration")]
 public class CryptoTechnicalToolsTest
 {
     [TestMethod]

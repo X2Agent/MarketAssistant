@@ -18,6 +18,7 @@ namespace TestMarketAssistant.Tools;
 /// ICryptoMetricsTools 接口测试（虚拟币市场数据）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class CryptoMetricsToolsTest
 {
     private ServiceProvider? _serviceProvider;

@@ -22,12 +22,7 @@ public static class ModelProviderCatalog
             Id: "DeepSeek",
             DisplayName: "DeepSeek",
             DefaultEndpoint: "https://api.deepseek.com",
-            ApiKeyUrl: "https://platform.deepseek.com/api_keys",
-            ModelContextWindowTokens: new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["deepseek-v4-flash"] = 1_000_000,
-                ["deepseek-v4-pro"] = 1_000_000
-            }),
+            ApiKeyUrl: "https://platform.deepseek.com/api_keys"),
         new(
             Id: "Moonshot",
             DisplayName: "月之暗面 (Kimi)",
@@ -68,6 +63,11 @@ public static class ModelProviderCatalog
             DisplayName: "PPIO 派欧云",
             DefaultEndpoint: "https://api.ppio.com/openai/v1",
             ApiKeyUrl: "https://console.ppinfra.com/user/token"),
+        new(
+            Id: "SenseNova",
+            DisplayName: "商汤日日新",
+            DefaultEndpoint: "https://token.sensenova.cn/v1",
+            ApiKeyUrl: "https://platform.sensenova.cn/console"),
         // 国外服务商
         new(
             Id: "OpenCodeZen",
