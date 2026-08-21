@@ -380,7 +380,7 @@ public class MarketMonitor : IDisposable
             // HOLD/无持仓完结是正常路径：不进失败冷却，重试频率由
             // StrategyEngine 的 LastTriggeredAt（analysisInterval）节流
             if (result.Outcome != AISignalOutcome.NoTrade)
-                ApplyTradeFailurePolicy(strategy, result.TradeExecuted, result.TradeResult);
+                await ApplyTradeFailurePolicy(strategy, result.TradeExecuted, result.TradeResult);
 
             await CheckStrategyCompletionAsync(strategy);
         }
@@ -397,7 +397,7 @@ public class MarketMonitor : IDisposable
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
-            ApplyTradeFailurePolicy(strategy, result.Success, result);
+            await ApplyTradeFailurePolicy(strategy, result.Success, result);
 
             await CheckStrategyCompletionAsync(strategy);
         }

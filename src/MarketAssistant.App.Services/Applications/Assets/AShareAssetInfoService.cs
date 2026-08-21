@@ -193,7 +193,7 @@ public class AShareAssetInfoService : IAssetInfoService
 
             foreach (var item in jsonDocument.RootElement.EnumerateArray())
             {
-                var symbol = item.TryGetProperty("symbol", out var symEl) ? symEl.GetString() ?? "" : "";
+                var symbol = ParseString(item, "symbol");
                 if (symbol.Length < 2)
                     continue;
 
@@ -202,8 +202,8 @@ public class AShareAssetInfoService : IAssetInfoService
                              symbol.StartsWith("bj", StringComparison.OrdinalIgnoreCase) ? "BJ" : "";
 
                 var code = symbol[2..];
-                var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
-                var price = item.TryGetProperty("trade", out var tradeEl) ? tradeEl.GetString() ?? "" : "";
+                var name = ParseString(item, "name");
+                var price = ParseString(item, "trade");
                 // 新浪接口的 changeratio 和 netamount 均为字符串类型，需手动解析
                 var changeRatio = ParseDouble(item, "changeratio");
                 var netAmount = ParseDouble(item, "netamount");
@@ -228,6 +228,18 @@ public class AShareAssetInfoService : IAssetInfoService
             _logger.LogError(ex, "GetHotAssetsAsync: {Message}", ex.Message);
             throw new Infrastructure.Core.FriendlyException($"获取热门股票失败: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// 从 JSON 元素安全解析字符串值。新浪接口在股票停牌/退市时，
+    /// 部分字段会返回 false 而非字符串，直接 GetString() 会抛异常。
+    /// </summary>
+    private static string ParseString(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var element))
+            return "";
+
+        return element.ValueKind == JsonValueKind.String ? element.GetString() ?? "" : "";
     }
 
     /// <summary>
