@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using System.Security.Cryptography;
 using System.Text;
 using MarketAssistant.Infrastructure.Core;
@@ -191,7 +192,9 @@ public class ChatClientFactory : IChatClientFactory
         var options = new OpenAIClientOptions
         {
             Endpoint = new Uri(endpoint),
-            NetworkTimeout = TimeSpan.FromMinutes(3)
+            NetworkTimeout = TimeSpan.FromMinutes(3),
+            // 显式对齐 Ollama 路径的 3 次重试，不依赖 SDK 默认值
+            RetryPolicy = new ClientRetryPolicy(3)
         };
 
         if (string.IsNullOrWhiteSpace(apiKey))
