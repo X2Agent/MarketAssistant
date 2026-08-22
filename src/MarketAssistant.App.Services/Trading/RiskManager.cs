@@ -32,7 +32,8 @@ public class RiskManager
     /// <summary>
     /// 校验交易是否通过风控检查
     /// </summary>
-    public async Task<RiskCheckResult> ValidateOrderAsync(
+    /// <remarks>virtual 供单元测试替换（并发卖出锁内复检测试）。</remarks>
+    public virtual async Task<RiskCheckResult> ValidateOrderAsync(
         string instrumentSymbol, OrderSide side, decimal quantity, decimal price,
         OrderType orderType = OrderType.Market,
         CancellationToken ct = default)
@@ -111,43 +112,47 @@ public class RiskManager
             if (side == OrderSide.Sell)
             {
                 var baseAsset = ExtractBaseAsset(instrumentSymbol);
-                if (!string.IsNullOrEmpty(baseAsset))
+                if (string.IsNullOrEmpty(baseAsset))
                 {
-                    if (_exchangeClient.IsFutures)
-                    {
-                        // 合约模式：检查交易所实际持仓，仅当持有多头时才校验平仓数量
-                        try
-                        {
-                            var exchangePositions = await _exchangeClient.GetPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
-                            var longPosition = exchangePositions.FirstOrDefault(p =>
-                                string.Equals(p.Symbol, instrumentSymbol, StringComparison.OrdinalIgnoreCase) &&
-                                p.PositionAmt > 0);
+                    // fail-closed：无法解析基础资产意味着无法校验持仓充足性，必须拒绝而非跳过校验
+                    return RiskCheckResult.Reject(
+                        $"无法解析交易对 {instrumentSymbol} 的基础资产，卖出持仓校验失败（fail-closed）");
+                }
 
-                            if (longPosition != null && quantity > longPosition.PositionAmt)
-                            {
-                                return RiskCheckResult.Reject(
-                                    $"平多数量 {quantity} 超过交易所多头持仓 {longPosition.PositionAmt}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            // 查询交易所持仓失败时不阻止交易（可能是网络问题），仅记录警告
-                            _logger.LogWarning(ex, "查询交易所持仓用于风控校验失败，跳过合约平多校验: {Symbol}", instrumentSymbol);
-                        }
-                    }
-                    else
+                if (_exchangeClient.IsFutures)
+                {
+                    // 合约模式：检查交易所实际持仓，仅当持有多头时才校验平仓数量
+                    try
                     {
-                        // 现货模式：使用本地 FIFO 持仓追踪校验
-                        // 注意用剩余未平仓数量（Quantity - ClosedQuantity）而非原始开仓量，
-                        // 否则部分平仓后仍按全额校验，会允许超出实际可卖数量的超卖
-                        var positions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
-                        var availableQty = positions
-                            .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
-                            .Sum(p => p.RemainingQuantity);
-                        if (quantity > availableQty)
+                        var exchangePositions = await _exchangeClient.GetPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
+                        var longPosition = exchangePositions.FirstOrDefault(p =>
+                            string.Equals(p.Symbol, instrumentSymbol, StringComparison.OrdinalIgnoreCase) &&
+                            p.PositionAmt > 0);
+
+                        if (longPosition != null && quantity > longPosition.PositionAmt)
+                        {
                             return RiskCheckResult.Reject(
-                                $"卖出数量 {quantity} 超过可用持仓 {availableQty}（含部分成交未同步的偏差）");
+                                $"平多数量 {quantity} 超过交易所多头持仓 {longPosition.PositionAmt}");
+                        }
                     }
+                    catch (Exception ex)
+                    {
+                        // 查询交易所持仓失败时不阻止交易（可能是网络问题），仅记录警告
+                        _logger.LogWarning(ex, "查询交易所持仓用于风控校验失败，跳过合约平多校验: {Symbol}", instrumentSymbol);
+                    }
+                }
+                else
+                {
+                    // 现货模式：使用本地 FIFO 持仓追踪校验
+                    // 注意用剩余未平仓数量（Quantity - ClosedQuantity）而非原始开仓量，
+                    // 否则部分平仓后仍按全额校验，会允许超出实际可卖数量的超卖
+                    var positions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
+                    var availableQty = positions
+                        .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
+                        .Sum(p => p.RemainingQuantity);
+                    if (quantity > availableQty)
+                        return RiskCheckResult.Reject(
+                            $"卖出数量 {quantity} 超过可用持仓 {availableQty}（含部分成交未同步的偏差）");
                 }
             }
 

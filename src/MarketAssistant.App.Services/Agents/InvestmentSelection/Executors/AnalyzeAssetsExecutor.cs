@@ -1,9 +1,12 @@
 using System.Text.Json;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Providers;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +16,7 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 统一的资产分析 Executor
 /// 对筛选出的资产进行深度分析并生成推荐报告
 /// </summary>
-public sealed class AnalyzeAssetsExecutor
+public sealed partial class AnalyzeAssetsExecutor : Executor
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly IServiceProvider _serviceProvider;
@@ -28,14 +31,17 @@ public sealed class AnalyzeAssetsExecutor
         IChatClientFactory chatClientFactory,
         IServiceProvider serviceProvider,
         ILogger<AnalyzeAssetsExecutor> logger)
+        : base("AnalyzeAssets")
     {
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async ValueTask<InvestmentSelectionResult> HandleAsync(
+    [MessageHandler]
+    private async ValueTask<InvestmentSelectionResult> HandleAsync(
         AssetScreeningResult input,
+        IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
         var originalRequest = input.OriginalRequest;
@@ -65,18 +71,23 @@ public sealed class AnalyzeAssetsExecutor
             var systemPrompt = formatter.GetAnalysisInstructions(originalRequest.IsNewsAnalysis);
             var userPrompt = BuildAnalysisPrompt(originalRequest, assetsDataText);
 
+            var runtime = _chatClientFactory.CreateRuntime();
+            systemPrompt = StructuredOutputOptions.AppendSchemaInstructions(
+                systemPrompt,
+                typeof(InvestmentSelectionResult),
+                runtime.StructuredOutputMode,
+                JsonOptions);
+
             var options = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(
-                    schema: AIJsonUtilities.CreateJsonSchema(typeof(InvestmentSelectionResult)),
-                    schemaName: "InvestmentSelectionResult",
-                    schemaDescription: "投资选择分析结果，包含推荐资产列表和分析报告"),
+                ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
+                    typeof(InvestmentSelectionResult),
+                    runtime.StructuredOutputMode,
+                    JsonOptions),
                 Temperature = 0.2f,
                 MaxOutputTokens = 8000
             };
-
-            var chatClient = _chatClientFactory.CreateClient();
-            var response = await chatClient.GetResponseAsync(
+            var response = await runtime.Client.GetResponseAsync(
                     [
                         new ChatMessage(ChatRole.System, systemPrompt),
                         new ChatMessage(ChatRole.User, userPrompt)
@@ -84,29 +95,36 @@ public sealed class AnalyzeAssetsExecutor
                     options,
                     cancellationToken);
 
-            _logger.LogDebug("[步骤3/3-{MarketType}] AI原始响应: {Response}", originalRequest.MarketType, response.Text);
+            _logger.LogDebug(
+                "[步骤3/3-{MarketType}] AI 响应接收完成，长度: {ResponseLength}",
+                originalRequest.MarketType,
+                response.Text?.Length ?? 0);
 
             var result = LlmJsonExtractor.Deserialize<InvestmentSelectionResult>(response.Text, JsonOptions);
 
             if (result == null)
             {
-                _logger.LogWarning("[步骤3/3-{MarketType}] 响应反序列化失败，原始响应: {Response}",
-                    originalRequest.MarketType, response.Text);
+                _logger.LogWarning(
+                    "[步骤3/3-{MarketType}] 响应反序列化失败，响应长度: {ResponseLength}",
+                    originalRequest.MarketType,
+                    response.Text?.Length ?? 0);
                 result = CreateDefaultResult("解析分析结果失败");
             }
             else
             {
-                var validationErrors = ValidateResult(result);
+                var validationErrors = ValidateResult(result, input, originalRequest);
                 if (validationErrors.Count > 0)
                 {
-                    _logger.LogWarning("[步骤3/3-{MarketType}] AI返回数据验证失败: {Errors}",
-                        originalRequest.MarketType, string.Join("; ", validationErrors));
+                    throw new InvalidOperationException(
+                        $"AI 返回的数据不符合约束: {string.Join("; ", validationErrors)}");
                 }
 
                 if (result.Recommendations.Count == 0)
                 {
-                    _logger.LogWarning("[步骤3/3-{MarketType}] AI未生成任何推荐，原始响应: {Response}",
-                        originalRequest.MarketType, response.Text);
+                    _logger.LogWarning(
+                        "[步骤3/3-{MarketType}] AI 未生成任何推荐，响应长度: {ResponseLength}",
+                        originalRequest.MarketType,
+                        response.Text?.Length ?? 0);
                 }
             }
 
@@ -122,39 +140,52 @@ public sealed class AnalyzeAssetsExecutor
         }
     }
 
-    private List<string> ValidateResult(InvestmentSelectionResult result)
+    private static List<string> ValidateResult(
+        InvestmentSelectionResult result,
+        AssetScreeningResult input,
+        InvestmentSelectionWorkflowRequest request)
     {
-        var errors = new List<string>();
+        var errors = StructuredOutputValidator.Validate(result).ToList();
+        var expectedSelectionType = request.IsNewsAnalysis
+            ? SelectionType.NewsBased
+            : SelectionType.UserRequest;
 
-        if (!Enum.IsDefined(typeof(SelectionType), result.SelectionType))
-            errors.Add($"SelectionType 值无效: {result.SelectionType}");
-
-        if (string.IsNullOrWhiteSpace(result.AnalysisSummary))
-            errors.Add("AnalysisSummary 不能为空");
-
-        if (string.IsNullOrWhiteSpace(result.MarketEnvironmentAnalysis))
-            errors.Add("MarketEnvironmentAnalysis 不能为空");
-
-        if (string.IsNullOrWhiteSpace(result.InvestmentAdvice))
-            errors.Add("InvestmentAdvice 不能为空");
-
-        if (result.RiskWarnings == null || result.RiskWarnings.Count == 0)
-            errors.Add("RiskWarnings 不能为空");
-
-        for (int i = 0; i < result.Recommendations.Count; i++)
+        if (result.SelectionType != expectedSelectionType)
         {
-            var rec = result.Recommendations[i];
-            if (string.IsNullOrWhiteSpace(rec.Symbol))
-                errors.Add($"第{i + 1}个推荐的 Symbol 不能为空");
+            errors.Add($"SelectionType 应为 {expectedSelectionType}，实际为 {result.SelectionType}");
+        }
 
-            if (string.IsNullOrWhiteSpace(rec.Name))
-                errors.Add($"第{i + 1}个推荐的 Name 不能为空");
+        if (result.Recommendations is null)
+        {
+            errors.Add("Recommendations 不能为空");
+            return errors;
+        }
 
-            if (string.IsNullOrWhiteSpace(rec.Reason))
-                errors.Add($"第{i + 1}个推荐的 Reason 不能为空");
+        var maxRecommendations = Math.Clamp(request.MaxRecommendations, 1, 10);
+        if (result.Recommendations.Count > maxRecommendations)
+        {
+            errors.Add(
+                $"推荐数量 {result.Recommendations.Count} 超过请求上限 {maxRecommendations}");
+        }
 
-            if (!Enum.IsDefined(typeof(RiskLevel), rec.RiskLevel))
-                errors.Add($"第{i + 1}个推荐的 RiskLevel 值无效: {rec.RiskLevel}");
+        var availableSymbols = input.ScreenedAssets
+            .Select(asset => asset.Symbol)
+            .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var recommendedSymbols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < result.Recommendations.Count; index++)
+        {
+            var recommendation = result.Recommendations[index];
+            if (!availableSymbols.Contains(recommendation.Symbol))
+            {
+                errors.Add($"Recommendations[{index}].Symbol 不在筛选结果中: {recommendation.Symbol}");
+            }
+
+            if (!recommendedSymbols.Add(recommendation.Symbol))
+            {
+                errors.Add($"Recommendations[{index}].Symbol 重复: {recommendation.Symbol}");
+            }
         }
 
         return errors;
@@ -196,8 +227,9 @@ public sealed class AnalyzeAssetsExecutor
         sb.AppendLine(assetsData);
         sb.AppendLine();
         sb.AppendLine("## 分析任务");
+        var maxRecommendations = Math.Clamp(request.MaxRecommendations, 1, 10);
         sb.AppendLine($"请基于以上{assetType}数据和用户需求，进行综合分析并生成推荐报告。");
-        sb.AppendLine($"- 从中选择最优的3-8个{assetType}进行推荐");
+        sb.AppendLine($"- 最多从中选择 {maxRecommendations} 个最优{assetType}进行推荐；没有合适标的时返回空数组");
         sb.AppendLine("- 说明推荐理由和风险提示");
 
         return sb.ToString();

@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="TestMarketAssistant" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
   </ItemGroup>

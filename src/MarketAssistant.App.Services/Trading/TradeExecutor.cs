@@ -44,7 +44,8 @@ public class TradeExecutor : IDisposable
     /// <paramref name="requireClose"/> 表示该触发语义为"平仓退出"（如止损、追踪止损、网格破网、AI 硬性边界）：
     /// 合约模式下若交易所不存在对应方向的持仓则拒绝下单，防止退出型触发在无持仓时反向开出新仓。
     /// </summary>
-    public async Task<TradeResult> ExecuteTradeAsync(
+    /// <remarks>virtual 供单元测试替换（AISignal 硬性边界行为测试）。</remarks>
+    public virtual async Task<TradeResult> ExecuteTradeAsync(
         TradingStrategy strategy, decimal currentPrice, string? aiReasoning = null,
         string? pendingCustomParams = null,
         bool requireClose = false,
@@ -108,19 +109,34 @@ public class TradeExecutor : IDisposable
                 var approved = await ConfirmationRequested.Invoke(
                     instrumentSymbol, side, currentPrice, quantity, riskCheck.Reason ?? "需人工确认");
                 if (!approved)
-                    return new TradeResult { Success = false, ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}" };
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"用户拒绝交易: {riskCheck.Reason}",
+                        FailureCategory = TradeFailureCategory.Rejected
+                    };
 
                 _logger.LogInformation("用户已确认交易: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             }
             else
             {
-                return new TradeResult { Success = false, ErrorMessage = $"需人工确认: {riskCheck.Reason}" };
+                return new TradeResult
+                {
+                    Success = false,
+                    ErrorMessage = $"需人工确认: {riskCheck.Reason}",
+                    FailureCategory = TradeFailureCategory.Rejected
+                };
             }
         }
         else if (!riskCheck.Passed)
         {
             _logger.LogWarning("风控拒绝: {Reason}", riskCheck.Reason);
-            return new TradeResult { Success = false, ErrorMessage = $"风控拒绝: {riskCheck.Reason}" };
+            return new TradeResult
+            {
+                Success = false,
+                ErrorMessage = $"风控拒绝: {riskCheck.Reason}",
+                FailureCategory = TradeFailureCategory.Rejected
+            };
         }
 
         // 仅在实际调用交易所 API 时持有 symbol 锁，防止同一标的并发重复下单
@@ -129,6 +145,31 @@ public class TradeExecutor : IDisposable
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // 锁内复检：风控校验与人工确认在锁外完成（防确认等待期间锁死同一标的），
+            // 等待期间同一标的的其他现货卖出可能已消耗本地 FIFO 持仓。两笔并发卖出若都基于
+            // 同一份持仓快照通过风控，会依次成交造成超卖与负持仓，故获取锁后必须重验。
+            // 合约模式以交易所持仓为准且 reduceOnly 由交易所强制，无需本地复检。
+            if (side == OrderSide.Sell && !_exchangeClient.IsFutures)
+            {
+                var openPositions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
+                var availableQuantity = openPositions
+                    .Where(p => p.Symbol.Equals(instrumentSymbol, StringComparison.OrdinalIgnoreCase))
+                    .Sum(p => p.RemainingQuantity);
+
+                if (quantity > availableQuantity)
+                {
+                    _logger.LogWarning(
+                        "锁内复检拒绝：{Symbol} 可平数量 {Available} 少于本次卖出 {Quantity}（并发卖出或确认等待期间持仓已变化）",
+                        instrumentSymbol, availableQuantity, quantity);
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"并发校验失败：{instrumentSymbol} 可平数量 {availableQuantity} 少于本次卖出数量 {quantity}",
+                        FailureCategory = TradeFailureCategory.Rejected
+                    };
+                }
+            }
+
             return await ExecuteApprovedOrderAsync(
                 instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
                 strategyId, aiReasoning, requireClose, ct).ConfigureAwait(false);
@@ -147,9 +188,9 @@ public class TradeExecutor : IDisposable
     {
         try
         {
-            // 生成幂等订单 ID：同一笔交易的所有重试使用相同 ID，
-            // 币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
-            // 币安限制 newClientOrderId 最长 36 字符，使用 Base36 编码压缩 GUID。
+            // 生成订单客户端 ID（"MA" + 16 位 hex，总长 18 ≤ 币安 36 字符上限）。
+            // 同一次下单内的网络异常重试复用该 ID：币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
+            // 注意：幂等性仅覆盖本方法的内部重试循环；跨调用重试（如人工重发）会生成新 ID。
             var clientOrderId = "MA" + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
 
             // 合约模式：判断本次操作是开仓还是平仓
@@ -170,7 +211,8 @@ public class TradeExecutor : IDisposable
                     return new TradeResult
                     {
                         Success = false,
-                        ErrorMessage = $"策略要求平仓但 {instrumentSymbol} 无对应方向持仓，拒绝下单"
+                        ErrorMessage = $"策略要求平仓但 {instrumentSymbol} 无对应方向持仓，拒绝下单",
+                        FailureCategory = TradeFailureCategory.Rejected
                     };
                 }
 
@@ -274,7 +316,11 @@ public class TradeExecutor : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
-            return new TradeResult { Success = false, ErrorMessage = ex.Message };
+            // 网络类异常（含重试耗尽）短期可恢复；其余归为其他失败由调用方按冷却策略处理
+            var category = ex is HttpRequestException or TimeoutException || ex.InnerException is HttpRequestException
+                ? TradeFailureCategory.Network
+                : TradeFailureCategory.Other;
+            return new TradeResult { Success = false, ErrorMessage = ex.Message, FailureCategory = category };
         }
     }
 

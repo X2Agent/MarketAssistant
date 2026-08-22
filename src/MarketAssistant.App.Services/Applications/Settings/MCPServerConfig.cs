@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
@@ -38,6 +40,7 @@ public class MCPServerConfig
     /// <summary>
     /// 环境变量，用于stdio类型
     /// </summary>
+    [JsonIgnore]
     public Dictionary<string, string?> EnvironmentVariables { get; set; } = new();
 
     /// <summary>

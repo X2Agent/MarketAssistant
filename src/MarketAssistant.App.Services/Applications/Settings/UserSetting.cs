@@ -10,17 +10,33 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public class UserSetting : INotifyPropertyChanged
 {
-    public string ModelId { get; set; } = "";
+    /// <summary>
+    /// 模型服务商 ID（对应 ModelProviderCatalog 中的 Id）
+    /// </summary>
+    public string ProviderId { get; set; } = "";
+
+    /// <summary>
+    /// 按服务商保存模型 ID，切换服务商时恢复各自选择。
+    /// </summary>
+    public Dictionary<string, string> ProviderModelIds { get; set; } = new();
 
     public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
     public string EmbeddingEndpoint { get; set; } = "https://api.jina.ai";
 
+    [JsonIgnore]
     public string EmbeddingApiKey { get; set; } = "";
 
-    public string Endpoint { get; set; } = "https://api.siliconflow.cn";
+    /// <summary>
+    /// 按服务商保存自定义 Endpoint，空值表示使用目录默认地址。
+    /// </summary>
+    public Dictionary<string, string> ProviderEndpoints { get; set; } = new();
 
-    public string ApiKey { get; set; } = "";
+    /// <summary>
+    /// 按服务商 ID 存储各自的 API Key
+    /// </summary>
+    [JsonIgnore]
+    public Dictionary<string, string> ProviderApiKeys { get; set; } = new();
 
     private bool _loadKnowledge;
     public bool LoadKnowledge
@@ -44,6 +60,7 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public bool Notification { get; set; } = true;
 
+    [JsonIgnore]
     public string ZhiTuApiToken { get; set; } = "";
 
     /// <summary>
@@ -80,16 +97,19 @@ public class UserSetting : INotifyPropertyChanged
     /// CoinGecko API 密钥（Demo 版免费，需在 https://www.coingecko.com/api/dashboard 注册获取）
     /// /coins/markets 等端点现要求携带 Demo Key，留空可能导致虚拟币筛选失败
     /// </summary>
+    [JsonIgnore]
     public string CoinGeckoApiKey { get; set; } = "";
 
     /// <summary>
     /// Binance API Key（交易功能必须）
     /// </summary>
+    [JsonIgnore]
     public string BinanceApiKey { get; set; } = "";
 
     /// <summary>
     /// Binance Secret Key（交易功能必须）
     /// </summary>
+    [JsonIgnore]
     public string BinanceSecretKey { get; set; } = "";
 
     /// <summary>
@@ -125,6 +145,7 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// Web Search API Key
     /// </summary>
+    [JsonIgnore]
     public string WebSearchApiKey { get; set; } = "";
 
     /// <summary>

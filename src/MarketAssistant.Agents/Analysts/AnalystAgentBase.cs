@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.PromptConfiguration;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -32,13 +33,12 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         float temperature,
         float topP,
         int? topK,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        AIContextProvider[]? aiContextProviders = null)
         : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
-            temperature, topP, topK, responseFormat, tools,
-            skillsProvider != null ? [skillsProvider, .. (aiContextProviders ?? [])] : aiContextProviders))
+            temperature, topP, topK, resultType, structuredOutputMode, tools, aiContextProviders))
     {
     }
 
@@ -48,13 +48,13 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
     protected AnalystAgentBase(
         IChatClient chatClient,
         AnalystPromptConfig config,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        AIContextProvider[]? aiContextProviders = null)
         : this(chatClient, config.Instructions, config.Name, config.Description,
               config.Temperature, config.TopP, config.TopK,
-              responseFormat, tools, aiContextProviders, skillsProvider)
+              resultType, structuredOutputMode, tools, aiContextProviders)
     {
     }
 
@@ -69,10 +69,18 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         float temperature,
         float topP,
         int? topK,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
         AIContextProvider[]? aiContextProviders)
     {
+        instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            instructions,
+            resultType,
+            structuredOutputMode);
+        var responseFormat = StructuredOutputOptions.CreateResponseFormat(
+            resultType,
+            structuredOutputMode);
         var options = new ChatClientAgentOptions
         {
             Name = name,

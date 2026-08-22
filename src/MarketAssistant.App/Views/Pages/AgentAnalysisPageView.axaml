@@ -24,7 +24,6 @@
             <!-- 进度显示区域 - 仅在分析时显示 -->
             <views:ProgressDisplayView 
                 IsVisible="{Binding IsBusy}"
-                IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
                 AnalysisStage="{Binding AnalysisStage}"
                 ProgressPercent="{Binding AnalysisProgressPercent}"
                 FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
@@ -159,8 +158,9 @@
                     </Button>
                 </Border>
 
-                <!-- 报告内容区域 -->
-                <Grid Grid.Row="1">
+                <!-- 报告内容区域（仅在成功产出报告后展示） -->
+                <Grid Grid.Row="1"
+                      IsVisible="{Binding HasActiveReport}">
                     <!-- 智能分析报告区域 -->
                     <ContentControl Content="{Binding AnalysisReportViewModel}">
                         <ContentControl.ContentTemplate>
@@ -209,6 +209,56 @@
                         </Button.Styles>
                     </Button>
                 </Grid>
+
+                <!-- 分析未完成状态：分析失败或取消且无报告可展示时出现 -->
+                <Border Grid.Row="1"
+                        IsVisible="{Binding !HasActiveReport}"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        CornerRadius="{StaticResource DefaultCornerRadius}"
+                        Padding="{StaticResource DefaultCardPadding}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="{StaticResource ProgressDialogWidth}">
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="⚠️"
+                                   FontSize="{StaticResource ExtraLargeFontSize}"
+                                   HorizontalAlignment="Center"/>
+
+                        <TextBlock Text="分析未完成"
+                                   FontSize="{StaticResource LargeFontSize}"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+                        <TextBlock Text="{Binding AnalysisFailureMessage}"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding AnalysisFailureMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <Button Content="重新分析"
+                                Command="{Binding RetryAnalysisCommand}"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource PrimaryBrush}"
+                                Foreground="White"
+                                BorderThickness="{StaticResource NoBorderThickness}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                Padding="{StaticResource CompactCardPadding}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+                                </Style>
+                                <Style Selector="Button:pressed /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
 
@@ -216,6 +266,7 @@
         <Border Background="#80000000"
                 IsVisible="{Binding IsChatSidebarVisible}"
                 ZIndex="1500"
+                Focusable="False"
                 Tapped="OnOverlayTapped"/>
 
         <!-- 聊天侧边栏（浮层，右对齐） -->

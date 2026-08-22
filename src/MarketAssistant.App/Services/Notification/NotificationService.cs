@@ -8,7 +8,7 @@ namespace MarketAssistant.Services.Notification;
 /// </summary>
 public class NotificationService : INotificationService
 {
-    private const int DefaultDuration = 3000;
+    private const int DefaultDuration = 5000;
     private readonly ILogger<NotificationService> _logger;
 
     public NotificationService(ILogger<NotificationService> logger)

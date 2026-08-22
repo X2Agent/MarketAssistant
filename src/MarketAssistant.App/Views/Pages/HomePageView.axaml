@@ -14,7 +14,6 @@
 
     <UserControl.Resources>
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
-        <converts:NumberFormatConverter x:Key="NumberFormatConverter"/>
     </UserControl.Resources>
 
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
@@ -76,8 +75,8 @@
         </controls:CardView>
 
         <!-- 三列布局 -->
-        <Grid Grid.Row="1" 
-              ColumnDefinitions="2*,3*,1*">
+        <Grid Grid.Row="1"
+              ColumnDefinitions="2*,3*,2*">
             
             <!-- 左侧：7*24小时新闻快讯 -->
             <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
@@ -107,6 +106,9 @@
                             <DataTemplate x:DataType="telegrams:Telegram">
                                 <Border Classes="news-card"
                                         Tapped="NewsCard_Tapped"
+                                        KeyDown="NewsCard_KeyDown"
+                                        Focusable="True"
+                                        AutomationProperties.Name="{Binding Title}"
                                         Tag="{Binding .}">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <!-- 左侧内容 -->
@@ -191,6 +193,9 @@
                                         Background="{DynamicResource CardBackgroundBrush}"
                                         CornerRadius="{StaticResource DefaultCornerRadius}"
                                         Tapped="HotStockCard_Tapped"
+                                        KeyDown="HotStockCard_KeyDown"
+                                        Focusable="True"
+                                        AutomationProperties.Name="{Binding Name}"
                                         Tag="{Binding .}">
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Cursor="Hand">
                                         
@@ -270,6 +275,9 @@
                                 <DataTemplate x:DataType="assets:AssetItem">
                                     <Border Classes="recent-stock-card" 
                                             Tapped="RecentStockCard_Tapped"
+                                            KeyDown="RecentStockCard_KeyDown"
+                                            Focusable="True"
+                                            AutomationProperties.Name="{Binding Name}"
                                             Tag="{Binding .}">
                                         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
                                             <TextBlock Grid.Row="0" Grid.Column="0"

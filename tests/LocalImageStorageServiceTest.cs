@@ -7,13 +7,14 @@ public class LocalImageStorageServiceTest
 {
     private LocalImageStorageService _service = null!;
     private string _testDirectory = null!;
-    private const string TestDocumentPath = "test-document.pdf";
+    private string _testDocumentPath = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         _service = new LocalImageStorageService();
         _testDirectory = Path.Combine(Path.GetTempPath(), "LocalImageStorageServiceTest", Guid.NewGuid().ToString());
+        _testDocumentPath = Path.Combine(_testDirectory, "test-document.pdf");
     }
 
     [TestCleanup]
@@ -35,7 +36,7 @@ public class LocalImageStorageServiceTest
         var fileNameHint = "test-image.png";
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, fileNameHint, TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, fileNameHint, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -52,7 +53,7 @@ public class LocalImageStorageServiceTest
         var imageBytes = CreateTestImageBytes();
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, "", TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, "", _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -68,7 +69,7 @@ public class LocalImageStorageServiceTest
         var imageBytes = CreateTestImageBytes();
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, null!, TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, null!, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -86,8 +87,8 @@ public class LocalImageStorageServiceTest
         var fileNameHint = "duplicate.png";
 
         // Act
-        var result1 = await _service.SaveImageAsync(imageBytes1, fileNameHint, TestDocumentPath);
-        var result2 = await _service.SaveImageAsync(imageBytes2, fileNameHint, TestDocumentPath);
+        var result1 = await _service.SaveImageAsync(imageBytes1, fileNameHint, _testDocumentPath);
+        var result2 = await _service.SaveImageAsync(imageBytes2, fileNameHint, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result1);
@@ -110,7 +111,7 @@ public class LocalImageStorageServiceTest
         var unsafeHint = "unsafe<>:|?*.png";
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, unsafeHint, TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, unsafeHint, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -133,7 +134,7 @@ public class LocalImageStorageServiceTest
         var fileNameHint = "test.xyz";
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, fileNameHint, TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, fileNameHint, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -150,7 +151,7 @@ public class LocalImageStorageServiceTest
         var longName = new string('a', 300) + ".png";
 
         // Act
-        var result = await _service.SaveImageAsync(imageBytes, longName, TestDocumentPath);
+        var result = await _service.SaveImageAsync(imageBytes, longName, _testDocumentPath);
 
         // Assert
         Assert.IsNotNull(result);
@@ -165,7 +166,7 @@ public class LocalImageStorageServiceTest
     {
         // Act & Assert
         await Assert.ThrowsExactlyAsync<ArgumentException>(
-            () => _service.SaveImageAsync(null!, "test.png", TestDocumentPath));
+            () => _service.SaveImageAsync(null!, "test.png", _testDocumentPath));
     }
 
     [TestMethod]
@@ -174,7 +175,7 @@ public class LocalImageStorageServiceTest
     {
         // Act & Assert
         await Assert.ThrowsExactlyAsync<ArgumentException>(
-            () => _service.SaveImageAsync(Array.Empty<byte>(), "test.png", TestDocumentPath));
+            () => _service.SaveImageAsync(Array.Empty<byte>(), "test.png", _testDocumentPath));
     }
 
     [TestMethod]
@@ -186,7 +187,7 @@ public class LocalImageStorageServiceTest
 
         // Act & Assert
         await Assert.ThrowsExactlyAsync<ArgumentException>(
-            () => _service.SaveImageAsync(largeImageBytes, "large.png", TestDocumentPath));
+            () => _service.SaveImageAsync(largeImageBytes, "large.png", _testDocumentPath));
     }
 
     [TestMethod]
@@ -231,7 +232,7 @@ public class LocalImageStorageServiceTest
     {
         // Arrange
         var imageBytes = CreateTestImageBytes();
-        var documentPath = Path.Combine("subfolder", "deep", "document.pdf");
+        var documentPath = Path.Combine(_testDirectory, "subfolder", "deep", "document.pdf");
 
         // Act
         var result = await _service.SaveImageAsync(imageBytes, "test.png", documentPath);
@@ -257,7 +258,7 @@ public class LocalImageStorageServiceTest
 
         // Act & Assert
         await Assert.ThrowsExactlyAsync<TaskCanceledException>(
-            () => _service.SaveImageAsync(imageBytes, "test.png", TestDocumentPath, cts.Token));
+            () => _service.SaveImageAsync(imageBytes, "test.png", _testDocumentPath, cts.Token));
     }
 
     private static byte[] CreateTestImageBytes()

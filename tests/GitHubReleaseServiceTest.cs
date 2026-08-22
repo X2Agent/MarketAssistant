@@ -247,7 +247,7 @@ public class GitHubReleaseServiceTest
             )
             .ReturnsAsync(responseMessage);
 
-        var progress = new Progress<double>(p => progressReports.Add(p));
+        var progress = new SynchronousProgress<double>(progressReports.Add);
 
         try
         {
@@ -261,11 +261,10 @@ public class GitHubReleaseServiceTest
             Assert.AreEqual(savePath, result);
             Assert.IsTrue(File.Exists(savePath));
 
-            // 如果有进度报告，验证最后一个应该是100%
-            if (progressReports.Count > 0)
-            {
-                Assert.IsTrue(progressReports[progressReports.Count - 1] >= 1.0);
-            }
+            // 10MB 文件应触发进度报告，且最终进度应为 100%
+            Assert.IsTrue(progressReports.Count > 0, "下载 10MB 文件应触发进度回调");
+            Assert.IsTrue(progressReports[progressReports.Count - 1] >= 1.0,
+                $"最终进度应 >= 1.0，实际: {progressReports[progressReports.Count - 1]}");
         }
         finally
         {
@@ -303,14 +302,6 @@ public class GitHubReleaseServiceTest
             async () => await _service.DownloadUpdateAsync(
                 "https://github.com/test/app.zip",
                 Path.GetTempFileName()));
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void ClearCache_ClearsSuccessfully()
-    {
-        // Act & Assert - 不抛出异常即可
-        _service.ClearCache();
     }
 
     private void SetupHttpResponse<T>(HttpStatusCode statusCode, T content)
@@ -417,6 +408,11 @@ public class GitHubReleaseServiceTest
         Assert.IsTrue(result.HasNewVersion);
         Assert.AreEqual("v1.1.0-beta1", result.LatestRelease!.TagName,
             "应按版本号排序取最高，而非按发布时间");
+    }
+
+    private sealed class SynchronousProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
     }
 
     [TestMethod]

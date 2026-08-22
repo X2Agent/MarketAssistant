@@ -18,28 +18,19 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [RequiresTools(typeof(IFinancialTools))]
 public class FinancialAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FinancialAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(FinancialAnalysisResult),
-        schemaDescription: "财务分析师的结构化分析结果，包含财务健康、盈利质量、现金流和风险预警"
-    );
-
     public FinancialAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
             promptLoader.GetConfig("FinancialAnalyst"),
-            ResponseFormat,
+            typeof(FinancialAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
-
 }

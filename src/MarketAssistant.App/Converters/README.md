@@ -18,18 +18,7 @@
            Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
 ```
 
-### 2. NavigationIconConverter
-
-根据导航项的选中状态返回对应的 SVG 图标路径，实现 `IMultiValueConverter`。
-
-```xml
-<MultiBinding Converter="{StaticResource NavigationIconConverter}">
-    <Binding Path="." />
-    <Binding Path="IsSelected" />
-</MultiBinding>
-```
-
-### 3. RadioButtonEqualityConverter
+### 2. RadioButtonEqualityConverter
 
 用于 RadioButton 的 IsChecked 属性与字符串值的双向绑定。
 
@@ -40,23 +29,19 @@
                 Mode=TwoWay}" />
 ```
 
-### 4. EnumDescriptionConverter
+### 3. EnumDescriptionConverter
 
 将枚举值转换为 `[Description]` 特性中指定的描述文本，用于 UI 显示。
 
-### 5. NullableValueConverter
+### 4. NullableValueConverter
 
 可空值格式化转换器，参数格式 `format|fallback`（如 `"{0:F2}元|--"`）。
 
-### 6. NullableVisibilityConverter
+### 5. NullableVisibilityConverter
 
 当值为 null 时返回 false，用于 `IsVisible` 绑定。
 
-### 7. NumberFormatConverter
-
-数值格式化转换器，按参数指定的格式字符串输出。
-
-### 8. ScoreToColorConverter
+### 6. ScoreToColorConverter
 
 将评分（1-10）映射到对应的颜色，用于分析报告评分展示。
 

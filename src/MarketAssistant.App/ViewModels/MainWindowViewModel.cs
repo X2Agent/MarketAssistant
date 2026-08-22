@@ -16,6 +16,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly NavigationService _navigationService;
     private readonly MarketContext _marketContext;
     private readonly INotificationService _notificationService;
+    private bool _isSynchronizingNavigationSelection;
 
     [ObservableProperty]
     private NavigationItemViewModel? _selectedNavigationItem;
@@ -53,10 +54,8 @@ public partial class MainWindowViewModel : ViewModelBase
         // 监听市场切换事件
         SubscribeToMarketChanges(_marketContext);
 
-        // 默认导航到首页
+        // 默认导航到首页。SelectedNavigationItem 的变更回调负责实际导航，避免重复入栈。
         SelectedNavigationItem = NavigationItems[0];
-        var homeViewModel = SelectedNavigationItem.CreateViewModel();
-        _navigationService.NavigateToRoot(homeViewModel, SelectedNavigationItem.Title);
     }
 
     protected override void OnMarketChanged(MarketType newMarket)
@@ -98,8 +97,16 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (_navigationService.CurrentRootNavigationItemTitle != null)
             {
-                SelectedNavigationItem = NavigationItems.FirstOrDefault(
-                    item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
+                _isSynchronizingNavigationSelection = true;
+                try
+                {
+                    SelectedNavigationItem = NavigationItems.FirstOrDefault(
+                        item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
+                }
+                finally
+                {
+                    _isSynchronizingNavigationSelection = false;
+                }
             }
         }
     }
@@ -143,17 +150,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnSelectedNavigationItemChanged(NavigationItemViewModel? value)
     {
-        if (value != null)
-        {
-            // 避免重复导航
-            if (_navigationService.CurrentRootNavigationItemTitle == value.Title)
-            {
-                return;
-            }
+        if (value is null || _isSynchronizingNavigationSelection)
+            return;
 
-            var viewModel = value.CreateViewModel();
-            _navigationService.NavigateToRoot(viewModel, value.Title);
-        }
+        // 避免重复导航
+        if (_navigationService.CurrentRootNavigationItemTitle == value.Title)
+            return;
+
+        var viewModel = value.CreateViewModel();
+        _navigationService.NavigateToRoot(viewModel, value.Title);
     }
 }
 

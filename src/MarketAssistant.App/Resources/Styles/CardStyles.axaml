@@ -27,6 +27,11 @@
         <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
         <Setter Property="RenderTransform" Value="{StaticResource HoverLiftTransform}"/>
     </Style>
+    <Style Selector="Border.strategy-card:focus, Border.stock-card:focus, Border.hot-stock-card:focus, Border.recent-stock-card:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
+    </Style>
 
     <!-- ================================================================== -->
     <!-- 选股模式卡片样式 (独立定义，因样式差异较大) -->
@@ -48,6 +53,10 @@
     </Style>
     <Style Selector="Border.mode-card:pointerover">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+    </Style>
+    <Style Selector="Border.mode-card:focus">
+        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
     </Style>
     <Style Selector="Border.mode-card.selected">
         <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
@@ -103,9 +112,15 @@
     <!-- 新闻卡片样式 -->
     <Style Selector="Border.news-card">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Border.news-card:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
         <Setter Property="Cursor" Value="Hand"/>

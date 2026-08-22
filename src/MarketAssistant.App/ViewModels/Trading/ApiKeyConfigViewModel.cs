@@ -161,7 +161,10 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
         await SafeExecuteAsync(async () =>
         {
             // 切换到实盘模式时若监控正在运行，弹窗警告（运行中切换会立即对实盘账户下单）
-            if (IsLiveMode && _marketMonitor.IsRunning)
+            if (TradingEnvironmentService.RequiresLiveModeConfirmation(
+                    _tradingEnvironmentService.CurrentMode,
+                    SelectedMode,
+                    _marketMonitor.IsRunning))
             {
                 var confirmed = await _dialogService.ShowConfirmationAsync(
                     "切换到实盘模式",

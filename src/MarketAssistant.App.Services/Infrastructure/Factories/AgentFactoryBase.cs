@@ -12,32 +12,23 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Infrastructure.Factories;
 
 /// <summary>
-/// Agent 工厂基类：封装 ChatClient 创建、基于 RequiresToolsAttribute 的工具解析、
-/// Token 追踪中间件附加等公共流程。子类只需关注自身特有逻辑（如额外中间件）。
+/// Agent 工厂基类：封装基于 RequiresToolsAttribute 的工具解析和 Token 追踪中间件附加。
 /// </summary>
 public abstract class AgentFactoryBase
 {
     protected readonly IServiceProvider ServiceProvider;
-    protected readonly IChatClientFactory ChatClientFactory;
     protected readonly TokenTrackingMiddleware TokenTracking;
     protected readonly ILogger Logger;
 
     protected AgentFactoryBase(
         IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
         TokenTrackingMiddleware tokenTracking,
         ILogger logger)
     {
         ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        ChatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         TokenTracking = tokenTracking ?? throw new ArgumentNullException(nameof(tokenTracking));
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-
-    /// <summary>
-    /// 创建 ChatClient。
-    /// </summary>
-    protected IChatClient CreateChatClient() => ChatClientFactory.CreateClient();
 
     /// <summary>
     /// 基于 agentType 上的 <see cref="RequiresToolsAttribute"/> 与指定市场类型解析工具列表。
@@ -53,7 +44,19 @@ public abstract class AgentFactoryBase
             var toolService = ServiceProvider.GetKeyedService(attr.ToolInterfaceType, marketType);
             if (toolService is IToolsProvider provider)
             {
-                tools.AddRange(provider.GetFunctions());
+                var providerTools = provider.GetFunctions().ToList();
+
+                foreach (var tool in providerTools)
+                {
+                    Logger.LogDebug(
+                        "解析 Agent 专业工具: {AgentType}, 市场: {Market}, Tool: {ToolName}, RuntimeType: {RuntimeType}",
+                        agentType.Name,
+                        marketType,
+                        tool.Name,
+                        tool.GetType().FullName);
+                }
+
+                tools.AddRange(providerTools);
                 resolvedCount++;
             }
             else

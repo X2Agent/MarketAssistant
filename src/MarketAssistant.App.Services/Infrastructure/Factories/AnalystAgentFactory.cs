@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Market;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,14 +15,12 @@ namespace MarketAssistant.Infrastructure.Factories;
 public interface IAnalystAgentFactory
 {
     /// <summary>
-    /// 根据类型创建对应的代理（动态调用，运行时检查）
+    /// 使用调用方提供的不可变 Runtime Client 创建代理，确保同一次工作流模型配置一致。
     /// </summary>
-    AIAgent CreateAnalyst(Type agentType);
-
-    /// <summary>
-    /// 根据类型创建代理，附加额外的 AIContextProvider（如共享市场快照）
-    /// </summary>
-    AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders);
+    AIAgent CreateAnalyst(
+        Type agentType,
+        ChatClientRuntime runtime,
+        AIContextProvider[]? additionalProviders = null);
 }
 
 /// <summary>
@@ -31,41 +30,62 @@ public interface IAnalystAgentFactory
 public class AnalystAgentFactory : AgentFactoryBase, IAnalystAgentFactory
 {
     private readonly MarketContext _marketContext;
+    private readonly AgentSkillsProvider _skillsProvider;
 
     public AnalystAgentFactory(
         IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
         MarketContext marketContext,
+        AgentSkillsProvider skillsProvider,
         TokenTrackingMiddleware tokenTracking,
         ILogger<AnalystAgentFactory> logger)
-        : base(serviceProvider, chatClientFactory, tokenTracking, logger)
+        : base(serviceProvider, tokenTracking, logger)
     {
         _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
+        _skillsProvider = skillsProvider ?? throw new ArgumentNullException(nameof(skillsProvider));
     }
 
-    /// <inheritdoc />
-    public AIAgent CreateAnalyst(Type agentType) => CreateAnalyst(agentType, additionalProviders: null);
-
-    /// <inheritdoc />
-    public AIAgent CreateAnalyst(Type agentType, AIContextProvider[]? additionalProviders)
+    public AIAgent CreateAnalyst(
+        Type agentType,
+        ChatClientRuntime runtime,
+        AIContextProvider[]? additionalProviders = null)
     {
         try
         {
+            ArgumentNullException.ThrowIfNull(runtime);
+
             // 严格限制必须是 AnalystAgentBase 的子类
             if (!typeof(AnalystAgentBase).IsAssignableFrom(agentType))
             {
                 throw new ArgumentException($"Type {agentType.Name} must inherit from AnalystAgentBase", nameof(agentType));
             }
 
-            var chatClient = CreateChatClient();
+            // 根据当前市场类型获取对应的工具实现
             var currentMarket = _marketContext.CurrentMarket;
             var tools = ResolveToolsFor(agentType, currentMarket);
 
-            // 显式传递 chatClient、合并后的工具列表和 AIContextProvider[]，其余由 DI 自动解析
-            var parameters = new List<object> { chatClient, tools };
+            // 显式传递 Runtime Client、结构化输出模式、工具和上下文，其余由 DI 自动解析。
+            var parameters = new List<object>
+            {
+                runtime.Client,
+                tools,
+                runtime.StructuredOutputMode
+            };
 
-            if (additionalProviders is { Length: > 0 })
-                parameters.Add(additionalProviders);
+            Logger.LogInformation(
+                "创建分析师代理: {AgentType}, 市场: {Market}, Provider: {ProviderId}, Model: {ModelId}, ResponseFormat: {StructuredOutputMode}, Tools: {ToolCount}",
+                agentType.Name,
+                currentMarket,
+                runtime.ProviderId,
+                runtime.ModelId,
+                runtime.StructuredOutputMode,
+                tools.Count);
+
+            AIContextProvider[] contextProviders =
+            [
+                _skillsProvider,
+                .. (additionalProviders ?? [])
+            ];
+            parameters.Add(contextProviders);
 
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(ServiceProvider, agentType, parameters.ToArray());
 

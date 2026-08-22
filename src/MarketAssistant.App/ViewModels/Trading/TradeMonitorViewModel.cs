@@ -15,7 +15,6 @@ namespace MarketAssistant.ViewModels.Trading;
 public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 {
     private const decimal RiskWarningThreshold = 0.8m;
-    private const int ConfirmationTimeoutSeconds = 60;
 
     private readonly MarketMonitor _marketMonitor;
     private readonly CryptoPortfolioService _portfolioService;
@@ -23,7 +22,6 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private readonly TradingDataService _dataService;
     private readonly TradingStrategyService _strategyService;
     private readonly OrderStateSyncService _orderStateSyncService;
-    private readonly TradeExecutor _tradeExecutor;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
     public ObservableCollection<ExchangeOrderResult> OpenOrders { get; } = [];
@@ -46,16 +44,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isDailyLossHigh;
     [ObservableProperty] private bool _isPositionHigh;
 
-    // Human-in-the-Loop 确认
-    [ObservableProperty] private bool _hasPendingConfirmation;
-    [ObservableProperty] private string _confirmationSymbol = string.Empty;
-    [ObservableProperty] private string _confirmationSide = string.Empty;
-    [ObservableProperty] private string _confirmationPrice = string.Empty;
-    [ObservableProperty] private string _confirmationQuantity = string.Empty;
-    [ObservableProperty] private string _confirmationReason = string.Empty;
-
-    private TaskCompletionSource<bool>? _confirmationTcs;
-    private CancellationTokenSource? _confirmationCts;
+    // 说明：Human-in-the-Loop 交易确认已上移至应用级 TradeConfirmationService
+    // （全局对话框，不依赖本页存活），本 ViewModel 不再订阅 ConfirmationRequested。
 
     public TradeMonitorViewModel(
         MarketMonitor marketMonitor,
@@ -64,7 +54,6 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         TradingDataService dataService,
         TradingStrategyService strategyService,
         OrderStateSyncService orderStateSyncService,
-        TradeExecutor tradeExecutor,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
     {
@@ -74,13 +63,9 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _dataService = dataService;
         _strategyService = strategyService;
         _orderStateSyncService = orderStateSyncService;
-        _tradeExecutor = tradeExecutor;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
-
-        // 接管 TradeExecutor 的确认事件（使用事件模式，Dispose 时取消订阅）
-        _tradeExecutor.ConfirmationRequested += OnTradeConfirmationRequestedAsync;
     }
 
     [RelayCommand]
@@ -195,56 +180,9 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         IsMonitorRunning = isRunning;
     }
 
-    private Task<bool> OnTradeConfirmationRequestedAsync(
-        string symbol, OrderSide side, decimal price, decimal quantity, string reason)
-    {
-        ConfirmationSymbol = symbol;
-        ConfirmationSide = side.ToString();
-        ConfirmationPrice = price.ToString("F2");
-        ConfirmationQuantity = quantity.ToString("F6");
-        ConfirmationReason = reason;
-        HasPendingConfirmation = true;
-
-        _confirmationTcs = new TaskCompletionSource<bool>();
-
-        // 60 秒超时自动拒绝，避免用户离开后交易长时间挂起
-        _confirmationCts?.Dispose();
-        _confirmationCts = new CancellationTokenSource(TimeSpan.FromSeconds(ConfirmationTimeoutSeconds));
-        _confirmationCts.Token.Register(() => _confirmationTcs.TrySetResult(false));
-
-        return _confirmationTcs.Task;
-    }
-
-    [RelayCommand]
-    private void ApproveConfirmation()
-    {
-        HasPendingConfirmation = false;
-        // 注意：必须 Dispose 而非 Cancel。
-        // Cancel 会同步触发 Token.Register 的回调（TrySetResult(false)），
-        // 导致随后的 TrySetResult(true) 被忽略，用户批准反而变成拒绝。
-        _confirmationCts?.Dispose();
-        _confirmationCts = null;
-        _confirmationTcs?.TrySetResult(true);
-    }
-
-    [RelayCommand]
-    private void RejectConfirmation()
-    {
-        HasPendingConfirmation = false;
-        _confirmationCts?.Dispose();
-        _confirmationCts = null;
-        _confirmationTcs?.TrySetResult(false);
-    }
-
     public void Dispose()
     {
         _marketMonitor.StatusChanged -= OnMonitorStatusChanged;
-        // 取消订阅事件，避免单例 TradeExecutor 持有已 Dispose 的 ViewModel 引用
-        _tradeExecutor.ConfirmationRequested -= OnTradeConfirmationRequestedAsync;
-        // 释放前若仍有待确认请求，按拒绝处理，避免调用方永久挂起
-        _confirmationTcs?.TrySetResult(false);
-        _confirmationCts?.Dispose();
-        _confirmationCts = null;
         GC.SuppressFinalize(this);
     }
 }

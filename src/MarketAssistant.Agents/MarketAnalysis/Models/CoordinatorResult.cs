@@ -195,18 +195,23 @@ public sealed class KeyIndicator
 [Description("各维度评分详情")]
 public sealed class AnalysisDimensionScores
 {
+    [Range(1, 10)]
     [Description("基本面评分")]
     public float Fundamental { get; set; }
 
+    [Range(1, 10)]
     [Description("技术面评分")]
     public float Technical { get; set; }
 
+    [Range(1, 10)]
     [Description("财务面评分")]
     public float Financial { get; set; }
 
+    [Range(1, 10)]
     [Description("市场情绪评分")]
     public float Sentiment { get; set; }
 
+    [Range(1, 10)]
     [Description("新闻事件评分")]
     public float News { get; set; }
 }

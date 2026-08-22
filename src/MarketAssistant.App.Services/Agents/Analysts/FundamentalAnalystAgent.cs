@@ -19,27 +19,19 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [RequiresTools(typeof(IBasicDataTools))]
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(FundamentalAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(FundamentalAnalysisResult),
-        schemaDescription: "基本面分析师的结构化分析结果，包含公司基本面、行业竞争和投资价值评估"
-    );
-
     public FundamentalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
             promptLoader.GetConfig("FundamentalAnalyst"),
-            ResponseFormat,
+            typeof(FundamentalAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
 }

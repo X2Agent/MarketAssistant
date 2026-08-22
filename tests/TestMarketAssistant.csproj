@@ -23,4 +23,9 @@
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="demo.pdf" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="demo.docx" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

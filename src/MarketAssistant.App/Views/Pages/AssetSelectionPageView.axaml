@@ -101,9 +101,12 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:SelectionModeItem">
-								<Border Classes.mode-card="True"
+                                <Border Classes.mode-card="True"
                                         Classes.selected="{Binding IsSelected}"
-                                        MinWidth="{StaticResource ButtonMinWidth}">
+                                        MinWidth="{StaticResource ButtonMinWidth}"
+                                        Focusable="True"
+                                        KeyDown="OnCardKeyDown"
+                                        AutomationProperties.Name="{Binding Name}">
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
                                         <TextBlock Text="{Binding Icon}" 
                                                    FontSize="{StaticResource LargeFontSize}" 
@@ -140,7 +143,7 @@
                                 Padding="{StaticResource PagePadding}"
                                 MinWidth="{StaticResource ButtonMinWidth}"/>
                         <Button Content="清除"
-								Command="{Binding ClearContentCommand}"
+                                Command="{Binding ClearContentCommand}"
                                 Padding="{StaticResource PagePadding}"
                                 MinWidth="{StaticResource SmallButtonMinWidth}"/>
                     </StackPanel>
@@ -165,7 +168,11 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:QuickSelectionStrategyInfo">
-                                <Border Classes="strategy-card" Margin="{StaticResource SmallMargin}">
+                                <Border Classes="strategy-card"
+                                        Margin="{StaticResource SmallMargin}"
+                                        Focusable="True"
+                                        KeyDown="OnCardKeyDown"
+                                        AutomationProperties.Name="{Binding Name}">
                                     <Grid ColumnDefinitions="Auto,*">
                                         <!-- 图标 -->
                                         <Border Grid.Column="0"

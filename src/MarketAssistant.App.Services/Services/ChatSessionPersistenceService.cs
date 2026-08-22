@@ -24,14 +24,30 @@ public class ChatSessionPersistenceService : SqliteServiceBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            INSERT OR REPLACE INTO chat_sessions (id, stock_code, title, messages_json, analysis_context, created_at, updated_at)
-            VALUES (@id, @stockCode, @title, @messagesJson, @analysisContext, @createdAt, @updatedAt)
+            INSERT OR REPLACE INTO chat_sessions (
+                id, stock_code, title, messages_json, analysis_context,
+                agent_session_json, session_schema_version, provider_id, model_id, endpoint,
+                runtime_configuration_fingerprint, created_at, updated_at)
+            VALUES (
+                @id, @stockCode, @title, @messagesJson, @analysisContext,
+                @agentSessionJson, @sessionSchemaVersion, @providerId, @modelId, @endpoint,
+                @runtimeConfigurationFingerprint, @createdAt, @updatedAt)
             """;
         cmd.Parameters.AddWithValue("@id", snapshot.Id);
         cmd.Parameters.AddWithValue("@stockCode", snapshot.StockCode);
         cmd.Parameters.AddWithValue("@title", snapshot.Title);
         cmd.Parameters.AddWithValue("@messagesJson", JsonSerializer.Serialize(snapshot.Messages));
         cmd.Parameters.AddWithValue("@analysisContext", (object?)snapshot.AnalysisContext ?? DBNull.Value);
+        cmd.Parameters.AddWithValue(
+            "@agentSessionJson",
+            snapshot.AgentSessionState is { } state ? state.GetRawText() : DBNull.Value);
+        cmd.Parameters.AddWithValue("@sessionSchemaVersion", snapshot.SessionSchemaVersion);
+        cmd.Parameters.AddWithValue("@providerId", snapshot.ProviderId);
+        cmd.Parameters.AddWithValue("@modelId", snapshot.ModelId);
+        cmd.Parameters.AddWithValue("@endpoint", snapshot.Endpoint);
+        cmd.Parameters.AddWithValue(
+            "@runtimeConfigurationFingerprint",
+            snapshot.RuntimeConfigurationFingerprint);
         cmd.Parameters.AddWithValue("@createdAt", snapshot.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
@@ -113,6 +129,10 @@ public class ChatSessionPersistenceService : SqliteServiceBase
         var messages = JsonSerializer.Deserialize<List<ChatMessageDto>>(messagesJson) ?? [];
 
         var contextOrd = reader.GetOrdinal("analysis_context");
+        var agentSessionOrd = reader.GetOrdinal("agent_session_json");
+        var agentSessionJson = reader.IsDBNull(agentSessionOrd)
+            ? null
+            : reader.GetString(agentSessionOrd);
 
         return new ChatSessionSnapshot
         {
@@ -121,6 +141,15 @@ public class ChatSessionPersistenceService : SqliteServiceBase
             Title = reader.GetString(reader.GetOrdinal("title")),
             Messages = messages,
             AnalysisContext = reader.IsDBNull(contextOrd) ? null : reader.GetString(contextOrd),
+            AgentSessionState = string.IsNullOrWhiteSpace(agentSessionJson)
+                ? null
+                : JsonDocument.Parse(agentSessionJson).RootElement.Clone(),
+            SessionSchemaVersion = reader.GetInt32(reader.GetOrdinal("session_schema_version")),
+            ProviderId = reader.GetString(reader.GetOrdinal("provider_id")),
+            ModelId = reader.GetString(reader.GetOrdinal("model_id")),
+            Endpoint = reader.GetString(reader.GetOrdinal("endpoint")),
+            RuntimeConfigurationFingerprint = reader.GetString(
+                reader.GetOrdinal("runtime_configuration_fingerprint")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
             UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("updated_at")))
         };
@@ -207,6 +236,38 @@ public class ChatSessionPersistenceService : SqliteServiceBase
         }
     }
 
+    private static async Task EnsureSessionColumnsAsync(SqliteConnection conn)
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using (var pragmaCommand = conn.CreateCommand())
+        {
+            pragmaCommand.CommandText = "PRAGMA table_info(chat_sessions)";
+            await using var reader = await pragmaCommand.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+                existingColumns.Add(reader.GetString(1));
+        }
+
+        var requiredColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["agent_session_json"] = "TEXT",
+            ["session_schema_version"] = "INTEGER NOT NULL DEFAULT 0",
+            ["provider_id"] = "TEXT NOT NULL DEFAULT ''",
+            ["model_id"] = "TEXT NOT NULL DEFAULT ''",
+            ["endpoint"] = "TEXT NOT NULL DEFAULT ''",
+            ["runtime_configuration_fingerprint"] = "TEXT NOT NULL DEFAULT ''"
+        };
+
+        foreach (var (columnName, definition) in requiredColumns)
+        {
+            if (existingColumns.Contains(columnName))
+                continue;
+
+            await using var alterCommand = conn.CreateCommand();
+            alterCommand.CommandText = $"ALTER TABLE chat_sessions ADD COLUMN {columnName} {definition}";
+            await alterCommand.ExecuteNonQueryAsync();
+        }
+    }
+
     protected override async Task InitializeDatabaseAsync()
     {
         try
@@ -220,6 +281,12 @@ public class ChatSessionPersistenceService : SqliteServiceBase
                     title TEXT NOT NULL,
                     messages_json TEXT NOT NULL,
                     analysis_context TEXT,
+                    agent_session_json TEXT,
+                    session_schema_version INTEGER NOT NULL DEFAULT 0,
+                    provider_id TEXT NOT NULL DEFAULT '',
+                    model_id TEXT NOT NULL DEFAULT '',
+                    endpoint TEXT NOT NULL DEFAULT '',
+                    runtime_configuration_fingerprint TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
@@ -236,7 +303,8 @@ public class ChatSessionPersistenceService : SqliteServiceBase
                 );
                 """;
             await cmd.ExecuteNonQueryAsync();
-            Logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引）");
+            await EnsureSessionColumnsAsync(conn);
+            Logger.LogInformation("聊天会话数据库初始化完成（含 FTS5 索引与 MAF Session 状态）");
         }
         catch (Exception ex)
         {
@@ -256,6 +324,12 @@ public class ChatSessionSnapshot
     public string Title { get; set; } = string.Empty;
     public List<ChatMessageDto> Messages { get; set; } = [];
     public string? AnalysisContext { get; set; }
+    public JsonElement? AgentSessionState { get; set; }
+    public int SessionSchemaVersion { get; set; }
+    public string ProviderId { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public string Endpoint { get; set; } = string.Empty;
+    public string RuntimeConfigurationFingerprint { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -2,15 +2,16 @@ using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Agents.Analysts;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace MarketAssistant.Agents.MarketAnalysis;
@@ -21,10 +22,9 @@ namespace MarketAssistant.Agents.MarketAnalysis;
 /// </summary>
 public class MarketAnalysisWorkflow
 {
-    private readonly AnalysisAggregatorExecutor _aggregatorExecutor;
-    private readonly CoordinatorExecutor _coordinatorExecutor;
     private readonly IUserSettingService _userSettingService;
     private readonly IAnalystAgentFactory _analystAgentFactory;
+    private readonly IChatClientFactory _chatClientFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MarketAnalysisWorkflow> _logger;
     private readonly AnalysisReportCache _reportCache;
@@ -42,26 +42,22 @@ public class MarketAnalysisWorkflow
     /// 导致 ExecutorId 退化为 <c>_826faad2...</c>。故 Name 必须为 ASCII，
     /// 显示名在本映射中维护。
     /// </remarks>
-    private readonly Dictionary<string, string> _agentNameToDisplayName = new();
-
     /// <summary>
     /// 分析进度事件
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
 
     public MarketAnalysisWorkflow(
-        AnalysisAggregatorExecutor aggregatorExecutor,
-        CoordinatorExecutor coordinatorExecutor,
         IUserSettingService userSettingService,
         IAnalystAgentFactory analystAgentFactory,
+        IChatClientFactory chatClientFactory,
         ILoggerFactory loggerFactory,
         AnalysisReportCache reportCache,
         ILogger<MarketAnalysisWorkflow> logger)
     {
-        _aggregatorExecutor = aggregatorExecutor ?? throw new ArgumentNullException(nameof(aggregatorExecutor));
-        _coordinatorExecutor = coordinatorExecutor ?? throw new ArgumentNullException(nameof(coordinatorExecutor));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
+        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -70,15 +66,33 @@ public class MarketAnalysisWorkflow
     /// <summary>
     /// 执行市场分析工作流
     /// </summary>
-    public async Task<MarketAnalysisReport> AnalyzeAsync(
+    public Task<MarketAnalysisReport> AnalyzeAsync(
         string assetSymbol,
         CancellationToken cancellationToken = default)
     {
+        return AnalyzeAsync(assetSymbol, Guid.NewGuid(), cancellationToken);
+    }
+
+    /// <summary>
+    /// 使用调用方分配的 Run ID 执行市场分析，确保并发进度事件可准确归属。
+    /// </summary>
+    public async Task<MarketAnalysisReport> AnalyzeAsync(
+        string assetSymbol,
+        Guid runId,
+        CancellationToken cancellationToken = default)
+    {
+        if (runId == Guid.Empty)
+            throw new ArgumentException("Run ID 不能为空", nameof(runId));
+
+        using var activity = MarketAssistantDiagnostics.StartActivity("market_analysis.workflow.run");
+        activity?.SetTag("marketassistant.run.id", runId.ToString("N"));
+        activity?.SetTag("marketassistant.asset.symbol", assetSymbol);
+
         try
         {
             _logger.LogInformation("开始执行市场分析工作流，标的代码: {AssetSymbol}", assetSymbol);
 
-            OnProgressChanged(new AnalysisProgressEventArgs
+            OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
             {
                 StageDescription = "正在准备分析环境",
                 IsInProgress = true
@@ -97,21 +111,71 @@ public class MarketAnalysisWorkflow
             marketSnapshot.SetData("分析标的", assetSymbol);
             marketSnapshot.SetData("分析时间", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC"));
 
-            var analystAgents = CreateAnalystAgents(enabledAnalysts, marketSnapshot);
+            var runtime = _chatClientFactory.CreateRuntime();
+            activity?.SetTag("gen_ai.provider.name", runtime.ProviderId);
+            activity?.SetTag("gen_ai.request.model", runtime.ModelId);
+            activity?.SetTag("marketassistant.analyst.requested_count", enabledAnalysts.Count);
+
+            // 运行期降级记录：失败隔离包装器在分析师运行失败时回调，
+            // 这里维护已降级名单并向 UI 发布进度事件（与聚合器的失败计数相互独立）
+            var degradedAnalysts = new List<string>();
+            var degradationGate = new object();
+            var totalForProgress = 0;
+
+            var analystAgents = CreateAnalystAgents(
+                enabledAnalysts,
+                marketSnapshot,
+                runtime,
+                onAnalystDegraded: (analystType, exception) =>
+                {
+                    var displayName = GetAnalystDisplayNameFromType(analystType);
+                    List<string> failedSnapshot;
+                    lock (degradationGate)
+                    {
+                        if (!degradedAnalysts.Contains(displayName))
+                            degradedAnalysts.Add(displayName);
+                        failedSnapshot = [.. degradedAnalysts];
+                    }
+
+                    _logger.LogWarning(exception, "分析师执行失败，降级继续其余分析师: {Analyst}", displayName);
+                    OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
+                    {
+                        StageDescription = $"{displayName} 分析失败，继续其他分析",
+                        IsInProgress = true,
+                        TotalAnalysts = totalForProgress,
+                        FailedAnalysts = failedSnapshot
+                    });
+                });
             var failedAnalystNames = analystAgents.FailedTypes
                 .Select(GetAnalystDisplayNameFromType)
                 .ToList();
             var createdAgents = analystAgents.Agents;
+            totalForProgress = createdAgents.Count;
 
             if (createdAgents.Count == 0)
             {
                 throw new InvalidOperationException("所有分析师创建失败，无法执行分析");
             }
 
-            // 构建工作流（传入分析师数量）
-            var workflow = BuildWorkflow(createdAgents.Count, createdAgents);
+            // 同一次 Run 的分析师与 Coordinator 绑定同一个 Runtime Client。
+            var coordinatorAgent = _analystAgentFactory.CreateAnalyst(
+                typeof(CoordinatorAnalystAgent),
+                runtime);
+            var coordinatorExecutor = new CoordinatorExecutor(
+                coordinatorAgent,
+                _loggerFactory.CreateLogger<CoordinatorExecutor>());
+            var aggregatorExecutor = new AnalysisAggregatorExecutor(
+                createdAgents.Count,
+                _loggerFactory.CreateLogger<AnalysisAggregatorExecutor>());
 
-            OnProgressChanged(new AnalysisProgressEventArgs
+            // 构建工作流（所有 Executor 均为 Run 局部实例）
+            var agentNameToDisplayName = analystAgents.NameToDisplayName;
+            var workflow = BuildWorkflow(
+                createdAgents,
+                aggregatorExecutor,
+                coordinatorExecutor);
+
+            OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
             {
                 StageDescription = $"{createdAgents.Count} 位分析师正在并发分析",
                 IsInProgress = true,
@@ -120,12 +184,21 @@ public class MarketAnalysisWorkflow
             });
 
             // 执行工作流（流式处理）
-            var finalReport = await ExecuteWorkflowAsync(workflow, assetSymbol, createdAgents.Count, cancellationToken);
+            var finalReport = await ExecuteWorkflowAsync(
+                workflow,
+                runId,
+                assetSymbol,
+                createdAgents.Count,
+                agentNameToDisplayName,
+                degradedAnalysts,
+                cancellationToken);
 
             // 缓存分析结果，供交易决策模块使用
             _reportCache.Set(assetSymbol, finalReport);
+            activity?.SetTag("marketassistant.analyst.completed_count", createdAgents.Count);
+            activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
 
-            OnProgressChanged(new AnalysisProgressEventArgs
+            OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
             {
                 StageDescription = "分析完成",
                 IsInProgress = false
@@ -133,14 +206,17 @@ public class MarketAnalysisWorkflow
 
             return finalReport;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
+            activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, "cancelled");
+            activity?.SetTag("error.type", ex.GetType().FullName);
             throw;
         }
         catch (Exception ex)
         {
+            MarketAssistantDiagnostics.RecordException(activity, ex);
             _logger.LogError(ex, "执行市场分析工作流时发生错误");
-            OnProgressChanged(new AnalysisProgressEventArgs
+            OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
             {
                 StageDescription = $"分析失败: {ex.Message}",
                 IsInProgress = false
@@ -154,8 +230,11 @@ public class MarketAnalysisWorkflow
     /// </summary>
     private async Task<MarketAnalysisReport> ExecuteWorkflowAsync(
         Workflow workflow,
+        Guid runId,
         string assetSymbol,
         int analystCount,
+        IReadOnlyDictionary<string, string> agentNameToDisplayName,
+        List<string> degradedAnalysts,
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
@@ -166,6 +245,7 @@ public class MarketAnalysisWorkflow
         string? lastCompletedStep = null;
         // 追踪当前正在运行的 Executor，超时时用于定位卡住的分析师
         var activeExecutors = new HashSet<string>();
+        var executorStartedAt = new Dictionary<string, long>(StringComparer.Ordinal);
 
         // 执行工作流（流式处理）
         // 初始输入 assetSymbol 会触发 Dispatcher，Dispatcher 再通过 context.SendMessageAsync
@@ -183,17 +263,21 @@ public class MarketAnalysisWorkflow
                 {
                     case ExecutorInvokedEvent executorInvoked:
                         activeExecutors.Add(executorInvoked.ExecutorId);
-                        _logger.LogDebug("工作流步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                        executorStartedAt[executorInvoked.ExecutorId] = Stopwatch.GetTimestamp();
+                        _logger.LogInformation(
+                            "工作流步骤开始: {ExecutorId}, 输入类型: {InputType}",
+                            executorInvoked.ExecutorId,
+                            executorInvoked.Data?.GetType().FullName ?? "null");
 
                         string stageName = GetExecutorNamePrefix(executorInvoked.ExecutorId) switch
                         {
                             "AnalysisDispatcher" => "正在分发分析任务",
                             "AnalysisAggregator" => "正在聚合分析结果",
                             "Coordinator" => "正在生成综合报告",
-                            _ => $"{GetDisplayNameForExecutorId(executorInvoked.ExecutorId)} 正在分析"
+                            _ => $"{GetDisplayNameForExecutorId(executorInvoked.ExecutorId, agentNameToDisplayName)} 正在分析"
                         };
 
-                        OnProgressChanged(new AnalysisProgressEventArgs
+                        OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
                         {
                             StageDescription = stageName,
                             IsInProgress = true,
@@ -204,13 +288,20 @@ public class MarketAnalysisWorkflow
 
                     case ExecutorCompletedEvent executorComplete:
                         activeExecutors.Remove(executorComplete.ExecutorId);
-                        lastCompletedStep = GetDisplayNameForExecutorId(executorComplete.ExecutorId);
-                        _logger.LogDebug("工作流步骤完成: {ExecutorId}", executorComplete.ExecutorId);
+                        lastCompletedStep = GetDisplayNameForExecutorId(executorComplete.ExecutorId, agentNameToDisplayName);
+                        var elapsed = executorStartedAt.Remove(executorComplete.ExecutorId, out var startedAt)
+                            ? Stopwatch.GetElapsedTime(startedAt)
+                            : TimeSpan.Zero;
+                        _logger.LogInformation(
+                            "工作流步骤完成: {ExecutorId}, 耗时: {ElapsedMs} ms, 结果类型: {ResultType}",
+                            executorComplete.ExecutorId,
+                            elapsed.TotalMilliseconds,
+                            executorComplete.Data?.GetType().FullName ?? "null");
 
                         if (IsAnalystExecutor(executorComplete.ExecutorId))
                         {
                             completedAnalysts++;
-                            OnProgressChanged(new AnalysisProgressEventArgs
+                            OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
                             {
                                 StageDescription = $"{lastCompletedStep} 分析完成",
                                 IsInProgress = true,
@@ -249,7 +340,7 @@ public class MarketAnalysisWorkflow
 
                     case ExecutorFailedEvent executorFailed:
                         activeExecutors.Remove(executorFailed.ExecutorId);
-                        var failedDisplayName = GetDisplayNameForExecutorId(executorFailed.ExecutorId);
+                        var failedDisplayName = GetDisplayNameForExecutorId(executorFailed.ExecutorId, agentNameToDisplayName);
                         var errorDetail = executorFailed.Data?.Message ?? "未知错误";
                         _logger.LogError(executorFailed.Data,
                             "步骤失败: {ExecutorId} ({DisplayName}), 错误: {Error}",
@@ -262,7 +353,7 @@ public class MarketAnalysisWorkflow
                                 $"分析流程关键环节「{failedDisplayName}」执行失败: {errorDetail}");
                         }
 
-                        OnProgressChanged(new AnalysisProgressEventArgs
+                        OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
                         {
                             StageDescription = $"{failedDisplayName} 分析失败，继续其他分析",
                             IsInProgress = true,
@@ -298,11 +389,11 @@ public class MarketAnalysisWorkflow
             // AI 模型 API 响应超时（NetworkTimeout），精确定位卡住的分析师
             var stuckAnalysts = activeExecutors
                 .Where(id => IsAnalystExecutor(id))
-                .Select(GetDisplayNameForExecutorId)
+                .Select(id => GetDisplayNameForExecutorId(id, agentNameToDisplayName))
                 .ToList();
             var stuckSystem = activeExecutors
                 .Where(id => IsSystemExecutor(id))
-                .Select(GetDisplayNameForExecutorId)
+                .Select(id => GetDisplayNameForExecutorId(id, agentNameToDisplayName))
                 .ToList();
 
             var allStuck = stuckAnalysts.Concat(stuckSystem).ToList();
@@ -325,6 +416,19 @@ public class MarketAnalysisWorkflow
         if (finalReport != null)
         {
             return finalReport;
+        }
+
+        // 全部分析师被失败隔离包装器降级：聚合器不会派发 Coordinator，事件流自然结束。
+        // Fan-In barrier 目标执行器的异常不会以 ExecutorFailedEvent 暴露，因此由这里终局判定。
+        if (degradedAnalysts.Count >= analystCount && analystCount > 0)
+        {
+            _logger.LogError(
+                "全部分析师均执行失败，标的: {AssetSymbol}，失败名单: [{DegradedAnalysts}]",
+                assetSymbol,
+                string.Join(", ", degradedAnalysts));
+
+            throw new FriendlyException(
+                $"所有分析师均执行失败，无法生成综合报告: {string.Join("；", degradedAnalysts)}");
         }
 
         // 工作流正常结束但未收到 WorkflowOutputEvent，构建详细诊断信息
@@ -419,23 +523,31 @@ public class MarketAnalysisWorkflow
     }
 
     /// <summary>
-    /// 创建分析师代理（使用 Factory 模式），返回成功创建的 Agent 列表及失败的类型列表
+    /// 创建分析师代理（使用 Factory 模式），返回成功创建的 Agent 列表及失败的类型列表。
+    /// 每位成功创建的分析师都会附加失败隔离包装，保证 Fan-In 聚合器总能收齐消息。
     /// </summary>
-    private (List<AIAgent> Agents, List<Type> FailedTypes) CreateAnalystAgents(
+    private (
+        List<AIAgent> Agents,
+        List<Type> FailedTypes,
+        IReadOnlyDictionary<string, string> NameToDisplayName) CreateAnalystAgents(
         List<Type> analystTypes,
-        MarketSnapshotContextProvider marketSnapshot)
+        MarketSnapshotContextProvider marketSnapshot,
+        ChatClientRuntime runtime,
+        Action<Type, Exception>? onAnalystDegraded = null)
     {
         _logger.LogInformation("开始创建分析师代理，数量: {Count}", analystTypes.Count);
 
         var sharedProviders = new AIContextProvider[] { marketSnapshot };
         var createdAgents = new List<AIAgent>();
         var failedTypes = new List<Type>();
+        var nameToDisplayName = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var type in analystTypes)
         {
             try
             {
-                var agent = _analystAgentFactory.CreateAnalyst(type, sharedProviders);
+                var agent = _analystAgentFactory.CreateAnalyst(type, runtime, sharedProviders)
+                    .WithFailureIsolation(exception => onAnalystDegraded?.Invoke(type, exception));
                 createdAgents.Add(agent);
 
                 // 创建时即建立 Name → DisplayName 映射。
@@ -445,7 +557,7 @@ public class MarketAnalysisWorkflow
                 var displayName = GetAnalystDisplayNameFromType(type);
                 if (!string.IsNullOrEmpty(agent.Name))
                 {
-                    _agentNameToDisplayName[agent.Name] = displayName;
+                    nameToDisplayName[agent.Name] = displayName;
                 }
             }
             catch (Exception ex)
@@ -456,7 +568,7 @@ public class MarketAnalysisWorkflow
         }
 
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
-        return (createdAgents, failedTypes);
+        return (createdAgents, failedTypes, nameToDisplayName);
     }
 
     /// <summary>
@@ -509,11 +621,13 @@ public class MarketAnalysisWorkflow
     /// 从工作流 ExecutorId 中提取分析师显示名称。
     /// 按第一个下划线切出 Name 前缀，再在 <see cref="_agentNameToDisplayName"/> 中查中文显示名。
     /// </summary>
-    private string GetDisplayNameForExecutorId(string executorId)
+    private static string GetDisplayNameForExecutorId(
+        string executorId,
+        IReadOnlyDictionary<string, string> agentNameToDisplayName)
     {
         var namePrefix = GetExecutorNamePrefix(executorId);
 
-        return _agentNameToDisplayName.TryGetValue(namePrefix, out var displayName)
+        return agentNameToDisplayName.TryGetValue(namePrefix, out var displayName)
             ? displayName
             : executorId;
     }
@@ -525,7 +639,10 @@ public class MarketAnalysisWorkflow
     /// 流程：
     /// [Dispatcher] → [并发分析师团队] → [Aggregator] → [Coordinator]
     /// </summary>
-    private Workflow BuildWorkflow(int analystCount, List<AIAgent> analystAgents)
+    private Workflow BuildWorkflow(
+        List<AIAgent> analystAgents,
+        AnalysisAggregatorExecutor aggregatorExecutor,
+        CoordinatorExecutor coordinatorExecutor)
     {
         // 构建标准 Fan-Out/Fan-In 工作流：
         // 
@@ -537,9 +654,8 @@ public class MarketAnalysisWorkflow
         //      ↓
         // [Coordinator] List<ChatMessage> → MarketAnalysisReport (输出)
 
-        // 1. 动态创建 Dispatcher（需要知道分析师数量）
+        // 1. 创建 Dispatcher（作为入口节点）
         var dispatcher = new AnalysisDispatcherExecutor(
-            analystCount,
             _loggerFactory.CreateLogger<AnalysisDispatcherExecutor>());
 
         // 2. 创建工作流，Dispatcher 作为入口节点
@@ -551,13 +667,13 @@ public class MarketAnalysisWorkflow
 
         // 4. Fan-In: 所有分析师 → Aggregator
         // 框架会自动收集所有源（分析师）的消息，并作为 List<ChatMessage> 一次性传递给 Aggregator
-        builder.AddFanInBarrierEdge([.. analystAgents], _aggregatorExecutor);
+        builder.AddFanInBarrierEdge([.. analystAgents], aggregatorExecutor);
 
         // 5. Aggregator → Coordinator（将聚合结果传递给协调分析师）
-        builder.AddEdge(_aggregatorExecutor, _coordinatorExecutor);
+        builder.AddEdge(aggregatorExecutor, coordinatorExecutor);
 
         // 6. 设置输出来自 Coordinator
-        builder.WithOutputFrom(_coordinatorExecutor);
+        builder.WithOutputFrom(coordinatorExecutor);
 
         return builder.Build();
     }
@@ -565,8 +681,13 @@ public class MarketAnalysisWorkflow
     /// <summary>
     /// 触发进度事件
     /// </summary>
-    protected virtual void OnProgressChanged(AnalysisProgressEventArgs e)
+    protected virtual void OnProgressChanged(
+        Guid runId,
+        string assetSymbol,
+        AnalysisProgressEventArgs e)
     {
+        e.RunId = runId;
+        e.AssetSymbol = assetSymbol;
         ProgressChanged?.Invoke(this, e);
     }
 }
@@ -576,6 +697,16 @@ public class MarketAnalysisWorkflow
 /// </summary>
 public sealed class AnalysisProgressEventArgs : EventArgs
 {
+    /// <summary>
+    /// 本次分析运行的唯一标识。
+    /// </summary>
+    public Guid RunId { get; internal set; }
+
+    /// <summary>
+    /// 本次分析对应的标的代码。
+    /// </summary>
+    public string AssetSymbol { get; internal set; } = string.Empty;
+
     /// <summary>
     /// 当前阶段描述
     /// </summary>

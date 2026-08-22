@@ -7,6 +7,7 @@ using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Services.Agents.Analysts;
@@ -20,7 +21,6 @@ using Microsoft.Extensions.VectorData;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reflection;
-using YamlDotNet.Serialization;
 
 namespace MarketAssistant.ViewModels;
 
@@ -34,6 +34,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly Func<IRagIngestionService> _ragIngestionServiceFactory;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
+    private readonly IModelDiscoveryService _modelDiscoveryService;
     private readonly Func<IEmbeddingFactory> _embeddingFactoryFactory;
     private readonly Func<VectorStore> _vectorStoreFactory;
     private readonly Services.Market.MarketContext _marketContext;
@@ -41,6 +42,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly Func<MarketMonitor> _marketMonitorFactory;
     private readonly IDialogService _dialogService;
     private IStorageProvider? _storageProvider;
+    private bool _isInitializingProvider;
+    private CancellationTokenSource? _modelFetchCancellationTokenSource;
 
     // UserSetting对象，包含所有用户设置
     [ObservableProperty]
@@ -93,6 +96,171 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private ObservableCollection<string> _models = [];
 
+    // 服务商列表
+    public List<ModelProvider> Providers => ModelProviderCatalog.Providers.ToList();
+
+    // 当前选中的服务商
+    [ObservableProperty]
+    private ModelProvider? _selectedProvider;
+
+    // 当前服务商的 API Key（从 ProviderApiKeys 中读取当前服务商的 Key）
+    public string ApiKey
+    {
+        get => UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
+        set
+        {
+            if (string.IsNullOrWhiteSpace(UserSetting.ProviderId) || ApiKey == value)
+                return;
+
+            UserSetting.ProviderApiKeys[UserSetting.ProviderId] = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanFetchModels));
+            OnPropertyChanged(nameof(ModelDiscoveryHint));
+            FetchModelsCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    // 是否显示 API Key 配置。OpenCode Zen 即使当前使用免费模型也允许配置 Key。
+    public bool SupportsApiKeyConfiguration => SelectedProvider?.RequiresApiKey ?? false;
+
+    // 当前模型是否强制要求 API Key，用于提示而不是控制输入框可见性。
+    public bool IsApiKeyRequiredForSelectedModel =>
+        SelectedProvider?.RequiresApiKeyForModel(ModelId) ?? false;
+
+    public string ApiKeyHint => IsApiKeyRequiredForSelectedModel
+        ? "当前模型需要 API Key"
+        : "API Key 可选；留空使用免费模型，配置后可访问账号授权模型";
+
+    // 当前服务商的 API Key 获取链接
+    public string? ProviderApiKeyUrl => SelectedProvider?.ApiKeyUrl;
+
+    public bool CanOverrideEndpoint => SelectedProvider?.AllowsEndpointOverride ?? false;
+
+    // 当前服务商的活动模型 ID（按服务商存储于 ProviderModelIds）。
+    public string ModelId
+    {
+        get => UserSetting.ProviderModelIds.GetValueOrDefault(UserSetting.ProviderId, string.Empty);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(UserSetting.ProviderId))
+                return;
+            if (ModelId == value)
+                return;
+
+            UserSetting.ProviderModelIds[UserSetting.ProviderId] = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
+            OnPropertyChanged(nameof(ApiKeyHint));
+        }
+    }
+
+    // 仅本地部署和自定义服务允许覆盖默认端点。按服务商存储于 ProviderEndpoints。
+    public string Endpoint
+    {
+        get => UserSetting.ProviderEndpoints.GetValueOrDefault(UserSetting.ProviderId, string.Empty);
+        set
+        {
+            if (string.IsNullOrWhiteSpace(UserSetting.ProviderId))
+                return;
+            if (Endpoint == value)
+                return;
+
+            UserSetting.ProviderEndpoints[UserSetting.ProviderId] = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(EffectiveEndpoint));
+        }
+    }
+
+    public string EndpointPlaceholder => string.IsNullOrWhiteSpace(SelectedProvider?.DefaultEndpoint)
+        ? "请输入完整的 API Base URL"
+        : $"默认：{SelectedProvider.DefaultEndpoint}";
+
+    public string EffectiveEndpoint => string.IsNullOrWhiteSpace(Endpoint)
+        ? SelectedProvider?.DefaultEndpoint ?? string.Empty
+        : Endpoint.Trim();
+
+    // 当前服务商是否支持在线获取模型列表
+    public bool SupportsModelListing => SelectedProvider?.SupportsModelListing ?? false;
+
+    public bool CanFetchModels =>
+        SelectedProvider is { SupportsModelListing: true } provider &&
+        !IsLoadingModels &&
+        (!provider.ModelListingRequiresApiKey || !string.IsNullOrWhiteSpace(ApiKey));
+
+    public string ModelDiscoveryHint
+    {
+        get
+        {
+            if (SelectedProvider is not { } provider)
+                return "请先选择模型服务商";
+
+            if (!provider.SupportsModelListing)
+                return "该服务商不提供模型目录，请直接输入模型 ID";
+
+            if (provider.ModelListingRequiresApiKey && string.IsNullOrWhiteSpace(ApiKey))
+                return "配置 API Key 后可获取模型目录，也可以直接输入模型 ID";
+
+            return string.IsNullOrWhiteSpace(ModelDiscoveryStatus)
+                ? "可从服务商获取模型目录，也可以直接输入未列出的模型 ID"
+                : ModelDiscoveryStatus;
+        }
+    }
+
+    [ObservableProperty]
+    private string _modelDiscoveryStatus = string.Empty;
+
+    partial void OnModelDiscoveryStatusChanged(string value) =>
+        OnPropertyChanged(nameof(ModelDiscoveryHint));
+
+    // 是否正在加载模型列表
+    [ObservableProperty]
+    private bool _isLoadingModels;
+
+    partial void OnIsLoadingModelsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanFetchModels));
+        OnPropertyChanged(nameof(ModelDiscoveryHint));
+        FetchModelsCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnSelectedProviderChanged(ModelProvider? oldValue, ModelProvider? newValue)
+    {
+        if (newValue is null)
+            return;
+
+        UserSetting.ProviderId = newValue.Id;
+
+        _modelFetchCancellationTokenSource?.Cancel();
+        Models.Clear();
+        ModelDiscoveryStatus = string.Empty;
+
+        // ModelId/Endpoint 按服务商存储于字典，切换后通知绑定重新读取即可。
+        OnPropertyChanged(nameof(ApiKey));
+        OnPropertyChanged(nameof(ModelId));
+        OnPropertyChanged(nameof(Endpoint));
+        OnPropertyChanged(nameof(SupportsApiKeyConfiguration));
+        OnPropertyChanged(nameof(IsApiKeyRequiredForSelectedModel));
+        OnPropertyChanged(nameof(ApiKeyHint));
+        OnPropertyChanged(nameof(ProviderApiKeyUrl));
+        OnPropertyChanged(nameof(CanOverrideEndpoint));
+        OnPropertyChanged(nameof(EndpointPlaceholder));
+        OnPropertyChanged(nameof(EffectiveEndpoint));
+        OnPropertyChanged(nameof(SupportsModelListing));
+        OnPropertyChanged(nameof(CanFetchModels));
+        OnPropertyChanged(nameof(ModelDiscoveryHint));
+        FetchModelsCommand.NotifyCanExecuteChanged();
+
+        if (!_isInitializingProvider)
+        {
+            // 模型列表鉴权与具体模型调用鉴权彼此独立。
+            var currentKey = UserSetting.ProviderApiKeys.TryGetValue(newValue.Id, out var key) ? key : "";
+            if (newValue.CanListModels(currentKey))
+            {
+                _ = FetchModels();
+            }
+        }
+    }
+
     // 分析师角色列表
     [ObservableProperty]
     private ObservableCollection<AnalystRoleViewModel> _analystRoles = new();
@@ -125,7 +293,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     public List<CryptoTradingMode> CryptoTradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
 
     // API密钥获取URL
-    public string ModelApiUrl { get; } = "https://cloud.siliconflow.cn/i/z4lbHdBE";
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
     public string JinaApiUrl { get; } = "https://jina.ai/embeddings";
@@ -296,6 +463,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         Func<IRagIngestionService> ragIngestionServiceFactory,
         INotificationService notificationService,
         IUserSettingService userSettingService,
+        IModelDiscoveryService modelDiscoveryService,
         Func<IEmbeddingFactory> embeddingFactoryFactory,
         Func<VectorStore> vectorStoreFactory,
         Services.Market.MarketContext marketContext,
@@ -307,6 +475,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _ragIngestionServiceFactory = ragIngestionServiceFactory;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
+        _modelDiscoveryService = modelDiscoveryService;
         _embeddingFactoryFactory = embeddingFactoryFactory;
         _vectorStoreFactory = vectorStoreFactory;
         _marketContext = marketContext;
@@ -326,10 +495,29 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     private async Task InitializeAsync()
     {
-        // 先加载模型列表
-        await LoadModelsAsync();
         // 加载用户设置（OnUserSettingChanged 会自动订阅 PropertyChanged）
         UserSetting = _userSettingService.CurrentSetting;
+
+        // 同步服务商选择。初始化期间保留已保存的 ModelId 和 Endpoint，
+        // 仅用户主动切换服务商时才清空这些字段。
+        _isInitializingProvider = true;
+        try
+        {
+            SelectedProvider = ModelProviderCatalog.GetProvider(UserSetting.ProviderId)
+                ?? ModelProviderCatalog.Providers.First();
+        }
+        finally
+        {
+            _isInitializingProvider = false;
+        }
+
+        // 模型列表鉴权与具体模型调用鉴权彼此独立。
+        var currentKey = UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
+        if (SelectedProvider?.CanListModels(currentKey) == true)
+        {
+            await FetchModels();
+        }
+
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         // 加载分析师角色
@@ -377,7 +565,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// 打开API密钥网站命令
     /// </summary>
     [RelayCommand]
-    private Task OpenModelApiWebsite() => OpenUrlAsync(ModelApiUrl);
+    private Task OpenModelApiWebsite() => ProviderApiKeyUrl != null ? OpenUrlAsync(ProviderApiKeyUrl) : Task.CompletedTask;
 
     [RelayCommand]
     private Task OpenZhiTuApiWebsite() => OpenUrlAsync(ZhiTuApiUrl);
@@ -571,14 +759,16 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
             }
 
-            // 切换到实盘模式时若监控正在运行，弹窗警告（运行中切换会立即对实盘账户下单）
+            // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。
             var targetMode = UserSetting.CryptoTradingMode;
-            var isLiveTarget = targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
-            if (isLiveTarget && targetMode != _tradingEnvironmentService.CurrentMode && _marketMonitorFactory().IsRunning)
+            if (TradingEnvironmentService.RequiresLiveModeConfirmation(
+                    _tradingEnvironmentService.CurrentMode,
+                    targetMode,
+                    _marketMonitorFactory().IsRunning))
             {
                 var confirmed = await _dialogService.ShowConfirmationAsync(
                     "切换到实盘模式",
-                    "⚠️ 市场监控正在运行中！保存设置后将切换到实盘模式，后续触发的交易将立即对真实账户下单。\n\n请确认是否继续？",
+                    "市场监控正在运行。保存后会先停止监控并切换到实盘模式，后续触发的交易将发送到真实账户。\n\n请确认是否继续？",
                     "确认切换",
                     "取消");
 
@@ -611,6 +801,18 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         {
             _userSettingService.ResetSettings();
             UserSetting = _userSettingService.CurrentSetting;
+
+            _isInitializingProvider = true;
+            try
+            {
+                SelectedProvider = ModelProviderCatalog.GetProvider(UserSetting.ProviderId)
+                    ?? ModelProviderCatalog.Providers.First();
+            }
+            finally
+            {
+                _isInitializingProvider = false;
+            }
+
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
             ApplyTheme(UserSetting.ThemeMode);
             await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
@@ -630,64 +832,90 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 加载模型列表
+    /// 从服务商 API 获取模型列表（用户填好 API Key 后手动触发）
     /// </summary>
-    private async Task LoadModelsAsync()
+    private bool CanFetchModelsCommand() => CanFetchModels;
+
+    [RelayCommand(CanExecute = nameof(CanFetchModelsCommand))]
+    private async Task FetchModels()
     {
+        var provider = SelectedProvider;
+        if (provider is null || !provider.SupportsModelListing)
+            return;
+
+        _modelFetchCancellationTokenSource?.Cancel();
+        _modelFetchCancellationTokenSource?.Dispose();
+        var cts = new CancellationTokenSource();
+        _modelFetchCancellationTokenSource = cts;
+        var requestedProviderId = provider.Id;
+
+        ModelDiscoveryStatus = $"正在从 {provider.DisplayName} 获取模型目录...";
+        IsLoadingModels = true;
         try
         {
-            // 清空当前模型列表
+            var apiKey = string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey;
+            var endpoint = provider.AllowsEndpointOverride && !string.IsNullOrWhiteSpace(Endpoint)
+                ? Endpoint
+                : null;
+            var models = await _modelDiscoveryService.ListModelsAsync(
+                provider,
+                apiKey,
+                endpoint,
+                cts.Token);
+
+            // 取消不能保证远端立即停止；响应落 UI 前再次校验 Provider 身份。
+            if (cts.IsCancellationRequested || SelectedProvider?.Id != requestedProviderId)
+                return;
+
             Models.Clear();
-
-            // 从YAML文件加载模型
-            var modelsFromYaml = await LoadModelsFromYamlAsync();
-
-            foreach (var model in modelsFromYaml)
-            {
+            foreach (var model in models)
                 Models.Add(model);
-            }
+
+            ModelDiscoveryStatus = Models.Count == 0
+                ? "服务商未返回可用模型，请直接输入模型 ID"
+                : $"已获取 {Models.Count} 个模型，可直接选择或继续手工输入";
         }
-        catch (Exception)
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
-            // 忽略加载错误
+            Logger?.LogDebug("已取消服务商 {ProviderId} 的模型列表请求", requestedProviderId);
         }
-    }
-
-    /// <summary>
-    /// 从yaml文件加载模型列表
-    /// </summary>
-    private async Task<List<string>> LoadModelsFromYamlAsync()
-    {
-        try
+        catch (HttpRequestException ex) when (
+            ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
         {
-            var models = new List<string>();
-
-            // 读取config/models.yaml文件
-            var configPath = Path.Combine(AppContext.BaseDirectory, "config", "models.yaml");
-            if (!File.Exists(configPath))
-            {
-                return models;
-            }
-
-            var yamlContent = await File.ReadAllTextAsync(configPath);
-
-            // 解析yaml内容
-            var deserializer = new DeserializerBuilder().Build();
-            var yamlData = deserializer.Deserialize<Dictionary<string, List<string>>>(yamlContent);
-
-            // 返回模型列表
-            if (yamlData != null && yamlData.ContainsKey("models"))
-            {
-                models = yamlData["models"];
-            }
-
-            return models;
+            HandleModelDiscoveryFailure(
+                requestedProviderId,
+                ex,
+                $"{provider.DisplayName} 拒绝访问，请检查 API Key");
         }
         catch (Exception ex)
         {
-            Logger?.LogWarning(ex, "从 YAML 加载模型列表失败");
-            return new List<string>();
+            HandleModelDiscoveryFailure(
+                requestedProviderId,
+                ex,
+                $"获取失败：{ErrorMessageMapper.GetUserFriendlyMessage(ex)}");
         }
+        finally
+        {
+            if (ReferenceEquals(_modelFetchCancellationTokenSource, cts))
+            {
+                _modelFetchCancellationTokenSource = null;
+                IsLoadingModels = false;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private void HandleModelDiscoveryFailure(
+        string requestedProviderId,
+        Exception exception,
+        string status)
+    {
+        if (SelectedProvider?.Id != requestedProviderId)
+            return;
+
+        ModelDiscoveryStatus = $"{status}，仍可直接输入模型 ID";
+        Logger?.LogWarning(exception, "获取服务商模型列表失败: {ProviderId}", requestedProviderId);
+        _notificationService.ShowError(ModelDiscoveryStatus);
     }
 
     /// <summary>
@@ -713,6 +941,10 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+
+        _modelFetchCancellationTokenSource?.Cancel();
+        _modelFetchCancellationTokenSource?.Dispose();
+        _modelFetchCancellationTokenSource = null;
 
         // 取消 UserSetting.PropertyChanged 订阅，避免 Singleton 持有已释放 ViewModel 的引用
         if (UserSetting is not null)

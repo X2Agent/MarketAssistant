@@ -46,6 +46,12 @@ public class MarketMonitor : IDisposable
     private static readonly TimeSpan StrategyFailureCooldown = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// 网络类失败的短冷却：网络异常属临时状态，快速重试以免错过触发窗口
+    /// （止损单挂 30 秒的冷却可能已造成实际损失）。
+    /// </summary>
+    private static readonly TimeSpan NetworkFailureCooldown = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// 各策略最近一次执行失败的冷却截止时间（UTC）
     /// </summary>
     private readonly ConcurrentDictionary<string, DateTime> _strategyFailureCooldowns = new();
@@ -330,7 +336,8 @@ public class MarketMonitor : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "策略执行异常: {StrategyId}", strategy.Id);
-            RecordStrategyFailureCooldown(strategy.Id);
+            // 未分类异常（未走到 TradeResult 分类）按常规冷却处理
+            RecordStrategyFailureCooldown(strategy.Id, StrategyFailureCooldown);
         }
         finally
         {
@@ -341,8 +348,8 @@ public class MarketMonitor : IDisposable
     /// <summary>
     /// 记录策略执行失败的冷却截止时间
     /// </summary>
-    private void RecordStrategyFailureCooldown(string strategyId)
-        => _strategyFailureCooldowns[strategyId] = DateTime.UtcNow.Add(StrategyFailureCooldown);
+    private void RecordStrategyFailureCooldown(string strategyId, TimeSpan cooldown)
+        => _strategyFailureCooldowns[strategyId] = DateTime.UtcNow.Add(cooldown);
 
     /// <summary>
     /// 判断策略是否处于执行失败冷却期内；冷却期结束后自动清理记录
@@ -370,10 +377,10 @@ public class MarketMonitor : IDisposable
             if (result.TradeExecuted && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
-            if (result.TradeExecuted)
-                _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
-            else
-                RecordStrategyFailureCooldown(strategy.Id);
+            // HOLD/无持仓完结是正常路径：不进失败冷却，重试频率由
+            // StrategyEngine 的 LastTriggeredAt（analysisInterval）节流
+            if (result.Outcome != AISignalOutcome.NoTrade)
+                await ApplyTradeFailurePolicy(strategy, result.TradeExecuted, result.TradeResult);
 
             await CheckStrategyCompletionAsync(strategy);
         }
@@ -390,13 +397,58 @@ public class MarketMonitor : IDisposable
             if (result.Success && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
-            // 执行成功清除失败冷却记录；失败则进入冷却期，避免下一 tick 立即重复触发
-            if (result.Success)
-                _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
-            else
-                RecordStrategyFailureCooldown(strategy.Id);
+            await ApplyTradeFailurePolicy(strategy, result.Success, result);
 
             await CheckStrategyCompletionAsync(strategy);
+        }
+    }
+
+    /// <summary>
+    /// 按失败类别应用后续策略：
+    /// - 成功：清除冷却记录；
+    /// - 拒绝类（风控/人工确认被拒/持仓校验不通过）：重试不会改变结果，暂停策略并通知用户，防永久空转；
+    /// - 网络类：短冷却后快速重试，避免错过止损/止盈窗口；
+    /// - 其他：常规 30s 冷却。
+    /// </summary>
+    private async Task ApplyTradeFailurePolicy(TradingStrategy strategy, bool success, TradeResult? tradeResult)
+    {
+        if (success)
+        {
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            return;
+        }
+
+        var category = tradeResult?.FailureCategory ?? TradeFailureCategory.Other;
+        if (category == TradeFailureCategory.Rejected)
+        {
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            await PauseStrategyAfterRejectionAsync(strategy, tradeResult);
+            return;
+        }
+
+        RecordStrategyFailureCooldown(
+            strategy.Id,
+            category == TradeFailureCategory.Network ? NetworkFailureCooldown : StrategyFailureCooldown);
+    }
+
+    /// <summary>
+    /// 拒绝类失败后暂停策略：状态置为 Paused（用户可在策略页重新启用），
+    /// 并弹通知让用户知晓（策略静默停摆比反复重试更危险）。
+    /// </summary>
+    private async Task PauseStrategyAfterRejectionAsync(TradingStrategy strategy, TradeResult? tradeResult)
+    {
+        var reason = tradeResult?.ErrorMessage ?? "交易被拒绝";
+        _logger.LogWarning(
+            "策略 {StrategyId}（{Type} {Symbol}）触发被拒绝，已自动暂停: {Reason}",
+            strategy.Id, strategy.Type, strategy.Symbol, reason);
+
+        try
+        {
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, MonitorToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "暂停被拒策略失败，策略将保持 Active: {StrategyId}", strategy.Id);
         }
     }
 

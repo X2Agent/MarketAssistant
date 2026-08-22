@@ -52,6 +52,36 @@ public class TradeResult
     public string? ErrorMessage { get; set; }
     [Description("成功时的交易记录")]
     public TradeRecord? Record { get; set; }
+    /// <summary>
+    /// 失败类别。调用方据此区分重试策略：网络类可快速重试，
+    /// 拒绝类（风控/用户）重试无意义，应暂停策略并通知用户。
+    /// </summary>
+    [Description("失败类别")]
+    public TradeFailureCategory FailureCategory { get; set; } = TradeFailureCategory.None;
+}
+
+/// <summary>
+/// 交易失败类别
+/// </summary>
+public enum TradeFailureCategory
+{
+    [Description("无失败")]
+    None,
+
+    /// <summary>
+    /// 网络类失败（请求超时、连接异常、重试耗尽），短期重试可能恢复
+    /// </summary>
+    [Description("网络异常")]
+    Network,
+
+    /// <summary>
+    /// 拒绝类失败（风控拒绝、人工确认被拒或超时、持仓校验不通过），重试不会改变结果
+    /// </summary>
+    [Description("交易被拒绝")]
+    Rejected,
+
+    [Description("其他失败")]
+    Other
 }
 
 /// <summary>

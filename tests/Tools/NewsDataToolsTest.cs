@@ -19,6 +19,7 @@ namespace TestMarketAssistant.Tools;
 /// - 虚拟币 GetNewsAsync：调用 CoinTelegraph RSS（https://cointelegraph.com/rss），免费、无需密钥
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class NewsDataToolsTest
 {
     private ServiceProvider? _serviceProvider;

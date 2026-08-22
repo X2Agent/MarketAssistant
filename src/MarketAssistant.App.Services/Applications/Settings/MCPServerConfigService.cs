@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using MarketAssistant.Services.Settings;
+
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
@@ -6,8 +9,13 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public class MCPServerConfigService
 {
+    private static readonly ConcurrentDictionary<string, object> FileLocks = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+
     private List<MCPServerConfig> _serverConfigs = new();
-    private readonly object _lock = new();
+    private readonly object _lock;
+    private readonly ISecureSettingsStore _secretStore;
+    private readonly string _configFilePath;
 
     /// <summary>
     /// 当前所有MCP服务器配置（返回副本，避免外部修改影响内部状态）
@@ -23,15 +31,24 @@ public class MCPServerConfigService
         }
     }
 
-    // 配置文件路径
-    private readonly string _configFilePath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName);
-
     /// <summary>
     /// 构造函数
     /// </summary>
     public MCPServerConfigService()
+        : this(
+            Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName),
+            new SecureSettingsStore(AppInfo.McpSecretsStoreName, FileSystem.AppDataDirectory))
     {
-        // 从存储中加载设置
+    }
+
+    internal MCPServerConfigService(string configFilePath, ISecureSettingsStore secretStore)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configFilePath);
+        ArgumentNullException.ThrowIfNull(secretStore);
+
+        _configFilePath = Path.GetFullPath(configFilePath);
+        _lock = FileLocks.GetOrAdd(_configFilePath, static _ => new object());
+        _secretStore = secretStore;
         LoadConfigs();
     }
 
@@ -42,10 +59,33 @@ public class MCPServerConfigService
     {
         lock (_lock)
         {
+            string? legacyJson = null;
             if (File.Exists(_configFilePath))
             {
-                string json = File.ReadAllText(_configFilePath);
-                _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(json) ?? new List<MCPServerConfig>();
+                legacyJson = File.ReadAllText(_configFilePath);
+                _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(legacyJson) ?? [];
+            }
+
+            var legacyConfigs = string.IsNullOrWhiteSpace(legacyJson)
+                ? []
+                : JsonSerializer.Deserialize<List<LegacyMcpServerSecrets>>(legacyJson) ?? [];
+            var migratedSecrets = legacyConfigs
+                .Where(config => config.EnvironmentVariables is { Count: > 0 })
+                .ToDictionary(
+                    config => config.Id,
+                    config => new Dictionary<string, string?>(config.EnvironmentVariables!),
+                    StringComparer.Ordinal);
+
+            if (_secretStore.Read<Dictionary<string, Dictionary<string, string?>>>() is { } storedEnvironmentVariables)
+            {
+                ApplyEnvironmentVariables(storedEnvironmentVariables);
+                if (migratedSecrets.Count > 0)
+                    SaveConfigs();
+            }
+            else if (migratedSecrets.Count > 0)
+            {
+                ApplyEnvironmentVariables(migratedSecrets);
+                SaveConfigs();
             }
         }
     }
@@ -55,24 +95,28 @@ public class MCPServerConfigService
     /// </summary>
     public void SaveConfigs()
     {
-        List<MCPServerConfig> snapshot;
         lock (_lock)
         {
-            snapshot = _serverConfigs.ToList();
+            var snapshot = _serverConfigs.ToList();
+
+            var directory = Path.GetDirectoryName(_configFilePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var environmentVariables = snapshot.ToDictionary(
+                config => config.Id,
+                config => new Dictionary<string, string?>(config.EnvironmentVariables),
+                StringComparer.Ordinal);
+            _secretStore.Write(environmentVariables);
+
+            // 序列化不含环境变量 Secret 的配置对象并原子替换目标文件。
+            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+            var tempFilePath = _configFilePath + ".tmp";
+            File.WriteAllText(tempFilePath, json);
+            File.Move(tempFilePath, _configFilePath, overwrite: true);
         }
-
-        // 确保目录存在
-        var directory = Path.GetDirectoryName(_configFilePath);
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        // 序列化配置对象
-        var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
-
-        // 保存到文件
-        File.WriteAllText(_configFilePath, json);
     }
 
     /// <summary>
@@ -115,6 +159,22 @@ public class MCPServerConfigService
 
         // 保存更改
         SaveConfigs();
+    }
+
+    private void ApplyEnvironmentVariables(
+        IReadOnlyDictionary<string, Dictionary<string, string?>> environmentVariables)
+    {
+        foreach (var config in _serverConfigs)
+        {
+            if (environmentVariables.TryGetValue(config.Id, out var values))
+                config.EnvironmentVariables = new Dictionary<string, string?>(values);
+        }
+    }
+
+    private sealed class LegacyMcpServerSecrets
+    {
+        public string Id { get; set; } = string.Empty;
+        public Dictionary<string, string?>? EnvironmentVariables { get; set; }
     }
 
     /// <summary>

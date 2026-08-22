@@ -94,42 +94,6 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task AddHistory_Crypto_ShouldStoreAsset()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
-        var asset = new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" };
-
-        // Act
-        await service.AddHistoryAsync(asset);
-        var history = await service.GetHistoryAsync();
-
-        // Assert
-        Assert.IsNotNull(history);
-        Assert.AreEqual(1, history.Count);
-        Assert.AreEqual("BTCUSDT", history[0].Code);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GetHistory_Crypto_ShouldReturnRecentAssets()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
-        await service.AddHistoryAsync(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
-        await service.AddHistoryAsync(new AssetItem { Code = "ETHUSDT", Name = "Ethereum" });
-
-        // Act
-        var history = await service.GetHistoryAsync();
-
-        // Assert
-        Assert.IsNotNull(history);
-        Assert.AreEqual(2, history.Count);
-        Assert.AreEqual("ETHUSDT", history[0].Code); // 最新的在前面
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange

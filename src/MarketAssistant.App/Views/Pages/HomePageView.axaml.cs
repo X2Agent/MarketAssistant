@@ -47,6 +47,20 @@ public partial class HomePageView : UserControl
     /// </summary>
     private void HotStockCard_Tapped(object? sender, RoutedEventArgs e)
     {
+        ActivateHotAsset(sender);
+    }
+
+    private void HotStockCard_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (IsActivationKey(e))
+        {
+            ActivateHotAsset(sender);
+            e.Handled = true;
+        }
+    }
+
+    private void ActivateHotAsset(object? sender)
+    {
         if (sender is Border border &&
             border.Tag is HotAsset hotAsset &&
             DataContext is HomePageViewModel viewModel)
@@ -59,6 +73,20 @@ public partial class HomePageView : UserControl
     /// 最近查看资产卡片点击事件
     /// </summary>
     private void RecentStockCard_Tapped(object? sender, RoutedEventArgs e)
+    {
+        ActivateRecentAsset(sender);
+    }
+
+    private void RecentStockCard_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (IsActivationKey(e))
+        {
+            ActivateRecentAsset(sender);
+            e.Handled = true;
+        }
+    }
+
+    private void ActivateRecentAsset(object? sender)
     {
         if (sender is Border border &&
             border.Tag is AssetItem assetItem &&
@@ -73,6 +101,20 @@ public partial class HomePageView : UserControl
     /// </summary>
     private void NewsCard_Tapped(object? sender, RoutedEventArgs e)
     {
+        ActivateNews(sender);
+    }
+
+    private void NewsCard_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (IsActivationKey(e))
+        {
+            ActivateNews(sender);
+            e.Handled = true;
+        }
+    }
+
+    private void ActivateNews(object? sender)
+    {
         if (sender is Border border &&
             border.Tag is Telegram telegram &&
             DataContext is HomePageViewModel viewModel)
@@ -80,4 +122,6 @@ public partial class HomePageView : UserControl
             viewModel.News.OpenNewsCommand.Execute(telegram);
         }
     }
+
+    private static bool IsActivationKey(KeyEventArgs e) => e.Key is Key.Enter or Key.Space;
 }

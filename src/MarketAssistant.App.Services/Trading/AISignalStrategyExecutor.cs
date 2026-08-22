@@ -45,18 +45,75 @@ public sealed class AISignalStrategyExecutor
     {
         if (TryHandleHardBoundary(strategy, currentPrice, out var boundaryReasoning))
         {
-            strategy.Side = strategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
-            var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
-                strategy,
-                currentPrice,
-                boundaryReasoning,
-                requireClose: true,
-                ct: ct).ConfigureAwait(false);
-
-            return new AISignalExecutionResult(boundaryResult.Success ? boundaryResult.Record : null);
+            return await ExecuteHardBoundaryAsync(strategy, currentPrice, boundaryReasoning, ct)
+                .ConfigureAwait(false);
         }
 
         return await ExecuteWithAgentAsync(strategy, currentPrice, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 硬性边界（止损/止盈）处理：确认仍有持仓后反向平仓。
+    /// 平仓成功或持仓已消失时完结策略，防止退出条件兑现后策略按评估间隔反复触发
+    /// （TradeExecutor 仅在成功时回写触发计数，失败时保持 Active 留待下个冷却期重试）。
+    /// </summary>
+    private async Task<AISignalExecutionResult> ExecuteHardBoundaryAsync(
+        TradingStrategy strategy,
+        decimal currentPrice,
+        string reasoning,
+        CancellationToken ct)
+    {
+        try
+        {
+            var positions = await _portfolioService.GetCurrentPositionsAsync(ct).ConfigureAwait(false);
+            var hasPosition = positions.Any(position =>
+                position.Symbol.Equals(strategy.Symbol, StringComparison.OrdinalIgnoreCase) &&
+                Math.Abs(position.Quantity) > 0);
+
+            if (!hasPosition)
+            {
+                // 持仓已不存在（如手动平仓），退出条件失去对象，策略使命结束
+                _logger.LogInformation(
+                    "硬性边界触发但已无持仓，直接完结策略: {StrategyId} {Symbol}",
+                    strategy.Id, strategy.Symbol);
+                await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct)
+                    .ConfigureAwait(false);
+                return AISignalExecutionResult.NoTrade;
+            }
+
+            // TradeExecutor 从 strategy 读取执行方向；用 try/finally 把翻转限制在本次调用内，
+            // 避免"持仓方向"语义被平仓动作污染（当前策略对象每次评估重新加载，此处防御性恢复使约定显式化）
+            var originalSide = strategy.Side;
+            try
+            {
+                strategy.Side = originalSide == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
+
+                var boundaryResult = await _tradeExecutor.ExecuteTradeAsync(
+                    strategy, currentPrice, reasoning,
+                    requireClose: true,
+                    ct: ct).ConfigureAwait(false);
+
+                if (boundaryResult.Success)
+                {
+                    // 止损/止盈退出即本策略使命完成；重新建仓应通过新策略表达
+                    _logger.LogInformation("硬性边界平仓成功，完结策略: {StrategyId}", strategy.Id);
+                    await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct)
+                        .ConfigureAwait(false);
+                    return new AISignalExecutionResult(boundaryResult.Record, boundaryResult);
+                }
+
+                return new AISignalExecutionResult(null, boundaryResult);
+            }
+            finally
+            {
+                strategy.Side = originalSide;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "硬性边界处理失败: {StrategyId}", strategy.Id);
+            return AISignalExecutionResult.Failed;
+        }
     }
 
     private async Task<AISignalExecutionResult> ExecuteWithAgentAsync(
@@ -82,7 +139,7 @@ public sealed class AISignalStrategyExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "AI 信号策略执行失败: {StrategyId}", strategy.Id);
-            return AISignalExecutionResult.None;
+            return AISignalExecutionResult.Failed;
         }
         finally
         {
@@ -189,7 +246,7 @@ public sealed class AISignalStrategyExecutor
 
     private async Task InvokeAgentAsync(string prompt, CancellationToken ct)
     {
-        var agent = _agentFactory.CreateAgent();
+        var agent = _agentFactory.CreateAutomationAgent();
         var messages = new List<ChatMessage>
         {
             new(ChatRole.User, prompt)
@@ -209,7 +266,7 @@ public sealed class AISignalStrategyExecutor
             .ConfigureAwait(false);
         var newestRecord = recentRecords.FirstOrDefault();
         if (newestRecord == null || newestRecord.Id == priorLatestRecordId)
-            return AISignalExecutionResult.None;
+            return AISignalExecutionResult.NoTrade;
 
         await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct).ConfigureAwait(false);
         return new AISignalExecutionResult(newestRecord);
@@ -275,13 +332,51 @@ public sealed class AISignalStrategyExecutor
 
 public sealed class AISignalExecutionResult
 {
-    public static AISignalExecutionResult None { get; } = new(null);
+    /// <summary>
+    /// AI 决策为 HOLD 或策略已自然完结（无持仓），属正常路径：不进失败冷却，
+    /// 重试频率由 StrategyEngine 的 LastTriggeredAt（analysisInterval）节流。
+    /// </summary>
+    public static AISignalExecutionResult NoTrade { get; } = new(null, null, AISignalOutcome.NoTrade);
+
+    /// <summary>
+    /// 执行过程发生异常。进入失败冷却，防止每个价格 tick 重复失败。
+    /// </summary>
+    public static AISignalExecutionResult Failed { get; } = new(null, null, AISignalOutcome.Failed);
 
     public AISignalExecutionResult(TradeRecord? record)
+        : this(record, null, record != null ? AISignalOutcome.Executed : AISignalOutcome.NoTrade)
+    {
+    }
+
+    public AISignalExecutionResult(TradeRecord? record, TradeResult? tradeResult)
+        : this(record, tradeResult, record != null ? AISignalOutcome.Executed : AISignalOutcome.Failed)
+    {
+    }
+
+    private AISignalExecutionResult(TradeRecord? record, TradeResult? tradeResult, AISignalOutcome outcome)
     {
         Record = record;
+        TradeResult = tradeResult;
+        Outcome = outcome;
     }
 
     public TradeRecord? Record { get; }
+    public TradeResult? TradeResult { get; }
+    public AISignalOutcome Outcome { get; }
     public bool TradeExecuted => Record != null;
+}
+
+/// <summary>
+/// AISignal 策略单次执行的结局
+/// </summary>
+public enum AISignalOutcome
+{
+    /// <summary>已成交（含硬性边界平仓成功）</summary>
+    Executed,
+
+    /// <summary>未交易且无异常（HOLD 决策 / 无持仓完结）</summary>
+    NoTrade,
+
+    /// <summary>执行异常（网络、Agent 调用失败等）</summary>
+    Failed
 }

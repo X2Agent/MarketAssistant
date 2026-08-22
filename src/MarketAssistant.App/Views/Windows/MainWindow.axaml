@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MarketAssistant.ViewModels"
         xmlns:infra="using:MarketAssistant.Infrastructure.Core"
-        xmlns:converts="using:MarketAssistant.Converters"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -20,7 +19,6 @@
 
     <Window.Resources>
         <infra:ViewLocator x:Key="ViewLocator"/>
-        <converts:NavigationIconConverter x:Key="NavigationIconConverter"/>
     </Window.Resources>
 
     <Window.KeyBindings>
@@ -50,6 +48,7 @@
                     <!-- Logo按钮（点击切换市场） -->
                     <Button Width="{StaticResource AppLogoSize}"
                             Height="{StaticResource AppLogoSize}"
+                            AutomationProperties.Name="切换市场"
                             CornerRadius="{StaticResource DefaultCornerRadius}"
                             HorizontalAlignment="Center"
                             Padding="0"
@@ -104,6 +103,10 @@
                         </Style>
                         <Style Selector="ListBoxItem:selected">
                             <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                        </Style>
+                        <Style Selector="ListBoxItem:focus">
+                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
                         </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>

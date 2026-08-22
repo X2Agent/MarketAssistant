@@ -11,7 +11,10 @@ namespace MarketAssistant.Views.Windows;
 public partial class NotificationWindow : Window
 {
     private const int AnimationDuration = 300;
-    private const int DisplayDuration = 3000;
+    private const int DisplayDuration = 5000;
+    private const int MinimumDisplayDuration = 3000;
+    private const int DurationPerLine = 700;
+    private const int MaximumDisplayDuration = 12000;
 
     private static readonly Color SuccessColor = Color.Parse("#4CAF50");
     private static readonly Color ErrorColor = Color.Parse("#F44336");
@@ -95,8 +98,8 @@ public partial class NotificationWindow : Window
         // 滑入动画
         await SlideInAsync();
 
-        // 显示一段时间
-        await Task.Delay(durationMs);
+        // 长文本按预计行数延长停留时间，避免用户尚未读完就消失。
+        await Task.Delay(CalculateDisplayDuration(durationMs));
 
         // 滑出动画
         await SlideOutAsync();
@@ -144,6 +147,15 @@ public partial class NotificationWindow : Window
             Position = new PixelPoint((int)currentX, (int)y);
             await Task.Delay(stepDuration);
         }
+    }
+
+    private int CalculateDisplayDuration(int requestedDuration)
+    {
+        var messageText = this.FindControl<TextBlock>("MessageText")?.Text ?? string.Empty;
+        var estimatedLines = Math.Max(1, (int)Math.Ceiling(messageText.Length / 28d));
+        var contentDuration = estimatedLines * DurationPerLine;
+        var displayDuration = Math.Max(MinimumDisplayDuration, Math.Max(requestedDuration, contentDuration));
+        return Math.Min(MaximumDisplayDuration, displayDuration);
     }
 
     /// <summary>

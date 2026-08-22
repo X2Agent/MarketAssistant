@@ -85,6 +85,9 @@
                             <Border Classes="stock-card"
                                     Margin="{StaticResource SmallMargin}"
                                     Tapped="OnStockItemTapped"
+                                    KeyDown="OnStockItemKeyDown"
+                                    Focusable="True"
+                                    AutomationProperties.Name="{Binding Name}"
                                     Tag="{Binding .}"
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Top">

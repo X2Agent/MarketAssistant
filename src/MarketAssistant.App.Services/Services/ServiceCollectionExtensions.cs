@@ -29,6 +29,7 @@ using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
@@ -231,6 +232,14 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
+        // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
+        services.AddHttpClient("AnonymousOpenAI", client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(3);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+        });
+
         return services;
     }
 
@@ -278,6 +287,7 @@ public static class BusinessServiceCollectionExtensions
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
+        services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
         // 延迟工厂：仅在向量化等真实场景解析，避免浏览设置页时构造嵌入/向量存储链路
         services.AddSingleton<Func<IEmbeddingFactory>>(sp => sp.GetRequiredService<IEmbeddingFactory>);
         services.AddSingleton<IWebSearchService, WebSearchService>();
@@ -293,16 +303,19 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IJsonToAdaptiveCardParser, NewsCardParser>();
         services.AddSingleton<IJsonToAdaptiveCardParser, TechnicalCardParser>();
 
-        // MAF 中间件
+        // MAF 中间件与会话级 Context Provider 工厂
         services.AddSingleton<TokenTrackingMiddleware>();
-        services.AddSingleton<ConversationCompressionMiddleware>(sp =>
-            new ConversationCompressionMiddleware(
-                () => sp.GetRequiredService<IChatClientFactory>().CreateClient(),
-                sp.GetRequiredService<ILogger<ConversationCompressionMiddleware>>()));
+        services.AddSingleton<ConversationCompactionProviderFactory>();
 
         services.AddSingleton(sp =>
             new AgentSkillsProvider(
-                skillPath: Path.Combine(AppContext.BaseDirectory, "skills")));
+                skillPath: Path.Combine(AppContext.BaseDirectory, "skills"),
+                options: new AgentSkillsProviderOptions
+                {
+                    DisableLoadSkillApproval = true,
+                    DisableReadSkillResourceApproval = true,
+                    DisableRunSkillScriptApproval = true
+                }));
 
         services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();
@@ -432,9 +445,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 
-        // 市场分析工作流
-        services.AddSingleton<AnalysisAggregatorExecutor>();
-        services.AddSingleton<CoordinatorExecutor>();
+        // 市场分析工作流；Executor 在每次 Run 内创建，避免共享可变状态和模型固化。
         services.AddSingleton<MarketAnalysisWorkflow>();
         services.AddSingleton<AnalysisOrchestrationService>();
 

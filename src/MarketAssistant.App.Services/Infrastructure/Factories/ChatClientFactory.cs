@@ -1,9 +1,15 @@
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Security.Cryptography;
+using System.Text;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Http.Resilience;
+using OllamaSharp;
 using OpenAI;
 using Polly;
-using Polly.Retry;
-using System.ClientModel;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
@@ -11,174 +17,235 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// ChatClient 工厂接口
 /// 负责创建和管理底层的 IChatClient 实例
 /// </summary>
-public interface IChatClientFactory
+public interface IChatClientFactory : IDisposable
 {
     /// <summary>
-    /// 创建配置好的 ChatClient 实例
+    /// 创建配置好的 ChatClient 实例。
     /// </summary>
     IChatClient CreateClient();
+
+    /// <summary>
+    /// 创建绑定不可变模型配置快照的 ChatClient Runtime。
+    /// </summary>
+    ChatClientRuntime CreateRuntime();
 }
 
 /// <summary>
+/// ChatClient 与其不可变模型配置快照。
+/// </summary>
+public sealed record ChatClientRuntime(
+    IChatClient Client,
+    string ProviderId,
+    string ModelId,
+    string Endpoint,
+    string ConfigurationFingerprint,
+    StructuredOutputMode StructuredOutputMode);
+
+/// <summary>
 /// ChatClient 工厂实现
-/// 创建和缓存底层的 OpenAI ChatClient，并附加 LLM 瞬态错误重试管道
+/// 根据用户配置创建并缓存官方 SDK 提供的 IChatClient。
 /// </summary>
 public class ChatClientFactory : IChatClientFactory
 {
-    /// <summary>
-    /// 瞬态错误冷却时间：冷却期内同一配置不重试，冷却后允许再次尝试
-    /// </summary>
-    private static readonly TimeSpan ErrorCooldown = TimeSpan.FromSeconds(30);
-
-    /// <summary>
-    /// LLM 调用重试管道：针对瞬态网络/服务端错误自动重试 2 次，指数退避 + 抖动
-    /// 覆盖 Coordinator 和所有业务分析师的 LLM 调用
-    /// </summary>
-    private static readonly ResiliencePipeline LlmRetryPipeline = new ResiliencePipelineBuilder()
-        .AddRetry(new RetryStrategyOptions
-        {
-            MaxRetryAttempts = 2,
-            BackoffType = DelayBackoffType.Exponential,
-            UseJitter = true,
-            Delay = TimeSpan.FromSeconds(2),
-            ShouldHandle = new PredicateBuilder()
-                .Handle<HttpRequestException>()
-                .Handle<TaskCanceledException>(ex => IsNetworkTimeout(ex))
-        })
-        .Build();
-
-    /// <summary>
-    /// 判断 TaskCanceledException 是否由网络超时引起（而非用户主动取消）。
-    /// System.ClientModel 超时时抛出的异常链为：
-    /// TaskCanceledException → TaskCanceledException → IOException → SocketException
-    /// </summary>
-    private static bool IsNetworkTimeout(TaskCanceledException ex)
-    {
-        if (ex.InnerException is TimeoutException) return true;
-        if (ex.CancellationToken.IsCancellationRequested) return false;
-        // System.ClientModel 的超时消息包含 "exceeded the configured timeout"
-        return ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase);
-    }
+    private const int MaxCachedRuntimes = 16;
 
     private readonly IUserSettingService _userSettingService;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly object _lock = new();
-    private IChatClient? _cachedClient;
-    private string? _lastError;
-    private DateTime _lastErrorTime;
+    private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
+    private bool _disposed;
 
-    // 缓存用于创建客户端的配置，以便检测变更
-    private string? _cachedModelId;
-    private string? _cachedEndpoint;
-    private string? _cachedApiKey;
-
-    public ChatClientFactory(IUserSettingService userSettingService)
+    public ChatClientFactory(
+        IUserSettingService userSettingService,
+        IHttpClientFactory httpClientFactory)
     {
         _userSettingService = userSettingService;
+        _httpClientFactory = httpClientFactory;
     }
 
-    public IChatClient CreateClient()
+    public IChatClient CreateClient() => CreateRuntime().Client;
+
+    public ChatClientRuntime CreateRuntime()
     {
-        IChatClient? oldClient = null;
-        try
+        lock (_lock)
         {
-            lock (_lock)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var userSetting = _userSettingService.CurrentSetting;
+            var providerId = userSetting.ProviderId;
+            var modelId = userSetting.ProviderModelIds.GetValueOrDefault(providerId, string.Empty);
+            var provider = ModelProviderCatalog.GetProvider(providerId)
+                ?? throw new FriendlyException($"未知的服务商: {providerId}");
+            var configuredApiKey = userSetting.ProviderApiKeys.TryGetValue(providerId, out var key) ? key : string.Empty;
+            var apiKey = provider.RequiresApiKey ? configuredApiKey : string.Empty;
+            var endpointOverride = provider.AllowsEndpointOverride
+                ? userSetting.ProviderEndpoints.GetValueOrDefault(providerId, string.Empty)
+                : string.Empty;
+            var endpoint = provider.ResolveEndpoint(endpointOverride);
+            var structuredOutputMode = provider.StructuredOutputMode;
+            var runtimeKey = new ModelRuntimeKey(
+                providerId,
+                modelId,
+                endpoint,
+                ComputeSecretFingerprint(apiKey));
+            var configurationFingerprint = ComputeConfigurationFingerprint(runtimeKey);
+
+            if (_clients.TryGetValue(runtimeKey, out var cachedClient))
             {
-                var userSetting = _userSettingService.CurrentSetting;
-                var modelId = userSetting.ModelId;
-                var apiKey = userSetting.ApiKey;
-                var endpoint = userSetting.Endpoint;
-
-                bool configUnchanged = _cachedModelId == modelId
-                                    && _cachedEndpoint == endpoint
-                                    && _cachedApiKey == apiKey;
-
-                // 配置未变且有成功缓存 → 直接返回
-                if (configUnchanged && _cachedClient != null)
-                {
-                    return _cachedClient;
-                }
-
-                // 配置未变且上次失败仍在冷却期内 → 快速失败，避免频繁重试
-                if (configUnchanged
-                    && !string.IsNullOrEmpty(_lastError)
-                    && DateTime.UtcNow - _lastErrorTime < ErrorCooldown)
-                {
-                    throw new FriendlyException(_lastError);
-                }
-
-                // 配置已变更或冷却期已过，重置错误状态
-                _lastError = null;
-                // 保存旧客户端引用，稍后在 lock 外 Dispose（避免持锁等待网络连接关闭）
-                oldClient = _cachedClient;
-                _cachedClient = null;
-
-                try
-                {
-                    if (string.IsNullOrWhiteSpace(modelId))
-                        throw new FriendlyException("AI 功能未配置:请先在设置页面选择 AI 模型");
-                    if (string.IsNullOrWhiteSpace(apiKey))
-                        throw new FriendlyException("AI 功能未配置:请先在设置页面配置 API Key");
-                    if (string.IsNullOrWhiteSpace(endpoint))
-                        throw new FriendlyException("AI 功能未配置:请先在设置页面配置 API 端点");
-
-                    // 与 EmbeddingFactory 保持一致：OpenAI SDK 需要带 /v1 的 base URL
-                    // 规范化处理：去掉末尾斜杠，若未包含 /v1 则追加，避免重复拼接
-                    var normalizedEndpoint = endpoint.TrimEnd('/');
-                    if (!normalizedEndpoint.EndsWith("/v1", StringComparison.OrdinalIgnoreCase))
-                    {
-                        normalizedEndpoint += "/v1";
-                    }
-
-                    var openAIClient = new OpenAIClient(
-                        new ApiKeyCredential(apiKey),
-                        new OpenAIClientOptions
-                        {
-                            Endpoint = new Uri(normalizedEndpoint),
-                            // 分析工作流中 Agent 使用流式调用，Tool-Call 链路在等待外部 API
-                            // 返回期间不产生 token，默认 100s 超时过于激进。
-                            // 设为 3 分钟兼顾长链路 Tool-Call 和异常检测。
-                            NetworkTimeout = TimeSpan.FromMinutes(3)
-                        }
-                    );
-
-                    // 使用 ResilientChatClient 装饰器附加重试管道，所有 LLM 调用自动获得瞬态错误重试
-                    var rawClient = openAIClient.GetChatClient(modelId).AsIChatClient();
-                    _cachedClient = new ResilientChatClient(rawClient, LlmRetryPipeline);
-
-                    _cachedModelId = modelId;
-                    _cachedEndpoint = endpoint;
-                    _cachedApiKey = apiKey;
-
-                    return _cachedClient;
-                }
-                catch (Exception ex)
-                {
-                    _lastError = ex.Message;
-                    _lastErrorTime = DateTime.UtcNow;
-                    _cachedClient = null;
-                    _cachedModelId = modelId;
-                    _cachedEndpoint = endpoint;
-                    _cachedApiKey = apiKey;
-                    throw new FriendlyException(_lastError);
-                }
+                return new ChatClientRuntime(
+                    cachedClient,
+                    providerId,
+                    modelId,
+                    endpoint,
+                    configurationFingerprint,
+                    structuredOutputMode);
             }
-        }
-        finally
-        {
-            // 在 lock 外 Dispose 旧客户端，避免持锁等待网络连接关闭。
-            // 用 try-catch 包裹防止 Dispose 抛出异常覆盖 try 块中的原始异常
-            if (oldClient != null)
+
+            try
             {
-                try
+                if (string.IsNullOrWhiteSpace(modelId))
+                    throw new FriendlyException("AI 功能未配置:请先在设置页面选择 AI 模型");
+
+                if (provider.GetProtocol(modelId) == ModelApiProtocol.Unsupported)
                 {
-                    oldClient.Dispose();
+                    throw new FriendlyException(
+                        $"模型 {modelId} 当前使用的 API 协议尚未接入 {provider.DisplayName}");
                 }
-                catch (Exception)
+
+                if (provider.RequiresApiKeyForModel(modelId) && string.IsNullOrWhiteSpace(apiKey))
                 {
-                    // Dispose 失败不应影响主流程，仅记录
-                    // 此处无法使用 ILogger（工厂不持有 logger），异常被静默吞并
+                    throw new FriendlyException(
+                        $"AI 功能未配置：服务商 {provider.DisplayName} 的模型 {modelId} 需要 API Key，请先在设置页面配置");
                 }
+
+                if (_clients.Count >= MaxCachedRuntimes)
+                {
+                    throw new FriendlyException(
+                        $"本次应用运行已使用 {MaxCachedRuntimes} 组不同的模型配置。" +
+                        "为避免释放仍被会话引用的客户端，请重启应用后再切换新配置");
+                }
+
+                var client = CreateClient(provider, modelId, apiKey, endpoint);
+                _clients.Add(runtimeKey, client);
+                return new ChatClientRuntime(
+                    client,
+                    providerId,
+                    modelId,
+                    endpoint,
+                    configurationFingerprint,
+                    structuredOutputMode);
+            }
+            catch (FriendlyException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new FriendlyException($"创建 AI 客户端失败: {ex.Message}", ex);
             }
         }
     }
+
+    protected virtual IChatClient CreateClient(
+        ModelProvider provider,
+        string modelId,
+        string apiKey,
+        string endpoint)
+    {
+        return provider.GetProtocol(modelId) switch
+        {
+            ModelApiProtocol.Ollama => CreateOllamaClient(endpoint, modelId),
+            ModelApiProtocol.OpenAIChatCompletions => CreateOpenAIClient(apiKey, endpoint)
+                .GetChatClient(modelId)
+                .AsIChatClient(),
+            _ => throw new FriendlyException($"模型 {modelId} 的 API 协议暂不受支持")
+        };
+    }
+
+    /// <summary>
+    /// OllamaSharp 不自带重试；用 Microsoft.Extensions.Http.Resilience 的标准重试管道
+    /// 补齐与 OpenAI 协议（SDK 内建重试）对齐的弹性能力，并统一 3 分钟网络超时。
+    /// </summary>
+    private static OllamaApiClient CreateOllamaClient(string endpoint, string modelId)
+    {
+        var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+            .AddRetry(new HttpRetryStrategyOptions
+            {
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(1),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true
+            })
+            .Build();
+
+        var httpClient = new HttpClient(new ResilienceHandler(pipeline))
+        {
+            BaseAddress = new Uri(endpoint),
+            Timeout = TimeSpan.FromMinutes(3)
+        };
+
+        return new OllamaApiClient(httpClient, modelId);
+    }
+
+    private OpenAIClient CreateOpenAIClient(string apiKey, string endpoint)
+    {
+        var options = new OpenAIClientOptions
+        {
+            Endpoint = new Uri(endpoint),
+            NetworkTimeout = TimeSpan.FromMinutes(3),
+            // 显式对齐 Ollama 路径的 3 次重试，不依赖 SDK 默认值
+            RetryPolicy = new ClientRetryPolicy(3)
+        };
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            options.Transport = new AnonymousHttpClientPipelineTransport(
+                _httpClientFactory.CreateClient("AnonymousOpenAI"));
+            return new OpenAIClient(new ApiKeyCredential("anonymous"), options);
+        }
+
+        return new OpenAIClient(new ApiKeyCredential(apiKey), options);
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+
+            foreach (var client in _clients.Values)
+                client.Dispose();
+
+            _clients.Clear();
+            _disposed = true;
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    private static string ComputeSecretFingerprint(string secret)
+    {
+        if (string.IsNullOrEmpty(secret))
+            return string.Empty;
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
+    }
+
+    private static string ComputeConfigurationFingerprint(ModelRuntimeKey runtimeKey)
+    {
+        var canonicalValue = string.Join(
+            '\n',
+            runtimeKey.ProviderId,
+            runtimeKey.ModelId,
+            runtimeKey.Endpoint,
+            runtimeKey.ApiKeyFingerprint);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalValue)));
+    }
+
+    private sealed record ModelRuntimeKey(
+        string ProviderId,
+        string ModelId,
+        string Endpoint,
+        string ApiKeyFingerprint);
 }

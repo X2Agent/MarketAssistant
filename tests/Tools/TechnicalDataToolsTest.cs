@@ -19,6 +19,7 @@ namespace TestMarketAssistant.Tools;
 /// ITechnicalDataTools 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class TechnicalDataToolsTest
 {
     private ServiceProvider? _serviceProvider;
@@ -85,11 +86,15 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetKDJAsync("SH600519");
 
-        // Assert - 验证真实 KDJ 数据（K、D、J 值非空，证明 API 真实返回而非空对象）
+        // Assert - 验证真实 KDJ 数据（K、D、J 值非空且满足 J = 3K - 2D 公式）
         Assert.IsNotNull(indicator, "KDJ 指标不应为空");
         Assert.IsTrue(indicator.K.HasValue, "K 值不应为空");
         Assert.IsTrue(indicator.D.HasValue, "D 值不应为空");
         Assert.IsTrue(indicator.J.HasValue, "J 值不应为空");
+        // KDJ 公式：J = 3K - 2D
+        var expectedJ = 3m * indicator.K!.Value - 2m * indicator.D!.Value;
+        Assert.IsTrue(Math.Abs(expectedJ - indicator.J!.Value) < 0.1m,
+            $"J({indicator.J}) 应满足 J=3K-2D={expectedJ}，K={indicator.K}, D={indicator.D}");
         TestContext?.WriteLine($"SH600519 KDJ: K={indicator.K}, D={indicator.D}, J={indicator.J}, 日期={indicator.T}");
     }
 
@@ -103,10 +108,16 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetMACDAsync("SH600519");
 
-        // Assert - 验证真实 MACD 数据（Ema12、Ema26 非 0，证明 API 真实返回而非默认值）
+        // Assert - 验证真实 MACD 数据（Diff=Ema12-Ema26，Macd=2*(Diff-Dea)）
         Assert.IsNotNull(indicator, "MACD 指标不应为空");
         Assert.AreNotEqual(0m, indicator.Ema12, $"Ema12 不应为 0，实际: {indicator.Ema12}");
         Assert.AreNotEqual(0m, indicator.Ema26, $"Ema26 不应为 0，实际: {indicator.Ema26}");
+        // MACD 公式：Diff = Ema12 - Ema26
+        Assert.IsTrue(Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff) < 0.01m,
+            $"Diff({indicator.Diff}) 应等于 Ema12({indicator.Ema12}) - Ema26({indicator.Ema26})");
+        // MACD 公式：Macd = 2 * (Diff - Dea)
+        Assert.IsTrue(Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd) < 0.01m,
+            $"Macd({indicator.Macd}) 应等于 2*(Diff({indicator.Diff}) - Dea({indicator.Dea}))");
         TestContext?.WriteLine($"SH600519 MACD: Diff={indicator.Diff}, Dea={indicator.Dea}, Macd={indicator.Macd}, Ema12={indicator.Ema12}, Ema26={indicator.Ema26}, 日期={indicator.T}");
     }
 
@@ -140,10 +151,12 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetMAAsync("SH600519");
 
-        // Assert - 验证真实 MA 数据（MA5、MA20 非空，证明 API 真实返回而非空对象）
+        // Assert - 验证真实 MA 数据（MA5、MA20 非空且为正数，证明 API 真实返回价格均值）
         Assert.IsNotNull(indicator, "MA 指标不应为空");
         Assert.IsTrue(indicator.MA5.HasValue, "MA5 不应为空");
         Assert.IsTrue(indicator.MA20.HasValue, "MA20 不应为空");
+        Assert.IsTrue(indicator.MA5!.Value > 0, $"MA5 应为正数，实际: {indicator.MA5}");
+        Assert.IsTrue(indicator.MA20!.Value > 0, $"MA20 应为正数，实际: {indicator.MA20}");
         TestContext?.WriteLine($"SH600519 MA: MA5={indicator.MA5}, MA10={indicator.MA10}, MA20={indicator.MA20}, MA30={indicator.MA30}, 日期={indicator.T}");
     }
 
@@ -161,11 +174,15 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetKDJAsync("BTCUSDT");
 
-        // Assert - 验证真实 KDJ 数据（K、D、J 值非空，证明 K 线数据真实返回并完成指标计算）
+        // Assert - 验证真实 KDJ 数据（K、D、J 值非空且满足 J = 3K - 2D 公式）
         Assert.IsNotNull(indicator, "KDJ 指标不应为空");
         Assert.IsTrue(indicator.K.HasValue, "K 值不应为空");
         Assert.IsTrue(indicator.D.HasValue, "D 值不应为空");
         Assert.IsTrue(indicator.J.HasValue, "J 值不应为空");
+        // KDJ 公式：J = 3K - 2D
+        var expectedJ = 3m * indicator.K!.Value - 2m * indicator.D!.Value;
+        Assert.IsTrue(Math.Abs(expectedJ - indicator.J!.Value) < 0.1m,
+            $"J({indicator.J}) 应满足 J=3K-2D={expectedJ}，K={indicator.K}, D={indicator.D}");
         TestContext?.WriteLine($"BTCUSDT KDJ: K={indicator.K}, D={indicator.D}, J={indicator.J}, 日期={indicator.T}");
     }
 
@@ -179,10 +196,16 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetMACDAsync("BTCUSDT");
 
-        // Assert - 验证真实 MACD 数据（Ema12、Ema26 非 0，证明 K 线数据真实返回并完成指标计算）
+        // Assert - 验证真实 MACD 数据（Diff=Ema12-Ema26，Macd=2*(Diff-Dea)）
         Assert.IsNotNull(indicator, "MACD 指标不应为空");
         Assert.AreNotEqual(0m, indicator.Ema12, $"Ema12 不应为 0，实际: {indicator.Ema12}");
         Assert.AreNotEqual(0m, indicator.Ema26, $"Ema26 不应为 0，实际: {indicator.Ema26}");
+        // MACD 公式：Diff = Ema12 - Ema26
+        Assert.IsTrue(Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff) < 0.01m,
+            $"Diff({indicator.Diff}) 应等于 Ema12({indicator.Ema12}) - Ema26({indicator.Ema26})");
+        // MACD 公式：Macd = 2 * (Diff - Dea)
+        Assert.IsTrue(Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd) < 0.01m,
+            $"Macd({indicator.Macd}) 应等于 2*(Diff({indicator.Diff}) - Dea({indicator.Dea}))");
         TestContext?.WriteLine($"BTCUSDT MACD: Diff={indicator.Diff}, Dea={indicator.Dea}, Macd={indicator.Macd}, Ema12={indicator.Ema12}, Ema26={indicator.Ema26}, 日期={indicator.T}");
     }
 
@@ -216,10 +239,12 @@ public class TechnicalDataToolsTest
         // Act
         var indicator = await service.GetMAAsync("BTCUSDT");
 
-        // Assert - 验证真实 MA 数据（MA5、MA20 非空，证明 K 线数据真实返回并完成指标计算）
+        // Assert - 验证真实 MA 数据（MA5、MA20 非空且为正数，证明 K 线数据真实返回并完成指标计算）
         Assert.IsNotNull(indicator, "MA 指标不应为空");
         Assert.IsTrue(indicator.MA5.HasValue, "MA5 不应为空");
         Assert.IsTrue(indicator.MA20.HasValue, "MA20 不应为空");
+        Assert.IsTrue(indicator.MA5!.Value > 0, $"MA5 应为正数，实际: {indicator.MA5}");
+        Assert.IsTrue(indicator.MA20!.Value > 0, $"MA20 应为正数，实际: {indicator.MA20}");
         TestContext?.WriteLine($"BTCUSDT MA: MA5={indicator.MA5}, MA10={indicator.MA10}, MA20={indicator.MA20}, MA30={indicator.MA30}, 日期={indicator.T}");
     }
 

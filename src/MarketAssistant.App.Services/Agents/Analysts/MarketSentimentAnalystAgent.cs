@@ -19,27 +19,19 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [RequiresTools(typeof(ISentimentTools))]
 public class MarketSentimentAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(MarketSentimentAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(MarketSentimentAnalysisResult),
-        schemaDescription: "市场情绪分析师的结构化分析结果，包含市场情绪、资金流向、投资者行为和短期策略"
-    );
-
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
             promptLoader.GetConfig("MarketSentimentAnalyst"),
-            ResponseFormat,
+            typeof(MarketSentimentAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
 }

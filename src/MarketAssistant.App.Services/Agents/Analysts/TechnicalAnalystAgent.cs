@@ -18,27 +18,19 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [RequiresTools(typeof(ITechnicalDataTools))]
 public class TechnicalAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(TechnicalAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(TechnicalAnalysisResult),
-        schemaDescription: "技术分析师的结构化分析结果，包含图表形态、关键价位、技术指标和交易策略"
-    );
-
     public TechnicalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
         AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
             promptLoader.GetConfig("TechnicalAnalyst"),
-            ResponseFormat,
+            typeof(TechnicalAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
 }

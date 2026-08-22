@@ -4,8 +4,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>MarketAssistant</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- SK 搜索连接器（Plugins.Web）及泛型 ITextSearch 接口均为实验性 API（SKEXP0001/0050）且无稳定替代，
-         官方已确认 SK 进入维护模式，等待 MAF 生态补齐搜索能力，期间按需抑制 -->
+    <!-- SK 搜索连接器及泛型 ITextSearch 接口仍是实验性 API，当前无稳定替代。 -->
     <NoWarn>$(NoWarn);MAAI001;SKEXP0001;SKEXP0050</NoWarn>
   </PropertyGroup>
 
@@ -28,6 +27,7 @@
 
   <ItemGroup>
     <PackageReference Include="AdaptiveCards" />
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Agents.AI" />
@@ -37,10 +37,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 覆盖 Microsoft.Data.Sqlite 传递引入的 SQLitePCLRaw 2.1.11（CVE-2025-6965） -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
     <PackageReference Include="ModelContextProtocol" />

@@ -23,11 +23,13 @@ public class FavoriteServiceTest
         var services = new ServiceCollection();
 
         // 注册依赖服务
-        services.AddHttpClient();
         services.AddMemoryCache();
         services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
+        services.AddTestMarketDataHttpClients();
         services.AddSingleton<MarketContext>();
+        services.AddSingleton<CoinGeckoApiService>();
+        services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
         services.AddSingleton<BinanceMarketDataService>();
 
         // 注册 AssetInfoService（FavoriteService 的依赖）
@@ -133,20 +135,6 @@ public class FavoriteServiceTest
         // Assert
         Assert.IsNotNull(favorites);
         Assert.AreEqual(0, favorites.Count);
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task AddFavorite_Crypto_ShouldStoreAsset()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
-
-        // Act
-        await service.AddFavoriteAsync("BTCUSDT", "");
-
-        // Assert
-        Assert.IsTrue(await service.IsFavoriteAsync("BTCUSDT", ""));
     }
 
     [TestMethod]

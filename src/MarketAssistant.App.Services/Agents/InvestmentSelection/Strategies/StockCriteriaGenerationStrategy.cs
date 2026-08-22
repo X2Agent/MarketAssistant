@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Infrastructure.Core;
 
@@ -9,6 +10,20 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<StockCriteria>
 {
     protected override string AssetTypeLabel => "股票";
+
+    private static readonly HashSet<string> SupportedIndicatorCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mc", "fmc", "pettm", "pelyr", "pb", "psr", "roediluted", "bps", "eps",
+        "netprofit", "total_revenue", "dy_l", "npay", "oiy", "niota", "current", "pct",
+        "pct5", "pct10", "pct20", "pct60", "pct120", "pct250", "pct_current_year",
+        "amount", "volume", "volume_ratio", "tr", "chgpct", "follow", "tweet", "deal",
+        "follow7d", "tweet7d", "deal7d", "follow7dpct", "tweet7dpct", "deal7dpct"
+    };
+
+    private static readonly JsonSerializerOptions DeserializationOptions = new(JsonSerializerOptions.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public override MarketType SupportedMarketType => MarketType.AShare;
 
@@ -202,5 +217,87 @@ public class StockCriteriaGenerationStrategy : CriteriaGenerationStrategyBase<St
 - pb < 2  
 - roediluted > 8  
 """;
+    }
+
+    public override string BuildUserPrompt(InvestmentSelectionWorkflowRequest request)
+    {
+        if (request.IsNewsAnalysis)
+        {
+            return $"""
+                新闻内容：
+                {request.Content}
+
+                推荐股票数量限制：{request.MaxRecommendations}
+
+                请根据新闻内容生成股票筛选条件。
+                """;
+        }
+        else
+        {
+            return $"""
+                用户需求：
+                {request.Content}
+
+                推荐股票数量限制：{request.MaxRecommendations}
+
+                请根据用户需求生成股票筛选条件。
+                """;
+        }
+    }
+
+    public override StockCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
+    {
+        var criteria = LlmJsonExtractor.Deserialize<StockCriteria>(json, DeserializationOptions);
+        if (criteria == null)
+        {
+            throw new InvalidOperationException("股票筛选条件 JSON 解析失败");
+        }
+
+        if (criteria.Criteria is null)
+        {
+            throw new InvalidOperationException("股票筛选条件列表不能为空");
+        }
+
+        if (!Enum.IsDefined(criteria.Market))
+        {
+            throw new InvalidOperationException($"A股市场类型无效: {criteria.Market}");
+        }
+
+        if (!Enum.IsDefined(criteria.Industry))
+        {
+            throw new InvalidOperationException($"行业类型无效: {criteria.Industry}");
+        }
+
+        for (var index = 0; index < criteria.Criteria.Count; index++)
+        {
+            var condition = criteria.Criteria[index];
+            ValidateCondition(condition.Code, condition.MinValue, condition.MaxValue, index);
+        }
+
+        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
+        return criteria;
+    }
+
+    private static void ValidateCondition(
+        string code,
+        decimal? minValue,
+        decimal? maxValue,
+        int index)
+    {
+        if (string.IsNullOrWhiteSpace(code) || !SupportedIndicatorCodes.Contains(code))
+        {
+            throw new InvalidOperationException($"股票筛选条件[{index}]包含不支持的指标: {code}");
+        }
+
+        if (minValue is null && maxValue is null)
+        {
+            throw new InvalidOperationException($"股票筛选条件[{index}]必须至少指定最小值或最大值");
+        }
+
+        if (minValue > maxValue)
+        {
+            throw new InvalidOperationException(
+                $"股票筛选条件[{index}]最小值 {minValue} 不能大于最大值 {maxValue}");
+        }
     }
 }

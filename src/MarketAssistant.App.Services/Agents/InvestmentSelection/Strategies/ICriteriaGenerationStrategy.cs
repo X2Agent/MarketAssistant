@@ -33,9 +33,9 @@ public interface ICriteriaGenerationStrategy<TCriteria> where TCriteria : IScree
     string BuildUserPrompt(InvestmentSelectionWorkflowRequest request);
 
     /// <summary>
-    /// 反序列化筛选条件
+    /// 反序列化并验证筛选条件，使用请求中的数量上限覆盖模型输出。
     /// </summary>
-    TCriteria DeserializeCriteria(string json);
+    TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request);
 }
 
 /// <summary>
@@ -75,13 +75,15 @@ public abstract class CriteriaGenerationStrategyBase<TCriteria> : ICriteriaGener
             """;
     }
 
-    public TCriteria DeserializeCriteria(string json)
+    public virtual TCriteria DeserializeCriteria(string json, InvestmentSelectionWorkflowRequest request)
     {
         var criteria = LlmJsonExtractor.Deserialize<TCriteria>(json, DeserializationOptions);
         if (criteria == null)
         {
             throw new InvalidOperationException($"{AssetTypeLabel}筛选条件 JSON 解析失败");
         }
+
+        criteria.Limit = Math.Clamp(request.MaxRecommendations, 1, 10);
         return criteria;
     }
 }

@@ -112,7 +112,6 @@
     <!-- ========== 其他尺寸定义 ========== -->
     <x:Double x:Key="HeaderHeight">56</x:Double>
     <Thickness x:Key="FooterPadding">16</Thickness>
-    <Thickness x:Key="ImmersivePageMargin">16,8,16,80</Thickness>
     <x:Double x:Key="DividerHeight">1</x:Double>
     <x:Double x:Key="ProgressBarHeight">8</x:Double>
     <x:Double x:Key="IndicatorSize">12</x:Double>
@@ -126,8 +125,8 @@
     <x:Double x:Key="SidebarDefaultWidth">480</x:Double>
     <x:Double x:Key="SidebarMinWidth">360</x:Double>
     <x:Double x:Key="SidebarMaxWidth">720</x:Double>
-    <x:Double x:Key="NotificationWidth">320</x:Double>
-    <x:Double x:Key="NotificationHeight">72</x:Double>
+    <x:Double x:Key="NotificationWidth">440</x:Double>
+    <x:Double x:Key="NotificationHeight">120</x:Double>
     <x:Double x:Key="DialogWidth">400</x:Double>
     <x:Double x:Key="DialogHeight">200</x:Double>
     <x:Double x:Key="LogoSize">80</x:Double>

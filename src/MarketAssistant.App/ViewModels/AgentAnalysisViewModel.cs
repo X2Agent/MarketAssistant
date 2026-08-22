@@ -42,6 +42,18 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     [ObservableProperty]
     private string _failedAnalystsInfo = string.Empty;
 
+    /// <summary>
+    /// 当前会话是否已有可展示的分析报告（成功产出或加载历史报告后为 true）
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasActiveReport;
+
+    /// <summary>
+    /// 分析未完成（失败或取消）时展示给用户的提示信息
+    /// </summary>
+    [ObservableProperty]
+    private string _analysisFailureMessage = string.Empty;
+
     [ObservableProperty]
     private AnalysisReportViewModel _analysisReportViewModel;
 
@@ -50,10 +62,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     public ICommand ToggleChatSidebarCommand { get; private set; }
     public ICommand CancelAnalysisCommand { get; private set; }
+    public ICommand RetryAnalysisCommand { get; private set; }
 
     private MarketAnalysisReport? _lastReport;
     private IStorageProvider? _storageProvider;
     private CancellationTokenSource? _analysisCts;
+    private Guid? _activeAnalysisRunId;
 
     /// <summary>
     /// 供 View 在 AttachedToVisualTree 时注入
@@ -135,6 +149,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         SubscribeToEvents();
         ToggleChatSidebarCommand = new RelayCommand(ToggleChatSidebar);
         CancelAnalysisCommand = new RelayCommand(CancelAnalysis);
+        RetryAnalysisCommand = new AsyncRelayCommand(LoadAnalysisDataAsync);
         ExportReportCommand = new AsyncRelayCommand(ExportReportAsync);
         LoadHistoryReportCommand = new AsyncRelayCommand<ReportSummary>(LoadHistoryReportAsync);
     }
@@ -165,6 +180,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     private void OnAnalysisProgressChanged(object? sender, AnalysisProgressEventArgs e)
     {
+        if (_activeAnalysisRunId != e.RunId ||
+            !string.Equals(StockCode, e.AssetSymbol, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         Dispatcher.UIThread.InvokeAsync(() =>
         {
             IsAnalysisInProgress = e.IsInProgress;
@@ -185,32 +206,45 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     }
 
     /// <summary>
-    /// 加载分析数据
+    /// 加载分析数据。
+    /// 成功产出报告后才切换到报告视图；失败或取消时停留在"分析未完成"状态，
+    /// 不再弹出全局错误框并落入空白的报告页。
     /// </summary>
     public async Task LoadAnalysisDataAsync()
     {
         if (string.IsNullOrEmpty(StockCode))
             return;
 
-        await SafeExecuteAsync(async () =>
+        IsBusy = true;
+        try
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 AnalysisStage = "准备开始...";
                 FailedAnalystsInfo = string.Empty;
                 AnalysisProgressPercent = 0;
+                HasActiveReport = false;
+                AnalysisFailureMessage = string.Empty;
             });
 
             await RefreshHistoryAsync(StockCode);
 
             _analysisCts?.Cancel();
+            _analysisCts?.Dispose();
             _analysisCts = new CancellationTokenSource();
+            var runId = Guid.NewGuid();
+            _activeAnalysisRunId = runId;
+            var assetCode = StockCode;
 
-            var result = await _orchestrationService.AnalyzeAsync(StockCode, _analysisCts.Token);
+            var result = await _orchestrationService.AnalyzeAsync(
+                assetCode,
+                runId,
+                _analysisCts.Token);
             var report = result.Report;
 
             _lastReport = report;
             CanExportReport = true;
+            HasActiveReport = true;
 
             if (!result.FromCache)
                 await RefreshHistoryAsync(StockCode);
@@ -223,8 +257,21 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
                 }
             });
-
-        }, "资产分析");
+        }
+        catch (OperationCanceledException)
+        {
+            Logger?.LogInformation("资产 {StockCode} 的分析已取消", StockCode);
+            AnalysisFailureMessage = "分析已取消，可点击下方按钮重新发起分析";
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "执行 '资产分析' 时发生错误");
+            AnalysisFailureMessage = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "资产分析");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     /// <summary>
@@ -285,6 +332,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     public void OnNavigatedFrom()
     {
+        _analysisCts?.Cancel();
+        _activeAnalysisRunId = null;
+        IsChatSidebarVisible = false;
     }
 
     private async Task RefreshHistoryAsync(string assetCode)
@@ -310,6 +360,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
             _lastReport = report;
             CanExportReport = true;
+            HasActiveReport = true;
+            AnalysisFailureMessage = string.Empty;
 
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
@@ -326,6 +378,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
         _analysisCts = null;
+        _activeAnalysisRunId = null;
         _lastReport = null;
 
         // 重置分析状态
@@ -334,6 +387,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisProgressPercent = 0;
         FailedAnalystsInfo = string.Empty;
         CanExportReport = false;
+        HasActiveReport = false;
+        AnalysisFailureMessage = string.Empty;
 
         OnPropertyChanged(nameof(Title));
     }
@@ -343,6 +398,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
+        _activeAnalysisRunId = null;
 
         if (MarketContext != null)
             UnsubscribeFromMarketChanges(MarketContext);

@@ -39,6 +39,19 @@ public sealed class TradingEnvironmentService
     public string CurrentModeDescription => GetModeDescription(_currentMode);
 
     /// <summary>
+    /// 判断运行中的市场监控切换到实盘环境时是否必须二次确认。
+    /// </summary>
+    public static bool RequiresLiveModeConfirmation(
+        CryptoTradingMode currentMode,
+        CryptoTradingMode targetMode,
+        bool isMonitorRunning)
+    {
+        return isMonitorRunning &&
+               targetMode != currentMode &&
+               targetMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
+    }
+
+    /// <summary>
     /// 切换交易模式。若监控正在运行，先等待其完全停止（最长 10 秒）再切换，
     /// 避免切换瞬间在途策略任务或订单状态同步访问新环境的账户与数据。
     /// </summary>
@@ -58,9 +71,9 @@ public sealed class TradingEnvironmentService
 
         _currentMode = mode;
 
-        // 持久化到用户设置，确保重启后保持一致
-        _userSettingService.CurrentSetting.CryptoTradingMode = mode;
-        _userSettingService.SaveSettings();
+        // 持久化到用户设置，确保重启后保持一致；
+        // 与持久化共用同步边界，避免与其它线程的设置保存交错
+        _userSettingService.UpdateSetting(setting => setting.CryptoTradingMode = mode);
 
         _logger.LogInformation("虚拟币交易模式已切换为 {Mode} 并已持久化", mode);
         ModeChanged?.Invoke(mode);
