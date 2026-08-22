@@ -188,9 +188,9 @@ public class TradeExecutor : IDisposable
     {
         try
         {
-            // 生成幂等订单 ID：同一笔交易的所有重试使用相同 ID，
-            // 币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
-            // 币安限制 newClientOrderId 最长 36 字符，使用 Base36 编码压缩 GUID。
+            // 生成订单客户端 ID（"MA" + 16 位 hex，总长 18 ≤ 币安 36 字符上限）。
+            // 同一次下单内的网络异常重试复用该 ID：币安收到重复的 newClientOrderId 时返回已有订单而非新建，避免重复下单。
+            // 注意：幂等性仅覆盖本方法的内部重试循环；跨调用重试（如人工重发）会生成新 ID。
             var clientOrderId = "MA" + Convert.ToHexString(Guid.NewGuid().ToByteArray())[..16].ToLowerInvariant();
 
             // 合约模式：判断本次操作是开仓还是平仓

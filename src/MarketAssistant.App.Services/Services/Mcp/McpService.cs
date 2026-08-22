@@ -24,6 +24,9 @@ public sealed class McpService : IAsyncDisposable
     private readonly Dictionary<string, McpRuntime> _activeRuntimes = new(StringComparer.Ordinal);
     private readonly List<McpRuntime> _retainedRuntimes = [];
 
+    /// <summary>活动 MCP 连接计数。与 _activeRuntimes 同步维护，供属性无锁读取，避免 UI 线程同步等待信号量。</summary>
+    private int _activeRuntimeCount;
+
     private bool _disposed;
 
     /// <summary>
@@ -32,18 +35,7 @@ public sealed class McpService : IAsyncDisposable
     /// </summary>
     public int ActiveConnectionCount
     {
-        get
-        {
-            _runtimeGate.Wait();
-            try
-            {
-                return _activeRuntimes.Count;
-            }
-            finally
-            {
-                _runtimeGate.Release();
-            }
-        }
+        get => Volatile.Read(ref _activeRuntimeCount);
     }
 
     public McpService(
@@ -156,7 +148,7 @@ public sealed class McpService : IAsyncDisposable
         try
         {
             ThrowIfDisposed();
-            var invalidatedCount = _activeRuntimes.Count;
+            var invalidatedCount = Interlocked.Exchange(ref _activeRuntimeCount, 0);
             _activeRuntimes.Clear();
 
             _logger.LogInformation(
@@ -183,6 +175,7 @@ public sealed class McpService : IAsyncDisposable
             runtimesToDispose = [.. _retainedRuntimes];
             _activeRuntimes.Clear();
             _retainedRuntimes.Clear();
+            Interlocked.Exchange(ref _activeRuntimeCount, 0);
         }
         finally
         {
@@ -252,6 +245,7 @@ public sealed class McpService : IAsyncDisposable
                 .ConfigureAwait(false);
             _activeRuntimes.Add(fingerprint, runtime);
             _retainedRuntimes.Add(runtime);
+            Interlocked.Increment(ref _activeRuntimeCount);
             return runtime;
         }
         finally
@@ -316,17 +310,52 @@ public sealed class McpService : IAsyncDisposable
 
     private static IClientTransport CreateStdioTransport(MCPServerConfig config)
     {
-        var arguments = string.IsNullOrEmpty(config.Arguments)
-            ? Array.Empty<string>()
-            : config.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
         return new StdioClientTransport(new StdioClientTransportOptions
         {
             Name = config.Name,
             Command = config.Command,
-            Arguments = arguments,
+            Arguments = ParseStdioArguments(config.Arguments),
             EnvironmentVariables = config.EnvironmentVariables
         });
+    }
+
+    /// <summary>
+    /// 解析 stdio 启动参数：支持双引号包裹含空格的参数（如 Windows 下 "C:\Program Files\..." 路径），
+    /// 避免简单按空格切分导致带空格路径被拆散。
+    /// </summary>
+    private static string[] ParseStdioArguments(string? arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+            return [];
+
+        var parts = new List<string>();
+        var current = new StringBuilder();
+        var inQuotes = false;
+
+        foreach (var ch in arguments)
+        {
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (char.IsWhiteSpace(ch) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    parts.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        if (current.Length > 0)
+            parts.Add(current.ToString());
+
+        return [.. parts];
     }
 
     private static IClientTransport CreateSseTransport(MCPServerConfig config)

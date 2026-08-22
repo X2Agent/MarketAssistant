@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Services.Trading.Exchanges;
 using MarketAssistant.Trading.Abstractions;
@@ -359,7 +360,7 @@ public class StrategyEngine
                 }
                 // 检查加倍冷却期
                 else if (dcaParams.LastDoubleBuyAt != null
-                         && DateTime.TryParse(dcaParams.LastDoubleBuyAt, out var lastDouble)
+                         && DateTime.TryParse(dcaParams.LastDoubleBuyAt, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var lastDouble)
                          && (DateTime.UtcNow - lastDouble).TotalSeconds < dcaParams.DoubleBuyCooldownSeconds)
                 {
                     _logger.LogDebug("DCA 加倍冷却中: {StrategyId} 距上次加倍 {Elapsed:F0}s < 冷却 {Cooldown}s",

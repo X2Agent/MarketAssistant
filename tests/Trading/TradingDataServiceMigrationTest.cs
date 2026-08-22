@@ -10,6 +10,27 @@ public sealed class TradingDataServiceMigrationTest
 
     [TestMethod]
     [TestCategory("Integration")]
+    public async Task MigrateDatabaseSchemaAsync_MoneyColumns_ConvertedToTextWithoutPrecisionLoss()
+    {
+        await using var connection = await CreateLegacyDatabaseAsync();
+
+        await TradingDataService.MigrateDatabaseSchemaAsync(connection);
+
+        // 金额列类型应为 TEXT
+        await AssertColumnTypeAsync(connection, "strategies", "trigger_price", "TEXT");
+        await AssertColumnTypeAsync(connection, "trade_records", "executed_price", "TEXT");
+        await AssertColumnTypeAsync(connection, "positions", "entry_price", "TEXT");
+        await AssertColumnTypeAsync(connection, "daily_stats", "total_pnl", "TEXT");
+        await AssertColumnTypeAsync(connection, "account_snapshots", "total_value_usdt", "TEXT");
+
+        // 历史 REAL 值搬运后数值不变（CAST(REAL AS TEXT) 可能保留 ".0" 形式，按数值等价断言）
+        await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM strategies WHERE id = 'strategy-1' AND ABS(CAST(trigger_price AS REAL) - 65000) < 1e-9", 1L);
+        await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM trade_records WHERE id = 'record-1' AND ABS(CAST(executed_price AS REAL) - 65000) < 1e-9", 1L);
+        await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM daily_stats WHERE date = '2026-08-03' AND ABS(CAST(total_pnl AS REAL) - 120.5) < 1e-9", 1L);
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
     public async Task MigrateDatabaseSchemaAsync_FromLegacySchema_PreservesDataAndCreatesEnvironmentIndexes()
     {
         await using var connection = await CreateLegacyDatabaseAsync();
@@ -221,6 +242,27 @@ public sealed class TradingDataServiceMigrationTest
             connection,
             $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '{indexName}'",
             1L);
+    }
+
+    private static async Task AssertColumnTypeAsync(
+        SqliteConnection connection,
+        string tableName,
+        string columnName,
+        string expectedType)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName})";
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            if (reader.GetString(1).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.AreEqual(expectedType, reader.GetString(2), ignoreCase: true);
+                return;
+            }
+        }
+
+        Assert.Fail($"表 {tableName} 缺少列 {columnName}");
     }
 
     private static async Task AssertRowValueAsync(
