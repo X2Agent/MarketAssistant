@@ -74,18 +74,18 @@
             </Grid>
         </controls:CardView>
 
-        <!-- 三列布局 -->
+        <!-- 三列布局：热门标的优先（对齐原型 Bento Grid 层级） -->
         <Grid Grid.Row="1"
-              ColumnDefinitions="2*,3*,2*">
+              ColumnDefinitions="3*,2*,2*">
             
-            <!-- 左侧：7*24小时新闻快讯 -->
-            <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
+            <!-- 中列：7*24小时新闻快讯 -->
+            <controls:CardView Grid.Column="1" Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" 
-                                   Text="7*24小时快讯" 
+                        <TextBlock Grid.Column="0"
+                                   Text="7*24小时快讯"
                                    FontSize="{StaticResource SectionTitleFontSize}" 
-                               FontWeight="SemiBold"/>
+                                   FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1"
                                    Text="{Binding News.TelegraphRefreshCountdown}"
                                    FontSize="{StaticResource SmallFontSize}"
@@ -162,12 +162,12 @@
                 </ScrollViewer>
             </controls:CardView>
             
-            <!-- 中间：热门推荐 -->
-            <controls:CardView Grid.Column="1" Margin="{StaticResource SmallRightMargin}">
+            <!-- 左列：热门标的 -->
+            <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
-                                   Text="热门推荐"
+                                   Text="热门标的"
                                    FontSize="{StaticResource SectionTitleFontSize}" 
                                    FontWeight="SemiBold"/>
                         <svg:Svg Grid.Column="1"
