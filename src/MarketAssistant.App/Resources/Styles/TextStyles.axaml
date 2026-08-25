@@ -109,9 +109,11 @@
     </Style>
 
     <!-- ===== 金融数据文本 (Data) ===== -->
+    <!-- 数据字体：等宽数字保证多列价格/百分比纵向对齐 -->
 
     <!-- Data — 数据文本（价格、百分比、成交量） -->
     <Style Selector="TextBlock.data">
+        <Setter Property="FontFamily" Value="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"/>
         <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
         <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -119,6 +121,7 @@
 
     <!-- Data-Large — 大号数据（如当前价） -->
     <Style Selector="TextBlock.data-lg">
+        <Setter Property="FontFamily" Value="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"/>
         <Setter Property="FontSize" Value="{StaticResource ExtraLargeFontSize}"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -126,6 +129,7 @@
 
     <!-- Data-Small — 小号数据（表格数值） -->
     <Style Selector="TextBlock.data-sm">
+        <Setter Property="FontFamily" Value="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"/>
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -158,6 +162,7 @@
 
     <!-- Text-Code — 代码/标的代码 -->
     <Style Selector="TextBlock.text-code">
+        <Setter Property="FontFamily" Value="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"/>
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
