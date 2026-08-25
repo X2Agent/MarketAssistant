@@ -101,8 +101,9 @@
                             <Setter Property="VerticalContentAlignment" Value="Center"/>
                             <Setter Property="Cursor" Value="Hand"/>
                         </Style>
+                        <!-- 活跃态：浅色选中背景，替代整块品牌蓝填充 -->
                         <Style Selector="ListBoxItem:selected">
-                            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                            <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
                         </Style>
                         <Style Selector="ListBoxItem:focus">
                             <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
@@ -131,43 +132,106 @@
             </StackPanel>
         </Border>
 
-        <!-- 顶部导航栏 -->
+        <!-- 常驻顶部栏：标题/返回 + 分段市场切换器 -->
         <Border Grid.Column="1" 
                 Grid.Row="0"
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource NavBarBottomBorder}"
-                IsVisible="{Binding CanGoBack}">
-            <StackPanel Orientation="Horizontal" 
-                        Spacing="{StaticResource SmallSpacing}" 
-                        Margin="{StaticResource PagePadding}">
-                <Button Command="{Binding GoBackCommand}"
-                        Background="Transparent"
-                        BorderThickness="{StaticResource NoBorderThickness}"
-                        Padding="{StaticResource SmallMargin}"
-                        ToolTip.Tip="返回">
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                        <TextBlock Text="←" 
-                                   FontSize="{StaticResource SubTitleFontSize}" 
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="返回" 
-                                   FontSize="{StaticResource LabelFontSize}" 
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-                
-                <Border Width="{StaticResource DividerHeight}" 
-                        Height="{StaticResource SmallIconSize}" 
-                        Background="{DynamicResource BorderBrush}"
-                        VerticalAlignment="Center"
-                        IsVisible="{Binding CanGoBack}"/>
-                
-                <TextBlock Text="{Binding CurrentPageTitle}" 
+                BorderThickness="{StaticResource NavBarBottomBorder}">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="{StaticResource PagePadding}">
+                <!-- 返回按钮 -->
+                <StackPanel Grid.Column="0" 
+                            Orientation="Horizontal" 
+                            Spacing="{StaticResource SmallSpacing}"
+                            IsVisible="{Binding CanGoBack}">
+                    <Button Command="{Binding GoBackCommand}"
+                            Background="Transparent"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            Padding="{StaticResource SmallMargin}"
+                            ToolTip.Tip="返回">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="←" 
+                                       FontSize="{StaticResource SubTitleFontSize}" 
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="返回" 
+                                       FontSize="{StaticResource LabelFontSize}" 
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    
+                    <Border Width="{StaticResource DividerHeight}" 
+                            Height="{StaticResource SmallIconSize}" 
+                            Background="{DynamicResource BorderBrush}"
+                            VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 页面标题 -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding CurrentPageTitle}" 
                            FontSize="{StaticResource LabelFontSize}"
                            FontWeight="SemiBold"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
-            </StackPanel>
+
+                <!-- A股 / 虚拟币 分段市场切换器 -->
+                <Border Grid.Column="3"
+                        Padding="2"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource SurfaceVariantBrush}"
+                        CornerRadius="{StaticResource DefaultCornerRadius}"
+                        ToolTip.Tip="快捷键: Ctrl+M">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button Classes.active="{Binding IsAShareMarket}"
+                            Command="{Binding SwitchMarketCommand}"
+                            CommandParameter="AShare"
+                            Padding="12,4"
+                            CornerRadius="{StaticResource DefaultCornerRadius}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            AutomationProperties.Name="切换到A股市场">
+                        <Button.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                            </Style>
+                            <Style Selector="Button[IsPressed=true]">
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="Button.active">
+                                <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Style>
+                        </Button.Styles>
+                        <TextBlock Text="A股"
+                                   FontSize="{StaticResource TinyFontSize}"
+                                   FontWeight="SemiBold"/>
+                    </Button>
+                    <Button Classes.active="{Binding IsCryptoMarket}"
+                            Command="{Binding SwitchMarketCommand}"
+                            CommandParameter="Crypto"
+                            Padding="12,4"
+                            CornerRadius="{StaticResource DefaultCornerRadius}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            AutomationProperties.Name="切换到虚拟币市场">
+                        <Button.Styles>
+                            <Style Selector="Button">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                            </Style>
+                            <Style Selector="Button[IsPressed=true]">
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="Button.active">
+                                <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Style>
+                        </Button.Styles>
+                        <TextBlock Text="虚拟币"
+                                   FontSize="{StaticResource TinyFontSize}"
+                                   FontWeight="SemiBold"/>
+                    </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
 
         <!-- 右侧内容区域 -->

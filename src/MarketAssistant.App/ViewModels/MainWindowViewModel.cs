@@ -35,6 +35,16 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public string CurrentMarketText => _marketContext.CurrentMarket == MarketType.AShare ? "A股市场" : "虚拟币市场";
 
+    /// <summary>
+    /// 当前是否为 A 股市场（用于顶栏分段切换器视觉状态）
+    /// </summary>
+    public bool IsAShareMarket => _marketContext.CurrentMarket == MarketType.AShare;
+
+    /// <summary>
+    /// 当前是否为虚拟币市场（用于顶栏分段切换器视觉状态）
+    /// </summary>
+    public bool IsCryptoMarket => _marketContext.CurrentMarket == MarketType.Crypto;
+
     public MainWindowViewModel(
         IServiceProvider serviceProvider,
         NavigationService navigationService,
@@ -66,6 +76,8 @@ public partial class MainWindowViewModel : ViewModelBase
     protected override void OnMarketChanged(MarketType newMarket)
     {
         OnPropertyChanged(nameof(CurrentMarketText));
+        OnPropertyChanged(nameof(IsAShareMarket));
+        OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
     }
 
@@ -142,6 +154,31 @@ public partial class MainWindowViewModel : ViewModelBase
             ? MarketType.Crypto
             : MarketType.AShare;
 
+        SwitchToMarket(newMarket);
+    }
+
+    /// <summary>
+    /// 按指定市场切换（顶栏分段切换器使用）
+    /// </summary>
+    /// <param name="market">目标市场类型</param>
+    [RelayCommand]
+    private void SwitchMarket(string market)
+    {
+        if (!Enum.TryParse<MarketType>(market, out var targetMarket))
+            return;
+
+        // 已是目标市场则不重复切换刷新页面
+        if (_marketContext.CurrentMarket == targetMarket)
+            return;
+
+        SwitchToMarket(targetMarket);
+    }
+
+    /// <summary>
+    /// 执行市场切换、提示并刷新当前页面
+    /// </summary>
+    private void SwitchToMarket(MarketType newMarket)
+    {
         _marketContext.SwitchMarket(newMarket);
 
         // 显示切换提示
