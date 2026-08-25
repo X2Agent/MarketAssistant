@@ -240,15 +240,15 @@
                             <ItemsControl ItemsSource="{Binding InvestmentHighlights}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Border Background="{StaticResource SuccessLightBrush}" 
+                                        <Border Background="{DynamicResource SuccessPanelBackgroundBrush}" 
                                                 CornerRadius="{StaticResource SmallCornerRadius}" 
                                                 Padding="{StaticResource ReportNoticePadding}" 
                                                 Margin="{StaticResource SmallBottomMargin}"
-                                                BorderBrush="{StaticResource SuccessBorderBrush}"
+                                                BorderBrush="{DynamicResource SuccessPanelBorderBrush}"
                                                 BorderThickness="{StaticResource DefaultBorderThickness}">
                                             <TextBlock Text="{Binding .}" 
                                                        TextWrapping="Wrap" 
-                                                       Foreground="{StaticResource SuccessDeepTextBrush}"/>
+                                                       Foreground="{DynamicResource SuccessPanelTextBrush}"/>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -266,15 +266,15 @@
                             <ItemsControl ItemsSource="{Binding RiskFactors}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Border Background="{StaticResource DangerLightBrush}" 
+                                        <Border Background="{DynamicResource DangerPanelBackgroundBrush}" 
                                                 CornerRadius="{StaticResource SmallCornerRadius}" 
                                                 Padding="{StaticResource ReportNoticePadding}" 
                                                 Margin="{StaticResource SmallBottomMargin}"
-                                                BorderBrush="{StaticResource DangerBorderBrush}"
+                                                BorderBrush="{DynamicResource DangerPanelBorderBrush}"
                                                 BorderThickness="{StaticResource DefaultBorderThickness}">
                                             <TextBlock Text="{Binding .}" 
                                                        TextWrapping="Wrap" 
-                                                       Foreground="{StaticResource DangerTextBrush}"/>
+                                                       Foreground="{DynamicResource DangerPanelTextBrush}"/>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -318,7 +318,7 @@
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                                     <TextBlock Text="⚖️" FontSize="{StaticResource SubTitleFontSize}"/>
-                                    <TextBlock Text="主要分歧" FontWeight="Bold" FontSize="{StaticResource SectionTitleFontSize}" Foreground="{StaticResource WarningDeepTextBrush}"/>
+                                    <TextBlock Text="主要分歧" FontWeight="Bold" FontSize="{StaticResource SectionTitleFontSize}" Foreground="{DynamicResource WarningPanelTextBrush}"/>
                                 </StackPanel>
                                 <TextBlock Text="{Binding DisagreementAnalysis}" 
                                            TextWrapping="Wrap" 

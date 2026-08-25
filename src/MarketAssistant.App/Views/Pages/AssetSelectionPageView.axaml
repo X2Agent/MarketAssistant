@@ -75,8 +75,8 @@
                                FontWeight="Bold"/>
                     
                     <!-- 验证提示消息 -->
-                    <Border Background="{StaticResource WarningLightBrush}"
-                            BorderBrush="{StaticResource WarningBorderBrush}"
+                    <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
+                            BorderBrush="{DynamicResource WarningPanelBorderBrush}"
                             BorderThickness="{StaticResource DefaultBorderThickness}"
                             CornerRadius="{StaticResource CardCornerRadius}"
                             Padding="{StaticResource DefaultCardPadding}"
@@ -87,7 +87,7 @@
                                        VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding ValidationMessage}"
                                        FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{StaticResource WarningTextBrush}"
+                                       Foreground="{DynamicResource WarningPanelTextBrush}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
@@ -280,8 +280,8 @@
                     </Border>
                     
                     <!-- 投资建议 -->
-                    <Border Background="{StaticResource InfoLightBrush}"
-                            BorderBrush="{StaticResource InfoBorderBrush}"
+                    <Border Background="{DynamicResource InfoPanelBackgroundBrush}"
+                            BorderBrush="{DynamicResource InfoPanelBorderBrush}"
                             BorderThickness="{StaticResource ThickBorderThickness}"
                             CornerRadius="{StaticResource CardCornerRadius}"
                             Padding="{StaticResource CardPadding}">
@@ -289,10 +289,10 @@
                             <TextBlock Text="💡 投资建议" 
                                        FontSize="{StaticResource MediumFontSize}" 
                                        FontWeight="Bold"
-                                       Foreground="{StaticResource InfoTextBrush}"/>
+                                       Foreground="{DynamicResource InfoPanelTextBrush}"/>
                             <TextBlock Text="{Binding SelectionResult.InvestmentAdvice}"
                                        FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{StaticResource InfoTextDarkBrush}"
+                                       Foreground="{DynamicResource InfoPanelTextBrush}"
                                        TextWrapping="Wrap"
                                        LineHeight="{StaticResource DefaultLineHeight}"/>
                         </StackPanel>

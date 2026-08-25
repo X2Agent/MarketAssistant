@@ -61,6 +61,20 @@
             
             <!-- 语义化容器背景 -->
             <SolidColorBrush x:Key='DangerBackgroundBrush'>#FEF2F2</SolidColorBrush>
+
+            <!-- 语义面板（提示/建议/亮点风险区块） -->
+            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#ECFDF5</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#065F46</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#FFFBEB</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelTextBrush'>#92400E</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#F0F9FF</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelTextBrush'>#1E40AF</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#FEE2E2</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelTextBrush'>#991B1B</SolidColorBrush>
         </ResourceDictionary>
         
         <ResourceDictionary x:Key='Dark'>
@@ -92,6 +106,20 @@
             
             <!-- 语义化容器背景 -->
             <SolidColorBrush x:Key='DangerBackgroundBrush'>#2D1B1B</SolidColorBrush>
+
+            <!-- 语义面板：暗色下使用低透明度色块 + 高亮文字 -->
+            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#1E10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#34D399</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#1EF59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelTextBrush'>#FBBF24</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#1E3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelTextBrush'>#93C5FD</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#1EEF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelTextBrush'>#FCA5A5</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
