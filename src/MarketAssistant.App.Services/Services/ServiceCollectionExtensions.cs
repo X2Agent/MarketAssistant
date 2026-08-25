@@ -34,6 +34,9 @@ using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Rag.Services;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Settings;
@@ -64,6 +67,7 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddMemoryCache();
         services.AddNamedMarketHttpClients();
+        services.AddAShareDataProviders();
         services.AddAgentTools();
         services.AddAgentInfrastructure();
         services.AddRagServices();
@@ -72,6 +76,11 @@ public static class BusinessServiceCollectionExtensions
         services.AddWorkflowServices();
         services.AddMarketModules();
         services.AddSingleton<IReleaseService, GitHubReleaseService>();
+        services.AddSingleton<Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore>(_ => new Agents.MarketAnalysis.Artifacts.FileAnalystArtifactStore(
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                AppInfo.AppName,
+                "analyst-artifacts")));
         return services;
     }
 
@@ -336,6 +345,14 @@ public static class BusinessServiceCollectionExtensions
             AppInfo.AppName,
             "vector.sqlite");
         services.AddSqliteVectorStore(_ => $"Data Source={store}");
+
+        // P1-01：文档段落清单（与向量库同目录的旁路 SQLite）
+        var catalogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            AppInfo.AppName,
+            "rag-catalog.sqlite");
+        services.AddSingleton<IRagDocumentCatalog>(_ => new SqliteRagDocumentCatalog(catalogPath));
+
         services.AddSingleton<Func<VectorStore>>(sp => sp.GetRequiredService<VectorStore>);
 
         return services;
@@ -371,7 +388,17 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<TradingEnvironmentService>();
         // 打破 TradingEnvironmentService → MarketMonitor → BinanceUserDataStreamService → TradingEnvironmentService 的循环依赖
         services.AddSingleton<Func<MarketMonitor>>(sp => () => sp.GetRequiredService<MarketMonitor>());
-        services.AddSingleton<RoutingExchangeClient>(CreateRoutingExchangeClient);
+        // 交易所客户端由工厂按交易模式构建，组合根不感知具体交易所实现（P1-5）
+        services.AddSingleton<IExchangeClientFactory, BinanceExchangeClientFactory>();
+        services.AddSingleton<RoutingExchangeClient>(sp =>
+        {
+            var factory = sp.GetRequiredService<IExchangeClientFactory>();
+            var clients = Enum.GetValues<CryptoTradingMode>()
+                .ToDictionary(mode => mode, factory.Create);
+            return new RoutingExchangeClient(
+                sp.GetRequiredService<TradingEnvironmentService>(),
+                clients);
+        });
         services.AddSingleton<TradingStrategyService>();
         services.AddSingleton<RiskManager>();
         services.AddSingleton<StrategyEngine>();
@@ -383,54 +410,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
 
         return services;
-    }
-
-    /// <summary>
-    /// 创建 RoutingExchangeClient，通过 ITradingCredentialStore 加密读取密钥，
-    /// 为每种交易模式构建独立的鉴权/账户/客户端实例，注册到字典中路由。
-    /// 支持现货实盘、现货 Demo、合约实盘、合约 Testnet 共 4 种模式。
-    /// 实盘合约复用现货实盘 API Key（同一账户，需在 binance.com 开启合约权限）。
-    /// </summary>
-    private static RoutingExchangeClient CreateRoutingExchangeClient(IServiceProvider sp)
-    {
-        var env = sp.GetRequiredService<TradingEnvironmentService>();
-        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-        var credentialStore = sp.GetRequiredService<ITradingCredentialStore>();
-        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-
-        var spotLogger = sp.GetRequiredService<ILogger<BinanceSpotAccountService>>();
-        var futuresLogger = sp.GetRequiredService<ILogger<BinanceFuturesAccountService>>();
-
-        // 为每种交易模式创建独立的鉴权服务（从加密存储读取密钥）
-        var spotLiveAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.LiveSpot,
-            "Binance", httpClientFactory, "Binance", "/api/v3/time",
-            loggerFactory.CreateLogger<BinanceAuthService>());
-        var spotDemoAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.BinanceSpotDemo,
-            "Binance Spot Demo", httpClientFactory, "BinanceSpotDemo", "/api/v3/time",
-            loggerFactory.CreateLogger<BinanceAuthService>());
-        var futuresLiveAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.LiveFutures,
-            "Binance Futures", httpClientFactory, "BinanceFutures", "/fapi/v1/time",
-            loggerFactory.CreateLogger<BinanceAuthService>());
-        var futuresTestnetAuth = new BinanceAuthService(credentialStore, CryptoTradingMode.BinanceFuturesTestnet,
-            "Binance Futures Testnet", httpClientFactory, "BinanceFuturesTestnet", "/fapi/v1/time",
-            loggerFactory.CreateLogger<BinanceAuthService>());
-
-        // 账户服务（HttpClient 名与标签不同）
-        var spotLiveAccount = new BinanceSpotAccountService(httpClientFactory, spotLogger, spotLiveAuth, "Binance", "");
-        var spotDemoAccount = new BinanceSpotAccountService(httpClientFactory, spotLogger, spotDemoAuth, "BinanceSpotDemo", "Demo ");
-        var futuresLiveAccount = new BinanceFuturesAccountService(httpClientFactory, futuresLogger, futuresLiveAuth, "BinanceFutures", "");
-        var futuresTestnetAccount = new BinanceFuturesAccountService(httpClientFactory, futuresLogger, futuresTestnetAuth, "BinanceFuturesTestnet", "Testnet ");
-
-        // 交易所客户端
-        var clients = new Dictionary<CryptoTradingMode, IExchangeClient>
-        {
-            [CryptoTradingMode.LiveSpot] = new BinanceExchangeClient(spotLiveAccount, "Binance"),
-            [CryptoTradingMode.BinanceSpotDemo] = new BinanceExchangeClient(spotDemoAccount, "Binance Spot Demo"),
-            [CryptoTradingMode.LiveFutures] = new BinanceFuturesExchangeClient(futuresLiveAccount, "Binance Futures"),
-            [CryptoTradingMode.BinanceFuturesTestnet] = new BinanceFuturesExchangeClient(futuresTestnetAccount, "Binance Futures Testnet"),
-        };
-
-        return new RoutingExchangeClient(env, clients);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

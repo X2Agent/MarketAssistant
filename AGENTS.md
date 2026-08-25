@@ -27,7 +27,8 @@ Core（无依赖）
  ├── Rag → Core
  ├── DataProviders → Core
  ├── Agents → Core
- ├── App.Services → Core, Agents, DataProviders, Rag
+ ├── Infrastructure → Core
+ ├── App.Services → Core, Agents, DataProviders, Rag, Infrastructure
  └── App → Core, Agents, DataProviders, App.Services, Rag
 ```
 

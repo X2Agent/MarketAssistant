@@ -44,6 +44,7 @@ public static class ServiceCollectionExtensions
         // 专为金融场景优化：信任度评分 + 关键词加成 + 时效性 + 多样性优化
         services.AddSingleton<IRerankerService, RerankerService>();
         services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
+        services.AddSingleton<IContextExpansionService, ContextExpansionService>();
 
         services.AddSingleton<IRetrievalOrchestrator, RetrievalOrchestrator>();
 

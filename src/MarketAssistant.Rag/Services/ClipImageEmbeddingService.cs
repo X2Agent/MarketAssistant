@@ -86,6 +86,9 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     {
         try
         {
+            // 取消优先于一切降级/不可用判断
+            ct.ThrowIfCancellationRequested();
+
             // 步骤1：确保ONNX会话已初始化
             EnsureSession();
             if (_session is not null)
@@ -94,8 +97,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                 var (imageInput, imageOutput) = ResolveVisionIO();
                 if (imageInput == null || imageOutput == null)
                 {
-                    _logger.LogWarning("Cannot resolve model input/output structure, falling back to hash");
-                    return new Embedding<float>(HashToVector(imageBytes, TargetDim));
+                    _logger.LogWarning("Cannot resolve model input/output structure; image embedding unavailable");
+                    throw new InvalidOperationException("CLIP 模型输入输出结构无法解析，图像嵌入不可用");
                 }
 
                 // 步骤3~6：在后台线程执行预处理 + 推理 + 后处理（支持取消）
@@ -119,6 +122,9 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
                 return new Embedding<float>(vec);
             }
+
+            // P1-03：CLIP 模型不可用时不再降级为哈希向量
+            throw new InvalidOperationException("CLIP 模型不可用，图像嵌入未生成");
         }
         catch (OperationCanceledException)
         {
@@ -126,12 +132,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         }
         catch (Exception ex)
         {
-            // 异常处理：CLIP推理失败时记录日志并降级
-            _logger.LogDebug(ex, "CLIP embedding failed, fallback to hash vector");
+            // P1-03：CLIP 失败不再降级为哈希向量——哈希向量无语义，
+            // 不得混入与文本同维度的语义检索空间。调用方应跳过图像向量并依赖 Caption 文本召回。
+            _logger.LogWarning(ex, "CLIP 图像嵌入失败，本图不生成图像向量（Caption 文本召回不受影响）");
+            throw new InvalidOperationException("CLIP 图像嵌入不可用", ex);
         }
-
-        // 降级策略：生成哈希向量作为备用
-        return new Embedding<float>(HashToVector(imageBytes, TargetDim));
     }
 
     /// <summary>
@@ -441,39 +446,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 哈希向量生成（降级兜底方案）
-    /// 
-    /// 【学习要点】：
-    /// - 确定性：相同输入始终产生相同输出，保证验证一致性
-    /// - 哈希算法：SHA256提供良好的数据分布特性
-    /// - 伪随机性：哈希值具有统计随机性，适合作为随机向量
-    /// - 降级无关：不依赖外部模型，作为最后的防线
-    /// 
-    /// 【实现思路】：
-    /// - 确定性：相同字节数组产生相同哈希
-    /// - 分布均匀：SHA256确保输出在[0,1]范围内均匀分布
-    /// - 简单可靠：无外部依赖，永不失败
-    /// </summary>
-    /// <param name="bytes">原始图像字节数组</param>
-    /// <param name="dim">目标向量维度</param>
-    /// <returns>基于哈希的伪随机向量</returns>
-    private static float[] HashToVector(byte[] bytes, int dim)
-    {
-        // 计算哈希值：使用SHA256算法
-        using var sha = SHA256.Create();
-        var h = sha.ComputeHash(bytes);
-
-        // 生成向量：将哈希字节转换为浮点数
-        var vec = new float[dim];
-        for (int i = 0; i < dim; i++)
-            vec[i] = h[i % h.Length] / 255f;  // 将字节值[0,255]转换为[0,1]
-
-        return vec;
-    }
-
-    /// <summary>
     /// 资源释放：正确释放ONNX推理会话
-    /// 
+    ///
     /// 【学习要点】：
     /// - 资源管理：ONNX会话包含非托管资源，需显式释放
     /// - IDisposable模式：.NET资源管理的标准模式

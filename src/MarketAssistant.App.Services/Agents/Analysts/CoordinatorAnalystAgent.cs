@@ -29,12 +29,12 @@ public class CoordinatorAnalystAgent : AnalystAgentBase
         GroundingSearchTools searchTools,
         IUserSettingService userSettingService,
         ILoggerFactory loggerFactory,
-        AnalystPromptLoader promptLoader,
+        AnalystPromptConfig config,
         StructuredOutputMode structuredOutputMode,
         AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("CoordinatorAnalyst"),
+            config,
             typeof(CoordinatorResult),
             structuredOutputMode,
             [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],

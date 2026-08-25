@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Infrastructure\MarketAssistant.Infrastructure.csproj" />
     <ProjectReference Include="..\MarketAssistant.Agents\MarketAssistant.Agents.csproj" />
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
     <ProjectReference Include="..\MarketAssistant.DataProviders\MarketAssistant.DataProviders.csproj" />

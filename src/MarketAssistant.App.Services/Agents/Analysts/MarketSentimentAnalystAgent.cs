@@ -22,12 +22,12 @@ public class MarketSentimentAnalystAgent : AnalystAgentBase
     public MarketSentimentAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
-        AnalystPromptLoader promptLoader,
+        AnalystPromptConfig config,
         StructuredOutputMode structuredOutputMode,
         AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("MarketSentimentAnalyst"),
+            config,
             typeof(MarketSentimentAnalysisResult),
             structuredOutputMode,
             tools,

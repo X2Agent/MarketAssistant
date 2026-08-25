@@ -2,6 +2,7 @@ using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public class FavoriteServiceTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
         services.AddMemoryCache();

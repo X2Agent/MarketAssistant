@@ -30,8 +30,9 @@ public sealed class MarketAnalysisDegradationTest
     [TestCategory("Unit")]
     public async Task AnalyzeAsync_SingleAnalystFails_ShouldDegradeAndReturnReport()
     {
-        // MAF Fan-In 管道存在时序性的消息路由丢失（1.16.0，证据见聚合器批次诊断日志；
-        // 与本降级逻辑无关的框架级缺陷，已单列跟进项）。此处用有界重试隔离该偶发，
+        // MAF Fan-In 管道存在时序性的消息路由丢失（1.19.0 仍未修复，证据见聚合器批次诊断日志；
+        // 聚合器已增加有界宽限+降级发送兜底。与本降级逻辑无关的框架级缺陷，已单列跟进项）。
+        // 此处用有界重试隔离该偶发，
         // 降级语义本身由 AnalysisAggregatorExecutorTest / AIAgentFailureIsolationTest 确定性覆盖。
         const int maxAttempts = 5;
         FriendlyException? lastFrameworkError = null;
@@ -54,8 +55,11 @@ public sealed class MarketAnalysisDegradationTest
                 Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary));
 
                 var texts = report.AnalystMessages.Select(message => message.Text ?? string.Empty).ToList();
-                Assert.IsTrue(texts.Any(text => text.Contains("正常的新闻事件分析结论", StringComparison.Ordinal)),
-                    $"存活分析师的结论应进入报告\n--- 诊断日志 ---\n{string.Join("\n", diagnosticLogs.TakeLast(80))}");
+                // P1-07：协调载荷为摘要而非全文，摘要应包含显示名与工具读取指引
+                Assert.IsTrue(texts.Any(text => text.Contains("结论摘要", StringComparison.Ordinal) && text.Contains("NewsEventAnalyst", StringComparison.Ordinal)),
+                    $"存活分析师的结论摘要应进入报告\n--- 诊断日志 ---\n{string.Join("\n", diagnosticLogs.TakeLast(80))}");
+                Assert.IsTrue(texts.Any(text => text.Contains("get_analyst_artifact", StringComparison.Ordinal)),
+                    "协调载荷应包含产物读取工具指引");
                 Assert.IsTrue(texts.All(text => !AnalystFailureMessages.IsFailureMarker(text)),
                     "失败标记不应进入报告载荷");
                 Assert.IsTrue(texts.Any(text => text.StartsWith(AnalystFailureMessages.MissingDimensionNotePrefix, StringComparison.Ordinal)),
@@ -148,20 +152,20 @@ public sealed class MarketAnalysisDegradationTest
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "FundamentalAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _) =>
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) =>
                 CreateAnalystAgent("FundamentalAnalyst", fundamentalFails, "正常的基本面分析结论"));
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "NewsEventAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _) =>
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) =>
                 CreateAnalystAgent("NewsEventAnalyst", newsEventFails, "正常的新闻事件分析结论"));
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "CoordinatorAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _) => new ChatClientAgent(
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) => new ChatClientAgent(
                 coordinatorClient,
                 new ChatClientAgentOptions
                 {
@@ -169,12 +173,15 @@ public sealed class MarketAnalysisDegradationTest
                     ChatOptions = new ChatOptions()
                 }));
 
+        var marketContext = new MarketContext(settingService.Object, Mock.Of<IServiceProvider>());
         var workflow = new MarketAnalysisWorkflow(
             settingService.Object,
             analystFactory.Object,
             chatClientFactory.Object,
             loggerFactory,
-            new AnalysisReportCache(new MarketContext(settingService.Object, Mock.Of<IServiceProvider>())),
+            new AnalysisReportCache(marketContext),
+            marketContext,
+            new InMemoryArtifactStore(),
             NullLogger<MarketAnalysisWorkflow>.Instance);
 
         workflow.ProgressChanged += (_, args) => capturedProgressEvents.Add(args);

@@ -298,6 +298,18 @@
                     </Grid>
                 </controls:CardView>
 
+                <!-- 实验功能区域 -->
+                <controls:CardView Header="实验功能">
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <CheckBox IsChecked="{Binding UserSetting.EnableExperimentalTrading}"
+                                  Content="启用实验性自主交易（仅虚拟币市场）"/>
+                        <TextBlock Text="⚠️ 高风险：开启后导航栏将出现「交易」入口。自主交易可能产生真实资金损失，需要配置交易所 API 密钥，且下单操作可能无法撤销。建议先使用合约测试网/现货 Demo 验证。"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource LabelFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </controls:CardView>
+
                 <!-- 知识库设置区域 -->
                 <controls:CardView Header="知识库设置">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">

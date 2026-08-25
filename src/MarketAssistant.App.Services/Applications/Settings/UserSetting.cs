@@ -45,6 +45,17 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _loadKnowledge, value);
     }
 
+    private bool _enableExperimentalTrading;
+    /// <summary>
+    /// 是否启用实验性自主交易。默认关闭；仅虚拟币等支持交易的市场生效。
+    /// 开启即表示用户理解实盘风险、密钥与不可撤销操作。
+    /// </summary>
+    public bool EnableExperimentalTrading
+    {
+        get => _enableExperimentalTrading;
+        set => SetProperty(ref _enableExperimentalTrading, value);
+    }
+
     [JsonIgnore]
     public const string VectorCollectionName = "knowledge";
 

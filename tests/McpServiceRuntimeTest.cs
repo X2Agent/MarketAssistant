@@ -9,6 +9,7 @@ namespace TestMarketAssistant;
 public sealed class McpServiceRuntimeTest
 {
     [TestMethod]
+    [TestCategory("Integration")]
     public void ComputeConfigurationFingerprint_IgnoresPolicyOnlyFields()
     {
         var first = CreateConfig();
@@ -25,6 +26,7 @@ public sealed class McpServiceRuntimeTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public void ComputeConfigurationFingerprint_ChangesWhenConnectionSecretChanges()
     {
         var first = CreateConfig();
@@ -37,11 +39,14 @@ public sealed class McpServiceRuntimeTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAITools_SameConnectionConfiguration_ReusesClientAndReappliesAllowList()
     {
         var factory = new FakeMcpClientSessionFactory();
         await using var service = CreateService(factory);
         var config = CreateConfig();
+        // 本测试验证白名单重放，需关闭“允许全部”
+        config.AllowAllTools = false;
         config.AllowedTools = ["search"];
 
         var first = await service.GetAIToolsAsync([config]);
@@ -57,6 +62,7 @@ public sealed class McpServiceRuntimeTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task ResetConnections_KeepsOldClientAliveAndCreatesNewRuntime()
     {
         var factory = new FakeMcpClientSessionFactory();
@@ -80,6 +86,7 @@ public sealed class McpServiceRuntimeTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetAITools_ListFailure_DisposesFailedClientAndDoesNotCacheIt()
     {
         var factory = new FakeMcpClientSessionFactory(failFirstList: true);
@@ -102,6 +109,7 @@ public sealed class McpServiceRuntimeTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task Dispose_DisposesEveryRetainedRuntimeAndRejectsFurtherUse()
     {
         var factory = new FakeMcpClientSessionFactory();
@@ -139,6 +147,8 @@ public sealed class McpServiceRuntimeTest
             Command = "test-command",
             Arguments = "--flag value",
             Category = "search",
+            // 这些测试验证连接与运行时行为，显式允许全部工具以绕过白名单默认不暴露
+            AllowAllTools = true,
             EnvironmentVariables = new Dictionary<string, string?>
             {
                 ["API_KEY"] = "secret",

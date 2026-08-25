@@ -22,12 +22,12 @@ public class FundamentalAnalystAgent : AnalystAgentBase
     public FundamentalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
-        AnalystPromptLoader promptLoader,
+        AnalystPromptConfig config,
         StructuredOutputMode structuredOutputMode,
         AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("FundamentalAnalyst"),
+            config,
             typeof(FundamentalAnalysisResult),
             structuredOutputMode,
             tools,

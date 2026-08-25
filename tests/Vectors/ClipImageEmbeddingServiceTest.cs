@@ -52,70 +52,34 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
     #region 图像嵌入向量生成测试
 
     [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GenerateAsync_WithValidImage_ShouldReturnVector()
+    public async Task GenerateAsync_WithoutClipModel_ShouldThrowInsteadOfHashVector()
     {
-        // Act
-        var result = await _service.GenerateAsync(_testImageBytes);
-
-        // Assert
-        Assert.IsNotNull(result, "嵌入结果不应为null");
-        Assert.AreEqual(1024, result.Vector.Length, "向量维度应为1024");
+        // P1-03：CLIP 不可用时不生成哈希伪语义向量，直接抛出由调用方降级为 Caption 召回
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => _service.GenerateAsync(_testImageBytes));
     }
 
     [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GenerateAsync_WithSameImage_ShouldReturnConsistentVector()
-    {
-        // Arrange
-        var imageBytes = _testImageBytes;
-
-        // Act - 两次生成同一图像的向量
-        var result1 = await _service.GenerateAsync(imageBytes);
-        var result2 = await _service.GenerateAsync(imageBytes);
-
-        // Assert - 默认哈希降级应保证确定性；若加载真实模型，允许不同但维度相同
-        Assert.AreEqual(result1.Vector.Length, result2.Vector.Length, "向量维度应一致");
-        // 当未加载模型（走哈希降级）时，两次应完全一致
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")))
-        {
-            for (int i = 0; i < result1.Vector.Length; i++)
-            {
-                Assert.AreEqual(result1.Vector.Span[i], result2.Vector.Span[i]);
-            }
-        }
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GenerateAsync_WithInvalidImageData_ShouldUseFallback()
+    public async Task GenerateAsync_WithInvalidImageData_ShouldThrow()
     {
         // Arrange - 无效的图像数据
         var invalidBytes = new byte[] { 0x00, 0x01, 0x02, 0x03 };
 
-        // Act
-        var result = await _service.GenerateAsync(invalidBytes);
-
-        // Assert - 应该优雅处理（哈希降级或模型输出）
-        Assert.IsNotNull(result, "无效图像应返回降级结果");
-        Assert.IsFalse(result.Vector.IsEmpty, "降级向量不应为空");
-        Assert.AreEqual(1024, result.Vector.Length, "降级向量维度应正确");
+        // Act & Assert - 不再返回哈希降级结果
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+            () => _service.GenerateAsync(invalidBytes));
     }
 
     [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GenerateAsync_WithCancelledToken_ShouldStillReturnHashFallbackVector()
+    public async Task GenerateAsync_WithCancelledToken_ShouldThrowOperationCanceled()
     {
-        // Arrange - 哈希降级路径为纯 CPU 计算，不响应取消令牌
+        // Arrange - 取消必须以 OperationCanceledException 向上传播，不被吞掉
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        // Act
-        var result = await _service.GenerateAsync(_testImageBytes, cts.Token);
-
-        // Assert - 哈希降级应忽略取消并返回 1024 维向量
-        Assert.IsNotNull(result, "哈希降级应返回非空结果");
-        Assert.AreEqual(1024, result.Vector.Length, "降级向量维度应为1024");
+        // Act & Assert
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(
+            () => _service.GenerateAsync(_testImageBytes, cts.Token));
     }
 
     #endregion
@@ -139,21 +103,18 @@ public class ClipImageEmbeddingServiceTest : BaseAgentTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task MultipleOperations_ShouldWorkCorrectly()
+    public async Task CaptionAsync_ConcurrentCalls_ShouldWorkCorrectly()
     {
         // Arrange
-        // Act - 同时进行多个操作
-        var embeddingTask = _service.GenerateAsync(_testImageBytes);
-        var captionTask = _service.CaptionAsync(_testImageBytes);
-
-        var embedding = await embeddingTask;
-        var caption = await captionTask;
+        // Act - 并发进行多次描述生成（嵌入在无 CLIP 模型时抛错，不再参与并发断言）
+        var caption1 = await _service.CaptionAsync(_testImageBytes);
+        var caption2 = await _service.CaptionAsync(_testImageBytes);
 
         // Assert
-        Assert.IsNotNull(embedding, "并发嵌入生成应成功");
-        Assert.IsNotNull(caption, "并发描述生成应成功");
+        Assert.IsNotNull(caption1, "并发描述生成应成功");
+        Assert.IsNotNull(caption2, "并发描述生成应成功");
         // 默认无Chat服务，返回占位符
-        Assert.AreEqual("(图像内容生成失败)", caption);
+        Assert.AreEqual("(图像内容生成失败)", caption1);
     }
 
     #endregion

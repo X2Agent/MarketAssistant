@@ -52,7 +52,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="config\prompts\*.yaml">
+    <Content Include="config\prompts\**\*.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="skills\**\*.*">

@@ -22,12 +22,12 @@ public class NewsEventAnalystAgent : AnalystAgentBase
     public NewsEventAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
-        AnalystPromptLoader promptLoader,
+        AnalystPromptConfig config,
         StructuredOutputMode structuredOutputMode,
         AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("NewsEventAnalyst"),
+            config,
             typeof(NewsEventAnalysisResult),
             structuredOutputMode,
             tools,

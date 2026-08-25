@@ -34,7 +34,7 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         ZHITU_API_TOKEN: ${{ secrets.ZHITU_API_TOKEN }}
         WEB_SEARCH_API_KEY: ${{ secrets.WEB_SEARCH_API_KEY }}
-      run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build --logger "trx;LogFileName=test-results.trx"
+      run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build -s tests/unit.runsettings --filter "TestCategory=Unit" --logger "trx;LogFileName=test-results.trx"
     
     - name: Upload test results
       uses: actions/upload-artifact@v4

@@ -7,6 +7,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,6 +50,7 @@ public class BasicDataToolsTest
         _siliconFlowApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         services.AddLogging(builder =>
         {

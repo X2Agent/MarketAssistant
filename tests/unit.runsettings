@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <MaxCpuCount>0</MaxCpuCount>
+    <!-- 默认只跑单元测试；Integration/E2E 需显式指定过滤器运行 -->
+    <TestCaseFilter>TestCategory=Unit</TestCaseFilter>
+
+  </RunConfiguration>
+  <MSTest>
+    <TreatNoTestsAsError>true</TreatNoTestsAsError>
+  </MSTest>
+</RunSettings>

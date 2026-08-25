@@ -55,9 +55,16 @@ public class MCPServerConfig
     public string Category { get; set; } = "general";
 
     /// <summary>
-    /// 允许的工具名称列表（白名单），为空则允许所有工具
+    /// 允许的工具名称列表（白名单）。为空表示不暴露任何工具；
+    /// 只有显式设置 <see cref="AllowAllTools"/> = true 才会加载该服务器全部工具。
     /// </summary>
     public List<string> AllowedTools { get; set; } = [];
+
+    /// <summary>
+    /// 是否允许加载全部工具。默认 false；开启后忽略 <see cref="AllowedTools"/> 白名单。
+    /// 属于高危选项，仅应在明确信任该服务器时启用。
+    /// </summary>
+    public bool AllowAllTools { get; set; } = false;
 
     /// <summary>
     /// 获取传输选项字典

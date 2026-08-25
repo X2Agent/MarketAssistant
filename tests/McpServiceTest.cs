@@ -21,6 +21,8 @@ public class McpServiceTest
             TransportType = "stdio",
             Command = "npx",
             Arguments = "-y @modelcontextprotocol/server-everything",
+            // 验证工具加载能力，显式允许全部；空白名单默认不暴露由 EmptyWhitelist 测试覆盖
+            AllowAllTools = true,
             EnvironmentVariables = new Dictionary<string, string?>()
         };
 
@@ -32,6 +34,31 @@ public class McpServiceTest
         var tools = await service.GetAIToolsAsync([config]);
 
         Assert.IsTrue(tools.Count > 0, "应该返回至少一个 AI 工具");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetAITools_EmptyWhitelist_ShouldExposeNoTools()
+    {
+        // P1-08：空白名单且未显式 AllowAllTools 时，不暴露任何工具
+        var config = new MCPServerConfig
+        {
+            Name = "mcp-server-filesystem",
+            TransportType = "stdio",
+            Command = "npx",
+            Arguments = "-y @modelcontextprotocol/server-everything",
+            AllowedTools = [],
+            EnvironmentVariables = new Dictionary<string, string?>()
+        };
+
+        var service = new McpService(
+            NullLogger<McpService>.Instance,
+            new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
+            new MCPServerConfigService());
+
+        var tools = await service.GetAIToolsAsync([config]);
+
+        Assert.HasCount(0, tools, "空白名单默认不应暴露任何 MCP 工具");
     }
 
     [TestMethod]

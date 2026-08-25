@@ -8,6 +8,7 @@ namespace TestMarketAssistant.Infrastructure;
 public sealed class SecureSettingsMigrationTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public void UserSettings_ExistingSecureValues_ShouldWinAndRemoveLegacyPlaintext()
     {
         using var directory = new TemporaryDirectory();
@@ -40,6 +41,7 @@ public sealed class SecureSettingsMigrationTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void UserSettings_Reset_ShouldOverwriteStoredSecretsWithEmptyValues()
     {
         using var directory = new TemporaryDirectory();
@@ -58,6 +60,7 @@ public sealed class SecureSettingsMigrationTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void UserSettings_SecureWriteFailure_ShouldNotWriteOrdinarySettings()
     {
         using var directory = new TemporaryDirectory();
@@ -73,6 +76,7 @@ public sealed class SecureSettingsMigrationTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task UserSettings_MultipleInstances_ShouldSerializeWritesForSamePath()
     {
         using var directory = new TemporaryDirectory();
@@ -106,6 +110,7 @@ public sealed class SecureSettingsMigrationTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task McpSettings_MultipleInstances_ShouldSerializeWritesForSamePath()
     {
         using var directory = new TemporaryDirectory();
@@ -144,6 +149,7 @@ public sealed class SecureSettingsMigrationTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void McpSettings_ExistingSecureValues_ShouldWinAndRemoveLegacyPlaintext()
     {
         using var directory = new TemporaryDirectory();

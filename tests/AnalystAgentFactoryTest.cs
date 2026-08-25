@@ -18,7 +18,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     private const string StockSymbol = "sz002594";
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public void TestAnalystAgentFactory_CreateFinancialAnalyst_ShouldSucceed()
     {
         RequireLlm();
@@ -29,7 +29,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestNewsEventAnalyst_CallsNewsToolCorrectly()
     {
         RequireLlm();
@@ -49,7 +49,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestFundamentalAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
@@ -69,7 +69,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestCoordinatorAnalyst_HandlesMultipleAnalystInputs()
     {
         RequireLlm();
@@ -127,7 +127,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestFinancialAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
@@ -153,7 +153,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestMarketSentimentAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
@@ -178,7 +178,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestTechnicalAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();

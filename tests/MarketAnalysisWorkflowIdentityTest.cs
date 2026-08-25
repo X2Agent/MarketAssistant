@@ -14,6 +14,7 @@ namespace TestMarketAssistant;
 public sealed class MarketAnalysisWorkflowIdentityTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task AnalyzeAsync_ConcurrentFailedRuns_ShouldKeepRunAndAssetIdentityIsolated()
     {
         var settingService = new Mock<IUserSettingService>();
@@ -21,12 +22,15 @@ public sealed class MarketAnalysisWorkflowIdentityTest
         {
             EnabledAnalystRoles = new Dictionary<string, bool>()
         });
+        var marketContext = new MarketContext(settingService.Object, Mock.Of<IServiceProvider>());
         var workflow = new MarketAnalysisWorkflow(
             settingService.Object,
             Mock.Of<IAnalystAgentFactory>(),
             Mock.Of<IChatClientFactory>(),
             NullLoggerFactory.Instance,
-            new AnalysisReportCache(new MarketContext(settingService.Object, Mock.Of<IServiceProvider>())),
+            new AnalysisReportCache(marketContext),
+            marketContext,
+            new InMemoryArtifactStore(),
             NullLogger<MarketAnalysisWorkflow>.Instance);
         var runA = Guid.NewGuid();
         var runB = Guid.NewGuid();
@@ -54,16 +58,20 @@ public sealed class MarketAnalysisWorkflowIdentityTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public async Task AnalyzeAsync_EmptyRunId_ShouldFailBeforePublishingProgress()
     {
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(service => service.CurrentSetting).Returns(new UserSetting());
+        var marketContext = new MarketContext(settingService.Object, Mock.Of<IServiceProvider>());
         var workflow = new MarketAnalysisWorkflow(
             settingService.Object,
             Mock.Of<IAnalystAgentFactory>(),
             Mock.Of<IChatClientFactory>(),
             NullLoggerFactory.Instance,
-            new AnalysisReportCache(new MarketContext(settingService.Object, Mock.Of<IServiceProvider>())),
+            new AnalysisReportCache(marketContext),
+            marketContext,
+            new InMemoryArtifactStore(),
             NullLogger<MarketAnalysisWorkflow>.Instance);
         var progressCount = 0;
         workflow.ProgressChanged += (_, _) => progressCount++;
@@ -86,4 +94,12 @@ public sealed class MarketAnalysisWorkflowIdentityTest
             return ex;
         }
     }
+}
+internal sealed class InMemoryArtifactStore : MarketAssistant.Services.Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore
+{
+    public System.Collections.Generic.Dictionary<(Guid RunId, string Analyst), string> Map { get; } = new();
+    public System.Threading.Tasks.Task SaveAsync(Guid runId, string analystName, string content, System.Threading.CancellationToken cancellationToken = default)
+    { Map[(runId, analystName)] = content; return System.Threading.Tasks.Task.CompletedTask; }
+    public System.Threading.Tasks.Task<string?> GetAsync(Guid runId, string analystName, System.Threading.CancellationToken cancellationToken = default)
+        => System.Threading.Tasks.Task.FromResult(Map.TryGetValue((runId, analystName), out var v) ? v : null);
 }

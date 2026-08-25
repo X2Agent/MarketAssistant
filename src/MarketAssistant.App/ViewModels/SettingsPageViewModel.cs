@@ -537,6 +537,9 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             var description = type.GetCustomAttribute<DescriptionAttribute>()?.Description ?? "";
             var isRequired = type.GetCustomAttribute<RequiredAnalystAttribute>() != null;
 
+            // 按当前市场过滤角色列表（未标注 SupportedMarkets 视为全市场支持）
+            if (!SupportedMarketsAttribute.SupportsMarket(type, _marketContext.CurrentMarket)) continue;
+
             // 使用类名作为ID
             var id = type.Name;
 
@@ -673,8 +676,10 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
             var ragIngestionService = _ragIngestionServiceFactory();
             var successCount = 0;
+            var partialCount = 0;
             var failedCount = 0;
             var failedFiles = new List<string>();
+            var partialFiles = new List<string>();
 
             // 逐个处理文件
             for (int i = 0; i < totalFiles; i++)
@@ -693,11 +698,37 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     Logger?.LogInformation("正在处理 ({Index}/{Total}): {FileName} [{Extension}]",
                         currentIndex, totalFiles, fileName, fileExtension);
 
-                    // 执行向量化
-                    await ragIngestionService.IngestFileAsync(collection, file, embeddingGenerator);
+                    // 执行向量化：根据结构化结果区分完全成功/部分成功/失败
+                    var result = await ragIngestionService.IngestFileAsync(
+                        collection, collectionName, file, embeddingGenerator);
 
-                    successCount++;
-                    Logger?.LogInformation("✓ 成功向量化: {FileName}", fileName);
+                    if (result.IsSuccess)
+                    {
+                        successCount++;
+                        Logger?.LogInformation("✓ 成功向量化: {FileName}", fileName);
+                    }
+                    else if (result.IsPartialSuccess)
+                    {
+                        // 部分成功不计入完全成功
+                        partialCount++;
+                        partialFiles.Add($"{fileName}（{result.Failures.Count} 个块失败）");
+                        Logger?.LogWarning("△ 部分成功向量化: {FileName}，{BlockCount} 块中 {Failed} 个失败",
+                            fileName, result.BlockCount, result.Failures.Count);
+                    }
+                    else
+                    {
+                        failedCount++;
+                        failedFiles.Add(fileName);
+                        var reason = result.Failures.FirstOrDefault()?.Message ?? "没有内容入库";
+                        Logger?.LogError("✗ 向量化失败: {FileName} - {Reason}", fileName, reason);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    VectorizingProgressText = "向量化已取消";
+                    _notificationService.ShowWarning("向量化已取消。已完成的部分保持有效。");
+                    Logger?.LogWarning("向量化被用户取消");
+                    return;
                 }
                 catch (Exception ex)
                 {
@@ -709,9 +740,9 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                 }
             }
 
-            // 显示完成消息
+            // 显示完成消息（三态：完全成功 / 部分成功 / 失败）
             VectorizingProgress = 100;
-            if (failedCount == 0)
+            if (failedCount == 0 && partialCount == 0)
             {
                 VectorizingProgressText = $"✅ 全部完成！共 {successCount} 个文件";
                 _notificationService.ShowSuccess($"✅ 所有文档向量化完成！\n成功处理 {successCount} 个文件");
@@ -719,18 +750,28 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                VectorizingProgressText = $"⚠️ 完成（部分失败）: {successCount} 成功, {failedCount} 失败";
+                var summaryText = $"⚠️ 完成（存在失败）: {successCount} 成功, {partialCount} 部分成功, {failedCount} 失败";
+                VectorizingProgressText = summaryText;
+
                 var failedList = string.Join("\n- ", failedFiles.Take(5));
                 if (failedFiles.Count > 5)
                 {
                     failedList += $"\n... 还有 {failedFiles.Count - 5} 个";
                 }
 
-                _notificationService.ShowWarning(
-                    $"向量化完成：\n✓ 成功 {successCount} 个\n✗ 失败 {failedCount} 个\n\n失败文件：\n- {failedList}");
+                var partialList = string.Join("\n- ", partialFiles.Take(5));
+                if (partialFiles.Count > 5)
+                {
+                    partialList += $"\n... 还有 {partialFiles.Count - 5} 个";
+                }
 
-                Logger?.LogWarning("向量化完成：成功 {Success} 个，失败 {Failed} 个，总计 {Total} 个",
-                    successCount, failedCount, totalFiles);
+                _notificationService.ShowWarning(
+                    $"向量化完成：\n✓ 完全成功 {successCount} 个\n△ 部分成功 {partialCount} 个\n✗ 失败 {failedCount} 个" +
+                    (partialFiles.Count > 0 ? $"\n\n部分成功（存在失败块）：\n- {partialList}" : string.Empty) +
+                    (failedFiles.Count > 0 ? $"\n\n失败文件：\n- {failedList}" : string.Empty));
+
+                Logger?.LogWarning("向量化完成：成功 {Success} 个，部分成功 {Partial} 个，失败 {Failed} 个，总计 {Total} 个",
+                    successCount, partialCount, failedCount, totalFiles);
             }
         }
         catch (Exception ex)

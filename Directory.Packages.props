@@ -4,9 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- MAF / Agents -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.17.0" />
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.19.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.19.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.19.0" />
     <!-- MAF Evaluation -->
     <PackageVersion Include="Microsoft.Extensions.AI.Evaluation" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.9.0" />

@@ -1,6 +1,7 @@
 using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Data;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace MarketAssistant.Rag.Services;
@@ -41,21 +42,21 @@ public record ScoringConstants
 /// </summary>
 public class ScoredResult
 {
-    public ScoredSearchResult Item { get; init; } = null!;
-    public double NormalizedVectorScore { get; init; }
+    public RagSearchCandidate Item { get; init; } = null!;
+    public double NormalizedVectorSimilarity { get; init; }
     public double RelevanceScore { get; init; }
     public double FreshnessScore { get; init; }
     public double LengthScore { get; init; }
     public double TotalScore { get; set; }
 
-    public ScoredResult(ScoredSearchResult item)
+    public ScoredResult(RagSearchCandidate item)
     {
         Item = item;
     }
 }
 
 /// <summary>
-/// 重排序服务 - 融合向量相似度分数与启发式评分
+/// 重排序服务 - 融合向量距离（反转归一为相似度）与启发式评分
 /// 多维度评分：向量相似度（主导） + 文本相关性 + 时效性 + 长度优化 + 多样性
 /// </summary>
 public class RerankerService : IRerankerService
@@ -69,9 +70,9 @@ public class RerankerService : IRerankerService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public IReadOnlyList<TextSearchResult> Rerank(
+    public IReadOnlyList<RagSearchCandidate> Rerank(
         string query,
-        IEnumerable<ScoredSearchResult> items)
+        IEnumerable<RagSearchCandidate> items)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -79,7 +80,7 @@ public class RerankerService : IRerankerService
         if (itemList.Count == 0)
         {
             _logger.LogDebug("重排序输入为空，直接返回");
-            return new List<TextSearchResult>();
+            return new List<RagSearchCandidate>();
         }
 
         var safeQuery = query?.Trim() ?? string.Empty;
@@ -87,11 +88,11 @@ public class RerankerService : IRerankerService
 
         try
         {
-            // 向量分数归一化（min-max），消除不同查询间分数尺度差异
-            var vectorScores = itemList.Select(i => (double)i.VectorScore).ToList();
-            var minScore = vectorScores.Min();
-            var maxScore = vectorScores.Max();
-            var range = maxScore - minScore;
+            // 向量距离归一化（min-max 反转为相似度），消除不同查询间距离尺度差异
+            var vectorDistances = itemList.Select(i => (double)i.VectorDistance).ToList();
+            var minDistance = vectorDistances.Min();
+            var maxDistance = vectorDistances.Max();
+            var range = maxDistance - minDistance;
 
             // 预处理查询词元
             var queryTokens = TokenizeWithBonus(safeQuery);
@@ -99,9 +100,9 @@ public class RerankerService : IRerankerService
             // 计算各项评分
             var scoredResults = itemList.Select(item =>
             {
-                // 所有分数相同时给满分，避免单一维度失效
-                var normalizedVector = range < 1e-9 ? 1.0 : (item.VectorScore - minScore) / range;
-                return CalculateItemScore(item, queryTokens, safeQuery, normalizedVector);
+                // 所有距离相同时给满分，避免单一维度失效；距离反转为相似度（越小越相关）
+                var normalizedSimilarity = range < 1e-9 ? 1.0 : (maxDistance - item.VectorDistance) / range;
+                return CalculateItemScore(item, queryTokens, safeQuery, normalizedSimilarity);
             }).ToList();
 
             // 应用多样性优化
@@ -110,7 +111,7 @@ public class RerankerService : IRerankerService
             // 排序并返回结果
             var rankedResults = scoredResults
                 .OrderByDescending(r => r.TotalScore)
-                .Select(r => r.Item.Item)
+                .Select(r => r.Item)
                 .ToList();
 
             LogTopResults(scoredResults);
@@ -119,26 +120,25 @@ public class RerankerService : IRerankerService
         catch (Exception ex)
         {
             _logger.LogError(ex, "重排序过程中发生错误，查询: '{Query}'", safeQuery);
-            // 发生错误时返回原始排序（按向量分数降序）
+            // 发生错误时返回原始排序（按向量距离升序，距离最小即最相关在前）
             return itemList
-                .OrderByDescending(x => x.VectorScore)
-                .Select(x => x.Item)
+                .OrderBy(x => x.VectorDistance)
                 .ToList();
         }
     }
 
     #region 评分计算核心方法
 
-    private ScoredResult CalculateItemScore(ScoredSearchResult item, IReadOnlyList<TokenInfo> queryTokens, string query, double normalizedVectorScore)
+    private ScoredResult CalculateItemScore(RagSearchCandidate item, IReadOnlyList<TokenInfo> queryTokens, string query, double normalizedVectorSimilarity)
     {
-        var text = GetFullText(item.Item);
+        var text = GetFullText(item);
         var itemTokens = TokenizeWithBonus(text);
 
         var scores = new
         {
-            Vector = normalizedVectorScore,
+            Vector = normalizedVectorSimilarity,
             Relevance = CalculateRelevanceScore(queryTokens, itemTokens, query, text),
-            Freshness = CalculateFreshnessScore(item.Item),
+            Freshness = CalculateFreshnessScore(item),
             Length = CalculateLengthScore(text)
         };
 
@@ -149,7 +149,7 @@ public class RerankerService : IRerankerService
 
         return new ScoredResult(item)
         {
-            NormalizedVectorScore = scores.Vector,
+            NormalizedVectorSimilarity = scores.Vector,
             RelevanceScore = scores.Relevance,
             FreshnessScore = scores.Freshness,
             LengthScore = scores.Length,
@@ -191,12 +191,19 @@ public class RerankerService : IRerankerService
     }
 
     /// <summary>
-    /// 计算时效性评分
+    /// 计算时效性评分（P1-02：优先 PublishedAt，缺失回退 URL/正文启发式）
     /// </summary>
-    private static double CalculateFreshnessScore(TextSearchResult item)
+    private static double CalculateFreshnessScore(RagSearchCandidate item)
     {
-        var uri = item.Link ?? string.Empty;
-        var text = item.Value ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(item.Record.PublishedAt)
+            && DateTimeOffset.TryParse(item.Record.PublishedAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var published))
+        {
+            var ageDays = (DateTimeOffset.UtcNow - published).TotalDays;
+            return Math.Max(0.1, 1.0 / (1.0 + ageDays / 30.0));
+        }
+
+        var uri = item.Record.DocumentUri ?? string.Empty;
+        var text = item.Record.Text ?? string.Empty;
 
         var urlScore = ExtractDateFromUrl(uri);
         if (urlScore > 0) return urlScore;
@@ -237,7 +244,7 @@ public class RerankerService : IRerankerService
         var tokenSetCache = new Dictionary<ScoredResult, HashSet<string>>();
         foreach (var result in results)
         {
-            var text = GetFullText(result.Item.Item);
+            var text = GetFullText(result.Item);
             var tokens = TokenizeWithBonus(text)
                 .Select(t => t.Token)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -409,13 +416,13 @@ public class RerankerService : IRerankerService
     #region 辅助方法
 
     /// <summary>
-    /// 获取搜索结果的完整文本
+    /// 获取搜索候选的完整文本（Section 标题 + 正文）
     /// </summary>
-    private static string GetFullText(TextSearchResult item)
+    private static string GetFullText(RagSearchCandidate item)
     {
         var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(item.Name)) parts.Add(item.Name);
-        if (!string.IsNullOrWhiteSpace(item.Value)) parts.Add(item.Value);
+        if (!string.IsNullOrWhiteSpace(item.Record.Section)) parts.Add(item.Record.Section);
+        if (!string.IsNullOrWhiteSpace(item.Record.Text)) parts.Add(item.Record.Text);
         return string.Join(" ", parts);
     }
 
@@ -430,11 +437,11 @@ public class RerankerService : IRerankerService
         int index = 1;
         foreach (var scored in topResults)
         {
-            var snippet = GetFullText(scored.Item.Item);
+            var snippet = GetFullText(scored.Item);
             if (snippet.Length > 50) snippet = snippet[..50] + "...";
 
             _logger.LogDebug("  {Index}. 总分: {Score:F2} (向量: {Vec:F2}, 相关: {Rel:F2}, 时效: {Fresh:F2}, 长度: {Len:F2}) - {Title}",
-                index++, scored.TotalScore, scored.NormalizedVectorScore, scored.RelevanceScore, scored.FreshnessScore, scored.LengthScore, snippet);
+                index++, scored.TotalScore, scored.NormalizedVectorSimilarity, scored.RelevanceScore, scored.FreshnessScore, scored.LengthScore, snippet);
         }
     }
 

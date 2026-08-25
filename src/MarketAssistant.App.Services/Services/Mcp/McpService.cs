@@ -123,6 +123,21 @@ public sealed class McpService : IAsyncDisposable
     }
 
     /// <summary>
+    /// 枚举指定服务器提供的全部工具（名称与描述），供配置页勾选工具白名单使用。
+    /// 相同连接配置复用已建立的客户端。
+    /// </summary>
+    public async Task<IReadOnlyList<(string Name, string Description)>> GetServerToolsAsync(
+        MCPServerConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        var runtime = await GetOrCreateRuntimeAsync(config, cancellationToken)
+            .ConfigureAwait(false);
+        return [.. runtime.Tools.Select(tool => (tool.Name, tool.Description))];
+    }
+
+    /// <summary>
     /// 创建客户端传输。
     /// </summary>
     public static IClientTransport CreateClientTransport(MCPServerConfig config)
@@ -280,20 +295,26 @@ public sealed class McpService : IAsyncDisposable
         IReadOnlyList<AITool> availableTools,
         List<AITool> destination)
     {
-        if (config.AllowedTools.Count == 0)
+        // 最小暴露原则：空白名单默认不暴露任何工具，只有显式 AllowAllTools 才放行全部
+        if (!config.AllowAllTools && config.AllowedTools.Count == 0)
         {
             _logger.LogWarning(
-                "MCP 服务器 {Name} 未配置 AllowedTools 白名单，将加载全部 {Count} 个工具。" +
-                "建议在配置中显式指定允许的工具以遵循最小暴露原则。",
-                config.Name,
-                availableTools.Count);
+                "MCP 服务器 {Name} 未配置 AllowedTools 白名单且未显式允许全部，默认不暴露任何工具。" +
+                "请在 MCP 配置中勾选需要的工具，或显式开启“允许全部”。",
+                config.Name);
+
+            foreach (var tool in availableTools)
+            {
+                _auditLogger.LogToolFiltered(config.Name, tool.Name, "白名单为空且未允许全部，默认不暴露");
+            }
+            return 0;
         }
 
         var loadedCount = 0;
         foreach (var tool in availableTools)
         {
             var toolName = tool.Name;
-            if (config.AllowedTools.Count > 0 &&
+            if (!config.AllowAllTools &&
                 !config.AllowedTools.Contains(toolName, StringComparer.OrdinalIgnoreCase))
             {
                 _auditLogger.LogToolFiltered(config.Name, toolName, "不在允许列表中");

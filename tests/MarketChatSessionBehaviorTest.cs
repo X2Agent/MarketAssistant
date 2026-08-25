@@ -9,6 +9,7 @@ namespace TestMarketAssistant;
 public sealed class MarketChatSessionBehaviorTest
 {
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SendMessageStream_NormalMultiTurn_ShouldSendOnlyNewUserMessageToClient()
     {
         using var client = new RecordingChatClient();
@@ -27,6 +28,7 @@ public sealed class MarketChatSessionBehaviorTest
     }
 
     [TestMethod]
+    [TestCategory("Integration")]
     public async Task SendMessageStream_CancelledRun_ShouldMarkUiHistoryAndAllowNextTurn()
     {
         using var client = new RecordingChatClient(cancelFirstStream: true);

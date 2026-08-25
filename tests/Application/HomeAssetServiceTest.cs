@@ -3,6 +3,7 @@ using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
@@ -27,6 +28,7 @@ public class HomeAssetServiceTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
         services.AddHttpClient();

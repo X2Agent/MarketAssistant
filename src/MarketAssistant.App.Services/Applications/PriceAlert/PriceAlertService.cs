@@ -1,7 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using Microsoft.Data.Sqlite;
@@ -22,7 +23,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
     private readonly BinanceWebSocketService _wsService;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ClsQuoteClient _clsClient;
 
     private readonly object _syncRoot = new();
     private readonly object _initializationLock = new();
@@ -50,14 +51,14 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         BinanceWebSocketService wsService,
         INotificationService notificationService,
         IUserSettingService userSettingService,
-        IHttpClientFactory httpClientFactory,
+        ClsQuoteClient clsClient,
         ILogger<PriceAlertService> logger)
         : base(logger)
     {
         _wsService = wsService;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
-        _httpClientFactory = httpClientFactory;
+        _clsClient = clsClient;
 
         _wsService.PriceUpdated += OnCryptoPriceUpdated;
         _pollingTask = Task.Run(() => PollASharePricesAsync(_pollingCts.Token));
@@ -288,46 +289,14 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
             if (string.IsNullOrWhiteSpace(clsCode))
                 return null;
 
-            var url =
-                $"https://x-quote.cls.cn/quote/stock/basic?secu_code={clsCode}&fields=last_px,change&app=CailianpressWeb&os=web&sv=8.4.6";
-
-            using var httpClient = _httpClientFactory.CreateClient("Cls");
-            using var response = await httpClient.GetAsync(url, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            // HTTP 访问与容错解析由 ClsQuoteClient 负责
+            var data = await _clsClient.GetStockQuoteAsync(clsCode, "last_px,change", cancellationToken);
+            if (data is null || data.LastPrice <= 0 && data.Change == 0)
                 return null;
 
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var jsonDocument = JsonDocument.Parse(json);
-            if (!jsonDocument.RootElement.TryGetProperty("data", out var data) || data.ValueKind == JsonValueKind.Null)
-                return null;
+            decimal? changePercent = data.Change != 0 ? data.Change * 100 : null;
 
-            decimal? price = null;
-            if (data.TryGetProperty("last_px", out var priceElement))
-            {
-                if (priceElement.ValueKind == JsonValueKind.Number && priceElement.TryGetDecimal(out var numberPrice))
-                    price = numberPrice;
-                else if (priceElement.ValueKind == JsonValueKind.String &&
-                         decimal.TryParse(priceElement.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var stringPrice))
-                    price = stringPrice;
-            }
-
-            decimal? changePercent = null;
-            if (data.TryGetProperty("change", out var changeElement))
-            {
-                var changeText = changeElement.ToString();
-                if (changeText.EndsWith('%') &&
-                    decimal.TryParse(changeText.TrimEnd('%'), NumberStyles.Number, CultureInfo.InvariantCulture, out var percentValue))
-                {
-                    changePercent = percentValue;
-                }
-                else if (decimal.TryParse(changeText, NumberStyles.Number, CultureInfo.InvariantCulture, out var ratio))
-                {
-                    // CLS 返回小数比率，换算为百分比
-                    changePercent = ratio * 100;
-                }
-            }
-
-            return price.HasValue ? (price.Value, changePercent) : null;
+            return (data.LastPrice, changePercent);
         }
         catch (OperationCanceledException)
         {

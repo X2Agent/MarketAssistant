@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -13,22 +14,22 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// </summary>
 public sealed class AShareFinancialTools : IShareFinancialTools
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareFinancialTools> _logger;
 
     public AShareFinancialTools(
-        IHttpClientFactory httpClientFactory,
+        ZhiTuMarketClient zhiTuClient,
         IUserSettingService userSettingService,
         ILogger<AShareFinancialTools> logger)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _logger = logger;
     }
 
     /// <summary>
-    /// 通用财务数据获取方法
+    /// 通用财务数据获取方法（HTTP 与容错反序列化由 ZhiTuMarketClient 负责）
     /// </summary>
     private async Task<List<T>> GetFinancialDataAsync<T>(string endpoint, string assetSymbol, int years = 2, CancellationToken cancellationToken = default)
     {
@@ -39,11 +40,8 @@ public sealed class AShareFinancialTools : IShareFinancialTools
             var endDate = DateTime.Now.ToString("yyyyMMdd");
             var startDate = DateTime.Now.AddYears(-years).ToString("yyyyMMdd");
 
-            var url = $"/hs/fin/{endpoint}/{stockCode}?token={token}&st={startDate}&et={endDate}";
-
-            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url, cancellationToken);
-            return JsonSerializer.Deserialize<List<T>>(response, JsonOptions.AShareApiOptions) ?? new List<T>();
+            return await _zhiTuClient.GetFinancialListAsync<T>(
+                endpoint, stockCode, token, startDate, endDate, cancellationToken);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

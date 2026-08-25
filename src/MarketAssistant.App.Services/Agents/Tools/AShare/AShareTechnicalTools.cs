@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -14,16 +15,16 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// </summary>
 public sealed class AShareTechnicalTools : ITechnicalDataTools
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareTechnicalTools> _logger;
 
     public AShareTechnicalTools(
-        IHttpClientFactory httpClientFactory,
+        ZhiTuMarketClient zhiTuClient,
         IUserSettingService userSettingService,
         ILogger<AShareTechnicalTools> logger)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _logger = logger;
     }
@@ -34,13 +35,9 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
         {
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var formattedSymbol = StockSymbolConverter.ToZhiTuFormat(assetSymbol);
-            var url = $"/hs/history/{indicator}/{formattedSymbol}/d/n?token={token}&lt=30";
+            var items = await _zhiTuClient.GetIndicatorListAsync<T>(indicator, formattedSymbol, token, cancellationToken);
 
-            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url, cancellationToken);
-            var items = JsonSerializer.Deserialize<List<T>>(response, JsonOptions.AShareApiOptions);
-
-            if (items == null || !items.Any())
+            if (items.Count == 0)
                 throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
 
             return items.Last();
@@ -97,13 +94,10 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
 
             var startDate = DateTime.Now.AddDays(-daysBack).ToString("yyyyMMdd");
             var endDate = DateTime.Now.ToString("yyyyMMdd");
-            var url = $"/hs/history/{formattedSymbol}/{zhiTuInterval}/n?token={token}&st={startDate}&et={endDate}";
+            var items = await _zhiTuClient.GetKLineBarsAsync<ZhiTuKLineBar>(
+                formattedSymbol, zhiTuInterval, token, startDate, endDate, cancellationToken);
 
-            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url, cancellationToken);
-            var items = JsonSerializer.Deserialize<List<ZhiTuKLineBar>>(response, JsonOptions.AShareApiOptions);
-
-            if (items == null || items.Count == 0)
+            if (items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");
 
             return items

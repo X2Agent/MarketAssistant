@@ -34,7 +34,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
 
         // Act
         var (paragraphs, nextOrder, updatedSection) = _mapper.MapBlock(
-            textBlock, "test.pdf", 10, "第一章");
+            textBlock, "test.pdf", "doc-1", 10, "第一章");
 
         // Assert
         var paragraphList = paragraphs.ToList();
@@ -66,7 +66,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
 
         // Act
         var (paragraphs, nextOrder, updatedSection) = _mapper.MapBlock(
-            headingBlock, "test.pdf", 0, null);
+            headingBlock, "test.pdf", "doc-1", 0, null);
 
         // Assert
         var paragraph = paragraphs.Single();
@@ -92,7 +92,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
 
         // Act
         var (paragraphs, nextOrder, updatedSection) = _mapper.MapBlock(
-            listBlock, "test.pdf", 0, "第一章");
+            listBlock, "test.pdf", "doc-1", 0, "第一章");
 
         // Assert
         var paragraph = paragraphs.Single();
@@ -122,7 +122,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
 
         // Act
         var (paragraphs, nextOrder, updatedSection) = _mapper.MapBlock(
-            tableBlock, "test.pdf", 0, "第一章");
+            tableBlock, "test.pdf", "doc-1", 0, "第一章");
 
         // Assert
         var paragraph = paragraphs.Single();
@@ -153,7 +153,7 @@ public class DocumentBlockMapperTest : BaseAgentTest
 
         // Act
         var (paragraphs, nextOrder, updatedSection) = _mapper.MapBlock(
-            imageBlock, "test.pdf", 5, "第二章", imageMetadata);
+            imageBlock, "test.pdf", "doc-1", 5, "第二章", imageMetadata);
 
         // Assert
         var paragraph = paragraphs.Single();

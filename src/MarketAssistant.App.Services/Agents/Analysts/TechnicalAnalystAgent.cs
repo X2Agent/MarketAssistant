@@ -21,12 +21,12 @@ public class TechnicalAnalystAgent : AnalystAgentBase
     public TechnicalAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
-        AnalystPromptLoader promptLoader,
+        AnalystPromptConfig config,
         StructuredOutputMode structuredOutputMode,
         AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("TechnicalAnalyst"),
+            config,
             typeof(TechnicalAnalysisResult),
             structuredOutputMode,
             tools,

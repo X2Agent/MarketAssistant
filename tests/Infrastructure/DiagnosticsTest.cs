@@ -9,6 +9,7 @@ namespace TestMarketAssistant.Infrastructure;
 public sealed class DiagnosticsTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public void TokenTracking_ShouldAttachUsageToCurrentMarketAssistantActivity()
     {
         Activity? stoppedActivity = null;
@@ -38,6 +39,7 @@ public sealed class DiagnosticsTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void RecordException_ShouldSetErrorStatusWithoutRecordingMessage()
     {
         Activity? stoppedActivity = null;

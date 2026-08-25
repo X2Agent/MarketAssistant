@@ -239,6 +239,41 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
 
+                            <!-- 工具白名单 -->
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <CheckBox IsChecked="{Binding AllowAllTools}"
+                                          Content="允许全部工具（高危：跳过白名单，仅在完全信任该服务器时开启）"/>
+                                <WrapPanel Orientation="Horizontal">
+                                    <Button Content="加载工具列表"
+                                            Command="{Binding LoadToolsCommand}"
+                                            Classes="action-button"
+                                            Margin="{StaticResource TinyRightMargin}"
+                                            IsEnabled="{Binding !AllowAllTools}"/>
+                                    <TextBlock Text="空白名单默认不向 Agent 暴露任何工具"
+                                               FontSize="{StaticResource SmallFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                </WrapPanel>
+                                <ItemsControl ItemsSource="{Binding ToolItems}"
+                                              IsEnabled="{Binding !AllowAllTools}"
+                                              MaxHeight="220">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding Description}"
+                                                               FontSize="{StaticResource SmallFontSize}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               MaxWidth="420"/>
+                                                </StackPanel>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
                             <!-- 是否启用 -->
                             <CheckBox IsChecked="{Binding IsEnabled}" Content="启用此服务器"/>
                         </StackPanel>
@@ -333,3 +368,4 @@
         </Grid>
     </Grid>
 </UserControl>
+

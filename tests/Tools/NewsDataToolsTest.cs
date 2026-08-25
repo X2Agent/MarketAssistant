@@ -6,6 +6,7 @@ using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,6 +31,7 @@ public class NewsDataToolsTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
         services.AddSingleton<IUserSettingService, UserSettingService>();

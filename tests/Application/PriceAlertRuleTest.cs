@@ -6,6 +6,7 @@ namespace TestMarketAssistant.Application;
 public sealed class PriceAlertRuleTest
 {
     [TestMethod]
+    [TestCategory("Unit")]
     public void PriceCondition_ShouldCalculatePriceDifferenceAndPercent()
     {
         var rule = new PriceAlertRule
@@ -24,6 +25,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void PercentCondition_ShouldCalculatePercentagePointDifference()
     {
         var rule = new PriceAlertRule
@@ -41,6 +43,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     [DataRow(AlertCondition.PriceAbove, 100, 101, 0, true)]
     [DataRow(AlertCondition.PriceAbove, 100, 99, 0, false)]
     [DataRow(AlertCondition.PriceBelow, 100, 99, 0, true)]
@@ -68,6 +71,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void UpdateTriggerState_ShouldNotifyOnlyOnConditionEntryAndRearmAfterExit()
     {
         var rule = new PriceAlertRule
@@ -84,6 +88,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void OneTimeRule_ShouldNotifyOnceAndKeepTriggeredLatch()
     {
         var rule = new PriceAlertRule
@@ -107,6 +112,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void OneTimeRule_ShouldExposeReenableStatus()
     {
         var rule = new PriceAlertRule
@@ -125,6 +131,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void ContinuousRule_ShouldExposeContinuousMode()
     {
         var rule = new PriceAlertRule
@@ -142,6 +149,7 @@ public sealed class PriceAlertRuleTest
     }
 
     [TestMethod]
+    [TestCategory("Unit")]
     public void MissingQuote_ShouldExposeWaitingState()
     {
         var rule = new PriceAlertRule

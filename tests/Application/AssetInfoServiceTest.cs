@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,7 @@ public class AssetInfoServiceTest
 
         // 注册依赖服务
         services.AddHttpClient();
+        services.AddAShareDataProviders();
         services.AddTestMarketDataHttpClients();
         services.AddMemoryCache();
         services.AddLogging();

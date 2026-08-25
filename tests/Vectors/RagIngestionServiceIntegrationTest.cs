@@ -71,6 +71,7 @@ public class RagIngestionServiceIntegrationTest : BaseAgentTest
         // 执行文件摄取
         await _ragIngestionService.IngestFileAsync(
             collection,
+            _collectionName,
             _testDocxFile,
             _embeddingGenerator);
 
@@ -104,6 +105,87 @@ public class RagIngestionServiceIntegrationTest : BaseAgentTest
             var text = result.Text;
             var preview = text.Length > 100 ? text[..100] + "..." : text;
             Console.WriteLine($"段落: {preview}");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task TestIngestFileAsync_WithWrongDimension_ShouldFailBeforeUpsert()
+    {
+        // Arrange - 使用返回非 1024 维向量的嵌入生成器
+        var collection = _vectorStore.GetCollection<string, TextParagraph>(_collectionName);
+        var wrongDimGenerator = new FixedDimensionEmbeddingGenerator(_embeddingGenerator, 1536);
+
+        // Act
+        var result = await _ragIngestionService.IngestFileAsync(
+            collection,
+            _collectionName,
+            _testDocxFile,
+            wrongDimGenerator);
+
+        // Assert - 在 Upsert 前失败，不产生脏数据
+        Assert.IsTrue(result.IsFailure, "非 1024 维向量不应有任何段落入库");
+        Assert.IsTrue(result.Failures.Any(f => f.ErrorCode == "EmbeddingDimensionMismatch"),
+            "失败原因应包含维度不匹配");
+        var message = result.Failures.First(f => f.ErrorCode == "EmbeddingDimensionMismatch").Message;
+        StringAssert.Contains(message, "1024", "错误消息应包含期望维度");
+        StringAssert.Contains(message, "1536", "错误消息应包含实际维度");
+
+        Console.WriteLine($"维度校验生效，{result.Failures.Count} 个块被拒绝写入");
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task TestIngestFileAsync_WithFewerEmbeddings_ShouldFailWithoutWriting()
+    {
+        // Arrange - 返回条数少于文本条数
+        var collection = _vectorStore.GetCollection<string, TextParagraph>(_collectionName);
+        var shortGenerator = new ShortCountEmbeddingGenerator(_embeddingGenerator);
+
+        // Act
+        var result = await _ragIngestionService.IngestFileAsync(
+            collection,
+            _collectionName,
+            _testDocxFile,
+            shortGenerator);
+
+        // Assert
+        Assert.IsTrue(result.IsFailure, "嵌入数量不足时不应有段落入库");
+        Assert.IsTrue(result.Failures.Any(f => f.ErrorCode == "EmbeddingCountMismatch"),
+            "失败原因应包含数量不匹配");
+
+        Console.WriteLine($"数量校验生效，{result.Failures.Count} 个块被拒绝写入");
+    }
+
+    /// <summary>包装真实生成器但输出固定错误维度的嵌入。</summary>
+    private sealed class FixedDimensionEmbeddingGenerator(
+        IEmbeddingGenerator<string, Embedding<float>> inner, int dimension)
+        : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+
+        public async Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var embeddings = await inner.GenerateAsync(values, options, cancellationToken);
+            return new GeneratedEmbeddings<Embedding<float>>(
+                embeddings.Select(e => new Embedding<float>(new float[dimension])));
+        }
+    }
+
+    /// <summary>丢弃一半嵌入以模拟返回条数不足。</summary>
+    private sealed class ShortCountEmbeddingGenerator(IEmbeddingGenerator<string, Embedding<float>> inner)
+        : IEmbeddingGenerator<string, Embedding<float>>
+    {
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+
+        public async Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+            IEnumerable<string> values, EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            var embeddings = await inner.GenerateAsync(values, options, cancellationToken);
+            return new GeneratedEmbeddings<Embedding<float>>(embeddings.Take(Math.Max(1, embeddings.Count / 2)));
         }
     }
 

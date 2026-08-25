@@ -61,6 +61,12 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private bool _isEnabled = true;
 
+    [ObservableProperty]
+    private bool _allowAllTools;
+
+    [ObservableProperty]
+    private ObservableCollection<McpToolSelectionItem> _toolItems = new();
+
     private MCPServerConfig? _editingConfig;
 
     public MCPConfigPageViewModel(
@@ -312,6 +318,50 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     }
 
     /// <summary>
+    /// 连接服务器并加载工具列表，供勾选工具白名单。
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadToolsAsync()
+    {
+        if (_editingConfig is null)
+            return;
+
+        IsTesting = true;
+        TestStatus = "正在连接服务器获取工具列表...";
+        try
+        {
+            // 先把表单内容写入编辑配置，确保用最新的连接参数建立会话
+            SaveUIToConfig(_editingConfig);
+            var tools = await _mcpService.GetServerToolsAsync(_editingConfig);
+            var selectedNames = ToolItems
+                .Where(item => item.IsSelected)
+                .Select(item => item.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            ToolItems.Clear();
+            foreach (var (name, description) in tools)
+            {
+                ToolItems.Add(new McpToolSelectionItem
+                {
+                    Name = name,
+                    Description = description,
+                    IsSelected = selectedNames.Contains(name)
+                });
+            }
+            TestStatus = $"已加载 {tools.Count} 个工具";
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "加载 MCP 工具列表失败");
+            TestStatus = $"加载工具列表失败: {ex.Message}";
+        }
+        finally
+        {
+            IsTesting = false;
+            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+        }
+    }
+
+    /// <summary>
     /// 将配置加载到UI
     /// </summary>
     private void LoadConfigToUI(MCPServerConfig config)
@@ -322,6 +372,19 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         Command = config.Command ?? string.Empty;
         Arguments = config.Arguments ?? string.Empty;
         IsEnabled = config.IsEnabled;
+        AllowAllTools = config.AllowAllTools;
+
+        // 依据已保存的白名单回填勾选态（描述在“加载工具列表”后补全）
+        ToolItems.Clear();
+        foreach (var toolName in config.AllowedTools)
+        {
+            ToolItems.Add(new McpToolSelectionItem { Name = toolName, IsSelected = true });
+        }
+
+        if (!config.AllowAllTools && config.AllowedTools.Count == 0)
+        {
+            TestStatus = "该服务器尚未勾选任何工具，当前不会暴露任何工具，请点击加载工具列表后勾选";
+        }
 
         // 环境变量转为文本
         if (config.EnvironmentVariables != null && config.EnvironmentVariables.Count > 0)
@@ -346,6 +409,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         config.Command = Command;
         config.Arguments = Arguments;
         config.IsEnabled = IsEnabled;
+        config.AllowAllTools = AllowAllTools;
+        config.AllowedTools = AllowAllTools
+            ? []
+            : ToolItems.Where(item => item.IsSelected).Select(item => item.Name).ToList();
         config.EnvironmentVariables = ParseEnvironmentVariables();
     }
 

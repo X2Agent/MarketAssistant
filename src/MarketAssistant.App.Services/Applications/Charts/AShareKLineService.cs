@@ -1,7 +1,8 @@
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -15,22 +16,16 @@ namespace MarketAssistant.Applications.Charts;
 /// </summary>
 public class AShareKLineService : IKLineService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareKLineService> _logger;
-    // 支持 API 返回的字符串数值自动转换为 decimal
-    private static readonly JsonSerializerOptions KLineJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new StringToDecimalConverter() }
-    };
 
     public AShareKLineService(
-        IHttpClientFactory httpClientFactory,
+        ZhiTuMarketClient zhiTuClient,
         ILogger<AShareKLineService> logger,
         IUserSettingService userSettingService)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
         _userSettingService = userSettingService;
         _logger = logger;
     }
@@ -168,27 +163,13 @@ public class AShareKLineService : IKLineService
     private async Task<List<ZhiTuKLineData>> FetchZhiTuDataAsync(string url, string dataType, string symbol)
     {
         _logger.LogInformation("正在获取股票{DataType}数据: 股票代码: {Symbol}", dataType, symbol);
-        _logger.LogDebug("请求URL: {Url}", url);
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetAsync(url);
+            // HTTP 访问与容错反序列化由 ZhiTuMarketClient 负责
+            var zhiTuData = await _zhiTuClient.GetListAsync<ZhiTuKLineData>(url);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning(
-                    "智图API返回错误 {StatusCode}，股票代码: {Symbol}，响应: {ErrorBody}",
-                    (int)response.StatusCode, symbol, errorBody);
-                throw new FriendlyException(
-                    $"获取{dataType}数据失败: 智图API返回 {(int)response.StatusCode} ({response.StatusCode})，{(string.IsNullOrWhiteSpace(errorBody) ? "请稍后重试" : errorBody)}");
-            }
-
-            var jsonContent = await response.Content.ReadAsStringAsync();
-            var zhiTuData = JsonSerializer.Deserialize<List<ZhiTuKLineData>>(jsonContent, KLineJsonOptions);
-
-            if (zhiTuData == null || !zhiTuData.Any())
+            if (zhiTuData.Count == 0)
             {
                 throw new FriendlyException($"获取{dataType}数据失败: 返回数据为空");
             }

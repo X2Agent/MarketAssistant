@@ -1,8 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
+using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels.Trading;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -16,6 +18,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly NavigationService _navigationService;
     private readonly MarketContext _marketContext;
     private readonly INotificationService _notificationService;
+    private readonly IUserSettingService _userSettingService;
     private bool _isSynchronizingNavigationSelection;
 
     [ObservableProperty]
@@ -37,6 +40,7 @@ public partial class MainWindowViewModel : ViewModelBase
         NavigationService navigationService,
         MarketContext marketContext,
         INotificationService notificationService,
+        IUserSettingService userSettingService,
         ILogger<MainWindowViewModel>? logger = null)
         : base(logger)
     {
@@ -44,6 +48,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _navigationService = navigationService;
         _marketContext = marketContext;
         _notificationService = notificationService;
+        _userSettingService = userSettingService;
 
         NavigationItems = new ObservableCollection<NavigationItemViewModel>();
         RebuildNavigationItems();
@@ -72,15 +77,21 @@ public partial class MainWindowViewModel : ViewModelBase
         NavigationItems.Add(new NavigationItemViewModel("收藏", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _serviceProvider.GetRequiredService<FavoritesPageViewModel>()));
         NavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _serviceProvider.GetRequiredService<PriceAlertPageViewModel>()));
         NavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _serviceProvider.GetRequiredService<AssetSelectionPageViewModel>()));
-#if DEBUG
-        if (_marketContext.CurrentCapability.SupportsTrading)
+        // 交易为实验功能：仅当前市场支持交易且用户在设置中显式开启时可见（默认关闭）
+        if (IsTradingVisible())
         {
             NavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _serviceProvider.GetRequiredService<TradingPageViewModel>()));
         }
-#endif
         NavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _serviceProvider.GetRequiredService<SettingsPageViewModel>()));
         NavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _serviceProvider.GetRequiredService<AboutPageViewModel>()));
     }
+
+    /// <summary>
+    /// 交易导航可见性：市场支持交易（如虚拟币）且用户显式开启实验开关；A 股始终不可见。
+    /// </summary>
+    private bool IsTradingVisible()
+        => _marketContext.CurrentCapability.SupportsTrading
+           && _userSettingService.CurrentSetting.EnableExperimentalTrading;
 
     private void OnNavigationServicePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {

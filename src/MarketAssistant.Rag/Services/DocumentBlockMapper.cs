@@ -7,9 +7,10 @@ using System.Text;
 namespace MarketAssistant.Rag.Services;
 
 /// <summary>
-/// 图片元数据，用于传递图片处理结果
+/// 图片元数据，用于传递图片处理结果。
+/// ImageEmbedding 为 null 表示 CLIP 不可用（不写哈希向量），检索依赖 Caption 文本向量。
 /// </summary>
-public record ImageMetadata(string Caption, string StoredPath, Embedding<float> ImageEmbedding);
+public record ImageMetadata(string Caption, string StoredPath, Embedding<float>? ImageEmbedding);
 
 /// <summary>
 /// 将 DocumentBlock 转换为 TextParagraph 的映射器
@@ -38,11 +39,12 @@ public class DocumentBlockMapper
         MapBlock(
             DocumentBlock block,
             string filePath,
+            string documentId,
             int baseOrder,
             string? currentSection,
             ImageMetadata? imageMetadata = null)
     {
-        var fileHash = Sha256Hex(filePath);
+        // P1-01：Key 统一为 {documentId}:{blockKind}:{order:D6}:{contentHashPrefix}，由调用方传入稳定 DocumentId
         var sourceType = GetSourceTypeFromPath(filePath);
         var paragraphs = new List<TextParagraph>();
         var nextOrder = baseOrder;
@@ -58,13 +60,13 @@ public class DocumentBlockMapper
                     // 创建新的段落对象以确保 ParagraphId 一致性
                     var newParagraph = new TextParagraph
                     {
-                        Key = chunk.Key,
+                        Key = MakeKey(documentId, 0, nextOrder, chunk.ContentHash ?? Sha256Hex(chunk.Text)),
                         DocumentUri = chunk.DocumentUri,
                         ParagraphId = $"txt_{nextOrder}",
                         Text = chunk.Text,
                         TextEmbedding = chunk.TextEmbedding,
                         ImageUri = chunk.ImageUri,
-                        ImageEmbedding = chunk.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]), // 确保不为null
+                        ImageEmbedding = chunk.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]), // 零向量=图像嵌入不可用标记
                         Order = nextOrder++,
                         Section = currentSection,
                         SourceType = chunk.SourceType,
@@ -85,7 +87,7 @@ public class DocumentBlockMapper
                     var hash = Sha256Hex(headingText);
                     paragraphs.Add(new TextParagraph
                     {
-                        Key = $"{fileHash}:hdg:{headingBlock.Level}:{hash[..8]}",
+                        Key = MakeKey(documentId, 1, nextOrder, hash),
                         DocumentUri = filePath,
                         ParagraphId = $"hdg_{nextOrder}",
                         Text = headingText,
@@ -96,7 +98,7 @@ public class DocumentBlockMapper
                         PublishedAt = null,
                         BlockKind = 1, // Heading
                         HeadingLevel = headingBlock.Level,
-                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
+                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 零向量=不可用标记
                     });
 
                     // 更新当前章节：高级别标题会重置章节上下文
@@ -115,7 +117,7 @@ public class DocumentBlockMapper
                     var hash = Sha256Hex(cleanedList);
                     paragraphs.Add(new TextParagraph
                     {
-                        Key = $"{fileHash}:lst:{(listBlock.ListType == ListType.Ordered ? "o" : "u")}:{hash[..8]}",
+                        Key = MakeKey(documentId, 2, nextOrder, hash),
                         DocumentUri = filePath,
                         ParagraphId = $"lst_{nextOrder}",
                         Text = cleanedList,
@@ -126,7 +128,7 @@ public class DocumentBlockMapper
                         PublishedAt = null,
                         BlockKind = 2, // List
                         ListType = (int)listBlock.ListType,
-                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
+                        ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 零向量=不可用标记
                     });
                 }
                 break;
@@ -135,7 +137,7 @@ public class DocumentBlockMapper
                 var tableText = tableBlock.Text; // 包含标题 + Markdown
                 paragraphs.Add(new TextParagraph
                 {
-                    Key = $"{fileHash}:tbl:{tableBlock.Hash[..8]}",
+                    Key = MakeKey(documentId, 3, nextOrder, tableBlock.Hash),
                     DocumentUri = filePath,
                     ParagraphId = $"tbl_{nextOrder}",
                     Text = tableText,
@@ -145,7 +147,7 @@ public class DocumentBlockMapper
                     ContentHash = tableBlock.Hash,
                     PublishedAt = null,
                     BlockKind = 3, // Table
-                    ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 空的图像嵌入
+                    ImageEmbedding = new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 零向量=不可用标记
                 });
                 break;
 
@@ -153,7 +155,7 @@ public class DocumentBlockMapper
                 var imageHash = Convert.ToHexString(SHA256.HashData(imageBlock.ImageBytes));
                 var imageParagraph = new TextParagraph
                 {
-                    Key = $"{fileHash}:img:{imageHash[..8]}",
+                    Key = MakeKey(documentId, 4, nextOrder, imageHash),
                     DocumentUri = filePath,
                     ParagraphId = $"img_{nextOrder}",
                     Text = imageMetadata?.Caption ?? imageBlock.Text ?? "[图片]",
@@ -164,7 +166,7 @@ public class DocumentBlockMapper
                     PublishedAt = null,
                     BlockKind = 4, // Image
                     ImageUri = imageMetadata?.StoredPath,
-                    ImageEmbedding = imageMetadata?.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 确保不为null
+                    ImageEmbedding = imageMetadata?.ImageEmbedding ?? new Embedding<float>(new float[RagConstants.EmbeddingDimension]) // 零向量=不可用标记
                 };
                 paragraphs.Add(imageParagraph);
                 break;
@@ -172,6 +174,13 @@ public class DocumentBlockMapper
 
         return (paragraphs, nextOrder, updatedSection);
     }
+
+    /// <summary>
+    /// 统一段落 Key：{documentId}:{blockKind}:{order:D6}:{contentHashPrefix}（P1-01）。
+    /// 同级同名标题因 Order 不同而不互相覆盖；重复摄取时 Order+Hash 稳定，保证幂等。
+    /// </summary>
+    private static string MakeKey(string documentId, int blockKind, int order, string contentHash)
+        => $"{documentId}:{blockKind}:{order:D6}:{contentHash[..8]}";
 
     private static string GetSourceTypeFromPath(string filePath)
         => Path.GetExtension(filePath).ToLowerInvariant() switch

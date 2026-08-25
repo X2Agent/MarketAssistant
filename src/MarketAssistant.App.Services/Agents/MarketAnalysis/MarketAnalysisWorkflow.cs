@@ -5,10 +5,13 @@ using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Agents.Analysts;
+using MarketAssistant.Services.Agents.MarketAnalysis.Artifacts;
+using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -28,6 +31,8 @@ public class MarketAnalysisWorkflow
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MarketAnalysisWorkflow> _logger;
     private readonly AnalysisReportCache _reportCache;
+    private readonly MarketContext _marketContext;
+    private readonly IAnalystArtifactStore _artifactStore;
 
     /// <summary>
     /// MAF Agent <c>Name</c>（ASCII 标识符，如 "FundamentalAnalyst"）→ 中文显示名（如"基本面分析师"）映射。
@@ -53,11 +58,15 @@ public class MarketAnalysisWorkflow
         IChatClientFactory chatClientFactory,
         ILoggerFactory loggerFactory,
         AnalysisReportCache reportCache,
+        MarketContext marketContext,
+        IAnalystArtifactStore artifactStore,
         ILogger<MarketAnalysisWorkflow> logger)
     {
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
         _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+        _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
+        _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -158,14 +167,27 @@ public class MarketAnalysisWorkflow
             }
 
             // 同一次 Run 的分析师与 Coordinator 绑定同一个 Runtime Client。
+            // P1-07：协调器附带只读产物读取工具，全文按需获取而非随消息注入。
+            var getArtifactTool = AIFunctionFactory.Create(
+                ([Description("本次分析的 Run ID（32 位十六进制）")] string runId,
+                  [Description("分析师名称")] string analystName,
+                  CancellationToken ct)
+                    => _artifactStore.GetAsync(Guid.ParseExact(runId, "N"), analystName, ct),
+                name: "get_analyst_artifact",
+                description: "读取本次运行中某位分析师的完整分析产物全文。仅在需要某维度细节时调用，不要凭摘要编造内容。");
+
             var coordinatorAgent = _analystAgentFactory.CreateAnalyst(
                 typeof(CoordinatorAnalystAgent),
-                runtime);
+                runtime,
+                extraTools: [getArtifactTool]);
             var coordinatorExecutor = new CoordinatorExecutor(
                 coordinatorAgent,
                 _loggerFactory.CreateLogger<CoordinatorExecutor>());
             var aggregatorExecutor = new AnalysisAggregatorExecutor(
                 createdAgents.Count,
+                runId,
+                _artifactStore,
+                analystAgents.NameToDisplayName,
                 _loggerFactory.CreateLogger<AnalysisAggregatorExecutor>());
 
             // 构建工作流（所有 Executor 均为 Run 局部实例）
@@ -493,11 +515,15 @@ public class MarketAnalysisWorkflow
 
         // 获取所有 AnalystAgentBase 的非抽象子类
         var agentTypes = AnalystTypeRegistry.GetConcreteAnalystTypes();
+        var currentMarket = _marketContext.CurrentMarket;
 
         foreach (var agentType in agentTypes)
         {
             // 排除 CoordinatorAnalystAgent，它由CoordinatorExecutor独自管理
             if (agentType.Name == nameof(CoordinatorAnalystAgent)) continue;
+
+            // 分析师必须声明支持当前市场（未标注 SupportedMarkets 视为全市场支持）
+            if (!SupportedMarketsAttribute.SupportsMarket(agentType, currentMarket)) continue;
 
             var agentClassName = agentType.Name;
 

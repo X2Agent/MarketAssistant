@@ -11,13 +11,14 @@ namespace MarketAssistant.Rag.Services;
 /// RAG 检索编排器，专注于知识库检索的核心管理
 /// 包含经典的检索优化：
 /// 1) 查询重写——将原始查询生成多个候选，提高召回。
-/// 2) 向量检索——对每个候选在内部向量集合中检索，保留向量相似度分数。
+/// 2) 向量检索——对每个候选在内部向量集合中检索，保留向量距离（越小越相关）。
 /// 3) 去重与重排：去重相似条目，融合向量分数与启发式评分重排。
 /// </summary>
 public class RetrievalOrchestrator : IRetrievalOrchestrator
 {
     private readonly IQueryRewriteService _queryRewrite;
     private readonly IRerankerService _reranker;
+    private readonly IContextExpansionService _contextExpansion;
     private readonly VectorStore _vectorStore;
     private readonly IEmbeddingFactory _embeddingFactory;
     private readonly ILogger<RetrievalOrchestrator> _logger;
@@ -25,12 +26,14 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
     public RetrievalOrchestrator(
         IQueryRewriteService queryRewrite,
         IRerankerService reranker,
+        IContextExpansionService contextExpansion,
         VectorStore vectorStore,
         IEmbeddingFactory embeddingFactory,
         ILogger<RetrievalOrchestrator> logger)
     {
         _queryRewrite = queryRewrite;
         _reranker = reranker;
+        _contextExpansion = contextExpansion ?? throw new ArgumentNullException(nameof(contextExpansion));
         _vectorStore = vectorStore;
         _embeddingFactory = embeddingFactory;
         _logger = logger;
@@ -84,8 +87,8 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         // 确保重排候选池足够大：每个查询召回 top*3，至少 10 条
         var perQueryLimit = Math.Max(top * 3, 10);
 
-        // 3) 向量检索——对每个查询在向量集合中检索，合并结果并保留向量分数
-        var merged = new List<ScoredSearchResult>();
+        // 3) 向量检索——对每个查询在向量集合中检索，合并结果并保留向量距离与完整元数据（P1-02）
+        var merged = new List<RagSearchCandidate>();
 
         for (int qi = 0; qi < distinctQueries.Count; qi++)
         {
@@ -102,14 +105,9 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
 
                 await foreach (var searchResult in searchResults)
                 {
-                    var textResult = new TextSearchResult(value: searchResult.Record.Text)
-                    {
-                        Name = searchResult.Record.ParagraphId,
-                        Link = searchResult.Record.DocumentUri
-                    };
-                    // 保留向量相似度分数，用于后续重排融合
-                    var score = (float)(searchResult.Score ?? 0f);
-                    merged.Add(new ScoredSearchResult(textResult, score));
+                    // P1-02：保留原始 Record（PublishedAt/Order/Section 等），最后一步才转换为 TextSearchResult
+                    var distance = (double)(searchResult.Score ?? 0f);
+                    merged.Add(new RagSearchCandidate(searchResult.Record, distance, q));
                 }
             }
             catch (Exception ex)
@@ -124,14 +122,34 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
             return Array.Empty<TextSearchResult>();
         }
 
-        // 5) 标准去重：通过文本内容合并重复项，保留向量分数最高的
+        // 5) 标准去重：优先按 Record.Key，其次 ContentHash，最后文本内容；保留距离最小（最相关）的
         var dedup = merged
-            .GroupBy(r => $"{r.Item.Link}|{r.Item.Name}|{r.Item.Value}", StringComparer.Ordinal)
-            .Select(g => g.OrderByDescending(x => x.VectorScore).First())
+            .GroupBy(
+                c => c.Record.Key
+                     ?? c.Record.ContentHash
+                     ?? $"{c.Record.DocumentUri}|{c.Record.ParagraphId}|{c.Record.Text}",
+                StringComparer.Ordinal)
+            .Select(g => g.OrderBy(item => item.VectorDistance).First())
             .ToList();
 
-        // 6) 重排：融合向量相似度分数与启发式评分
+        // 6) 重排：融合向量距离与启发式评分（时效优先 PublishedAt）
         var reranked = _reranker.Rerank(query, dedup);
-        return reranked.Take(top).ToList();
+
+        // 7) 邻接上下文扩展（P1-02）：为选中候选拼接同文档相邻段落，再转换为 TextSearchResult
+        var selected = reranked.Take(top).ToList();
+        var contextPool = dedup;
+        var results = new List<TextSearchResult>(selected.Count);
+
+        foreach (var candidate in selected)
+        {
+            var text = _contextExpansion.BuildExpandedText(candidate, contextPool);
+            results.Add(new TextSearchResult(value: text)
+            {
+                Name = candidate.Record.ParagraphId,
+                Link = candidate.Record.DocumentUri
+            });
+        }
+
+        return results;
     }
 }
