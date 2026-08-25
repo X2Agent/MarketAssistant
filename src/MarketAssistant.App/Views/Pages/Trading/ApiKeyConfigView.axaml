@@ -51,11 +51,11 @@
                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                     <TextBlock Text="⚠"
                                FontSize="{StaticResource SubTitleFontSize}"
-                               Foreground="{StaticResource DangerAccentBrush}"
+                               Foreground="{DynamicResource DangerPanelTextBrush}"
                                VerticalAlignment="Top"/>
                     <TextBlock Text="实盘模式将使用真实资金进行交易。请确认 API Key 已在 binance.com 配置正确的权限（仅开启现货/合约交易，不要开启提现权限）。"
                                Classes="caption"
-                               Foreground="{StaticResource DangerTextBrush}"
+                               Foreground="{DynamicResource DangerPanelTextBrush}"
                                TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
