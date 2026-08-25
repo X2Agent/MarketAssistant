@@ -40,6 +40,7 @@
                                 Padding="{StaticResource TinyPadding}"
                                 VerticalAlignment="Center">
                             <TextBlock Text="{Binding AssetCode}" 
+                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                        FontSize="{StaticResource TinyFontSize}" 
                                        FontWeight="Bold" 
                                        Foreground="White" />
@@ -49,6 +50,7 @@
                     <!-- 第二行/第三行左侧：价格 -->
                     <TextBlock Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
                                Text="{Binding CurrentPrice, StringFormat={}{0:F2}}" 
+                               FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                FontSize="{StaticResource TitleFontSize}"
                                FontWeight="Bold"
                                Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"

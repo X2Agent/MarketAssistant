@@ -403,11 +403,11 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
-                                        <Border Background="{StaticResource WarningLightBrush}"
+                                        <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
                                                 CornerRadius="{StaticResource TinyCornerRadius}" Padding="{StaticResource ReportBadgePadding}" Margin="{StaticResource ReportChipMargin}">
                                             <TextBlock Text="{Binding .}" 
                                                        FontSize="{StaticResource SmallFontSize}"
-                                                       Foreground="{StaticResource WarningDeepTextBrush}"/>
+                                                       Foreground="{DynamicResource WarningPanelTextBrush}"/>
                                         </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

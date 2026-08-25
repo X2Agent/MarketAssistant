@@ -314,31 +314,40 @@
                                                         Spacing="{StaticResource TinySpacing}"
                                                         IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceAbove}}">
                                                 <TextBlock Text="↑ 涨破" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
+                                                           FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                           FontWeight="Bold"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal"
                                                         Spacing="{StaticResource TinySpacing}"
                                                         IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceBelow}}">
                                                 <TextBlock Text="↓ 跌破" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
+                                                           FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                           FontWeight="Bold"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal"
                                                         Spacing="{StaticResource TinySpacing}"
                                                         IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentAbove}}">
                                                 <TextBlock Text="↑ 涨幅超" FontWeight="SemiBold" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
+                                                           FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                           FontWeight="Bold"/>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal"
                                                         Spacing="{StaticResource TinySpacing}"
                                                         IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentBelow}}">
                                                 <TextBlock Text="↓ 跌幅超" FontWeight="SemiBold" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}" FontWeight="Bold"/>
+                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
+                                                           FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                           FontWeight="Bold"/>
                                             </StackPanel>
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="实时价格" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Text="{Binding CurrentPriceText}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                        FontSize="{StaticResource LabelFontSize}"
                                                        FontWeight="Bold"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -350,6 +359,7 @@
                                         <StackPanel Grid.Column="3" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="当前浮动值" FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Text="{Binding FloatingValueText}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                        FontSize="{StaticResource BodyFontSize}"
                                                        FontWeight="SemiBold"
                                                        Foreground="{Binding FloatingValue, Converter={StaticResource PriceChangeColorConverter}}"/>

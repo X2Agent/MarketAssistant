@@ -373,6 +373,7 @@
                                                             VerticalAlignment="Center"
                                                             Margin="{StaticResource TinyTopMargin}">
                                                     <TextBlock Text="{Binding Symbol}" 
+                                                               FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                                FontSize="{StaticResource BodyFontSize}"
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                VerticalAlignment="Center"/>
@@ -391,14 +392,14 @@
                                                             </TextBlock.Text>
                                                         </TextBlock>
                                                     </Border>
-                                                    <Border Background="{StaticResource InfoLightBrush}"
-                                                            BorderBrush="{StaticResource InfoBorderBrush}"
+                                                    <Border Background="{DynamicResource InfoPanelBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource InfoPanelBorderBrush}"
                                                             BorderThickness="{StaticResource DefaultBorderThickness}"
                                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                                             Padding="{StaticResource TagPadding}"
                                                             VerticalAlignment="Center"
                                                             IsVisible="{Binding RecommendedHoldingPeriod, Converter={StaticResource NullableVisibilityConverter}}">
-                                                        <TextBlock FontSize="{StaticResource TinyFontSize}" Foreground="{StaticResource InfoTextBrush}">
+                                                        <TextBlock FontSize="{StaticResource TinyFontSize}" Foreground="{DynamicResource InfoPanelTextBrush}">
                                                             <TextBlock.Text>
                                                                 <MultiBinding StringFormat="期限 {0}天">
                                                                     <Binding Path="RecommendedHoldingPeriod"/>
@@ -406,15 +407,15 @@
                                                             </TextBlock.Text>
                                                         </TextBlock>
                                                     </Border>
-                                                    <Border Background="{StaticResource DangerLightBrush}"
-                                                            BorderBrush="{StaticResource DangerBorderBrush}"
+                                                    <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
+                                                            BorderBrush="{DynamicResource DangerPanelBorderBrush}"
                                                             BorderThickness="{StaticResource DefaultBorderThickness}"
                                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                                             Padding="{StaticResource TagPadding}"
                                                             VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding RiskLevel, StringFormat='{}风险 {0}'}"
                                                                    FontSize="{StaticResource TinyFontSize}"
-                                                                   Foreground="{StaticResource DangerTextBrush}"/>
+                                                                   Foreground="{DynamicResource DangerPanelTextBrush}"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Grid>
@@ -422,35 +423,37 @@
                                             <!-- 核心投资指标 -->
                                             <Grid ColumnDefinitions="*,*,*">
                                                 <Border Grid.Column="0"
-                                                        Background="{StaticResource SuccessLightBrush}"
+                                                        Background="{DynamicResource SuccessPanelBackgroundBrush}"
                                                         CornerRadius="{StaticResource SmallCornerRadius}"
                                                         Padding="{StaticResource CompactCardPadding}"
                                                         Margin="{StaticResource TinyRightMargin}">
                                                     <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                         <TextBlock Text="🎯 目标价"
                                                                    FontSize="{StaticResource TinyFontSize}"
-                                                                   Foreground="{StaticResource SuccessTextBrush}"
+                                                                   Foreground="{DynamicResource SuccessPanelTextBrush}"
                                                                    FontWeight="SemiBold"/>
                                                         <TextBlock Text="{Binding TargetPrice, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}元|待定}"
+                                                                   FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                                    FontSize="{StaticResource MediumFontSize}"
                                                                    FontWeight="Bold"
-                                                                   Foreground="{StaticResource SuccessAccentBrush}"/>
+                                                                   Foreground="{DynamicResource SuccessPanelTextBrush}"/>
                                                     </StackPanel>
                                                 </Border>
                                                 <Border Grid.Column="1"
-                                                        Background="{StaticResource InfoBackgroundBrush}"
+                                                        Background="{DynamicResource InfoPanelBackgroundBrush}"
                                                         CornerRadius="{StaticResource SmallCornerRadius}"
                                                         Padding="{StaticResource CompactCardPadding}"
                                                         Margin="{StaticResource TinyHorizontalMargin}">
                                                     <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                         <TextBlock Text="📈 预期收益"
                                                                    FontSize="{StaticResource TinyFontSize}"
-                                                                   Foreground="{StaticResource InfoTextBrush}"
+                                                                   Foreground="{DynamicResource InfoPanelTextBrush}"
                                                                    FontWeight="SemiBold"/>
                                                         <TextBlock Text="{Binding ExpectedReturn, Converter={StaticResource NullableValueConverter}, ConverterParameter=+{0:F1}%|待定}"
+                                                                   FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                                    FontSize="{StaticResource MediumFontSize}"
                                                                    FontWeight="Bold"
-                                                                   Foreground="{StaticResource InfoAccentBrush}"/>
+                                                                   Foreground="{DynamicResource InfoPanelTextBrush}"/>
                                                     </StackPanel>
                                                 </Border>
                                                 <Border Grid.Column="2"
