@@ -197,50 +197,45 @@
                                         Focusable="True"
                                         AutomationProperties.Name="{Binding Name}"
                                         Tag="{Binding .}">
-                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Cursor="Hand">
-                                        
-                                        <!-- Row 0: Code & Heat Label -->
-                                        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                            <TextBlock Text="{Binding Market}"
-                                                       FontSize="{StaticResource TinyFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <!-- 单行紧凑布局（对齐原型 ast-row）：名称/代码 | 价格/涨跌 | 热度值 | 收藏 -->
+                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" Cursor="Hand">
+                                        <!-- 名称与代码 -->
+                                        <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="{StaticResource BodyFontSize}"
+                                                       FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding Code}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                        FontSize="{StaticResource TinyFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Row="0" Grid.Column="1"
-                                                   Text="{Binding MetricLabel}"
-                                                   FontSize="{StaticResource MiniFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   HorizontalAlignment="Right"/>
 
-                                        <!-- Row 1: Name & Heat/Volume Value -->
-                                        <TextBlock Grid.Row="1" Grid.Column="0"
-                                                   Text="{Binding Name}"
-                                                   FontSize="{StaticResource BodyFontSize}"
-                                                   FontWeight="SemiBold"
-                                                   Margin="{StaticResource TinyVerticalMargin}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1"
-                                                   Text="{Binding FormattedMetric}"
-                                                   FontSize="{StaticResource BodyFontSize}"
-                                                   FontWeight="Bold"
-                                                   Foreground="{StaticResource PrimaryBrush}"
-                                                   HorizontalAlignment="Right"/>
-
-                                        <!-- Row 2: Price & Favorite -->
-                                        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                        <!-- 价格与涨跌 -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center" Margin="{StaticResource TinyRightMargin}">
                                             <TextBlock Text="{Binding CurrentPrice}"
                                                        FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
-                                                       FontSize="{StaticResource MediumFontSize}"
+                                                       FontSize="{StaticResource BodyFontSize}"
                                                        FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ChangePercentage}"
                                                        FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
-                                                       FontSize="{StaticResource BodyFontSize}"
+                                                       FontSize="{StaticResource SmallFontSize}"
                                                        Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
-                                                       VerticalAlignment="Bottom"/>
+                                                       VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        
-                                        <Button Grid.Row="2" Grid.Column="1"
+
+                                        <!-- 热度/成交量指标 -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center" Margin="{StaticResource TinyRightMargin}">
+                                            <TextBlock Text="{Binding MetricLabel}"
+                                                       FontSize="{StaticResource MiniFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <TextBlock Text="{Binding FormattedMetric}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource PrimaryBrush}"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="3"
                                                 Classes="favorite-button"
                                                 Background="Transparent"
                                                 Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.AddToFavoriteCommand}"
@@ -249,7 +244,7 @@
                                                 Width="{StaticResource SmallIconSize}"
                                                 Height="{StaticResource SmallIconSize}"
                                                 Padding="0"
-                                                HorizontalAlignment="Right">
+                                                HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <svg:Svg Path="/Assets/Images/tab_favorites.svg"
                                                      Width="{StaticResource MiniIconSize}"
                                                      Height="{StaticResource MiniIconSize}"/>
