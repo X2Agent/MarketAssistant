@@ -23,7 +23,7 @@
     <Grid RowDefinitions="Auto,*">
         <!-- 加载指示器（优化后的覆盖层） -->
         <Border Grid.Row="0" Grid.RowSpan="2"
-                Background="{StaticResource OverlayBrush}"
+                Background="{DynamicResource DarkOverlayBrush}"
                 IsVisible="{Binding IsBusy}"
                 ZIndex="1000">
             <Border Background="{DynamicResource CardBackgroundBrush}"

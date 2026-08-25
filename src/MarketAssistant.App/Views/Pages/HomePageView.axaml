@@ -230,9 +230,11 @@
                                         <!-- Row 2: Price & Favorite -->
                                         <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding CurrentPrice}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                        FontSize="{StaticResource MediumFontSize}"
                                                        FontWeight="Bold"/>
                                             <TextBlock Text="{Binding ChangePercentage}"
+                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                        FontSize="{StaticResource BodyFontSize}"
                                                        Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
                                                        VerticalAlignment="Bottom"/>

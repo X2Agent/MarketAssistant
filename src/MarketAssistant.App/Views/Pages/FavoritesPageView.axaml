@@ -100,7 +100,8 @@
                                             <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                     CornerRadius="{StaticResource TinyCornerRadius}"
                                                     Padding="{StaticResource TinyPadding}">
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}" 
+                                                <TextBlock FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                           FontSize="{StaticResource SmallFontSize}" 
                                                            FontWeight="Bold"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            VerticalAlignment="Center">
@@ -149,6 +150,7 @@
                                     <!-- 底部价格信息 -->
                                     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
                                         <TextBlock Text="{Binding CurrentPrice}" 
+                                                   FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
                                                    FontSize="{StaticResource LargeFontSize}" 
                                                    FontWeight="Bold" 
                                                    Foreground="{DynamicResource TextPrimaryBrush}"
