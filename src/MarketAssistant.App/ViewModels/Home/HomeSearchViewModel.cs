@@ -32,6 +32,12 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     private bool _isSearching;
 
     /// <summary>
+    /// 当前键盘/鼠标高亮的结果项（Up/Down 仅移动高亮，导航由 Enter 或点击显式触发）
+    /// </summary>
+    [ObservableProperty]
+    private AssetItem? _selectedResult;
+
+    /// <summary>
     /// 搜索结果集合
     /// </summary>
     public ObservableCollection<AssetItem> SearchResults { get; } = new();
@@ -73,43 +79,42 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // 触发防抖搜索
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                // 等待200毫秒
-                await Task.Delay(DebounceDelayMs, cancellationToken);
-
-                // 如果没有被取消，执行搜索
-                if (!cancellationToken.IsCancellationRequested)
-                {
-                    await SearchAsync(value);
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                // 防抖被取消，正常情况，不记录日志
-                Logger?.LogDebug("搜索防抖被取消，查询：{Query}", value);
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, "搜索资产时发生错误，查询：{Query}", value);
-            }
-        }, cancellationToken);
+        // 触发防抖搜索：延迟与请求共用同一令牌，避免慢响应的旧查询覆盖新查询结果
+        _ = DebouncedSearchAsync(value, cancellationToken);
     }
 
     /// <summary>
-    /// 执行搜索
+    /// 防抖后执行搜索
     /// </summary>
-    [RelayCommand]
-    private async Task SearchAsync(string? query)
+    private async Task DebouncedSearchAsync(string value, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(DebounceDelayMs, cancellationToken);
+            await SearchAsync(value, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // 防抖或请求被取消，正常情况，不记录日志
+            Logger?.LogDebug("搜索被取消，查询：{Query}", value);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "搜索资产时发生错误，查询：{Query}", value);
+        }
+    }
+
+    /// <summary>
+    /// 执行搜索并刷新结果列表
+    /// </summary>
+    private async Task SearchAsync(string query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
             IsSearching = false;
             IsSearchResultVisible = false;
             SearchResults.Clear();
+            SelectedResult = null;
             Logger?.LogDebug("搜索查询为空，清空结果");
             return;
         }
@@ -119,13 +124,17 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 
         await SafeExecuteAsync(async () =>
         {
-            var results = await HomeAssetService.SearchAssetAsync(query, CancellationToken.None);
+            var results = await HomeAssetService.SearchAssetAsync(query, cancellationToken);
+
+            // 请求期间查询已变化则丢弃本次结果
+            cancellationToken.ThrowIfCancellationRequested();
 
             Logger?.LogInformation("搜索完成，找到 {Count} 个结果", results.Count);
 
             // 确保在 UI 线程上更新集合
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
+                SelectedResult = null;
                 SearchResults.Clear();
                 foreach (var asset in results)
                 {
@@ -161,6 +170,30 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// 在结果列表中移动键盘高亮项，返回是否发生了移动。
+    /// 仅移动选中项不触发导航，导航由 Enter 或点击显式触发。
+    /// </summary>
+    public bool MoveSelection(int offset)
+    {
+        if (SearchResults.Count == 0)
+        {
+            return false;
+        }
+
+        var currentIndex = SelectedResult is null ? -1 : SearchResults.IndexOf(SelectedResult);
+        var newIndex = Math.Clamp(currentIndex + offset, 0, SearchResults.Count - 1);
+        var target = SearchResults[newIndex];
+
+        if (target == SelectedResult)
+        {
+            return false;
+        }
+
+        SelectedResult = target;
+        return true;
+    }
+
+    /// <summary>
     /// 清空搜索（包括文本和结果）
     /// </summary>
     public void ClearSearch()
@@ -172,6 +205,7 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 
         SearchQuery = string.Empty;
         SearchResults.Clear();
+        SelectedResult = null;
         IsSearchResultVisible = false;
         IsSearching = false;
     }

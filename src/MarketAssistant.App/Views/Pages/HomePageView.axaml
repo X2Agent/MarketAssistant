@@ -66,6 +66,7 @@
                                 ClipToBounds="True">
                             <ListBox x:Name="SearchResultsList"
                                      ItemsSource="{Binding Search.SearchResults}"
+                                     SelectedItem="{Binding Search.SelectedResult, Mode=TwoWay}"
                                      SelectionMode="Single"
                                      Background="Transparent"
                                      BorderThickness="0"
@@ -75,8 +76,7 @@
                                         <StackPanel Margin="{StaticResource TinyMargin}"
                                                    Background="Transparent"
                                                    Cursor="Hand"
-                                                   PointerPressed="SearchResultItem_PointerPressed"
-                                                   Tag="{Binding .}">
+                                                   Tapped="SearchResultItem_Tapped">
                                             <TextBlock Text="{Binding Name}" 
                                                        FontWeight="SemiBold"
                                                        FontSize="{StaticResource LabelFontSize}"/>

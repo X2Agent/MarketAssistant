@@ -15,27 +15,22 @@ public partial class HomePageView : UserControl
     }
 
     /// <summary>
-    /// 搜索结果项点击处理
+    /// 搜索结果项点击处理：激活所点资产并导航
     /// </summary>
-    private void SearchResultItem_PointerPressed(object? sender, PointerPressedEventArgs e)
+    private void SearchResultItem_Tapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Control control &&
-            control.Tag is AssetItem selectedAsset &&
+        if (sender is Control { DataContext: AssetItem asset } &&
             DataContext is HomePageViewModel viewModel)
         {
-            // 标记事件已处理，防止列表处理
             e.Handled = true;
 
-            // 关闭下拉框
-            viewModel.Search.IsSearchResultVisible = false;
-
-            // 执行导航
-            viewModel.Search.NavigateToAssetCommand.Execute(selectedAsset);
+            // 执行导航（内部会关闭下拉框）
+            viewModel.Search.NavigateToAssetCommand.Execute(asset);
         }
     }
 
     /// <summary>
-    /// 搜索框键盘处理：Esc 关闭结果、上下键选择、回车跳转所选结果。
+    /// 搜索框键盘处理：Esc 关闭结果、上下键移动高亮、回车跳转高亮结果。
     /// 输入法组合期间回车由输入法消费，不会进入此处理，避免重复提交。
     /// </summary>
     private void StockSearchBox_KeyDown(object? sender, KeyEventArgs e)
@@ -58,14 +53,14 @@ public partial class HomePageView : UserControl
                 break;
 
             case Key.Down:
-                if (TryMoveListSelection(SearchResultsList, 1))
+                if (search.IsSearchResultVisible && search.MoveSelection(1))
                 {
                     e.Handled = true;
                 }
                 break;
 
             case Key.Up:
-                if (TryMoveListSelection(SearchResultsList, -1))
+                if (search.IsSearchResultVisible && search.MoveSelection(-1))
                 {
                     e.Handled = true;
                 }
@@ -73,7 +68,7 @@ public partial class HomePageView : UserControl
 
             case Key.Enter:
                 if (search.IsSearchResultVisible &&
-                    SearchResultsList.SelectedItem is AssetItem selectedAsset)
+                    search.SelectedResult is AssetItem selectedAsset)
                 {
                     search.IsSearchResultVisible = false;
                     search.NavigateToAssetCommand.Execute(selectedAsset);
@@ -81,31 +76,6 @@ public partial class HomePageView : UserControl
                 }
                 break;
         }
-    }
-
-    /// <summary>
-    /// 在结果列表中移动选中项，返回是否发生了移动
-    /// </summary>
-    private static bool TryMoveListSelection(ListBox list, int offset)
-    {
-        if (list.ItemCount == 0)
-        {
-            return false;
-        }
-
-        var newIndex = Math.Clamp(list.SelectedIndex + offset, 0, list.ItemCount - 1);
-        if (newIndex == list.SelectedIndex && list.SelectedIndex >= 0)
-        {
-            return false;
-        }
-
-        list.SelectedIndex = newIndex;
-        if (list.SelectedItem is { } item)
-        {
-            list.ScrollIntoView(item);
-        }
-
-        return true;
     }
 
     /// <summary>
