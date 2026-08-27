@@ -16,10 +16,29 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
+    <!-- 热门资产卡片瓦片 / 最近查看条目样式 -->
+    <UserControl.Styles>
+        <!-- 最近查看条目：无卡片效果，仅悬停高亮 -->
+        <Style Selector="Border.recent-chip">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Padding" Value="{StaticResource SmallCardPadding}"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.recent-chip:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
-        
+      <StackPanel Grid.Row="0">
+
         <!-- 顶部搜索区域 -->
-        <controls:CardView Grid.Row="0" Margin="{StaticResource BottomMargin}">
+        <controls:CardView Margin="{StaticResource BottomMargin}">
             <Grid ColumnDefinitions="*,Auto">
                 <AutoCompleteBox x:Name="StockSearchBox"
                                  Grid.Column="0"
@@ -74,12 +93,83 @@
             </Grid>
         </controls:CardView>
 
-        <!-- 三列布局：热门标的优先（对齐原型 Bento Grid 层级） -->
+        <!-- 最近查看：紧凑单行条（无卡片，高度随内容自适应，超出横向滚动，悬停显示滚动条） -->
+        <StackPanel Orientation="Horizontal"
+                    Spacing="{StaticResource DefaultSpacing}"
+                    IsVisible="{Binding RecentAssets.RecentAssets.Count}"
+                    Margin="{StaticResource BottomMargin}">
+            <TextBlock Text="最近查看"
+                       FontSize="{StaticResource SmallFontSize}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       VerticalAlignment="Center"/>
+            <ScrollViewer Classes="recent-scroller"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled"
+                          AllowAutoHide="False">
+                <ScrollViewer.Styles>
+                    <!-- 滚动条默认隐藏，悬停时淡入 -->
+                    <Style Selector="ScrollViewer.recent-scroller /template/ ScrollBar">
+                        <Setter Property="Opacity" Value="0"/>
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ScrollViewer.recent-scroller:pointerover /template/ ScrollBar">
+                        <Setter Property="Opacity" Value="1"/>
+                    </Style>
+                </ScrollViewer.Styles>
+                <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="assets:AssetItem">
+                            <Border Classes="recent-chip"
+                                    Margin="{StaticResource SmallRightMargin}"
+                                    Tapped="RecentStockCard_Tapped"
+                                    KeyDown="RecentStockCard_KeyDown"
+                                    Focusable="True"
+                                    AutomationProperties.Name="{Binding Name}"
+                                    Tag="{Binding .}">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource TinySpacing}"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontSize="{StaticResource LabelFontSize}"
+                                               FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding CurrentPrice}"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource SmallFontSize}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding CurrentPrice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                               Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                    <TextBlock Text="{Binding ChangePercentage}"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource SmallFontSize}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding ChangePercentage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                               Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+      </StackPanel>
+
+        <!-- 两列布局（对齐原型 Bento Grid 层级）：热门资产 | 7*24快讯 -->
         <Grid Grid.Row="1"
-              ColumnDefinitions="3*,2*,2*">
+              ColumnDefinitions="3*,2*">
             
-            <!-- 中列：7*24小时新闻快讯 -->
-            <controls:CardView Grid.Column="1" Margin="{StaticResource SmallRightMargin}">
+            <!-- 上排右列：7*24小时新闻快讯 -->
+            <controls:CardView Grid.Column="1" Grid.Row="0">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
@@ -162,12 +252,13 @@
                 </ScrollViewer>
             </controls:CardView>
             
-            <!-- 左列：热门标的 -->
-            <controls:CardView Grid.Column="0" Margin="{StaticResource SmallRightMargin}">
+            <!-- 左列：热门资产（撑满列高，与右侧快讯对齐） -->
+            <controls:CardView Grid.Column="0"
+                               Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
-                                   Text="热门标的"
+                                   Text="热门资产"
                                    FontSize="{StaticResource SectionTitleFontSize}" 
                                    FontWeight="SemiBold"/>
                         <svg:Svg Grid.Column="1"
@@ -179,17 +270,20 @@
                 </controls:CardView.Header>
                 
                 <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}">
+                    <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}"
+                                  VerticalAlignment="Top">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Columns="2" />
+                                <!-- 恢复重构前写法：两列均分卡片宽度 -->
+                                <UniformGrid Columns="2"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="assets:HotAsset">
-                                <Border Classes="hot-stock-card" 
-                                        Margin="{StaticResource TinyMargin}" 
-                                        Padding="{StaticResource DefaultCardPadding}"
+                                <!-- 卡片瓦片（恢复重构前写法）：名称/代码 | 价格/涨跌 | 热度/成交量 | 收藏 -->
+                                <Border Classes="hot-stock-card"
+                                        Margin="{StaticResource TinyMargin}"
+                                        Padding="{StaticResource CompactCardPadding}"
                                         Background="{DynamicResource CardBackgroundBrush}"
                                         CornerRadius="{StaticResource DefaultCornerRadius}"
                                         Tapped="HotStockCard_Tapped"
@@ -197,45 +291,48 @@
                                         Focusable="True"
                                         AutomationProperties.Name="{Binding Name}"
                                         Tag="{Binding .}">
-                                    <!-- 单行紧凑布局（对齐原型 ast-row）：名称/代码 | 价格/涨跌 | 热度值 | 收藏 -->
-                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" Cursor="Hand">
-                                        <!-- 名称与代码 -->
-                                        <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}" VerticalAlignment="Center">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" Cursor="Hand">
+                                        <!-- 左栏：名称与代码 -->
+                                        <StackPanel Grid.Column="0" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Name}"
                                                        FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="SemiBold"/>
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding Code}"
-                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
+                                                       FontFamily="{StaticResource DataFontFamily}"
                                                        FontSize="{StaticResource TinyFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         </StackPanel>
 
-                                        <!-- 价格与涨跌 -->
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center" Margin="{StaticResource TinyRightMargin}">
-                                            <TextBlock Text="{Binding CurrentPrice}"
-                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
-                                                       FontSize="{StaticResource BodyFontSize}"
-                                                       FontWeight="Bold"/>
-                                            <TextBlock Text="{Binding ChangePercentage}"
-                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
-                                                       VerticalAlignment="Center"/>
+                                        <!-- 右栏：价格/涨跌在上、指标在下，右对齐形成整齐数字列 -->
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center" Margin="{StaticResource TinyRightMargin}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding CurrentPrice}"
+                                                           FontFamily="{StaticResource DataFontFamily}"
+                                                           FontSize="{StaticResource BodyFontSize}"
+                                                           FontWeight="Bold"
+                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                                <TextBlock Text="{Binding ChangePercentage}"
+                                                           FontFamily="{StaticResource DataFontFamily}"
+                                                           FontSize="{StaticResource SmallFontSize}"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding MetricLabel}"
+                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBlock Text="{Binding FormattedMetric}"
+                                                           FontFamily="{StaticResource DataFontFamily}"
+                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontWeight="SemiBold"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </StackPanel>
                                         </StackPanel>
 
-                                        <!-- 热度/成交量指标 -->
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center" Margin="{StaticResource TinyRightMargin}">
-                                            <TextBlock Text="{Binding MetricLabel}"
-                                                       FontSize="{StaticResource MiniFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            <TextBlock Text="{Binding FormattedMetric}"
-                                                       FontFamily="JetBrains Mono, SF Mono, Consolas, Cascadia Mono"
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       FontWeight="Bold"
-                                                       Foreground="{StaticResource PrimaryBrush}"/>
-                                        </StackPanel>
-
-                                        <Button Grid.Column="3"
+                                        <!-- 收藏 -->
+                                        <Button Grid.Column="2"
                                                 Classes="favorite-button"
                                                 Background="Transparent"
                                                 Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.AddToFavoriteCommand}"
@@ -257,80 +354,9 @@
                 </ScrollViewer>
             </controls:CardView>
             
-            <!-- 右侧：最近查看 -->
-            <controls:CardView Grid.Column="2" Header="最近查看">
-                <ScrollViewer>
-                    <Panel>
-                        <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="{StaticResource SmallSpacing}"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="assets:AssetItem">
-                                    <Border Classes="recent-stock-card" 
-                                            Tapped="RecentStockCard_Tapped"
-                                            KeyDown="RecentStockCard_KeyDown"
-                                            Focusable="True"
-                                            AutomationProperties.Name="{Binding Name}"
-                                            Tag="{Binding .}">
-                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                                            <TextBlock Grid.Row="0" Grid.Column="0"
-                                                       Text="{Binding Name}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       FontWeight="Bold"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Row="1" Grid.Column="0"
-                                                       Text="{Binding Code}"
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                                       Margin="{StaticResource TinyTopMargin}"/>
 
-                                            <!-- 收藏按钮 -->
-                                            <Button Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
-                                                    Classes="favorite-button"
-                                                    Background="Transparent"
-                                                    Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentAssets.AddToFavoriteCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                    Tapped="OnPreventTapped"
-                                                    Width="{StaticResource DefaultIconSize}"
-                                                    Height="{StaticResource DefaultIconSize}"
-                                                    Padding="0"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center">
-                                                <svg:Svg Path="/Assets/Images/tab_favorites.svg"
-                                                         Width="{StaticResource TinyIconSize}"
-                                                         Height="{StaticResource TinyIconSize}"/>
-                                            </Button>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        
-                        <!-- 空视图提示 -->
-                        <StackPanel IsVisible="{Binding !RecentAssets.RecentAssets.Count}"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Spacing="{StaticResource DefaultSpacing}">
-                            <svg:Svg Path="/Assets/Images/empty_data.svg"
-                                     Width="{StaticResource ExtraLargeIconSize}"
-                                     Height="{StaticResource ExtraLargeIconSize}"
-                                     Opacity="0.6"/>
-                            <TextBlock Text="暂无查看记录"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       HorizontalAlignment="Center"/>
-                            <TextBlock Text="搜索或浏览热门资产以添加记录"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       HorizontalAlignment="Center"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Panel>
-                </ScrollViewer>
-            </controls:CardView>
+
+
         </Grid>
             </Grid>
 </UserControl>

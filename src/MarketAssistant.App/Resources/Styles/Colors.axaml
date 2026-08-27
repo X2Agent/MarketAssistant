@@ -39,7 +39,6 @@
             <!-- 列表项背景 - 统一使用白色卡片背景，去除灰色底 -->
             <SolidColorBrush x:Key='ItemBackgroundBrush'>#FFFFFF</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#F0F1F3</SolidColorBrush>
-            <SolidColorBrush x:Key='ElevatedBackgroundBrush'>#F0F1F3</SolidColorBrush>
             
             <!-- 文本颜色 - 增强对比度 -->
             <SolidColorBrush x:Key='TextPrimaryBrush'>#212121</SolidColorBrush>
@@ -55,6 +54,7 @@
             <SolidColorBrush x:Key='HoverBackgroundBrush'>#F5F5F5</SolidColorBrush>
             <SolidColorBrush x:Key='PressedBackgroundBrush'>#EEEEEE</SolidColorBrush>
             <SolidColorBrush x:Key='SelectedBackgroundBrush'>#E3F2FD</SolidColorBrush>
+    <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#1565C0</SolidColorBrush>
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#40000000</SolidColorBrush>
@@ -84,7 +84,6 @@
             <!-- 列表项背景 - 与卡片背景保持一致 -->
             <SolidColorBrush x:Key='ItemBackgroundBrush'>#111722</SolidColorBrush>
             <SolidColorBrush x:Key='SurfaceVariantBrush'>#1B2233</SolidColorBrush>
-            <SolidColorBrush x:Key='ElevatedBackgroundBrush'>#161C2A</SolidColorBrush>
             
             <!-- 文本颜色 - 减轻长时间盯盘眩光 -->
             <SolidColorBrush x:Key='TextPrimaryBrush'>#E4EAF5</SolidColorBrush>
@@ -93,13 +92,13 @@
             
             <!-- 边框和分割线 -->
             <SolidColorBrush x:Key='BorderBrush'>#1E2636</SolidColorBrush>
-            <SolidColorBrush x:Key='SubtleBorderBrush'>#182032</SolidColorBrush>
             <SolidColorBrush x:Key='DividerBrush'>#182032</SolidColorBrush>
             
             <!-- 交互状态 -->
             <SolidColorBrush x:Key='HoverBackgroundBrush'>#161C2A</SolidColorBrush>
             <SolidColorBrush x:Key='PressedBackgroundBrush'>#1B2233</SolidColorBrush>
             <SolidColorBrush x:Key='SelectedBackgroundBrush'>#262D3D</SolidColorBrush>
+            <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#42A5F5</SolidColorBrush>
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#80000000</SolidColorBrush>
@@ -154,15 +153,7 @@
     <SolidColorBrush x:Key="UpColorBrush" Color="{StaticResource BullishRed}"/>
     <SolidColorBrush x:Key="DownColorBrush" Color="{StaticResource BearishGreen}"/>
 
-    <!-- ========== 状态透明背景（Tag/Badge 专用，对齐设计系统 v2） ========== -->
-    <SolidColorBrush x:Key="BullishTagBackgroundBrush" Color="#1EF44336"/>
-    <SolidColorBrush x:Key="BearishTagBackgroundBrush" Color="#1E4CAF50"/>
-    <SolidColorBrush x:Key="BrandTagBackgroundBrush" Color="#1E1976D2"/>
-    <SolidColorBrush x:Key="WarningTagBackgroundBrush" Color="#1AF59E0B"/>
-    <SolidColorBrush x:Key="SuccessTagBackgroundBrush" Color="#1A10B981"/>
-
     <!-- ========== 半透明背景色 ========== -->
-    <SolidColorBrush x:Key="OverlayBrush" Color="#E0FFFFFF"/>
     <SolidColorBrush x:Key="DarkOverlayBrush" Color="#80000000"/>
     <SolidColorBrush x:Key="LightOverlayBrush" Color="#40FFFFFF"/>
     

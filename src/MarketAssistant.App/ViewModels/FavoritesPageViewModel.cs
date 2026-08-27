@@ -299,7 +299,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
             if (_assetIndex.TryGetValue(symbol, out var asset))
             {
-                asset.CurrentPrice = update.Price.ToString("G");
+                asset.CurrentPrice = PriceFormatter.Format(update.Price);
                 asset.ChangePercentage = $"{update.Change:F2}%";
             }
         }

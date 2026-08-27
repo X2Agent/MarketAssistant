@@ -39,9 +39,7 @@
                         Background="{DynamicResource CardBackgroundBrush}">
                     <Button Content="添加服务器" 
                             Command="{Binding AddServerCommand}" 
-                            Classes="action-button"
-                            Background="{StaticResource SuccessBrush}"
-                            Foreground="White"
+                            Classes="btn-primary"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"/>
                 </Border>
@@ -246,7 +244,7 @@
                                 <WrapPanel Orientation="Horizontal">
                                     <Button Content="加载工具列表"
                                             Command="{Binding LoadToolsCommand}"
-                                            Classes="action-button"
+                                            Classes="btn-secondary"
                                             Margin="{StaticResource TinyRightMargin}"
                                             IsEnabled="{Binding !AllowAllTools}"/>
                                     <TextBlock Text="空白名单默认不向 Agent 暴露任何工具"
@@ -316,15 +314,13 @@
                                HorizontalAlignment="Right">
                         <Button Content="取消" 
                                 Command="{Binding CancelEditCommand}"
-                                Classes="action-button"
+                                Classes="btn-secondary"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
                                 Margin="{StaticResource TinyLeftMargin}"/>
                         
                         <Button Content="删除" 
                                 Command="{Binding DeleteServerCommand}"
-                                Classes="action-button"
-                                Background="{StaticResource ErrorBrush}"
-                                Foreground="White"
+                                Classes="btn-danger"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
                                 Margin="{StaticResource TinyLeftMargin}"
                                 IsVisible="{Binding SelectedConfig, Converter={x:Static ObjectConverters.IsNotNull}}"/>
@@ -332,18 +328,14 @@
                         <Button Content="测试连接" 
                                 Command="{Binding TestConnectionCommand}"
                                 IsEnabled="{Binding !IsTesting}"
-                                Classes="action-button"
-                                Background="{StaticResource InfoBrush}"
-                                Foreground="White"
+                                Classes="btn-secondary"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
                                 Margin="{StaticResource TinyLeftMargin}"/>
                         
                         <Button Content="保存" 
                                 Command="{Binding SaveServerCommand}"
                                 IsEnabled="{Binding !IsTesting}"
-                                Classes="action-button"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="White"
+                                Classes="btn-primary"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"
                                 Margin="{StaticResource TinyLeftMargin}"/>
                     </WrapPanel>

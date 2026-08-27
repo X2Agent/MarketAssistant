@@ -299,6 +299,7 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             IconSource = "/Assets/Images/refresh.svg",
             Title = "更新日志",
+            Description = "了解每个版本的功能更新与问题修复",
             ButtonText = "查看",
             Command = new RelayCommand(() => OpenUrl(AppInfo.ChangelogUrl))
         });
@@ -307,6 +308,7 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             IconSource = "/Assets/Images/globe.svg",
             Title = "官方网站",
+            Description = "访问项目主页，获取最新动态与文档",
             ButtonText = "查看",
             Command = new RelayCommand(() => OpenUrl(AppInfo.OfficialWebsite))
         });
@@ -315,6 +317,7 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             IconSource = "/Assets/Images/feedback.svg",
             Title = "意见反馈",
+            Description = "提交遇到的问题或功能建议",
             ButtonText = "反馈",
             Command = new RelayCommand(() => OpenUrl(AppInfo.FeedbackUrl))
         });
@@ -323,6 +326,7 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             IconSource = "/Assets/Images/license.svg",
             Title = "许可证",
+            Description = "查看本应用的开源许可条款",
             ButtonText = "查看",
             Command = new RelayCommand(() => OpenUrl(AppInfo.LicenseUrl))
         });
@@ -331,6 +335,7 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             IconSource = "/Assets/Images/qq.svg",
             Title = $"官方QQ群: {AppInfo.QQGroupNumber}",
+            Description = "加入社区，与其他用户交流使用心得",
             ButtonText = "加入",
             Command = new RelayCommand(() => OpenUrl(AppInfo.QQGroupUrl))
         });
@@ -348,6 +353,11 @@ public class FeatureItem
     /// 功能项名称
     /// </summary>
     public string Title { get; set; } = "";
+
+    /// <summary>
+    /// 功能项描述
+    /// </summary>
+    public string Description { get; set; } = "";
 
     /// <summary>
     /// 按钮文本

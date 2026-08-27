@@ -200,7 +200,7 @@
                                                 Margin="{StaticResource HorizontalMargin}">
                                         <TextBlock Text="{Binding Title}"
                                                    Classes="feature-title"/>
-                                        <TextBlock Text="{Binding Title, StringFormat='查看{0}相关信息'}"
+                                        <TextBlock Text="{Binding Description}"
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     </StackPanel>

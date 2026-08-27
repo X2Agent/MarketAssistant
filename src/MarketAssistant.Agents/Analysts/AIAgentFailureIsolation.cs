@@ -1,7 +1,7 @@
-using System.Runtime.CompilerServices;
-using System.Text;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace MarketAssistant.Agents.Analysts;
 

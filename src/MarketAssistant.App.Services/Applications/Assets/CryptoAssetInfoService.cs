@@ -82,7 +82,7 @@ public class CryptoAssetInfoService : IAssetInfoService
             Name = ExtractBaseCurrency(ticker.Symbol), // 提取基础币种
             MarketType = MarketType.Crypto,
             Market = "Binance",
-            CurrentPrice = FormatPrice(ticker.LastPrice),
+            CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
             ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
             Volume24h = FormatVolume(ticker.Volume),
             MarketCap = await FetchMarketCapAsync(ExtractBaseCurrency(ticker.Symbol), cancellationToken)
@@ -109,7 +109,7 @@ public class CryptoAssetInfoService : IAssetInfoService
         // 稳定币列表（用于过滤稳定币互换交易对）
         var stablecoins = new[] { "USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD", "USDP" };
 
-        // 筛选USDT交易对，排除稳定币互换（需同时满足：基础币种是稳定币 且 价格接近1.0），按24小时交易量排序，取前8个
+        // 筛选USDT交易对，排除稳定币互换（需同时满足：基础币种是稳定币 且 价格接近1.0），按24小时交易量排序，取前12个
         var hotAssets = tickers
             .Where(t => t.Symbol.EndsWith("USDT") && t.Symbol != "USDT")
             // 过滤稳定币互换交易对（基础币种是稳定币 且 价格接近1.0，同时满足才过滤）
@@ -123,13 +123,13 @@ public class CryptoAssetInfoService : IAssetInfoService
                 return !(isStablecoin && isPriceNearOne);
             })
             .OrderByDescending(t => t.QuoteVolume)
-            .Take(8)
+            .Take(12)
             .Select(t => new HotAsset
             {
                 Name = ExtractBaseCurrency(t.Symbol),
                 Code = t.Symbol,
                 Market = "Binance",
-                CurrentPrice = FormatPrice(t.LastPrice),
+                CurrentPrice = PriceFormatter.Format(t.LastPrice),
                 ChangePercentage = FormatOpenClosePercentage(t.OpenPrice, t.LastPrice),
                 MarketType = MarketType.Crypto,
                 MetricLabel = "交易量",
@@ -199,26 +199,6 @@ public class CryptoAssetInfoService : IAssetInfoService
 
         _logger.LogInformation("已缓存 {Count} 个 TRADING 状态的交易对", tradingSymbols.Count);
         return tradingSymbols;
-    }
-
-    /// <summary>
-    /// 格式化价格显示
-    /// </summary>
-    private string FormatPrice(decimal price)
-    {
-        // 根据价格大小选择精度
-        if (price >= 1000)
-        {
-            return price.ToString("N2"); // 1000+ 显示2位小数
-        }
-        else if (price >= 1)
-        {
-            return price.ToString("N4"); // 1-1000 显示4位小数
-        }
-        else
-        {
-            return price.ToString("N6"); // <1 显示6位小数
-        }
     }
 
     /// <summary>

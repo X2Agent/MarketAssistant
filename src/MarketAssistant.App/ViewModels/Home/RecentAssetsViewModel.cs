@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
@@ -23,6 +24,9 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
 
     private IHomeAssetService HomeAssetService =>
         _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
+
+    private IAssetInfoService AssetInfoService =>
+        _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
 
     /// <summary>
     /// 最近查看资产集合
@@ -68,12 +72,32 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         {
             var recentAssets = await HistoryService.GetHistoryAsync();
 
+            // 并行补全实时价格/涨跌幅（单个失败仅留空，不影响整体加载）
+            await Task.WhenAll(recentAssets.Select(EnrichWithQuoteAsync));
+
             RecentAssets.Clear();
             foreach (var asset in recentAssets)
             {
                 RecentAssets.Add(asset);
             }
         }, "加载最近查看资产");
+    }
+
+    /// <summary>
+    /// 补全单个资产的实时价格与涨跌幅
+    /// </summary>
+    private async Task EnrichWithQuoteAsync(AssetItem asset)
+    {
+        try
+        {
+            var info = await AssetInfoService.GetAssetInfoAsync(asset.Code);
+            asset.CurrentPrice = info.CurrentPrice;
+            asset.ChangePercentage = info.ChangePercentage;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "补全最近查看资产行情失败: {Code}", asset.Code);
+        }
     }
 
     /// <summary>

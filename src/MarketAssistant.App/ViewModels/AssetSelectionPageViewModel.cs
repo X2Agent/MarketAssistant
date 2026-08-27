@@ -140,14 +140,21 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     };
 
     /// <summary>
-    /// 当前按钮文本
+    /// 当前按钮文本（随模式与市场类型切换，如"开始选股"/"开始选币"）
     /// </summary>
-    public string CurrentButtonText => SelectedMode?.ModeType switch
+    public string CurrentButtonText
     {
-        SelectionModeType.UserRequirement => "开始选股",
-        SelectionModeType.NewsAnalysis => "基于新闻选股",
-        _ => "开始分析"
-    };
+        get
+        {
+            var noun = _marketContext.CurrentMarket == MarketType.Crypto ? "选币" : "选股";
+            return SelectedMode?.ModeType switch
+            {
+                SelectionModeType.UserRequirement => $"开始{noun}",
+                SelectionModeType.NewsAnalysis => $"基于新闻{noun}",
+                _ => "开始分析"
+            };
+        }
+    }
 
     /// <summary>
     /// 推荐投资标的列表（用于UI绑定）
@@ -239,6 +246,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         {
             OnPropertyChanged(nameof(CurrentInputContent));
             OnPropertyChanged(nameof(CurrentPlaceholder));
+          OnPropertyChanged(nameof(CurrentButtonText));
             OnPropertyChanged(nameof(CurrentButtonText));
             OnPropertyChanged(nameof(IsInputAreaVisible));
             OnPropertyChanged(nameof(IsQuickStrategyAreaVisible));

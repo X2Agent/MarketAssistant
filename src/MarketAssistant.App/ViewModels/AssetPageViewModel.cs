@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
@@ -54,6 +55,16 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     [ObservableProperty]
     private decimal _priceChange;
+
+    /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
+    public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
+
+    /// <summary>涨跌额展示文本（按量级格式化，适配低价币）</summary>
+    public string PriceChangeText => PriceFormatter.Format(PriceChange);
+
+    partial void OnCurrentPriceChanged(decimal value) => OnPropertyChanged(nameof(CurrentPriceText));
+
+    partial void OnPriceChangeChanged(decimal value) => OnPropertyChanged(nameof(PriceChangeText));
 
     /// <summary>
     /// 计算属性用于UI绑定
