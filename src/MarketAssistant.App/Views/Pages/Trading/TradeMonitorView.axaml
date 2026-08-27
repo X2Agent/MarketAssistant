@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              xmlns:models="using:MarketAssistant.Trading.Models"
              xmlns:abstractions="using:MarketAssistant.Trading.Abstractions"
              xmlns:converts="using:MarketAssistant.Converters"
@@ -70,17 +71,25 @@
                         </controls:CardView>
                     </UniformGrid>
 
-                    <!-- 操作按钮 -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                Spacing="{StaticResource SmallSpacing}"
+                    <!-- 操作按钮（图标按钮，纵向排列贴合卡片高度） -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical"
+                                Spacing="{StaticResource TinySpacing}"
                                 VerticalAlignment="Center"
                                 Margin="{StaticResource SmallLeftMargin}">
-                        <Button Content="余额详情" Command="{Binding ShowBalanceDetailCommand}"
-                                Classes="btn-secondary"
-                                MinWidth="{StaticResource SmallButtonMinWidth}"/>
-                        <Button Content="刷新" Command="{Binding RefreshCommand}"
-                                Classes="btn-secondary"
-                                MinWidth="{StaticResource SmallButtonMinWidth}"/>
+                        <Button Classes="icon-action"
+                                Command="{Binding ShowBalanceDetailCommand}"
+                                ToolTip.Tip="余额详情">
+                            <svg:Svg Path="/Assets/Images/wallet.svg"
+                                     Width="{StaticResource SmallIconSize}"
+                                     Height="{StaticResource SmallIconSize}"/>
+                        </Button>
+                        <Button Classes="icon-action"
+                                Command="{Binding RefreshCommand}"
+                                ToolTip.Tip="刷新数据">
+                            <svg:Svg Path="/Assets/Images/refresh.svg"
+                                     Width="{StaticResource SmallIconSize}"
+                                     Height="{StaticResource SmallIconSize}"/>
+                        </Button>
                     </StackPanel>
                 </Grid>
 

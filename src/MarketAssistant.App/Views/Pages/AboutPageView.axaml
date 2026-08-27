@@ -33,6 +33,7 @@
                                 Padding="0"
                                 Width="{StaticResource SmallIconSize}"
                                 Height="{StaticResource SmallIconSize}"
+                                ToolTip.Tip="在 GitHub 上查看源码"
                                 Command="{Binding OpenGitHubCommand}">
                             <svg:Svg Path="/Assets/Images/github.svg"
                                      Width="{StaticResource SmallIconSize}"
@@ -45,7 +46,7 @@
                       RowDefinitions="Auto">
                     <!-- Logo -->
                     <Border Grid.Column="0"
-                            Background="{DynamicResource CardBackgroundBrush}"
+                            Background="{DynamicResource SurfaceVariantBrush}"
                             CornerRadius="{StaticResource DefaultCornerRadius}"
                             Padding="{StaticResource DefaultCardPadding}"
                             BorderBrush="{DynamicResource BorderBrush}"
@@ -168,11 +169,14 @@
                             Padding="{StaticResource DefaultCardPadding}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="{StaticResource DefaultBorderThickness}">
-                        <TextBlock Text="{Binding ReleaseNotes}"
-                                   FontSize="{StaticResource BodyFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   TextWrapping="Wrap"
-                                   MaxHeight="{StaticResource SmallDialogHeight}"/>
+                        <ScrollViewer MaxHeight="{StaticResource SmallDialogHeight}"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding ReleaseNotes}"
+                                       FontSize="{StaticResource BodyFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </ScrollViewer>
                     </Border>
                 </StackPanel>
             </controls:CardView>

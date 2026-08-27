@@ -125,7 +125,7 @@
                                 Spacing="{StaticResource DefaultSpacing}"
                                 VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{StaticResource SuccessBrush}" 
+                            <Border Background="{StaticResource ErrorBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -135,7 +135,7 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{StaticResource ErrorBrush}" 
+                            <Border Background="{StaticResource SuccessBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
