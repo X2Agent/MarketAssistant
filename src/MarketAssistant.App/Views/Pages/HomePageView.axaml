@@ -40,36 +40,56 @@
         <!-- 顶部搜索区域 -->
         <controls:CardView Margin="{StaticResource BottomMargin}">
             <Grid ColumnDefinitions="*,Auto">
-                <AutoCompleteBox x:Name="StockSearchBox"
-                                 Grid.Column="0"
-                                 PlaceholderText="输入资产代码或名称"
-                                 MinimumPrefixLength="1"
-                                 ItemsSource="{Binding Search.SearchResults}"
-                                 FilterMode="None"
-                                 Text="{Binding Search.SearchQuery, Mode=TwoWay}"
-                                 IsDropDownOpen="{Binding Search.IsSearchResultVisible, Mode=TwoWay}"
-                                 MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
-                                 Background="Transparent"
-                                 Foreground="{DynamicResource TextPrimaryBrush}"
-                                 FontSize="{StaticResource SectionTitleFontSize}"
-                                 Padding="{StaticResource SmallCardPadding}">
-                    <AutoCompleteBox.ItemTemplate>
-                        <DataTemplate x:DataType="assets:AssetItem">
-                            <StackPanel Margin="{StaticResource TinyMargin}"
-                                       Background="Transparent"
-                                       Cursor="Hand"
-                                       PointerPressed="SearchResultItem_PointerPressed"
-                                       Tag="{Binding .}">
-                                <TextBlock Text="{Binding Name}" 
-                                           FontWeight="SemiBold"
-                                           FontSize="{StaticResource LabelFontSize}"/>
-                                <TextBlock Text="{Binding Code}" 
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </AutoCompleteBox.ItemTemplate>
-                </AutoCompleteBox>
+                <!-- 搜索输入框 + 结果弹层。
+                     不使用 AutoCompleteBox：其内部文本同步机制会在输入法组合期间
+                     异步改写文本，导致拼音提交时出现重复字符串。 -->
+                <Panel Grid.Column="0">
+                    <TextBox x:Name="StockSearchBox"
+                             PlaceholderText="输入资产代码或名称"
+                             Text="{Binding Search.SearchQuery, Mode=TwoWay}"
+                             Background="Transparent"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             FontSize="{StaticResource SectionTitleFontSize}"
+                             Padding="{StaticResource SmallCardPadding}"
+                             KeyDown="StockSearchBox_KeyDown"/>
+                    <Popup x:Name="SearchResultsPopup"
+                           PlacementTarget="{Binding #StockSearchBox}"
+                           Placement="Bottom"
+                           IsLightDismissEnabled="True"
+                           IsOpen="{Binding Search.IsSearchResultVisible, Mode=TwoWay}">
+                        <Border Width="{Binding #StockSearchBox.Bounds.Width}"
+                                MaxHeight="{StaticResource DropDownMaxHeight}"
+                                Background="{DynamicResource CardBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                ClipToBounds="True">
+                            <ListBox x:Name="SearchResultsList"
+                                     ItemsSource="{Binding Search.SearchResults}"
+                                     SelectionMode="Single"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Padding="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="assets:AssetItem">
+                                        <StackPanel Margin="{StaticResource TinyMargin}"
+                                                   Background="Transparent"
+                                                   Cursor="Hand"
+                                                   PointerPressed="SearchResultItem_PointerPressed"
+                                                   Tag="{Binding .}">
+                                            <TextBlock Text="{Binding Name}" 
+                                                       FontWeight="SemiBold"
+                                                       FontSize="{StaticResource LabelFontSize}"/>
+                                            <TextBlock Text="{Binding Code}" 
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </Panel>
                 
                 <!-- 搜索加载指示器 -->
                 <Border Grid.Column="1"

@@ -49,6 +49,28 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private string _transportType = "stdio";
 
+    /// <summary>
+    /// 是否为 stdio 传输类型（控制参数与环境变量输入区的可见性）
+    /// </summary>
+    public bool IsStdio => TransportType == "stdio";
+
+    /// <summary>
+    /// 命令/URL 输入框占位提示，随传输类型切换
+    /// </summary>
+    public string CommandPlaceholder => TransportType switch
+    {
+        "stdio" => "请输入命令，如 npx",
+        "sse" => "请输入 URL，如 http://localhost:3000/sse",
+        _ => "请输入 URL，如 http://localhost:3000/mcp"
+    };
+
+    /// <summary>
+    /// 命令/URL 输入框下方说明文字，随传输类型切换
+    /// </summary>
+    public string CommandHint => TransportType == "stdio"
+        ? "提示：命令参数与环境变量请在下方对应输入框填写"
+        : $"提示：URL 示例 http://localhost:3000/{(TransportType == "sse" ? "sse" : "mcp")}";
+
     [ObservableProperty]
     private string _command = string.Empty;
 
@@ -67,7 +89,20 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     [ObservableProperty]
     private ObservableCollection<McpToolSelectionItem> _toolItems = new();
 
+    // 表单校验错误信息（保存/测试时触发，修正后即时清除）
+    [ObservableProperty]
+    private string? _nameError;
+
+    [ObservableProperty]
+    private string? _commandError;
+
     private MCPServerConfig? _editingConfig;
+
+    // 正在编辑的列表源配置（用于切换确认被拒时回退选中项）
+    private MCPServerConfig? _editingSource;
+
+    // 回退选中项期间抑制选择变更处理，避免递归触发确认
+    private bool _suppressSelectionChanged;
 
     public MCPConfigPageViewModel(
         MCPServerConfigService configService,
@@ -115,6 +150,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     {
         // 清空选中项，避免与编辑状态冲突
         SelectedConfig = null;
+        _editingSource = null;
 
         _editingConfig = new MCPServerConfig
         {
@@ -135,6 +171,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     {
         if (SelectedConfig == null) return;
 
+        _editingSource = SelectedConfig;
+
         // 手动复制配置
         _editingConfig = new MCPServerConfig
         {
@@ -147,7 +185,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             IsEnabled = SelectedConfig.IsEnabled,
             EnvironmentVariables = new Dictionary<string, string?>(SelectedConfig.EnvironmentVariables),
             Category = SelectedConfig.Category,
-            AllowedTools = [.. SelectedConfig.AllowedTools]
+            AllowedTools = [.. SelectedConfig.AllowedTools],
+            AllowAllTools = SelectedConfig.AllowAllTools
         };
         LoadConfigToUI(_editingConfig);
         IsEditing = true;
@@ -161,16 +200,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     {
         if (_editingConfig == null) return;
 
-        // 验证必填字段
-        if (string.IsNullOrWhiteSpace(Name))
+        // 校验必填字段
+        if (!ValidateForm())
         {
-            _notificationService?.ShowWarning("请输入服务器名称");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(Command))
-        {
-            _notificationService?.ShowWarning("请输入命令或URL");
             return;
         }
 
@@ -187,6 +219,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             _mcpToolProvider.Invalidate();
             IsEditing = false;
             _editingConfig = null;
+            _editingSource = null;
 
             _notificationService?.ShowSuccess("保存成功");
             Logger?.LogInformation("MCP服务器配置已保存: {Name}", Name);
@@ -199,14 +232,36 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     }
 
     /// <summary>
-    /// 取消编辑
+    /// 取消编辑（存在未保存修改时需用户确认）
     /// </summary>
     [RelayCommand]
-    private void CancelEdit()
+    private async Task CancelEdit()
+    {
+        if (HasUnsavedChanges())
+        {
+            var confirmed = await _dialogService.ShowConfirmationAsync(
+                "未保存的修改",
+                "当前有未保存的修改，确定放弃并退出编辑吗？",
+                "放弃修改",
+                "继续编辑");
+
+            if (!confirmed) return;
+        }
+
+        ForceCancelEdit();
+    }
+
+    /// <summary>
+    /// 直接退出编辑状态，不做脏检查（用于页面导航离开等自动取消场景）
+    /// </summary>
+    private void ForceCancelEdit()
     {
         SelectedConfig = null;
         IsEditing = false;
         _editingConfig = null;
+        _editingSource = null;
+        NameError = null;
+        CommandError = null;
     }
 
     /// <summary>
@@ -217,16 +272,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     {
         if (_editingConfig == null) return;
 
-        // 验证必填字段
-        if (string.IsNullOrWhiteSpace(Name))
+        // 校验必填字段
+        if (!ValidateForm())
         {
-            _notificationService?.ShowWarning("请输入服务器名称");
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(Command))
-        {
-            _notificationService?.ShowWarning("请输入命令或URL");
             return;
         }
 
@@ -313,6 +361,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             LoadServerConfigs();
             _mcpToolProvider.Invalidate();
             IsEditing = false;
+            _editingConfig = null;
+            _editingSource = null;
             _notificationService?.ShowSuccess("删除成功");
         }
     }
@@ -396,6 +446,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             EnvironmentVariablesText = string.Empty;
         }
+
+        // 重新载入表单时清除历史校验错误
+        NameError = null;
+        CommandError = null;
     }
 
     /// <summary>
@@ -439,12 +493,169 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         return result;
     }
 
+    /// <summary>
+    /// 校验名称必填
+    /// </summary>
+    private void ValidateName()
+    {
+        NameError = string.IsNullOrWhiteSpace(Name) ? "请输入服务器名称" : null;
+    }
+
+    /// <summary>
+    /// 校验命令/URL必填及URL格式（sse/streamableHttp 时 Command 字段存储 URL）
+    /// </summary>
+    private void ValidateCommand()
+    {
+        if (string.IsNullOrWhiteSpace(Command))
+        {
+            CommandError = TransportType == "stdio" ? "请输入命令" : "请输入 URL";
+        }
+        else if (TransportType != "stdio" && !Uri.TryCreate(Command, UriKind.Absolute, out _))
+        {
+            CommandError = "URL 格式不正确，例如 http://localhost:3000/mcp";
+        }
+        else
+        {
+            CommandError = null;
+        }
+    }
+
+    /// <summary>
+    /// 校验表单必填项，返回是否全部通过
+    /// </summary>
+    private bool ValidateForm()
+    {
+        ValidateName();
+        ValidateCommand();
+        return NameError is null && CommandError is null;
+    }
+
+    partial void OnNameChanged(string value)
+    {
+        // 已显示错误时即时重新校验，便于用户修正后错误提示消失
+        if (NameError is not null)
+        {
+            ValidateName();
+        }
+    }
+
+    partial void OnCommandChanged(string value)
+    {
+        if (CommandError is not null)
+        {
+            ValidateCommand();
+        }
+    }
+
+    partial void OnTransportTypeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsStdio));
+        OnPropertyChanged(nameof(CommandPlaceholder));
+        OnPropertyChanged(nameof(CommandHint));
+        if (CommandError is not null)
+        {
+            ValidateCommand();
+        }
+    }
+
     partial void OnSelectedConfigChanged(MCPServerConfig? value)
     {
-        if (value != null)
+        if (value is null || _suppressSelectionChanged)
         {
+            return;
+        }
+
+        // 存在未保存修改时先确认，用户拒绝则回退选中项
+        if (IsEditing && HasUnsavedChanges() && !ReferenceEquals(value, _editingSource))
+        {
+            _ = HandleSelectionChangeAsync(value);
+            return;
+        }
+
+        EditServer();
+    }
+
+    /// <summary>
+    /// 处理带未保存修改的选中切换：确认丢弃后加载目标配置，否则回退选中项
+    /// </summary>
+    private async Task HandleSelectionChangeAsync(MCPServerConfig target)
+    {
+        try
+        {
+            var confirmed = await _dialogService.ShowConfirmationAsync(
+                "未保存的修改",
+                $"服务器「{(target.Name is { Length: > 0 } n ? n : target.Id)}」有未保存的修改，切换后将丢弃这些修改。是否继续？",
+                "丢弃并切换",
+                "继续编辑");
+
+            if (confirmed)
+            {
+                EditServer();
+            }
+            else
+            {
+                _suppressSelectionChanged = true;
+                try
+                {
+                    SelectedConfig = _editingSource;
+                }
+                finally
+                {
+                    _suppressSelectionChanged = false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "处理MCP服务器切换确认失败");
             EditServer();
         }
+    }
+
+    /// <summary>
+    /// 判断当前表单是否存在未保存的修改
+    /// </summary>
+    private bool HasUnsavedChanges()
+    {
+        if (_editingConfig is null || !IsEditing)
+        {
+            return false;
+        }
+
+        return !string.Equals(Name, _editingConfig.Name, StringComparison.Ordinal)
+            || !string.Equals(Description, _editingConfig.Description, StringComparison.Ordinal)
+            || !string.Equals(TransportType, _editingConfig.TransportType, StringComparison.Ordinal)
+            || !string.Equals(Command, _editingConfig.Command, StringComparison.Ordinal)
+            || !string.Equals(Arguments, _editingConfig.Arguments, StringComparison.Ordinal)
+            || IsEnabled != _editingConfig.IsEnabled
+            || !AreDictionariesEqual(ParseEnvironmentVariables(), _editingConfig.EnvironmentVariables)
+            || !AreAllowedToolsEqual();
+    }
+
+    /// <summary>
+    /// 比较两个环境变量字典是否一致（忽略顺序）
+    /// </summary>
+    private static bool AreDictionariesEqual(Dictionary<string, string?> left, Dictionary<string, string?> right)
+        => left.Count == right.Count && left.All(kv => right.TryGetValue(kv.Key, out var value) && value == kv.Value);
+
+    /// <summary>
+    /// 比较当前勾选的工具白名单（含允许全部工具开关）与编辑配置是否一致
+    /// </summary>
+    private bool AreAllowedToolsEqual()
+    {
+        if (AllowAllTools != _editingConfig!.AllowAllTools)
+        {
+            return false;
+        }
+
+        if (AllowAllTools)
+        {
+            return true;
+        }
+
+        var selected = ToolItems.Where(item => item.IsSelected).Select(item => item.Name).ToList();
+        return selected.Count == _editingConfig.AllowedTools.Count
+            && selected.All(_editingConfig.AllowedTools.Contains);
     }
 
     public void OnNavigatedFrom()
@@ -452,7 +663,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         // 离开页面时如果正在编辑但未保存，自动取消编辑状态
         if (IsEditing)
         {
-            CancelEdit();
+            ForceCancelEdit();
         }
     }
 

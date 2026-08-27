@@ -23,7 +23,7 @@ public partial class HomePageView : UserControl
             control.Tag is AssetItem selectedAsset &&
             DataContext is HomePageViewModel viewModel)
         {
-            // 标记事件已处理，防止AutoCompleteBox处理
+            // 标记事件已处理，防止列表处理
             e.Handled = true;
 
             // 关闭下拉框
@@ -32,6 +32,80 @@ public partial class HomePageView : UserControl
             // 执行导航
             viewModel.Search.NavigateToAssetCommand.Execute(selectedAsset);
         }
+    }
+
+    /// <summary>
+    /// 搜索框键盘处理：Esc 关闭结果、上下键选择、回车跳转所选结果。
+    /// 输入法组合期间回车由输入法消费，不会进入此处理，避免重复提交。
+    /// </summary>
+    private void StockSearchBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not HomePageViewModel viewModel)
+        {
+            return;
+        }
+
+        var search = viewModel.Search;
+
+        switch (e.Key)
+        {
+            case Key.Escape:
+                if (search.IsSearchResultVisible)
+                {
+                    search.IsSearchResultVisible = false;
+                    e.Handled = true;
+                }
+                break;
+
+            case Key.Down:
+                if (TryMoveListSelection(SearchResultsList, 1))
+                {
+                    e.Handled = true;
+                }
+                break;
+
+            case Key.Up:
+                if (TryMoveListSelection(SearchResultsList, -1))
+                {
+                    e.Handled = true;
+                }
+                break;
+
+            case Key.Enter:
+                if (search.IsSearchResultVisible &&
+                    SearchResultsList.SelectedItem is AssetItem selectedAsset)
+                {
+                    search.IsSearchResultVisible = false;
+                    search.NavigateToAssetCommand.Execute(selectedAsset);
+                    e.Handled = true;
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 在结果列表中移动选中项，返回是否发生了移动
+    /// </summary>
+    private static bool TryMoveListSelection(ListBox list, int offset)
+    {
+        if (list.ItemCount == 0)
+        {
+            return false;
+        }
+
+        var newIndex = Math.Clamp(list.SelectedIndex + offset, 0, list.ItemCount - 1);
+        if (newIndex == list.SelectedIndex && list.SelectedIndex >= 0)
+        {
+            return false;
+        }
+
+        list.SelectedIndex = newIndex;
+        if (list.SelectedItem is { } item)
+        {
+            list.ScrollIntoView(item);
+        }
+
+        return true;
     }
 
     /// <summary>
