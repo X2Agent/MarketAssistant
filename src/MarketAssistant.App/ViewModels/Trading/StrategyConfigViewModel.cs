@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.DataProviders;
@@ -13,7 +12,6 @@ using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
-using MarketAssistant.Views.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;
@@ -485,18 +483,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
                 strategy.LastTriggeredAt = latest.LastTriggeredAt;
             }
 
-            await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
-                    return;
-
-                var owner = desktop.Windows.FirstOrDefault(w => w.IsActive) ?? desktop.MainWindow;
-                if (owner == null) return;
-
-                var window = new StrategyExecutionWindow();
-                window.SetContent(strategy, records);
-                await window.ShowDialog(owner);
-            });
+            // 通过对话框服务展示，避免 ViewModel 直接 new 窗口（便于测试与解耦）
+            await _dialogService.ShowStrategyExecutionAsync(strategy, records);
         }, "查看策略执行历史");
     }
 

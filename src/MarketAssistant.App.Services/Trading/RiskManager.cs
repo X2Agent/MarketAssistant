@@ -161,10 +161,24 @@ public class RiskManager
                 }
             }
 
-            // 最大回撤熔断
+            // 买入订单校验报价资产（USDT）可用余额：
+            // - 现货：本地余额（Free + Locked）必须覆盖订单金额，防止下单后因余额不足被交易所拒绝
+            // - 合约：以交易所保证金为准，跳过本地余额校验（杠杆下占用保证金远小于订单名义价值）
+            if (side == OrderSide.Buy && !_exchangeClient.IsFutures)
+            {
+                var availableQuote = CryptoPortfolioService.GetUsdtBalance(portfolioSummary);
+                if (orderValueUSDT > availableQuote)
+                    return RiskCheckResult.Reject(
+                        $"买入金额 {orderValueUSDT:F2} USDT 超过可用余额 {availableQuote:F2} USDT");
+            }
+
+            // 最大回撤熔断：峰值取最近 30 天滚动窗口，
+            // 窗口随时间滑动，历史峰值自动"过期"，无需手动重置
             if (config.MaxDrawdownPercent > 0)
             {
-                var peakValue = await _dataService.GetPeakAccountValueAsync(ct).ConfigureAwait(false);
+                var peakValue = await _dataService
+                    .GetPeakAccountValueAsync(DateTime.UtcNow.AddDays(-30), ct)
+                    .ConfigureAwait(false);
                 if (peakValue > 0)
                 {
                     var drawdownPercent = (peakValue - totalUSDT) / peakValue * 100;

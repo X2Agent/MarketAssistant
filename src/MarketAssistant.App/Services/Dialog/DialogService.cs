@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using MarketAssistant.Trading.Models;
 using MarketAssistant.Views.Windows;
 
 namespace MarketAssistant.Services.Dialog;
@@ -51,6 +52,25 @@ public class DialogService : IDialogService
         using var cancelRegistration = ct.Register(() => Dispatcher.UIThread.Post(() => dialog.Close()));
         await dialog.ShowDialog(owner);
         return dialog.Result;
+    }
+
+    /// <summary>
+    /// 显示策略执行历史对话框窗口
+    /// </summary>
+    public async Task ShowStrategyExecutionAsync(TradingStrategy strategy, IReadOnlyList<TradeRecord> records)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => ShowStrategyExecutionAsync(strategy, records));
+            return;
+        }
+
+        var owner = GetActiveWindow();
+        if (owner == null) return;
+
+        var window = new StrategyExecutionWindow();
+        window.SetContent(strategy, records);
+        await window.ShowDialog(owner);
     }
 
     /// <summary>

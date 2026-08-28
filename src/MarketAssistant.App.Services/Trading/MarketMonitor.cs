@@ -568,6 +568,24 @@ public class MarketMonitor : IDisposable
         _cts?.Cancel();
         _cts?.Dispose();
         _priceChannel.Writer.TryComplete();
+
+        // 释放策略级锁之前，先短暂等待在途任务收尾（最多 3 秒，Dispose 为同步方法不允许无限等待），
+        // 防止任务在锁对象已被 Dispose 后调用 Release/WaitAsync 抛出 ObjectDisposedException
+        try
+        {
+            Task[] pendingTasks;
+            lock (_pendingTasksLock)
+                pendingTasks = _pendingStrategyTasks.ToArray();
+
+            if (pendingTasks.Length > 0)
+                Task.WaitAll(pendingTasks, TimeSpan.FromSeconds(3));
+        }
+        catch (Exception ex)
+        {
+            // 等待超时或个别任务失败都不阻断释放，仅记录
+            _logger.LogWarning(ex, "Dispose 等待在途策略任务超时或失败，部分状态可能未持久化");
+        }
+
         foreach (var kvp in _strategyLocks)
             kvp.Value.Dispose();
         _strategyLocks.Clear();

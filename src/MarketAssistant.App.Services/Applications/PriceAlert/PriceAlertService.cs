@@ -16,7 +16,7 @@ namespace MarketAssistant.Applications.PriceAlert;
 /// 价格预警服务，监听 WebSocket 价格并触发通知。
 /// 持久化通过 SQLite（market.db）实现，规则在启动时异步加载到内存。
 /// </summary>
-public sealed class PriceAlertService : SqliteServiceBase, IDisposable
+public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDisposable
 {
     private static readonly TimeSpan ASharePollingInterval = TimeSpan.FromSeconds(20);
 
@@ -464,6 +464,38 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// 异步释放：取消轮询并等待后台任务收尾，超时（5 秒）后不再等待；
+    /// OperationCanceledException 属正常取消路径，静默处理，其余异常记录后不重抛。
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        _wsService.PriceUpdated -= OnCryptoPriceUpdated;
+        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.PriceAlerts);
+        _pollingCts.Cancel();
+        try
+        {
+            await Task.WhenAll(_pollingTask ?? Task.CompletedTask, _subscriptionTask ?? Task.CompletedTask)
+                .WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常取消路径
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "价格预警服务后台任务清理异常（已忽略）");
+        }
+
+        _subscriptionLock.Dispose();
+        _pollingCts.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// 同步释放：与异步释放相同的清理逻辑，但不再向调用方重抛非取消异常，
+    /// 避免 Dispose 在应用退出时抛出导致终止流程失败。
+    /// </summary>
     public void Dispose()
     {
         _wsService.PriceUpdated -= OnCryptoPriceUpdated;
@@ -476,10 +508,19 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable
         }
         catch (AggregateException ex)
         {
+            // 取消属正常路径；其余异常仅记录，不再重抛（同步 Dispose 中重抛会中断应用退出）
             ex.Handle(e => e is OperationCanceledException);
+            foreach (var inner in ex.InnerExceptions.Where(e => e is not OperationCanceledException))
+                Logger.LogWarning(inner, "价格预警服务后台任务清理异常（已忽略）");
         }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "价格预警服务后台任务清理异常（已忽略）");
+        }
+
         _subscriptionLock.Dispose();
         _pollingCts.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private bool IsNotificationEnabled()

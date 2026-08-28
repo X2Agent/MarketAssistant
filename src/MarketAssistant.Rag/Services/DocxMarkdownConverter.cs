@@ -22,17 +22,19 @@ public class ListInfo
 /// </summary>
 public class DocxMarkdownConverter : IMarkdownConverter
 {
-    private readonly Dictionary<int, ListInfo> _numberingFormats = new();
-    private readonly Dictionary<string, string> _imageReferences = new();
-    private readonly IImageStorageService _imageStorageService;
-    private readonly Dictionary<int, int> _listItemCounters = new();
-    private int _imageCounter = 0;
-
     /// <summary>
-    /// 转换过程串行化锁：实例字段在并发调用时非线程安全，
-    /// 同一 Singleton 实例的并发转换必须串行执行。
+    /// 单次转换的上下文状态：编号定义、图片引用、列表计数器等仅在本次转换内有效，
+    /// 通过方法参数传递，保证转换器本身无共享可变状态（可安全注册为 Singleton 并发使用）。
     /// </summary>
-    private readonly SemaphoreSlim _convertLock = new(1, 1);
+    private sealed class ConversionContext
+    {
+        public readonly Dictionary<int, ListInfo> NumberingFormats = new();
+        public readonly Dictionary<string, string> ImageReferences = new(StringComparer.Ordinal);
+        public readonly Dictionary<int, int> ListItemCounters = new();
+        public int ImageCounter;
+    }
+
+    private readonly IImageStorageService _imageStorageService;
 
     public DocxMarkdownConverter(IImageStorageService imageStorageService)
     {
@@ -44,16 +46,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
     public async Task<string> ConvertToMarkdownAsync(string filePath)
     {
-        // 串行化转换：实例字段（_numberingFormats 等）在并发调用时非线程安全
-        await _convertLock.WaitAsync();
-        try
-        {
-            return await ConvertCoreAsync(filePath);
-        }
-        finally
-        {
-            _convertLock.Release();
-        }
+        return await ConvertCoreAsync(filePath);
     }
 
     private async Task<string> ConvertCoreAsync(string filePath)
@@ -66,15 +59,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
             if (main?.Document?.Body == null)
                 return string.Empty;
 
-            // 清理之前的状态
-            _numberingFormats.Clear();
-            _imageReferences.Clear();
-            _listItemCounters.Clear();
-            _imageCounter = 0;
+            // 每次转换独立的上下文状态，转换器实例本身无共享可变状态
+            var state = new ConversionContext();
 
             // 预处理编号定义和图片
-            await ProcessNumberingDefinitionsAsync(doc);
-            await ProcessImageReferencesAsync(doc, filePath);
+            await ProcessNumberingDefinitionsAsync(doc, state);
+            await ProcessImageReferencesAsync(doc, filePath, state);
 
             var markdown = new StringBuilder();
             var previousWasList = false;
@@ -87,11 +77,11 @@ public class DocxMarkdownConverter : IMarkdownConverter
                 switch (element)
                 {
                     case Paragraph paragraph:
-                        isCurrentList = ProcessParagraph(paragraph, markdown);
+                        isCurrentList = ProcessParagraph(paragraph, markdown, state);
                         break;
 
                     case Table table:
-                        ProcessTable(table, markdown);
+                        ProcessTable(table, markdown, state);
                         break;
 
                     default:
@@ -127,8 +117,9 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// </summary>
     /// <param name="paragraph">段落</param>
     /// <param name="markdown">markdown构建器</param>
+    /// <param name="state">本次转换的上下文状态</param>
     /// <returns>是否为列表项</returns>
-    private bool ProcessParagraph(Paragraph paragraph, StringBuilder markdown)
+    private bool ProcessParagraph(Paragraph paragraph, StringBuilder markdown, ConversionContext state)
     {
         // 检查是否为列表项
         var numberingId = GetNumberingId(paragraph);
@@ -136,12 +127,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
         if (numberingId.HasValue)
         {
-            ProcessListItem(paragraph, markdown, numberingId.Value, numberingLevel);
+            ProcessListItem(paragraph, markdown, numberingId.Value, numberingLevel, state);
             return true;
         }
 
         // 处理段落格式化文本（包括图片）
-        var formattedText = ProcessTextFormatting(paragraph);
+        var formattedText = ProcessTextFormatting(paragraph, state);
 
         if (string.IsNullOrWhiteSpace(formattedText))
         {
@@ -167,7 +158,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 处理表格元素
     /// </summary>
-    private void ProcessTable(Table table, StringBuilder markdown)
+    private void ProcessTable(Table table, StringBuilder markdown, ConversionContext state)
     {
         var rows = new List<List<string>>();
 
@@ -176,7 +167,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
             var row = new List<string>();
             foreach (var tableCell in tableRow.Elements<TableCell>())
             {
-                var cellText = ExtractTableCellText(tableCell);
+                var cellText = ExtractTableCellText(tableCell, state);
                 row.Add(cellText);
             }
 
@@ -236,7 +227,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 处理文本格式化
     /// </summary>
-    private string ProcessTextFormatting(Paragraph paragraph)
+    private string ProcessTextFormatting(Paragraph paragraph, ConversionContext state)
     {
         var result = new StringBuilder();
 
@@ -246,7 +237,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
             var drawing = run.Elements<Drawing>().FirstOrDefault();
             if (drawing != null)
             {
-                var imageMarkdown = ProcessImage(drawing);
+                var imageMarkdown = ProcessImage(drawing, state);
                 if (!string.IsNullOrEmpty(imageMarkdown))
                 {
                     result.Append(imageMarkdown);
@@ -287,13 +278,13 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 提取表格单元格文本
     /// </summary>
-    private string ExtractTableCellText(TableCell cell)
+    private string ExtractTableCellText(TableCell cell, ConversionContext state)
     {
         var cellContent = new StringBuilder();
 
         foreach (var paragraph in cell.Elements<Paragraph>())
         {
-            var formattedText = ProcessTextFormatting(paragraph);
+            var formattedText = ProcessTextFormatting(paragraph, state);
             if (!string.IsNullOrWhiteSpace(formattedText))
             {
                 if (cellContent.Length > 0)
@@ -348,9 +339,9 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 预处理编号定义
     /// </summary>
-    private async Task ProcessNumberingDefinitionsAsync(WordprocessingDocument doc)
+    private async Task ProcessNumberingDefinitionsAsync(WordprocessingDocument doc, ConversionContext state)
     {
-        _numberingFormats.Clear();
+        state.NumberingFormats.Clear();
 
         await Task.Run(() =>
         {
@@ -381,7 +372,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
                             Prefix = numFmt?.Value == NumberFormatValues.Bullet ? "- " : "1. "
                         };
 
-                        _numberingFormats[numId.Value] = listInfo;
+                        state.NumberingFormats[numId.Value] = listInfo;
                     }
                 }
             }
@@ -409,12 +400,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 处理列表项
     /// </summary>
-    private void ProcessListItem(Paragraph paragraph, StringBuilder markdown, int numberingId, int level)
+    private void ProcessListItem(Paragraph paragraph, StringBuilder markdown, int numberingId, int level, ConversionContext state)
     {
-        var text = ProcessTextFormatting(paragraph);
+        var text = ProcessTextFormatting(paragraph, state);
         if (string.IsNullOrWhiteSpace(text)) return;
 
-        var listInfo = _numberingFormats.GetValueOrDefault(numberingId, new ListInfo { Prefix = "- ", IsOrdered = false });
+        var listInfo = state.NumberingFormats.GetValueOrDefault(numberingId, new ListInfo { Prefix = "- ", IsOrdered = false });
 
         // 添加缩进
         var indent = new string(' ', level * 2);
@@ -423,11 +414,11 @@ public class DocxMarkdownConverter : IMarkdownConverter
         {
             // 为有序列表维护计数器
             var counterKey = numberingId * 100 + level; // 组合键考虑级别
-            if (!_listItemCounters.ContainsKey(counterKey))
-                _listItemCounters[counterKey] = 1;
+            if (!state.ListItemCounters.ContainsKey(counterKey))
+                state.ListItemCounters[counterKey] = 1;
 
-            markdown.AppendLine($"{indent}{_listItemCounters[counterKey]}. {text}");
-            _listItemCounters[counterKey]++;
+            markdown.AppendLine($"{indent}{state.ListItemCounters[counterKey]}. {text}");
+            state.ListItemCounters[counterKey]++;
         }
         else
         {
@@ -438,9 +429,9 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 预处理图片引用
     /// </summary>
-    private async Task ProcessImageReferencesAsync(WordprocessingDocument doc, string documentPath)
+    private async Task ProcessImageReferencesAsync(WordprocessingDocument doc, string documentPath, ConversionContext state)
     {
-        _imageReferences.Clear();
+        state.ImageReferences.Clear();
 
         await Task.Run(async () =>
         {
@@ -452,10 +443,10 @@ public class DocxMarkdownConverter : IMarkdownConverter
                 try
                 {
                     var relationshipId = doc.MainDocumentPart.GetIdOfPart(imagePart);
-                    _imageCounter++;
+                    state.ImageCounter++;
 
                     // 使用 IImageStorageService 保存图片
-                    var imageFileName = $"doc_image{_imageCounter}.{GetImageExtension(imagePart.ContentType)}";
+                    var imageFileName = $"doc_image{state.ImageCounter}.{GetImageExtension(imagePart.ContentType)}";
 
                     using var stream = imagePart.GetStream();
                     using var memoryStream = new MemoryStream();
@@ -466,7 +457,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
                     var imagePath = await _imageStorageService.SaveImageAsync(imageBytes, imageFileName, documentPath);
 
                     // 存储完整的绝对路径
-                    _imageReferences[relationshipId] = imagePath;
+                    state.ImageReferences[relationshipId] = imagePath;
                 }
                 catch (Exception ex)
                 {
@@ -480,7 +471,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// <summary>
     /// 处理图片元素
     /// </summary>
-    private string ProcessImage(Drawing drawing)
+    private string ProcessImage(Drawing drawing, ConversionContext state)
     {
         try
         {
@@ -488,7 +479,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
             if (blip?.Embed?.Value == null) return string.Empty;
 
             var relationshipId = blip.Embed.Value;
-            if (_imageReferences.TryGetValue(relationshipId, out var imagePath))
+            if (state.ImageReferences.TryGetValue(relationshipId, out var imagePath))
             {
                 // 从文件路径中提取图片序号来生成有意义的alt文本
                 var fileName = IOPath.GetFileNameWithoutExtension(imagePath);

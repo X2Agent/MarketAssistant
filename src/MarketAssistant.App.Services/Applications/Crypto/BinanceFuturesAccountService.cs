@@ -26,6 +26,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     protected override string AccountEndpoint => "/fapi/v2/account";
     protected override string OrderEndpoint => "/fapi/v1/order";
     protected override string OpenOrdersEndpoint => "/fapi/v1/openOrders";
+    protected override string ExchangeInfoEndpoint => "/fapi/v1/exchangeInfo";
 
     /// <summary>
     /// 合约下单附加 positionSide（单向模式 BOTH / 双向模式 LONG/SHORT）。

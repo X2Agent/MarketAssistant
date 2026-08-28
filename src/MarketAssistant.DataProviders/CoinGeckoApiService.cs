@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -15,9 +16,16 @@ public sealed class CoinGeckoApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinGeckoApiService> _logger;
 
-    private static readonly SemaphoreSlim Throttle = new(1, 1);
-    private static DateTime _lastRequestTime = DateTime.MinValue;
-    private const int MinRequestIntervalMs = 2500;
+    // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔
+    private static readonly TokenBucketRateLimiter Throttle = new(new TokenBucketRateLimiterOptions
+    {
+        TokenLimit = 1,
+        TokensPerPeriod = 1,
+        ReplenishmentPeriod = TimeSpan.FromMilliseconds(2500),
+        QueueLimit = int.MaxValue,
+        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        AutoReplenishment = true
+    });
 
     // 支持 API 返回的字符串数值/null 自动容错转换为 decimal?（CoinGeckoMarket 全为 decimal?）
     private static readonly JsonSerializerOptions CoinGeckoJsonOptions = new()
@@ -39,22 +47,13 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<T> ThrottledExecuteAsync<T>(Func<HttpClient, Task<T>> action, CancellationToken cancellationToken)
     {
-        await Throttle.WaitAsync(cancellationToken);
-        try
-        {
-            var elapsed = (DateTime.UtcNow - _lastRequestTime).TotalMilliseconds;
-            if (elapsed < MinRequestIntervalMs)
-                await Task.Delay((int)(MinRequestIntervalMs - elapsed), cancellationToken);
+        // AcquireAsync 在令牌不足时按 QueueLimit 排队等待，天然实现串行 + 固定间隔
+        using RateLimitLease lease = await Throttle.AcquireAsync(1, cancellationToken);
+        if (!lease.IsAcquired)
+            throw new InvalidOperationException("CoinGecko 限流租约获取失败");
 
-            using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
-            var result = await action(httpClient);
-            _lastRequestTime = DateTime.UtcNow;
-            return result;
-        }
-        finally
-        {
-            Throttle.Release();
-        }
+        using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
+        return await action(httpClient);
     }
 
     /// <summary>

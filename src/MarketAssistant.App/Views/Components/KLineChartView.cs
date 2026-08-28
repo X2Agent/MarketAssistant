@@ -18,6 +18,8 @@ public class KLineChartView : UserControl
     private const int CheckIntervalMs = 100; // 100毫秒
 
     private bool _isInitialized = false;
+    private bool _navigationHandlerSubscribed = false;
+    private readonly SemaphoreSlim _updateSemaphore = new(1, 1);
     private NativeWebView? _webView;
     private StackPanel? _loadingPanel;
     private StackPanel? _errorPanel;
@@ -79,7 +81,7 @@ public class KLineChartView : UserControl
 
         if (change.Property == DataProperty)
         {
-            // 当数据源发生变化时，自动更新图表
+            // 当数据源发生变化时，自动更新图表（UpdateChartAsync 内部串行化，跳过并发重入）
             if (change.NewValue is IEnumerable<KLineData> data)
             {
                 _ = UpdateChartAsync(data);
@@ -200,8 +202,12 @@ public class KLineChartView : UserControl
                 return;
             }
 
-            // 监听 WebView 加载完成事件（必须在 NavigateToString 之前注册）
-            _webView.NavigationCompleted += OnWebViewNavigated;
+            // 监听 WebView 加载完成事件（必须在 NavigateToString 之前注册；仅订阅一次，避免重试后重复触发）
+            if (!_navigationHandlerSubscribed)
+            {
+                _webView.NavigationCompleted += OnWebViewNavigated;
+                _navigationHandlerSubscribed = true;
+            }
 
             // 使用 NativeWebView 的 NavigateToString 方法加载 HTML 内容
             _webView.NavigateToString(htmlContent);
@@ -392,6 +398,10 @@ public class KLineChartView : UserControl
         if (kLineData == null || !kLineData.Any() || _webView == null)
             return;
 
+        // 数据源变更可能高频触发，信号量不可立即进入说明上一次更新尚未完成，直接跳过本次
+        if (!_updateSemaphore.Wait(0))
+            return;
+
         try
         {
             // 首次调用时才初始化图表（延迟初始化）
@@ -433,6 +443,10 @@ public class KLineChartView : UserControl
         catch (Exception ex)
         {
             ShowError($"更新失败: {ex.Message}");
+        }
+        finally
+        {
+            _updateSemaphore.Release();
         }
     }
 

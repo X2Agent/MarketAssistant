@@ -26,18 +26,29 @@ public sealed class AnalysisReportCache
         _marketContext = marketContext;
     }
 
-    public void Set(string symbol, MarketAnalysisReport report)
+    /// <summary>
+    /// 写入缓存（显式市场类型）。后台交易链路应显式传入市场，
+    /// 避免依赖随时可能被 UI 切换的全局 MarketContext 状态。
+    /// </summary>
+    public void Set(string symbol, MarketType market, MarketAnalysisReport report)
     {
         // 惰性清理：写入前移除已过期条目，并在超限时淘汰最旧的条目
         EvictExpired();
         EnsureCapacity();
 
-        _reports[BuildKey(symbol)] = new CachedReport(report, DateTime.UtcNow);
+        _reports[BuildKey(market, symbol)] = new CachedReport(report, DateTime.UtcNow);
     }
 
-    public CachedReport? Get(string symbol)
+    /// <summary>写入缓存（沿用全局 MarketContext 当前市场，供市场分析工作流使用）。</summary>
+    public void Set(string symbol, MarketAnalysisReport report)
+        => Set(symbol, _marketContext.CurrentMarket, report);
+
+    /// <summary>
+    /// 读取缓存（显式市场类型）。
+    /// </summary>
+    public CachedReport? Get(string symbol, MarketType market)
     {
-        var key = BuildKey(symbol);
+        var key = BuildKey(market, symbol);
         if (!_reports.TryGetValue(key, out var cached))
             return null;
 
@@ -50,12 +61,16 @@ public sealed class AnalysisReportCache
         return cached;
     }
 
+    /// <summary>读取缓存（沿用全局 MarketContext 当前市场）。</summary>
+    public CachedReport? Get(string symbol)
+        => Get(symbol, _marketContext.CurrentMarket);
+
     /// <summary>
     /// 构建包含市场类型的缓存键，避免跨市场冲突。
     /// 键格式由 <see cref="CacheKeys.GetTradingAnalysisReportKey"/> 统一管理。
     /// </summary>
-    private string BuildKey(string symbol)
-        => CacheKeys.GetTradingAnalysisReportKey(_marketContext.CurrentMarket, symbol);
+    private static string BuildKey(MarketType market, string symbol)
+        => CacheKeys.GetTradingAnalysisReportKey(market, symbol);
 
     /// <summary>
     /// 移除所有已过期条目

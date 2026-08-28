@@ -332,7 +332,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
                 IsEnabled = true,
                 EnvironmentVariables = ParseEnvironmentVariables(),
                 Category = _editingConfig.Category,
-                AllowedTools = [.. _editingConfig.AllowedTools]
+                AllowedTools = [.. _editingConfig.AllowedTools],
+                AllowAllTools = AllowAllTools,
+                ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion
             };
 
             // 设置超时
@@ -373,8 +375,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             IsTesting = false;
 
-            // 3秒后清除状态信息
-            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+            // 3秒后清除状态信息（TestStatus 为 UI 绑定属性，回调须在 UI 线程执行）
+            _ = Task.Delay(3000).ContinueWith(
+                _ => TestStatus = string.Empty,
+                TaskScheduler.FromCurrentSynchronizationContext());
         }
     }
 
@@ -444,7 +448,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         finally
         {
             IsTesting = false;
-            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+            // TestStatus 为 UI 绑定属性，回调须在 UI 线程执行
+            _ = Task.Delay(3000).ContinueWith(
+                _ => TestStatus = string.Empty,
+                TaskScheduler.FromCurrentSynchronizationContext());
         }
     }
 

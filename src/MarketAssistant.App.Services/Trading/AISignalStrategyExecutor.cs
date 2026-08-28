@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Trading.Models;
 using Microsoft.Agents.AI;
@@ -239,6 +240,49 @@ public sealed class AISignalStrategyExecutor
         return new AISignalExecutionResult(result.Record, result);
     }
 
+    /// <summary>
+    /// 查找与父策略关联的现存追踪止损伴随策略：
+    /// 匹配 CustomParams 中 parentStrategyId 指向当前策略的
+    /// 同 Symbol + TrailingStop + Active + 同方向策略；无关联记录时返回 null。
+    /// </summary>
+    private async Task<TradingStrategy?> FindTrailingStopCompanionAsync(
+        TradingStrategy parentStrategy, CancellationToken ct)
+    {
+        var activeStrategies = await _strategyService
+            .GetStrategiesByStatusAsync(StrategyStatus.Active, ct)
+            .ConfigureAwait(false);
+
+        return activeStrategies.FirstOrDefault(s =>
+            s.Type == StrategyType.TrailingStop &&
+            s.Symbol.Equals(parentStrategy.Symbol, StringComparison.OrdinalIgnoreCase) &&
+            s.Side == (parentStrategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy) &&
+            HasParentStrategyId(s, parentStrategy.Id));
+    }
+
+    /// <summary>
+    /// 判断伴随策略的 CustomParams 是否显式关联指定父策略（parentStrategyId 字段）。
+    /// </summary>
+    private static bool HasParentStrategyId(TradingStrategy companion, string parentStrategyId)
+    {
+        if (string.IsNullOrEmpty(companion.CustomParams))
+            return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(companion.CustomParams);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return false;
+
+            return doc.RootElement.TryGetProperty("parentStrategyId", out var idProp) &&
+                idProp.ValueKind == JsonValueKind.String &&
+                string.Equals(idProp.GetString(), parentStrategyId, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static string? Truncate(string? text, int maxLength)
         => string.IsNullOrEmpty(text) || text.Length <= maxLength ? text : text[..maxLength] + "…";
 
@@ -276,10 +320,27 @@ public sealed class AISignalStrategyExecutor
                 MaxExecutions = 1,
                 CustomParams = JsonSerializer.Serialize(new
                 {
+                    parentStrategyId = strategy.Id,
                     trailingPercent,
                     activationPrice = currentPrice
                 })
             };
+
+            // 去重：同 Symbol + TrailingStop + Active 且 CustomParams 关联同一父策略的伴随策略已存在时，
+            // 更新其数量/触发价/参数而不是新建，防止多次加仓后堆积大量重复的追踪止损策略
+            var existing = await FindTrailingStopCompanionAsync(strategy, ct).ConfigureAwait(false);
+            if (existing != null)
+            {
+                companion.Id = existing.Id;
+                companion.ExecutionCount = existing.ExecutionCount;
+                companion.TrailingPeakPrice = existing.TrailingPeakPrice;
+                await _strategyService.SaveStrategyAsync(companion, ct).ConfigureAwait(false);
+                _logger.LogInformation(
+                    "AI 已更新既有追踪止损伴随策略: {CompanionId} 回调 {Percent}% 激活价 {Activation} 关联 {StrategyId}",
+                    companion.Id, trailingPercent, currentPrice, strategy.Id);
+                return;
+            }
+
             await _strategyService.SaveStrategyAsync(companion, ct).ConfigureAwait(false);
             _logger.LogInformation(
                 "AI 已创建追踪止损伴随策略: {CompanionId} 回调 {Percent}% 激活价 {Activation} 关联 {StrategyId}",
@@ -455,7 +516,9 @@ public sealed class AISignalStrategyExecutor
 
     private string BuildAnalysisContext(string symbol)
     {
-        var cached = _reportCache.Get(symbol);
+        // 后台 AI 交易固定运行在虚拟币市场，显式传入市场类型，
+        // 不依赖随时可能被 UI 切换的全局 MarketContext
+        var cached = _reportCache.Get(symbol, MarketType.Crypto);
         if (cached == null)
             return "（暂无分析报告，建议先运行市场分析工作流）";
 

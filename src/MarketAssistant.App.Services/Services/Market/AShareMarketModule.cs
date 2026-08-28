@@ -59,6 +59,7 @@ public sealed class AShareMarketModule : IMarketModule
         // 工作流
         services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>(MarketType.AShare);
         services.AddSingleton<ICriteriaGenerationStrategy<StockCriteria>, StockCriteriaGenerationStrategy>();
-        services.AddSingleton<GenerateCriteriaExecutor<StockCriteria>>();
+        // Transient：由投资选择工作流在每次 Run 内重新解析，避免并发共享状态
+        services.AddTransient<GenerateCriteriaExecutor<StockCriteria>>();
     }
 }

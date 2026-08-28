@@ -114,19 +114,22 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
             if (_ws != null)
             {
-                if (_ws.State == WebSocketState.Open)
+                // 快照到局部变量后统一关闭/释放：重连循环与 StopAsync 并发时，
+                // 判空后字段可能被对方置 null，直接使用字段存在 NullReference 竞争
+                var ws = _ws;
+                _ws = null;
+                if (ws.State == WebSocketState.Open)
                 {
                     try
                     {
-                        await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "stop", CancellationToken.None);
+                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "stop", CancellationToken.None);
                     }
                     catch
                     {
                         // 忽略关闭异常
                     }
                 }
-                _ws.Dispose();
-                _ws = null;
+                ws.Dispose();
             }
 
             if (_listenKey != null && TryGetSpotContext(out var apiKey, out var httpClientName))
@@ -246,12 +249,14 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
         while (!ct.IsCancellationRequested)
         {
-            _ws = new ClientWebSocket();
+            // 使用局部变量持有连接，避免与 StopAsync 并发时对字段判空后字段被置 null 的竞争
+            var ws = new ClientWebSocket();
+            _ws = ws;
             try
             {
                 _logger.LogInformation("连接币安用户数据流 WebSocket");
-                await _ws.ConnectAsync(new Uri(url), ct);
-                await ReceiveLoopAsync(_ws, ct);
+                await ws.ConnectAsync(new Uri(url), ct);
+                await ReceiveLoopAsync(ws, ct);
             }
             catch (OperationCanceledException)
             {
@@ -267,8 +272,10 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             }
             finally
             {
-                _ws.Dispose();
-                _ws = null;
+                ws.Dispose();
+                // 仅当字段仍指向本次连接时才清空，避免误清 StopAsync 已快照或重连后新赋值的实例
+                if (ReferenceEquals(_ws, ws))
+                    _ws = null;
             }
 
             if (ct.IsCancellationRequested)
@@ -383,7 +390,9 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
         _keepaliveTimer?.Dispose();
         _cts?.Cancel();
         _cts?.Dispose();
-        _ws?.Dispose();
+        var ws = _ws;
+        _ws = null;
+        ws?.Dispose();
         _gate.Dispose();
         GC.SuppressFinalize(this);
     }

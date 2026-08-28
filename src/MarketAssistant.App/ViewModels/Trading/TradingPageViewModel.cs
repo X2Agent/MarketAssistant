@@ -83,6 +83,8 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _tradingEnvironmentService.ModeChanged -= OnTradingModeChanged;
+        // StrategyConfig 订阅了单例 MarketMonitor.StatusChanged，需一并释放避免泄漏
+        StrategyConfig.Dispose();
         TradeMonitor.Dispose();
         GC.SuppressFinalize(this);
     }

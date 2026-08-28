@@ -409,9 +409,10 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddWorkflowServices(this IServiceCollection services)
     {
-        // 投资选择工作流
-        services.AddSingleton<ScreenInvestmentTargetsExecutor>();
-        services.AddSingleton<AnalyzeAssetsExecutor>();
+        // 投资选择工作流；Executor 为 Transient，由工作流在每次 Run 内重新解析，
+        // 避免 Singleton Executor 在并发分析间共享可变状态和模型引用。
+        services.AddTransient<ScreenInvestmentTargetsExecutor>();
+        services.AddTransient<AnalyzeAssetsExecutor>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 

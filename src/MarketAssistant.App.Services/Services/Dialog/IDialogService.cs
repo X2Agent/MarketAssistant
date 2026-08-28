@@ -1,3 +1,5 @@
+using MarketAssistant.Trading.Models;
+
 namespace MarketAssistant.Services.Dialog;
 
 /// <summary>
@@ -9,6 +11,11 @@ public interface IDialogService
     /// 显示简单的信息对话框（只有一个按钮）
     /// </summary>
     Task ShowMessageAsync(string title, string message, string button = "确定");
+
+    /// <summary>
+    /// 显示策略执行历史对话框窗口
+    /// </summary>
+    Task ShowStrategyExecutionAsync(TradingStrategy strategy, IReadOnlyList<TradeRecord> records);
 
     /// <summary>
     /// 显示确认对话框（两个按钮，可自定义文本）

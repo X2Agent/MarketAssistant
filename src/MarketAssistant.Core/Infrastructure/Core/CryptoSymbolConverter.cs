@@ -6,6 +6,15 @@ namespace MarketAssistant.Infrastructure.Core;
 public static class CryptoSymbolConverter
 {
     /// <summary>
+    /// 包装币白名单：其代码本身以 BTC/ETH/BNB 等计价货币字母结尾，
+    /// 但并非交易对，须短路处理，避免被误判为“已含计价货币”。
+    /// </summary>
+    private static readonly HashSet<string> WrappedBaseCurrencies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "WBTC", "WETH", "STETH", "WBNB"
+    };
+
+    /// <summary>
     /// 将币种代码转换为币安交易对格式（如 BTC → BTCUSDT）
     /// </summary>
     /// <param name="symbol">币种代码，支持格式：BTC、BTCUSDT、BTC/USDT、BTC-USDT</param>
@@ -25,6 +34,12 @@ public static class CryptoSymbolConverter
                        .ToUpperInvariant();
 
         quoteCurrency = quoteCurrency.ToUpperInvariant();
+
+        // 包装币（WBTC/WETH 等）本身以计价货币字母结尾，须先于后缀判断短路，避免漏加计价货币
+        if (WrappedBaseCurrencies.Contains(symbol))
+        {
+            return $"{symbol}{quoteCurrency}";
+        }
 
         // 如果已经包含计价货币后缀，直接返回
         var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "BTC", "ETH", "BNB", "DAI" };
@@ -53,6 +68,12 @@ public static class CryptoSymbolConverter
         }
 
         tradingPair = tradingPair.ToUpperInvariant();
+
+        // 包装币（WBTC/WETH 等）本身以计价货币字母结尾，须先于后缀剥离短路，避免被截断成错误基础币
+        if (WrappedBaseCurrencies.Contains(tradingPair))
+        {
+            return tradingPair;
+        }
 
         // 移除常见计价货币后缀（按长度倒序，避免误匹配）
         var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "DAI", "BTC", "ETH", "BNB" };

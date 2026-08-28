@@ -174,14 +174,17 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
         var results = await Task.WhenAll(tasks);
 
-        // 在UI线程上批量添加结果
-        foreach (var assetInfo in results)
+        // 集合修改须在 UI 线程执行（加载可能由后台事件触发进入），避免跨线程操作 ObservableCollection
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (assetInfo != null)
+            foreach (var assetInfo in results)
             {
-                Assets.Add(assetInfo);
+                if (assetInfo != null)
+                {
+                    Assets.Add(assetInfo);
+                }
             }
-        }
+        });
     }
 
     /// <summary>
@@ -281,14 +284,14 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
         Dispatcher.UIThread.Post(() =>
         {
-            if (_priceFlushTimer != null)
+            if (_disposed || _priceFlushTimer != null)
                 return;
 
             _priceFlushTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(250)
             };
-            _priceFlushTimer.Tick += (_, _) => FlushPendingPriceUpdates();
+            _priceFlushTimer.Tick += FlushPendingPriceUpdates;
             _priceFlushTimer.Start();
         });
     }
@@ -296,7 +299,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// <summary>
     /// 批量应用暂存的价格更新到展示对象（UI 线程，每 250ms 至多一次）。
     /// </summary>
-    private void FlushPendingPriceUpdates()
+    private void FlushPendingPriceUpdates(object? sender, EventArgs e)
     {
         foreach (var symbol in _pendingPriceUpdates.Keys.ToList())
         {
@@ -324,8 +327,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _disposed = true;
         _loadCts?.Cancel();
         _loadCts?.Dispose();
-        _priceFlushTimer?.Stop();
-        _priceFlushTimer = null;
+        if (_priceFlushTimer != null)
+        {
+            _priceFlushTimer.Tick -= FlushPendingPriceUpdates;
+            _priceFlushTimer.Stop();
+            _priceFlushTimer = null;
+        }
         UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.Favorites);

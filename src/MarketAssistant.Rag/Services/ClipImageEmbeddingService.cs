@@ -47,7 +47,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
     // 【状态管理】：ONNX推理会话和初始化标志
     private InferenceSession? _session;                                   // ONNX运行时推理会话
-    private bool _initAttempted;                                          // 防止重复初始化的标志
+    private volatile bool _initAttempted;                                 // 防止重复初始化的标志
+    private readonly object _initLock = new();                            // 初始化锁：保证并发下仅创建一个 InferenceSession
 
     /// <summary>
     /// 构造函数：使用依赖注入获取服务，支持环境变量配置模型路径
@@ -60,7 +61,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     public ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IServiceProvider sp)
     {
         _logger = logger;
-        // 尝试获取聊天服务（多模态Caption功能），可选
+        // 尝试获取聊天服务（多模态Caption功能），可选。
+        // 注意：此处为服务定位器模式，若 IChatCompletionService 为 Scoped 且本服务为 Singleton，
+        // 会形成 captive dependency（Scoped 实例被 Singleton 捕获）。当前 IChatCompletionService
+        // 注册为 Singleton，风险可控；如改为 Scoped 生命周期需重构为工厂委托注入。
         _chat = sp.GetService<IChatCompletionService>();
 
         // 模型路径配置：优先环境变量，否则使用本地默认路径
@@ -285,34 +289,44 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     /// </summary>
     private void EnsureSession()
     {
-        // 检查点：防止重复初始化尝试
+        // 快速路径：已初始化过（无论成败）则直接返回
         if (_initAttempted) return;
-        _initAttempted = true;
 
-        try
+        // 双检查锁：并发首次调用时仅允许一个线程创建 InferenceSession，
+        // 其余线程等待后复用同一会话（或复用"初始化已失败"的结果），不会重复加载模型
+        lock (_initLock)
         {
-            // 资源检查：验证模型文件路径
-            if (!string.IsNullOrWhiteSpace(_modelPath) && File.Exists(_modelPath))
+            if (_initAttempted) return;
+            try
             {
-                // 创建ONNX运行时推理会话
-                _session = new InferenceSession(_modelPath);
+                // 资源检查：验证模型文件路径
+                if (!string.IsNullOrWhiteSpace(_modelPath) && File.Exists(_modelPath))
+                {
+                    // 创建ONNX运行时推理会话
+                    _session = new InferenceSession(_modelPath);
 
-                // 记录模型信息（输入输出节点）便于调试
-                LogModelInfo();
+                    // 记录模型信息（输入输出节点）便于调试
+                    LogModelInfo();
 
-                _logger.LogInformation("Loaded CLIP image ONNX model: {Path}", _modelPath);
+                    _logger.LogInformation("Loaded CLIP image ONNX model: {Path}", _modelPath);
+                }
+                else
+                {
+                    // 警告：配置的模型不存在时发出提示（不降级为哈希向量，图像嵌入将不可用）
+                    _logger.LogWarning("CLIP model not found at {Path}, image embedding will be unavailable", _modelPath);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // 警告：配置的模型不存在时发出提示（不降级为哈希向量，图像嵌入将不可用）
-                _logger.LogWarning("CLIP model not found at {Path}, image embedding will be unavailable", _modelPath);
+                // 初始化失败：记录错误但不抛出，GenerateAsync 会因会话不可用而抛出，
+                // 由调用方降级为 Caption 文本召回
+                _logger.LogWarning(ex, "Failed to init CLIP model session; image embedding will be unavailable");
             }
-        }
-        catch (Exception ex)
-        {
-            // 初始化失败：记录错误但不抛出，GenerateAsync 会因会话不可用而抛出，
-            // 由调用方降级为 Caption 文本召回
-            _logger.LogWarning(ex, "Failed to init CLIP model session; image embedding will be unavailable");
+            finally
+            {
+                // 无论成败只尝试一次，避免失败后反复加载模型
+                _initAttempted = true;
+            }
         }
     }
 

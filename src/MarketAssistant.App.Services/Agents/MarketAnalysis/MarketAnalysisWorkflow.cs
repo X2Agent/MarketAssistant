@@ -168,11 +168,13 @@ public class MarketAnalysisWorkflow
 
             // 同一次 Run 的分析师与 Coordinator 绑定同一个 Runtime Client。
             // P1-07：协调器附带只读产物读取工具，全文按需获取而非随消息注入。
+            // Run ID 通过闭包捕获真实值，不暴露给 LLM 填写（LLM 传入伪造/格式错误的
+            // runId 会解析失败），工具仅暴露 analystName 参数。
+            var currentRunId = runId;
             var getArtifactTool = AIFunctionFactory.Create(
-                ([Description("本次分析的 Run ID（32 位十六进制）")] string runId,
-                  [Description("分析师名称")] string analystName,
+                ([Description("分析师名称")] string analystName,
                   CancellationToken ct)
-                    => _artifactStore.GetAsync(Guid.ParseExact(runId, "N"), analystName, ct),
+                    => _artifactStore.GetAsync(currentRunId, analystName, ct),
                 name: "get_analyst_artifact",
                 description: "读取本次运行中某位分析师的完整分析产物全文。仅在需要某维度细节时调用，不要凭摘要编造内容。");
 

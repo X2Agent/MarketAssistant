@@ -121,6 +121,7 @@ public partial class ChatMessageAdapter : ObservableObject
         if (card != null)
         {
             AdaptiveCard = card;
+            OnPropertyChanged(nameof(AdaptiveCard));
             OnPropertyChanged(nameof(IsAdaptiveCard));
         }
     }

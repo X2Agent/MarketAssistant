@@ -19,6 +19,12 @@ public abstract class BinanceAccountServiceBase
     protected readonly string HttpClientName;
     protected readonly string Label;
 
+    /// <summary>
+    /// 交易对精度过滤器缓存（进程内共享，按 HttpClient 名称维度隔离）。
+    /// 下单时用于对数量/价格取整，避免精度违规被交易所拒单。
+    /// </summary>
+    private ExchangeSymbolFilterCache? _filterCache;
+
     /// <param name="httpClientFactory">HttpClient 工厂</param>
     /// <param name="logger">日志器</param>
     /// <param name="authService">鉴权服务（决定实盘/Testnet 密钥来源）</param>
@@ -52,6 +58,11 @@ public abstract class BinanceAccountServiceBase
     /// 挂单端点（如 /api/v3/openOrders、/fapi/v1/openOrders）
     /// </summary>
     protected abstract string OpenOrdersEndpoint { get; }
+
+    /// <summary>
+    /// 交易对精度过滤器端点（现货 /api/v3/exchangeInfo，合约 /fapi/v1/exchangeInfo）
+    /// </summary>
+    protected abstract string ExchangeInfoEndpoint { get; }
 
     /// <summary>
     /// 解析账户信息响应。子类负责将合约/现货特定结构映射为统一的 <see cref="BinanceAccountInfo"/>。
@@ -135,12 +146,24 @@ public abstract class BinanceAccountServiceBase
                 throw new FriendlyException($"{Label}账户当前被限制交易，无法下单（可能因违规、KYC 未完成或地区限制）");
             }
 
+            // 按交易所精度过滤器取整：数量向下取整到 stepSize，价格/触发价四舍五入到 tickSize；
+            // 拿不到过滤器信息时保持原值，由交易所侧校验兜底
+            _filterCache ??= new ExchangeSymbolFilterCache(HttpClientFactory, Logger);
+            var filters = await _filterCache.GetFiltersAsync(symbol, HttpClientName, ExchangeInfoEndpoint, cancellationToken);
+
+            var roundedQuantity = ExchangeSymbolFilterCache.RoundQuantityToStep(quantity, filters?.StepSize) ?? quantity;
+            if (roundedQuantity != quantity)
+            {
+                Logger.LogDebug("下单数量按 stepSize {StepSize} 取整: {Original} → {Rounded} ({Symbol})",
+                    filters!.StepSize, quantity, roundedQuantity, symbol);
+            }
+
             var parameters = new Dictionary<string, string>
             {
                 ["symbol"] = symbol.ToUpper(),
                 ["side"] = side.ToUpper(),
                 ["type"] = type.ToUpper(),
-                ["quantity"] = quantity.ToString("F8", CultureInfo.InvariantCulture)
+                ["quantity"] = roundedQuantity.ToString("F8", CultureInfo.InvariantCulture)
             };
 
             if (!string.IsNullOrEmpty(clientOrderId))
@@ -158,7 +181,13 @@ public abstract class BinanceAccountServiceBase
                 {
                     throw new ArgumentException("限价单必须指定价格");
                 }
-                parameters["price"] = price.Value.ToString("F8", CultureInfo.InvariantCulture);
+                var roundedPrice = ExchangeSymbolFilterCache.RoundPriceToTick(price.Value, filters?.TickSize) ?? price.Value;
+                if (roundedPrice != price.Value)
+                {
+                    Logger.LogDebug("限价单价格按 tickSize {TickSize} 取整: {Original} → {Rounded} ({Symbol})",
+                        filters!.TickSize, price.Value, roundedPrice, symbol);
+                }
+                parameters["price"] = roundedPrice.ToString("F8", CultureInfo.InvariantCulture);
                 parameters["timeInForce"] = "GTC";
             }
 
@@ -166,7 +195,9 @@ public abstract class BinanceAccountServiceBase
             var typeUpper = type.ToUpper();
             if (stopPrice.HasValue && (typeUpper == "STOP_MARKET" || typeUpper == "TAKE_PROFIT_MARKET"))
             {
-                parameters["stopPrice"] = stopPrice.Value.ToString("F8", CultureInfo.InvariantCulture);
+                // 触发价同样受 tickSize 约束，否则条件单会被交易所以精度错误拒绝
+                var roundedStopPrice = ExchangeSymbolFilterCache.RoundPriceToTick(stopPrice.Value, filters?.TickSize) ?? stopPrice.Value;
+                parameters["stopPrice"] = roundedStopPrice.ToString("F8", CultureInfo.InvariantCulture);
             }
 
             if (trailingDelta.HasValue && typeUpper == "TRAILING_STOP_MARKET")
@@ -364,6 +395,7 @@ public sealed class BinanceSpotAccountService : BinanceAccountServiceBase
     protected override string AccountEndpoint => "/api/v3/account";
     protected override string OrderEndpoint => "/api/v3/order";
     protected override string OpenOrdersEndpoint => "/api/v3/openOrders";
+    protected override string ExchangeInfoEndpoint => "/api/v3/exchangeInfo";
 
     protected override async Task<BinanceAccountInfo> ParseAccountInfoAsync(HttpContent content, CancellationToken cancellationToken)
     {

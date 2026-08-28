@@ -177,7 +177,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
     private void OnMonitorStatusChanged(bool isRunning)
     {
-        IsMonitorRunning = isRunning;
+        // StatusChanged 由后台线程触发，需切回 UI 线程更新绑定属性
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => IsMonitorRunning = isRunning);
     }
 
     public void Dispose()
