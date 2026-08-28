@@ -192,8 +192,14 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _ = SearchAssetsAsync(value.Trim());
     }
 
+    private bool _disposed;
+
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（更新状态/启动加载）
+        if (_disposed)
+            return;
+
         OnPropertyChanged(nameof(IsCryptoMarket));
         OnPropertyChanged(nameof(NewRuleMarketType));
         OnPropertyChanged(nameof(AssetLabelText));
@@ -441,6 +447,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _assetLoadCts?.Cancel();
         _assetLoadCts?.Dispose();
         _assetLoadCts = null;

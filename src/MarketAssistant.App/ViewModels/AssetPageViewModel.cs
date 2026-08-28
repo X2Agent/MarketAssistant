@@ -188,12 +188,10 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 在 UI 线程上更新 ObservableCollection，避免后台线程修改绑定属性
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                KLineData = new ObservableCollection<KLineData>(kLineDataList);
-                CalculatePriceInfo(kLineDataList);
-            });
+            // 方法从 UI 线程启动且未脱离同步上下文，await 之后天然回到 UI 线程，
+            // 无需再手动 InvokeAsync
+            KLineData = new ObservableCollection<KLineData>(kLineDataList);
+            CalculatePriceInfo(kLineDataList);
         }
         catch (OperationCanceledException)
         {
@@ -267,11 +265,13 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                 PriceChange = 0;
             }
 
-            // 4. 在后台线程加载完整数据（不阻塞导航）
-            // GoBack 重新激活时不重复加载，避免重复订阅 WebSocket 和重复请求
+            // 4. 异步加载完整数据（不阻塞导航）。
+            // 不要包 Task.Run：OnNavigatedTo 已在 UI 线程，LoadAssetDataAsync 第一个 await
+            // 之后自动回到 UI 线程，包 Task.Run 会把 IsBusy/HasError 等绑定属性丢到线程池线程写入，
+            // 触发 Avalonia 跨线程异常
             if (!isReactivation)
             {
-                _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
+                _ = LoadAssetDataAsync(parameter.Code);
 
                 // 5. 虚拟币市场订阅 WebSocket 实时价格
                 // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态

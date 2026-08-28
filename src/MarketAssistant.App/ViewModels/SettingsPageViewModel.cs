@@ -366,7 +366,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         {
             if (value && UserSetting.CurrentMarketType != MarketType.AShare)
             {
-                // 仅修改本地 UserSetting，不立即调用 SwitchMarket
+                // 仅修改本地草稿 UserSetting，不立即调用 SwitchMarket
                 // 避免触发 MainWindowViewModel 重建导航，导致正在编辑的设置丢失
                 // 实际市场切换统一在 Save() 中执行
                 UserSetting.CurrentMarketType = MarketType.AShare;
@@ -495,8 +495,10 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     private async Task InitializeAsync()
     {
-        // 加载用户设置（OnUserSettingChanged 会自动订阅 PropertyChanged）
-        UserSetting = _userSettingService.CurrentSetting;
+        // 加载用户设置为独立草稿副本（OnUserSettingChanged 会自动订阅 PropertyChanged）。
+        // 不能直接绑定 CurrentSetting 本体：页面上的每次编辑都会立刻生效于全进程，
+        // 任何一次切市场的整体落盘都会把未保存的修改（含交易模式改实盘、半填密钥）静默写盘
+        UserSetting = _userSettingService.CurrentSetting.Clone();
 
         // 同步服务商选择。初始化期间保留已保存的 ModelId 和 Endpoint，
         // 仅用户主动切换服务商时才清空这些字段。
@@ -823,7 +825,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             // 同步市场类型到MarketContext
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
 
-            _userSettingService.UpdateSettings(UserSetting);
+            // 提交草稿副本（而非页面持有的编辑中实例），保证服务内部状态与页面编辑解耦
+            _userSettingService.UpdateSettings(UserSetting.Clone());
             await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             _notificationService.ShowSuccess("设置已保存");
             Logger?.LogInformation("保存设置，市场类型：{MarketType}，交易模式：{TradingMode}",

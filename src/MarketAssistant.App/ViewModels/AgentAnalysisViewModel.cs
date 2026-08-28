@@ -372,8 +372,14 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }, "加载历史报告");
     }
 
+    private bool _disposed;
+
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（重置 UI 状态/启动加载）
+        if (_disposed)
+            return;
+
         // 取消进行中的分析任务，避免旧市场的分析结果污染新市场
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
@@ -395,6 +401,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     public void Dispose()
     {
+        _disposed = true;
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();

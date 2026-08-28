@@ -65,6 +65,11 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
+            // lambda 是排入 Dispatcher 队列后延迟执行的，期间本 VM 可能已被 Dispose；
+            // 不检查 _disposed 会给已释放的 VM 重新订阅单例事件并重启轮询，造成泄漏
+            if (_disposed)
+                return;
+
             // 停止旧服务并取消事件订阅
             _newsUpdateService.StopUpdates();
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;
@@ -138,24 +143,24 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 释放资源
+    /// 释放资源（幂等：市场切换回调与 Dispose 存在交错可能，退订可安全重复执行）
     /// </summary>
     public void Dispose()
     {
         if (!_disposed)
         {
-            // 取消市场切换事件订阅
-            UnsubscribeFromMarketChanges(_marketContext);
-
-            // 取消新闻服务事件订阅
-            _newsUpdateService.NewsUpdated -= OnNewsUpdated;
-            _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
-
-            // 停止新闻更新服务
-            _newsUpdateService.StopUpdates();
-
             _disposed = true;
         }
+
+        // 取消市场切换事件订阅
+        UnsubscribeFromMarketChanges(_marketContext);
+
+        // 取消新闻服务事件订阅
+        _newsUpdateService.NewsUpdated -= OnNewsUpdated;
+        _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
+
+        // 停止新闻更新服务
+        _newsUpdateService.StopUpdates();
 
         GC.SuppressFinalize(this);
     }

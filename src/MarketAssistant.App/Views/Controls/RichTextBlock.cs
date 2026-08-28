@@ -111,7 +111,11 @@ public class RichTextBlock : UserControl
     }
 
     /// <summary>
-    /// 自动检测内容格式
+    /// 自动检测内容格式。
+    /// 安全决策（2026-08-28）：不再自动识别 HTML。聊天内容来源（模型流式输出、Web 搜索
+    /// 抓取的网页正文、MCP 工具返回的第三方内容）均不可信，自动走 WebView 渲染意味着
+    /// 未经消毒的 HTML/脚本可被间接提示注入触发执行。显式设置 Format=Html 的分支保留，
+    /// 但启用前必须先实现白名单消毒（如 AngleSharp）+ CSP，见 RenderAsHtml。
     /// </summary>
     private ContentFormat DetectContentFormat(string content)
     {
@@ -120,47 +124,11 @@ public class RichTextBlock : UserControl
 
         var trimmedContent = content.Trim();
 
-        // 检测HTML（更严格的判断）
-        if (IsHtmlContent(trimmedContent))
-            return ContentFormat.Html;
-
         // 检测Markdown（常见语法）
         if (IsMarkdownContent(trimmedContent))
             return ContentFormat.Markdown;
 
         return ContentFormat.PlainText;
-    }
-
-    /// <summary>
-    /// 判断是否为HTML内容
-    /// </summary>
-    private bool IsHtmlContent(string content)
-    {
-        // 检查是否以HTML标签开始和结束
-        if (content.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) ||
-            content.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        // 检查是否包含常见的HTML结构标签
-        var htmlStructureTags = new[] { "<html", "<head", "<body", "<div", "<span", "<p>", "<br>", "<br/>" };
-        var lowerContent = content.ToLowerInvariant();
-
-        int htmlTagCount = 0;
-        foreach (var tag in htmlStructureTags)
-        {
-            if (lowerContent.Contains(tag))
-                htmlTagCount++;
-        }
-
-        // 如果包含多个HTML标签，认为是HTML
-        if (htmlTagCount >= 2)
-            return true;
-
-        // 检查是否包含HTML实体
-        if (Regex.IsMatch(content, @"&[a-z]+;|&#\d+;", RegexOptions.IgnoreCase))
-            return true;
-
-        return false;
     }
 
     /// <summary>
@@ -219,7 +187,11 @@ public class RichTextBlock : UserControl
     }
 
     /// <summary>
-    /// 使用HTML渲染
+    /// 使用HTML渲染。
+    /// ⚠ 安全限制（2026-08-28 决策）：自动识别已禁用，仅当调用方显式设置 Format=Html 时才可达。
+    /// 当前实现把原始内容零消毒直接插值进模板交给 WebView 执行——启用前必须先实现
+    /// 标签/属性白名单消毒（建议 AngleSharp）并注入 CSP：
+    /// &lt;meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"&gt;
     /// </summary>
     private void RenderAsHtml(string htmlContent)
     {

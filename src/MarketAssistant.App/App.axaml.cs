@@ -38,6 +38,11 @@ public partial class App : Application
         var priceAlertService = ServiceProvider.GetRequiredService<PriceAlertService>();
         _ = priceAlertService.InitializeAsync();
 
+        // 激活 HITL 交易确认服务：DI 单例是惰性创建的，仅注册不会实例化，
+        // 必须显式解析一次让构造函数完成对 TradeExecutor.ConfirmationRequested 的订阅，
+        // 否则自动交易的超阈值订单会因无订阅者被静默拒绝
+        ServiceProvider.GetRequiredService<MarketAssistant.Services.Trading.TradeConfirmationService>();
+
         // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();
         RequestedThemeVariant = settingService.CurrentSetting.ThemeMode switch

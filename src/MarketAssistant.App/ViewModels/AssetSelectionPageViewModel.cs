@@ -260,8 +260,14 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasRiskWarnings));
     }
 
+    private bool _disposed;
+
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（更新状态/启动加载）
+        if (_disposed)
+            return;
+
         OnPropertyChanged(nameof(LoadingText));
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(ModeLabel));
@@ -491,6 +497,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         UnsubscribeFromMarketChanges(_marketContext);
         GC.SuppressFinalize(this);
     }

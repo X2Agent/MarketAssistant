@@ -90,8 +90,14 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// </summary>
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（重启加载/WebSocket 订阅）
+        if (_disposed)
+            return;
+
         _ = LoadFavoriteAssetsAsync();
     }
+
+    private bool _disposed;
 
     /// <summary>
     /// 加载收藏资产列表
@@ -315,6 +321,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
     public void Dispose()
     {
+        _disposed = true;
         _loadCts?.Cancel();
         _loadCts?.Dispose();
         _priceFlushTimer?.Stop();

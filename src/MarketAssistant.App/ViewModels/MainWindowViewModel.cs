@@ -18,8 +18,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly INotificationService _notificationService;
     private bool _isSynchronizingNavigationSelection;
 
+    // 主导航与底部导航必须各自持有选中项：两个 ListBox 绑定同一属性时，
+    // 任一选中变化会让另一个列表把 SelectedIndex 归 -1 并回写 null，导致侧栏高亮丢失
     [ObservableProperty]
-    private NavigationItemViewModel? _selectedNavigationItem;
+    private NavigationItemViewModel? _selectedMainNavigationItem;
+
+    [ObservableProperty]
+    private NavigationItemViewModel? _selectedBottomNavigationItem;
 
     public ViewModelBase? CurrentPage => _navigationService.CurrentPage;
     public bool CanGoBack => _navigationService.CanGoBack;
@@ -79,8 +84,8 @@ public partial class MainWindowViewModel : ViewModelBase
         // 监听市场切换事件
         SubscribeToMarketChanges(_marketContext);
 
-        // 默认导航到首页。SelectedNavigationItem 的变更回调负责实际导航，避免重复入栈。
-        SelectedNavigationItem = MainNavigationItems[0];
+        // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
+        SelectedMainNavigationItem = MainNavigationItems[0];
     }
 
     protected override void OnMarketChanged(MarketType newMarket)
@@ -163,10 +168,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 _isSynchronizingNavigationSelection = true;
                 try
                 {
-                    SelectedNavigationItem = MainNavigationItems.FirstOrDefault(
-                        item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
-                        ?? BottomNavigationItems.FirstOrDefault(
+                    var mainItem = MainNavigationItems.FirstOrDefault(
                         item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
+                    SelectedMainNavigationItem = mainItem;
+                    SelectedBottomNavigationItem = mainItem == null
+                        ? BottomNavigationItems.FirstOrDefault(
+                            item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
+                        : null;
                 }
                 finally
                 {
@@ -218,6 +226,10 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     private void SwitchToMarket(MarketType newMarket)
     {
+        // 切市场会触发导航集合重建（Clear 使 ListBox 清空选中并回写 null），
+        // 必须先把当前页标题缓存到局部变量，切完按标题重新定位并导航
+        var currentTitle = SelectedMainNavigationItem?.Title ?? SelectedBottomNavigationItem?.Title;
+
         _marketContext.SwitchMarket(newMarket);
 
         // 显示切换提示
@@ -226,16 +238,36 @@ public partial class MainWindowViewModel : ViewModelBase
 
         Logger?.LogInformation("市场已切换到: {Market} ({MarketName})", newMarket, marketName);
 
-        // 刷新当前页面（重新加载数据）
-        if (SelectedNavigationItem != null)
+        // 按标题重新定位导航项：原市场特有的页面（如交易）在新市场不存在时回退到首页
+        var target = currentTitle != null
+            ? MainNavigationItems.FirstOrDefault(item => item.Title == currentTitle)
+              ?? BottomNavigationItems.FirstOrDefault(item => item.Title == currentTitle)
+            : null;
+        target ??= MainNavigationItems[0];
+
+        var viewModel = target.CreateViewModel();
+        _navigationService.NavigateToRoot(viewModel, target.Title);
+
+        // 同步两个列表的选中态（NavigateToRoot 会经 NavigationService 事件同步，此处兜底显式设置）
+        _isSynchronizingNavigationSelection = true;
+        try
         {
-            var currentTitle = SelectedNavigationItem.Title;
-            var viewModel = SelectedNavigationItem.CreateViewModel();
-            _navigationService.NavigateToRoot(viewModel, currentTitle);
+            SelectedMainNavigationItem = MainNavigationItems.Contains(target) ? target : null;
+            SelectedBottomNavigationItem = BottomNavigationItems.Contains(target) ? target : null;
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
         }
     }
 
-    partial void OnSelectedNavigationItemChanged(NavigationItemViewModel? value)
+    partial void OnSelectedMainNavigationItemChanged(NavigationItemViewModel? value)
+        => OnNavigationItemSelected(value);
+
+    partial void OnSelectedBottomNavigationItemChanged(NavigationItemViewModel? value)
+        => OnNavigationItemSelected(value);
+
+    private void OnNavigationItemSelected(NavigationItemViewModel? value)
     {
         if (value is null || _isSynchronizingNavigationSelection)
             return;

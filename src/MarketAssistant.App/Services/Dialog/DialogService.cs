@@ -21,23 +21,26 @@ public class DialogService : IDialogService
 
     /// <summary>
     /// 显示确认对话框（两个按钮，都可自定义）
+    /// 取消令牌触发时主动关闭对话框，返回 false（取消语义）。
     /// </summary>
     /// <returns>如果用户点击确认返回 true，点击取消返回 false</returns>
-    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消")
+    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default)
     {
-        var result = await ShowCustomDialogAsync(title, message, new[] { accept, cancel });
+        var result = await ShowCustomDialogAsync(title, message, new[] { accept, cancel }, ct);
         return result == accept;
     }
 
     /// <summary>
     /// 显示带有自定义按钮的对话框
+    /// 取消令牌触发时主动关闭对话框（Result 为 null），
+    /// 避免"超时已自动拒绝但对话框仍挂在屏幕上、用户点击结果被丢弃"的错位。
     /// </summary>
-    /// <returns>用户选择的按钮文本</returns>
-    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons)
+    /// <returns>用户选择的按钮文本；取消令牌触发或无活动窗口时为 null</returns>
+    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons, CancellationToken ct = default)
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons));
+            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons, ct));
         }
 
         var owner = GetActiveWindow();
@@ -45,6 +48,7 @@ public class DialogService : IDialogService
 
         var dialog = new MessageDialogWindow();
         dialog.SetContent(title, message, buttons);
+        using var cancelRegistration = ct.Register(() => Dispatcher.UIThread.Post(() => dialog.Close()));
         await dialog.ShowDialog(owner);
         return dialog.Result;
     }
