@@ -267,6 +267,8 @@ public class KLineChartView : UserControl
     <meta charset=""UTF-8"">
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <title>K线图表</title>
+    <!-- 注意：仓库未内置 ECharts 本地资源，此处回退到 CDN。
+         离线环境下图表不可用；链接无 SRI 校验且无 CSP 限制，存在供应链风险，待内置本地资源后替换。 -->
     <script src=""https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js""></script>
     <style>
         body { margin: 0; padding: 10px; font-family: Arial, sans-serif; background-color: #0A0E17; color: #E4EAF5; }

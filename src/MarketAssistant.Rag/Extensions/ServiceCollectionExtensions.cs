@@ -13,6 +13,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddRagServices(this IServiceCollection services)
     {
+        // Token 计数统一入口（进程内单例，词表延迟加载一次）
+        services.AddSingleton<MarketAssistant.Infrastructure.Tokenization.ITokenCounter,
+            MarketAssistant.Infrastructure.Tokenization.TiktokenTokenCounter>();
+
         services.AddSingleton<ITextCleaningService, TextCleaningService>();
         services.AddSingleton<ITextChunkingService, TextChunkingService>();
 

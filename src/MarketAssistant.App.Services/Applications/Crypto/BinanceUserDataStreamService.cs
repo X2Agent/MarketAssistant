@@ -34,8 +34,6 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
     /// <summary>收到订单状态变更回报时触发。</summary>
     public event Action<ExecutionReport>? OrderUpdate;
 
-    /// <summary>收到账户余额变动时触发。</summary>
-    public event Action<AccountUpdate>? AccountUpdate;
 
     public BinanceUserDataStreamService(
         IHttpClientFactory httpClientFactory,
@@ -336,37 +334,6 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
                         OrderUpdate?.Invoke(report);
                     break;
 
-                case "outboundAccountPosition":
-                    var account = JsonSerializer.Deserialize<OutboundAccountPosition>(json);
-                    if (account != null)
-                    {
-                        var updateTime = DateTimeOffset.FromUnixTimeMilliseconds(account.LastAccountUpdate).UtcDateTime;
-                        foreach (var b in account.Balances)
-                        {
-                            AccountUpdate?.Invoke(new AccountUpdate
-                            {
-                                Asset = b.Asset,
-                                Free = b.Free,
-                                Locked = b.Locked,
-                                UpdateTime = updateTime
-                            });
-                        }
-                    }
-                    break;
-
-                case "balanceUpdate":
-                    var delta = JsonSerializer.Deserialize<BalanceUpdate>(json);
-                    if (delta != null)
-                    {
-                        AccountUpdate?.Invoke(new AccountUpdate
-                        {
-                            Asset = delta.Asset,
-                            Free = delta.Delta,
-                            Locked = 0,
-                            UpdateTime = DateTimeOffset.FromUnixTimeMilliseconds(delta.ClearTime).UtcDateTime
-                        });
-                    }
-                    break;
             }
         }
         catch (Exception ex)

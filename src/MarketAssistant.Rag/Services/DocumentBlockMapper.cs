@@ -61,7 +61,7 @@ public class DocumentBlockMapper
             ImageMetadata? imageMetadata = null)
     {
         // P1-01：Key 统一为 {documentId}:{blockKind}:{order:D6}:{contentHashPrefix}，由调用方传入稳定 DocumentId
-        var sourceType = GetSourceTypeFromPath(filePath);
+        var sourceType = RagSourceType.InferFromPath(filePath);
         var paragraphs = new List<TextParagraph>();
         var nextOrder = baseOrder;
         var updatedSection = currentSection;
@@ -197,17 +197,6 @@ public class DocumentBlockMapper
     /// </summary>
     private static string MakeKey(string documentId, int blockKind, int order, string contentHash)
         => $"{documentId}:{blockKind}:{order:D6}:{contentHash[..8]}";
-
-    private static string GetSourceTypeFromPath(string filePath)
-        => Path.GetExtension(filePath).ToLowerInvariant() switch
-        {
-            ".pdf" => "pdf",
-            ".docx" => "docx",
-            ".md" => "markdown",
-            ".txt" => "text",
-            _ when filePath.StartsWith("http", StringComparison.OrdinalIgnoreCase) => "web",
-            _ => "unknown"
-        };
 
     private static string Sha256Hex(string input)
     {

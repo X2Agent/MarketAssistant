@@ -173,7 +173,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         if (string.IsNullOrEmpty(assetCode))
             return;
 
+        // 取消并释放上一次加载的 CTS，避免泄漏
         _loadingCancellationTokenSource?.Cancel();
+        _loadingCancellationTokenSource?.Dispose();
         _loadingCancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = _loadingCancellationTokenSource.Token;
 
@@ -184,6 +186,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         try
         {
             var klineService = _klineServiceResolver(_marketContext.CurrentMarket);
+            // IKLineService.GetKLineDataAsync 暂不支持 CancellationToken，
+            // 仅能通过取消令牌在返回后丢弃过期结果
             var kLineDataList = await klineService.GetKLineDataAsync(assetCode, CurrentKLineType);
 
             cancellationToken.ThrowIfCancellationRequested();

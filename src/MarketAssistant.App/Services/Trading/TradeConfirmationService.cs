@@ -37,12 +37,6 @@ public sealed class TradeConfirmationService : IDisposable
         _tradeExecutor.ConfirmationRequested += OnConfirmationRequestedAsync;
     }
 
-    /// <summary>
-    /// 是否有确认请求正在进行（同一时刻只允许一个对话框，后续请求直接拒绝，
-    /// 避免多个待确认交易叠加导致用户误批）。
-    /// </summary>
-    private bool HasPendingConfirmation => Volatile.Read(ref _pendingConfirmationCount) > 0;
-
     private async Task<bool> OnConfirmationRequestedAsync(
         string symbol, OrderSide side, decimal price, decimal quantity, string reason)
     {

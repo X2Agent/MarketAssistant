@@ -22,6 +22,7 @@ public class MarketMonitor : IDisposable
     private readonly AISignalStrategyExecutor _aiSignalExecutor;
     private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradingStrategyService _strategyService;
+    private readonly TradingDataService _dataService;
     private readonly INotificationService _notificationService;
     private readonly ILogger<MarketMonitor> _logger;
 
@@ -98,6 +99,7 @@ public class MarketMonitor : IDisposable
         AISignalStrategyExecutor aiSignalExecutor,
         OrderStateSyncService orderStateSyncService,
         TradingStrategyService strategyService,
+        TradingDataService dataService,
         BinanceUserDataStreamService userDataStreamService,
         INotificationService notificationService,
         ILogger<MarketMonitor> logger)
@@ -108,6 +110,7 @@ public class MarketMonitor : IDisposable
         _aiSignalExecutor = aiSignalExecutor;
         _orderStateSyncService = orderStateSyncService;
         _strategyService = strategyService;
+        _dataService = dataService;
         _userDataStreamService = userDataStreamService;
         _notificationService = notificationService;
         _logger = logger;
@@ -553,7 +556,7 @@ public class MarketMonitor : IDisposable
         if (!strategy.MaxExecutions.HasValue)
             return;
 
-        var updated = await _strategyService.GetStrategyAsync(strategy.Id);
+        var updated = await _dataService.GetStrategyAsync(strategy.Id);
         if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
         {
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);

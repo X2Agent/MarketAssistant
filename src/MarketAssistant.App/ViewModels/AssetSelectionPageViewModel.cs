@@ -247,7 +247,6 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(CurrentInputContent));
             OnPropertyChanged(nameof(CurrentPlaceholder));
             OnPropertyChanged(nameof(CurrentButtonText));
-            OnPropertyChanged(nameof(CurrentButtonText));
             OnPropertyChanged(nameof(IsInputAreaVisible));
             OnPropertyChanged(nameof(IsQuickStrategyAreaVisible));
         }

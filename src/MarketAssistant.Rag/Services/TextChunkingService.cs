@@ -1,5 +1,5 @@
+using MarketAssistant.Infrastructure.Tokenization;
 using MarketAssistant.Rag.Interfaces;
-using Microsoft.ML.Tokenizers;
 using System.Security.Cryptography;
 
 namespace MarketAssistant.Rag.Services;
@@ -11,6 +11,16 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class TextChunkingService : ITextChunkingService
 {
+    private readonly ITokenCounter _tokenCounter;
+
+    /// <summary>
+    /// <paramref name="tokenCounter"/> 为可选参数：DI 注册单例 ITokenCounter；测试/手工构造可缺省。
+    /// </summary>
+    public TextChunkingService(ITokenCounter? tokenCounter = null)
+    {
+        _tokenCounter = tokenCounter ?? new TiktokenTokenCounter();
+    }
+
     /// <summary>
     /// 将清洗后的全文分块为段落，优先使用语义边界（行/段落），并用 token 限制控制长度与重叠。
     /// </summary>
@@ -23,11 +33,13 @@ public class TextChunkingService : ITextChunkingService
         const int maxTokensPerParagraph = 400;
         const int overlapTokens = 40;
 
+        var helper = new TextChunkerHelper(_tokenCounter);
+
         // 1) 按行切分（基于换行符的语义边界）
-        var lines = TextChunkerHelper.SplitPlainTextLines(text, maxTokensPerLine);
+        var lines = helper.SplitPlainTextLines(text, maxTokensPerLine);
 
         // 2) 将行聚合为段落（带 token 限制与重叠）
-        var paragraphs = TextChunkerHelper.SplitPlainTextParagraphs(
+        var paragraphs = helper.SplitPlainTextParagraphs(
             lines,
             maxTokensPerParagraph,
             overlapTokens);
@@ -48,7 +60,7 @@ public class TextChunkingService : ITextChunkingService
                 Text = trimmed,
                 Order = order,
                 Section = null,
-                SourceType = GetSourceTypeFromUri(documentUri),
+                SourceType = RagSourceType.InferFromPath(documentUri),
                 ContentHash = hash,
                 PublishedAt = null
             };
@@ -56,12 +68,6 @@ public class TextChunkingService : ITextChunkingService
             order++;
         }
     }
-
-    private static string GetSourceTypeFromUri(string uri)
-        => uri.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "pdf"
-         : uri.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) ? "docx"
-         : uri.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? "web"
-         : "text";
 
     private static string Sha256Hex(string input)
     {
@@ -71,18 +77,26 @@ public class TextChunkingService : ITextChunkingService
     }
 
     /// <summary>
-    /// 内部辅助类，移植自 Microsoft.SemanticKernel.Text.TextChunker
+    /// 内部辅助类，移植自 Microsoft.SemanticKernel.Text.TextChunker。
+    /// Token 计数统一委托给注入的 <see cref="ITokenCounter"/>，不再自建 Tiktoken 编码器与启发式回退。
     /// </summary>
-    private static class TextChunkerHelper
+    private class TextChunkerHelper
     {
+        private readonly ITokenCounter _tokenCounter;
+
+        public TextChunkerHelper(ITokenCounter tokenCounter)
+        {
+            _tokenCounter = tokenCounter;
+        }
+
         private static readonly string?[] s_plaintextSplitOptions = ["\n", ".。．", "?!", ";", ":", ",，、", ")]}", " ", "-", null];
 
-        public static List<string> SplitPlainTextLines(string text, int maxTokensPerLine)
+        public List<string> SplitPlainTextLines(string text, int maxTokensPerLine)
         {
             return InternalSplitLines(text, maxTokensPerLine, trim: true, s_plaintextSplitOptions);
         }
 
-        public static List<string> SplitPlainTextParagraphs(IEnumerable<string> lines, int maxTokensPerParagraph, int overlapTokens)
+        public List<string> SplitPlainTextParagraphs(IEnumerable<string> lines, int maxTokensPerParagraph, int overlapTokens)
         {
             return InternalSplitTextParagraphs(
                 lines.Select(line => line.Replace("\r\n", "\n").Replace('\r', '\n')),
@@ -91,7 +105,7 @@ public class TextChunkingService : ITextChunkingService
                 (text, maxTokens) => InternalSplitLines(text, maxTokens, trim: false, s_plaintextSplitOptions));
         }
 
-        private static List<string> InternalSplitLines(string text, int maxTokensPerLine, bool trim, string?[] splitOptions)
+        private List<string> InternalSplitLines(string text, int maxTokensPerLine, bool trim, string?[] splitOptions)
         {
             var result = new List<string>();
             text = text.Replace("\r\n", "\n"); // normalize line endings
@@ -122,12 +136,12 @@ public class TextChunkingService : ITextChunkingService
             return currentList;
         }
 
-        private static bool AllLinesFit(List<string> lines, int maxTokens)
+        private bool AllLinesFit(List<string> lines, int maxTokens)
         {
             return lines.All(l => GetTokenCount(l) <= maxTokens);
         }
 
-        private static (List<string>, bool) Split(string input, int maxTokens, ReadOnlySpan<char> separators, bool trim)
+        private (List<string>, bool) Split(string input, int maxTokens, ReadOnlySpan<char> separators, bool trim)
         {
             int inputTokenCount = GetTokenCount(input);
             if (inputTokenCount <= maxTokens)
@@ -187,7 +201,7 @@ public class TextChunkingService : ITextChunkingService
             return (new List<string> { trim ? input.Trim() : input }, false);
         }
 
-        private static List<string> InternalSplitTextParagraphs(
+        private List<string> InternalSplitTextParagraphs(
             IEnumerable<string> lines,
             int maxTokensPerParagraph,
             int overlapTokens,
@@ -211,7 +225,7 @@ public class TextChunkingService : ITextChunkingService
             return processedParagraphs;
         }
 
-        private static List<string> BuildParagraph(IEnumerable<string> truncatedLines, int maxTokensPerParagraph)
+        private List<string> BuildParagraph(IEnumerable<string> truncatedLines, int maxTokensPerParagraph)
         {
             StringBuilder paragraphBuilder = new();
             List<string> paragraphs = new();
@@ -240,7 +254,7 @@ public class TextChunkingService : ITextChunkingService
             return paragraphs;
         }
 
-        private static List<string> ProcessParagraphs(
+        private List<string> ProcessParagraphs(
             List<string> paragraphs,
             int maxTokensPerParagraph,
             int overlapTokens,
@@ -295,46 +309,7 @@ public class TextChunkingService : ITextChunkingService
             return processedParagraphs;
         }
 
-        private static readonly Tokenizer? s_tokenizer;
-
-        static TextChunkerHelper()
-        {
-            try
-            {
-                // 使用 cl100k_base 编码而非绑定特定模型名。
-                // cl100k_base 对中文分词偏保守（token 数更多），用于分块更安全；
-                // 且与具体 LLM 提供商无关，适用于 DeepSeek/Qwen 等非 OpenAI 模型。
-                s_tokenizer = TiktokenTokenizer.CreateForEncoding("cl100k_base");
-            }
-            catch
-            {
-                // 离线环境或编码数据不可用时回退到启发式估算
-                s_tokenizer = null;
-            }
-        }
-
-        private static int GetTokenCount(string input)
-        {
-            if (string.IsNullOrEmpty(input)) return 0;
-
-            if (s_tokenizer != null)
-                return s_tokenizer.CountTokens(input);
-
-            // 回退：区分中文与其他字符
-            int chineseCount = 0;
-            int otherCount = 0;
-            foreach (var ch in input)
-            {
-                if (ch is >= '\u4E00' and <= '\u9FFF' or
-                    >= '\u3400' and <= '\u4DBF' or
-                    >= '\u3000' and <= '\u303F' or
-                    >= '\uFF00' and <= '\uFFEF')
-                    chineseCount++;
-                else
-                    otherCount++;
-            }
-            return Math.Max((int)(chineseCount / 1.5 + otherCount / 4.0), 1);
-        }
+        private int GetTokenCount(string input) => _tokenCounter.CountTokens(input);
     }
 }
 

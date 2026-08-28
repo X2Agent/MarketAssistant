@@ -100,18 +100,6 @@ public class BinanceExchangeClient : IExchangeClient
         => Task.CompletedTask;
 
     /// <summary>
-    /// 现货无需设置保证金模式，为空操作。合约由子类覆写。
-    /// </summary>
-    public virtual Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default)
-        => Task.CompletedTask;
-
-    /// <summary>
-    /// 现货成交明细由子类覆写（如需支持），默认返回空列表。
-    /// </summary>
-    public virtual Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
-        => Task.FromResult<List<ExchangeTradeDetail>>([]);
-
-    /// <summary>
     /// 将币安订单响应映射为统一的 ExchangeOrderResult。
     /// </summary>
     private protected static ExchangeOrderResult MapOrderResponse(BinanceOrderResponse response)

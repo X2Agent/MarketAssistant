@@ -48,7 +48,7 @@ public class CryptoStrategyTools : IStrategyTools
     {
         try
         {
-            return await _strategyService.GetStrategyAsync(strategyId, cancellationToken);
+            return await _dataService.GetStrategyAsync(strategyId, cancellationToken);
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

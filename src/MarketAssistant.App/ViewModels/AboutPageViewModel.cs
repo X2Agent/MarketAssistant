@@ -148,6 +148,16 @@ public partial class AboutPageViewModel : ViewModelBase
                     return;
                 }
 
+                // 净化远端资产文件名：仅取文件名部分，并拒绝包含路径分隔符的名称，防止路径穿越
+                var assetName = Path.GetFileName(asset.Name);
+                if (string.IsNullOrEmpty(assetName) ||
+                    asset.Name.Contains('/') || asset.Name.Contains('\\'))
+                {
+                    Logger?.LogWarning("检测到可疑的资产文件名，已拒绝下载: {Name}", asset.Name);
+                    _notificationService.ShowError("更新资产文件名异常，已取消下载，请前往 GitHub 手动下载");
+                    return;
+                }
+
                 // 确定保存路径
                 var downloadsPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 downloadsPath = Path.Combine(downloadsPath, "Downloads");
@@ -156,7 +166,7 @@ public partial class AboutPageViewModel : ViewModelBase
                     downloadsPath = Path.GetTempPath();
                 }
 
-                var savePath = Path.Combine(downloadsPath, asset.Name);
+                var savePath = Path.Combine(downloadsPath, assetName);
                 Logger?.LogInformation("准备下载更新：{Url} -> {Path}", asset.DownloadUrl, savePath);
 
                 _notificationService.ShowInfo($"开始下载 {asset.Name}...");
@@ -176,9 +186,11 @@ public partial class AboutPageViewModel : ViewModelBase
 
                 Logger?.LogInformation("更新文件下载完成: {Path}", downloadedPath);
 
+                // 风险提示：下载产物未做哈希/签名校验（GitHub Release 未提供校验和信息），
+                // 提示用户自行确认来源后再运行安装程序。
                 // 下载完成
                 UpdateStatus = "下载完成！";
-                _notificationService.ShowSuccess($"更新文件已下载到：\n{downloadedPath}\n\n请手动运行安装程序进行更新");
+                _notificationService.ShowSuccess($"更新文件已下载到：\n{downloadedPath}\n\n请确认文件来源后手动运行安装程序进行更新（当前未提供校验和验证）");
 
                 // 打开下载目录
                 Process.Start(new ProcessStartInfo
@@ -221,9 +233,11 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             Process.Start(new ProcessStartInfo(AppInfo.GitHubRepoUrl) { UseShellExecute = true });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 处理异常
+            // 打开浏览器失败不影响主流程，记录日志即可
+            Logger?.LogWarning(ex, "打开 GitHub 仓库页面失败: {Url}", AppInfo.GitHubRepoUrl);
+            _notificationService.ShowWarning("无法打开浏览器，请手动访问 GitHub 仓库");
         }
     }
 
@@ -287,9 +301,10 @@ public partial class AboutPageViewModel : ViewModelBase
         {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 处理异常
+            // 打开链接失败不影响主流程，记录日志即可
+            Logger?.LogWarning(ex, "打开链接失败: {Url}", url);
         }
     }
 

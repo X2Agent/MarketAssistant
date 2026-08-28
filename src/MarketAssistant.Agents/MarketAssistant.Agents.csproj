@@ -1,9 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <RootNamespace>MarketAssistant</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);MAAI001</NoWarn>
   </PropertyGroup>
 
@@ -14,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Infrastructure\MarketAssistant.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

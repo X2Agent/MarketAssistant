@@ -198,8 +198,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     {
         await SafeExecuteAsync(async () =>
         {
-            RiskConfig = await _strategyService.LoadRiskConfigAsync();
-            var strategies = await _strategyService.GetAllStrategiesAsync();
+            RiskConfig = await _dataService.LoadRiskConfigAsync();
+            var strategies = await _dataService.GetAllStrategiesAsync();
             Strategies.Clear();
             foreach (var s in strategies)
                 Strategies.Add(s);
@@ -475,7 +475,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             var records = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
 
             // 刷新策略最新状态（执行次数可能已被后台引擎更新）
-            var latest = await _strategyService.GetStrategyAsync(strategy.Id);
+            var latest = await _dataService.GetStrategyAsync(strategy.Id);
             if (latest != null)
             {
                 strategy.ExecutionCount = latest.ExecutionCount;
@@ -491,7 +491,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task SaveRiskConfigAsync()
     {
-        await _strategyService.SaveRiskConfigAsync(RiskConfig);
+        await _dataService.SaveRiskConfigAsync(RiskConfig);
     }
 
     [RelayCommand]

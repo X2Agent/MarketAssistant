@@ -56,8 +56,8 @@ public static class ErrorMessageMapper
             JsonException => "数据解析失败，请检查数据格式",
 
             // 系统资源相关异常
+            // 注意：StackOverflowException 在 .NET 上直接终止进程、不可捕获，此处不做映射
             OutOfMemoryException => "内存不足，请关闭其他应用后重试",
-            StackOverflowException => "程序错误，请重启应用",
 
             // 数据库相关异常：通过类型名匹配，避免 Core 直接依赖 SQLite 包
             Exception ex when ex.GetType().Name.Contains("Sqlite", StringComparison.Ordinal)

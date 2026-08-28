@@ -95,7 +95,7 @@ public sealed class GlobalExceptionHandler
     /// </summary>
     private void OnDispatcherUnhandledException(object sender, Avalonia.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
-        // OutOfMemoryException / StackOverflowException 之类的致命错误不应被吞并，让进程终止并写入崩溃日志
+        // OutOfMemoryException / AccessViolationException 之类的致命错误不应被吞并，让进程终止并写入崩溃日志
         if (IsFatalException(e.Exception))
         {
             _logger.LogCritical(e.Exception, "UI 线程发生致命异常，不处理，允许进程终止");
@@ -118,11 +118,11 @@ public sealed class GlobalExceptionHandler
     }
 
     /// <summary>
-    /// 判断是否是不可恢复的致命异常
+    /// 判断是否是不可恢复的致命异常。
+    /// 注意：StackOverflowException 在 .NET 上会直接终止进程，无法以异常对象形式到达此处，故不列出。
     /// </summary>
     private static bool IsFatalException(Exception ex) =>
         ex is OutOfMemoryException
-            or StackOverflowException
             or AccessViolationException
             or AppDomainUnloadedException;
 

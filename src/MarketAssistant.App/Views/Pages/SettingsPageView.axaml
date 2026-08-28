@@ -278,6 +278,7 @@
                                                FontSize="{StaticResource LabelFontSize}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
+                                             PasswordChar="●"
                                              PlaceholderText="请输入Web Search API Key"/>
                                 </StackPanel>
                                 <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
@@ -332,6 +333,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.ZhiTuApiToken}"
+                                         PasswordChar="●"
                                          PlaceholderText="请输入ZhiTu API令牌"/>
                                 <Button Grid.Column="1"
                                         Content="获取令牌"

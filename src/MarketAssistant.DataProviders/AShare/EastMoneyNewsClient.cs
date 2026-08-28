@@ -65,7 +65,7 @@ public sealed class EastMoneyNewsClient
         var param = Uri.EscapeDataString(payloadJson);
         var url = $"search/jsonp?cb=jQuery&param={param}";
         using var httpClient = _httpClientFactory.CreateClient("EastMoneySearch");
-        httpClient.Timeout = TimeSpan.FromSeconds(15);
+        // 超时由统一命名客户端配置 / resilience 管线管理，不在调用点单独设置
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("Referer", "https://so.eastmoney.com/");

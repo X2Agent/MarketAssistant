@@ -16,23 +16,15 @@ public class TradingStrategyService
 
     public event EventHandler? StrategiesChanged;
 
-    public Task<TradingStrategy?> GetStrategyAsync(string strategyId, CancellationToken ct = default)
-        => _dataService.GetStrategyAsync(strategyId, ct);
-
+    /// <summary>
+    /// 按状态查询策略。该转发保留：调用方（StrategyEngine/MarketMonitor 等）依赖策略变更广播语义，
+    /// 且单元测试通过 virtual 覆写替换实现（AISignal 硬性边界行为测试）。
+    /// </summary>
     /// <remarks>virtual 供单元测试替换（AISignal 硬性边界行为测试）。</remarks>
     public virtual Task<List<TradingStrategy>> GetStrategiesByStatusAsync(
         StrategyStatus status,
         CancellationToken ct = default)
         => _dataService.GetStrategiesByStatusAsync(status, ct);
-
-    public Task<List<TradingStrategy>> GetAllStrategiesAsync(CancellationToken ct = default)
-        => _dataService.GetAllStrategiesAsync(ct);
-
-    public Task<RiskConfig> LoadRiskConfigAsync(CancellationToken ct = default)
-        => _dataService.LoadRiskConfigAsync(ct);
-
-    public Task SaveRiskConfigAsync(RiskConfig config, CancellationToken ct = default)
-        => _dataService.SaveRiskConfigAsync(config, ct);
 
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {

@@ -26,7 +26,8 @@ public class PriceChangeColorConverter : IValueConverter
         {
             decimal priceChange => priceChange,
             string percentageStr when !string.IsNullOrEmpty(percentageStr)
-                => decimal.TryParse(percentageStr.Replace("%", "").Trim(), out var parsed) ? parsed : null,
+                // 固定使用 InvariantCulture 解析，避免区域设置（如 de-DE 的小数逗号）导致解析失败而变灰
+                => decimal.TryParse(percentageStr.Replace("%", "").Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed) ? parsed : null,
             _ => null
         };
 

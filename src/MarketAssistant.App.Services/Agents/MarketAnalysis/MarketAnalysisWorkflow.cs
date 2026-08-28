@@ -640,12 +640,6 @@ public class MarketAnalysisWorkflow
     private static bool IsAnalystExecutor(string executorId) => !IsSystemExecutor(executorId);
 
     /// <summary>
-    /// 判断是否为 Dispatcher Executor。
-    /// </summary>
-    private static bool IsDispatcherExecutor(string executorId)
-        => GetExecutorNamePrefix(executorId) == "AnalysisDispatcher";
-
-    /// <summary>
     /// 从工作流 ExecutorId 中提取分析师显示名称。
     /// 按第一个下划线切出 Name 前缀，再在 <see cref="_agentNameToDisplayName"/> 中查中文显示名。
     /// </summary>

@@ -69,17 +69,6 @@ public interface IExchangeClient
     /// 设置合约杠杆倍数（合约专用，现货为空操作）
     /// </summary>
     Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default);
-
-    /// <summary>
-    /// 设置合约保证金模式（合约专用，现货为空操作）
-    /// </summary>
-    /// <param name="marginType">"ISOLATED"（逐仓）或 "CROSSED"（全仓）</param>
-    Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default);
-
-    /// <summary>
-    /// 查询成交明细（合约专用，现货返回空列表）
-    /// </summary>
-    Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -181,57 +170,3 @@ public class ExchangePosition
     public decimal MaxQty { get; set; }
 }
 
-/// <summary>
-/// 成交明细（合约专用）
-/// </summary>
-public class ExchangeTradeDetail
-{
-    public string Symbol { get; set; } = string.Empty;
-    public long TradeId { get; set; }
-    public long OrderId { get; set; }
-
-    /// <summary>
-    /// 成交方向：BUY / SELL
-    /// </summary>
-    public string Side { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 持仓方向：BOTH / LONG / SHORT
-    /// </summary>
-    public string PositionSide { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 成交价格
-    /// </summary>
-    public decimal Price { get; set; }
-
-    /// <summary>
-    /// 成交数量
-    /// </summary>
-    public decimal Quantity { get; set; }
-
-    /// <summary>
-    /// 成交金额（Price × Quantity）
-    /// </summary>
-    public decimal QuoteQuantity { get; set; }
-
-    /// <summary>
-    /// 手续费
-    /// </summary>
-    public decimal Commission { get; set; }
-
-    /// <summary>
-    /// 手续费币种
-    /// </summary>
-    public string CommissionAsset { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 是否为平仓成交
-    /// </summary>
-    public bool IsBuyer { get; set; }
-
-    /// <summary>
-    /// 成交时间（Unix 毫秒）
-    /// </summary>
-    public long Time { get; set; }
-}

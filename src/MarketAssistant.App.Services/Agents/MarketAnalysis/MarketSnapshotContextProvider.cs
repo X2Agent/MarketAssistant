@@ -17,17 +17,6 @@ public class MarketSnapshotContextProvider : MessageAIContextProvider
     /// </summary>
     public void SetData(string key, string value) => _sharedData[key] = value;
 
-    /// <summary>
-    /// 获取所有共享数据
-    /// </summary>
-    public IReadOnlyDictionary<string, string> GetAllData() =>
-        new Dictionary<string, string>(_sharedData);
-
-    /// <summary>
-    /// 清空共享数据
-    /// </summary>
-    public void Clear() => _sharedData.Clear();
-
     protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(
         InvokingContext context, CancellationToken cancellationToken = default)
     {

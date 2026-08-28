@@ -8,7 +8,7 @@ namespace MarketAssistant.Rag.Services;
 /// 基于 SQLite 旁路表的文档段落清单实现（P1-01）。
 /// 表结构：rag_document_catalog(collection, document_id, document_uri, content_hash, keys_json, embedding_model_id, dimension, updated_at)
 /// </summary>
-public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog
+public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
 {
     private readonly string _dbPath;
     private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -98,6 +98,11 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog
             Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
 
             await using var conn = CreateConnection();
+            // 启用 WAL 模式，提升并发读写性能
+            await using var walCmd = conn.CreateCommand();
+            walCmd.CommandText = "PRAGMA journal_mode=WAL;";
+            await walCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS rag_document_catalog (
@@ -119,5 +124,13 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog
         {
             _initLock.Release();
         }
+    }
+
+    /// <summary>
+    /// 释放初始化锁资源。各操作均为短连接（用后即关），无需额外清理。
+    /// </summary>
+    public void Dispose()
+    {
+        _initLock.Dispose();
     }
 }
