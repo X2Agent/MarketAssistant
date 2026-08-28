@@ -63,7 +63,8 @@ BenchmarkDotNet.Artifacts/
 # .NET Core
 project.lock.json
 project.fragment.lock.json
-artifacts/
+# 仅忽略仓库根目录的构建产物目录，避免误伤源码子目录（如 Agents/MarketAnalysis/Artifacts/）
+/artifacts/
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt

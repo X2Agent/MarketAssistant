@@ -64,7 +64,7 @@ public sealed class EastMoneyNewsClient
         });
         var param = Uri.EscapeDataString(payloadJson);
         var url = $"search/jsonp?cb=jQuery&param={param}";
-using var httpClient = _httpClientFactory.CreateClient("EastMoneySearch");
+        using var httpClient = _httpClientFactory.CreateClient("EastMoneySearch");
         httpClient.Timeout = TimeSpan.FromSeconds(15);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);

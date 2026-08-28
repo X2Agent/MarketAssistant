@@ -2,7 +2,6 @@ using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 
 namespace MarketAssistant.Applications.Assets;
 
@@ -84,7 +83,7 @@ public class AShareAssetInfoService : IAssetInfoService
             }
 
             // 当前价格
-            assetInfo.CurrentPrice = data.LastPrice.ToString(CultureInfo.InvariantCulture);
+            assetInfo.CurrentPrice = PriceFormatter.Format(data.LastPrice);
 
             // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）
             var changeRatio = data.Change;
@@ -103,7 +102,7 @@ public class AShareAssetInfoService : IAssetInfoService
         // HTTP 访问、GBK 解码与解析由 SinaFundFlowClient 负责；此处仅做业务映射。
         try
         {
-            var items = await _sinaFundFlowClient.GetTopNetInflowAsync(8);
+            var items = await _sinaFundFlowClient.GetTopNetInflowAsync(12);
 
             return items.Select(item =>
             {

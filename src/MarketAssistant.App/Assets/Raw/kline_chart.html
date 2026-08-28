@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>股票K线图</title>
     <style>
+      :root {
+        /* 主题变量，默认浅色，由 setTheme 动态切换 */
+        --chart-bg: #FFFFFF;
+        --overlay-bg: rgba(255, 255, 255, 0.9);
+        --spinner-ring: rgba(0, 0, 0, 0.1);
+        --spinner-accent: #1976D2;
+      }
       body {
         margin: 0;
         padding: 0;
@@ -16,7 +23,7 @@
         height: 100%;
         position: relative;
         overflow: hidden;
-        background-color: #ffffff;
+        background-color: var(--chart-bg);
       }
       html, body {
         width: 100%;
@@ -24,6 +31,7 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
+        background-color: #FFFFFF;
       }
       .loading-overlay {
         position: absolute;
@@ -31,7 +39,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(255, 255, 255, 0.9);
+        background-color: var(--overlay-bg);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -44,7 +52,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(255, 255, 255, 0.95);
+        background-color: var(--overlay-bg);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -63,11 +71,11 @@
         background-color: rgba(231, 76, 60, 0.1);
       }
       .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
+        border: 4px solid var(--spinner-ring);
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        border-left-color: #3498db;
+        border-left-color: var(--spinner-accent);
         animation: spin 1s linear infinite;
       }
       @keyframes spin {
@@ -175,35 +183,35 @@
         locale: 'zh-CN',
       });
 
-      // 设置图表样式
+      // 浅色主题样式，与宿主 UI 保持一致
       chart.setStyles({
         grid: {
           show: true,
           horizontal: {
             show: true,
             size: 1,
-            color: '#EEEEEE',
+            color: '#E6E9EF',
             style: 'dashed',
           },
           vertical: {
             show: true,
             size: 1,
-            color: '#EEEEEE',
+            color: '#E6E9EF',
             style: 'dashed',
           },
         },
         candle: {
           type: 'candle_solid',
           bar: {
-            upColor: '#26A69A',
-            downColor: '#EF5350',
-            noChangeColor: '#888888',
-            upBorderColor: '#26A69A',
-            downBorderColor: '#EF5350',
-            noChangeBorderColor: '#888888',
-            upWickColor: '#26A69A',
-            downWickColor: '#EF5350',
-            noChangeWickColor: '#888888',
+            upColor: '#F44336',
+            downColor: '#4CAF50',
+            noChangeColor: '#98A2B3',
+            upBorderColor: '#F44336',
+            downBorderColor: '#4CAF50',
+            noChangeBorderColor: '#98A2B3',
+            upWickColor: '#F44336',
+            downWickColor: '#4CAF50',
+            noChangeWickColor: '#98A2B3',
           },
           tooltip: {
             showRule: 'always',
@@ -216,23 +224,23 @@
             show: true,
             high: {
               show: true,
-              color: '#76808F',
+              color: '#667085',
               textSize: 12,
               textFamily: 'Consolas',
               textWeight: 'normal',
             },
             low: {
               show: true,
-              color: '#76808F',
+              color: '#667085',
               textSize: 12,
               textFamily: 'Consolas',
               textWeight: 'normal',
             },
             last: {
               show: true,
-              upColor: '#26A69A',
-              downColor: '#EF5350',
-              noChangeColor: '#888888',
+              upColor: '#F44336',
+              downColor: '#4CAF50',
+              noChangeColor: '#98A2B3',
               line: {
                 show: true,
                 style: 'dashed',
@@ -254,12 +262,12 @@
           show: true,
           axisLine: {
             show: true,
-            color: '#DDDDDD',
+            color: '#D0D5DD',
             size: 1,
           },
           tickText: {
             show: true,
-            color: '#76808F',
+            color: '#667085',
             family: 'Consolas',
             weight: 'normal',
             size: 12,
@@ -268,7 +276,7 @@
             show: true,
             size: 1,
             length: 3,
-            color: '#DDDDDD',
+            color: '#D0D5DD',
           },
         },
         yAxis: {
@@ -278,12 +286,12 @@
           inside: false,
           axisLine: {
             show: true,
-            color: '#DDDDDD',
+            color: '#D0D5DD',
             size: 1,
           },
           tickText: {
             show: true,
-            color: '#76808F',
+            color: '#667085',
             family: 'Consolas',
             weight: 'normal',
             size: 12,
@@ -292,14 +300,14 @@
             show: true,
             size: 1,
             length: 3,
-            color: '#DDDDDD',
+            color: '#D0D5DD',
           },
         },
         separator: {
           size: 1,
-          color: '#DDDDDD',
-          fill: true,
-          activeBackgroundColor: 'rgba(230, 230, 230, .15)',
+          color: '#E6E9EF',
+          fill: false,
+          activeBackgroundColor: 'rgba(25, 118, 210, 0.06)',
         },
         crosshair: {
           show: true,
@@ -308,7 +316,7 @@
             line: {
               show: true,
               style: 'dashed',
-              color: '#76808F',
+              color: '#98A2B3',
               size: 1,
             },
             text: {
@@ -317,7 +325,7 @@
               size: 12,
               family: 'Consolas',
               weight: 'normal',
-              backgroundColor: '#76808F',
+              backgroundColor: '#98A2B3',
             },
           },
           vertical: {
@@ -325,7 +333,7 @@
             line: {
               show: true,
               style: 'dashed',
-              color: '#76808F',
+              color: '#98A2B3',
               size: 1,
             },
             text: {
@@ -334,7 +342,7 @@
               size: 12,
               family: 'Consolas',
               weight: 'normal',
-              backgroundColor: '#76808F',
+              backgroundColor: '#98A2B3',
             },
           },
         },
@@ -434,3 +442,4 @@
     </script>
   </body>
 </html>
+

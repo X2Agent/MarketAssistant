@@ -12,14 +12,35 @@
 
     <UserControl.Resources>
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
         <Thickness x:Key="CompactButtonPadding">12,4</Thickness>
         <x:Double x:Key="FormFieldMinWidth">200</x:Double>
+        <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
     </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- 分组手风琴卡片（对齐原型 section-card） -->
+        <Style Selector="Expander.section-card">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Expander.section-card TextBlock.section-title">
+            <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
 
     <ScrollViewer>
         <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- 策略列表 -->
+    <!-- 策略列表（主） / 新建策略（从，创建时浮出右栏） -->
+    <Grid ColumnDefinitions="*,Auto">
             <controls:CardView>
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
@@ -234,17 +255,17 @@
                                                 </Border>
                                             </StackPanel>
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}"
+                                                <TextBlock FontSize="{StaticResource SmallFontSize}" FontFamily="{StaticResource DataFontFamily}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}">
                                                     <TextBlock.Text>
-                                                        <MultiBinding StringFormat="方向: {0} | 触发价: {1:F4} | {2}">
+                                                        <MultiBinding StringFormat="方向: {0} | 触发价: {1} | {2}">
                                                             <Binding Path="Side" Converter="{StaticResource EnumDescriptionConverter}"/>
-                                                            <Binding Path="TriggerPrice"/>
+                                                            <Binding Path="TriggerPrice" Converter="{StaticResource PriceTextConverter}"/>
                                                             <Binding Path="QuantityLabel"/>
                                                         </MultiBinding>
                                                     </TextBlock.Text>
                                                 </TextBlock>
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}"
+                                                <TextBlock FontSize="{StaticResource SmallFontSize}" FontFamily="{StaticResource DataFontFamily}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}">
                                                     <TextBlock.Text>
                                                         <MultiBinding StringFormat="已执行: {0}次">
@@ -296,9 +317,160 @@
                 </StackPanel>
             </controls:CardView>
 
-            <!-- 风控设置 -->
-            <controls:CardView Header="风控设置">
-                <StackPanel Spacing="{StaticResource SmallSpacing}">
+                <!-- 新建策略（从栏）：仅在创建时展示 -->
+                <controls:CardView Grid.Column="1" Width="360"
+                                   Margin="{StaticResource LeftMargin}"
+                                   VerticalAlignment="Top"
+                                   IsVisible="{Binding IsCreating}">
+                    <controls:CardView.Header>
+                        <TextBlock Text="新建策略" FontSize="{StaticResource SectionTitleFontSize}" FontWeight="SemiBold"/>
+                    </controls:CardView.Header>
+                    <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
+                    <!-- 新建表单 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsCreating}">
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
+                              ColumnSpacing="{StaticResource DefaultSpacing}"
+                              RowSpacing="{StaticResource SmallSpacing}">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="交易对" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding NewSymbol}" PlaceholderText="如 BTCUSDT"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="策略类型" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <ComboBox ItemsSource="{Binding StrategyTypes}"
+                                          SelectedItem="{Binding NewStrategyType}"
+                                          HorizontalAlignment="Stretch"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="方向" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <ComboBox ItemsSource="{Binding OrderSides}"
+                                          SelectedItem="{Binding NewSide}"
+                                          HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="{Binding SideHintText}"
+                                           IsVisible="{Binding SideHintText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           Foreground="{StaticResource WarningBrush}"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="触发价格" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding NewTriggerPrice}" PlaceholderText="触发价格"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}"
+                                        IsVisible="{Binding IsBasicStrategy}">
+                                <TextBlock Text="数量" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding NewQuantity}" PlaceholderText="交易数量"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}"
+                                        IsVisible="{Binding IsBasicStrategy}">
+                                <TextBlock Text="止损价（可选）" FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding NewStopLossPrice}" PlaceholderText="止损价格"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 基础策略止盈价 -->
+                        <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding IsBasicStrategy}">
+                            <TextBlock Text="止盈价（可选）" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding NewTakeProfitPrice}" PlaceholderText="止盈价格"
+                                     HorizontalAlignment="Left" MinWidth="{StaticResource FormFieldMinWidth}"/>
+                        </StackPanel>
+
+                        <!-- 网格交易参数 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsGridTrading}">
+                            <TextBlock Text="网格交易参数" FontWeight="SemiBold"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}"
+                                  RowSpacing="{StaticResource SmallSpacing}">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="上界价格" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridUpperPrice}" PlaceholderText="价格上限"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="下界价格" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridLowerPrice}" PlaceholderText="价格下限"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="网格数量" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridCount}" PlaceholderText="如 10"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="每格数量" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding GridQuantityPerGrid}" PlaceholderText="代币数量"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- DCA 定投参数 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsDCA}">
+                            <TextBlock Text="定投参数" FontWeight="SemiBold"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}"
+                                  RowSpacing="{StaticResource SmallSpacing}">
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="每次定投金额 (USDT)" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaAmountPerInterval}" PlaceholderText="如 100"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="定投间隔 (秒)" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaIntervalSeconds}" PlaceholderText="86400 = 每天"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="最高买入价（可选）" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaMaxBuyPrice}" PlaceholderText="超过此价不买"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <TextBlock Text="低于此价双倍定投（可选）" FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding DcaDoubleBuyBelowPrice}" PlaceholderText="低于此价双倍"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- 校验错误提示 -->
+                        <TextBlock Text="{Binding ValidationError}"
+                                   IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Foreground="{StaticResource ErrorBrush}"
+                                   FontSize="{StaticResource LabelFontSize}"
+                                   TextWrapping="Wrap"/>
+
+                        <Button Content="创建策略"
+                                Command="{Binding CreateStrategyCommand}"
+                                Background="{StaticResource PrimaryBrush}"
+                                Foreground="White"
+                                HorizontalAlignment="Left"
+                                Margin="{StaticResource TinyTopMargin}"/>
+                    </StackPanel>
+                    </ScrollViewer>
+                </controls:CardView>
+            </Grid>
+
+
+            <!-- 风控设置：默认折叠 -->
+            <Expander Classes="section-card">
+                <Expander.Header>
+                    <TextBlock Classes="section-title" Text="风控设置"/>
+                </Expander.Header>
+                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
                           ColumnSpacing="{StaticResource DefaultSpacing}"
                           RowSpacing="{StaticResource SmallSpacing}">
@@ -343,7 +515,7 @@
                             HorizontalAlignment="Left"
                             Margin="{StaticResource TinyTopMargin}"/>
                 </StackPanel>
-            </controls:CardView>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

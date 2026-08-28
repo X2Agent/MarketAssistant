@@ -33,12 +33,12 @@
     <!-- 主题变体颜色 - 支持亮色/暗色主题 -->
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key='Light'>
-            <!-- 背景层级 - 三层体系更清晰 -->
-            <SolidColorBrush x:Key='PageBackgroundBrush'>#FAFAFA</SolidColorBrush>
+            <!-- 背景层级 - 对齐设计系统 v2 -->
+            <SolidColorBrush x:Key='PageBackgroundBrush'>#F5F6F8</SolidColorBrush>
             <SolidColorBrush x:Key='CardBackgroundBrush'>#FFFFFF</SolidColorBrush>
             <!-- 列表项背景 - 统一使用白色卡片背景，去除灰色底 -->
             <SolidColorBrush x:Key='ItemBackgroundBrush'>#FFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key='SurfaceVariantBrush'>#EEEEEE</SolidColorBrush>
+            <SolidColorBrush x:Key='SurfaceVariantBrush'>#F0F1F3</SolidColorBrush>
             
             <!-- 文本颜色 - 增强对比度 -->
             <SolidColorBrush x:Key='TextPrimaryBrush'>#212121</SolidColorBrush>
@@ -46,48 +46,79 @@
             <SolidColorBrush x:Key='TextDisabledBrush'>#BDBDBD</SolidColorBrush>
             
             <!-- 边框和分割线 - 更清晰的层次 -->
-            <SolidColorBrush x:Key='BorderBrush'>#E0E0E0</SolidColorBrush>
-            <SolidColorBrush x:Key='DividerBrush'>#EEEEEE</SolidColorBrush>
+            <SolidColorBrush x:Key='BorderBrush'>#E0E2E8</SolidColorBrush>
+            <SolidColorBrush x:Key='SubtleBorderBrush'>#EEF0F4</SolidColorBrush>
+            <SolidColorBrush x:Key='DividerBrush'>#EEF0F4</SolidColorBrush>
             
             <!-- 交互状态 -->
             <SolidColorBrush x:Key='HoverBackgroundBrush'>#F5F5F5</SolidColorBrush>
             <SolidColorBrush x:Key='PressedBackgroundBrush'>#EEEEEE</SolidColorBrush>
             <SolidColorBrush x:Key='SelectedBackgroundBrush'>#E3F2FD</SolidColorBrush>
+    <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#1565C0</SolidColorBrush>
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#40000000</SolidColorBrush>
             
             <!-- 语义化容器背景 -->
             <SolidColorBrush x:Key='DangerBackgroundBrush'>#FEF2F2</SolidColorBrush>
+
+            <!-- 语义面板（提示/建议/亮点风险区块） -->
+            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#ECFDF5</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#065F46</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#FFFBEB</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelTextBrush'>#92400E</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#F0F9FF</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelTextBrush'>#1E40AF</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#FEE2E2</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelTextBrush'>#991B1B</SolidColorBrush>
         </ResourceDictionary>
         
         <ResourceDictionary x:Key='Dark'>
-            <!-- 背景层级 - 深色模式三层体系 -->
-            <SolidColorBrush x:Key='PageBackgroundBrush'>#121212</SolidColorBrush>
-            <SolidColorBrush x:Key='CardBackgroundBrush'>#1E1E1E</SolidColorBrush>
+            <!-- 背景层级 - 蓝调深色四层体系（对齐设计系统 v2） -->
+            <SolidColorBrush x:Key='PageBackgroundBrush'>#0A0E17</SolidColorBrush>
+            <SolidColorBrush x:Key='CardBackgroundBrush'>#111722</SolidColorBrush>
             <!-- 列表项背景 - 与卡片背景保持一致 -->
-            <SolidColorBrush x:Key='ItemBackgroundBrush'>#1E1E1E</SolidColorBrush>
-            <SolidColorBrush x:Key='SurfaceVariantBrush'>#383838</SolidColorBrush>
+            <SolidColorBrush x:Key='ItemBackgroundBrush'>#111722</SolidColorBrush>
+            <SolidColorBrush x:Key='SurfaceVariantBrush'>#1B2233</SolidColorBrush>
             
-            <!-- 文本颜色 - 适合深色背景 -->
-            <SolidColorBrush x:Key='TextPrimaryBrush'>#FFFFFF</SolidColorBrush>
-            <SolidColorBrush x:Key='TextSecondaryBrush'>#B3B3B3</SolidColorBrush>
-            <SolidColorBrush x:Key='TextDisabledBrush'>#666666</SolidColorBrush>
+            <!-- 文本颜色 - 减轻长时间盯盘眩光 -->
+            <SolidColorBrush x:Key='TextPrimaryBrush'>#E4EAF5</SolidColorBrush>
+            <SolidColorBrush x:Key='TextSecondaryBrush'>#8894A8</SolidColorBrush>
+            <SolidColorBrush x:Key='TextDisabledBrush'>#5A6680</SolidColorBrush>
             
             <!-- 边框和分割线 -->
-            <SolidColorBrush x:Key='BorderBrush'>#3A3A3A</SolidColorBrush>
-            <SolidColorBrush x:Key='DividerBrush'>#2C2C2C</SolidColorBrush>
+            <SolidColorBrush x:Key='BorderBrush'>#1E2636</SolidColorBrush>
+            <SolidColorBrush x:Key='DividerBrush'>#182032</SolidColorBrush>
             
             <!-- 交互状态 -->
-            <SolidColorBrush x:Key='HoverBackgroundBrush'>#2C2C2C</SolidColorBrush>
-            <SolidColorBrush x:Key='PressedBackgroundBrush'>#383838</SolidColorBrush>
-            <SolidColorBrush x:Key='SelectedBackgroundBrush'>#1E3A5F</SolidColorBrush>
+            <SolidColorBrush x:Key='HoverBackgroundBrush'>#161C2A</SolidColorBrush>
+            <SolidColorBrush x:Key='PressedBackgroundBrush'>#1B2233</SolidColorBrush>
+            <SolidColorBrush x:Key='SelectedBackgroundBrush'>#262D3D</SolidColorBrush>
+            <SolidColorBrush x:Key='ModeCardSelectedTextBrush'>#42A5F5</SolidColorBrush>
             
             <!-- 阴影颜色 -->
             <SolidColorBrush x:Key='ShadowBrush'>#80000000</SolidColorBrush>
             
             <!-- 语义化容器背景 -->
             <SolidColorBrush x:Key='DangerBackgroundBrush'>#2D1B1B</SolidColorBrush>
+
+            <!-- 语义面板：暗色下使用低透明度色块 + 高亮文字 -->
+            <SolidColorBrush x:Key='SuccessPanelBackgroundBrush'>#1E10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelBorderBrush'>#10B981</SolidColorBrush>
+            <SolidColorBrush x:Key='SuccessPanelTextBrush'>#34D399</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBackgroundBrush'>#1EF59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelBorderBrush'>#F59E0B</SolidColorBrush>
+            <SolidColorBrush x:Key='WarningPanelTextBrush'>#FBBF24</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBackgroundBrush'>#1E3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelBorderBrush'>#3B82F6</SolidColorBrush>
+            <SolidColorBrush x:Key='InfoPanelTextBrush'>#93C5FD</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBackgroundBrush'>#1EEF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelBorderBrush'>#EF4444</SolidColorBrush>
+            <SolidColorBrush x:Key='DangerPanelTextBrush'>#FCA5A5</SolidColorBrush>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -121,9 +152,8 @@
     <!-- 向后兼容的别名 - 逐步迁移 -->
     <SolidColorBrush x:Key="UpColorBrush" Color="{StaticResource BullishRed}"/>
     <SolidColorBrush x:Key="DownColorBrush" Color="{StaticResource BearishGreen}"/>
-    
+
     <!-- ========== 半透明背景色 ========== -->
-    <SolidColorBrush x:Key="OverlayBrush" Color="#E0FFFFFF"/>
     <SolidColorBrush x:Key="DarkOverlayBrush" Color="#80000000"/>
     <SolidColorBrush x:Key="LightOverlayBrush" Color="#40FFFFFF"/>
     

@@ -3,77 +3,175 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
-             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converts="using:MarketAssistant.Converters"
              xmlns:trading="using:MarketAssistant.Views.Pages.Trading"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradingPageView"
              x:DataType="vm:TradingPageViewModel">
 
-    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
-        <StackPanel Grid.Row="0" Spacing="{StaticResource SmallSpacing}">
-                <Border IsVisible="{Binding IsTestnetTradingMode}"
-                    Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{StaticResource WarningBrush}"
-                    BorderThickness="{StaticResource DefaultBorderThickness}"
-                    CornerRadius="{StaticResource SmallCornerRadius}"
-                    Padding="{StaticResource SmallPadding}">
-                <StackPanel Spacing="{StaticResource TinySpacing}">
-                    <TextBlock Text="Binance Spot Testnet 已启用"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource WarningBrush}"/>
-                    <TextBlock Text="{Binding TradingModeDescription}"
-                               FontSize="{StaticResource SmallFontSize}"
+    <UserControl.Resources>
+        <converts:PriceChangeColorConverter x:Key="PnlColorConverter"/>
+        <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- 下划线式页签：底部 2px 主色指示条（独立图层，不挤压文字） -->
+        <Style Selector="Button.trade-tab">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="MinHeight" Value="40"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Panel>
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border x:Name="PART_Indicator"
+                                Height="2"
+                                VerticalAlignment="Bottom"
+                                Margin="10,0"
+                                CornerRadius="1,1,0,0"
+                                Background="Transparent"/>
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.trade-tab /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="TextBlock.FontSize" Value="{StaticResource BodyFontSize}"/>
+            <Setter Property="TextBlock.FontWeight" Value="Medium"/>
+        </Style>
+        <Style Selector="Button.trade-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.trade-tab:selected /template/ Border#PART_Indicator">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Button.trade-tab:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="TextBlock.Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="TextBlock.FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- API 密钥设置手风琴卡片（对齐设置页 section-card） -->
+        <Style Selector="Expander.section-card">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Expander.section-card TextBlock.section-title">
+            <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,Auto,*">
+
+        <!-- ===== 全局状态栏：监控状态 + 交易模式 + 今日盈亏 + 启停 ===== -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="{StaticResource DefaultBorderThickness}"
+                CornerRadius="{StaticResource SmallCornerRadius}"
+                Padding="{StaticResource SmallPadding}">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{StaticResource SuccessBrush}"
+                             IsVisible="{Binding TradeMonitor.IsMonitorRunning}"/>
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                             Fill="{DynamicResource TextSecondaryBrush}"
+                             IsVisible="{Binding !TradeMonitor.IsMonitorRunning}"/>
+                    <TextBlock Text="交易监控运行中" VerticalAlignment="Center"
+                               FontSize="{StaticResource SmallFontSize}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               IsVisible="{Binding TradeMonitor.IsMonitorRunning}"/>
+                    <TextBlock Text="交易监控未启动" VerticalAlignment="Center"
+                               FontSize="{StaticResource SmallFontSize}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               TextWrapping="Wrap"/>
+                               IsVisible="{Binding !TradeMonitor.IsMonitorRunning}"/>
+                    <Ellipse Width="3" Height="3" VerticalAlignment="Center"
+                             Fill="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding CurrentTradingModeText}" VerticalAlignment="Center"
+                               FontSize="{StaticResource SmallFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Border Background="{StaticResource WarningBrush}"
+                            CornerRadius="{StaticResource TinyCornerRadius}"
+                            Padding="{StaticResource TagPadding}"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="{Binding TradingModeDescription}"
+                            IsVisible="{Binding IsTestnetTradingMode}">
+                        <TextBlock Text="测试网" FontSize="{StaticResource SmallFontSize}" Foreground="White"/>
+                    </Border>
                 </StackPanel>
-            </Border>
-
-            <!-- Tab 按钮组 -->
-            <Border Background="{DynamicResource SurfaceVariantBrush}"
-                    CornerRadius="{StaticResource SmallCornerRadius}"
-                    Padding="{StaticResource TinyPadding}"
-                    Margin="{StaticResource SmallBottomMargin}">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource DefaultSpacing}">
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <Button Content="交易配置"
-                                Classes="period-button"
-                                Classes.selected="{Binding IsConfigTabSelected}"
-                                Command="{Binding SelectTabCommand}"
-                                CommandParameter="0"/>
-                        <Button Content="交易监控"
-                                Classes="period-button"
-                                Classes.selected="{Binding IsMonitorTabSelected}"
-                                Command="{Binding SelectTabCommand}"
-                                CommandParameter="1"/>
-                        <Button Content="交易历史"
-                                Classes="period-button"
-                                Classes.selected="{Binding IsHistoryTabSelected}"
-                                Command="{Binding SelectTabCommand}"
-                                CommandParameter="2"/>
-                    </StackPanel>
-
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding CurrentTradingModeText}"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                    <TextBlock Text="今日盈亏" VerticalAlignment="Center"
                                FontSize="{StaticResource SmallFontSize}"
-                               FontWeight="Medium"/>
-                </Grid>
-            </Border>
-        </StackPanel>
-
-        <!-- Tab 内容区域 -->
-        <Panel Grid.Row="1">
-            <!-- 交易配置：策略配置（左）+ API 密钥（右）-->
-            <Grid IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsConfigTabSelected}"
-                  ColumnDefinitions="*,400"
-                  ColumnSpacing="{StaticResource DefaultSpacing}">
-                <trading:StrategyConfigView Grid.Column="0"
-                                            DataContext="{Binding StrategyConfig}"/>
-                <trading:ApiKeyConfigView Grid.Column="1"
-                                         DataContext="{Binding ApiKeyConfig}"/>
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock VerticalAlignment="Center"
+                               FontFamily="{StaticResource DataFontFamily}" FontWeight="SemiBold"
+                               Foreground="{Binding TradeMonitor.TodayStats.TotalPnl, Converter={StaticResource PnlColorConverter}}">
+                        <TextBlock.Text>
+                            <Binding Path="TradeMonitor.TodayStats.TotalPnl" StringFormat="{}{0:+0.00;-0.00;0.00} USDT"/>
+                        </TextBlock.Text>
+                    </TextBlock>
+                    <Button Classes="btn-secondary"
+                            Command="{Binding TradeMonitor.ToggleMonitorCommand}">
+                        <Panel>
+                            <TextBlock Text="停止监控" IsVisible="{Binding TradeMonitor.IsMonitorRunning}"/>
+                            <TextBlock Text="启动监控" IsVisible="{Binding !TradeMonitor.IsMonitorRunning}"/>
+                        </Panel>
+                    </Button>
+                </StackPanel>
             </Grid>
+        </Border>
+
+        <!-- ===== 页签栏 ===== -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="{StaticResource DefaultBorderThickness}"
+                CornerRadius="{StaticResource SmallCornerRadius}"
+                Margin="{StaticResource TopMargin}">
+            <StackPanel Orientation="Horizontal" Margin="{StaticResource HorizontalMargin}">
+                <Button Classes="trade-tab" Content="策略配置"
+                        Classes.selected="{Binding IsConfigTabSelected}"
+                        Command="{Binding SelectTabCommand}" CommandParameter="0"/>
+                <Button Classes="trade-tab" Content="实时监控"
+                        Classes.selected="{Binding IsMonitorTabSelected}"
+                        Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                <Button Classes="trade-tab" Content="交易历史"
+                        Classes.selected="{Binding IsHistoryTabSelected}"
+                        Command="{Binding SelectTabCommand}" CommandParameter="2"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== 页签内容 ===== -->
+        <Panel Grid.Row="2">
+            <ScrollViewer IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsConfigTabSelected}">
+                <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource TopMargin}">
+                    <trading:StrategyConfigView DataContext="{Binding StrategyConfig}"/>
+                    <Expander Classes="section-card">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Classes="section-title" Text="API 密钥设置" VerticalAlignment="Center"/>
+                                <TextBlock Text="· 密钥按交易模式保存在本地，不会上传" VerticalAlignment="Center"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </StackPanel>
+                        </Expander.Header>
+                        <trading:ApiKeyConfigView DataContext="{Binding ApiKeyConfig}"
+                                                  Margin="{StaticResource ExpanderContentPadding}"/>
+                    </Expander>
+                </StackPanel>
+            </ScrollViewer>
 
             <trading:TradeMonitorView DataContext="{Binding TradeMonitor}"
                                       IsVisible="{Binding $parent[UserControl].((vm:TradingPageViewModel)DataContext).IsMonitorTabSelected}"/>

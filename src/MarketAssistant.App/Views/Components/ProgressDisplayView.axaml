@@ -107,14 +107,14 @@
             </StackPanel>
 
             <!-- 失败分析师提示 -->
-            <Border Background="{StaticResource DangerLightBrush}"
+            <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
                     CornerRadius="{StaticResource SmallCornerRadius}"
                     Padding="{StaticResource CompactCardPadding}"
                     IsVisible="{Binding #Root.FailedAnalystsInfo, 
                         Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Text="{Binding #Root.FailedAnalystsInfo}"
                            FontSize="{StaticResource SmallFontSize}"
-                           Foreground="{StaticResource DangerTextBrush}"
+                           Foreground="{DynamicResource DangerPanelTextBrush}"
                            HorizontalAlignment="Center"
                            TextWrapping="Wrap"/>
             </Border>

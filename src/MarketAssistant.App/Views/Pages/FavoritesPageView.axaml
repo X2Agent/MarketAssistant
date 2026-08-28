@@ -20,158 +20,141 @@
         <vm:FavoritesPageViewModel/>
     </Design.DataContext>
 
+    <!-- 收藏卡片（对齐原型 fav-card：宽 290 自适应换行） -->
+    <UserControl.Styles>
+        <Style Selector="Border.fav-card">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
+            <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.fav-card:pointerover">
+            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
     <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
-        <controls:CardView Margin="{StaticResource PagePadding}">
-            <controls:CardView.Header>
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" 
-                               Text="我的收藏" 
-                               FontSize="{StaticResource LargeFontSize}" 
-                               FontWeight="Bold" 
-                               Foreground="{DynamicResource TextPrimaryBrush}" />
-                    <svg:Svg Grid.Column="1" 
-                             Path="/Assets/Images/tab_favorites_on.svg" 
-                             Width="{StaticResource DefaultIconSize}" 
-                             Height="{StaticResource DefaultIconSize}" 
-                             VerticalAlignment="Center" />
-                </Grid>
-            </controls:CardView.Header>
+        <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
 
-            <!-- 主内容区域 -->
-            <Grid>
-                <!-- 加载指示器 -->
-                <StackPanel IsVisible="{Binding IsBusy}"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="{StaticResource LargeSpacing}">
-                    <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
-                    <TextBlock Text="正在加载收藏列表..." 
-                               FontSize="{StaticResource LabelFontSize}"
-                               HorizontalAlignment="Center"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                </StackPanel>
+            <!-- 加载指示器 -->
+            <StackPanel IsVisible="{Binding IsBusy}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="{StaticResource LargeSpacing}">
+                <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
+                <TextBlock Text="正在加载收藏列表..."
+                           FontSize="{StaticResource LabelFontSize}"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
 
-                <!-- 内容区域（非加载状态） -->
-                <Grid IsVisible="{Binding !IsBusy}">
-                    <!-- 空视图 -->
-                    <StackPanel IsVisible="{Binding !Assets.Count}"
-                                HorizontalAlignment="Center" 
-                                VerticalAlignment="Center" 
-                                Spacing="{StaticResource DefaultSpacing}">
-                        <svg:Svg Path="/Assets/Images/tab_favorites.svg" 
-                                 Width="{StaticResource LargeIconSize}" 
-                                 Height="{StaticResource LargeIconSize}" 
-                                 HorizontalAlignment="Center"/>
-                        <TextBlock Text="暂无收藏资产" 
-                                   HorizontalAlignment="Center" 
-                                   Foreground="{DynamicResource TextSecondaryBrush}" />
-                        <TextBlock Text="在资产详情页点击收藏按钮添加" 
-                                   HorizontalAlignment="Center" 
-                                   Foreground="{DynamicResource TextSecondaryBrush}" 
-                                   FontSize="{StaticResource SmallFontSize}" />
-                    </StackPanel>
-
-                    <!-- 资产网格 -->
-                    <ItemsControl ItemsSource="{Binding Assets}"
-                                  IsVisible="{Binding Assets.Count}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <UniformGrid Columns="4" VerticalAlignment="Top"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="assets:AssetInfo">
-                            <Border Classes="stock-card"
-                                    Margin="{StaticResource SmallMargin}"
-                                    Tapped="OnStockItemTapped"
-                                    KeyDown="OnStockItemKeyDown"
-                                    Focusable="True"
-                                    AutomationProperties.Name="{Binding Name}"
-                                    Tag="{Binding .}"
-                                    HorizontalAlignment="Stretch"
-                                    VerticalAlignment="Top">
-                                <Grid RowDefinitions="Auto,Auto,Auto">
-                                    <!-- 顶部信息栏 -->
-                                    <Grid ColumnDefinitions="*,Auto" Margin="{StaticResource BottomMargin}">
-                                        <StackPanel Orientation="Horizontal" 
-                                                    Spacing="{StaticResource TinySpacing}"
-                                                    VerticalAlignment="Center">
-                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TinyPadding}">
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}" 
-                                                           FontWeight="Bold"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           VerticalAlignment="Center">
-                                                    <Run Text="{Binding Market}"/>
-                                                    <Run Text="{Binding Code}"/>
-                                                </TextBlock>
-                                            </Border>
-                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TinyPadding}"
-                                                    IsVisible="{Binding SectorName, Converter={StaticResource NullableVisibilityConverter}}">
-                                                <TextBlock Text="{Binding SectorName}"
-                                                           FontSize="{StaticResource SmallFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           VerticalAlignment="Center"/>
-                                            </Border>
-                                        </StackPanel>
-                                        
-                                        <!-- 删除按钮 -->
-                                        <Button Grid.Column="1"
-                                                Classes="delete-button"
-                                                Width="{StaticResource TinyIconButtonSize}" 
-                                                Height="{StaticResource TinyIconButtonSize}" 
-                                                Cursor="Hand"
-                                                Background="Transparent"
-                                                BorderThickness="{StaticResource NoBorderThickness}"
-                                                Padding="0"
-                                                Tapped="OnDeleteButtonTapped"
-                                                Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}" 
-                                                CommandParameter="{Binding .}">
-                                            <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
-                                                      Width="{StaticResource TinyIconSize}" 
-                                                      Height="{StaticResource TinyIconSize}"
-                                                      Foreground="{StaticResource ErrorBrush}" />
-                                        </Button>
-                                    </Grid>
-
-                                    <!-- 股票名称 -->
-                                    <TextBlock Grid.Row="1"
-                                               Text="{Binding Name}" 
-                                               FontSize="{StaticResource SubTitleFontSize}" 
-                                               FontWeight="Bold" 
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               Margin="{StaticResource BottomMargin}"/>
-                                    
-                                    <!-- 底部价格信息 -->
-                                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
-                                        <TextBlock Text="{Binding CurrentPrice}" 
-                                                   FontSize="{StaticResource LargeFontSize}" 
-                                                   FontWeight="Bold" 
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                                   VerticalAlignment="Center"/>
-                                        
-                                        <Border Grid.Column="1"
-                                                Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
-                                                CornerRadius="{StaticResource TinyCornerRadius}"
-                                                Padding="{StaticResource TinyPadding}"
-                                                VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding ChangePercentage}" 
-                                                       FontSize="{StaticResource SmallFontSize}" 
-                                                       FontWeight="Bold"
-                                                       Foreground="White"/>
-                                        </Border>
-                                    </Grid>
+            <!-- 内容区域（非加载状态） -->
+            <StackPanel IsVisible="{Binding !IsBusy}">
+            <!-- 空视图 -->
+            <StackPanel IsVisible="{Binding !Assets.Count}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="{StaticResource DefaultSpacing}">
+                <svg:Svg Path="/Assets/Images/tab_favorites.svg"
+                         Width="{StaticResource LargeIconSize}"
+                         Height="{StaticResource LargeIconSize}"
+                         HorizontalAlignment="Center"/>
+                <TextBlock Text="暂无收藏资产"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <TextBlock Text="在资产详情页点击收藏按钮添加"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           FontSize="{StaticResource SmallFontSize}" />
+            </StackPanel>
+            <!-- 收藏网格（对齐原型 fav-grid：auto-fill 自适应换行） -->
+            <ItemsControl ItemsSource="{Binding Assets}"
+                          IsVisible="{Binding Assets.Count}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="assets:AssetInfo">
+                        <Border Classes="fav-card"
+                                Width="290"
+                                Margin="0,0,12,12"
+                                Tapped="OnStockItemTapped"
+                                KeyDown="OnStockItemKeyDown"
+                                Focusable="True"
+                                AutomationProperties.Name="{Binding Name}"
+                                Tag="{Binding .}">
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <!-- 顶部：代码/板块 | 删除 -->
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
+                                        <TextBlock Text="{Binding Code}"
+                                                   FontFamily="{StaticResource DataFontFamily}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding SectorName}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{StaticResource PrimaryBrush}"
+                                                   IsVisible="{Binding SectorName, Converter={StaticResource NullableVisibilityConverter}}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Classes="delete-button"
+                                            Width="{StaticResource TinyIconButtonSize}"
+                                            Height="{StaticResource TinyIconButtonSize}"
+                                            Cursor="Hand"
+                                            Background="Transparent"
+                                            BorderThickness="{StaticResource NoBorderThickness}"
+                                            Padding="0"
+                                            Tapped="OnDeleteButtonTapped"
+                                            Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}"
+                                            CommandParameter="{Binding .}">
+                                        <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                                  Width="{StaticResource TinyIconSize}"
+                                                  Height="{StaticResource TinyIconSize}"
+                                                  Foreground="{StaticResource ErrorBrush}" />
+                                    </Button>
                                 </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                </Grid>
-            </Grid>
-        </controls:CardView>
+
+                                <!-- 名称 -->
+                                <TextBlock Text="{Binding Name}"
+                                           FontSize="{StaticResource MediumFontSize}"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+                                <!-- 底部：价格 | 涨跌幅 -->
+                                <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Bottom">
+                                    <TextBlock Text="{Binding CurrentPrice}"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource LargeFontSize}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center"/>
+                                    <Border Grid.Column="1"
+                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                            CornerRadius="{StaticResource TinyCornerRadius}"
+                                            Padding="{StaticResource TinyPadding}"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding ChangePercentage}"
+                                                   FontSize="{StaticResource SmallFontSize}"
+                                                   FontWeight="Bold"
+                                                   Foreground="White"/>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </StackPanel>
+        </StackPanel>
     </ScrollViewer>
 </UserControl>
