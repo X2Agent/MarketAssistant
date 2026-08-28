@@ -408,4 +408,4 @@ FodyWeavers.xsd
 .secrets
 .env
 *.pem
-*.key
+*.key.zcode/
