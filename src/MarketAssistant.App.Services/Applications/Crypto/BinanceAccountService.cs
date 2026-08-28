@@ -158,6 +158,13 @@ public abstract class BinanceAccountServiceBase
                     filters!.StepSize, quantity, roundedQuantity, symbol);
             }
 
+            // 取整后数量归零（如小于 stepSize）提交必被 -1013 拒绝且浪费请求，直接本地拒单
+            if (roundedQuantity <= 0)
+            {
+                throw new FriendlyException(
+                    $"下单数量 {quantity} 经 {symbol} 精度取整后为 0（stepSize={filters?.StepSize}），已拒绝下单");
+            }
+
             var parameters = new Dictionary<string, string>
             {
                 ["symbol"] = symbol.ToUpper(),

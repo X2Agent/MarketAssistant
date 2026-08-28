@@ -110,12 +110,12 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
                 _cts = null;
             }
 
-            if (_ws != null)
+            // 先快照到局部变量再判空：重连循环与 StopAsync 并发时，
+            // 若先判字段再快照，两行之间字段可能被对方置 null 导致 NRE
+            var ws = _ws;
+            _ws = null;
+            if (ws != null)
             {
-                // 快照到局部变量后统一关闭/释放：重连循环与 StopAsync 并发时，
-                // 判空后字段可能被对方置 null，直接使用字段存在 NullReference 竞争
-                var ws = _ws;
-                _ws = null;
                 if (ws.State == WebSocketState.Open)
                 {
                     try

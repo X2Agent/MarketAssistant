@@ -375,10 +375,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             IsTesting = false;
 
-            // 3秒后清除状态信息（TestStatus 为 UI 绑定属性，回调须在 UI 线程执行）
+            // 3秒后清除状态信息（TestStatus 为 UI 绑定属性，回调经 Dispatcher 切回 UI 线程，
+            // 不依赖当前同步上下文，避免链路中加入 ConfigureAwait(false) 后调度失效）
             _ = Task.Delay(3000).ContinueWith(
-                _ => TestStatus = string.Empty,
-                TaskScheduler.FromCurrentSynchronizationContext());
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => TestStatus = string.Empty));
         }
     }
 
@@ -448,10 +448,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         finally
         {
             IsTesting = false;
-            // TestStatus 为 UI 绑定属性，回调须在 UI 线程执行
+            // TestStatus 为 UI 绑定属性，回调经 Dispatcher 切回 UI 线程（同上，不依赖同步上下文）
             _ = Task.Delay(3000).ContinueWith(
-                _ => TestStatus = string.Empty,
-                TaskScheduler.FromCurrentSynchronizationContext());
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => TestStatus = string.Empty));
         }
     }
 

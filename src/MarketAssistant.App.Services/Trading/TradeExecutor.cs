@@ -299,7 +299,7 @@ public class TradeExecutor : IDisposable
                         stopPrice: null, trailingDelta: null, ct: ct);
                     break;
                 }
-                catch (Exception ex) when (IsTransient(ex, out _) && !ct.IsCancellationRequested)
+                catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
                 {
                     lastNetworkException = ex;
                     if (attempt >= maxRetries)
@@ -370,7 +370,7 @@ public class TradeExecutor : IDisposable
             _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
             // 网络类异常（含重试耗尽）短期可恢复；其余归为其他失败由调用方按冷却策略处理。
             // 交易所异常统一被包装成 FriendlyException，必须沿 InnerException 链递归判定。
-            var category = IsTransient(ex, out _)
+            var category = IsTransient(ex)
                 ? TradeFailureCategory.Network
                 : TradeFailureCategory.Other;
             return new TradeResult { Success = false, ErrorMessage = ex.Message, FailureCategory = category };
@@ -381,24 +381,18 @@ public class TradeExecutor : IDisposable
     /// 递归判定异常是否为瞬时（网络/超时）类，沿 InnerException 链检查。
     /// 交易所客户端会把 HttpRequestException 包装成 FriendlyException 抛出，
     /// 仅判断顶层类型会让重试与冷却分类全部失效。
+    /// 用户主动取消的 TaskCanceledException（令牌已取消）不算瞬时——重试过滤器
+    /// 另有 !ct.IsCancellationRequested 守卫，取消会直接落入 Other 类别而非重试。
     /// </summary>
-    /// <param name="ex">待判定异常</param>
-    /// <param name="userCanceled">出参：TaskCanceledException 对应的取消令牌是否为用户主动取消</param>
-    internal static bool IsTransient(Exception ex, out bool userCanceled)
+    internal static bool IsTransient(Exception ex)
     {
-        userCanceled = false;
         for (var current = ex; current != null; current = current.InnerException)
         {
             if (current is HttpRequestException or TimeoutException or SocketException)
                 return true;
-            if (current is TaskCanceledException taskCanceled)
-            {
-                // 令牌未被取消 = HttpClient 超时触发的取消，属瞬时网络问题；
-                // 令牌已取消 = 用户/系统主动取消，不重试
-                if (!taskCanceled.CancellationToken.IsCancellationRequested)
-                    return true;
-                userCanceled = true;
-            }
+            // 令牌未被取消的 TaskCanceledException = HttpClient 超时触发的取消，属瞬时网络问题
+            if (current is TaskCanceledException taskCanceled && !taskCanceled.CancellationToken.IsCancellationRequested)
+                return true;
         }
         return false;
     }

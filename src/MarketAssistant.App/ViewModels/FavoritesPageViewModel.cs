@@ -309,7 +309,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             if (_assetIndex.TryGetValue(symbol, out var asset))
             {
                 asset.CurrentPrice = PriceFormatter.Format(update.Price);
-                asset.ChangePercentage = $"{update.Change:F2}%";
+                // InvariantCulture 与 PriceChangeColorConverter 的解析端保持同一 culture，否则逗号小数区域下解析失败标签变灰
+                asset.ChangePercentage = update.Change.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "%";
             }
         }
     }

@@ -126,7 +126,7 @@ public class QueryRewriteService : IQueryRewriteService
     /// 生成同义词变体
     /// </summary>
     /// <remarks>
-    /// 拉丁字母键使用词边界正则替换（避免子串误命中，如 "AI" 命中 "wait"）；
+    /// 拉丁字母键使用 ASCII 边界正则替换（避免子串误命中，如 "AI" 命中 "chain"）；
     /// 中文键保持简单子串替换。
     /// </remarks>
     private static IEnumerable<string> GenerateSynonymVariants(string query)
@@ -135,9 +135,11 @@ public class QueryRewriteService : IQueryRewriteService
         {
             if (char.IsAsciiLetter(kvp.Key[0]))
             {
-                // 拉丁字母键：词边界正则匹配（大小写不敏感），未命中则跳过
+                // 拉丁字母键：ASCII 边界正则匹配（大小写不敏感），未命中则跳过。
+                // 不能用 \b：.NET 把 CJK 字符算作 word char，"AI选股" 里 AI 与汉字之间不存在 \b，
+                // 会漏匹配最常见的中文混合查询；纯 ASCII 前后视断言既防误命中又保住 CJK 相邻
                 var wordRegex = LatinKeyRegexCache.GetOrAdd(kvp.Key, static key =>
-                    new Regex(@$"\b{Regex.Escape(key)}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled));
+                    new Regex(@$"(?<![A-Za-z0-9]){Regex.Escape(key)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase | RegexOptions.Compiled));
                 if (!wordRegex.IsMatch(query))
                 {
                     continue;

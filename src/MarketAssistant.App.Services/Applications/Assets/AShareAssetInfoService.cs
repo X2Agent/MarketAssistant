@@ -85,9 +85,10 @@ public class AShareAssetInfoService : IAssetInfoService
             // 当前价格
             assetInfo.CurrentPrice = PriceFormatter.Format(data.LastPrice);
 
-            // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）
+            // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）。
+            // InvariantCulture：下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
             var changeRatio = data.Change;
-            assetInfo.ChangePercentage = $"{changeRatio * 100:+0.00;-0.00;0.00}%";
+            assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
         }
         catch (Exception ex)
         {
@@ -116,7 +117,7 @@ public class AShareAssetInfoService : IAssetInfoService
                     Code = item.Symbol[2..],
                     Market = market,
                     CurrentPrice = item.Price,
-                    ChangePercentage = $"{item.ChangeRatio * 100:+0.00;-0.00;0.00}%",
+                    ChangePercentage = (item.ChangeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%",
                     MetricLabel = "净流入",
                     MetricValue = item.NetAmount.ToString("F0"),
                     MarketType = MarketType.AShare

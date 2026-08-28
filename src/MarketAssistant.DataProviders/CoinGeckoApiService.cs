@@ -16,13 +16,14 @@ public sealed class CoinGeckoApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinGeckoApiService> _logger;
 
-    // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔
+    // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔。
+    // QueueLimit 有限：突发排队超过 8 个直接失败并抛错（无界排队会让调用方长时间悬挂）
     private static readonly TokenBucketRateLimiter Throttle = new(new TokenBucketRateLimiterOptions
     {
         TokenLimit = 1,
         TokensPerPeriod = 1,
         ReplenishmentPeriod = TimeSpan.FromMilliseconds(2500),
-        QueueLimit = int.MaxValue,
+        QueueLimit = 8,
         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
         AutoReplenishment = true
     });

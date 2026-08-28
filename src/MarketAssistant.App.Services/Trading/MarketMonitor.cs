@@ -197,7 +197,14 @@ public class MarketMonitor : IDisposable
                 {
                     await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(10));
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException)
+                {
+                    // 停止取消使尚未进入执行的任务以 Canceled 结束：状态可能未持久化，
+                    // 必须报告"未完整停止"让调用方（如环境切换）中止，不能让异常穿透破坏返回值契约
+                    _logger.LogWarning("等待策略任务完成时被取消，部分状态可能未持久化");
+                    return false;
+                }
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "等待策略任务完成时超时或出错，部分状态可能未持久化");
                     return false;
@@ -429,6 +436,13 @@ public class MarketMonitor : IDisposable
     /// </summary>
     private async Task CompleteOneShotStrategyAsync(TradingStrategy strategy)
     {
+        // 用户显式配置 MaxExecutions > 1 时尊重配置，仍按执行计数完结
+        if (strategy.MaxExecutions is > 1)
+        {
+            await CheckStrategyCompletionAsync(strategy);
+            return;
+        }
+
         var isOneShot = strategy.Type is StrategyType.StopLoss or StrategyType.TakeProfit or StrategyType.TrailingStop;
         if (!isOneShot)
         {
@@ -572,28 +586,33 @@ public class MarketMonitor : IDisposable
         _cts?.Dispose();
         _priceChannel.Writer.TryComplete();
 
-        // 释放策略级锁之前，先短暂等待在途任务收尾（最多 3 秒，Dispose 为同步方法不允许无限等待），
-        // 防止任务在锁对象已被 Dispose 后调用 Release/WaitAsync 抛出 ObjectDisposedException
-        try
-        {
-            Task[] pendingTasks;
-            lock (_pendingTasksLock)
-                pendingTasks = _pendingStrategyTasks.ToArray();
+        Task[] pendingTasks;
+        lock (_pendingTasksLock)
+            pendingTasks = _pendingStrategyTasks.ToArray();
 
+        // 锁资源改为在后台等待在途任务收尾后释放：Dispose 常从 UI 线程触发（页面卸载/退出），
+        // 在途任务可能正等待 HITL 确认框（最长 60s），同步等待会冻结 UI；
+        // 后台等待 3 秒后释放，防止任务随后调用 Release/WaitAsync 抛 ObjectDisposedException
+        _ = Task.Run(async () =>
+        {
             if (pendingTasks.Length > 0)
-                Task.WaitAll(pendingTasks, TimeSpan.FromSeconds(3));
-        }
-        catch (Exception ex)
-        {
-            // 等待超时或个别任务失败都不阻断释放，仅记录
-            _logger.LogWarning(ex, "Dispose 等待在途策略任务超时或失败，部分状态可能未持久化");
-        }
+            {
+                try
+                {
+                    await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Dispose 等待在途策略任务超时或失败，部分状态可能未持久化");
+                }
+            }
 
-        foreach (var kvp in _strategyLocks)
-            kvp.Value.Dispose();
-        _strategyLocks.Clear();
-        _strategyFailureCooldowns.Clear();
-        _lifecycleLock.Dispose();
+            foreach (var kvp in _strategyLocks)
+                kvp.Value.Dispose();
+            _strategyLocks.Clear();
+            _strategyFailureCooldowns.Clear();
+            _lifecycleLock.Dispose();
+        });
 
         TradeExecuted = null;
         StatusChanged = null;

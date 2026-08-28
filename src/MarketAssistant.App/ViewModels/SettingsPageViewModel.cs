@@ -844,7 +844,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             _userSettingService.ResetSettings();
-            UserSetting = _userSettingService.CurrentSetting;
+            UserSetting = _userSettingService.CurrentSetting.Clone();
 
             _isInitializingProvider = true;
             try

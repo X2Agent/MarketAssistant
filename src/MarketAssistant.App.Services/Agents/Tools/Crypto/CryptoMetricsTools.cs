@@ -537,6 +537,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 AverageReturn = avgReturn * 100
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 内层 GetOHLCVAsync 已透传取消，此处不得再包装成业务错误
+            throw;
+        }
         catch (FriendlyException)
         {
             throw;
