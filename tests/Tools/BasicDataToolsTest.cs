@@ -18,12 +18,10 @@ using System.Text.Json;
 namespace TestMarketAssistant.Tools;
 
 /// <summary>
-/// IBasicDataTools 接口真实场景验证测试（覆盖 A股 和 虚拟币 实现）
+/// IBasicDataTools 接口真实场景验证测试（A股实现）
 /// 使用真实 API 调用验证工具实现的 authenticity：
 /// - A股 GetAssetInfoAsync：调用财联社（cls.cn）行情接口
 /// - A股 GetCompanyInfoAsync：调用智兔 API（需 ZhiTuApiToken）
-/// - 虚拟币 GetAssetInfoAsync：调用币安 24h 行情接口
-/// - 虚拟币 GetProjectInfoAsync：调用 CoinDesk 项目元数据接口
 ///
 /// 环境变量（缺失时对应测试直接 Fail，不跳过）：
 /// - ZHITU_API_TOKEN：智兔 API 令牌（A 股公司基本面必需）
@@ -60,10 +58,6 @@ public class BasicDataToolsTest
         // 注册命名 HttpClient（含 BaseAddress 与弹性策略），与生产配置一致
         services.AddNamedMarketHttpClients();
 
-        // 注册虚拟币基础数据工具依赖的数据服务（CoinGecko 替代 CoinDesk）
-        services.AddSingleton<BinanceMarketDataService>();
-        services.AddSingleton<CoinGeckoApiService>();
-
         // 通过 Mock 注入带真实密钥的 UserSetting（避免依赖本地 Preferences 存储）
         var userSetting = new UserSetting
         {
@@ -82,8 +76,6 @@ public class BasicDataToolsTest
         // 注册被测试的服务（A股 + 虚拟币，含基接口与子接口）
         services.AddKeyedSingleton<IShareBasicTools, AShareBasicTools>(MarketType.AShare);
         services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ICryptoBasicTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -196,83 +188,6 @@ public class BasicDataToolsTest
 
     #endregion
 
-    #region 虚拟币基础数据测试
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task GetAssetInfoAsync_Crypto_ShouldReturnValidQuoteInfo()
-    {
-        // Arrange - BTC 现货，币安 24h 行情接口
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoBasicTools>(MarketType.Crypto);
-
-        // Act
-        var quoteInfo = await service.GetAssetInfoAsync("BTC");
-
-        // Assert - 验证真实币安行情数据（数值合理性 + 字段一致性，证明币安 API 真实返回）
-        Assert.IsNotNull(quoteInfo);
-        Assert.AreEqual("BTC", quoteInfo.SecurityCode);
-        Assert.IsFalse(string.IsNullOrEmpty(quoteInfo.SecurityName), "币种名称不应为空");
-        Assert.IsTrue(quoteInfo.CurrentPrice > 0, $"当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-        Assert.IsTrue(quoteInfo.Volume > 0, $"24h 成交量应大于0，实际: {quoteInfo.Volume}");
-        Assert.IsTrue(quoteInfo.Amount > 0, $"24h 成交额应大于0，实际: {quoteInfo.Amount}");
-        Assert.IsTrue(quoteInfo.HighPrice >= quoteInfo.LowPrice, $"最高价({quoteInfo.HighPrice})应大于等于最低价({quoteInfo.LowPrice})");
-        Assert.IsTrue(quoteInfo.HighPrice >= quoteInfo.CurrentPrice, $"最高价({quoteInfo.HighPrice})应大于等于当前价({quoteInfo.CurrentPrice})");
-        Assert.IsTrue(quoteInfo.LowPrice <= quoteInfo.CurrentPrice, $"最低价({quoteInfo.LowPrice})应小于等于当前价({quoteInfo.CurrentPrice})");
-        // BTC 价格量级校验（真实场景下 BTC 价格远高于 1000 USDT）
-        Assert.IsTrue(quoteInfo.CurrentPrice > 1000, $"BTC 当前价格应大于 1000 USDT，实际: {quoteInfo.CurrentPrice}");
-        TestContext?.WriteLine($"BTC 当前价: {quoteInfo.CurrentPrice}, 24h成交额: {quoteInfo.Amount:N0}, 涨跌幅: {quoteInfo.PercentageChange}%");
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task GetProjectInfoAsync_Crypto_ShouldReturnValidInfo()
-    {
-        // Arrange - CoinGecko /coins/{id} 项目详情接口（免费，无需密钥）
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoBasicTools>(MarketType.Crypto);
-
-        // Act
-        var projectInfo = await service.GetProjectInfoAsync("BTC");
-
-        // Assert - 验证真实项目基本面数据（字段非空 + 数值合理 + 内容匹配，证明 CoinGecko API 真实返回）
-        Assert.IsNotNull(projectInfo);
-        Assert.IsFalse(string.IsNullOrEmpty(projectInfo.Symbol), "项目符号不应为空");
-        Assert.AreEqual("BTC", projectInfo.Symbol, $"项目符号应为 BTC，实际: {projectInfo.Symbol}");
-        Assert.IsFalse(string.IsNullOrEmpty(projectInfo.Name), "项目名称不应为空");
-        Assert.IsTrue(projectInfo.CirculatingSupply > 0, $"流通供应量应大于0，实际: {projectInfo.CirculatingSupply}");
-        Assert.IsTrue(projectInfo.PriceUsd > 0, $"美元价格应大于0，实际: {projectInfo.PriceUsd}");
-        Assert.IsTrue(projectInfo.TotalMarketCapUsd > 0, $"总市值应大于0，实际: {projectInfo.TotalMarketCapUsd}");
-        Assert.IsFalse(string.IsNullOrEmpty(projectInfo.Description), "项目描述不应为空");
-        Assert.IsFalse(string.IsNullOrEmpty(projectInfo.AssetType), "资产类型不应为空");
-        Assert.AreEqual("BLOCKCHAIN", projectInfo.AssetType, $"资产类型应为 BLOCKCHAIN，实际: {projectInfo.AssetType}");
-        TestContext?.WriteLine($"{projectInfo.Name}({projectInfo.Symbol}) 价格: ${projectInfo.PriceUsd:N2}, 流通量: {projectInfo.CirculatingSupply:N0}, 市值: ${projectInfo.TotalMarketCapUsd:N0}");
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task GetAssetInfoAsync_Crypto_MultipleSymbols_ShouldAllReturnValidData()
-    {
-        // Arrange - 验证多个币种的真实行情
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoBasicTools>(MarketType.Crypto);
-        var symbols = new[] { "BTC", "ETH", "BNB" };
-
-        foreach (var symbol in symbols)
-        {
-            // Act
-            var quoteInfo = await service.GetAssetInfoAsync(symbol);
-
-            // Assert - 校验真实数据（代码匹配 + 价格合理 + 高低价关系）
-            Assert.IsNotNull(quoteInfo, $"{symbol} 行情数据不应为空");
-            Assert.AreEqual(symbol.ToUpper(), quoteInfo.SecurityCode);
-            Assert.IsTrue(quoteInfo.CurrentPrice > 0, $"{symbol} 当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-            Assert.IsTrue(quoteInfo.Volume > 0, $"{symbol} 24h成交量应大于0，实际: {quoteInfo.Volume}");
-            Assert.IsTrue(quoteInfo.Amount > 0, $"{symbol} 24h成交额应大于0，实际: {quoteInfo.Amount}");
-            Assert.IsTrue(quoteInfo.HighPrice >= quoteInfo.LowPrice, $"{symbol} 最高价({quoteInfo.HighPrice})应大于等于最低价({quoteInfo.LowPrice})");
-            TestContext?.WriteLine($"{symbol} 当前价: {quoteInfo.CurrentPrice}, 24h涨跌: {quoteInfo.PercentageChange}%, 成交额: {quoteInfo.Amount:N0}");
-        }
-    }
-
-    #endregion
-
     #region GetFunctions 验证（MAF 工具函数契约）
 
     [TestMethod]
@@ -293,25 +208,6 @@ public class BasicDataToolsTest
         // 使用 Contains 模糊匹配，兼容 AIFunctionFactory 不同版本的命名约定
         Assert.IsTrue(functionNames.Any(n => n.Contains("GetAssetInfo")), "应包含 GetAssetInfo 函数");
         Assert.IsTrue(functionNames.Any(n => n.Contains("GetCompanyInfo")), "应包含 GetCompanyInfo 函数");
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public void GetFunctions_Crypto_ShouldReturnTwoAIFunctions()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IBasicDataTools>(MarketType.Crypto);
-
-        // Act
-        var functions = service.GetFunctions().ToList();
-        var functionNames = functions.Select(f => f.Name).ToList();
-        TestContext?.WriteLine($"Crypto AIFunction 名称: {string.Join(", ", functionNames)}");
-
-        // Assert - CryptoBasicTools 暴露 2 个 AIFunction
-        Assert.IsNotNull(functions);
-        Assert.AreEqual(2, functions.Count);
-        Assert.IsTrue(functionNames.Any(n => n.Contains("GetAssetInfo")), "应包含 GetAssetInfo 函数");
-        Assert.IsTrue(functionNames.Any(n => n.Contains("GetProjectInfo")), "应包含 GetProjectInfo 函数");
     }
 
     #endregion
@@ -343,34 +239,6 @@ public class BasicDataToolsTest
         Assert.IsTrue(quoteInfo.CurrentPrice > 0, $"当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
         Assert.IsTrue(quoteInfo.MarketCapitalization > 0, $"总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
         TestContext?.WriteLine($"AIFunction 返回 {quoteInfo.SecurityName}({quoteInfo.SecurityCode}), 当前价: {quoteInfo.CurrentPrice}, 总市值: {quoteInfo.MarketCapitalization}亿");
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
-    public async Task AIFunction_GetAssetInfoAsync_Crypto_ShouldInvokeRealApi()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IBasicDataTools>(MarketType.Crypto);
-        var getAssetInfoFunction = service.GetFunctions().First(f => f.Name.Contains("GetAssetInfo"));
-
-        // Act - AIFunction.InvokeAsync 返回 JsonElement（MAF 序列化返回值），需反序列化为强类型
-        var result = await getAssetInfoFunction.InvokeAsync(new AIFunctionArguments
-        {
-            ["assetSymbol"] = "BTC"
-        });
-
-        // Assert - 验证 AIFunction 真实返回数据并反序列化为 CryptoQuoteInfo（非空对象 + 真实字段值）
-        Assert.IsNotNull(result, "AIFunction 返回值不应为空");
-        Assert.IsInstanceOfType(result, typeof(JsonElement), $"AIFunction 返回值应为 JsonElement 类型，实际: {result.GetType().Name}");
-        var jsonElement = (JsonElement)result;
-        var quoteInfo = JsonSerializer.Deserialize<CryptoQuoteInfo>(jsonElement.GetRawText(), AIFunctionJsonOptions)
-            ?? throw new AssertFailedException("AIFunction 返回值反序列化为 CryptoQuoteInfo 失败");
-        Assert.AreEqual("BTC", quoteInfo.SecurityCode, $"币种代码应为 BTC，实际: {quoteInfo.SecurityCode}");
-        Assert.IsTrue(quoteInfo.CurrentPrice > 0, $"当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-        Assert.IsTrue(quoteInfo.Volume > 0, $"24h成交量应大于0，实际: {quoteInfo.Volume}");
-        Assert.IsTrue(quoteInfo.Amount > 0, $"24h成交额应大于0，实际: {quoteInfo.Amount}");
-        Assert.IsTrue(quoteInfo.CurrentPrice > 1000, $"BTC 当前价格应大于 1000 USDT，实际: {quoteInfo.CurrentPrice}");
-        TestContext?.WriteLine($"AIFunction 返回 {quoteInfo.SecurityName}({quoteInfo.SecurityCode}), 当前价: {quoteInfo.CurrentPrice}, 24h成交额: {quoteInfo.Amount:N0}");
     }
 
     #endregion

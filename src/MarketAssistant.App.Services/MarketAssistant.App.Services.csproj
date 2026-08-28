@@ -27,7 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AdaptiveCards" />
     <PackageReference Include="AngleSharp" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Markdig" />

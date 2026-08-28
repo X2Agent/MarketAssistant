@@ -164,8 +164,9 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             var historyPoints = sortedData
                 .Select(h => new LongShortRatioPoint
                 {
-                    LongRatio = decimal.Parse(h.LongAccount, CultureInfo.InvariantCulture),
-                    ShortRatio = decimal.Parse(h.ShortAccount, CultureInfo.InvariantCulture),
+                    // 币安返回 0-1 小数，模型契约为百分比（%），需 ×100（与资金费率处理一致）
+                    LongRatio = decimal.Parse(h.LongAccount, CultureInfo.InvariantCulture) * 100,
+                    ShortRatio = decimal.Parse(h.ShortAccount, CultureInfo.InvariantCulture) * 100,
                     Ratio = decimal.Parse(h.LongShortRatio, CultureInfo.InvariantCulture),
                     Timestamp = h.Timestamp
                 })

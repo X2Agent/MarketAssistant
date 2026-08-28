@@ -26,7 +26,6 @@ using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
 using MarketAssistant.Infrastructure.Providers;
@@ -303,14 +302,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
-
-        // AdaptiveCard Parsers（责任链）
-        services.AddSingleton<IJsonToAdaptiveCardParser, CoordinatorCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, FinancialCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, FundamentalCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, SentimentCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, NewsCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, TechnicalCardParser>();
 
         // MAF 中间件与会话级 Context Provider 工厂
         services.AddSingleton<TokenTrackingMiddleware>();

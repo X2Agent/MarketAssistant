@@ -6,6 +6,7 @@
              xmlns:models="using:MarketAssistant.Models"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Components.AnalysisReportView"
              x:DataType="vm:AnalysisReportViewModel">
@@ -86,14 +87,14 @@
                             <!-- 投资评级徽章 -->
                             <Border Grid.Row="0" 
                                     Background="{StaticResource PrimaryBrush}" 
-                                    CornerRadius="{StaticResource LargeCornerRadius}"
+                                    CornerRadius="{StaticResource DefaultCornerRadius}"
                                     Padding="{StaticResource ReportHeaderPadding}"
                                     HorizontalAlignment="Center"
                                     Margin="{StaticResource ReportHeroMargin}">
                                 <TextBlock Text="{Binding InvestmentRating}" 
                                            FontSize="{StaticResource ExtraLargeFontSize}" 
                                            FontWeight="Bold" 
-                                           Foreground="White"
+                                           Foreground="{StaticResource TextOnEmphasisBrush}"
                                            HorizontalAlignment="Center"/>
                             </Border>
                             
@@ -169,7 +170,13 @@
                     <!-- 维度评分 (Skill Bars) -->
                     <controls:CardView Grid.Column="0">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                            <TextBlock Text="📊 维度评分" Classes="section-title"/>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_chart.svg"
+                                         Width="{StaticResource DefaultIconSize}"
+                                         Height="{StaticResource DefaultIconSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="维度评分" Classes="section-title"/>
+                            </StackPanel>
                             <ItemsControl ItemsSource="{Binding DimensionScores}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ScoreItem">
@@ -198,7 +205,13 @@
                     <!-- 操作建议 (Step List) -->
                     <controls:CardView Grid.Column="1">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                            <TextBlock Text="📋 操作建议" Classes="section-title"/>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_clipboard.svg"
+                                         Width="{StaticResource DefaultIconSize}"
+                                         Height="{StaticResource DefaultIconSize}"
+                                         VerticalAlignment="Center"/>
+                                <TextBlock Text="操作建议" Classes="section-title"/>
+                            </StackPanel>
                             <ItemsControl ItemsSource="{Binding OperationSuggestions}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="x:String">
@@ -210,7 +223,7 @@
                                                     Margin="{StaticResource RightMargin}"
                                                     VerticalAlignment="Top">
                                                 <TextBlock Text="✓" 
-                                                           Foreground="White" 
+                                                           Foreground="{StaticResource TextOnEmphasisBrush}" 
                                                            HorizontalAlignment="Center" 
                                                            VerticalAlignment="Center"
                                                            FontWeight="Bold"/>
@@ -234,7 +247,10 @@
                     <controls:CardView Grid.Column="0">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="💡" FontSize="{StaticResource LargeFontSize}"/>
+                                <svg:Svg Path="/Assets/Images/icon_bulb.svg"
+                                         Width="{StaticResource LargeFontSize}"
+                                         Height="{StaticResource LargeFontSize}"
+                                         VerticalAlignment="Center"/>
                                 <TextBlock Text="投资亮点" Classes="section-title" Margin="0"/>
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding InvestmentHighlights}">
@@ -260,7 +276,10 @@
                     <controls:CardView Grid.Column="1">
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="⚠️" FontSize="{StaticResource LargeFontSize}"/>
+                                <svg:Svg Path="/Assets/Images/icon_danger.svg"
+                                         Width="{StaticResource LargeFontSize}"
+                                         Height="{StaticResource LargeFontSize}"
+                                         VerticalAlignment="Center"/>
                                 <TextBlock Text="风险因素" Classes="section-title" Margin="0"/>
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding RiskFactors}">
@@ -299,7 +318,10 @@
                                 IsVisible="{Binding HasConsensusAnalysis}">
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                    <TextBlock Text="🤝" FontSize="{StaticResource SubTitleFontSize}"/>
+                                    <svg:Svg Path="/Assets/Images/icon_users.svg"
+                                             Width="{StaticResource SubTitleFontSize}"
+                                             Height="{StaticResource SubTitleFontSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="核心共识" FontWeight="Bold" FontSize="{StaticResource SectionTitleFontSize}"/>
                                 </StackPanel>
                                 <TextBlock Text="{Binding ConsensusAnalysis}" 
@@ -317,7 +339,10 @@
                                 IsVisible="{Binding HasDisagreementAnalysis}">
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                    <TextBlock Text="⚖️" FontSize="{StaticResource SubTitleFontSize}"/>
+                                    <svg:Svg Path="/Assets/Images/icon_scale.svg"
+                                             Width="{StaticResource SubTitleFontSize}"
+                                             Height="{StaticResource SubTitleFontSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="主要分歧" FontWeight="Bold" FontSize="{StaticResource SectionTitleFontSize}" Foreground="{DynamicResource WarningPanelTextBrush}"/>
                                 </StackPanel>
                                 <TextBlock Text="{Binding DisagreementAnalysis}" 
@@ -334,7 +359,10 @@
                                 Background="{DynamicResource SelectedBackgroundBrush}">
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                    <TextBlock Text="📝" FontSize="{StaticResource SubTitleFontSize}"/>
+                                    <svg:Svg Path="/Assets/Images/icon_edit.svg"
+                                             Width="{StaticResource SubTitleFontSize}"
+                                             Height="{StaticResource SubTitleFontSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="协调分析师综述" FontWeight="Bold" FontSize="{StaticResource SectionTitleFontSize}" Foreground="{StaticResource PrimaryDarkBrush}"/>
                                 </StackPanel>
                                 <TextBlock Text="{Binding CoordinatorSummary}" 
@@ -350,7 +378,10 @@
                 <controls:CardView IsVisible="{Binding HasQualityMetrics}">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="🔍" FontSize="{StaticResource LargeFontSize}"/>
+                            <svg:Svg Path="/Assets/Images/icon_magnifier.svg"
+                                     Width="{StaticResource LargeFontSize}"
+                                     Height="{StaticResource LargeFontSize}"
+                                     VerticalAlignment="Center"/>
                             <TextBlock Text="分析质量评估" Classes="section-title" Margin="0"/>
                         </StackPanel>
 
@@ -420,7 +451,10 @@
                                 Padding="{StaticResource CompactCardPadding}"
                                 IsVisible="{Binding LimitationsNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="⚠️" FontSize="{StaticResource LabelFontSize}" VerticalAlignment="Top"/>
+                                <svg:Svg Path="/Assets/Images/icon_warning.svg"
+                                         Width="{StaticResource LabelFontSize}"
+                                         Height="{StaticResource LabelFontSize}"
+                                         VerticalAlignment="Top"/>
                                 <TextBlock Text="{Binding LimitationsNote}" 
                                            TextWrapping="Wrap"
                                            FontSize="{StaticResource SmallFontSize}"

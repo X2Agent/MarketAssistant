@@ -19,7 +19,8 @@ public class TradingStrategyService
     public Task<TradingStrategy?> GetStrategyAsync(string strategyId, CancellationToken ct = default)
         => _dataService.GetStrategyAsync(strategyId, ct);
 
-    public Task<List<TradingStrategy>> GetStrategiesByStatusAsync(
+    /// <remarks>virtual 供单元测试替换（AISignal 硬性边界行为测试）。</remarks>
+    public virtual Task<List<TradingStrategy>> GetStrategiesByStatusAsync(
         StrategyStatus status,
         CancellationToken ct = default)
         => _dataService.GetStrategiesByStatusAsync(status, ct);

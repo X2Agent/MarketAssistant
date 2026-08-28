@@ -139,14 +139,14 @@
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                VerticalAlignment="Center"/>
                                     <Border Grid.Column="1"
-                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"
                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                             Padding="{StaticResource TinyPadding}"
                                             VerticalAlignment="Center">
                                         <TextBlock Text="{Binding ChangePercentage}"
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    FontWeight="Bold"
-                                                   Foreground="White"/>
+                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
                                     </Border>
                                 </Grid>
                             </StackPanel>

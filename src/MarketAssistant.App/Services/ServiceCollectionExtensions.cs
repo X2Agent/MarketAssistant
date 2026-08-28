@@ -1,5 +1,6 @@
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Infrastructure.AdaptiveCards;
+using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Navigation;
@@ -32,7 +33,15 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<NavigationService>();
 
-        // AdaptiveCard 转换器（依赖 App.Services 注册的 parsers）
+        // AdaptiveCard 解析器责任链（解析器实现位于本工程 Infrastructure/AdaptiveCards/Parsers）
+        services.AddSingleton<IJsonToAdaptiveCardParser, CoordinatorCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, FinancialCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, FundamentalCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, SentimentCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, NewsCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, TechnicalCardParser>();
+
+        // AdaptiveCard 转换器（依赖上方注册的解析器责任链）
         services.AddSingleton<AdaptiveCardConverter>();
 
         // 注册全局异常处理器（Singleton，由 DI 创建实例）

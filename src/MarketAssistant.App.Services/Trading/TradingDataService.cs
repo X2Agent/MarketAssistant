@@ -191,7 +191,8 @@ public class TradingDataService : SqliteServiceBase
     /// 仅更新策略的最后评估时间（不增加执行计数），用于 AI 信号策略的评估节流：
     /// 无论 Agent 是否实际成交，一次评估后都记入冷却期，避免未成交时每个价格 tick 重复调用 LLM。
     /// </summary>
-    public async Task UpdateStrategyLastTriggeredAtAsync(string id, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyLastTriggeredAtAsync(string id, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -240,7 +241,8 @@ public class TradingDataService : SqliteServiceBase
         }
     }
 
-    public async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -253,9 +255,31 @@ public class TradingDataService : SqliteServiceBase
     }
 
     /// <summary>
+    /// 更新策略护栏位（止损/止盈价）。AI 决策生成护栏后调用，
+    /// 使 StrategyEngine 的硬性边界评估与 TradeExecutor 的风控检查立即生效。
+    /// </summary>
+    public async Task UpdateStrategyGuardrailsAsync(
+        string id, decimal? stopLossPrice, decimal? takeProfitPrice, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE strategies SET stop_loss_price = @stopLoss, take_profit_price = @takeProfit
+            WHERE id = @id AND environment = @environment
+            """;
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@stopLoss", ToDbNullable(stopLossPrice));
+        cmd.Parameters.AddWithValue("@takeProfit", ToDbNullable(takeProfitPrice));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// 更新追踪止损的峰值/谷值价格（持久化，防止重启丢失）
     /// </summary>
-    public async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -811,7 +835,8 @@ public class TradingDataService : SqliteServiceBase
     /// <summary>
     /// 计算指定 symbol 的加权平均开仓价（仅未平仓部分，用于风控与 UI）
     /// </summary>
-    public async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);

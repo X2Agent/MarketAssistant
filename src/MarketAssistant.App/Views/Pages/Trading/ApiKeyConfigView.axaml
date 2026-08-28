@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converters="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="600"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="MarketAssistant.Views.Pages.Trading.ApiKeyConfigView"
              x:DataType="vm:ApiKeyConfigViewModel">
 
@@ -43,16 +44,16 @@
 
             <!-- 实盘警告 -->
             <Border IsVisible="{Binding IsLiveMode}"
-                    Background="{DynamicResource DangerBackgroundBrush}"
-                    BorderBrush="{StaticResource DangerBorderBrush}"
+                    Background="{DynamicResource DangerPanelBackgroundBrush}"
+                    BorderBrush="{DynamicResource DangerPanelBorderBrush}"
                     BorderThickness="{StaticResource DefaultBorderThickness}"
                     CornerRadius="{StaticResource SmallCornerRadius}"
                     Padding="{StaticResource DefaultPadding}">
                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                    <TextBlock Text="⚠"
-                               FontSize="{StaticResource SubTitleFontSize}"
-                               Foreground="{DynamicResource DangerPanelTextBrush}"
-                               VerticalAlignment="Top"/>
+                    <svg:Svg Path="/Assets/Images/icon_danger.svg"
+                             Width="{StaticResource SubTitleFontSize}"
+                             Height="{StaticResource SubTitleFontSize}"
+                             VerticalAlignment="Top"/>
                     <TextBlock Text="实盘模式将使用真实资金进行交易。请确认 API Key 已在 binance.com 配置正确的权限（仅开启现货/合约交易，不要开启提现权限）。"
                                Classes="caption"
                                Foreground="{DynamicResource DangerPanelTextBrush}"
@@ -105,13 +106,13 @@
                                            VerticalAlignment="Center"/>
                                 <Border Grid.Column="1"
                                         IsVisible="{Binding IsConfigured}"
-                                        Background="{StaticResource SuccessBackgroundBrush}"
+                                        Background="{DynamicResource SuccessPanelBackgroundBrush}"
                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                         Padding="{StaticResource TagPadding}"
                                         VerticalAlignment="Center">
                                     <TextBlock Text="已配置"
                                                FontSize="{StaticResource TinyFontSize}"
-                                               Foreground="{StaticResource SuccessAccentBrush}"/>
+                                               Foreground="{DynamicResource SuccessPanelTextBrush}"/>
                                 </Border>
                                 <Border Grid.Column="1"
                                         IsVisible="{Binding !IsConfigured}"

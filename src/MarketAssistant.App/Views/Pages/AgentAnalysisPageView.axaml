@@ -7,6 +7,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              xmlns:models="using:MarketAssistant.Services.Archive"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AgentAnalysisPageView"
              x:DataType="vm:AgentAnalysisViewModel"
@@ -92,7 +93,10 @@
                                                 Command="{Binding ExportReportCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                                                <TextBlock Text="📄" FontSize="{StaticResource LabelFontSize}" VerticalAlignment="Center"/>
+                                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -182,23 +186,24 @@
                         IsHitTestVisible="False"/>
 
                     <!-- 智能对话 FAB -->
-                    <Button Content="💬"
-                            HorizontalAlignment="Right"
+                    <Button HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
                             ZIndex="1000"
-                            Margin="{StaticResource FABMargin}"
-                            FontSize="{StaticResource TitleFontSize}"
                             Width="{StaticResource FABSize}"
                             Height="{StaticResource FABSize}"
                             CornerRadius="{StaticResource FABCornerRadius}"
                             Background="{StaticResource PrimaryBrush}"
-                            Foreground="White"
+                            Foreground="{StaticResource TextOnEmphasisBrush}"
                             BorderThickness="{StaticResource NoBorderThickness}"
                             Padding="0"
                             Command="{Binding ToggleChatSidebarCommand}"
                             ToolTip.Tip="智能对话"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center">
+                        <svg:Svg Path="/Assets/Images/icon_chat.svg"
+                                 Width="24" Height="24"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"/>
                         <Button.Styles>
                             <Style Selector="Button:pointerover /template/ ContentPresenter">
                                 <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
@@ -222,9 +227,9 @@
                         VerticalAlignment="Center"
                         Width="{StaticResource ProgressDialogWidth}">
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <TextBlock Text="⚠️"
-                                   FontSize="{StaticResource ExtraLargeFontSize}"
-                                   HorizontalAlignment="Center"/>
+                        <svg:Svg Path="/Assets/Images/icon_warning.svg"
+                                 Width="28" Height="28"
+                                 HorizontalAlignment="Center"/>
 
                         <TextBlock Text="分析未完成"
                                    FontSize="{StaticResource LargeFontSize}"
@@ -244,7 +249,7 @@
                                 Command="{Binding RetryAnalysisCommand}"
                                 HorizontalAlignment="Center"
                                 Background="{StaticResource PrimaryBrush}"
-                                Foreground="White"
+                                Foreground="{StaticResource TextOnEmphasisBrush}"
                                 BorderThickness="{StaticResource NoBorderThickness}"
                                 CornerRadius="{StaticResource SmallCornerRadius}"
                                 Padding="{StaticResource CompactCardPadding}">
@@ -263,7 +268,7 @@
         </Grid>
 
         <!-- 半透明遮罩层：点击可关闭侧边栏 -->
-        <Border Background="#80000000"
+        <Border Background="{DynamicResource DarkOverlayBrush}"
                 IsVisible="{Binding IsChatSidebarVisible}"
                 ZIndex="1500"
                 Focusable="False"
@@ -278,7 +283,7 @@
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource LeftBorderThickness}"
-                BoxShadow="-4 0 16 0 #40000000">
+                BoxShadow="{StaticResource SidebarBoxShadow}">
             <ContentControl Content="{Binding ChatSidebarViewModel}">
                 <ContentControl.ContentTemplate>
                     <DataTemplate x:DataType="vm:ChatSidebarViewModel">

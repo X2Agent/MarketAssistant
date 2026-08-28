@@ -80,12 +80,15 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
                 .LastOrDefault(item => item.Macd is not null && item.Signal is not null)
                 ?? throw new FriendlyException($"MACD 指标结果为空: {assetSymbol}");
 
+            var diff = Round(result.Macd) ?? 0;
+            var dea = Round(result.Signal) ?? 0;
             var macd = new TechnicalMACD
             {
                 T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                Diff = Round(result.Macd) ?? 0,
-                Dea = Round(result.Signal) ?? 0,
-                Macd = Round(result.Histogram) ?? 0,
+                Diff = diff,
+                Dea = dea,
+                // 国内惯例 MACD 柱线 = 2*(DIFF-DEA)，与模型契约及 A 股智兔数据口径保持一致
+                Macd = 2 * (diff - dea),
                 Ema12 = Round(result.FastEma) ?? 0,
                 Ema26 = Round(result.SlowEma) ?? 0
             };

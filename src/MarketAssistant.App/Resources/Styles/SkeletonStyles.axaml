@@ -11,7 +11,7 @@
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Transitions">
             <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.8"/>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.6"/>
             </Transitions>
         </Setter>
     </Style>

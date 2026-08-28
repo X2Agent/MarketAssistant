@@ -4,6 +4,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -23,12 +24,17 @@ public class KLineServiceTest
     {
         var services = new ServiceCollection();
 
-        // 注册依赖服务
+        // 注册 A 股数据提供者（ZhiTuMarketClient，AShareKLineService 构造依赖）
+        services.AddAShareDataProviders();
+        // BinanceMarketDataService 重构后依赖 IMemoryCache
+        services.AddMemoryCache();
+
+        // 注册依赖服务（智兔令牌从环境变量读取，不在代码中硬编码）
         var mockUserSettingService = new Mock<IUserSettingService>();
         mockUserSettingService.Setup(s => s.CurrentSetting)
             .Returns(new UserSetting
             {
-                ZhiTuApiToken = "test-token"
+                ZhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN") ?? ""
             });
 
         services.AddSingleton(mockUserSettingService.Object);

@@ -466,6 +466,8 @@ public class MarketMonitor : IDisposable
             StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
             StrategyType.TrailingStop => true,
             StrategyType.GridTrading => IsGridBreakOut(strategy, currentPrice),
+            // DCA 评估只会以卖出方向触发出场（止盈/止损清仓），卖出即平仓语义
+            StrategyType.DCA => strategy.Side == OrderSide.Sell,
             _ => false
         };
     }

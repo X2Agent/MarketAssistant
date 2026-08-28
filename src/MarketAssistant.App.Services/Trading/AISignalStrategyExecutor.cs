@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Trading.Models;
 using Microsoft.Agents.AI;
@@ -127,13 +128,20 @@ public sealed class AISignalStrategyExecutor
 
             var priorRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, ct)
                 .ConfigureAwait(false);
-            var priorLatestRecordId = priorRecords.FirstOrDefault()?.Id;
 
             var prompt = await BuildAIPromptAsync(strategy, currentPrice, priorRecords, ct)
                 .ConfigureAwait(false);
-            await InvokeAgentAsync(prompt, ct).ConfigureAwait(false);
+            var responseText = await InvokeAgentAsync(prompt, ct).ConfigureAwait(false);
 
-            return await ProcessAgentResponseAsync(strategy, priorLatestRecordId, ct)
+            if (!AISignalDecisionParser.TryParse(responseText, out var decision) || decision!.IsHold)
+            {
+                _logger.LogInformation(
+                    "AI 决策为 HOLD 或无法解析: {StrategyId} 响应片段 {ResponseSnippet}",
+                    strategy.Id, Truncate(responseText, 200));
+                return AISignalExecutionResult.NoTrade;
+            }
+
+            return await ExecuteDecisionAsync(strategy, currentPrice, decision!, ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -145,6 +153,165 @@ public sealed class AISignalStrategyExecutor
         {
             TradingContext.CurrentStrategyId = null;
         }
+    }
+
+    /// <summary>
+    /// 执行 AI 结构化决策：置信度门控 → 置信度动态仓位（按档案预算与仓位上限封顶）→
+    /// 本地下单（AI 不直接调用下单工具）→ 成交后自动附加止盈止损护栏。
+    /// </summary>
+    private async Task<AISignalExecutionResult> ExecuteDecisionAsync(
+        TradingStrategy strategy,
+        decimal currentPrice,
+        AISignalDecision decision,
+        CancellationToken ct)
+    {
+        var aiParams = AISignalParams.FromJson(strategy.CustomParams) ?? new AISignalParams();
+
+        if (decision.Confidence < aiParams.ConfidenceThreshold)
+        {
+            _logger.LogInformation(
+                "AI 置信度 {Confidence} 低于门槛 {Threshold}，放弃执行: {StrategyId} 理由: {Reason}",
+                decision.Confidence, aiParams.ConfidenceThreshold, strategy.Id, decision.Reason);
+            return AISignalExecutionResult.NoTrade;
+        }
+
+        var entrySide = strategy.Side;
+        var budget = aiParams.BudgetUsdt > 0 ? aiParams.BudgetUsdt : strategy.Quantity;
+        if (budget <= 0)
+        {
+            _logger.LogWarning(
+                "AI 策略未配置开仓预算（BudgetUsdt/Quantity），跳过执行: {StrategyId}", strategy.Id);
+            return AISignalExecutionResult.NoTrade;
+        }
+
+        // 置信度动态仓位：预算 × 置信度系数，并按档案仓位上限封顶（AI 无法突破）
+        var sizedBudget = budget * (decision.Confidence / 100m);
+        var balanceSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct).ConfigureAwait(false);
+        var accountValue = balanceSummary?.TotalValueUSDT ?? 0;
+        if (accountValue > 0)
+        {
+            var capValue = accountValue * aiParams.MaxPositionPercent / 100m;
+            if (sizedBudget > capValue)
+            {
+                _logger.LogInformation(
+                    "预算 {Budget:F2} 超出仓位上限 {Cap:F2}（账户总值 {AccountValue:F2} × {MaxPercent}%），已封顶: {StrategyId}",
+                    sizedBudget, capValue, accountValue, aiParams.MaxPositionPercent, strategy.Id);
+                sizedBudget = capValue;
+            }
+        }
+
+        var quantity = currentPrice > 0 ? Math.Round(sizedBudget / currentPrice, 8) : 0;
+        if (quantity <= 0)
+        {
+            _logger.LogInformation("计算后下单数量为 0，跳过执行: {StrategyId} 预算 {Budget}", strategy.Id, sizedBudget);
+            return AISignalExecutionResult.NoTrade;
+        }
+
+        if (aiParams.ShadowMode)
+        {
+            _logger.LogInformation(
+                "影子模式决策（仅记录不下单）: {StrategyId} {Symbol} {Action} 置信度 {Confidence}% 数量 {Qty} " +
+                "止损 {StopLoss} 止盈 {TakeProfit} 理由: {Reason}",
+                strategy.Id, strategy.Symbol, decision.Action, decision.Confidence, quantity,
+                decision.StopLossPrice, decision.TakeProfitPrice, decision.Reason);
+            return AISignalExecutionResult.NoTrade;
+        }
+
+        var result = await _tradeExecutor.ExecuteOrderAsync(
+            strategy.Symbol,
+            entrySide,
+            OrderType.Market,
+            quantity,
+            currentPrice,
+            strategyId: strategy.Id,
+            aiReasoning: decision.Reason,
+            requireClose: false,
+            ct: ct).ConfigureAwait(false);
+
+        if (!result.Success || result.Record == null)
+            return new AISignalExecutionResult(null, result);
+
+        // 成交后自动附加护栏：本地按决策价/档案兜底价生成并持久化，下个 tick 即生效
+        await ApplyGuardrailsAsync(strategy, aiParams, entrySide, currentPrice, quantity, decision, ct)
+            .ConfigureAwait(false);
+        await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct).ConfigureAwait(false);
+
+        return new AISignalExecutionResult(result.Record, result);
+    }
+
+    private static string? Truncate(string? text, int maxLength)
+        => string.IsNullOrEmpty(text) || text.Length <= maxLength ? text : text[..maxLength] + "…";
+
+    /// <summary>
+    /// 生成并持久化护栏：
+    /// - TrailingStop 出场：创建独立的追踪止损伴随策略（复用引擎现有追踪评估，一次性执行）；
+    /// - FixedStop 出场：止损/止盈价写入策略的 StopLossPrice/TakeProfitPrice（硬性边界机制）。
+    /// AI 给出的价位仅在与当前价方向关系合理时采用，否则按档案百分比兜底，保证护栏方向永不颠倒。
+    /// </summary>
+    private async Task ApplyGuardrailsAsync(
+        TradingStrategy strategy,
+        AISignalParams aiParams,
+        OrderSide entrySide,
+        decimal currentPrice,
+        decimal executedQty,
+        AISignalDecision decision,
+        CancellationToken ct)
+    {
+        var isLong = entrySide == OrderSide.Buy;
+
+        if (aiParams.ParsedExitStyle == ExitStyle.TrailingStop)
+        {
+            var trailingPercent = aiParams.TrailingPercent > 0
+                ? aiParams.TrailingPercent
+                : ScenarioPresets.GetTrailingPercent(aiParams.ParsedRiskProfile);
+            var companion = new TradingStrategy
+            {
+                Symbol = strategy.Symbol,
+                Type = StrategyType.TrailingStop,
+                Status = StrategyStatus.Active,
+                // 多头入场 → 追踪卖出出场；空头入场 → 追踪买入出场
+                Side = isLong ? OrderSide.Sell : OrderSide.Buy,
+                TriggerPrice = currentPrice,
+                Quantity = executedQty,
+                MaxExecutions = 1,
+                CustomParams = JsonSerializer.Serialize(new
+                {
+                    trailingPercent,
+                    activationPrice = currentPrice
+                })
+            };
+            await _strategyService.SaveStrategyAsync(companion, ct).ConfigureAwait(false);
+            _logger.LogInformation(
+                "AI 已创建追踪止损伴随策略: {CompanionId} 回调 {Percent}% 激活价 {Activation} 关联 {StrategyId}",
+                companion.Id, trailingPercent, currentPrice, strategy.Id);
+            return;
+        }
+
+        decimal? aiStopLoss = decision.StopLossPrice;
+        var stopLossValid = aiStopLoss.HasValue &&
+            (isLong ? aiStopLoss.Value < currentPrice : aiStopLoss.Value > currentPrice);
+        var stopLossFallback = isLong
+            ? currentPrice * (1 - aiParams.StopLossPercent / 100m)
+            : currentPrice * (1 + aiParams.StopLossPercent / 100m);
+        var stopLoss = Math.Round(stopLossValid ? aiStopLoss!.Value : stopLossFallback, 8);
+
+        decimal? aiTakeProfit = decision.TakeProfitPrice;
+        var takeProfitValid = aiTakeProfit.HasValue &&
+            (isLong ? aiTakeProfit.Value > currentPrice : aiTakeProfit.Value < currentPrice);
+        var takeProfitFallback = isLong
+            ? currentPrice * (1 + aiParams.TakeProfitPercent / 100m)
+            : currentPrice * (1 - aiParams.TakeProfitPercent / 100m);
+        var takeProfit = Math.Round(takeProfitValid ? aiTakeProfit!.Value : takeProfitFallback, 8);
+
+        strategy.StopLossPrice = stopLoss;
+        strategy.TakeProfitPrice = takeProfit;
+        await _dataService.UpdateStrategyGuardrailsAsync(strategy.Id, stopLoss, takeProfit, ct)
+            .ConfigureAwait(false);
+        _logger.LogInformation(
+            "AI 护栏已附加: {StrategyId} 止损 {StopLoss} 止盈 {TakeProfit}（{Source}）",
+            strategy.Id, stopLoss, takeProfit,
+            decision.StopLossPrice.HasValue || decision.TakeProfitPrice.HasValue
+                ? "AI 决策价" : "风险档案兜底价");
     }
 
     private static bool TryHandleHardBoundary(
@@ -190,36 +357,45 @@ public sealed class AISignalStrategyExecutor
         List<TradeRecord> priorRecords,
         CancellationToken ct)
     {
-        var recentSummary = priorRecords.Count == 0
-            ? "（该策略尚无成交记录）"
-            : string.Join("\n", priorRecords.Take(5).Select(r =>
-                $"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"));
+        var recentSummary = priorRecords.
+            Take(5)
+            .Aggregate(new StringBuilder(), (sb, r) => sb.AppendLine($"{r.CreatedAt:u} {r.Side} 成交量:{r.ExecutedQty} 价:{r.ExecutedPrice} {r.Status}"))
+            .ToString().TrimEnd();
 
         var positionSummary = await BuildPositionSummaryAsync(strategy.Symbol, ct).ConfigureAwait(false);
         var analysisContext = BuildAnalysisContext(strategy.Symbol);
 
-        var stopLossInfo = strategy.StopLossPrice.HasValue
-            ? $"止损价: {strategy.StopLossPrice.Value}"
-            : "未设置止损";
-        var takeProfitInfo = strategy.TakeProfitPrice.HasValue
-            ? $"止盈价: {strategy.TakeProfitPrice.Value}"
-            : "未设置止盈";
-        var maxPositionPercent = strategy.MaxPositionPercent ?? 20m;
+        var aiParams = AISignalParams.FromJson(strategy.CustomParams) ?? new AISignalParams();
+        var budget = aiParams.BudgetUsdt > 0 ? aiParams.BudgetUsdt : strategy.Quantity;
         var todayStats = await _dataService.GetTodayStatsAsync(ct).ConfigureAwait(false);
         var maxDailyTrades = (await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false)).MaxDailyTrades;
         var remainingTrades = Math.Max(0, maxDailyTrades - todayStats.TradeCount);
 
+        const string jsonTemplate = """
+            {
+              "decision": "BUY | SELL | HOLD",
+              "confidence": 0,
+              "stopLossPrice": null,
+              "takeProfitPrice": null,
+              "reason": "一句话决策理由"
+            }
+            """;
+
         return $"""
-            分析交易标的 {strategy.Symbol}，当前价格 {currentPrice}。
+            你是虚拟币智能交易决策引擎，负责 {strategy.Symbol} 的交易决策。当前价格 {currentPrice}。
 
-            ## 风险预算（必须严格遵守）
-            - 本次交易后该 symbol 总仓位不得超过账户总值的 {maxPositionPercent:F1}%
-            - 今日已实现盈亏: {todayStats.TotalPnl:F2} USDT
-            - 今日剩余交易次数: {remainingTrades}
+            ## 输出格式（强制）
+            你的最终回答必须且只能是一个 JSON 对象，格式如下，禁止输出任何其他文字、markdown 代码块标记或工具调用说明。
+            下单由系统完成，禁止调用任何下单（PlaceOrder）工具；你可以调用行情、持仓等技术指标查询工具辅助决策。
+            {jsonTemplate}
 
-            ## 策略配置
-            {strategy.CustomParams ?? "无"}
-            风险边界: {stopLossInfo} | {takeProfitInfo}
+            ## 决策约束
+            - 置信度低于 {aiParams.ConfidenceThreshold} 时必须 HOLD（系统会强制拦截，低于门槛的 BUY/SELL 不会执行）。
+            - decision 为 BUY 时：stopLossPrice 必须低于当前价、takeProfitPrice 必须高于当前价；SELL 相反。
+            - 无法给出合理止盈/止损价时填 null，系统会按风险档案「{aiParams.ParsedRiskProfile.GetDisplayName()}」自动生成护栏。
+            - 本次开仓预算约 {budget:F2} USDT，实际下单数量由系统按置信度与仓位上限计算，你无需输出数量。
+            - 仓位上限为账户总值的 {aiParams.MaxPositionPercent:F1}%（系统强制执行）。
+            - 今日已实现盈亏 {todayStats.TotalPnl:F2} USDT，今日剩余交易次数 {remainingTrades}。
 
             ## 当前仓位状态
             {positionSummary}
@@ -229,22 +405,13 @@ public sealed class AISignalStrategyExecutor
 
             近期该策略成交摘要（最多 5 笔，按时间倒序）:
             {recentSummary}
-
-            ## 决策要求
-            请输出结构化决策：
-            1. 决策: BUY / SELL / HOLD
-            2. 置信度: 0-100
-            3. 入场逻辑
-            4. 退出计划（止损/止盈具体价位）
-            5. 主要风险因素
-
-            如果置信度低于 60，建议 HOLD。
-            如果决定交易，请调用 PlaceOrder 工具执行 {strategy.Side} 操作，数量 {strategy.Quantity}。
-            如果决定不交易，请说明理由。
             """;
     }
 
-    private async Task InvokeAgentAsync(string prompt, CancellationToken ct)
+    /// <summary>
+    /// 调用交易 Agent 并返回原始响应文本（由本地解析为结构化决策）。
+    /// </summary>
+    private async Task<string> InvokeAgentAsync(string prompt, CancellationToken ct)
     {
         var agent = _agentFactory.CreateAutomationAgent();
         var messages = new List<ChatMessage>
@@ -255,21 +422,7 @@ public sealed class AISignalStrategyExecutor
         var response = await agent.RunAsync(messages, session: null, options: null, cancellationToken: ct)
             .ConfigureAwait(false);
         _logger.LogDebug("TradingAgent 响应: {Content}", response.Text);
-    }
-
-    private async Task<AISignalExecutionResult> ProcessAgentResponseAsync(
-        TradingStrategy strategy,
-        string? priorLatestRecordId,
-        CancellationToken ct)
-    {
-        var recentRecords = await _dataService.GetRecordsByStrategyAsync(strategy.Id, ct)
-            .ConfigureAwait(false);
-        var newestRecord = recentRecords.FirstOrDefault();
-        if (newestRecord == null || newestRecord.Id == priorLatestRecordId)
-            return AISignalExecutionResult.NoTrade;
-
-        await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct).ConfigureAwait(false);
-        return new AISignalExecutionResult(newestRecord);
+        return response.Text;
     }
 
     private async Task<string> BuildPositionSummaryAsync(string symbol, CancellationToken ct)

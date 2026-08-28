@@ -179,6 +179,58 @@ public sealed class SecureSettingsMigrationTest
         Assert.IsFalse(sanitizedJson.Contains("EnvironmentVariables", StringComparison.Ordinal));
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void McpSettings_LegacyConfigWithoutSchemaVersion_ShouldDeserializeAsZero()
+    {
+        // 旧版本保存的配置 JSON 无 ToolsSchemaVersion 字段，应反序列化为 0，
+        // 由 UI 据此提示用户重新勾选工具白名单
+        using var directory = new TemporaryDirectory();
+        var configPath = Path.Combine(directory.Path, "mcpservers.json");
+        File.WriteAllText(configPath, """
+            [
+              {
+                "Id": "server-legacy",
+                "Name": "旧版服务器",
+                "TransportType": "stdio",
+                "Command": "npx",
+                "IsEnabled": true
+              }
+            ]
+            """);
+
+        var service = new MCPServerConfigService(configPath, new InMemorySecureSettingsStore());
+
+        var configs = service.ServerConfigs;
+        Assert.HasCount(1, configs);
+        Assert.AreEqual(0, configs[0].ToolsSchemaVersion);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void McpSettings_NewConfig_ShouldPersistCurrentSchemaVersion()
+    {
+        using var directory = new TemporaryDirectory();
+        var configPath = Path.Combine(directory.Path, "mcpservers.json");
+        var service = new MCPServerConfigService(configPath, new InMemorySecureSettingsStore());
+
+        service.AddOrUpdateConfig(new MCPServerConfig
+        {
+            Id = "server-new",
+            Name = "新服务器",
+            ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion
+        });
+
+        using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+        Assert.AreEqual(
+            MCPServerConfig.CurrentToolsSchemaVersion,
+            document.RootElement[0].GetProperty("ToolsSchemaVersion").GetInt32());
+
+        // 重新加载后版本号保持当前值，不应再触发迁移提示
+        var reloaded = new MCPServerConfigService(configPath, new InMemorySecureSettingsStore());
+        Assert.AreEqual(MCPServerConfig.CurrentToolsSchemaVersion, reloaded.GetConfig("server-new")!.ToolsSchemaVersion);
+    }
+
     private sealed class InMemorySecureSettingsStore : ISecureSettingsStore
     {
         public bool FailWrites { get; init; }

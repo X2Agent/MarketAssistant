@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform;
+using Avalonia.Styling;
 using MarketAssistant.Applications.Charts.Models;
 using System.Text.Json;
 
@@ -39,6 +40,34 @@ public class KLineChartView : UserControl
     public KLineChartView()
     {
         InitializeComponent();
+
+        // 跟随应用主题变化，同步 K 线图配色
+        ActualThemeVariantChanged += (_, _) => _ = ApplyThemeToChartAsync();
+    }
+
+    /// <summary>
+    /// 将当前主题同步到图表内嵌页面（深色/浅色）
+    /// </summary>
+    private async Task ApplyThemeToChartAsync()
+    {
+        if (_webView == null || !_isInitialized)
+        {
+            return;
+        }
+
+        var theme = ActualThemeVariant == ThemeVariant.Dark ? "dark" : "light";
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                await _webView.InvokeScript($"window.stockChartInterface.setTheme('{theme}');");
+            });
+        }
+        catch (Exception ex)
+        {
+            // 图表脚本尚未就绪时忽略，导航完成回调会再次同步主题
+            System.Diagnostics.Debug.WriteLine($"同步K线图主题失败: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -134,8 +163,17 @@ public class KLineChartView : UserControl
         Dispatcher.UIThread.Post(() =>
         {
             _isInitialized = true;
+            ApplyThemeToChart();
             HideLoading();
         });
+    }
+
+    /// <summary>
+    /// 在 UI 线程上同步图表主题（导航完成后的首次注入）
+    /// </summary>
+    private void ApplyThemeToChart()
+    {
+        Dispatcher.UIThread.Post(() => _ = ApplyThemeToChartAsync());
     }
 
     /// <summary>
@@ -225,9 +263,9 @@ public class KLineChartView : UserControl
     <title>K线图表</title>
     <script src=""https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js""></script>
     <style>
-        body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
+        body { margin: 0; padding: 10px; font-family: Arial, sans-serif; background-color: #0A0E17; color: #E4EAF5; }
         #chartContainer { width: 100%; height: 400px; }
-        .loading { text-align: center; padding: 20px; color: #666; }
+        .loading { text-align: center; padding: 20px; color: #8894A8; }
     </style>
 </head>
 <body>
@@ -261,9 +299,9 @@ public class KLineChartView : UserControl
                     if (loading) {
                         this.chart.showLoading('default', {
                             text: '正在加载...',
-                            color: '#4d90fe',
-                            textColor: '#000',
-                            maskColor: 'rgba(255, 255, 255, 0.8)'
+                            color: '#1976D2',
+                            textColor: '#8894A8',
+                            maskColor: 'rgba(10, 14, 23, 0.8)'
                         });
                     } else {
                         this.chart.hideLoading();
@@ -293,7 +331,7 @@ public class KLineChartView : UserControl
             setError: function(hasError, message) {
                 if (hasError) {
                     document.getElementById('chartContainer').innerHTML = 
-                        '<div class=""loading"" style=""color: red;"">❌ ' + message + '</div>';
+                        '<div class=""loading"" style=""color: #EF4444;"">加载失败: ' + message + '</div>';
                 }
             }
         };

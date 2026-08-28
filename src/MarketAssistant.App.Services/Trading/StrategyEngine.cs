@@ -88,7 +88,7 @@ public class StrategyEngine
             StrategyType.TakeProfit => (EvaluateTakeProfit(strategy, currentPrice), strategy.Side, strategy.Quantity),
             StrategyType.TrailingStop => (await EvaluateAndUpdateTrailingStopAsync(strategy, currentPrice, ct), strategy.Side, strategy.Quantity),
             StrategyType.AISignal => (await EvaluateAndUpdateAISignalAsync(strategy, ct).ConfigureAwait(false), strategy.Side, strategy.Quantity),
-            StrategyType.GridTrading => EvaluateAndUpdateGridTrading(strategy, currentPrice, out var gs, out var gq) ? (true, gs, gq) : (false, strategy.Side, strategy.Quantity),
+            StrategyType.GridTrading => await EvaluateAndUpdateGridTradingAsync(strategy, currentPrice, ct).ConfigureAwait(false),
             StrategyType.DCA => await EvaluateDCAAsync(strategy, currentPrice, ct),
             _ => (false, strategy.Side, strategy.Quantity)
         };
@@ -128,29 +128,47 @@ public class StrategyEngine
     /// 评估追踪止损触发条件。
     /// 注意：此方法会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.TrailingPeakPrice"/>
     /// 字段以持久化追踪峰值/谷值状态，并同步写入数据存储，调用方依赖此副作用保持内存与持久化状态一致。
+    /// 参数回退策略：trailingPercent 缺失时按策略风险档案（CustomParams.riskProfile）取预设回调比例，
+    /// activationPrice 缺失时回退到策略触发价；确保安全护栏永不静默失效。
     /// </summary>
     private async Task<bool> EvaluateAndUpdateTrailingStopAsync(TradingStrategy strategy, decimal currentPrice, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(strategy.CustomParams))
-            return false;
-
         try
         {
-            using var doc = JsonDocument.Parse(strategy.CustomParams);
-            var root = doc.RootElement;
+            decimal trailingPercent = 0;
+            decimal activationPrice = 0;
 
-            if (!root.TryGetProperty("activationPrice", out var activationPriceEl))
-                return false;
-            var activationPrice = activationPriceEl.GetDecimal();
+            if (!string.IsNullOrEmpty(strategy.CustomParams))
+            {
+                using var doc = JsonDocument.Parse(strategy.CustomParams);
+                var root = doc.RootElement;
 
-            if (!root.TryGetProperty("trailingPercent", out var trailingPercentEl))
-                return false;
-            var trailingPercent = trailingPercentEl.GetDecimal();
+                if (root.TryGetProperty("trailingPercent", out var trailingPercentEl)
+                    && trailingPercentEl.TryGetDecimal(out var parsedPercent))
+                    trailingPercent = parsedPercent;
+
+                if (root.TryGetProperty("activationPrice", out var activationPriceEl)
+                    && activationPriceEl.TryGetDecimal(out var parsedActivation))
+                    activationPrice = parsedActivation;
+            }
+
+            if (trailingPercent <= 0)
+            {
+                var profile = ResolveRiskProfile(strategy);
+                trailingPercent = ScenarioPresets.GetTrailingPercent(profile);
+                _logger.LogWarning(
+                    "追踪止损策略 {StrategyId} 缺少 trailingPercent，按风险档案 {Profile} 回退为 {Percent}%",
+                    strategy.Id, profile.GetDisplayName(), trailingPercent);
+            }
+
+            // 未配置激活价时回退到策略触发价；两者皆无则立即激活（护栏优先于精度）
+            if (activationPrice <= 0 && strategy.TriggerPrice > 0)
+                activationPrice = strategy.TriggerPrice;
 
             if (strategy.Side == OrderSide.Sell)
             {
-                // 未激活且价格未达到激活价：不触发
-                if (!strategy.TrailingPeakPrice.HasValue && currentPrice < activationPrice)
+                // 未激活且价格未达到激活价：不触发（activationPrice 为 0 表示立即激活）
+                if (!strategy.TrailingPeakPrice.HasValue && activationPrice > 0 && currentPrice < activationPrice)
                     return false;
 
                 // 追踪最高价（从持久化字段恢复），从峰值回撤 trailingPercent% 时触发卖出
@@ -168,7 +186,7 @@ public class StrategyEngine
             }
             else
             {
-                if (!strategy.TrailingPeakPrice.HasValue && currentPrice > activationPrice)
+                if (!strategy.TrailingPeakPrice.HasValue && activationPrice > 0 && currentPrice > activationPrice)
                     return false;
 
                 // 追踪最低价（从持久化字段恢复），从谷值反弹 trailingPercent% 时触发买入
@@ -189,6 +207,15 @@ public class StrategyEngine
             _logger.LogWarning(ex, "解析 TrailingStop 参数失败: {StrategyId}", strategy.Id);
             return false;
         }
+    }
+
+    /// <summary>
+    /// 解析策略的风险档案：优先读取 CustomParams.riskProfile，缺失时回退稳健档。
+    /// </summary>
+    private static RiskProfile ResolveRiskProfile(TradingStrategy strategy)
+    {
+        var aiParams = AISignalParams.FromJson(strategy.CustomParams);
+        return aiParams?.ParsedRiskProfile ?? RiskProfile.Balanced;
     }
 
     // 未配置时的安全默认值，防止每个价格 tick 都触发 AI 调用
@@ -239,36 +266,33 @@ public class StrategyEngine
     /// 网格在 LowerPrice 和 UpperPrice 之间均匀分布。
     /// 价格下穿网格线时买入，上穿时卖出。
     /// 注意：此方法会修改入参 <paramref name="strategy"/> 的 <see cref="TradingStrategy.CustomParams"/>
-    /// 字段以更新网格的 LastTriggeredIndex 状态，调用方依赖此副作用在交易成功后原子持久化更新后的参数。
+    /// 字段以更新网格的 LastTriggeredIndex 状态，并将状态持久化到数据存储；
+    /// 首次评估的基准索引同样立即落库，避免应用重启后基准丢失导致重复触发。
     /// </summary>
-    private bool EvaluateAndUpdateGridTrading(TradingStrategy strategy, decimal currentPrice,
-        out OrderSide effectiveSide, out decimal effectiveQty)
+    private async Task<(bool Triggered, OrderSide Side, decimal Qty)> EvaluateAndUpdateGridTradingAsync(
+        TradingStrategy strategy, decimal currentPrice, CancellationToken ct)
     {
-        effectiveSide = strategy.Side;
-        effectiveQty = strategy.Quantity;
-
         if (string.IsNullOrEmpty(strategy.CustomParams))
-            return false;
+            return (false, strategy.Side, strategy.Quantity);
 
         try
         {
             var gridParams = JsonSerializer.Deserialize<GridTradingParams>(strategy.CustomParams);
             if (gridParams == null || gridParams.GridCount <= 1 || gridParams.UpperPrice <= gridParams.LowerPrice)
-                return false;
+                return (false, strategy.Side, strategy.Quantity);
 
             if (currentPrice < gridParams.LowerPrice)
             {
                 // 价格跌破网格下界：检查破网止损
                 if (gridParams.StopLossPrice.HasValue && currentPrice <= gridParams.StopLossPrice.Value)
                 {
-                    effectiveSide = OrderSide.Sell;
-                    effectiveQty = gridParams.QuantityPerGrid * gridParams.GridCount;
+                    var stopQty = gridParams.QuantityPerGrid * gridParams.GridCount;
                     _logger.LogWarning(
                         "网格破网止损触发: {StrategyId} 价格 {Price} <= 止损位 {StopLoss}，清仓 {Qty}",
-                        strategy.Id, currentPrice, gridParams.StopLossPrice, effectiveQty);
-                    return true;
+                        strategy.Id, currentPrice, gridParams.StopLossPrice, stopQty);
+                    return (true, OrderSide.Sell, stopQty);
                 }
-                return false;
+                return (false, strategy.Side, strategy.Quantity);
             }
             if (currentPrice > gridParams.UpperPrice)
             {
@@ -276,14 +300,13 @@ public class StrategyEngine
                 // 与破网止损方向对称；若反向买入会在高点开出全网格量多头。
                 if (gridParams.TakeProfitPrice.HasValue && currentPrice >= gridParams.TakeProfitPrice.Value)
                 {
-                    effectiveSide = OrderSide.Sell;
-                    effectiveQty = gridParams.QuantityPerGrid * gridParams.GridCount;
+                    var takeQty = gridParams.QuantityPerGrid * gridParams.GridCount;
                     _logger.LogWarning(
                         "网格破网止盈触发: {StrategyId} 价格 {Price} >= 止盈位 {TakeProfit}，清仓 {Qty}",
-                        strategy.Id, currentPrice, gridParams.TakeProfitPrice, effectiveQty);
-                    return true;
+                        strategy.Id, currentPrice, gridParams.TakeProfitPrice, takeQty);
+                    return (true, OrderSide.Sell, takeQty);
                 }
-                return false;
+                return (false, strategy.Side, strategy.Quantity);
             }
 
             var spacing = gridParams.GridSpacing;
@@ -292,16 +315,20 @@ public class StrategyEngine
 
             if (gridParams.LastTriggeredIndex < 0)
             {
+                // 首次评估：仅记录基准网格线并立即落库，不触发交易
                 gridParams.LastTriggeredIndex = currentIndex;
                 strategy.CustomParams = JsonSerializer.Serialize(gridParams);
-                return false;
+                await _dataService.UpdateStrategyCustomParamsAsync(strategy.Id, strategy.CustomParams, ct);
+                _logger.LogInformation(
+                    "网格基准初始化: {StrategyId} 基准网格 {Index}，价格: {Price}",
+                    strategy.Id, currentIndex, currentPrice);
+                return (false, strategy.Side, strategy.Quantity);
             }
 
             if (currentIndex == gridParams.LastTriggeredIndex)
-                return false;
+                return (false, strategy.Side, strategy.Quantity);
 
-            effectiveSide = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
-            effectiveQty = gridParams.QuantityPerGrid;
+            var effectiveSide = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
 
             gridParams.LastTriggeredIndex = currentIndex;
             strategy.CustomParams = JsonSerializer.Serialize(gridParams);
@@ -309,12 +336,12 @@ public class StrategyEngine
             _logger.LogInformation(
                 "网格交易触发: {StrategyId} 网格 {Index} → {Side}，价格: {Price}",
                 strategy.Id, currentIndex, effectiveSide, currentPrice);
-            return true;
+            return (true, effectiveSide, gridParams.QuantityPerGrid);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "解析 GridTrading 参数失败: {StrategyId}", strategy.Id);
-            return false;
+            return (false, strategy.Side, strategy.Quantity);
         }
     }
 
@@ -333,6 +360,12 @@ public class StrategyEngine
             var dcaParams = JsonSerializer.Deserialize<DCAParams>(strategy.CustomParams);
             if (dcaParams == null || dcaParams.AmountPerInterval <= 0)
                 return (false, strategy.Side, strategy.Quantity);
+
+            // 出场优先：每 tick 评估止盈/止损，不受定投间隔节流限制（护栏必须实时生效）
+            var exitTriggered = await EvaluateDCAExitAsync(strategy, dcaParams, currentPrice, ct)
+                .ConfigureAwait(false);
+            if (exitTriggered.HasValue)
+                return exitTriggered.Value;
 
             if (strategy.LastTriggeredAt.HasValue)
             {
@@ -389,6 +422,60 @@ public class StrategyEngine
             _logger.LogWarning(ex, "解析 DCA 参数失败: {StrategyId}", strategy.Id);
             return (false, strategy.Side, strategy.Quantity);
         }
+    }
+
+    /// <summary>
+    /// DCA 出场评估：基于 FIFO 持仓均价判断止盈/止损。
+    /// 止盈：均价上涨达 TakeProfitPercent 时全部卖出获利了结，定投继续（从零重新积累）。
+    /// 止损：均价下跌达 StopLossPercent 时按 StopLossSellOut 决定清仓卖出或仅暂停策略（保守默认）。
+    /// 返回 null 表示未触发任何出场条件，继续走买入评估。
+    /// </summary>
+    private async Task<(bool Triggered, OrderSide Side, decimal Qty)?> EvaluateDCAExitAsync(
+        TradingStrategy strategy, DCAParams dcaParams, decimal currentPrice, CancellationToken ct)
+    {
+        if (dcaParams.TakeProfitPercent <= 0 && dcaParams.StopLossPercent <= 0)
+            return null;
+
+        var positions = await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct).ConfigureAwait(false);
+        var totalQty = positions.Sum(p => p.Quantity - p.ClosedQuantity);
+        if (totalQty <= 0)
+            return null;
+
+        var avgEntry = await _dataService.GetOpenPositionAvgEntryPriceAsync(strategy.Symbol, ct)
+            .ConfigureAwait(false);
+        if (avgEntry <= 0)
+            return null;
+
+        // 止盈：达到止盈线全部卖出
+        if (dcaParams.TakeProfitPercent > 0 && currentPrice >= avgEntry * (1 + dcaParams.TakeProfitPercent / 100m))
+        {
+            _logger.LogInformation(
+                "DCA 止盈触发: {StrategyId} 当前价 {Price} >= 均价 {AvgEntry} × (1 + {TakeProfit}%)，清仓 {Qty}",
+                strategy.Id, currentPrice, avgEntry, dcaParams.TakeProfitPercent, totalQty);
+            return (true, OrderSide.Sell, totalQty);
+        }
+
+        // 止损：达到止损线按配置卖出清仓或暂停策略
+        if (dcaParams.StopLossPercent > 0 && currentPrice <= avgEntry * (1 - dcaParams.StopLossPercent / 100m))
+        {
+            if (dcaParams.StopLossSellOut)
+            {
+                _logger.LogWarning(
+                    "DCA 止损清仓触发: {StrategyId} 当前价 {Price} <= 均价 {AvgEntry} × (1 - {StopLoss}%)，清仓 {Qty}",
+                    strategy.Id, currentPrice, avgEntry, dcaParams.StopLossPercent, totalQty);
+                return (true, OrderSide.Sell, totalQty);
+            }
+
+            // 保守动作：暂停定投保留持仓，等待人工决策
+            _logger.LogWarning(
+                "DCA 止损暂停触发: {StrategyId} 当前价 {Price} <= 均价 {AvgEntry} × (1 - {StopLoss}%)，暂停定投（保留持仓）",
+                strategy.Id, currentPrice, avgEntry, dcaParams.StopLossPercent);
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, ct)
+                .ConfigureAwait(false);
+            return (false, strategy.Side, strategy.Quantity);
+        }
+
+        return null;
     }
 
     /// <summary>
