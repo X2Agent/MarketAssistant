@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -29,7 +30,10 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
     private readonly ILogger<TradingCredentialStore> _logger;
     private readonly object _fileLock = new();
-    private Dictionary<CryptoTradingMode, CredentialEntry> _cache;
+
+    // UI 线程写入（保存密钥）与后台签名线程读取（每次交易所请求）并发访问，
+    // 必须使用并发容器，普通 Dictionary 扩容期间被并发读会抛异常甚至死循环
+    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> _cache;
 
     public TradingCredentialStore(
         IUserSettingService userSettingService,
@@ -51,7 +55,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
     public void SetCredentials(CryptoTradingMode mode, string apiKey, string secretKey)
     {
-        _cache[mode] = new CredentialEntry(apiKey, secretKey);
+        _cache.AddOrUpdate(mode, new CredentialEntry(apiKey, secretKey), (_, _) => new CredentialEntry(apiKey, secretKey));
         Save();
     }
 
@@ -64,7 +68,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
     public void ClearCredentials(CryptoTradingMode mode)
     {
-        if (_cache.Remove(mode))
+        if (_cache.TryRemove(mode, out _))
             Save();
     }
 
@@ -111,14 +115,14 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         }
     }
 
-    private Dictionary<CryptoTradingMode, CredentialEntry> Load()
+    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> Load()
     {
         lock (_fileLock)
         {
             try
             {
                 if (!File.Exists(FilePath))
-                    return new Dictionary<CryptoTradingMode, CredentialEntry>();
+                    return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
 
                 var bytes = File.ReadAllBytes(FilePath);
                 return Decrypt(bytes);
@@ -126,7 +130,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "加载交易凭证失败，使用空配置");
-                return new Dictionary<CryptoTradingMode, CredentialEntry>();
+                return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
             }
         }
     }
@@ -170,10 +174,10 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         return result;
     }
 
-    private Dictionary<CryptoTradingMode, CredentialEntry> Decrypt(byte[] data)
+    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> Decrypt(byte[] data)
     {
         if (data.Length < SaltSize + NonceSize + TagSize)
-            return new Dictionary<CryptoTradingMode, CredentialEntry>();
+            return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
 
         var salt = new byte[SaltSize];
         var nonce = new byte[NonceSize];
@@ -192,8 +196,9 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         aes.Decrypt(nonce, ciphertext, tag, plaintextBytes);
 
         var json = Encoding.UTF8.GetString(plaintextBytes);
-        return JsonSerializer.Deserialize<Dictionary<CryptoTradingMode, CredentialEntry>>(json)
+        var entries = JsonSerializer.Deserialize<Dictionary<CryptoTradingMode, CredentialEntry>>(json)
                ?? new Dictionary<CryptoTradingMode, CredentialEntry>();
+        return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>(entries);
     }
 
     /// <summary>

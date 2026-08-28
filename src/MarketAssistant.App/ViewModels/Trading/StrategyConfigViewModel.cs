@@ -10,6 +10,7 @@ using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using MarketAssistant.Views.Windows;
@@ -24,6 +25,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     private readonly MarketMonitor _marketMonitor;
     private readonly IDialogService _dialogService;
     private readonly BinanceMarketDataService _marketDataService;
+    private readonly INotificationService _notificationService;
     private bool _disposed;
 
     public ObservableCollection<TradingStrategy> Strategies { get; } = [];
@@ -172,6 +174,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         MarketMonitor marketMonitor,
         IDialogService dialogService,
         BinanceMarketDataService marketDataService,
+        INotificationService notificationService,
         ILogger<StrategyConfigViewModel> logger)
         : base(logger)
     {
@@ -180,6 +183,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         _marketMonitor = marketMonitor;
         _dialogService = dialogService;
         _marketDataService = marketDataService;
+        _notificationService = notificationService;
         IsMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
         ApplyScenarioPreset();
@@ -231,6 +235,11 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
 
             await _strategyService.SaveStrategyAsync(strategy);
             Strategies.Insert(0, strategy);
+
+            // 安全警示必须显式可见：本应用没有交易所原生条件单兜底，
+            // 止损/止盈/追踪止损全部由客户端按秒轮询执行，进程退出或网络中断期间不生效
+            _notificationService.ShowWarning(
+                "⚠ 注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
 
             ClearForm();
         }, "创建策略");

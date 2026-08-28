@@ -38,7 +38,6 @@ public sealed class TradingDataServiceMigrationTest
         await TradingDataService.MigrateDatabaseSchemaAsync(connection);
 
         await AssertColumnExistsAsync(connection, "strategies", "environment");
-        await AssertColumnExistsAsync(connection, "strategies", "native_order_id");
         await AssertColumnExistsAsync(connection, "trade_records", "environment");
         await AssertColumnExistsAsync(connection, "positions", "environment");
         await AssertColumnExistsAsync(connection, "daily_stats", "environment");

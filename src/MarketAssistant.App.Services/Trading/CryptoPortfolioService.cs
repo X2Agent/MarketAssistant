@@ -13,8 +13,8 @@ namespace MarketAssistant.Services.Trading;
 public class CryptoPortfolioService
 {
     /// <summary>
-    /// 账户概览缓存时长。风控与 AI 决策高频调用估值，3 秒内的陈旧数据对
-    /// 仓位校验精度影响可忽略，却能显著降低网格等高频策略的账户查询压力。
+    /// 账户概览缓存时长。仅供 UI 展示复用；风控与 AI 仓位封顶等资金安全路径
+    /// 必须实时查询（useCache: false），1 秒级价格 tick 下陈旧快照会让连发订单绕过仓位上限。
     /// </summary>
     private static readonly TimeSpan AccountSummaryCacheTtl = TimeSpan.FromSeconds(3);
 
@@ -41,10 +41,16 @@ public class CryptoPortfolioService
         _logger = logger;
     }
 
-    public virtual async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default)
+    /// <summary>
+    /// 获取账户估值概览。
+    /// </summary>
+    /// <param name="ct">取消令牌</param>
+    /// <param name="useCache">是否允许使用 3 秒缓存。仅 UI 展示可传 true；
+    /// 风控仓位校验、AI 仓位封顶等资金安全路径必须传 false 走实时查询。</param>
+    public virtual async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync(CancellationToken ct = default, bool useCache = true)
     {
         var cacheKey = CacheKeys.GetCryptoAccountSummaryKey(_environmentService.CurrentMode);
-        if (_memoryCache.TryGetValue(cacheKey, out AccountBalanceSummary? cached) && cached != null)
+        if (useCache && _memoryCache.TryGetValue(cacheKey, out AccountBalanceSummary? cached) && cached != null)
             return cached;
 
         var accountInfo = await _exchangeClient.GetAccountInfoAsync(ct);

@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,10 @@ public sealed class TradingEnvironmentService
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<TradingEnvironmentService> _logger;
     private readonly Func<MarketMonitor> _marketMonitorFactory;
-    private CryptoTradingMode _currentMode;
+
+    // 后台下单链路（MarketMonitor 消费者/TradeExecutor）与 UI 线程并发读写，
+    // 必须 volatile 保证模式切换立即对后台线程可见，避免"切到实盘仍在 Demo 下单"的反向错误
+    private volatile CryptoTradingMode _currentMode;
 
     public TradingEnvironmentService(
         IUserSettingService userSettingService,
@@ -52,8 +56,9 @@ public sealed class TradingEnvironmentService
     }
 
     /// <summary>
-    /// 切换交易模式。若监控正在运行，先等待其完全停止（最长 10 秒）再切换，
-    /// 避免切换瞬间在途策略任务或订单状态同步访问新环境的账户与数据。
+    /// 切换交易模式。若监控正在运行，先等待其完全停止（最长 10 秒）再切换；
+    /// 停止超时（存在未完成的在途策略任务）时中止切换并抛错，
+    /// 防止在途订单被路由到新环境造成"该下单到模拟盘却落到实盘"的资金安全事故。
     /// </summary>
     public async Task ApplyModeAsync(CryptoTradingMode mode)
     {
@@ -66,7 +71,15 @@ public sealed class TradingEnvironmentService
         if (monitor.IsRunning)
         {
             _logger.LogInformation("切换交易模式前停止市场监控: {OldMode} → {NewMode}", _currentMode, mode);
-            await monitor.StopAsync();
+            var stopped = await monitor.TryStopAsync().ConfigureAwait(false);
+            if (!stopped)
+            {
+                _logger.LogError(
+                    "市场监控停止超时（存在在途策略任务），已中止交易模式切换: {OldMode} → {NewMode}",
+                    _currentMode, mode);
+                throw new FriendlyException(
+                    "存在正在执行的策略任务，市场监控未能及时停止，交易模式切换已中止。请稍后重试；若持续失败请检查网络后重启应用。");
+            }
         }
 
         _currentMode = mode;

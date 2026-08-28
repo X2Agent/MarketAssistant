@@ -123,8 +123,11 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var gridParams = new GridTradingParams
         {
-            UpperPrice = 110m, LowerPrice = 90m, GridCount = 10,
-            QuantityPerGrid = 1m, LastTriggeredIndex = -1
+            UpperPrice = 110m,
+            LowerPrice = 90m,
+            GridCount = 10,
+            QuantityPerGrid = 1m,
+            LastTriggeredIndex = -1
         };
         var strategy = CreateStrategy(
             StrategyType.GridTrading, OrderSide.Buy, JsonSerializer.Serialize(gridParams));
@@ -151,8 +154,11 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var gridParams = new GridTradingParams
         {
-            UpperPrice = 110m, LowerPrice = 90m, GridCount = 10,
-            QuantityPerGrid = 1m, LastTriggeredIndex = 5
+            UpperPrice = 110m,
+            LowerPrice = 90m,
+            GridCount = 10,
+            QuantityPerGrid = 1m,
+            LastTriggeredIndex = 5
         };
         var strategy = CreateStrategy(
             StrategyType.GridTrading, OrderSide.Buy, JsonSerializer.Serialize(gridParams));
@@ -185,8 +191,10 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var dcaParams = new DCAParams
         {
-            AmountPerInterval = 100m, IntervalSeconds = 1,
-            TakeProfitPercent = 10m, StopLossPercent = 20m
+            AmountPerInterval = 100m,
+            IntervalSeconds = 1,
+            TakeProfitPercent = 10m,
+            StopLossPercent = 20m
         };
         var strategy = CreateStrategy(StrategyType.DCA, OrderSide.Buy, JsonSerializer.Serialize(dcaParams));
         strategy.LastTriggeredAt = DateTime.UtcNow.AddHours(-1);
@@ -210,8 +218,10 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var dcaParams = new DCAParams
         {
-            AmountPerInterval = 100m, IntervalSeconds = 1,
-            TakeProfitPercent = 10m, StopLossPercent = 20m
+            AmountPerInterval = 100m,
+            IntervalSeconds = 1,
+            TakeProfitPercent = 10m,
+            StopLossPercent = 20m
         };
         var strategy = CreateStrategy(StrategyType.DCA, OrderSide.Buy, JsonSerializer.Serialize(dcaParams));
         strategy.LastTriggeredAt = DateTime.UtcNow;
@@ -239,8 +249,10 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var dcaParams = new DCAParams
         {
-            AmountPerInterval = 100m, IntervalSeconds = 1,
-            TakeProfitPercent = 10m, StopLossPercent = 20m,
+            AmountPerInterval = 100m,
+            IntervalSeconds = 1,
+            TakeProfitPercent = 10m,
+            StopLossPercent = 20m,
             StopLossSellOut = false
         };
         var strategy = CreateStrategy(StrategyType.DCA, OrderSide.Buy, JsonSerializer.Serialize(dcaParams));
@@ -269,8 +281,10 @@ public sealed class StrategyEngineTriggerTest
         var ctx = CreateEngine();
         var dcaParams = new DCAParams
         {
-            AmountPerInterval = 100m, IntervalSeconds = 1,
-            TakeProfitPercent = 10m, StopLossPercent = 20m,
+            AmountPerInterval = 100m,
+            IntervalSeconds = 1,
+            TakeProfitPercent = 10m,
+            StopLossPercent = 20m,
             StopLossSellOut = true
         };
         var strategy = CreateStrategy(StrategyType.DCA, OrderSide.Buy, JsonSerializer.Serialize(dcaParams));

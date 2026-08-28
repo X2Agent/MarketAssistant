@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +22,7 @@ public class MarketMonitor : IDisposable
     private readonly AISignalStrategyExecutor _aiSignalExecutor;
     private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradingStrategyService _strategyService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -97,6 +99,7 @@ public class MarketMonitor : IDisposable
         OrderStateSyncService orderStateSyncService,
         TradingStrategyService strategyService,
         BinanceUserDataStreamService userDataStreamService,
+        INotificationService notificationService,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -106,6 +109,7 @@ public class MarketMonitor : IDisposable
         _orderStateSyncService = orderStateSyncService;
         _strategyService = strategyService;
         _userDataStreamService = userDataStreamService;
+        _notificationService = notificationService;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
         _strategyService.StrategiesChanged += OnStrategiesChanged;
@@ -152,13 +156,20 @@ public class MarketMonitor : IDisposable
     /// <summary>
     /// 停止后台监控
     /// </summary>
-    public async Task StopAsync()
+    public Task StopAsync() => TryStopAsync();
+
+    /// <summary>
+    /// 停止后台监控并报告是否完整停止。
+    /// </summary>
+    /// <returns>true = 所有在途策略任务已结束；false = 等待超时，仍有未完成任务，
+    /// 调用方（如交易模式切换）应据此中止后续操作</returns>
+    public async Task<bool> TryStopAsync()
     {
         await _lifecycleLock.WaitAsync();
         try
         {
             if (!_isRunning)
-                return;
+                return true;
 
             _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
             _userDataStreamService.OrderUpdate -= OnOrderUpdate;
@@ -186,6 +197,7 @@ public class MarketMonitor : IDisposable
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogWarning(ex, "等待策略任务完成时超时或出错，部分状态可能未持久化");
+                    return false;
                 }
             }
 
@@ -194,6 +206,7 @@ public class MarketMonitor : IDisposable
             _isRunning = false;
             _logger.LogInformation("MarketMonitor 已停止");
             StatusChanged?.Invoke(false);
+            return true;
         }
         finally
         {
@@ -399,7 +412,40 @@ public class MarketMonitor : IDisposable
 
             await ApplyTradeFailurePolicy(strategy, result.Success, result);
 
+            if (result.Success)
+                await CompleteOneShotStrategyAsync(strategy);
+            else
+                await CheckStrategyCompletionAsync(strategy);
+        }
+    }
+
+    /// <summary>
+    /// 一次性策略的成交后完结：止损/止盈/追踪止损语义上只执行一次（触发即出场或建仓），
+    /// 成交后必须置为 Completed，否则条件持续满足时每个价格 tick 都会再次下单，
+    /// 未设 MaxExecutions 的策略会反复打光账户资金。
+    /// </summary>
+    private async Task CompleteOneShotStrategyAsync(TradingStrategy strategy)
+    {
+        var isOneShot = strategy.Type is StrategyType.StopLoss or StrategyType.TakeProfit or StrategyType.TrailingStop;
+        if (!isOneShot)
+        {
+            // 网格/DCA 可多次执行，仍按 MaxExecutions 计数完结
             await CheckStrategyCompletionAsync(strategy);
+            return;
+        }
+
+        try
+        {
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
+            await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
+            _strategyLocks.TryRemove(strategy.Id, out _);
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            _logger.LogInformation(
+                "一次性策略已执行并完结: {StrategyId} {Type} {Symbol}", strategy.Id, strategy.Type, strategy.Symbol);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "完结一次性策略失败，可能重复触发: {StrategyId}", strategy.Id);
         }
     }
 
@@ -445,6 +491,8 @@ public class MarketMonitor : IDisposable
         try
         {
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, MonitorToken);
+            _notificationService.ShowWarning(
+                $"⚠ 策略已自动暂停：{strategy.Symbol} {strategy.Type} — {reason}");
         }
         catch (Exception ex)
         {

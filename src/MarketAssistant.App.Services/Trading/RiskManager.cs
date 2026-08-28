@@ -60,7 +60,9 @@ public class RiskManager
         AccountBalanceSummary portfolioSummary;
         try
         {
-            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct).ConfigureAwait(false);
+            // 风控路径必须实时估值：3 秒缓存仅供 UI 展示，1 秒级价格 tick 下
+            // 连发订单若共用同一份快照会绕过仓位上限
+            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct, useCache: false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -137,8 +139,11 @@ public class RiskManager
                     }
                     catch (Exception ex)
                     {
-                        // 查询交易所持仓失败时不阻止交易（可能是网络问题），仅记录警告
-                        _logger.LogWarning(ex, "查询交易所持仓用于风控校验失败，跳过合约平多校验: {Symbol}", instrumentSymbol);
+                        // fail-closed：无法确认交易所持仓就放行，平多单可能在持仓已平后
+                        // 以 reduceOnly=false 落地变成反向开仓，与基础资产解析失败的拒单策略保持一致
+                        _logger.LogError(ex, "查询交易所持仓用于风控校验失败，拒绝交易（fail-closed）: {Symbol}", instrumentSymbol);
+                        return RiskCheckResult.Reject(
+                            $"无法查询 {instrumentSymbol} 的交易所持仓，合约卖出校验失败（fail-closed）");
                     }
                 }
                 else

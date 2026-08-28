@@ -88,11 +88,11 @@ public class TradingDataService : SqliteServiceBase
             INSERT OR REPLACE INTO strategies
                 (id, environment, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
-                 execution_count, max_executions, trailing_peak_price, native_order_id)
+                 execution_count, max_executions, trailing_peak_price)
             VALUES
                 (@id, @environment, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
-                 @execCount, @maxExec, @trailingPeak, @nativeOrderId)
+                 @execCount, @maxExec, @trailingPeak)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -111,7 +111,6 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
         cmd.Parameters.AddWithValue("@trailingPeak", ToDbNullable(strategy.TrailingPeakPrice));
-        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)strategy.NativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -288,21 +287,6 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@peak", ToDbNullable(trailingPeakPrice));
-        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// 更新策略的原生条件单订单 ID（提交原生条件单后调用）
-    /// </summary>
-    public async Task UpdateStrategyNativeOrderIdAsync(string id, string? nativeOrderId, CancellationToken ct = default)
-    {
-        await EnsureInitializedAsync(InitializeDatabaseAsync);
-        await using var conn = await OpenConnectionAsync(ct);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE strategies SET native_order_id = @nativeOrderId WHERE id = @id AND environment = @environment";
-        cmd.Parameters.AddWithValue("@id", id);
-        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)nativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -1035,8 +1019,7 @@ public class TradingDataService : SqliteServiceBase
                 last_triggered_at TEXT,
                 execution_count INTEGER DEFAULT 0,
                 max_executions INTEGER,
-                trailing_peak_price TEXT,
-                native_order_id TEXT
+                trailing_peak_price TEXT
             )
             """,
         ["trade_records"] = """
@@ -1250,9 +1233,6 @@ public class TradingDataService : SqliteServiceBase
         var trailingOrd = reader.GetOrdinal("trailing_peak_price");
         if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = (decimal)reader.GetDouble(trailingOrd);
 
-        var nativeOrd = reader.GetOrdinal("native_order_id");
-        if (!reader.IsDBNull(nativeOrd)) strategy.NativeOrderId = reader.GetString(nativeOrd);
-
         return strategy;
     }
 
@@ -1345,7 +1325,6 @@ public class TradingDataService : SqliteServiceBase
         SqliteTransaction transaction)
     {
         await EnsureColumnAsync(conn, transaction, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
-        await EnsureColumnAsync(conn, transaction, "strategies", "native_order_id", "TEXT").ConfigureAwait(false);
         await EnsureColumnAsync(conn, transaction, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
         await EnsureColumnAsync(conn, transaction, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);

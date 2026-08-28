@@ -97,7 +97,7 @@ public sealed class TradeExecutorConcurrencyTest
 
         var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
         portfolioService
-            .Setup(service => service.GetAccountBalanceSummaryAsync(It.IsAny<CancellationToken>()))
+            .Setup(service => service.GetAccountBalanceSummaryAsync(It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new AccountBalanceSummary
             {
                 TotalValueUSDT = 1000m,

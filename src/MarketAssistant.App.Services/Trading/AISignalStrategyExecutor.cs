@@ -186,7 +186,7 @@ public sealed class AISignalStrategyExecutor
 
         // 置信度动态仓位：预算 × 置信度系数，并按档案仓位上限封顶（AI 无法突破）
         var sizedBudget = budget * (decision.Confidence / 100m);
-        var balanceSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct).ConfigureAwait(false);
+        var balanceSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct, useCache: false).ConfigureAwait(false);
         var accountValue = balanceSummary?.TotalValueUSDT ?? 0;
         if (accountValue > 0)
         {

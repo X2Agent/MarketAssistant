@@ -75,6 +75,12 @@ public sealed class RoutingExchangeClient : IExchangeClient
     public Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
         => GetActiveClient().GetUserTradesAsync(instrumentSymbol, ct);
 
+    /// <summary>
+    /// 获取当前活跃客户端的快照。下单链路（风控→杠杆→下单）必须对同一客户端实例完成，
+    /// 若各步骤独立重新解析，用户在等待确认期间切换模拟盘/实盘会让订单落到错误环境。
+    /// </summary>
+    public IExchangeClient GetActiveClientSnapshot() => GetActiveClient();
+
     private IExchangeClient GetActiveClient()
     {
         if (_clients.TryGetValue(_environmentService.CurrentMode, out var client))
