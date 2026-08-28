@@ -26,9 +26,9 @@ public class TextCleaningService : ITextCleaningService
 
     // 新增的清洗规则
     private static readonly Regex EmailPattern = new(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled);
-    private static readonly Regex PhonePattern = new(@"(?:\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})", RegexOptions.Compiled);
-    private static readonly Regex ChinesePhonePattern = new(@"1[3-9]\d{9}", RegexOptions.Compiled);
-    private static readonly Regex RepeatingChars = new(@"(.)\1{3,}", RegexOptions.Compiled); // 连续重复字符
+    // 仅匹配中国手机号语义（13-19 开头共 11 位），带前后边界断言。
+    // 严禁使用通用 N 位数字模式：金融文档中任意长数字串（成交额、证券代码、订单号）会被整段删除。
+    private static readonly Regex PhonePattern = new(@"(?<![\d,.])(?:\+?86[- ]?)?1[3-9]\d{9}(?![\d])", RegexOptions.Compiled);
     private static readonly Regex HeaderFooterPattern = new(@"(?:^|\n)(?:Header|Footer|页眉|页脚):.*?(?:\n|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public TextCleaningService(ILogger<TextCleaningService> logger)
@@ -43,16 +43,18 @@ public class TextCleaningService : ITextCleaningService
     {
     }
 
-    public string Clean(string? text)
+    /// <summary>
+    /// 无损归一化：仅做不改变任何语义字符的处理（Unicode 标准化、换行统一、控制字符、全角空格、
+    /// 多余空白合并、空行规范）。RAG 摄取管线必须使用本方法——金融文档中的数字
+    /// （成交额、证券代码、手机号、日期）承载核心语义，任何有损规则都可能产出错误投资结论。
+    /// </summary>
+    public string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
             _logger.LogDebug("输入文本为空或仅包含空白字符");
             return string.Empty;
         }
-
-        var originalLength = text.Length;
-        _logger.LogDebug("开始清洗文本，原始长度: {Length}", originalLength);
 
         try
         {
@@ -68,45 +70,64 @@ public class TextCleaningService : ITextCleaningService
             // 4. 处理中文全角空格
             text = ChineseSpecialChars.Replace(text, " ");
 
-            // 5. 移除页眉页脚
-            text = HeaderFooterPattern.Replace(text, "\n");
-
-            // 6. 修复英文断词
-            text = HyphenBreak.Replace(text, m => m.Groups[1].Value + m.Groups[2].Value);
-
-            // 7. 移除页码
-            text = PageNumber.Replace(text, " ");
-
-            // 8. 移除URL
-            text = UrlPattern.Replace(text, " ");
-
-            // 9. 移除邮箱
-            text = EmailPattern.Replace(text, " ");
-
-            // 10. 移除电话号码
-            text = PhonePattern.Replace(text, " ");
-            text = ChinesePhonePattern.Replace(text, " ");
-
-            // 11. 处理重复字符
-            text = RepeatingChars.Replace(text, "$1$1");
-
-            // 12. 合并多余空白
+            // 5. 合并多余空白
             text = MultiSpace.Replace(text, " ");
 
-            // 13. 规范空行
+            // 6. 规范空行
             text = NormalizeEmptyLines(text);
-
-            var finalLength = text.Length;
-            _logger.LogDebug("文本清洗完成，最终长度: {Length}，压缩比: {Ratio:P2}",
-                finalLength, 1.0 - (double)finalLength / originalLength);
 
             return text;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "文本清洗过程中发生错误");
-            throw new InvalidOperationException("文本清洗失败", ex);
+            _logger.LogError(ex, "文本归一化过程中发生错误");
+            throw new InvalidOperationException("文本归一化失败", ex);
         }
+    }
+
+    /// <summary>
+    /// 有损去噪：在 <see cref="Normalize"/> 基础上移除页眉页脚/页码/URL/邮箱/电话。
+    /// 仅适用于确定无需保留这些内容的通用文本，禁止用于金融文档摄取。
+    /// </summary>
+    public string Denoise(string? text)
+    {
+        text = Normalize(text);
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        // 移除页眉页脚
+        text = HeaderFooterPattern.Replace(text, "\n");
+
+        // 修复英文断词
+        text = HyphenBreak.Replace(text, m => m.Groups[1].Value + m.Groups[2].Value);
+
+        // 移除页码
+        text = PageNumber.Replace(text, " ");
+
+        // 移除URL
+        text = UrlPattern.Replace(text, " ");
+
+        // 移除邮箱
+        text = EmailPattern.Replace(text, " ");
+
+        // 移除电话号码（仅中国手机号语义，带边界断言）
+        text = PhonePattern.Replace(text, " ");
+
+        // 移除类规则以空格占位，结束后再次合并空白并规范空行
+        text = MultiSpace.Replace(text, " ");
+        text = NormalizeEmptyLines(text);
+
+        return text;
+    }
+
+    public string Clean(string? text)
+    {
+        var originalLength = text?.Length ?? 0;
+        var cleaned = Denoise(text);
+        var finalLength = cleaned.Length;
+        _logger.LogDebug("文本清洗完成，原始长度: {Original}，最终长度: {Length}，压缩比: {Ratio:P2}",
+            originalLength, finalLength, originalLength == 0 ? 0 : 1.0 - (double)finalLength / originalLength);
+        return cleaned;
     }
 
     /// <summary>

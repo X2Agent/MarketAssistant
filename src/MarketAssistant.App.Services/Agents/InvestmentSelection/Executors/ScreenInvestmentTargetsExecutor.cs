@@ -65,6 +65,11 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
                 OriginalRequest = originalRequest
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (FriendlyException)
         {
             // FriendlyException 已包含用户友好信息，直接抛出避免双重包装丢失原始错误

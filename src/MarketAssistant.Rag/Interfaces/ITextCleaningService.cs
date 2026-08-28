@@ -7,11 +7,19 @@ namespace MarketAssistant.Rag.Interfaces;
 public interface ITextCleaningService
 {
     /// <summary>
-    /// 清洗单段文本。
+    /// 清洗单段文本（含有损去噪）。
     /// </summary>
     /// <param name="text">原始文本</param>
     /// <returns>清洗后的文本</returns>
     string Clean(string? text);
+
+    /// <summary>
+    /// 无损归一化：仅做不改变语义字符的处理，RAG 摄取管线应使用本方法而非 <see cref="Clean"/>，
+    /// 避免金融数字（成交额/证券代码/订单号）被有损规则破坏。
+    /// </summary>
+    /// <param name="text">原始文本</param>
+    /// <returns>归一化后的文本</returns>
+    string Normalize(string? text);
 
     /// <summary>
     /// 验证清洗结果是否可接受

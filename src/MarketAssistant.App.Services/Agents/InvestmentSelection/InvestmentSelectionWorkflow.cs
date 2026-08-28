@@ -147,7 +147,12 @@ public class InvestmentSelectionWorkflow : IDisposable
             }
         }
 
-        return finalResult ?? CreateDefaultResult("工作流未返回结果");
+        // 事件流未产出结果说明工作流中途失败（各 Executor 已把异常包装上抛），
+        // 把"失败"伪装成结构完整的默认结果会让用户误以为"AI 认为没有合适标的"
+        if (finalResult == null)
+            throw new FriendlyException("投资选择工作流未返回结果，分析未完成，请重试。");
+
+        return finalResult;
     }
 
     private static InvestmentSelectionResult CreateDefaultResult(string? problem = null)

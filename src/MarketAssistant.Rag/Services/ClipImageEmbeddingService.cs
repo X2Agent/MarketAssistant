@@ -70,17 +70,13 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
     /// <summary>
     /// 生成图像嵌入向量（RAG系统的核心功能）
-    /// 
-    /// 【学习要点】：
-    /// - 异常降级：CLIP模型异常 -> 哈希算法，确保系统稳定性
-    /// - 异步编程：使用Task.Run将计算密集型任务移至后台线程，避免阻塞UI
-    /// - 向量归一化：确保向量在单位超球面上，便于余弦相似度计算
-    /// - 维度统一：统一到TargetDim维度，支持哈希降级
-    /// 
+    ///
     /// 【实现细节】：
     /// - ONNX推理：使用预训练CLIP模型进行图像编码
     /// - 预处理：将图像预处理为标准张量格式
-    /// - 内存管理：使用using确保资源及时释放
+    /// - 向量归一化：确保向量在单位超球面上，便于余弦相似度计算
+    /// - 失败语义：任何失败都抛出 InvalidOperationException，由调用方降级为 Caption 文本召回；
+    ///   不降级为哈希向量，也不产出零向量（P1-03）
     /// </summary>
     public async Task<Embedding<float>> GenerateAsync(byte[] imageBytes, CancellationToken ct = default)
     {
@@ -308,14 +304,15 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
             }
             else
             {
-                // 警告：配置的模型不存在时发出提示
-                _logger.LogWarning("CLIP model not found at {Path}, using hash fallback", _modelPath);
+                // 警告：配置的模型不存在时发出提示（不降级为哈希向量，图像嵌入将不可用）
+                _logger.LogWarning("CLIP model not found at {Path}, image embedding will be unavailable", _modelPath);
             }
         }
         catch (Exception ex)
         {
-            // 初始化失败：记录错误但不抛出异常，保证降级可用
-            _logger.LogWarning(ex, "Failed to init CLIP model session; fallback to hash embedding");
+            // 初始化失败：记录错误但不抛出，GenerateAsync 会因会话不可用而抛出，
+            // 由调用方降级为 Caption 文本召回
+            _logger.LogWarning(ex, "Failed to init CLIP model session; image embedding will be unavailable");
         }
     }
 
@@ -397,10 +394,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
             return new DenseTensor<float>(tensorData, new[] { 1, channels, size, size });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 异常降级：返回全零张量确保不崩溃
-            return new DenseTensor<float>(new float[1 * channels * size * size], new[] { 1, channels, size, size });
+            // 预处理失败必须抛出：静默返回全零张量会被当作合法输入跑完推理，
+            // 产出语义上无意义的零向量入库，污染多模态召回
+            throw new InvalidOperationException($"图像预处理失败: {ex.Message}", ex);
         }
     }
 
