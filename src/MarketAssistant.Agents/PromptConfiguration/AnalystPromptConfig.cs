@@ -1,8 +1,5 @@
 namespace MarketAssistant.Agents.PromptConfiguration;
 
-/// <summary>
-/// 分析师提示词配置模型
-/// </summary>
 public class AnalystPromptConfig
 {
     public string Name { get; set; } = string.Empty;

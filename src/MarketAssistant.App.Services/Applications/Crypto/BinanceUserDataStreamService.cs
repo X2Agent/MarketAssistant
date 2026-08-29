@@ -27,6 +27,7 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
+    private Task? _receiveTask;
     private string? _listenKey;
     private Timer? _keepaliveTimer;
     private bool _running;
@@ -71,14 +72,27 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             if (string.IsNullOrEmpty(_listenKey))
                 return;
 
-            _cts = new CancellationTokenSource();
+            // CTS 以局部变量捕获进 Timer/接收循环，回调不再读可被并发置 null 的字段
+            var cts = new CancellationTokenSource();
+            _cts = cts;
             _running = true;
 
             _keepaliveTimer = new Timer(
-                _ => _ = KeepaliveAsync(apiKey, httpClientName, _cts.Token),
+                _ =>
+                {
+                    // Timer 回调与 StopAsync 并发：CTS 可能已释放（Token 属性会抛 ODE），全部容错
+                    try
+                    {
+                        _ = KeepaliveAsync(apiKey, httpClientName, cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "ListenKey 续期任务调度失败");
+                    }
+                },
                 null, KeepaliveInterval, KeepaliveInterval);
 
-            _ = ConnectAndReceiveAsync(_listenKey, _cts.Token);
+            _receiveTask = ConnectAndReceiveAsync(_listenKey, cts.Token);
             _logger.LogInformation("币安现货用户数据流已启动（模式={Mode}）", _environmentService.CurrentMode);
         }
         finally
@@ -106,8 +120,23 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             if (_cts != null)
             {
                 await _cts.CancelAsync();
-                _cts.Dispose();
                 _cts = null;
+            }
+
+            // 等待接收循环退出后再释放 CTS：循环可能在带令牌的 Task.Delay/ConnectAsync 上
+            // 注册，先 Dispose 会让其抛 ObjectDisposedException 逃逸为未观察异常
+            var receiveTask = _receiveTask;
+            _receiveTask = null;
+            if (receiveTask != null)
+            {
+                try
+                {
+                    await receiveTask;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "等待用户数据流接收循环退出时出现异常");
+                }
             }
 
             // 先快照到局部变量再判空：重连循环与 StopAsync 并发时，
@@ -146,9 +175,19 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
     private void OnModeChanged(CryptoTradingMode newMode)
     {
-        // 模式切换在 UI 线程触发，异步重启避免阻塞
+        // 模式切换在 UI 线程触发，异步重启避免阻塞；fire-and-forget 需自带异常观察
         if (_running)
-            _ = RestartAsync();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await RestartAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "模式切换后重启用户数据流失败");
+                }
+            });
     }
 
     private async Task RestartAsync()
@@ -283,7 +322,7 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             {
                 await Task.Delay(5000, ct);
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
             {
                 return;
             }

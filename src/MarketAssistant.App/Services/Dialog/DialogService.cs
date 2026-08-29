@@ -25,9 +25,9 @@ public class DialogService : IDialogService
     /// 取消令牌触发时主动关闭对话框，返回 false（取消语义）。
     /// </summary>
     /// <returns>如果用户点击确认返回 true，点击取消返回 false</returns>
-    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default)
+    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default, bool topmost = false)
     {
-        var result = await ShowCustomDialogAsync(title, message, new[] { accept, cancel }, ct);
+        var result = await ShowCustomDialogAsync(title, message, new[] { accept, cancel }, ct, topmost);
         return result == accept;
     }
 
@@ -37,11 +37,11 @@ public class DialogService : IDialogService
     /// 避免"超时已自动拒绝但对话框仍挂在屏幕上、用户点击结果被丢弃"的错位。
     /// </summary>
     /// <returns>用户选择的按钮文本；取消令牌触发或无活动窗口时为 null</returns>
-    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons, CancellationToken ct = default)
+    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons, CancellationToken ct = default, bool topmost = false)
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons, ct));
+            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons, ct, topmost));
         }
 
         var owner = GetActiveWindow();
@@ -49,6 +49,7 @@ public class DialogService : IDialogService
 
         var dialog = new MessageDialogWindow();
         dialog.SetContent(title, message, buttons);
+        dialog.Topmost = topmost;
         using var cancelRegistration = ct.Register(() => Dispatcher.UIThread.Post(() => dialog.Close()));
         await dialog.ShowDialog(owner);
         return dialog.Result;
@@ -96,11 +97,16 @@ public class DialogService : IDialogService
     /// <summary>
     /// 获取当前活动窗口
     /// </summary>
+    /// <remarks>
+    /// 只兜底到"可见"的主窗口：主窗口被隐藏进托盘时，对隐藏窗口 ShowDialog 用户根本看不到，
+    /// 返回 null 让调用方（如交易确认）走"拒绝并通知"的 fail-closed 分支。
+    /// </remarks>
     private static Window? GetActiveWindow()
     {
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            return desktop.Windows.FirstOrDefault(w => w.IsActive) ?? desktop.MainWindow;
+            return desktop.Windows.FirstOrDefault(w => w.IsActive) ??
+                   (desktop.MainWindow is { IsVisible: true } main ? main : null);
         }
         return null;
     }

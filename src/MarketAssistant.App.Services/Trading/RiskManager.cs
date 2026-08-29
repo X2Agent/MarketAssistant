@@ -1,4 +1,5 @@
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -10,8 +11,6 @@ namespace MarketAssistant.Services.Trading;
 /// </summary>
 public class RiskManager
 {
-    private static readonly string[] QuoteAssets = { "USDT", "USDC", "BUSD", "BTC", "ETH", "BNB" };
-
     private readonly TradingDataService _dataService;
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
@@ -95,7 +94,7 @@ public class RiskManager
             // 单 symbol 仓位上限（仅买入时检查）
             if (config.MaxSinglePositionPercent > 0 && side == OrderSide.Buy)
             {
-                var baseAsset = ExtractBaseAsset(instrumentSymbol);
+                var baseAsset = TryExtractBaseAsset(instrumentSymbol);
                 if (!string.IsNullOrEmpty(baseAsset))
                 {
                     var symbolValue = portfolioSummary.Assets
@@ -113,7 +112,7 @@ public class RiskManager
             // - 合约：做空（卖出开空）无需持仓校验；平多（卖出平多）需检查多头持仓
             if (side == OrderSide.Sell)
             {
-                var baseAsset = ExtractBaseAsset(instrumentSymbol);
+                var baseAsset = TryExtractBaseAsset(instrumentSymbol);
                 if (string.IsNullOrEmpty(baseAsset))
                 {
                     // fail-closed：无法解析基础资产意味着无法校验持仓充足性，必须拒绝而非跳过校验
@@ -225,17 +224,16 @@ public class RiskManager
     }
 
     /// <summary>
-    /// 从交易对符号提取基础资产（如 BTCUSDT → BTC）
+    /// 从交易对符号提取基础资产（如 BTCUSDT → BTC、BTCFDUSD → BTC）。
+    /// 复用统一的 <see cref="CryptoSymbolConverter.ExtractBaseCurrency"/>；
+    /// 转换器对未匹配到已知计价后缀的输入会原样返回，此时视为解析失败返回 null。
     /// </summary>
-    private static string ExtractBaseAsset(string instrumentSymbol)
+    private static string? TryExtractBaseAsset(string instrumentSymbol)
     {
-        // 常见报价资产后缀
-        foreach (var quote in QuoteAssets)
-        {
-            if (instrumentSymbol.EndsWith(quote, StringComparison.OrdinalIgnoreCase))
-                return instrumentSymbol[..^quote.Length];
-        }
-        return string.Empty;
+        var baseAsset = CryptoSymbolConverter.ExtractBaseCurrency(instrumentSymbol);
+        return string.Equals(baseAsset, instrumentSymbol, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : baseAsset;
     }
 
 }

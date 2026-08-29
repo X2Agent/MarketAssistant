@@ -113,34 +113,24 @@
             </Grid>
         </controls:CardView>
 
-        <!-- 最近查看：紧凑单行条（无卡片，高度随内容自适应，超出横向滚动，悬停显示滚动条） -->
-        <StackPanel Orientation="Horizontal"
-                    Spacing="{StaticResource DefaultSpacing}"
-                    IsVisible="{Binding RecentAssets.RecentAssets.Count}"
-                    Margin="{StaticResource BottomMargin}">
-            <TextBlock Text="最近查看"
+        <!-- 最近查看：紧凑单行条（无卡片，高度随内容自适应，超出横向滚动，悬停显示滚动条）。
+             必须用 Grid * 列约束宽度：水平 StackPanel 以无限宽测量子级，
+             ScrollViewer 会按内容全宽排列并溢出窗口右缘，既无裁剪也无可滚动余量。 -->
+        <Grid ColumnDefinitions="Auto,*"
+              IsVisible="{Binding RecentAssets.RecentAssets.Count}"
+              Margin="{StaticResource BottomMargin}">
+            <TextBlock Grid.Column="0"
+                       Text="最近查看"
                        FontSize="{StaticResource SmallFontSize}"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        VerticalAlignment="Center"/>
-            <ScrollViewer Classes="recent-scroller"
-                          HorizontalScrollBarVisibility="Auto"
+            <!-- 滚动条整体隐藏：滚轮即可横向滚动，保持单行条的干净外观 -->
+            <ScrollViewer Grid.Column="1"
+                          x:Name="RecentScroller"
+                          HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
-                          AllowAutoHide="False">
-                <ScrollViewer.Styles>
-                    <!-- 滚动条默认隐藏，悬停时淡入 -->
-                    <Style Selector="ScrollViewer.recent-scroller /template/ ScrollBar">
-                        <Setter Property="Opacity" Value="0"/>
-                        <Setter Property="Transitions">
-                            <Transitions>
-                                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-                            </Transitions>
-                        </Setter>
-                    </Style>
-                    <Style Selector="ScrollViewer.recent-scroller:pointerover /template/ ScrollBar">
-                        <Setter Property="Opacity" Value="1"/>
-                    </Style>
-                </ScrollViewer.Styles>
+                          Margin="{StaticResource SmallLeftMargin}">
                 <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -181,7 +171,7 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-        </StackPanel>
+        </Grid>
       </StackPanel>
 
         <!-- 两列布局（对齐原型 Bento Grid 层级）：热门资产 | 7*24快讯 -->
@@ -300,10 +290,9 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="assets:HotAsset">
-                                <!-- 卡片瓦片（恢复重构前写法）：名称/代码 | 价格/涨跌 | 热度/成交量 | 收藏 -->
+                                <!-- 卡片瓦片：内边距与悬停效果由 hot-stock-card 样式统一管理 -->
                                 <Border Classes="hot-stock-card"
-                                        Margin="{StaticResource TinyMargin}"
-                                        Padding="{StaticResource CompactCardPadding}"
+                                        Margin="{StaticResource SmallMargin}"
                                         Background="{DynamicResource CardBackgroundBrush}"
                                         CornerRadius="{StaticResource DefaultCornerRadius}"
                                         Tapped="HotStockCard_Tapped"

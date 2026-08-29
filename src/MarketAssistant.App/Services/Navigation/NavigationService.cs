@@ -6,9 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Navigation;
 
-/// <summary>
-/// 导航项信息
-/// </summary>
 public class NavigationItem
 {
     public ViewModelBase ViewModel { get; }
@@ -23,13 +20,10 @@ public class NavigationItem
     }
 }
 
-/// <summary>
-/// 导航服务，用于管理页面导航和导航栈
-/// </summary>
 public partial class NavigationService : ObservableObject, IRecipient<NavigationMessage>
 {
     private readonly ILogger<NavigationService>? _logger;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly Stack<NavigationItem> _navigationStack = new();
     private readonly Dictionary<string, Type> _routes = new();
 
@@ -42,39 +36,29 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
     [ObservableProperty]
     private string? _currentRootNavigationItemTitle;
 
-    public NavigationService(IServiceProvider serviceProvider, ILogger<NavigationService>? logger = null)
+    public NavigationService(IPageViewModelFactory pageViewModelFactory, ILogger<NavigationService>? logger = null)
     {
-        _serviceProvider = serviceProvider;
+        _pageViewModelFactory = pageViewModelFactory;
         _logger = logger;
 
-        // 注册默认路由映射
         RegisterRoute<MCPConfigPageViewModel>("MCPConfig");
         RegisterRoute<AssetPageViewModel>("Asset");
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
         RegisterRoute<BalanceDetailPageViewModel>("BalanceDetail");
 
-        // 注册导航消息监听
         WeakReferenceMessenger.Default.Register(this);
     }
 
-    /// <summary>
-    /// 注册路由
-    /// </summary>
-    /// <typeparam name="TViewModel">ViewModel类型</typeparam>
-    /// <param name="pageName">页面名称</param>
     private void RegisterRoute<TViewModel>(string pageName) where TViewModel : ViewModelBase
     {
         _routes[pageName] = typeof(TViewModel);
     }
 
-    /// <summary>
-    /// 接收导航消息
-    /// </summary>
     public void Receive(NavigationMessage message)
     {
         if (_routes.TryGetValue(message.PageName, out var viewModelType))
         {
-            var viewModel = (ViewModelBase)_serviceProvider.GetRequiredService(viewModelType);
+            var viewModel = _pageViewModelFactory.Create(viewModelType);
             NavigateToInternal(viewModel, message.Parameter);
         }
         else
@@ -83,20 +67,12 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         }
     }
 
-    /// <summary>
-    /// 导航到指定类型的页面
-    /// </summary>
-    /// <typeparam name="TViewModel">ViewModel类型</typeparam>
-    /// <param name="parameter">导航参数</param>
     public void NavigateTo<TViewModel>(object? parameter = null) where TViewModel : ViewModelBase
     {
-        var viewModel = _serviceProvider.GetRequiredService<TViewModel>();
+        var viewModel = _pageViewModelFactory.Create<TViewModel>();
         NavigateToInternal(viewModel, parameter);
     }
 
-    /// <summary>
-    /// 内部导航实现
-    /// </summary>
     private void NavigateToInternal(ViewModelBase viewModel, object? parameter, string? rootTitleOverride = null)
     {
         // 1. 如果当前有页面，通知它即将离开（被覆盖）
@@ -117,7 +93,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         _logger?.LogInformation("导航到页面: {PageType}, 根导航项: {RootItem}",
             viewModel.GetType().Name, rootNavigationItemTitle ?? "无");
 
-        // 2. 通知新页面进入
         if (viewModel is INavigationAware navigationAware)
         {
             navigationAware.OnNavigatedTo(parameter);
@@ -127,9 +102,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         UpdateState();
     }
 
-    /// <summary>
-    /// 返回上一页
-    /// </summary>
     public bool GoBack()
     {
         if (!CanGoBack)
@@ -140,13 +112,11 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
 
         var poppedItem = _navigationStack.Pop();
 
-        // 1. 通知被弹出的页面离开
         if (poppedItem.ViewModel is INavigationAware poppedAware)
         {
             poppedAware.OnNavigatedFrom();
         }
 
-        // 释放旧页面资源
         DisposeViewModel(poppedItem.ViewModel);
 
         if (_navigationStack.Count > 0)
@@ -191,14 +161,8 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         NavigateToInternal(viewModel, null, rootNavigationItemTitle);
     }
 
-    /// <summary>
-    /// 获取导航栈深度
-    /// </summary>
     public int GetStackDepth() => _navigationStack.Count;
 
-    /// <summary>
-    /// 清空导航栈
-    /// </summary>
     public void Clear()
     {
         while (_navigationStack.Count > 0)
@@ -228,9 +192,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         }
     }
 
-    /// <summary>
-    /// 释放 ViewModel 资源（如果实现了 IDisposable）
-    /// </summary>
     private void DisposeViewModel(ViewModelBase? viewModel)
     {
         if (viewModel is not IDisposable disposable)

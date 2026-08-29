@@ -122,9 +122,6 @@ public class QueryRewriteService : IQueryRewriteService
         return s;
     }
 
-    /// <summary>
-    /// 生成同义词变体
-    /// </summary>
     /// <remarks>
     /// 拉丁字母键使用 ASCII 边界正则替换（避免子串误命中，如 "AI" 命中 "chain"）；
     /// 中文键保持简单子串替换。
@@ -213,9 +210,6 @@ public class QueryRewriteService : IQueryRewriteService
                       .ToList();
     }
 
-    /// <summary>
-    /// 移除停用词
-    /// </summary>
     private static string RemoveStopWords(string query)
     {
         var words = query.Split([' ', '，', '。', '、'], StringSplitOptions.RemoveEmptyEntries);

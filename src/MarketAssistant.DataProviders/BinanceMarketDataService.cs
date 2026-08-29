@@ -20,6 +20,11 @@ public sealed class BinanceMarketDataService
     /// </summary>
     private const string ExchangeInfoCacheKey = "BinanceExchangeInfo";
 
+    /// <summary>
+    /// 交易所信息回源闸门：冷启动并发首调只放一个请求出去（exchangeInfo weight=20），其余等结果共享缓存
+    /// </summary>
+    private readonly SemaphoreSlim _exchangeInfoGate = new(1, 1);
+
     private static readonly JsonSerializerOptions BinanceJsonSerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -65,14 +70,11 @@ public sealed class BinanceMarketDataService
 
     #region 24小时价格统计
 
-    /// <summary>
-    /// 获取单个交易对的24小时价格变动统计
-    /// </summary>
     public async Task<Binance24hrTicker?> Get24hrTickerAsync(
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/api/v3/ticker/24hr?symbol={symbol.ToUpperInvariant()}";
+        var url = $"/api/v3/ticker/24hr?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}";
         _logger.LogDebug("调用币安API: {Url}", url);
 
         using var httpClient = _httpClientFactory.CreateClient("Binance");
@@ -162,34 +164,44 @@ public sealed class BinanceMarketDataService
     public async Task<BinanceExchangeInfo?> GetExchangeInfoAsync(
         CancellationToken cancellationToken = default)
     {
-        // 尝试从缓存获取
         if (_memoryCache.TryGetValue(ExchangeInfoCacheKey, out BinanceExchangeInfo? cachedInfo) && cachedInfo != null)
         {
             _logger.LogDebug("从缓存获取交易所信息，交易对数量: {Count}", cachedInfo.Symbols?.Count ?? 0);
             return cachedInfo;
         }
 
-        var url = "/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false";
-        _logger.LogDebug("调用币安交易所信息API");
-
-        using var httpClient = _httpClientFactory.CreateClient("Binance");
-        var response = await httpClient.GetAsync(url, cancellationToken);
-        var content = await CheckAndReadResponseAsync(response, cancellationToken);
-
-        var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, BinanceJsonSerializerOptions);
-        _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
-
-        // 设置缓存（1小时过期）
-        if (exchangeInfo != null)
+        await _exchangeInfoGate.WaitAsync(cancellationToken);
+        try
         {
-            var cacheOptions = new MemoryCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
-            };
-            _memoryCache.Set(ExchangeInfoCacheKey, exchangeInfo, cacheOptions);
-        }
+            // 拿到闸门后再查一次：等闸门期间可能有先行者已完成回源
+            if (_memoryCache.TryGetValue(ExchangeInfoCacheKey, out cachedInfo) && cachedInfo != null)
+                return cachedInfo;
 
-        return exchangeInfo;
+            var url = "/api/v3/exchangeInfo?symbolStatus=TRADING&showPermissionSets=false";
+            _logger.LogDebug("调用币安交易所信息API");
+
+            using var httpClient = _httpClientFactory.CreateClient("Binance");
+            var response = await httpClient.GetAsync(url, cancellationToken);
+            var content = await CheckAndReadResponseAsync(response, cancellationToken);
+
+            var exchangeInfo = JsonSerializer.Deserialize<BinanceExchangeInfo>(content, BinanceJsonSerializerOptions);
+            _logger.LogInformation("成功获取交易所信息，交易对数量: {Count}", exchangeInfo?.Symbols?.Count ?? 0);
+
+            if (exchangeInfo != null)
+            {
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+                };
+                _memoryCache.Set(ExchangeInfoCacheKey, exchangeInfo, cacheOptions);
+            }
+
+            return exchangeInfo;
+        }
+        finally
+        {
+            _exchangeInfoGate.Release();
+        }
     }
 
     /// <summary>
@@ -252,9 +264,6 @@ public sealed class BinanceMarketDataService
 
     #region K线数据
 
-    /// <summary>
-    /// 获取K线数据（OHLCV）
-    /// </summary>
     public async Task<JsonArray?> GetKlinesAsync(
         string symbol,
         string interval = "1d",
@@ -263,7 +272,7 @@ public sealed class BinanceMarketDataService
         long? endTime = null,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/api/v3/klines?symbol={symbol.ToUpperInvariant()}&interval={interval}&limit={limit}";
+        var url = $"/api/v3/klines?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&interval={Uri.EscapeDataString(interval)}&limit={limit}";
 
         if (startTime.HasValue)
             url += $"&startTime={startTime.Value}";
@@ -285,15 +294,12 @@ public sealed class BinanceMarketDataService
 
     #region 订单簿深度
 
-    /// <summary>
-    /// 获取订单簿深度数据
-    /// </summary>
     public async Task<JsonObject?> GetDepthAsync(
         string symbol,
         int limit = 100,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/api/v3/depth?symbol={symbol.ToUpperInvariant()}&limit={limit}";
+        var url = $"/api/v3/depth?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&limit={limit}";
 
         _logger.LogDebug("调用币安深度API: {Symbol}", symbol);
 
@@ -307,15 +313,12 @@ public sealed class BinanceMarketDataService
 
     #region 最近交易
 
-    /// <summary>
-    /// 获取最近交易记录
-    /// </summary>
     public async Task<JsonArray?> GetRecentTradesAsync(
         string symbol,
         int limit = 500,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/api/v3/trades?symbol={symbol.ToUpperInvariant()}&limit={limit}";
+        var url = $"/api/v3/trades?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&limit={limit}";
 
         _logger.LogDebug("调用币安交易记录API: {Symbol}", symbol);
 
@@ -329,14 +332,11 @@ public sealed class BinanceMarketDataService
 
     #region 期货API
 
-    /// <summary>
-    /// 获取资金费率
-    /// </summary>
     public async Task<BinancePremiumIndexResponse?> GetPremiumIndexAsync(
         string symbol,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/fapi/v1/premiumIndex?symbol={symbol.ToUpperInvariant()}";
+        var url = $"/fapi/v1/premiumIndex?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}";
         _logger.LogDebug("调用币安期货资金费率API: {Symbol}", symbol);
 
         using var httpClient = _httpClientFactory.CreateClient("BinanceFutures");
@@ -346,9 +346,6 @@ public sealed class BinanceMarketDataService
         return JsonSerializer.Deserialize<BinancePremiumIndexResponse>(content, BinanceJsonSerializerOptions);
     }
 
-    /// <summary>
-    /// 获取历史资金费率
-    /// </summary>
     public async Task<List<BinanceFundingRateResponse>> GetFundingRateHistoryAsync(
         string symbol,
         int limit = 30,
@@ -356,7 +353,7 @@ public sealed class BinanceMarketDataService
         long? endTime = null,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/fapi/v1/fundingRate?symbol={symbol.ToUpperInvariant()}&limit={limit}";
+        var url = $"/fapi/v1/fundingRate?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&limit={limit}";
 
         if (startTime.HasValue)
             url += $"&startTime={startTime.Value}";
@@ -373,18 +370,23 @@ public sealed class BinanceMarketDataService
                ?? new List<BinanceFundingRateResponse>();
     }
 
-    /// <summary>
-    /// 获取多空比数据
-    /// </summary>
+    /// <param name="endpoint">统计端点（枚举白名单，杜绝路径拼接）</param>
     public async Task<List<BinanceLongShortRatioResponse>> GetLongShortRatioAsync(
-        string endpoint,
+        LongShortRatioEndpoint endpoint,
         string symbol,
         string period = "5m",
         int limit = 30,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/futures/data/{endpoint}?symbol={symbol.ToUpperInvariant()}&period={period}&limit={limit}";
-        _logger.LogDebug("调用币安期货多空比API: {Symbol} {Endpoint}", symbol, endpoint);
+        var endpointPath = endpoint switch
+        {
+            LongShortRatioEndpoint.GlobalLongShortAccountRatio => "globalLongShortAccountRatio",
+            LongShortRatioEndpoint.TopLongShortAccountRatio => "topLongShortAccountRatio",
+            LongShortRatioEndpoint.TopLongShortPositionRatio => "topLongShortPositionRatio",
+            _ => throw new ArgumentOutOfRangeException(nameof(endpoint), endpoint, null)
+        };
+        var url = $"/futures/data/{endpointPath}?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&period={Uri.EscapeDataString(period)}&limit={limit}";
+        _logger.LogDebug("调用币安期货多空比API: {Symbol} {Endpoint}", symbol, endpointPath);
 
         using var httpClient = _httpClientFactory.CreateClient("BinanceFutures");
         var response = await httpClient.GetAsync(url, cancellationToken);
@@ -394,16 +396,13 @@ public sealed class BinanceMarketDataService
                ?? new List<BinanceLongShortRatioResponse>();
     }
 
-    /// <summary>
-    /// 获取持仓量历史数据
-    /// </summary>
     public async Task<List<BinanceOpenInterestResponse>> GetOpenInterestHistAsync(
         string symbol,
         string period = "5m",
         int limit = 30,
         CancellationToken cancellationToken = default)
     {
-        var url = $"/futures/data/openInterestHist?symbol={symbol.ToUpperInvariant()}&period={period}&limit={limit}";
+        var url = $"/futures/data/openInterestHist?symbol={Uri.EscapeDataString(symbol.ToUpperInvariant())}&period={Uri.EscapeDataString(period)}&limit={limit}";
         _logger.LogDebug("调用币安期货持仓量API: {Symbol}", symbol);
 
         using var httpClient = _httpClientFactory.CreateClient("BinanceFutures");
@@ -415,4 +414,19 @@ public sealed class BinanceMarketDataService
     }
 
     #endregion
+}
+
+/// <summary>
+/// 多空比统计端点（币安 /futures/data 下三种口径的白名单）
+/// </summary>
+public enum LongShortRatioEndpoint
+{
+    /// <summary>全局账户多空比</summary>
+    GlobalLongShortAccountRatio,
+
+    /// <summary>顶级交易员账户多空比</summary>
+    TopLongShortAccountRatio,
+
+    /// <summary>顶级交易员持仓多空比</summary>
+    TopLongShortPositionRatio
 }

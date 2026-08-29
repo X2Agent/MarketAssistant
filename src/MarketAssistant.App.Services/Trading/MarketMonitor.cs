@@ -570,10 +570,11 @@ public class MarketMonitor : IDisposable
         if (!strategy.MaxExecutions.HasValue)
             return;
 
-        var updated = await _dataService.GetStrategyAsync(strategy.Id);
+        // 透传 MonitorToken：停止监控后不再执行 DB 查询/状态写回
+        var updated = await _dataService.GetStrategyAsync(strategy.Id, MonitorToken);
         if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
         {
-            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);

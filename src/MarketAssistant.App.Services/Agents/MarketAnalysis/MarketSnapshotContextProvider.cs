@@ -12,9 +12,6 @@ public class MarketSnapshotContextProvider : MessageAIContextProvider
 {
     private readonly ConcurrentDictionary<string, string> _sharedData = new();
 
-    /// <summary>
-    /// 设置共享数据项
-    /// </summary>
     public void SetData(string key, string value) => _sharedData[key] = value;
 
     protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(

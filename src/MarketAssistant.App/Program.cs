@@ -23,9 +23,6 @@ namespace MarketAssistant
                 .WithInterFont()
                 .LogToTrace();
 
-        /// <summary>
-        /// 配置依赖注入服务
-        /// </summary>
         public static IServiceProvider ConfigureServices()
         {
             var services = new ServiceCollection();
@@ -40,7 +37,6 @@ namespace MarketAssistant
             services.RemoveAll<IUserSettingService>();
             services.AddSingleton<IUserSettingService>(userSettingService);
 
-            // 注册ViewModels
             services.AddViewModels();
 
             // ValidateOnBuild：启动时即暴露错误的单例注册（fail-fast，避免运行期才爆炸）

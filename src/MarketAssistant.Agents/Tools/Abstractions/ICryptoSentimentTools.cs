@@ -7,9 +7,6 @@ namespace MarketAssistant.Agents.Tools.Abstractions;
 /// </summary>
 public interface ICryptoSentimentTools : ISentimentTools
 {
-    /// <summary>
-    /// 获取资金费率历史数据
-    /// </summary>
     /// <param name="symbol">交易对符号</param>
     /// <remarks>
     /// 数据源：币安 Futures API
@@ -18,9 +15,6 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// </remarks>
     Task<FundingRateHistory> GetFundingRateAsync(string symbol, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取全局账户多空比历史数据
-    /// </summary>
     /// <param name="symbol">交易对符号</param>
     /// <param name="period">时间周期（5m/15m/30m/1h/2h/4h/6h/12h/1d）</param>
     /// <param name="limit">获取的数据点数量（默认30）</param>
@@ -30,9 +24,6 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// </remarks>
     Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取顶级交易员账户多空比历史数据
-    /// </summary>
     /// <param name="symbol">交易对符号</param>
     /// <param name="period">时间周期（5m/15m/30m/1h/2h/4h/6h/12h/1d）</param>
     /// <param name="limit">获取的数据点数量（默认30）</param>
@@ -42,9 +33,6 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// </remarks>
     Task<LongShortRatioHistory> GetTopTraderAccountRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取顶级交易员持仓多空比历史数据
-    /// </summary>
     /// <param name="symbol">交易对符号</param>
     /// <param name="period">时间周期（5m/15m/30m/1h/2h/4h/6h/12h/1d）</param>
     /// <param name="limit">获取的数据点数量（默认30）</param>
@@ -54,9 +42,6 @@ public interface ICryptoSentimentTools : ISentimentTools
     /// </remarks>
     Task<LongShortRatioHistory> GetTopTraderPositionRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取合约持仓量
-    /// </summary>
     /// <param name="symbol">交易对符号</param>
     /// <param name="period">时间周期</param>
     /// <remarks>

@@ -72,7 +72,9 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
     {
         lock (_initializationLock)
         {
-            _initializationTask ??= InitializeCoreAsync(cancellationToken);
+            // 初始化是共享单飞任务，内部固定用 None：
+            // 首个调用者的令牌被固化进任务后，其取消会让后续所有调用方都拿到失败结果
+            _initializationTask ??= InitializeCoreAsync(CancellationToken.None);
             return _initializationTask;
         }
     }
@@ -291,7 +293,9 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
 
             // HTTP 访问与容错解析由 ClsQuoteClient 负责
             var data = await _clsClient.GetStockQuoteAsync(clsCode, "last_px,change", cancellationToken);
-            if (data is null || data.LastPrice <= 0 && data.Change == 0)
+            // 非正价格（停牌/无成交/数据缺失）一律拒绝参与预警评估，
+            // 否则 0 恒小于正目标价会对停牌股持续误报"跌破"
+            if (data is null || data.LastPrice <= 0)
                 return null;
 
             decimal? changePercent = data.Change != 0 ? data.Change * 100 : null;

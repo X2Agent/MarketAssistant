@@ -55,7 +55,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return kdj;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币KDJ指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币KDJ指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -98,7 +98,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return macd;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币MACD指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币MACD指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -136,7 +136,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return boll;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币BOLL指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币BOLL指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -177,7 +177,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return ma;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币MA指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币MA指标失败: {ex.Message} (交易对: {assetSymbol})", ex);

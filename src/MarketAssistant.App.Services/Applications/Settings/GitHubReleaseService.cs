@@ -6,9 +6,6 @@ using MarketAssistant.Applications.Cache;
 
 namespace MarketAssistant.Applications.Settings;
 
-/// <summary>
-/// GitHub Release 服务实现
-/// </summary>
 public class GitHubReleaseService : IReleaseService
 {
     private readonly IHttpClientFactory _httpClientFactory;
@@ -30,9 +27,6 @@ public class GitHubReleaseService : IReleaseService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <summary>
-    /// 检查是否有新版本
-    /// </summary>
     public async Task<UpdateCheckResult> CheckForUpdateAsync(string currentVersion, bool includePrerelease = true)
     {
         try
@@ -45,14 +39,12 @@ public class GitHubReleaseService : IReleaseService
                 throw new FriendlyException("当前版本号不能为空");
             }
 
-            // 检查速率限制
             if (!CheckRateLimit())
             {
                 var waitTime = _rateLimitInfo!.ResetTime - DateTime.UtcNow;
                 throw new FriendlyException($"GitHub API 速率限制已达上限，请等待 {waitTime.TotalMinutes:F0} 分钟后重试");
             }
 
-            // 获取最新版本
             ReleaseInfo? latestRelease;
             if (includePrerelease)
             {
@@ -77,7 +69,6 @@ public class GitHubReleaseService : IReleaseService
                 throw new FriendlyException("未找到可用的发布版本");
             }
 
-            // 比较版本号
             var latestVersion = latestRelease.TagName.TrimStart('v');
             var current = currentVersion.TrimStart('v');
 
@@ -110,9 +101,6 @@ public class GitHubReleaseService : IReleaseService
         }
     }
 
-    /// <summary>
-    /// 下载更新文件
-    /// </summary>
     public async Task<string> DownloadUpdateAsync(
         string downloadUrl,
         string savePath,
@@ -147,7 +135,6 @@ public class GitHubReleaseService : IReleaseService
             var totalMb = totalBytes / 1024.0 / 1024.0;
             _logger.LogInformation("文件大小：{Size:F2} MB", totalMb);
 
-            // 确保目录存在
             var directory = Path.GetDirectoryName(savePath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
@@ -212,21 +199,14 @@ public class GitHubReleaseService : IReleaseService
         }
     }
 
-    /// <summary>
-    /// 清除缓存的版本信息
-    /// </summary>
     public void ClearCache()
     {
         _memoryCache.Remove(CacheKeys.GitHubReleases);
         _logger.LogInformation("已清除版本信息缓存");
     }
 
-    /// <summary>
-    /// 获取所有发布版本（内部方法）
-    /// </summary>
     private async Task<List<ReleaseInfo>> GetAllReleasesInternalAsync()
     {
-        // 检查缓存
         if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? cachedReleases) &&
             cachedReleases is not null)
         {
@@ -244,7 +224,6 @@ public class GitHubReleaseService : IReleaseService
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
                 _logger.LogWarning("GitHub API 速率限制已达上限");
-                // 如果有缓存数据，返回缓存
                 if (_memoryCache.TryGetValue(CacheKeys.GitHubReleases, out List<ReleaseInfo>? fallbackReleases) &&
                     fallbackReleases is not null)
                 {
@@ -353,9 +332,6 @@ public class GitHubReleaseService : IReleaseService
         }
     }
 
-    /// <summary>
-    /// 检查 GitHub API 速率限制
-    /// </summary>
     private bool CheckRateLimit()
     {
         if (_rateLimitInfo == null || _rateLimitInfo.IsExpired())
@@ -376,9 +352,6 @@ public class GitHubReleaseService : IReleaseService
         return true;
     }
 
-    /// <summary>
-    /// 从响应头更新速率限制信息
-    /// </summary>
     private void UpdateRateLimitInfo(HttpResponseMessage response)
     {
         try
@@ -480,9 +453,6 @@ public class GitHubReleaseService : IReleaseService
         throw new FormatException($"无法解析版本号: {version}");
     }
 
-    /// <summary>
-    /// 验证版本号格式是否有效
-    /// </summary>
     private bool IsValidVersionFormat(string version)
     {
         if (string.IsNullOrWhiteSpace(version))
@@ -495,9 +465,6 @@ public class GitHubReleaseService : IReleaseService
         return parts.All(part => int.TryParse(part, out var num) && num >= 0);
     }
 
-    /// <summary>
-    /// 比较预发布版本标识符
-    /// </summary>
     private int ComparePrerelease(string prerelease1, string prerelease2)
     {
         var parts1 = prerelease1.Split('.');
@@ -530,9 +497,6 @@ public class GitHubReleaseService : IReleaseService
     }
 }
 
-/// <summary>
-/// GitHub API 速率限制信息
-/// </summary>
 internal class RateLimitInfo
 {
     public int Limit { get; }

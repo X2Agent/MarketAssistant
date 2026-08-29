@@ -18,14 +18,8 @@ public interface IExchangeClient
     /// </summary>
     bool IsFutures { get; }
 
-    /// <summary>
-    /// 获取账户余额
-    /// </summary>
     Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default);
 
-    /// <summary>
-    /// 对交易标的下单
-    /// </summary>
     /// <param name="clientOrderId">客户端自定义订单 ID，用于网络重试时实现幂等性，避免重复下单</param>
     /// <param name="reduceOnly">合约平仓时传 true，确保只平仓不开新仓（仅合约有效）</param>
     /// <param name="positionSide">持仓方向（合约双向模式：LONG/SHORT；单向模式/null：BOTH）</param>

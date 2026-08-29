@@ -507,9 +507,6 @@ public class MarketAnalysisWorkflow
         return $"分析 {assetSymbol} 的所有分析师已完成，但综合报告生成环节异常，请重试。如果问题持续，请检查 AI 模型配置是否正确";
     }
 
-    /// <summary>
-    /// 获取启用的分析师列表
-    /// </summary>
     private List<Type> GetEnabledAnalysts()
     {
         var enabledAnalysts = new List<Type>();

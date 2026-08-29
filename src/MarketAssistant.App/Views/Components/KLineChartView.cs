@@ -8,31 +8,24 @@ using System.Text.Json;
 
 namespace MarketAssistant.Views.Components;
 
-/// <summary>
-/// K线图表视图组件 (Avalonia版本)
-/// 使用 Avalonia.Controls.WebView 官方库提供 WebView 支持
-/// </summary>
 public class KLineChartView : UserControl
 {
-    private const int MaxWaitTimeMs = 5000; // 5秒
-    private const int CheckIntervalMs = 100; // 100毫秒
+    private const int MaxWaitTimeMs = 5000;
+    private const int CheckIntervalMs = 100;
 
     private bool _isInitialized = false;
     private bool _navigationHandlerSubscribed = false;
     private readonly SemaphoreSlim _updateSemaphore = new(1, 1);
     private NativeWebView? _webView;
+    private Grid? _rootGrid;
     private StackPanel? _loadingPanel;
     private StackPanel? _errorPanel;
     private TextBlock? _errorText;
     private Button? _retryButton;
 
-    // 定义依赖属性，支持 MVVM 绑定
     public static readonly StyledProperty<IEnumerable<KLineData>?> DataProperty =
         AvaloniaProperty.Register<KLineChartView, IEnumerable<KLineData>?>(nameof(Data));
 
-    /// <summary>
-    /// K线数据源
-    /// </summary>
     public IEnumerable<KLineData>? Data
     {
         get => GetValue(DataProperty);
@@ -43,13 +36,9 @@ public class KLineChartView : UserControl
     {
         InitializeComponent();
 
-        // 跟随应用主题变化，同步 K 线图配色
         ActualThemeVariantChanged += (_, _) => _ = ApplyThemeToChartAsync();
     }
 
-    /// <summary>
-    /// 将当前主题同步到图表内嵌页面（深色/浅色）
-    /// </summary>
     private async Task ApplyThemeToChartAsync()
     {
         if (_webView == null || !_isInitialized)
@@ -72,9 +61,6 @@ public class KLineChartView : UserControl
         }
     }
 
-    /// <summary>
-    /// 监听属性变化
-    /// </summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -92,16 +78,10 @@ public class KLineChartView : UserControl
     private void InitializeComponent()
     {
         var grid = new Grid();
+        _rootGrid = grid;
 
-        // 创建 WebView
-        _webView = new NativeWebView
-        {
-            IsVisible = false,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch
-        };
+        _webView = CreateWebView();
 
-        // 加载状态面板
         _loadingPanel = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -115,7 +95,6 @@ public class KLineChartView : UserControl
             HorizontalAlignment = HorizontalAlignment.Center
         });
 
-        // 错误状态面板
         _errorPanel = new StackPanel
         {
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -146,7 +125,6 @@ public class KLineChartView : UserControl
         _retryButton.Click += (s, e) => _ = InitializeChartAsync();
         _errorPanel.Children.Add(_retryButton);
 
-        // 添加到网格
         grid.Children.Add(_webView);
         grid.Children.Add(_loadingPanel);
         grid.Children.Add(_errorPanel);
@@ -157,9 +135,28 @@ public class KLineChartView : UserControl
         // 这样可以让页面更快地打开
     }
 
+    private static NativeWebView CreateWebView() => new()
+    {
+        IsVisible = false,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch
+    };
+
     /// <summary>
-    /// WebView 导航完成事件处理器
+    /// 获取 WebView，必要时重建（离开可视树时会释放，重新挂载后懒恢复）
     /// </summary>
+    private NativeWebView EnsureWebView()
+    {
+        if (_webView != null)
+            return _webView;
+
+        var webView = CreateWebView();
+        // 插入到最底层，保持状态面板位于 WebView 之上
+        _rootGrid?.Children.Insert(0, webView);
+        _webView = webView;
+        return webView;
+    }
+
     private void OnWebViewNavigated(object? sender, WebViewNavigationCompletedEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
@@ -178,22 +175,14 @@ public class KLineChartView : UserControl
         Dispatcher.UIThread.Post(() => _ = ApplyThemeToChartAsync());
     }
 
-    /// <summary>
-    /// 初始化图表
-    /// </summary>
     private async Task InitializeChartAsync()
     {
         try
         {
             ShowLoading();
 
-            if (_webView == null)
-            {
-                ShowError("WebView 未正确初始化");
-                return;
-            }
+            EnsureWebView();
 
-            // 加载 HTML 图表文件
             string htmlContent = await LoadHtmlContentAsync("kline_chart.html");
 
             if (string.IsNullOrEmpty(htmlContent))
@@ -209,7 +198,6 @@ public class KLineChartView : UserControl
                 _navigationHandlerSubscribed = true;
             }
 
-            // 使用 NativeWebView 的 NavigateToString 方法加载 HTML 内容
             _webView.NavigateToString(htmlContent);
         }
         catch (Exception ex)
@@ -218,9 +206,6 @@ public class KLineChartView : UserControl
         }
     }
 
-    /// <summary>
-    /// 加载HTML内容
-    /// </summary>
     private async Task<string> LoadHtmlContentAsync(string htmlFileName)
     {
         try
@@ -245,7 +230,6 @@ public class KLineChartView : UserControl
                 return await File.ReadAllTextAsync(htmlPath);
             }
 
-            // 如果都失败，返回默认HTML
             return GetDefaultChartHtml();
         }
         catch (Exception ex)
@@ -255,9 +239,6 @@ public class KLineChartView : UserControl
         }
     }
 
-    /// <summary>
-    /// 获取默认的图表HTML内容
-    /// </summary>
     private string GetDefaultChartHtml()
     {
         return @"
@@ -353,9 +334,6 @@ public class KLineChartView : UserControl
 </html>";
     }
 
-    /// <summary>
-    /// 显示加载状态
-    /// </summary>
     private void ShowLoading()
     {
         Dispatcher.UIThread.Post(() =>
@@ -366,9 +344,6 @@ public class KLineChartView : UserControl
         });
     }
 
-    /// <summary>
-    /// 隐藏加载状态
-    /// </summary>
     private void HideLoading()
     {
         Dispatcher.UIThread.Post(() =>
@@ -378,9 +353,6 @@ public class KLineChartView : UserControl
         });
     }
 
-    /// <summary>
-    /// 显示错误状态
-    /// </summary>
     private void ShowError(string message)
     {
         Dispatcher.UIThread.Post(() =>
@@ -392,13 +364,12 @@ public class KLineChartView : UserControl
         });
     }
 
-    /// <summary>
-    /// 使用K线数据更新图表
-    /// </summary>
     public async Task UpdateChartAsync(IEnumerable<KLineData> kLineData)
     {
-        if (kLineData == null || !kLineData.Any() || _webView == null)
+        if (kLineData == null || !kLineData.Any())
             return;
+
+        EnsureWebView();
 
         // 数据源变更可能高频触发，信号量不可立即进入说明上一次更新尚未完成，直接跳过本次
         if (!_updateSemaphore.Wait(0))
@@ -406,7 +377,6 @@ public class KLineChartView : UserControl
 
         try
         {
-            // 首次调用时才初始化图表（延迟初始化）
             if (!_isInitialized)
             {
                 await InitializeChartAsync();
@@ -418,10 +388,8 @@ public class KLineChartView : UserControl
             {
                 try
                 {
-                    // 设置加载状态
                     await _webView!.InvokeScript("window.stockChartInterface.setLoading(true);");
 
-                    // 序列化数据
                     var options = new JsonSerializerOptions
                     {
                         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -429,11 +397,9 @@ public class KLineChartView : UserControl
                     };
                     string jsonData = JsonSerializer.Serialize(kLineData, options);
 
-                    // 调用JavaScript更新图表数据
                     string script = $"window.stockChartInterface.loadData({jsonData});";
                     await _webView.InvokeScript(script);
 
-                    // 取消加载状态
                     await _webView.InvokeScript("window.stockChartInterface.setLoading(false);");
                 }
                 catch (Exception jsEx)
@@ -452,9 +418,6 @@ public class KLineChartView : UserControl
         }
     }
 
-    /// <summary>
-    /// 等待初始化完成
-    /// </summary>
     private async Task WaitForInitializationAsync()
     {
         int elapsed = 0;
@@ -469,6 +432,24 @@ public class KLineChartView : UserControl
         {
             throw new TimeoutException("图表初始化超时");
         }
+    }
+
+    /// <summary>
+    /// 释放 WebView 持有的原生资源（与 RichTextBlock.CleanupCurrentViewer 同一约定），
+    /// 避免反复进出资产页累积原生句柄；重新挂载后由 EnsureWebView 懒重建
+    /// </summary>
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        if (_webView is IDisposable disposableWebView)
+        {
+            try { disposableWebView.Dispose(); }
+            catch { /* 忽略 Dispose 异常 */ }
+        }
+        _webView = null;
+        _isInitialized = false;
+        _navigationHandlerSubscribed = false;
     }
 }
 

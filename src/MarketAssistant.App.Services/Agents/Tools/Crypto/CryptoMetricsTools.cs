@@ -42,9 +42,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
 
     // ==================== 市场深度数据（币安） ====================
 
-    /// <summary>
-    /// 获取历史K线数据（OHLCV）
-    /// </summary>
     [Description("获取历史K线数据（开盘、最高、最低、收盘、成交量），用于技术分析。interval为枚举类型，支持如 OneDay, OneHour 等")]
     public async Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null, CancellationToken cancellationToken = default)
     {
@@ -181,9 +178,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         _ => 24 * 60 * 60 * 1000
     };
 
-    /// <summary>
-    /// 获取订单簿深度数据
-    /// </summary>
     [Description("获取订单簿深度数据，包括买卖盘挂单，用于分析支撑压力位。limit通常为20/50/100")]
     public async Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100, CancellationToken cancellationToken = default)
     {
@@ -250,9 +244,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         }
     }
 
-    /// <summary>
-    /// 获取最近成交数据
-    /// </summary>
     [Description("获取最近成交记录，分析主动买入/卖出力量对比")]
     public async Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500, CancellationToken cancellationToken = default)
     {
@@ -318,9 +309,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
 
     // ==================== 综合市场指标（CoinGecko） ====================
 
-    /// <summary>
-    /// 获取综合市场指标
-    /// </summary>
     [Description("获取CoinGecko全方位市场数据：市值、FDV、ATH/ATL、历史排名等")]
     public async Task<CryptoMarketMetrics> GetMarketMetricsAsync(string symbol, CancellationToken cancellationToken = default)
     {
@@ -373,9 +361,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         }
     }
 
-    /// <summary>
-    /// 获取交易量分布
-    /// </summary>
     [Description("获取代币在不同交易所的交易量分布情况，用于分析流动性分布")]
     public async Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol, CancellationToken cancellationToken = default)
     {
@@ -433,9 +418,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
     private static decimal ParseInvariantDecimal(System.Text.Json.Nodes.JsonNode? node)
         => decimal.Parse(node?.GetValue<string>() ?? "0", NumberStyles.Float, CultureInfo.InvariantCulture);
 
-    /// <summary>
-    /// 获取波动性指标
-    /// </summary>
     [Description("获取波动性指标，包括历史波动率、ATR、最大回撤、夏普比率等，用于风险评估")]
     public async Task<CryptoVolatilityMetrics> GetVolatilityMetricsAsync(string symbol, int days = 30, CancellationToken cancellationToken = default)
     {

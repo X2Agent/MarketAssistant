@@ -10,6 +10,9 @@ namespace MarketAssistant.Applications.Assets;
 /// </summary>
 public class AShareAssetInfoService : IAssetInfoService
 {
+    /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
+    private const int HotAssetCount = 10;
+
     private readonly ClsQuoteClient _clsClient;
     private readonly SinaFundFlowClient _sinaFundFlowClient;
     private readonly ILogger<AShareAssetInfoService> _logger;
@@ -103,7 +106,7 @@ public class AShareAssetInfoService : IAssetInfoService
         // HTTP 访问、GBK 解码与解析由 SinaFundFlowClient 负责；此处仅做业务映射。
         try
         {
-            var items = await _sinaFundFlowClient.GetTopNetInflowAsync(12);
+            var items = await _sinaFundFlowClient.GetTopNetInflowAsync(HotAssetCount);
 
             return items.Select(item =>
             {

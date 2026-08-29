@@ -54,9 +54,6 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IRagIngestionService, RagIngestionService>();
 
-        // 延迟工厂：仅在真正使用 RAG 时解析，避免宿主浏览页面时触发整条 RAG 依赖链构造
-        services.AddSingleton<Func<IRagIngestionService>>(sp => sp.GetRequiredService<IRagIngestionService>);
-
         return services;
     }
 }

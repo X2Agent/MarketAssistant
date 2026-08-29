@@ -19,6 +19,15 @@ public sealed class StrategyEngineTriggerTest
 {
     private const string Symbol = "BTCUSDT";
 
+    /// <summary>
+    /// 触发评估路径不应创建 MarketMonitor，一旦创建立即失败。
+    /// </summary>
+    private sealed class ThrowingMarketMonitorProvider : IMarketMonitorProvider
+    {
+        public MarketMonitor GetMonitor()
+            => throw new InvalidOperationException("触发评估测试中不应创建 MarketMonitor");
+    }
+
     private static (StrategyEngine Engine, Mock<TradingDataService> Data, Mock<TradingStrategyService> Strategies) CreateEngine()
     {
         var settingService = new Mock<IUserSettingService>();
@@ -26,7 +35,7 @@ public sealed class StrategyEngineTriggerTest
 
         var environment = new TradingEnvironmentService(
             settingService.Object,
-            () => throw new InvalidOperationException("触发评估测试中不应创建 MarketMonitor"),
+            new ThrowingMarketMonitorProvider(),
             NullLogger<TradingEnvironmentService>.Instance);
 
         var data = new Mock<TradingDataService>(environment, NullLogger<TradingDataService>.Instance);

@@ -1,26 +1,23 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Services.Market;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels.Home;
 
-/// <summary>
-/// 主页搜索功能ViewModel
-/// </summary>
 public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private CancellationTokenSource? _debounceCts;
     private const int DebounceDelayMs = 200;
 
     private IHomeAssetService HomeAssetService =>
-        _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetHomeAssetService(_marketContext.CurrentMarket);
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -37,23 +34,17 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private AssetItem? _selectedResult;
 
-    /// <summary>
-    /// 搜索结果集合
-    /// </summary>
     public ObservableCollection<AssetItem> SearchResults { get; } = new();
 
-    /// <summary>
-    /// 资产选择事件
-    /// </summary>
     public event EventHandler<AssetItem>? AssetSelected;
 
     public HomeSearchViewModel(
-        IServiceProvider serviceProvider,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<HomeSearchViewModel> logger)
         : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
     }
 
@@ -62,9 +53,9 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
-        // 取消之前的防抖任务
+        // 只取消不 Dispose：在飞请求仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
+        // （未释放的 CTS 无非等待 GC，安全）
         _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
         _debounceCts = new CancellationTokenSource();
 
         var cancellationToken = _debounceCts.Token;
@@ -83,9 +74,6 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         _ = DebouncedSearchAsync(value, cancellationToken);
     }
 
-    /// <summary>
-    /// 防抖后执行搜索
-    /// </summary>
     private async Task DebouncedSearchAsync(string value, CancellationToken cancellationToken)
     {
         try
@@ -104,9 +92,6 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 执行搜索并刷新结果列表
-    /// </summary>
     private async Task SearchAsync(string query, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -154,18 +139,13 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         IsSearching = false;
     }
 
-    /// <summary>
-    /// 选择资产
-    /// </summary>
     [RelayCommand]
     private void NavigateToAsset(AssetItem? asset)
     {
         if (asset == null) return;
 
-        // 隐藏搜索结果
         IsSearchResultVisible = false;
 
-        // 通知父ViewModel
         AssetSelected?.Invoke(this, asset);
     }
 
@@ -193,14 +173,10 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         return true;
     }
 
-    /// <summary>
-    /// 清空搜索（包括文本和结果）
-    /// </summary>
     public void ClearSearch()
     {
-        // 取消防抖任务
+        // 只取消不 Dispose：在飞请求仍持有旧令牌
         _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
         _debounceCts = null;
 
         SearchQuery = string.Empty;
@@ -210,13 +186,9 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         IsSearching = false;
     }
 
-    /// <summary>
-    /// 释放资源
-    /// </summary>
     public void Dispose()
     {
         _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
         _debounceCts = null;
         GC.SuppressFinalize(this);
     }

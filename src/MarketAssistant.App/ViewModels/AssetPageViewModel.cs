@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Assets;
@@ -9,7 +10,6 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
@@ -17,14 +17,11 @@ using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
 
-/// <summary>
-/// 资产详情页ViewModel
-/// </summary>
 public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
     public override string Title => "资产详情";
 
-    private readonly Func<MarketType, IKLineService> _klineServiceResolver;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly BinanceWebSocketService _wsService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
@@ -66,9 +63,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     partial void OnPriceChangeChanged(decimal value) => OnPropertyChanged(nameof(PriceChangeText));
 
-    /// <summary>
-    /// 计算属性用于UI绑定
-    /// </summary>
     public bool IsMinuteSelected => CurrentKLineType == KLineType.Minute15;
     public bool IsDailySelected => CurrentKLineType == KLineType.Daily;
     public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
@@ -79,11 +73,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
-        Func<MarketType, IKLineService> klineServiceResolver,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         BinanceWebSocketService wsService) : base(logger)
     {
-        _klineServiceResolver = klineServiceResolver ?? throw new ArgumentNullException(nameof(klineServiceResolver));
+        _marketServiceRegistry = marketServiceRegistry ?? throw new ArgumentNullException(nameof(marketServiceRegistry));
         _marketContext = marketContext;
         _wsService = wsService;
 
@@ -91,21 +85,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
     }
 
-    /// <summary>
-    /// 设置资产代码（异步加载数据，避免阻塞UI）
-    /// </summary>
-    private void SetAssetCode(string code)
-    {
-        AssetCode = code;
-        if (!string.IsNullOrEmpty(code))
-        {
-            _ = LoadAssetDataAsync(code);
-        }
-    }
-
-    /// <summary>
-    /// 当K线类型变化时通知相关UI属性
-    /// </summary>
     partial void OnCurrentKLineTypeChanged(KLineType value)
     {
         OnPropertyChanged(nameof(IsMinuteSelected));
@@ -119,9 +98,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 刷新资产数据
-    /// </summary>
     [RelayCommand]
     private async Task RefreshDataAsync()
     {
@@ -131,9 +107,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 导航到资产分析页面
-    /// </summary>
     private void NavigateToAnalysisAsync()
     {
         if (string.IsNullOrEmpty(AssetCode))
@@ -142,9 +115,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         WeakReferenceMessenger.Default.Send(new NavigationMessage("Analysis", new AssetNavigationParameter(AssetCode, AssetName)));
     }
 
-    /// <summary>
-    /// 改变K线类型
-    /// </summary>
     private void ChangeKLineTypeAsync(string? type)
     {
         if (string.IsNullOrEmpty(type))
@@ -165,17 +135,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 加载资产K线数据
-    /// </summary>
     private async Task LoadAssetDataAsync(string assetCode)
     {
         if (string.IsNullOrEmpty(assetCode))
             return;
 
-        // 取消并释放上一次加载的 CTS，避免泄漏
+        // 取消上一次加载，避免并发加载；只取消不 Dispose——
+        // 在飞操作仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
         _loadingCancellationTokenSource?.Cancel();
-        _loadingCancellationTokenSource?.Dispose();
         _loadingCancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = _loadingCancellationTokenSource.Token;
 
@@ -185,7 +152,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         try
         {
-            var klineService = _klineServiceResolver(_marketContext.CurrentMarket);
+            var klineService = _marketServiceRegistry.GetKLineService(_marketContext.CurrentMarket);
             // IKLineService.GetKLineDataAsync 暂不支持 CancellationToken，
             // 仅能通过取消令牌在返回后丢弃过期结果
             var kLineDataList = await klineService.GetKLineDataAsync(assetCode, CurrentKLineType);
@@ -213,9 +180,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 计算价格相关信息
-    /// </summary>
     private void CalculatePriceInfo(List<KLineData> data)
     {
         if (data.Count == 0)
@@ -246,11 +210,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             IsBusy = true;
             HasError = false;
 
-            // 2. 设置基本信息（立即显示）
             AssetName = !string.IsNullOrEmpty(parameter.Name) ? parameter.Name : parameter.Code;
             AssetCode = parameter.Code;
 
-            // 3. 如果导航参数中包含价格信息，立即显示
             if (parameter.CurrentPrice.HasValue)
             {
                 CurrentPrice = parameter.CurrentPrice.Value;
@@ -263,13 +225,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             }
             else
             {
-                // 清空旧数据
                 CurrentPrice = 0;
                 PriceChangePercent = 0;
                 PriceChange = 0;
             }
 
-            // 4. 异步加载完整数据（不阻塞导航）。
+            // 2. 异步加载完整数据（不阻塞导航）。
             // 不要包 Task.Run：OnNavigatedTo 已在 UI 线程，LoadAssetDataAsync 第一个 await
             // 之后自动回到 UI 线程，包 Task.Run 会把 IsBusy/HasError 等绑定属性丢到线程池线程写入，
             // 触发 Avalonia 跨线程异常
@@ -277,7 +238,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             {
                 _ = LoadAssetDataAsync(parameter.Code);
 
-                // 5. 虚拟币市场订阅 WebSocket 实时价格
+                // 3. 虚拟币市场订阅 WebSocket 实时价格
                 // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
                 var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
                 if (effectiveMarket == MarketType.Crypto)
@@ -313,7 +274,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void Dispose()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _loadingCancellationTokenSource?.Dispose();
         _wsService.PriceUpdated -= OnDetailPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.AssetDetail);
         GC.SuppressFinalize(this);

@@ -70,7 +70,8 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
 
     private void OnTradingModeChanged(CryptoTradingMode mode)
     {
-        UpdateTradingModeState(mode);
+        // 防御：ModeChanged 若由后台线程触发（如监控停止路径），绑定属性更新必须切回 UI 线程
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdateTradingModeState(mode));
     }
 
     private void UpdateTradingModeState(CryptoTradingMode mode)

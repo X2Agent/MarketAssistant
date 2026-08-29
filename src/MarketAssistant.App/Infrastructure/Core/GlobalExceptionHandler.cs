@@ -14,7 +14,6 @@ public sealed class GlobalExceptionHandler
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
 
-    // 通过 DI 注入具体服务
     public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
     {
         _logger = logger;
@@ -37,24 +36,17 @@ public sealed class GlobalExceptionHandler
         }
     }
 
-    /// <summary>
-    /// 注册全局异常处理器
-    /// </summary>
     private void RegisterHandlers()
     {
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
-        // 注册 Avalonia 的 UI 线程异常处理
         if (Dispatcher.UIThread != null)
         {
             Dispatcher.UIThread.UnhandledException += OnDispatcherUnhandledException;
         }
     }
 
-    /// <summary>
-    /// 处理未捕获的异常
-    /// </summary>
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         if (e.ExceptionObject is not Exception exception) return;
@@ -76,23 +68,21 @@ public sealed class GlobalExceptionHandler
     }
 
     /// <summary>
-    /// 处理未观察到的任务异常
+    /// 处理未观察到的任务异常。
+    /// 只记日志不弹模态框：代码库存在大量带 try/catch 兜底的 fire-and-forget，
+    /// 瞬时网络错误的未观察异常若在未来某个 GC 时刻突然弹"后台任务执行失败"，
+    /// 用户既无法复现也无法归因。
     /// </summary>
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
-        _logger.LogError(e.Exception, "发生未观察到的任务异常");
-        e.SetObserved();
-
-        Dispatcher.UIThread.Post(async () =>
+        _logger.LogError(e.Exception, "发生未观察到的任务异常（每个内部异常各记一条）");
+        foreach (var inner in e.Exception.InnerExceptions)
         {
-            var message = ErrorMessageMapper.GetUserFriendlyMessage(e.Exception.GetBaseException());
-            await ShowErrorAsync("后台任务执行失败", message);
-        });
+            _logger.LogError(inner, "未观察到的任务异常详情");
+        }
+        e.SetObserved();
     }
 
-    /// <summary>
-    /// 处理 Avalonia Dispatcher 的未捕获异常
-    /// </summary>
     private void OnDispatcherUnhandledException(object sender, Avalonia.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
         // OutOfMemoryException / AccessViolationException 之类的致命错误不应被吞并，让进程终止并写入崩溃日志
@@ -110,7 +100,6 @@ public sealed class GlobalExceptionHandler
         // 标记异常已处理，防止应用崩溃
         e.Handled = true;
 
-        // 显示错误对话框
         Dispatcher.UIThread.Post(async () =>
         {
             await ShowErrorAsync("操作失败", message);
@@ -126,9 +115,6 @@ public sealed class GlobalExceptionHandler
             or AccessViolationException
             or AppDomainUnloadedException;
 
-    /// <summary>
-    /// 写入崩溃日志
-    /// </summary>
     private void WriteCrashLog(Exception exception)
     {
         try
@@ -164,9 +150,6 @@ public sealed class GlobalExceptionHandler
         }
     }
 
-    /// <summary>
-    /// 向用户显示错误信息
-    /// </summary>
     private async Task ShowErrorAsync(string title, string message)
     {
         try
@@ -312,9 +295,6 @@ public sealed class GlobalExceptionHandler
         }
     }
 
-    /// <summary>
-    /// 清理资源
-    /// </summary>
     public static void Cleanup()
     {
         if (_instance == null) return;

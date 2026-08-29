@@ -16,7 +16,7 @@
         <Setter Property="LineHeight" Value="34"/>
     </Style>
 
-    <!-- H2 — 区块大标题（如 "热门标的"、"7x24快讯"） -->
+    <!-- H2 — 区块大标题（如 "热门资产"、"7x24快讯"） -->
     <Style Selector="TextBlock.h2">
         <Setter Property="FontSize" Value="{StaticResource TitleFontSize}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>

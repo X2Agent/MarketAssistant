@@ -17,11 +17,6 @@ namespace MarketAssistant.Agents.Tools.Abstractions;
 /// </remarks>
 public interface ICryptoMetricsTools : IFinancialTools
 {
-    // ==================== 市场深度数据（币安） ====================
-
-    /// <summary>
-    /// 获取历史K线数据（OHLCV）
-    /// </summary>
     /// <param name="symbol">交易对符号（如BTCUSDT）</param>
     /// <param name="interval">时间间隔</param>
     /// <param name="limit">返回数据条数（默认500，最大1000）</param>
@@ -33,9 +28,6 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// </remarks>
     Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取订单簿深度数据
-    /// </summary>
     /// <param name="symbol">交易对符号（如BTCUSDT）</param>
     /// <param name="limit">返回档位数量（5/10/20/50/100/500/1000/5000）</param>
     /// <remarks>
@@ -44,9 +36,6 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// </remarks>
     Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// 获取最近成交数据
-    /// </summary>
     /// <param name="symbol">交易对符号（如BTCUSDT）</param>
     /// <param name="limit">返回成交笔数（默认500，最大1000）</param>
     /// <remarks>
@@ -54,8 +43,6 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 用于分析买卖力量对比、成交活跃度
     /// </remarks>
     Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500, CancellationToken cancellationToken = default);
-
-    // ==================== 综合市场指标（CoinGecko） ====================
 
     /// <summary>
     /// 获取综合市场指标（市值、供应量、排名、流通率等数值指标）
@@ -77,8 +64,6 @@ public interface ICryptoMetricsTools : IFinancialTools
     /// 用于分析流动性分布、交易所选择
     /// </remarks>
     Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol, CancellationToken cancellationToken = default);
-
-    // ==================== 衍生计算指标 ====================
 
     /// <summary>
     /// 获取波动性指标（历史波动率、ATR、最大回撤、夏普比率）

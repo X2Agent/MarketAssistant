@@ -2,9 +2,6 @@ using MarketAssistant.Agents.Tools.Models.Crypto;
 
 namespace MarketAssistant.Agents.Tools.Abstractions;
 
-/// <summary>
-/// 虚拟币市场基础数据工具接口
-/// </summary>
 public interface ICryptoBasicTools : IBasicDataTools
 {
     /// <summary>

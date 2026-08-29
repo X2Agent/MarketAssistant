@@ -8,9 +8,6 @@ namespace MarketAssistant.Infrastructure.Core;
 /// </summary>
 public static class ErrorMessageMapper
 {
-    /// <summary>
-    /// 获取用户友好的错误消息
-    /// </summary>
     public static string GetUserFriendlyMessage(Exception exception)
     {
         return exception switch
@@ -70,9 +67,6 @@ public static class ErrorMessageMapper
         };
     }
 
-    /// <summary>
-    /// 获取带上下文的用户友好错误消息
-    /// </summary>
     public static string GetUserFriendlyMessageWithContext(Exception exception, string operationName)
     {
         var baseMessage = GetUserFriendlyMessage(exception);

@@ -6,9 +6,6 @@ using IOPath = System.IO.Path;
 
 namespace MarketAssistant.Rag.Services;
 
-/// <summary>
-/// 列表信息
-/// </summary>
 public class ListInfo
 {
     public string Prefix { get; set; } = string.Empty;
@@ -62,14 +59,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
             // 每次转换独立的上下文状态，转换器实例本身无共享可变状态
             var state = new ConversionContext();
 
-            // 预处理编号定义和图片
             await ProcessNumberingDefinitionsAsync(doc, state);
             await ProcessImageReferencesAsync(doc, filePath, state);
 
             var markdown = new StringBuilder();
             var previousWasList = false;
 
-            // 按文档顺序处理所有元素
             foreach (var element in main.Document.Body.ChildElements)
             {
                 var isCurrentList = false;
@@ -95,7 +90,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
                         break;
                 }
 
-                // 如果从列表切换到非列表，添加额外的空行
                 if (previousWasList && !isCurrentList)
                 {
                     markdown.AppendLine();
@@ -112,16 +106,8 @@ public class DocxMarkdownConverter : IMarkdownConverter
         }
     }
 
-    /// <summary>
-    /// 处理段落元素
-    /// </summary>
-    /// <param name="paragraph">段落</param>
-    /// <param name="markdown">markdown构建器</param>
-    /// <param name="state">本次转换的上下文状态</param>
-    /// <returns>是否为列表项</returns>
     private bool ProcessParagraph(Paragraph paragraph, StringBuilder markdown, ConversionContext state)
     {
-        // 检查是否为列表项
         var numberingId = GetNumberingId(paragraph);
         var numberingLevel = GetNumberingLevel(paragraph);
 
@@ -131,7 +117,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
             return true;
         }
 
-        // 处理段落格式化文本（包括图片）
         var formattedText = ProcessTextFormatting(paragraph, state);
 
         if (string.IsNullOrWhiteSpace(formattedText))
@@ -140,7 +125,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
             return false;
         }
 
-        // 检查是否为标题
         var headingLevel = GetHeadingLevel(paragraph);
         if (headingLevel > 0)
         {
@@ -155,9 +139,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         return false;
     }
 
-    /// <summary>
-    /// 处理表格元素
-    /// </summary>
     private void ProcessTable(Table table, StringBuilder markdown, ConversionContext state)
     {
         var rows = new List<List<string>>();
@@ -179,7 +160,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
         if (rows.Count == 0) return;
 
-        // 标准化列数
         var maxColumns = rows.Max(r => r.Count);
         foreach (var row in rows)
         {
@@ -189,14 +169,10 @@ public class DocxMarkdownConverter : IMarkdownConverter
             }
         }
 
-        // 生成Markdown表格
         GenerateMarkdownTable(rows, markdown);
         markdown.AppendLine(); // 表格后空行
     }
 
-    /// <summary>
-    /// 获取段落的标题级别
-    /// </summary>
     private int GetHeadingLevel(Paragraph paragraph)
     {
         var style = paragraph.ParagraphProperties?.ParagraphStyleId?.Val?.Value;
@@ -204,7 +180,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
         var styleLower = style.ToLowerInvariant();
 
-        // 检查标准的Word标题样式
         if (styleLower.StartsWith("heading"))
         {
             var levelStr = styleLower.Replace("heading", "");
@@ -212,11 +187,9 @@ public class DocxMarkdownConverter : IMarkdownConverter
                 return level;
         }
 
-        // 检查数字样式
         if (int.TryParse(styleLower, out var numLevel) && numLevel >= 1 && numLevel <= 6)
             return numLevel;
 
-        // 检查大纲级别
         var outlineLevel = paragraph.ParagraphProperties?.OutlineLevel?.Val?.Value;
         if (outlineLevel.HasValue && outlineLevel.Value >= 0 && outlineLevel.Value <= 5)
             return outlineLevel.Value + 1;
@@ -224,16 +197,12 @@ public class DocxMarkdownConverter : IMarkdownConverter
         return 0;
     }
 
-    /// <summary>
-    /// 处理文本格式化
-    /// </summary>
     private string ProcessTextFormatting(Paragraph paragraph, ConversionContext state)
     {
         var result = new StringBuilder();
 
         foreach (var run in paragraph.Elements<Run>())
         {
-            // 检查是否包含图片
             var drawing = run.Elements<Drawing>().FirstOrDefault();
             if (drawing != null)
             {
@@ -275,9 +244,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         return result.ToString();
     }
 
-    /// <summary>
-    /// 提取表格单元格文本
-    /// </summary>
     private string ExtractTableCellText(TableCell cell, ConversionContext state)
     {
         var cellContent = new StringBuilder();
@@ -296,25 +262,19 @@ public class DocxMarkdownConverter : IMarkdownConverter
         return cellContent.ToString().Trim();
     }
 
-    /// <summary>
-    /// 生成Markdown表格
-    /// </summary>
     private void GenerateMarkdownTable(List<List<string>> rows, StringBuilder markdown)
     {
         if (rows.Count == 0) return;
 
-        // 表头
         var header = rows[0];
         markdown.Append("| ");
         markdown.AppendJoin(" | ", header.Select(EscapeMarkdownTableCell));
         markdown.AppendLine(" |");
 
-        // 分隔线
         markdown.Append("| ");
         markdown.AppendJoin(" | ", header.Select(_ => "---"));
         markdown.AppendLine(" |");
 
-        // 数据行
         foreach (var row in rows.Skip(1))
         {
             markdown.Append("| ");
@@ -323,9 +283,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         }
     }
 
-    /// <summary>
-    /// 转义Markdown表格单元格内容
-    /// </summary>
     private string EscapeMarkdownTableCell(string text)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
@@ -336,9 +293,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
                   .Trim();
     }
 
-    /// <summary>
-    /// 预处理编号定义
-    /// </summary>
     private async Task ProcessNumberingDefinitionsAsync(WordprocessingDocument doc, ConversionContext state)
     {
         state.NumberingFormats.Clear();
@@ -364,7 +318,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
                         var numFmt = level?.NumberingFormat?.Val;
                         var levelValue = level?.LevelIndex?.Value ?? 0;
 
-                        // 根据编号格式确定列表类型
                         var listInfo = new ListInfo
                         {
                             Level = levelValue,
@@ -379,27 +332,18 @@ public class DocxMarkdownConverter : IMarkdownConverter
         });
     }
 
-    /// <summary>
-    /// 获取段落的编号ID
-    /// </summary>
     private int? GetNumberingId(Paragraph paragraph)
     {
         var numPr = paragraph.ParagraphProperties?.NumberingProperties;
         return numPr?.NumberingId?.Val?.Value;
     }
 
-    /// <summary>
-    /// 获取段落的编号级别
-    /// </summary>
     private int GetNumberingLevel(Paragraph paragraph)
     {
         var numPr = paragraph.ParagraphProperties?.NumberingProperties;
         return numPr?.NumberingLevelReference?.Val?.Value ?? 0;
     }
 
-    /// <summary>
-    /// 处理列表项
-    /// </summary>
     private void ProcessListItem(Paragraph paragraph, StringBuilder markdown, int numberingId, int level, ConversionContext state)
     {
         var text = ProcessTextFormatting(paragraph, state);
@@ -407,12 +351,10 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
         var listInfo = state.NumberingFormats.GetValueOrDefault(numberingId, new ListInfo { Prefix = "- ", IsOrdered = false });
 
-        // 添加缩进
         var indent = new string(' ', level * 2);
 
         if (listInfo.IsOrdered)
         {
-            // 为有序列表维护计数器
             var counterKey = numberingId * 100 + level; // 组合键考虑级别
             if (!state.ListItemCounters.ContainsKey(counterKey))
                 state.ListItemCounters[counterKey] = 1;
@@ -426,9 +368,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         }
     }
 
-    /// <summary>
-    /// 预处理图片引用
-    /// </summary>
     private async Task ProcessImageReferencesAsync(WordprocessingDocument doc, string documentPath, ConversionContext state)
     {
         state.ImageReferences.Clear();
@@ -445,7 +384,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
                     var relationshipId = doc.MainDocumentPart.GetIdOfPart(imagePart);
                     state.ImageCounter++;
 
-                    // 使用 IImageStorageService 保存图片
                     var imageFileName = $"doc_image{state.ImageCounter}.{GetImageExtension(imagePart.ContentType)}";
 
                     using var stream = imagePart.GetStream();
@@ -453,10 +391,8 @@ public class DocxMarkdownConverter : IMarkdownConverter
                     await stream.CopyToAsync(memoryStream);
                     var imageBytes = memoryStream.ToArray();
 
-                    // 通过 IImageStorageService 保存图片并获取路径
                     var imagePath = await _imageStorageService.SaveImageAsync(imageBytes, imageFileName, documentPath);
 
-                    // 存储完整的绝对路径
                     state.ImageReferences[relationshipId] = imagePath;
                 }
                 catch (Exception ex)
@@ -468,9 +404,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         });
     }
 
-    /// <summary>
-    /// 处理图片元素
-    /// </summary>
     private string ProcessImage(Drawing drawing, ConversionContext state)
     {
         try
@@ -486,7 +419,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
                 var imageNumber = fileName.Replace("doc_image", "");
                 var altText = $"文档图片{imageNumber}";
 
-                // 使用绝对路径，转换为URI格式
                 var fileUri = new Uri(imagePath).AbsoluteUri;
                 return $"![{altText}]({fileUri})";
             }
@@ -499,9 +431,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         return string.Empty;
     }
 
-    /// <summary>
-    /// 根据内容类型获取图片扩展名
-    /// </summary>
     private static string GetImageExtension(string contentType)
     {
         return contentType.ToLowerInvariant() switch
@@ -517,9 +446,6 @@ public class DocxMarkdownConverter : IMarkdownConverter
         };
     }
 
-    /// <summary>
-    /// 清理和规范化Markdown内容
-    /// </summary>
     private string CleanupMarkdown(string markdown)
     {
         if (string.IsNullOrEmpty(markdown))
@@ -545,7 +471,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
             else
             {
                 consecutiveEmptyLines = 0;
-                cleanedLines.Add(line.TrimEnd()); // 移除行尾空白
+                cleanedLines.Add(line.TrimEnd());
             }
         }
 

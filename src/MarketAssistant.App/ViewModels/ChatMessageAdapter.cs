@@ -102,10 +102,24 @@ public partial class ChatMessageAdapter : ObservableObject
 
     partial void OnContentChanged(string value)
     {
-        // 内容变化时（如流式完成）重新尝试解析 Adaptive Card
+        // 流式期间每个 chunk 都会触发本回调，对不断增长的累积串做全量 JSON 解析是 O(n²)，
+        // 且未完成的 JSON 必然解析失败——只在消息终态时解析一次
+        if (Status is MessageStatus.Streaming or MessageStatus.Sending)
+            return;
+
         if (AdaptiveCard == null && IsJsonContent(value))
         {
             TryParseAdaptiveCard(value);
+        }
+    }
+
+    partial void OnStatusChanged(MessageStatus value)
+    {
+        // 流结束置为终态时，对最终内容统一解析一次 Adaptive Card
+        if (value is MessageStatus.Sent or MessageStatus.Failed &&
+            AdaptiveCard == null && IsJsonContent(Content))
+        {
+            TryParseAdaptiveCard(Content);
         }
     }
 

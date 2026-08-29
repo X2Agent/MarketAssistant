@@ -2,12 +2,12 @@ using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels;
@@ -35,7 +35,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private static readonly TimeSpan SearchDebounceDelay = TimeSpan.FromMilliseconds(300);
 
     private readonly PriceAlertService _alertService;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
     private readonly IUserSettingService _userSettingService;
@@ -49,7 +49,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// 当前市场对应的资产信息服务（Keyed Service，跟随市场切换）。
     /// </summary>
     private IAssetInfoService AssetInfoService =>
-        _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
 
     /// <summary>
     /// 当前页面的规则列表（仅展示当前市场的规则）
@@ -160,7 +160,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
 
     public PriceAlertPageViewModel(
         PriceAlertService alertService,
-        IServiceProvider serviceProvider,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         IDialogService dialogService,
         IUserSettingService userSettingService,
@@ -168,7 +168,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         : base(logger)
     {
         _alertService = alertService;
-        _serviceProvider = serviceProvider;
+        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
         _dialogService = dialogService;
         _userSettingService = userSettingService;
@@ -215,8 +215,8 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task SearchAssetsAsync(string keyword)
     {
+        // 只取消不 Dispose：在飞搜索仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
         _assetLoadCts?.Cancel();
-        _assetLoadCts?.Dispose();
         _assetLoadCts = new CancellationTokenSource();
         var cancellationToken = _assetLoadCts.Token;
 
@@ -354,7 +354,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // 校验目标值
         if (!decimal.TryParse(NewRuleTargetValue.Trim(), out var targetValue) || targetValue <= 0)
         {
             ValidationError = "请输入有效的目标值（正数）";
@@ -376,7 +375,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
 
             await _alertService.AddRuleAsync(rule);
 
-            // 清空表单
             NewRuleSelectedAsset = null;
             NewRuleAssetText = string.Empty;
             NewRuleTargetValue = string.Empty;
@@ -449,7 +447,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     {
         _disposed = true;
         _assetLoadCts?.Cancel();
-        _assetLoadCts?.Dispose();
         _assetLoadCts = null;
         _alertService.RulesChanged -= OnRulesChanged;
         _alertService.RuleQuoteUpdated -= OnRuleQuoteUpdated;

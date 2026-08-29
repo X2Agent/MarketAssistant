@@ -109,9 +109,6 @@ public class GroundingSearchTools : IToolsProvider
         return CombineResults(results);
     }
 
-    /// <summary>
-    /// 执行知识库搜索
-    /// </summary>
     private async Task<IReadOnlyList<TextSearchResult>> ExecuteKnowledgeSearch(string query, int top, CancellationToken cancellationToken)
     {
         try

@@ -26,7 +26,7 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
         string collectionName, string documentId, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        await using var conn = CreateConnection();
+        await using var conn = await CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT keys_json FROM rag_document_catalog WHERE collection = $c AND document_id = $d";
         cmd.Parameters.AddWithValue("$c", collectionName);
@@ -44,7 +44,7 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
         ArgumentNullException.ThrowIfNull(entry);
 
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        await using var conn = CreateConnection();
+        await using var conn = await CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO rag_document_catalog(collection, document_id, document_uri, content_hash, keys_json, embedding_model_id, dimension, updated_at)
@@ -69,7 +69,7 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
         string collectionName, string documentId, CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
-        await using var conn = CreateConnection();
+        await using var conn = await CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "DELETE FROM rag_document_catalog WHERE collection = $c AND document_id = $d";
         cmd.Parameters.AddWithValue("$c", collectionName);
@@ -77,10 +77,17 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
         await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private SqliteConnection CreateConnection()
+    private async Task<SqliteConnection> CreateConnectionAsync(CancellationToken cancellationToken)
     {
         var conn = new SqliteConnection($"Data Source={_dbPath}");
-        conn.Open();
+        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // busy_timeout 是连接级属性（WAL 才是库级持久属性），必须每连接设置，
+        // 否则并发写清单时写锁冲突会直接抛 "database is locked"
+        await using var pragmaCmd = conn.CreateCommand();
+        pragmaCmd.CommandText = "PRAGMA busy_timeout=5000;";
+        await pragmaCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
         return conn;
     }
 
@@ -97,7 +104,7 @@ public sealed class SqliteRagDocumentCatalog : IRagDocumentCatalog, IDisposable
 
             Directory.CreateDirectory(Path.GetDirectoryName(_dbPath)!);
 
-            await using var conn = CreateConnection();
+            await using var conn = await CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
             // 启用 WAL 模式，提升并发读写性能
             await using var walCmd = conn.CreateCommand();
             walCmd.CommandText = "PRAGMA journal_mode=WAL;";

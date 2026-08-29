@@ -184,10 +184,11 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                <!-- 行情条（模拟数据；贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker） -->
+                <!-- 行情条（贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker）；
+                     无真实指数数据时随 HasIndexTickers 自动隐藏 -->
                 <ItemsControl Grid.Column="2"
                               ItemsSource="{Binding IndexTickers}"
-                              IsVisible="{Binding !CanGoBack}"
+                              IsVisible="{Binding HasIndexTickers}"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Center"
                               Margin="{StaticResource SmallHorizontalMargin}">

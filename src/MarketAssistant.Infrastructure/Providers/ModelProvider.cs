@@ -33,21 +33,12 @@ public record ModelProvider(
 {
     private IModelProviderPolicy EffectivePolicy => Policy ?? DefaultModelProviderPolicy.Instance;
 
-    /// <summary>
-    /// 获取指定模型使用的 API 协议。
-    /// </summary>
     public ModelApiProtocol GetProtocol(string modelId) => EffectivePolicy.GetProtocol(this, modelId);
 
-    /// <summary>
-    /// 判断当前凭据是否允许访问模型列表。
-    /// </summary>
     public bool CanListModels(string? apiKey) =>
         SupportsModelListing &&
         (!ModelListingRequiresApiKey || !string.IsNullOrWhiteSpace(apiKey));
 
-    /// <summary>
-    /// 判断指定模型是否需要 API Key。
-    /// </summary>
     /// <remarks>
     /// “免费模型”不等于“匿名接口”。只有服务商通过模型目录或稳定命名约定明确确认无需鉴权时，才允许留空 API Key。
     /// </remarks>

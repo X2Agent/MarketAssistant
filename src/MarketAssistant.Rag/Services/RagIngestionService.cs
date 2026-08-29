@@ -93,7 +93,7 @@ public class RagIngestionService : IRagIngestionService
         IDocumentBlockReader blockReader,
         CancellationToken cancellationToken)
     {
-        var blocks = (await blockReader.ReadBlocksAsync(filePath)).OrderBy(b => b.Order).ToList();
+        var blocks = (await blockReader.ReadBlocksAsync(filePath, cancellationToken)).OrderBy(b => b.Order).ToList();
         if (blocks.Count == 0)
         {
             _logger.LogWarning("Document contains no blocks: {File}", filePath);

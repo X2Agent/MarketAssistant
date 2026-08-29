@@ -14,10 +14,7 @@ public partial class MainWindow : Window
     /// </summary>
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        // 取消关闭操作
         e.Cancel = true;
-
-        // 隐藏窗口到托盘
         Hide();
 
         base.OnClosing(e);

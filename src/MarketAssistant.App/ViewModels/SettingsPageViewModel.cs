@@ -24,28 +24,27 @@ using System.Reflection;
 
 namespace MarketAssistant.ViewModels;
 
-/// <summary>
-/// 设置页ViewModel
-/// </summary>
 public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 {
-    // RAG 与交易重依赖通过工厂延迟解析：仅在向量化/保存时实例化，
+    // RAG 与交易重依赖通过提供者延迟解析：仅在向量化/保存时实例化，
     // 避免首次进入设置页触发整条交易与 RAG 单例链的同步构造
-    private readonly Func<IRagIngestionService> _ragIngestionServiceFactory;
+    private readonly IRagInfrastructureProvider _ragInfrastructureProvider;
     private readonly INotificationService _notificationService;
     private readonly IUserSettingService _userSettingService;
     private readonly IModelDiscoveryService _modelDiscoveryService;
-    private readonly Func<IEmbeddingFactory> _embeddingFactoryFactory;
-    private readonly Func<VectorStore> _vectorStoreFactory;
     private readonly Services.Market.MarketContext _marketContext;
     private readonly TradingEnvironmentService _tradingEnvironmentService;
-    private readonly Func<MarketMonitor> _marketMonitorFactory;
+    private readonly IMarketMonitorProvider _marketMonitorProvider;
     private readonly IDialogService _dialogService;
     private IStorageProvider? _storageProvider;
     private bool _isInitializingProvider;
     private CancellationTokenSource? _modelFetchCancellationTokenSource;
+    private CancellationTokenSource? _vectorizationCts;
 
-    // UserSetting对象，包含所有用户设置
+    // 向量化在途守卫必须跨 ViewModel 实例生效：离开设置页会释放当前 VM 并新建实例，
+    // 实例级标志挡不住"旧循环仍在跑 + 新页面再次启动"的并发向量化
+    private static int _activeVectorizations;
+
     [ObservableProperty]
     private UserSetting _userSetting = new();
 
@@ -92,14 +91,12 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    // 模型列表 - ViewModel特有属性
     [ObservableProperty]
     private ObservableCollection<string> _models = [];
 
-    // 服务商列表
-    public List<ModelProvider> Providers => ModelProviderCatalog.Providers.ToList();
+    // 服务商列表（目录运行期不变，缓存实例避免 ComboBox 每次绑定求值新建 List）
+    public List<ModelProvider> Providers { get; } = ModelProviderCatalog.Providers.ToList();
 
-    // 当前选中的服务商
     [ObservableProperty]
     private ModelProvider? _selectedProvider;
 
@@ -131,7 +128,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         ? "当前模型需要 API Key"
         : "API Key 可选；留空使用免费模型，配置后可访问账号授权模型";
 
-    // 当前服务商的 API Key 获取链接
     public string? ProviderApiKeyUrl => SelectedProvider?.ApiKeyUrl;
 
     public bool CanOverrideEndpoint => SelectedProvider?.AllowsEndpointOverride ?? false;
@@ -179,7 +175,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         ? SelectedProvider?.DefaultEndpoint ?? string.Empty
         : Endpoint.Trim();
 
-    // 当前服务商是否支持在线获取模型列表
     public bool SupportsModelListing => SelectedProvider?.SupportsModelListing ?? false;
 
     public bool CanFetchModels =>
@@ -212,7 +207,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     partial void OnModelDiscoveryStatusChanged(string value) =>
         OnPropertyChanged(nameof(ModelDiscoveryHint));
 
-    // 是否正在加载模型列表
     [ObservableProperty]
     private bool _isLoadingModels;
 
@@ -261,14 +255,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    // 分析师角色列表
     [ObservableProperty]
     private ObservableCollection<AnalystRoleViewModel> _analystRoles = new();
 
-    // 判断知识库目录是否有效 - 计算属性
     public bool IsKnowledgeDirectoryValid => !string.IsNullOrEmpty(UserSetting.KnowledgeFileDirectory) && Directory.Exists(UserSetting.KnowledgeFileDirectory);
 
-    // 是否正在向量化
     [ObservableProperty]
     private bool _isVectorizing;
 
@@ -276,30 +267,21 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private int _vectorizingProgress;
 
-    // 向量化进度文本
     [ObservableProperty]
     private string _vectorizingProgressText = "";
 
-    // Web Search服务商列表
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
 
-    // 风险承受能力选项
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
 
-    // 投资期限选项
     public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
 
-    // 虚拟币交易模式选项
     public List<CryptoTradingMode> CryptoTradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
 
-    // API密钥获取URL
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
     public string JinaApiUrl { get; } = "https://jina.ai/embeddings";
 
-    /// <summary>
-    /// 主题：跟随系统
-    /// </summary>
     public bool IsThemeDefault
     {
         get => UserSetting.ThemeMode == "Default";
@@ -313,9 +295,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 主题：浅色
-    /// </summary>
     public bool IsThemeLight
     {
         get => UserSetting.ThemeMode == "Light";
@@ -329,9 +308,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 主题：深色
-    /// </summary>
     public bool IsThemeDark
     {
         get => UserSetting.ThemeMode == "Dark";
@@ -356,9 +332,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         };
     }
 
-    /// <summary>
-    /// 是否为A股市场
-    /// </summary>
     public bool IsAShareMarket
     {
         get => UserSetting.CurrentMarketType == MarketType.AShare;
@@ -375,9 +348,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 是否为虚拟币市场
-    /// </summary>
     public bool IsCryptoMarket
     {
         get => UserSetting.CurrentMarketType == MarketType.Crypto;
@@ -392,9 +362,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 是否为 Binance 实盘现货模式
-    /// </summary>
     public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveSpot;
 
     /// <summary>
@@ -402,24 +369,12 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public bool IsLiveTradingMode => IsLiveSpotTradingMode || IsLiveFuturesTradingMode;
 
-    /// <summary>
-    /// 是否为 Binance 实盘合约模式
-    /// </summary>
     public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveFutures;
 
-    /// <summary>
-    /// 是否为 Binance Futures Testnet 模式
-    /// </summary>
     public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.BinanceFuturesTestnet;
 
-    /// <summary>
-    /// 是否为合约模式（实盘或 Testnet）
-    /// </summary>
     public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
 
-    /// <summary>
-    /// 是否为Bing搜索平台
-    /// </summary>
     public bool IsBingProvider
     {
         get => UserSetting.WebSearchProvider == "Bing";
@@ -430,9 +385,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 是否为Brave搜索平台
-    /// </summary>
     public bool IsBraveProvider
     {
         get => UserSetting.WebSearchProvider == "Brave";
@@ -443,9 +395,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 是否为Tavily搜索平台
-    /// </summary>
     public bool IsTavilyProvider
     {
         get => UserSetting.WebSearchProvider == "Tavily";
@@ -456,31 +405,24 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 构造函数（使用依赖注入）
-    /// </summary>
     public SettingsPageViewModel(
-        Func<IRagIngestionService> ragIngestionServiceFactory,
+        IRagInfrastructureProvider ragInfrastructureProvider,
         INotificationService notificationService,
         IUserSettingService userSettingService,
         IModelDiscoveryService modelDiscoveryService,
-        Func<IEmbeddingFactory> embeddingFactoryFactory,
-        Func<VectorStore> vectorStoreFactory,
         Services.Market.MarketContext marketContext,
         TradingEnvironmentService tradingEnvironmentService,
-        Func<MarketMonitor> marketMonitorFactory,
+        IMarketMonitorProvider marketMonitorProvider,
         IDialogService dialogService,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
-        _ragIngestionServiceFactory = ragIngestionServiceFactory;
+        _ragInfrastructureProvider = ragInfrastructureProvider;
         _notificationService = notificationService;
         _userSettingService = userSettingService;
         _modelDiscoveryService = modelDiscoveryService;
-        _embeddingFactoryFactory = embeddingFactoryFactory;
-        _vectorStoreFactory = vectorStoreFactory;
         _marketContext = marketContext;
         _tradingEnvironmentService = tradingEnvironmentService;
-        _marketMonitorFactory = marketMonitorFactory;
+        _marketMonitorProvider = marketMonitorProvider;
         _dialogService = dialogService;
         _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
     }
@@ -522,9 +464,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
-        // 加载分析师角色
         LoadAnalystRoles();
-        // 应用保存的主题
         ApplyTheme(UserSetting.ThemeMode);
     }
 
@@ -542,17 +482,14 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             // 按当前市场过滤角色列表（未标注 SupportedMarkets 视为全市场支持）
             if (!SupportedMarketsAttribute.SupportsMarket(type, _marketContext.CurrentMarket)) continue;
 
-            // 使用类名作为ID
             var id = type.Name;
 
-            // 从设置中获取启用状态
             var isEnabled = false;
             if (UserSetting.EnabledAnalystRoles.TryGetValue(id, out var enabled))
             {
                 isEnabled = enabled;
             }
 
-            // 强制必需的角色为启用
             if (isRequired) isEnabled = true;
 
             AnalystRoles.Add(new AnalystRoleViewModel
@@ -627,9 +564,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }, "选择日志路径");
     }
 
-    /// <summary>
-    /// 向量化文档
-    /// </summary>
     [RelayCommand]
     private async Task VectorizeDocuments()
     {
@@ -640,6 +574,15 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        if (System.Threading.Interlocked.CompareExchange(ref _activeVectorizations, 1, 0) != 0)
+        {
+            _notificationService.ShowWarning("已有一个向量化任务在后台进行中，请等待其完成后再试");
+            Logger?.LogWarning("拒绝并发的向量化请求");
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _vectorizationCts = cts;
         try
         {
             IsVectorizing = true;
@@ -649,18 +592,15 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("开始向量化知识库目录: {Directory}", UserSetting.KnowledgeFileDirectory);
 
             // 创建嵌入生成器（只在实际需要时创建）
-            var embeddingGenerator = _embeddingFactoryFactory().Create();
+            var embeddingGenerator = _ragInfrastructureProvider.GetEmbeddingFactory().Create();
 
-            // 使用 UserSetting 中定义的集合名称
             var collectionName = UserSetting.VectorCollectionName;
-            var collection = _vectorStoreFactory().GetCollection<string, TextParagraph>(collectionName);
+            var collection = _ragInfrastructureProvider.GetVectorStore().GetCollection<string, TextParagraph>(collectionName);
             await collection.EnsureCollectionExistsAsync();
             Logger?.LogInformation("使用向量集合: {CollectionName}", collectionName);
 
-            // 支持的文件扩展名：PDF、DOCX、Markdown
             var supportedExtensions = new[] { ".pdf", ".docx", ".md" };
 
-            // 扫描目录获取所有支持的文件
             var files = Directory.GetFiles(UserSetting.KnowledgeFileDirectory, "*.*", SearchOption.AllDirectories)
                 .Where(f => supportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                 .ToList();
@@ -676,23 +616,22 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             Logger?.LogInformation("找到 {Count} 个文档需要向量化", totalFiles);
             _notificationService.ShowInfo($"开始向量化 {totalFiles} 个文档...");
 
-            var ragIngestionService = _ragIngestionServiceFactory();
+            var ragIngestionService = _ragInfrastructureProvider.GetIngestionService();
             var successCount = 0;
             var partialCount = 0;
             var failedCount = 0;
             var failedFiles = new List<string>();
             var partialFiles = new List<string>();
 
-            // 逐个处理文件
             for (int i = 0; i < totalFiles; i++)
             {
+                cts.Token.ThrowIfCancellationRequested();
                 var file = files[i];
                 var fileName = Path.GetFileName(file);
                 var fileExtension = Path.GetExtension(file).ToUpperInvariant();
 
                 try
                 {
-                    // 更新进度
                     var currentIndex = i + 1;
                     VectorizingProgress = (int)((double)currentIndex / totalFiles * 100);
                     VectorizingProgressText = $"正在处理 {currentIndex}/{totalFiles}: {fileName}";
@@ -702,7 +641,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
                     // 执行向量化：根据结构化结果区分完全成功/部分成功/失败
                     var result = await ragIngestionService.IngestFileAsync(
-                        collection, collectionName, file, embeddingGenerator);
+                        collection, collectionName, file, embeddingGenerator, cts.Token);
 
                     if (result.IsSuccess)
                     {
@@ -725,7 +664,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                         Logger?.LogError("✗ 向量化失败: {FileName} - {Reason}", fileName, reason);
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (cts.IsCancellationRequested)
                 {
                     VectorizingProgressText = "向量化已取消";
                     _notificationService.ShowWarning("向量化已取消。已完成的部分保持有效。");
@@ -776,6 +715,13 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     successCount, partialCount, failedCount, totalFiles);
             }
         }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // 取消发生在文件间隙或准备阶段
+            VectorizingProgressText = "向量化已取消";
+            _notificationService.ShowWarning("向量化已取消。已完成的部分保持有效。");
+            Logger?.LogWarning("向量化被用户取消");
+        }
         catch (Exception ex)
         {
             VectorizingProgressText = "向量化失败";
@@ -785,18 +731,18 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         finally
         {
             IsVectorizing = false;
+            if (ReferenceEquals(_vectorizationCts, cts))
+                _vectorizationCts = null;
+            cts.Dispose();
+            System.Threading.Interlocked.Exchange(ref _activeVectorizations, 0);
         }
     }
 
-    /// <summary>
-    /// 保存设置
-    /// </summary>
     [RelayCommand]
     private async Task SaveAsync()
     {
         await SafeExecuteAsync(async () =>
         {
-            // 同步分析师角色设置
             foreach (var role in AnalystRoles)
             {
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
@@ -807,7 +753,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             if (TradingEnvironmentService.RequiresLiveModeConfirmation(
                     _tradingEnvironmentService.CurrentMode,
                     targetMode,
-                    _marketMonitorFactory().IsRunning))
+                    _marketMonitorProvider.GetMonitor().IsRunning))
             {
                 var confirmed = await _dialogService.ShowConfirmationAsync(
                     "切换到实盘模式",
@@ -835,9 +781,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }, "保存设置");
     }
 
-    /// <summary>
-    /// 重置设置为默认值
-    /// </summary>
     [RelayCommand]
     private async Task Reset()
     {
@@ -860,15 +803,12 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
             ApplyTheme(UserSetting.ThemeMode);
             await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
-            LoadAnalystRoles(); // 重新加载角色
+            LoadAnalystRoles();
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");
         }, "重置设置");
     }
 
-    /// <summary>
-    /// 导航到MCP服务器配置页面
-    /// </summary>
     [RelayCommand]
     private void NavigateToMCPConfig()
     {
@@ -887,8 +827,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         if (provider is null || !provider.SupportsModelListing)
             return;
 
+        // 只取消上一个在飞请求，不 Dispose（其令牌仍被在飞请求持有，由该请求自身 finally 释放）
         _modelFetchCancellationTokenSource?.Cancel();
-        _modelFetchCancellationTokenSource?.Dispose();
         var cts = new CancellationTokenSource();
         _modelFetchCancellationTokenSource = cts;
         var requestedProviderId = provider.Id;
@@ -962,9 +902,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _notificationService.ShowError(ModelDiscoveryStatus);
     }
 
-    /// <summary>
-    /// 打开URL
-    /// </summary>
     private async Task OpenUrlAsync(string url)
     {
         await SafeExecuteAsync(async () =>
@@ -987,8 +924,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _disposed = true;
 
         _modelFetchCancellationTokenSource?.Cancel();
-        _modelFetchCancellationTokenSource?.Dispose();
         _modelFetchCancellationTokenSource = null;
+
+        // 只取消不 Dispose：在飞请求仍持有该令牌，其自身 finally 负责释放 CTS
+        _vectorizationCts?.Cancel();
+        _vectorizationCts = null;
 
         // 取消 UserSetting.PropertyChanged 订阅，避免 Singleton 持有已释放 ViewModel 的引用
         if (UserSetting is not null)

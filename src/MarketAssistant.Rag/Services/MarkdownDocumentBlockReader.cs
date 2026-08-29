@@ -35,7 +35,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
                filePath.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath)
+    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default)
     {
         string markdown;
 
@@ -43,7 +43,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
         if (filePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
             filePath.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase))
         {
-            markdown = await File.ReadAllTextAsync(filePath);
+            markdown = await File.ReadAllTextAsync(filePath, cancellationToken);
         }
         else
         {

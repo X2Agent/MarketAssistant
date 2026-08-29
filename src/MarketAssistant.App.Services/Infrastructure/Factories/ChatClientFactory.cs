@@ -53,6 +53,10 @@ public class ChatClientFactory : IChatClientFactory
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
+
+    // CreateOllamaClient 为每个 Ollama runtime 裸创建 HttpClient（SDK 不会托管释放），
+    // 必须记入此列表统一释放，否则每个缓存 runtime 悬挂一个连接池
+    private readonly List<HttpClient> _httpClients = [];
     private bool _disposed;
 
     public ChatClientFactory(
@@ -166,7 +170,7 @@ public class ChatClientFactory : IChatClientFactory
     /// OllamaSharp 不自带重试；用 Microsoft.Extensions.Http.Resilience 的标准重试管道
     /// 补齐与 OpenAI 协议（SDK 内建重试）对齐的弹性能力，并统一 3 分钟网络超时。
     /// </summary>
-    private static OllamaApiClient CreateOllamaClient(string endpoint, string modelId)
+    private OllamaApiClient CreateOllamaClient(string endpoint, string modelId)
     {
         var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
             .AddRetry(new HttpRetryStrategyOptions
@@ -183,6 +187,7 @@ public class ChatClientFactory : IChatClientFactory
             BaseAddress = new Uri(endpoint),
             Timeout = TimeSpan.FromMinutes(3)
         };
+        _httpClients.Add(httpClient);
 
         return new OllamaApiClient(httpClient, modelId);
     }
@@ -218,6 +223,11 @@ public class ChatClientFactory : IChatClientFactory
                 client.Dispose();
 
             _clients.Clear();
+
+            foreach (var httpClient in _httpClients)
+                httpClient.Dispose();
+            _httpClients.Clear();
+
             _disposed = true;
         }
 

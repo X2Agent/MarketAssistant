@@ -15,11 +15,18 @@ public partial class NotificationWindow : Window
     private const int MinimumDisplayDuration = 3000;
     private const int DurationPerLine = 700;
     private const int MaximumDisplayDuration = 12000;
+    private const double MarginFromEdge = 16;
+    private const double StackGap = 8;
 
     private static readonly Color SuccessColor = Color.Parse("#4CAF50");
     private static readonly Color ErrorColor = Color.Parse("#F44336");
     private static readonly Color WarningColor = Color.Parse("#FF9800");
     private static readonly Color InfoColor = Color.Parse("#2196F3");
+
+    // 堆叠槽位（0 = 底部基准位，向上依次偏移），由 NotificationService 分配
+    private int _slot;
+    private bool _closing;
+    private readonly CancellationTokenSource _closeCts = new();
 
     public NotificationWindow()
     {
@@ -35,6 +42,25 @@ public partial class NotificationWindow : Window
             closeButton.Click += OnCloseButtonClick;
         }
     }
+
+    /// <summary>
+    /// 设置堆叠槽位，由 <see cref="NotificationService"/> 在显示前分配
+    /// </summary>
+    public void SetStackSlot(int slot) => _slot = Math.Max(0, slot);
+
+    /// <summary>
+    /// 槽位回收后整体挪位（下方通知关闭后，上方通知顺次下移）
+    /// </summary>
+    public void MoveToSlot(int slot)
+    {
+        _slot = Math.Max(0, slot);
+        var screen = Screens.Primary;
+        if (screen == null) return;
+        Position = new PixelPoint(Position.X, ComputeY(screen.WorkingArea));
+    }
+
+    private int ComputeY(PixelRect workingArea) =>
+        (int)(workingArea.Bottom - Height - MarginFromEdge - _slot * (Height + StackGap));
 
     /// <summary>
     /// 设置通知消息
@@ -77,7 +103,8 @@ public partial class NotificationWindow : Window
     }
 
     /// <summary>
-    /// 显示通知（带动画）
+    /// 显示通知（带动画）。单一关闭路径：点击关闭按钮只取消等待，
+    /// 滑出与 Close 统一由本方法收尾，避免双重动画/二次 Close。
     /// </summary>
     public async Task ShowNotificationAsync(int durationMs = DisplayDuration)
     {
@@ -87,24 +114,35 @@ public partial class NotificationWindow : Window
         {
             var workingArea = screen.WorkingArea;
             var startX = workingArea.Right;
-            var finalX = workingArea.Right - Width - 16;
-            var y = workingArea.Bottom - Height - 16;
+            var y = ComputeY(workingArea);
 
-            Position = new PixelPoint((int)startX, (int)y);
+            Position = new PixelPoint((int)startX, y);
         }
 
         Show();
 
-        // 滑入动画
-        await SlideInAsync();
+        try
+        {
+            // 滑入动画
+            await SlideInAsync();
 
-        // 长文本按预计行数延长停留时间，避免用户尚未读完就消失。
-        await Task.Delay(CalculateDisplayDuration(durationMs));
-
-        // 滑出动画
-        await SlideOutAsync();
-
-        Close();
+            // 长文本按预计行数延长停留时间，避免用户尚未读完就消失。
+            try
+            {
+                await Task.Delay(CalculateDisplayDuration(durationMs), _closeCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // 用户点击了关闭按钮：跳过剩余等待，由下方统一滑出
+            }
+        }
+        finally
+        {
+            _closing = true;
+            await SlideOutAsync();
+            Close();
+            _closeCts.Dispose();
+        }
     }
 
     /// <summary>
@@ -116,9 +154,8 @@ public partial class NotificationWindow : Window
         if (screen != null)
         {
             var workingArea = screen.WorkingArea;
-            var x = workingArea.Right - Width - 16;
-            var y = workingArea.Bottom - Height - 16;
-            Position = new PixelPoint((int)x, (int)y);
+            var x = workingArea.Right - Width - MarginFromEdge;
+            Position = new PixelPoint((int)x, ComputeY(workingArea));
         }
     }
 
@@ -132,8 +169,8 @@ public partial class NotificationWindow : Window
 
         var workingArea = screen.WorkingArea;
         var startX = workingArea.Right;
-        var endX = workingArea.Right - Width - 16;
-        var y = workingArea.Bottom - Height - 16;
+        var endX = workingArea.Right - Width - MarginFromEdge;
+        var y = ComputeY(workingArea);
 
         var steps = 20;
         var stepDuration = AnimationDuration / steps;
@@ -167,9 +204,9 @@ public partial class NotificationWindow : Window
         if (screen == null) return;
 
         var workingArea = screen.WorkingArea;
-        var startX = workingArea.Right - Width - 16;
+        var startX = workingArea.Right - Width - MarginFromEdge;
         var endX = workingArea.Right;
-        var y = workingArea.Bottom - Height - 16;
+        var y = ComputeY(workingArea);
 
         var steps = 20;
         var stepDuration = AnimationDuration / steps;
@@ -193,11 +230,13 @@ public partial class NotificationWindow : Window
     private double EaseInCubic(double t) => t * t * t;
 
     /// <summary>
-    /// 关闭按钮点击事件
+    /// 关闭按钮点击事件：只取消显示等待，滑出与 Close 由 <see cref="ShowNotificationAsync"/> 统一收尾
     /// </summary>
     private void OnCloseButtonClick(object? sender, RoutedEventArgs e)
     {
-        _ = SlideOutAsync().ContinueWith(_ => Dispatcher.UIThread.Post(() => Close()));
+        if (_closing) return;
+        _closing = true;
+        _closeCts.Cancel();
     }
 }
 

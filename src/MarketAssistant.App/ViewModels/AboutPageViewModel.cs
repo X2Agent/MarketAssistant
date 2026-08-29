@@ -7,9 +7,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 
 namespace MarketAssistant.ViewModels;
-/// <summary>
-/// 关于页ViewModel
-/// </summary>
+
 public partial class AboutPageViewModel : ViewModelBase
 {
     private readonly IReleaseService _releaseService;
@@ -49,9 +47,6 @@ public partial class AboutPageViewModel : ViewModelBase
     public IAsyncRelayCommand DownloadUpdateCommand { get; }
     public IRelayCommand OpenGitHubCommand { get; }
 
-    /// <summary>
-    /// 构造函数（使用依赖注入）
-    /// </summary>
     public AboutPageViewModel(
         IReleaseService releaseService,
         INotificationService notificationService,
@@ -64,7 +59,6 @@ public partial class AboutPageViewModel : ViewModelBase
         DownloadUpdateCommand = new AsyncRelayCommand(DownloadUpdateAsync, () => HasNewVersion && !IsDownloading);
         OpenGitHubCommand = new RelayCommand(OpenGitHub);
 
-        // 初始化功能项列表
         InitializeFeatureItems();
     }
 
@@ -96,7 +90,6 @@ public partial class AboutPageViewModel : ViewModelBase
                     _notificationService.ShowInfo($"发现新版本 {result.LatestRelease.TagName}！\n点击下载按钮进行更新");
                     Logger?.LogInformation("发现新版本: {Version}", result.LatestRelease.TagName);
 
-                    // 更新下载命令的可执行状态
                     DownloadUpdateCommand.NotifyCanExecuteChanged();
                 }
                 else
@@ -142,7 +135,6 @@ public partial class AboutPageViewModel : ViewModelBase
 
                 if (asset == null || string.IsNullOrEmpty(asset.DownloadUrl))
                 {
-                    // 没有找到资产文件，打开 GitHub Release 页面
                     _notificationService.ShowInfo("将打开 GitHub Release 页面手动下载");
                     OpenUrl(_latestRelease.HtmlUrl);
                     return;
@@ -158,7 +150,6 @@ public partial class AboutPageViewModel : ViewModelBase
                     return;
                 }
 
-                // 确定保存路径
                 var downloadsPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 downloadsPath = Path.Combine(downloadsPath, "Downloads");
                 if (!Directory.Exists(downloadsPath))
@@ -171,14 +162,12 @@ public partial class AboutPageViewModel : ViewModelBase
 
                 _notificationService.ShowInfo($"开始下载 {asset.Name}...");
 
-                // 创建进度报告器
                 var progress = new Progress<double>(p =>
                 {
                     DownloadProgress = p * 100;
                     UpdateStatus = $"下载中... {DownloadProgress:F0}%";
                 });
 
-                // 下载更新文件
                 var downloadedPath = await _releaseService.DownloadUpdateAsync(
                     asset.DownloadUrl,
                     savePath,
@@ -188,11 +177,9 @@ public partial class AboutPageViewModel : ViewModelBase
 
                 // 风险提示：下载产物未做哈希/签名校验（GitHub Release 未提供校验和信息），
                 // 提示用户自行确认来源后再运行安装程序。
-                // 下载完成
                 UpdateStatus = "下载完成！";
                 _notificationService.ShowSuccess($"更新文件已下载到：\n{downloadedPath}\n\n请确认文件来源后手动运行安装程序进行更新（当前未提供校验和验证）");
 
-                // 打开下载目录
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = downloadsPath,
@@ -359,28 +346,13 @@ public partial class AboutPageViewModel : ViewModelBase
 
 public class FeatureItem
 {
-    /// <summary>
-    /// 功能项图标
-    /// </summary>
     public string IconSource { get; set; } = "";
 
-    /// <summary>
-    /// 功能项名称
-    /// </summary>
     public string Title { get; set; } = "";
 
-    /// <summary>
-    /// 功能项描述
-    /// </summary>
     public string Description { get; set; } = "";
 
-    /// <summary>
-    /// 按钮文本
-    /// </summary>
     public string ButtonText { get; set; } = "";
 
-    /// <summary>
-    /// 功能项命令
-    /// </summary>
     public IRelayCommand Command { get; set; } = null!;
 }

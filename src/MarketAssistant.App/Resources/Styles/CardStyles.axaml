@@ -121,7 +121,7 @@
 
     <!-- 热门股票卡片 -->
     <Style Selector="Border.hot-stock-card">
-        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>

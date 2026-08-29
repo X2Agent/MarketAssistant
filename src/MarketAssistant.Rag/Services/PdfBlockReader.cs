@@ -18,11 +18,11 @@ public class PdfBlockReader : IDocumentBlockReader
     public bool CanRead(string filePath) =>
         filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath)
+    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filePath);
 
         // 直接委托给 MarkdownDocumentBlockReader 处理
-        return await _markdownReader.ReadBlocksAsync(filePath);
+        return await _markdownReader.ReadBlocksAsync(filePath, cancellationToken);
     }
 }

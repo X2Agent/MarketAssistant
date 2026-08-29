@@ -1,8 +1,5 @@
 namespace MarketAssistant.Agents.Tools.Models;
 
-/// <summary>
-/// 资产行情数据模型
-/// </summary>
 public class AssetQuoteInfo
 {
     /// <summary>
@@ -55,9 +52,6 @@ public class AssetQuoteInfo
     /// </summary>
     public decimal PercentageChange5Day { get; set; }
 
-    /// <summary>
-    /// 总股本
-    /// </summary>
     public decimal TotalShares { get; set; }
 
     /// <summary>
@@ -65,24 +59,12 @@ public class AssetQuoteInfo
     /// </summary>
     public decimal MarketCapitalization { get; set; }
 
-    /// <summary>
-    /// 股票名称
-    /// </summary>
     public string SecurityName { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 股票代码
-    /// </summary>
     public string SecurityCode { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 交易状态
-    /// </summary>
     public string TradeStatus { get; set; } = string.Empty;
 
-    /// <summary>
-    /// 证券类型
-    /// </summary>
     public string SecurityType { get; set; } = string.Empty;
 
     /// <summary>
@@ -110,19 +92,10 @@ public class AssetQuoteInfo
     /// </summary>
     public decimal Amplitude { get; set; }
 
-    /// <summary>
-    /// 市盈率
-    /// </summary>
     public decimal PERatio { get; set; }
 
-    /// <summary>
-    /// TTM市盈率
-    /// </summary>
     public decimal TTMPERatio { get; set; }
 
-    /// <summary>
-    /// 市净率
-    /// </summary>
     public decimal PBRatio { get; set; }
 
     /// <summary>
@@ -145,11 +118,7 @@ public class AssetQuoteInfo
     /// </summary>
     public decimal AveragePrice { get; set; }
 
-    /// <summary>
-    /// 量比
-    /// </summary>
     public decimal VolumeRatio { get; set; }
-
     /// <summary>
     /// 委比（%）
     /// </summary>

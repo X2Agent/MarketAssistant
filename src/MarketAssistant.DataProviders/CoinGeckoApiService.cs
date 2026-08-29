@@ -57,9 +57,6 @@ public sealed class CoinGeckoApiService
         return await action(httpClient);
     }
 
-    /// <summary>
-    /// 获取市场数据（支持筛选）
-    /// </summary>
     public async Task<List<CoinGeckoMarket>> GetCoinsMarketsAsync(
         string vsCurrency = "usd",
         string? category = null,
@@ -100,9 +97,6 @@ public sealed class CoinGeckoApiService
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// 获取单币种市场数据（含价格变化百分比）
-    /// </summary>
     public async Task<JsonArray?> GetCoinMarketDataAsync(
         string coinId,
         string vsCurrency = "usd",
@@ -117,9 +111,6 @@ public sealed class CoinGeckoApiService
             cancellationToken);
     }
 
-    /// <summary>
-    /// 获取币种在各交易所的交易对数据
-    /// </summary>
     public async Task<CoinGeckoTickersResponse?> GetCoinTickersAsync(
         string coinId,
         CancellationToken cancellationToken = default)
@@ -135,9 +126,6 @@ public sealed class CoinGeckoApiService
             cancellationToken);
     }
 
-    /// <summary>
-    /// 搜索币种
-    /// </summary>
     public async Task<CoinGeckoSearchResponse?> SearchCoinsAsync(
         string query,
         CancellationToken cancellationToken = default)
@@ -199,9 +187,9 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<string?> ResolveCoinIdAsync(string baseSymbol, CancellationToken cancellationToken)
     {
-        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）
-        var mappedId = MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.ToCoinGeckoId(baseSymbol);
-        if (!string.IsNullOrEmpty(mappedId) && !string.Equals(mappedId, baseSymbol, StringComparison.OrdinalIgnoreCase))
+        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）。
+        // TryGet 区分"未命中"与"映射值恰与输入相同"（如 dai→dai），后者不再白打一次 /coins/list
+        if (MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.TryGetCoinGeckoId(baseSymbol, out var mappedId))
         {
             return mappedId;
         }
@@ -222,7 +210,7 @@ public sealed class CoinGeckoApiService
                 return hit?.Id;
             }, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "调用 /coins/list 解析 coinId 失败: {Symbol}", baseSymbol);
             return null;

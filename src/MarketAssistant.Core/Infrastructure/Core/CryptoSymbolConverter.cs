@@ -75,8 +75,8 @@ public static class CryptoSymbolConverter
             return tradingPair;
         }
 
-        // 移除常见计价货币后缀（按长度倒序，避免误匹配）
-        var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "DAI", "BTC", "ETH", "BNB" };
+        // 移除常见计价货币后缀（先长后短，避免 "BTCFDUSD" 被 USD 类短后缀误截断）
+        var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "FDUSD", "TUSD", "DAI", "BTC", "ETH", "BNB", "EUR", "TRY", "BRL" };
         foreach (var quote in quoteCurrencies)
         {
             if (tradingPair.EndsWith(quote) && tradingPair.Length > quote.Length)
@@ -117,36 +117,54 @@ public static class CryptoSymbolConverter
             baseCurrency = symbol;
         }
 
-        baseCurrency = baseCurrency.ToLower();
+        baseCurrency = baseCurrency.ToLowerInvariant();
 
-        // 常见币种映射表
-        var mapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            { "btc", "bitcoin" },
-            { "eth", "ethereum" },
-            { "bnb", "binancecoin" },
-            { "xrp", "ripple" },
-            { "ada", "cardano" },
-            { "doge", "dogecoin" },
-            { "sol", "solana" },
-            { "dot", "polkadot" },
-            { "matic", "matic-network" },
-            { "avax", "avalanche-2" },
-            { "link", "chainlink" },
-            { "uni", "uniswap" },
-            { "ltc", "litecoin" },
-            { "etc", "ethereum-classic" },
-            { "xlm", "stellar" },
-            { "bch", "bitcoin-cash" },
-            { "atom", "cosmos" },
-            { "trx", "tron" },
-            { "shib", "shiba-inu" },
-            { "usdc", "usd-coin" },
-            { "usdt", "tether" },
-            { "dai", "dai" },
-            { "busd", "binance-usd" }
-        };
-
-        return mapping.TryGetValue(baseCurrency, out var coinId) ? coinId : baseCurrency;
+        return TryGetCoinGeckoId(baseCurrency, out var coinId) ? coinId : baseCurrency;
     }
+
+    /// <summary>
+    /// 查询内置的 symbol → CoinGecko ID 映射表。
+    /// 与 <see cref="ToCoinGeckoId"/> 不同，本方法能区分"未命中"与"映射值恰好与输入相同"（如 dai → dai）。
+    /// </summary>
+    /// <returns>是否命中映射表</returns>
+    public static bool TryGetCoinGeckoId(string baseSymbol, out string coinId)
+    {
+        if (string.IsNullOrWhiteSpace(baseSymbol))
+        {
+            coinId = string.Empty;
+            return false;
+        }
+
+        return CoinGeckoIdMapping.TryGetValue(baseSymbol.Trim().ToLowerInvariant(), out coinId!);
+    }
+
+    /// <summary>
+    /// 常见币种的 CoinGecko ID 映射表（静态只读，避免每次调用重建）
+    /// </summary>
+    private static readonly Dictionary<string, string> CoinGeckoIdMapping = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "btc", "bitcoin" },
+        { "eth", "ethereum" },
+        { "bnb", "binancecoin" },
+        { "xrp", "ripple" },
+        { "ada", "cardano" },
+        { "doge", "dogecoin" },
+        { "sol", "solana" },
+        { "dot", "polkadot" },
+        { "matic", "matic-network" },
+        { "avax", "avalanche-2" },
+        { "link", "chainlink" },
+        { "uni", "uniswap" },
+        { "ltc", "litecoin" },
+        { "etc", "ethereum-classic" },
+        { "xlm", "stellar" },
+        { "bch", "bitcoin-cash" },
+        { "atom", "cosmos" },
+        { "trx", "tron" },
+        { "shib", "shiba-inu" },
+        { "usdc", "usd-coin" },
+        { "usdt", "tether" },
+        { "dai", "dai" },
+        { "busd", "binance-usd" }
+    };
 }

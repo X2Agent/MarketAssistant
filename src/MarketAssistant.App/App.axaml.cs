@@ -27,23 +27,23 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        // 配置依赖注入
         ServiceProvider = Program.ConfigureServices();
 
         // 初始化全局异常处理器（由 DI 创建实例，避免静态工厂自行 new）
         GlobalExceptionHandler.Initialize(
             ServiceProvider.GetRequiredService<GlobalExceptionHandler>());
 
-        // 激活价格预警服务：后台完成规则加载和行情订阅；服务内部会让后续写操作等待初始化完成
+        // 激活价格预警服务：后台完成规则加载和行情订阅；服务内部会让后续写操作等待初始化完成。
+        // 显式观察故障：不观察的话异常只会在未来某次 GC 时经由 UnobservedTaskException 弹出，
+        // 时机不定且用户无从知道价格告警已整体失效
         var priceAlertService = ServiceProvider.GetRequiredService<PriceAlertService>();
-        _ = priceAlertService.InitializeAsync();
+        _ = InitializePriceAlertServiceAsync(priceAlertService);
 
         // 激活 HITL 交易确认服务：DI 单例是惰性创建的，仅注册不会实例化，
         // 必须显式解析一次让构造函数完成对 TradeExecutor.ConfirmationRequested 的订阅，
         // 否则自动交易的超阈值订单会因无订阅者被静默拒绝
         ServiceProvider.GetRequiredService<MarketAssistant.Services.Trading.TradeConfirmationService>();
 
-        // 应用保存的主题
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();
         RequestedThemeVariant = settingService.CurrentSetting.ThemeMode switch
         {
@@ -54,7 +54,6 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // 使用DI容器创建MainWindowViewModel
             var mainWindowViewModel = ServiceProvider.GetRequiredService<MainWindowViewModel>();
             _mainWindow = new MainWindow
             {
@@ -65,7 +64,6 @@ public partial class App : Application
             // 配置关闭行为：最小化到托盘而不是退出
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-            // 订阅应用退出事件，进行资源清理
             desktop.Exit += OnApplicationExit;
         }
 
@@ -73,13 +71,34 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 应用退出事件处理
+    /// 初始化价格预警服务并显式观察失败，失败时记录日志并通知用户
     /// </summary>
+    private static async Task InitializePriceAlertServiceAsync(PriceAlertService priceAlertService)
+    {
+        try
+        {
+            await priceAlertService.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "价格预警服务初始化失败，价格告警功能不可用");
+            try
+            {
+                var notificationService = ServiceProvider?.GetRequiredService<Services.Notification.INotificationService>();
+                // NotificationService 内部投递到 UI 线程，后台线程调用安全
+                notificationService?.ShowWarning("价格预警服务启动失败，告警功能暂不可用，请重启应用重试");
+            }
+            catch (Exception notifyEx)
+            {
+                Log.Error(notifyEx, "价格预警服务初始化失败的通知发送失败");
+            }
+        }
+    }
+
     private void OnApplicationExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
     {
         try
         {
-            // 清理全局异常处理器
             GlobalExceptionHandler.Cleanup();
 
             // 释放根 DI 容器：触发容器创建的全部 IDisposable 单例的释放
@@ -88,7 +107,6 @@ public partial class App : Application
             (ServiceProvider as IDisposable)?.Dispose();
             ServiceProvider = null;
 
-            // 刷新并关闭日志
             Log.CloseAndFlush();
         }
         catch (Exception ex)
@@ -106,17 +124,11 @@ public partial class App : Application
         ShowMainWindow();
     }
 
-    /// <summary>
-    /// 显示主窗口菜单项点击事件
-    /// </summary>
     private void ShowMainWindow_Click(object? sender, EventArgs e)
     {
         ShowMainWindow();
     }
 
-    /// <summary>
-    /// 退出菜单项点击事件
-    /// </summary>
     private void Exit_Click(object? sender, EventArgs e)
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -125,9 +137,6 @@ public partial class App : Application
         }
     }
 
-    /// <summary>
-    /// 显示主窗口
-    /// </summary>
     private void ShowMainWindow()
     {
         if (_mainWindow != null)

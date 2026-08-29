@@ -1,4 +1,11 @@
+using MarketAssistant.Applications;
+using MarketAssistant.Applications.Assets;
+using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Charts;
+using MarketAssistant.Applications.Favorites;
+using MarketAssistant.Applications.History;
+using MarketAssistant.Applications.Home;
+using MarketAssistant.Applications.News;
 using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Core;
@@ -15,14 +22,8 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services;
 
-/// <summary>
-/// 服务注册扩展
-/// </summary>
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// 注册应用程序所有服务
-    /// </summary>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // 注册所有业务服务（非 UI 层，来自 App.Services）
@@ -51,22 +52,19 @@ public static class ServiceCollectionExtensions
         // 使 HITL 确认不依赖交易监控页存活（单例构造即接管订阅）
         services.AddSingleton<TradeConfirmationService>();
 
-        // Keyed Service 委托工厂：避免 ViewModel 使用 IServiceProvider 反模式
-        services.AddSingleton<Func<MarketType, IKLineService>>(
-            sp => marketType => sp.GetRequiredKeyedService<IKLineService>(marketType));
+        // 市场服务注册表：ViewModel 通过具名门面按市场解析 Keyed Service，避免 Func 委托堆叠与服务定位反模式
+        services.AddSingleton<IMarketServiceRegistry, MarketServiceRegistry>();
 
         return services;
     }
 
-    /// <summary>
-    /// 注册所有ViewModels
-    /// </summary>
     public static IServiceCollection AddViewModels(this IServiceCollection services)
     {
-        // 注册主窗口 ViewModel
+        // 页面 ViewModel 工厂：导航项点击时才实例化页面（配合 MainWindowViewModel 去服务定位）
+        services.AddSingleton<IPageViewModelFactory, PageViewModelFactory>();
+
         services.AddTransient<MainWindowViewModel>();
 
-        // 注册主要页面 ViewModels
         services.AddTransient<HomePageViewModel>();
         services.AddTransient<FavoritesPageViewModel>();
         services.AddTransient<PriceAlertPageViewModel>();
@@ -76,18 +74,15 @@ public static class ServiceCollectionExtensions
         services.AddTransient<MCPConfigPageViewModel>();
         services.AddTransient<AssetPageViewModel>();
 
-        // 注册 Home 子 ViewModels
         services.AddTransient<HomeSearchViewModel>();
         services.AddTransient<HotAssetsViewModel>();
         services.AddTransient<RecentAssetsViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
 
-        // 注册 AI 分析相关 ViewModels
         services.AddTransient<AgentAnalysisViewModel>();
         services.AddTransient<AnalysisReportViewModel>();
         services.AddTransient<ChatSidebarViewModel>();
 
-        // 注册交易模块 ViewModels
         services.AddTransient<TradingPageViewModel>();
         services.AddTransient<StrategyConfigViewModel>();
         services.AddTransient<TradeMonitorViewModel>();

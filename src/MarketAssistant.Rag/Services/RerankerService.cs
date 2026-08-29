@@ -218,9 +218,6 @@ public class RerankerService : IRerankerService
         return contentScore > 0 ? contentScore : 0.5;
     }
 
-    /// <summary>
-    /// 计算长度评分
-    /// </summary>
     private static double CalculateLengthScore(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return 0.0;
@@ -266,9 +263,6 @@ public class RerankerService : IRerankerService
         }
     }
 
-    /// <summary>
-    /// 计算Jaccard相似度
-    /// </summary>
     private static double CalculateJaccardSimilarity(HashSet<string> a, HashSet<string> b)
     {
         if (a.Count == 0 || b.Count == 0) return 0.0;

@@ -25,7 +25,7 @@ public sealed class StringToDecimalConverter : JsonConverterFactory
             if (reader.TokenType == JsonTokenType.String)
             {
                 var stringValue = reader.GetString();
-                if (decimal.TryParse(stringValue, out var value))
+                if (decimal.TryParse(stringValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
                     return value;
             }
             else if (reader.TokenType == JsonTokenType.Number)
@@ -33,12 +33,14 @@ public sealed class StringToDecimalConverter : JsonConverterFactory
                 return reader.GetDecimal();
             }
 
-            return 0m;
+            // 与 System.Text.Json 默认行为对齐：无法解析（含 null/空串喂给非空字段）直接报错，
+            // 绝不静默归零——0 会被下游当成合法行情参与计算
+            throw new JsonException($"无法将 '{reader.TokenType}' 解析为非空 decimal。");
         }
 
         public override void Write(Utf8JsonWriter writer, decimal value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value.ToString());
+            writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
         }
     }
 
@@ -68,7 +70,7 @@ public sealed class StringToDecimalConverter : JsonConverterFactory
         public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
         {
             if (value.HasValue)
-                writer.WriteStringValue(value.Value.ToString());
+                writer.WriteStringValue(value.Value.ToString(CultureInfo.InvariantCulture));
             else
                 writer.WriteNullValue();
         }

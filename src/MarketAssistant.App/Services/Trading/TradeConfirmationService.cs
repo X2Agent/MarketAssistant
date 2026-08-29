@@ -55,33 +55,42 @@ public sealed class TradeConfirmationService : IDisposable
                 $"触发原因：{reason}\n\n（{ConfirmationTimeoutSeconds} 秒内未操作将自动拒绝）";
 
             // 超时通过取消令牌主动关闭模态对话框：仅 Task.WhenAny 竞争会让对话框
-            // 留在屏幕上，用户随后点击"批准"的结果会被丢弃，误以为交易已批准
+            // 留在屏幕上，用户随后点击"批准"的结果会被丢弃，误以为交易已批准。
+            // 置顶显示：主窗口可能被全屏应用遮挡甚至隐藏进托盘，
+            // 非置顶的确认框会静默等待 60 秒后被自动拒绝，用户全程无感知
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(ConfirmationTimeoutSeconds));
-            var approved = await _dialogService
-                .ShowConfirmationAsync(title, message, "批准", "拒绝", timeoutCts.Token)
-                .ConfigureAwait(false);
 
-            if (approved)
+            // 用 Register 回调置标志判定超时：await 之后直接读 IsCancellationRequested
+            // 会把"用户恰在超时瞬间点击拒绝"错记成超时自动拒绝
+            var timedOut = false;
+            using (timeoutCts.Token.Register(() => timedOut = true))
             {
-                _logger.LogInformation("用户批准自动交易: {Symbol} {Side}", symbol, side);
-            }
-            else
-            {
-                // 超时/窗口不可用/用户拒绝均走此分支；ShowCustomDialogAsync 拿不到活动窗口时返回 null（视为拒绝）
-                if (timeoutCts.IsCancellationRequested)
+                var approved = await _dialogService
+                    .ShowConfirmationAsync(title, message, "批准", "拒绝", timeoutCts.Token, topmost: true)
+                    .ConfigureAwait(false);
+
+                if (approved)
                 {
-                    _logger.LogWarning("交易确认超时自动拒绝: {Symbol} {Side}", symbol, side);
-                    _notificationService.ShowWarning(
-                        $"⚠ 交易确认超时已自动拒绝：{symbol} {side} {quantity}");
+                    _logger.LogInformation("用户批准自动交易: {Symbol} {Side}", symbol, side);
                 }
                 else
                 {
-                    _logger.LogWarning("交易确认被拒绝或窗口不可用: {Symbol} {Side}", symbol, side);
-                    _notificationService.ShowWarning($"已拒绝自动交易：{symbol} {side} {quantity}");
+                    // 超时/窗口不可用/用户拒绝均走此分支；ShowCustomDialogAsync 拿不到活动窗口时返回 null（视为拒绝）
+                    if (timedOut)
+                    {
+                        _logger.LogWarning("交易确认超时自动拒绝: {Symbol} {Side}", symbol, side);
+                        _notificationService.ShowWarning(
+                            $"⚠ 交易确认超时已自动拒绝：{symbol} {side} {quantity}");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("交易确认被拒绝或窗口不可用: {Symbol} {Side}", symbol, side);
+                        _notificationService.ShowWarning($"已拒绝自动交易：{symbol} {side} {quantity}");
+                    }
                 }
-            }
 
-            return approved;
+                return approved;
+            }
         }
         finally
         {

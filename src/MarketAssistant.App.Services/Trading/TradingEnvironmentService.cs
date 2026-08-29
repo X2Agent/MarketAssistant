@@ -14,7 +14,7 @@ public sealed class TradingEnvironmentService
 {
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<TradingEnvironmentService> _logger;
-    private readonly Func<MarketMonitor> _marketMonitorFactory;
+    private readonly IMarketMonitorProvider _marketMonitorProvider;
 
     // 后台下单链路（MarketMonitor 消费者/TradeExecutor）与 UI 线程并发读写，
     // 必须 volatile 保证模式切换立即对后台线程可见，避免"切到实盘仍在 Demo 下单"的反向错误
@@ -22,11 +22,11 @@ public sealed class TradingEnvironmentService
 
     public TradingEnvironmentService(
         IUserSettingService userSettingService,
-        Func<MarketMonitor> marketMonitorFactory,
+        IMarketMonitorProvider marketMonitorProvider,
         ILogger<TradingEnvironmentService> logger)
     {
         _userSettingService = userSettingService;
-        _marketMonitorFactory = marketMonitorFactory;
+        _marketMonitorProvider = marketMonitorProvider;
         _logger = logger;
         _currentMode = userSettingService.CurrentSetting.CryptoTradingMode;
     }
@@ -67,11 +67,13 @@ public sealed class TradingEnvironmentService
             return;
         }
 
-        var monitor = _marketMonitorFactory();
+        var monitor = _marketMonitorProvider.GetMonitor();
         if (monitor.IsRunning)
         {
             _logger.LogInformation("切换交易模式前停止市场监控: {OldMode} → {NewMode}", _currentMode, mode);
-            var stopped = await monitor.TryStopAsync().ConfigureAwait(false);
+            // 不用 ConfigureAwait(false)：末尾的 ModeChanged 事件订阅方包含 UI ViewModel，
+            // 必须回到调用方上下文（UI 线程）触发，否则订阅方在后台线程更新绑定属性会抛线程异常
+            var stopped = await monitor.TryStopAsync();
             if (!stopped)
             {
                 _logger.LogError(

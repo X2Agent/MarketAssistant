@@ -15,19 +15,19 @@ namespace MarketAssistant.Agents.InvestmentSelection;
 /// </summary>
 /// <remarks>
 /// 与 MarketAnalysisWorkflow 对齐：4 个 Executor 均为 Transient 注册，
-/// 在每次 Run 内重新解析构造，避免 Singleton Executor 在并发分析间共享
-/// 可变状态与模型/运行时引用。
+/// 由 <see cref="IInvestmentExecutorFactory"/> 在每次 Run 内重新创建，
+/// 避免 Singleton Executor 在并发分析间共享可变状态与模型/运行时引用。
 /// </remarks>
 public class InvestmentSelectionWorkflow
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IInvestmentExecutorFactory _executorFactory;
     private readonly ILogger<InvestmentSelectionWorkflow> _logger;
 
     public InvestmentSelectionWorkflow(
-        IServiceProvider serviceProvider,
+        IInvestmentExecutorFactory executorFactory,
         ILogger<InvestmentSelectionWorkflow> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _executorFactory = executorFactory ?? throw new ArgumentNullException(nameof(executorFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -82,14 +82,10 @@ public class InvestmentSelectionWorkflow
             request.IsNewsAnalysis ? "新闻热点" : "用户需求");
 
         // 每次运行新建 Executor 实例（Transient），避免并发 Run 间共享状态
-        var generateStockCriteriaExecutor =
-            _serviceProvider.GetRequiredService<GenerateCriteriaExecutor<StockCriteria>>();
-        var generateCryptoCriteriaExecutor =
-            _serviceProvider.GetRequiredService<GenerateCriteriaExecutor<CryptoCriteria>>();
-        var screenTargetsExecutor =
-            _serviceProvider.GetRequiredService<ScreenInvestmentTargetsExecutor>();
-        var analyzeAssetsExecutor =
-            _serviceProvider.GetRequiredService<AnalyzeAssetsExecutor>();
+        var generateStockCriteriaExecutor = _executorFactory.CreateStockCriteriaExecutor();
+        var generateCryptoCriteriaExecutor = _executorFactory.CreateCryptoCriteriaExecutor();
+        var screenTargetsExecutor = _executorFactory.CreateScreenTargetsExecutor();
+        var analyzeAssetsExecutor = _executorFactory.CreateAnalyzeAssetsExecutor();
 
         WorkflowBuilder workflowBuilder = request.MarketType switch
         {

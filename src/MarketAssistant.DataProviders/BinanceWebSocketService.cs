@@ -12,9 +12,12 @@ namespace MarketAssistant.DataProviders;
 public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 {
     private const string WsBaseUrl = "wss://stream.binance.com:9443/stream?streams=";
+    private const int ReconnectDelayMs = 5000;
     private readonly ILogger<BinanceWebSocketService> _logger;
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
+    private volatile bool _disposed;
+    private int _retryScheduled;
 
     /// <summary>
     /// 各订阅方（价格告警、交易监控、收藏页、资产详情）独立维护的交易对集合。
@@ -24,11 +27,18 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     private readonly Dictionary<string, HashSet<string>> _subscriberSymbols = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 当前实际连接的交易对集合（所有订阅方并集，小写），供 ReconnectAsync 使用。
+    /// 当前实际连接的交易对集合（所有订阅方并集，小写），供重连使用。
     /// </summary>
     private HashSet<string> _subscribedSymbols = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly Lock _lock = new();
+
+    /// <summary>
+    /// 连接生命周期闸门：订阅变更、断开、重连必须整体串行执行。
+    /// UI 线程（收藏页/资产页）与后台线程（价格告警/交易监控）可能并发触发，
+    /// 无闸门时两个并发重连会互相覆盖 _ws，导致已连接 socket 成为孤儿并重复推送。
+    /// </summary>
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
 
     /// <summary>
     /// 收到价格更新时触发，参数为 (symbol, lastPrice, priceChangePercent)
@@ -50,19 +60,28 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     {
         var symbolSet = symbols.Select(s => s.ToLowerInvariant()).Distinct().ToHashSet();
 
-        bool changed;
-        lock (_lock)
+        await _lifecycleGate.WaitAsync();
+        try
         {
-            _subscriberSymbols[subscriberKey] = symbolSet;
-            changed = RecomputeSubscribedSymbolsLocked();
+            bool changed;
+            lock (_lock)
+            {
+                _subscriberSymbols[subscriberKey] = symbolSet;
+                changed = RecomputeSubscribedSymbolsLocked();
+            }
+
+            if (!changed) return;
+            await ApplySubscriptionAsync();
         }
-
-        if (!changed) return;
-
-        if (_subscribedSymbols.Count == 0)
-            await DisconnectAsync();
-        else
-            await ReconnectAsync();
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Binance WebSocket 订阅连接失败，{Delay}ms 后自动重试", ReconnectDelayMs);
+            ScheduleConnectRetry();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     /// <summary>
@@ -71,18 +90,27 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     /// </summary>
     public async Task UnsubscribeAllAsync(string subscriberKey)
     {
-        bool changed;
-        lock (_lock)
+        await _lifecycleGate.WaitAsync();
+        try
         {
-            changed = _subscriberSymbols.Remove(subscriberKey) && RecomputeSubscribedSymbolsLocked();
+            bool changed;
+            lock (_lock)
+            {
+                changed = _subscriberSymbols.Remove(subscriberKey) && RecomputeSubscribedSymbolsLocked();
+            }
+
+            if (!changed) return;
+            await ApplySubscriptionAsync();
         }
-
-        if (!changed) return;
-
-        if (_subscribedSymbols.Count == 0)
-            await DisconnectAsync();
-        else
-            await ReconnectAsync();
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Binance WebSocket 退订重连失败，{Delay}ms 后自动重试", ReconnectDelayMs);
+            ScheduleConnectRetry();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
     }
 
     /// <summary>
@@ -101,11 +129,15 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         return true;
     }
 
-    private async Task ReconnectAsync()
+    /// <summary>
+    /// 按当前并集重建连接（先断开旧连接再连接新集合）。调用方必须已持有 <see cref="_lifecycleGate"/>。
+    /// 连接失败时抛出异常（资源已清理），由调用方决定重试策略。
+    /// </summary>
+    private async Task ApplySubscriptionAsync()
     {
-        await DisconnectAsync();
+        await DisconnectCoreAsync();
 
-        List<string> symbols;
+        HashSet<string> symbols;
         lock (_lock)
         {
             symbols = [.. _subscribedSymbols];
@@ -116,19 +148,24 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         var streams = string.Join("/", symbols.Select(s => $"{s}@miniTicker"));
         var url = WsBaseUrl + streams;
 
-        _cts = new CancellationTokenSource();
-        _ws = new ClientWebSocket();
-
+        var cts = new CancellationTokenSource();
+        var ws = new ClientWebSocket();
         try
         {
             _logger.LogInformation("连接 Binance WebSocket，订阅 {Count} 个交易对", symbols.Count);
-            await _ws.ConnectAsync(new Uri(url), _cts.Token);
-            _ = ReceiveLoopAsync(_ws, _cts.Token);
+            await ws.ConnectAsync(new Uri(url), cts.Token);
         }
-        catch (Exception ex)
+        catch
         {
-            _logger.LogError(ex, "Binance WebSocket 连接失败");
+            cts.Dispose();
+            ws.Dispose();
+            throw;
         }
+
+        // 连接成功后才落字段，失败路径不残留半初始化状态
+        _ws = ws;
+        _cts = cts;
+        _ = ReceiveLoopAsync(ws, cts.Token);
     }
 
     private async Task ReceiveLoopAsync(ClientWebSocket ws, CancellationToken ct)
@@ -162,22 +199,98 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         }
         catch (OperationCanceledException)
         {
-            // 正常取消
+            // 正常取消（退订或释放）
         }
-        catch (WebSocketException ex)
+        catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Binance WebSocket 断开，将在 5 秒后重连");
+            // 网络断开、socket 被并发释放等均视为断线；仅当本连接仍是当前连接时才重连，
+            // 避免旧循环把新连接顶掉
+            _logger.LogWarning(ex, "Binance WebSocket 断开，将在 {Delay}ms 后重连", ReconnectDelayMs);
+            await ScheduleReconnectIfCurrentAsync(ws, ct);
+        }
+    }
+
+    /// <summary>
+    /// 延迟后重连，但仅当 <paramref name="ws"/> 仍是当前连接时执行；
+    /// 期间若发生过退订/重订阅/释放则放弃，避免覆盖新状态。
+    /// </summary>
+    private async Task ScheduleReconnectIfCurrentAsync(ClientWebSocket ws, CancellationToken ct)
+    {
+        try
+        {
             // 使用 ct 而非 CancellationToken.None，确保应用关闭时重连延迟可被取消
-            try
+            await Task.Delay(ReconnectDelayMs, ct);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            return;
+        }
+
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            if (_disposed || _ws != ws) return;
+            await ApplySubscriptionAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Binance WebSocket 重连失败，{Delay}ms 后自动重试", ReconnectDelayMs);
+            ScheduleConnectRetry();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 连接失败后的退避重试（去重排队）。成功连接或并集清空后自动退出。
+    /// </summary>
+    private void ScheduleConnectRetry()
+    {
+        if (Interlocked.Exchange(ref _retryScheduled, 1) == 1) return;
+        _ = ConnectRetryLoopAsync();
+    }
+
+    private async Task ConnectRetryLoopAsync()
+    {
+        try
+        {
+            while (true)
             {
-                await Task.Delay(5000, ct);
+                await Task.Delay(ReconnectDelayMs);
+
+                await _lifecycleGate.WaitAsync();
+                bool shouldContinue;
+                try
+                {
+                    if (_disposed) return;
+                    lock (_lock)
+                    {
+                        if (_subscribedSymbols.Count == 0) return;
+                    }
+
+                    await ApplySubscriptionAsync();
+                    shouldContinue = false;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Binance WebSocket 重试连接失败，将继续重试");
+                    shouldContinue = true;
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _retryScheduled, 0);
+                    _lifecycleGate.Release();
+                }
+
+                if (!shouldContinue) return;
             }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
-            if (!ct.IsCancellationRequested)
-                _ = ReconnectAsync();
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Exchange(ref _retryScheduled, 0);
+            _logger.LogWarning(ex, "Binance WebSocket 重连循环终止");
         }
     }
 
@@ -210,30 +323,37 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         }
     }
 
-    private async Task DisconnectAsync()
+    /// <summary>
+    /// 断开并清理当前连接。调用方必须已持有 <see cref="_lifecycleGate"/>。
+    /// 先清字段再关闭，确保在飞的重连检查立即把本连接视为过期。
+    /// </summary>
+    private async Task DisconnectCoreAsync()
     {
-        if (_cts != null)
+        var cts = _cts;
+        _cts = null;
+        var ws = _ws;
+        _ws = null;
+
+        if (cts != null)
         {
-            await _cts.CancelAsync();
-            _cts.Dispose();
-            _cts = null;
+            await cts.CancelAsync();
+            cts.Dispose();
         }
 
-        if (_ws != null)
+        if (ws != null)
         {
-            if (_ws.State == WebSocketState.Open)
+            if (ws.State == WebSocketState.Open)
             {
                 try
                 {
-                    await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "unsubscribe", CancellationToken.None);
+                    await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "unsubscribe", CancellationToken.None);
                 }
                 catch
                 {
                     // 忽略关闭异常
                 }
             }
-            _ws.Dispose();
-            _ws = null;
+            ws.Dispose();
         }
     }
 
@@ -242,17 +362,29 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
-        await DisconnectAsync().ConfigureAwait(false);
+        _disposed = true;
+        await _lifecycleGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await DisconnectCoreAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+        _lifecycleGate.Dispose();
         GC.SuppressFinalize(this);
     }
 
     public void Dispose()
     {
+        _disposed = true;
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
 
-        // 同步释放底层 WebSocket，不等待异步 CloseOutputAsync
+        // 同步释放底层 WebSocket，不等待异步 CloseOutputAsync；
+        // 在飞的接收循环会因 _ws 不再匹配而放弃重连
         _ws?.Dispose();
         _ws = null;
 

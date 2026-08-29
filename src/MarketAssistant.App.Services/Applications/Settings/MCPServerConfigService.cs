@@ -31,9 +31,6 @@ public class MCPServerConfigService
         }
     }
 
-    /// <summary>
-    /// 构造函数
-    /// </summary>
     public MCPServerConfigService()
         : this(
             Path.Combine(FileSystem.AppDataDirectory, AppInfo.MCPServerConfigFileName),

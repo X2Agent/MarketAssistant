@@ -15,8 +15,10 @@ public class TextCleaningService : ITextCleaningService
 
     // 预编译的正则表达式 - 固定清洗规则
     private static readonly Regex MultiSpace = new(@"[\t\x0B\f ]{2,}", RegexOptions.Compiled);
+    // "第"分支要求后随"页"：否则"第 3 季度"这类正文中带空格的数字写法会被整段误删；
+    // Latin/页/共 前缀与数字的组合语义明确，保持原有宽匹配
     private static readonly Regex PageNumber = new(
-        @"(?:^|\s)(?:Page|页|第|p\.|P\.)\s*\d+(?:\s*(?:of|\/|共|页|总)\s*\d+)?(?:\s|$)",
+        @"(?:^|\s)(?:Page|页|p\.|P\.)\s*\d+(?:\s*(?:of|\/|共|页|总)\s*\d+)?(?:\s|$)|(?:^|\s)第\s*\d+\s*页|(?:^|\s)共\s*\d+\s*页",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex HyphenBreak = new(@"([A-Za-z])-\n([A-Za-z])", RegexOptions.Compiled);
     private static readonly Regex UrlPattern = new(@"https?://\S+", RegexOptions.IgnoreCase | RegexOptions.Compiled);

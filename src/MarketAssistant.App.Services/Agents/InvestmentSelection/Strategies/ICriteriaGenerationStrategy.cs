@@ -12,24 +12,12 @@ namespace MarketAssistant.Agents.InvestmentSelection.Strategies;
 /// </summary>
 public interface ICriteriaGenerationStrategy<TCriteria> where TCriteria : IScreeningCriteria
 {
-    /// <summary>
-    /// 支持的市场类型
-    /// </summary>
     MarketType SupportedMarketType { get; }
 
-    /// <summary>
-    /// 构建用户需求分析的系统提示词
-    /// </summary>
     string BuildUserRequirementSystemPrompt();
 
-    /// <summary>
-    /// 构建新闻分析的系统提示词
-    /// </summary>
     string BuildNewsAnalysisSystemPrompt();
 
-    /// <summary>
-    /// 构建用户提示词
-    /// </summary>
     string BuildUserPrompt(InvestmentSelectionWorkflowRequest request);
 
     /// <summary>

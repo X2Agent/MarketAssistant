@@ -45,14 +45,8 @@ public class GridTradingParams
     /// </summary>
     public decimal? TakeProfitPrice { get; set; }
 
-    /// <summary>
-    /// 计算网格间距
-    /// </summary>
     public decimal GridSpacing => GridCount > 1 ? (UpperPrice - LowerPrice) / GridCount : 0;
 
-    /// <summary>
-    /// 获取指定索引处的网格价格
-    /// </summary>
     public decimal GetGridPrice(int index) => LowerPrice + GridSpacing * index;
 }
 
