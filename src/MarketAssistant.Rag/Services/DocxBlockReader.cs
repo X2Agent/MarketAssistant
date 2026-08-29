@@ -17,9 +17,9 @@ public class DocxBlockReader : IDocumentBlockReader
 
     public bool CanRead(string filePath) => filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
-    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath)
+    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default)
     {
         // 直接委托给 MarkdownDocumentBlockReader 处理
-        return await _markdownReader.ReadBlocksAsync(filePath);
+        return await _markdownReader.ReadBlocksAsync(filePath, cancellationToken);
     }
 }

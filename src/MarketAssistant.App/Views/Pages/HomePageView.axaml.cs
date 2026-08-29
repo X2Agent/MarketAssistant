@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -9,9 +10,35 @@ namespace MarketAssistant.Views.Pages;
 
 public partial class HomePageView : UserControl
 {
+    /// <summary>滚轮每格横向滚动距离（像素）</summary>
+    private const double WheelHorizontalStep = 50;
+
     public HomePageView()
     {
         InitializeComponent();
+
+        // 最近查看条仅有横向内容：在隧道阶段把纵向滚轮翻译为横向偏移并标记 Handled，
+        // 抢在 ScrollContentPresenter 原生处理之前，避免两种行为叠加导致双倍滚动。
+        RecentScroller.AddHandler(
+            PointerWheelChangedEvent,
+            RecentScroller_PointerWheelChanged,
+            RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>
+    /// 最近查看条滚轮处理：纵向滚轮转为横向滚动；带横向增量（如 Shift+滚轮）时交给原生处理
+    /// </summary>
+    private void RecentScroller_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
+    {
+        if (sender is not ScrollViewer scroller || e.Delta.X != 0)
+            return;
+
+        // 内容未超出可视宽度时无需横向滚动，交回默认处理
+        if (scroller.Extent.Width - scroller.Viewport.Width <= 0)
+            return;
+
+        scroller.Offset = new Vector(scroller.Offset.X - e.Delta.Y * WheelHorizontalStep, scroller.Offset.Y);
+        e.Handled = true;
     }
 
     /// <summary>

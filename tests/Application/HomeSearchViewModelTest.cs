@@ -1,5 +1,14 @@
+using MarketAssistant.Applications;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Cache;
+using MarketAssistant.Applications.Charts;
+using MarketAssistant.Applications.Favorites;
+using MarketAssistant.Applications.History;
+using MarketAssistant.Applications.Home;
+using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.ViewModels.Home;
@@ -15,6 +24,37 @@ namespace TestMarketAssistant.Application;
 [TestClass]
 public class HomeSearchViewModelTest
 {
+    private sealed class StubMarketServiceRegistry : IMarketServiceRegistry
+    {
+        private readonly IServiceProvider _serviceProvider;
+
+        public StubMarketServiceRegistry(IServiceProvider serviceProvider)
+        {
+            _serviceProvider = serviceProvider;
+        }
+
+        public IKLineService GetKLineService(MarketType marketType)
+            => throw new NotSupportedException();
+
+        public IAssetInfoService GetAssetInfoService(MarketType marketType)
+            => throw new NotSupportedException();
+
+        public INewsUpdateService GetNewsUpdateService(MarketType marketType)
+            => throw new NotSupportedException();
+
+        public IHomeAssetService GetHomeAssetService(MarketType marketType)
+            => _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(marketType);
+
+        public IAssetHistoryService GetAssetHistoryService(MarketType marketType)
+            => throw new NotSupportedException();
+
+        public IFavoriteService GetFavoriteService(MarketType marketType)
+            => throw new NotSupportedException();
+
+        public IAssetCacheService GetAssetCacheService(MarketType marketType)
+            => throw new NotSupportedException();
+    }
+
     private static HomeSearchViewModel CreateViewModel()
     {
         var services = new ServiceCollection();
@@ -27,7 +67,7 @@ public class HomeSearchViewModelTest
         var marketContext = new MarketContext(userSettingService.Object, serviceProvider);
 
         return new HomeSearchViewModel(
-            serviceProvider,
+            new StubMarketServiceRegistry(serviceProvider),
             marketContext,
             NullLogger<HomeSearchViewModel>.Instance);
     }

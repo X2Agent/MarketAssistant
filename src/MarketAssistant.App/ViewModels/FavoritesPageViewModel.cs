@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
@@ -9,7 +10,6 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -18,12 +18,9 @@ using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
 
-/// <summary>
-/// 收藏页ViewModel
-/// </summary>
 public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
     private readonly BinanceWebSocketService _wsService;
@@ -53,28 +50,25 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private DispatcherTimer? _priceFlushTimer;
 
     private IFavoriteService FavoriteService =>
-        _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetFavoriteService(_marketContext.CurrentMarket);
 
     private IAssetInfoService AssetInfoService =>
-        _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
 
     private IAssetCacheService CacheService =>
-        _serviceProvider.GetRequiredKeyedService<IAssetCacheService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetAssetCacheService(_marketContext.CurrentMarket);
 
     public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
 
-    /// <summary>
-    /// 构造函数
-    /// </summary>
     public FavoritesPageViewModel(
-        IServiceProvider serviceProvider,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         IDialogService dialogService,
         BinanceWebSocketService wsService,
         ILogger<FavoritesPageViewModel> logger)
         : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
         _dialogService = dialogService;
         _wsService = wsService;
@@ -90,24 +84,30 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// </summary>
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（重启加载/WebSocket 订阅）
+        if (_disposed)
+            return;
+
         _ = LoadFavoriteAssetsAsync();
     }
 
-    /// <summary>
-    /// 加载收藏资产列表
-    /// </summary>
+    private bool _disposed;
+
     private async Task LoadFavoriteAssetsAsync()
     {
-        // 取消上一次加载任务，避免并发加载导致列表闪烁或重复项
+        // 取消上一次加载任务，避免并发加载导致列表闪烁或重复项；
+        // 只取消不 Dispose：在飞加载仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
         _loadCts?.Cancel();
-        _loadCts?.Dispose();
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
         await SafeExecuteAsync(async () =>
         {
             var favoritesCodes = await FavoriteService.GetFavoritesCodesAsync();
-            Assets.Clear();
+
+            // 集合修改须在 UI 线程执行（加载可能由后台事件触发进入），避免跨线程操作 ObservableCollection
+            await Dispatcher.UIThread.InvokeAsync(Assets.Clear);
+
             await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
 
             RebuildAssetIndex();
@@ -126,7 +126,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// </summary>
     private async Task UpdateAssetDataProgressivelyAsync(List<FavoriteAsset> favorites, CancellationToken ct)
     {
-        const int maxConcurrency = 3; // 最多同时请求3个资产数据
+        const int maxConcurrency = 3;
         using var semaphore = new SemaphoreSlim(maxConcurrency);
 
         var tasks = favorites.Select(async favorite =>
@@ -135,14 +135,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             await semaphore.WaitAsync(ct);
             try
             {
-                // 先尝试从缓存获取
                 var assetInfo = await CacheService.GetCachedAssetInfoAsync(favorite.Code);
 
-                // 如果缓存中没有,则从网络获取
                 if (assetInfo == null)
                 {
                     assetInfo = await AssetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market);
-                    // 缓存获取到的数据
                     if (assetInfo != null)
                     {
                         CacheService.CacheAssetInfo(favorite.Code, assetInfo);
@@ -168,25 +165,27 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
         var results = await Task.WhenAll(tasks);
 
-        // 在UI线程上批量添加结果
-        foreach (var assetInfo in results)
+        // 落 UI 前复查取消：旧加载在新的 Clear 之后到达时不得再追加（防残留/重复条目）
+        ct.ThrowIfCancellationRequested();
+
+        // 集合修改须在 UI 线程执行（加载可能由后台事件触发进入），避免跨线程操作 ObservableCollection
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            if (assetInfo != null)
+            foreach (var assetInfo in results)
             {
-                Assets.Add(assetInfo);
+                if (assetInfo != null)
+                {
+                    Assets.Add(assetInfo);
+                }
             }
-        }
+        });
     }
 
-    /// <summary>
-    /// 选择收藏资产
-    /// </summary>
     [RelayCommand]
     private void SelectFavoriteAsset(AssetInfo? asset)
     {
         if (asset == null) return;
 
-        // 解析价格信息
         decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
         decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;
 
@@ -199,15 +198,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 changePercent)));
     }
 
-    /// <summary>
-    /// 移除收藏资产
-    /// </summary>
     [RelayCommand]
     private async Task RemoveFavorite(AssetInfo? asset)
     {
         if (asset == null) return;
 
-        // 显示确认对话框
         var confirmed = await _dialogService.ShowConfirmationAsync(
             "取消收藏",
             $"确定要取消收藏 {asset.Name}({asset.Code}) 吗？",
@@ -215,7 +210,6 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             "取消"
         );
 
-        // 用户确认后才执行删除
         if (confirmed)
         {
             await SafeExecuteAsync(async () =>
@@ -229,7 +223,6 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                     _pendingPriceUpdates.TryRemove(ToBinanceFormat(assetToRemove.Code), out _);
                 }
 
-                // 再从持久化存储中移除
                 await FavoriteService.RemoveFavoriteAsync(asset.Code, asset.Market);
 
                 Logger?.LogInformation($"已取消收藏资产: {asset.Name}({asset.Code})");
@@ -275,14 +268,14 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
         Dispatcher.UIThread.Post(() =>
         {
-            if (_priceFlushTimer != null)
+            if (_disposed || _priceFlushTimer != null)
                 return;
 
             _priceFlushTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(250)
             };
-            _priceFlushTimer.Tick += (_, _) => FlushPendingPriceUpdates();
+            _priceFlushTimer.Tick += FlushPendingPriceUpdates;
             _priceFlushTimer.Start();
         });
     }
@@ -290,7 +283,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// <summary>
     /// 批量应用暂存的价格更新到展示对象（UI 线程，每 250ms 至多一次）。
     /// </summary>
-    private void FlushPendingPriceUpdates()
+    private void FlushPendingPriceUpdates(object? sender, EventArgs e)
     {
         foreach (var symbol in _pendingPriceUpdates.Keys.ToList())
         {
@@ -300,14 +293,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             if (_assetIndex.TryGetValue(symbol, out var asset))
             {
                 asset.CurrentPrice = PriceFormatter.Format(update.Price);
-                asset.ChangePercentage = $"{update.Change:F2}%";
+                // InvariantCulture 与 PriceChangeColorConverter 的解析端保持同一 culture，否则逗号小数区域下解析失败标签变灰
+                asset.ChangePercentage = update.Change.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "%";
             }
         }
     }
 
-    /// <summary>
-    /// 接收收藏变更消息
-    /// </summary>
     public void Receive(AssetFavoritesChanged message)
     {
         _ = LoadFavoriteAssetsAsync();
@@ -315,10 +306,14 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
     public void Dispose()
     {
+        _disposed = true;
         _loadCts?.Cancel();
-        _loadCts?.Dispose();
-        _priceFlushTimer?.Stop();
-        _priceFlushTimer = null;
+        if (_priceFlushTimer != null)
+        {
+            _priceFlushTimer.Tick -= FlushPendingPriceUpdates;
+            _priceFlushTimer.Stop();
+            _priceFlushTimer = null;
+        }
         UnsubscribeFromMarketChanges(_marketContext);
         _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.Favorites);

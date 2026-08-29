@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -15,9 +16,17 @@ public sealed class CoinGeckoApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinGeckoApiService> _logger;
 
-    private static readonly SemaphoreSlim Throttle = new(1, 1);
-    private static DateTime _lastRequestTime = DateTime.MinValue;
-    private const int MinRequestIntervalMs = 2500;
+    // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔。
+    // QueueLimit 有限：突发排队超过 8 个直接失败并抛错（无界排队会让调用方长时间悬挂）
+    private static readonly TokenBucketRateLimiter Throttle = new(new TokenBucketRateLimiterOptions
+    {
+        TokenLimit = 1,
+        TokensPerPeriod = 1,
+        ReplenishmentPeriod = TimeSpan.FromMilliseconds(2500),
+        QueueLimit = 8,
+        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        AutoReplenishment = true
+    });
 
     // 支持 API 返回的字符串数值/null 自动容错转换为 decimal?（CoinGeckoMarket 全为 decimal?）
     private static readonly JsonSerializerOptions CoinGeckoJsonOptions = new()
@@ -39,27 +48,15 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<T> ThrottledExecuteAsync<T>(Func<HttpClient, Task<T>> action, CancellationToken cancellationToken)
     {
-        await Throttle.WaitAsync(cancellationToken);
-        try
-        {
-            var elapsed = (DateTime.UtcNow - _lastRequestTime).TotalMilliseconds;
-            if (elapsed < MinRequestIntervalMs)
-                await Task.Delay((int)(MinRequestIntervalMs - elapsed), cancellationToken);
+        // AcquireAsync 在令牌不足时按 QueueLimit 排队等待，天然实现串行 + 固定间隔
+        using RateLimitLease lease = await Throttle.AcquireAsync(1, cancellationToken);
+        if (!lease.IsAcquired)
+            throw new InvalidOperationException("CoinGecko 限流租约获取失败");
 
-            using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
-            var result = await action(httpClient);
-            _lastRequestTime = DateTime.UtcNow;
-            return result;
-        }
-        finally
-        {
-            Throttle.Release();
-        }
+        using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
+        return await action(httpClient);
     }
 
-    /// <summary>
-    /// 获取市场数据（支持筛选）
-    /// </summary>
     public async Task<List<CoinGeckoMarket>> GetCoinsMarketsAsync(
         string vsCurrency = "usd",
         string? category = null,
@@ -100,9 +97,6 @@ public sealed class CoinGeckoApiService
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// 获取单币种市场数据（含价格变化百分比）
-    /// </summary>
     public async Task<JsonArray?> GetCoinMarketDataAsync(
         string coinId,
         string vsCurrency = "usd",
@@ -117,9 +111,6 @@ public sealed class CoinGeckoApiService
             cancellationToken);
     }
 
-    /// <summary>
-    /// 获取币种在各交易所的交易对数据
-    /// </summary>
     public async Task<CoinGeckoTickersResponse?> GetCoinTickersAsync(
         string coinId,
         CancellationToken cancellationToken = default)
@@ -135,9 +126,6 @@ public sealed class CoinGeckoApiService
             cancellationToken);
     }
 
-    /// <summary>
-    /// 搜索币种
-    /// </summary>
     public async Task<CoinGeckoSearchResponse?> SearchCoinsAsync(
         string query,
         CancellationToken cancellationToken = default)
@@ -199,9 +187,9 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<string?> ResolveCoinIdAsync(string baseSymbol, CancellationToken cancellationToken)
     {
-        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）
-        var mappedId = MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.ToCoinGeckoId(baseSymbol);
-        if (!string.IsNullOrEmpty(mappedId) && !string.Equals(mappedId, baseSymbol, StringComparison.OrdinalIgnoreCase))
+        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）。
+        // TryGet 区分"未命中"与"映射值恰与输入相同"（如 dai→dai），后者不再白打一次 /coins/list
+        if (MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.TryGetCoinGeckoId(baseSymbol, out var mappedId))
         {
             return mappedId;
         }
@@ -222,7 +210,7 @@ public sealed class CoinGeckoApiService
                 return hit?.Id;
             }, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "调用 /coins/list 解析 coinId 失败: {Symbol}", baseSymbol);
             return null;

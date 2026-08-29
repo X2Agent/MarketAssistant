@@ -42,9 +42,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
 
     // ==================== 市场深度数据（币安） ====================
 
-    /// <summary>
-    /// 获取历史K线数据（OHLCV）
-    /// </summary>
     [Description("获取历史K线数据（开盘、最高、最低、收盘、成交量），用于技术分析。interval为枚举类型，支持如 OneDay, OneHour 等")]
     public async Task<CryptoOHLCV> GetOHLCVAsync(string symbol, MarketInterval interval = MarketInterval.OneDay, int limit = 500, long? startTime = null, long? endTime = null, CancellationToken cancellationToken = default)
     {
@@ -94,13 +91,13 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 candles.Add(new OHLCVCandle
                 {
                     OpenTime = arr[0]?.GetValue<long>() ?? 0,
-                    Open = decimal.Parse(arr[1]?.GetValue<string>() ?? "0"),
-                    High = decimal.Parse(arr[2]?.GetValue<string>() ?? "0"),
-                    Low = decimal.Parse(arr[3]?.GetValue<string>() ?? "0"),
-                    Close = decimal.Parse(arr[4]?.GetValue<string>() ?? "0"),
-                    Volume = decimal.Parse(arr[5]?.GetValue<string>() ?? "0"),
+                    Open = ParseInvariantDecimal(arr[1]),
+                    High = ParseInvariantDecimal(arr[2]),
+                    Low = ParseInvariantDecimal(arr[3]),
+                    Close = ParseInvariantDecimal(arr[4]),
+                    Volume = ParseInvariantDecimal(arr[5]),
                     CloseTime = arr[6]?.GetValue<long>() ?? 0,
-                    QuoteVolume = decimal.Parse(arr[7]?.GetValue<string>() ?? "0"),
+                    QuoteVolume = ParseInvariantDecimal(arr[7]),
                     TradeCount = arr[8]?.GetValue<int>() ?? 0
                 });
             }
@@ -111,6 +108,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 Interval = intervalStr,
                 Candles = candles
             };
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务错误
+            throw;
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -176,9 +178,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         _ => 24 * 60 * 60 * 1000
     };
 
-    /// <summary>
-    /// 获取订单簿深度数据
-    /// </summary>
     [Description("获取订单簿深度数据，包括买卖盘挂单，用于分析支撑压力位。limit通常为20/50/100")]
     public async Task<CryptoOrderBookDepth> GetOrderBookDepthAsync(string symbol, int limit = 100, CancellationToken cancellationToken = default)
     {
@@ -233,6 +232,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 Asks = asks
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取订单簿深度失败: {Symbol}", symbol);
@@ -240,9 +244,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         }
     }
 
-    /// <summary>
-    /// 获取最近成交数据
-    /// </summary>
     [Description("获取最近成交记录，分析主动买入/卖出力量对比")]
     public async Task<CryptoRecentTrades> GetRecentTradesAsync(string symbol, int limit = 500, CancellationToken cancellationToken = default)
     {
@@ -294,6 +295,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 SellerVolumePercent = totalVolume > 0 ? sellVolume / totalVolume * 100 : 0
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取最近成交失败: {Symbol}", symbol);
@@ -303,9 +309,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
 
     // ==================== 综合市场指标（CoinGecko） ====================
 
-    /// <summary>
-    /// 获取综合市场指标
-    /// </summary>
     [Description("获取CoinGecko全方位市场数据：市值、FDV、ATH/ATL、历史排名等")]
     public async Task<CryptoMarketMetrics> GetMarketMetricsAsync(string symbol, CancellationToken cancellationToken = default)
     {
@@ -346,6 +349,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 LastUpdated = data["last_updated"]?.GetValue<DateTime>() ?? DateTime.UtcNow
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取市场指标失败: {Symbol}", symbol);
@@ -353,9 +361,6 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         }
     }
 
-    /// <summary>
-    /// 获取交易量分布
-    /// </summary>
     [Description("获取代币在不同交易所的交易量分布情况，用于分析流动性分布")]
     public async Task<List<VolumeDistribution>> GetVolumeDistributionAsync(string symbol, CancellationToken cancellationToken = default)
     {
@@ -394,6 +399,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 })
                 .ToList();
         }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取交易量分布失败: {Symbol}", symbol);
@@ -401,18 +411,26 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
         }
     }
     /// <summary>
-    /// 获取波动性指标
+    /// 以 InvariantCulture 解析币安返回的数值字符串。
+    /// 币安 API 恒定使用 "." 作小数点，若按 CurrentCulture 解析（如 de-DE），
+    /// "0.5" 会被解析成 5，价格放大 10 倍并流入交易决策。
     /// </summary>
+    private static decimal ParseInvariantDecimal(System.Text.Json.Nodes.JsonNode? node)
+        => decimal.Parse(node?.GetValue<string>() ?? "0", NumberStyles.Float, CultureInfo.InvariantCulture);
+
     [Description("获取波动性指标，包括历史波动率、ATR、最大回撤、夏普比率等，用于风险评估")]
     public async Task<CryptoVolatilityMetrics> GetVolatilityMetricsAsync(string symbol, int days = 30, CancellationToken cancellationToken = default)
     {
         try
         {
+            // days 由 LLM 传入，钳制到合理区间：过小会导致样本数不足除零，过大会拉取过量数据
+            days = Math.Clamp(days, 3, 365);
+
             // 获取历史K线数据
             var ohlcv = await GetOHLCVAsync(symbol, MarketInterval.OneDay, days + 1, cancellationToken: cancellationToken);
-            if (ohlcv.Candles.Count < 2)
+            if (ohlcv.Candles.Count < 3)
             {
-                throw new FriendlyException($"数据不足，无法计算波动性指标");
+                throw new FriendlyException($"数据不足，无法计算波动性指标（至少需要 3 根日K线）");
             }
 
             var candles = ohlcv.Candles;
@@ -440,7 +458,10 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 trueRanges.Add(Math.Max(tr1, Math.Max(tr2, tr3)));
             }
 
-            // 计算统计指标
+            // 计算统计指标；样本不足时显式报错而非让除零/空序列异常穿透
+            if (returns.Count < 2)
+                throw new FriendlyException($"有效收益率样本不足（{returns.Count} 个），无法计算波动性指标");
+
             var avgReturn = returns.Average();
             var variance = returns.Sum(r => (r - avgReturn) * (r - avgReturn)) / (returns.Count - 1);
             var stdDev = (decimal)Math.Sqrt((double)variance);
@@ -497,6 +518,11 @@ public sealed class CryptoMetricsTools : ICryptoMetricsTools
                 StandardDeviation = stdDev * 100,
                 AverageReturn = avgReturn * 100
             };
+        }
+        catch (OperationCanceledException)
+        {
+            // 内层 GetOHLCVAsync 已透传取消，此处不得再包装成业务错误
+            throw;
         }
         catch (FriendlyException)
         {

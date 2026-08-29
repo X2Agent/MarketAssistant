@@ -51,11 +51,4 @@ public class TradingStrategy
 
     [Description("追踪止损的峰值/谷值价格")]
     public decimal? TrailingPeakPrice { get; set; }
-
-    /// <summary>
-    /// 原生条件单的交易所订单 ID。非空时表示该策略已提交为交易所原生条件单，
-    /// 客户端无需再轮询评估；策略完成/删除时应调用 TryCancelNativeConditionalOrderAsync 取消。
-    /// </summary>
-    [Description("原生条件单订单ID")]
-    public string? NativeOrderId { get; set; }
 }

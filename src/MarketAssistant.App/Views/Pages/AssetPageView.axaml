@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
 			 xmlns:components="using:MarketAssistant.Views.Components"
              xmlns:converts="using:MarketAssistant.Converters"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AssetPageView"
              x:DataType="vm:AssetPageViewModel">
@@ -43,7 +44,7 @@
                                        FontFamily="{StaticResource DataFontFamily}"
                                        FontSize="{StaticResource TinyFontSize}" 
                                        FontWeight="Bold" 
-                                       Foreground="White" />
+                                       Foreground="{StaticResource TextOnEmphasisBrush}" />
                         </Border>
                     </StackPanel>
                     
@@ -91,8 +92,8 @@
                     <Button Classes="action-button"
                             Command="{Binding NavigateToAnalysisCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="🤖"/>
-                            <TextBlock Text="AI分析"/>
+                            <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="AI分析" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     
@@ -100,8 +101,8 @@
                     <Button Classes="action-button"
                             Command="{Binding RefreshDataCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="🔄"/>
-                            <TextBlock Text="刷新"/>
+                            <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="刷新" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -233,9 +234,9 @@
             <StackPanel HorizontalAlignment="Center" 
                         VerticalAlignment="Center" 
                         Spacing="{StaticResource DefaultSpacing}">
-                <TextBlock Text="⚠️" 
-                           FontSize="{StaticResource LargeIconSize}" 
-                           HorizontalAlignment="Center" />
+                <svg:Svg Path="/Assets/Images/icon_danger.svg"
+                         Width="48" Height="48"
+                         HorizontalAlignment="Center"/>
                 <TextBlock Text="数据加载失败" 
                            FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"

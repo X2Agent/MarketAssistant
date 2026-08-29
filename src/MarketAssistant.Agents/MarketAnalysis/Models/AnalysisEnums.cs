@@ -29,9 +29,6 @@ public enum InvestmentRating
     StrongSell
 }
 
-/// <summary>
-/// 操作建议
-/// </summary>
 public enum OperationRecommendation
 {
     [Description("买入")]
@@ -44,9 +41,6 @@ public enum OperationRecommendation
     Sell
 }
 
-/// <summary>
-/// 趋势变化
-/// </summary>
 public enum TrendChange
 {
     [Description("上升")]
@@ -59,9 +53,6 @@ public enum TrendChange
     Stable
 }
 
-/// <summary>
-/// 影响方向
-/// </summary>
 public enum ImpactDirection
 {
     [Description("正面")]
@@ -74,9 +65,6 @@ public enum ImpactDirection
     Negative
 }
 
-/// <summary>
-/// 持续时长
-/// </summary>
 public enum Duration
 {
     [Description("短期")]
@@ -89,9 +77,6 @@ public enum Duration
     LongTerm
 }
 
-/// <summary>
-/// 水平等级（高中低）
-/// </summary>
 public enum Level
 {
     [Description("低")]
@@ -108,9 +93,6 @@ public enum Level
 
 #region 基本面分析枚举
 
-/// <summary>
-/// 行业生命周期
-/// </summary>
 public enum IndustryLifecycle
 {
     [Description("导入期")]
@@ -126,9 +108,6 @@ public enum IndustryLifecycle
     Decline
 }
 
-/// <summary>
-/// 市场地位
-/// </summary>
 public enum MarketPosition
 {
     [Description("龙头")]
@@ -141,9 +120,6 @@ public enum MarketPosition
     Follower
 }
 
-/// <summary>
-/// 盈利趋势
-/// </summary>
 public enum ProfitabilityTrend
 {
     [Description("优")]
@@ -156,9 +132,6 @@ public enum ProfitabilityTrend
     Poor
 }
 
-/// <summary>
-/// 现金流状况
-/// </summary>
 public enum CashFlowStatus
 {
     [Description("健康")]
@@ -175,9 +148,6 @@ public enum CashFlowStatus
 
 #region 财务分析枚举
 
-/// <summary>
-/// 债务结构评估
-/// </summary>
 public enum DebtStructureAssessment
 {
     [Description("健康")]
@@ -190,9 +160,6 @@ public enum DebtStructureAssessment
     Risky
 }
 
-/// <summary>
-/// 财务稳健性
-/// </summary>
 public enum FinancialStability
 {
     [Description("强")]
@@ -205,9 +172,6 @@ public enum FinancialStability
     Weak
 }
 
-/// <summary>
-/// 盈利趋势评估（财务分析）
-/// </summary>
 public enum ProfitTrendAssessment
 {
     [Description("稳健增长")]
@@ -220,10 +184,6 @@ public enum ProfitTrendAssessment
     Declining
 }
 
-
-/// <summary>
-/// 自由现金流状态
-/// </summary>
 public enum FreeCashFlowStatus
 {
     [Description("正值")]
@@ -233,9 +193,6 @@ public enum FreeCashFlowStatus
     Negative
 }
 
-/// <summary>
-/// 自由现金流趋势
-/// </summary>
 public enum FreeCashFlowTrend
 {
     [Description("改善")]
@@ -252,9 +209,6 @@ public enum FreeCashFlowTrend
 
 #region 技术分析枚举
 
-/// <summary>
-/// 趋势方向
-/// </summary>
 public enum TrendDirection
 {
     [Description("上升趋势")]
@@ -267,9 +221,6 @@ public enum TrendDirection
     Sideways
 }
 
-/// <summary>
-/// 时间框架
-/// </summary>
 public enum TimeFrame
 {
     [Description("日线")]
@@ -282,9 +233,6 @@ public enum TimeFrame
     Monthly
 }
 
-/// <summary>
-/// 突破方向
-/// </summary>
 public enum BreakoutDirection
 {
     [Description("向上突破")]
@@ -297,9 +245,6 @@ public enum BreakoutDirection
     Consolidation
 }
 
-/// <summary>
-/// 成交量状态
-/// </summary>
 public enum VolumeStatus
 {
     [Description("放量")]
@@ -309,9 +254,6 @@ public enum VolumeStatus
     Contracting
 }
 
-/// <summary>
-/// 量价关系
-/// </summary>
 public enum PriceVolumeRelationship
 {
     [Description("健康")]
@@ -321,15 +263,10 @@ public enum PriceVolumeRelationship
     Unhealthy
 }
 
-
-
 #endregion
 
 #region 市场情绪分析枚举
 
-/// <summary>
-/// 主导情绪
-/// </summary>
 public enum DominantEmotion
 {
     [Description("恐惧")]
@@ -342,10 +279,6 @@ public enum DominantEmotion
     Neutral
 }
 
-
-/// <summary>
-/// 市场氛围
-/// </summary>
 public enum MarketAtmosphere
 {
     [Description("极度乐观")]
@@ -364,9 +297,6 @@ public enum MarketAtmosphere
     ExtremelyPessimistic
 }
 
-/// <summary>
-/// 资金流向
-/// </summary>
 public enum CapitalFlowDirection
 {
     [Description("净流入")]
@@ -379,9 +309,6 @@ public enum CapitalFlowDirection
     NoSignificantChange
 }
 
-/// <summary>
-/// 机构动向
-/// </summary>
 public enum InstitutionTrend
 {
     [Description("加仓")]
@@ -394,9 +321,6 @@ public enum InstitutionTrend
     Watching
 }
 
-/// <summary>
-/// 行为偏差类型
-/// </summary>
 public enum BehaviorBias
 {
     [Description("锚定效应")]
@@ -412,9 +336,6 @@ public enum BehaviorBias
     LossAversion
 }
 
-/// <summary>
-/// 散户特征
-/// </summary>
 public enum RetailInvestorCharacteristics
 {
     [Description("追涨")]
@@ -427,9 +348,6 @@ public enum RetailInvestorCharacteristics
     Watching
 }
 
-/// <summary>
-/// 行为一致性
-/// </summary>
 public enum BehaviorConsistency
 {
     [Description("一致")]
@@ -439,9 +357,6 @@ public enum BehaviorConsistency
     Divergent
 }
 
-/// <summary>
-/// 风险偏好
-/// </summary>
 public enum RiskPreference
 {
     [Description("高风险偏好")]
@@ -451,9 +366,6 @@ public enum RiskPreference
     LowRisk
 }
 
-/// <summary>
-/// 市场节奏
-/// </summary>
 public enum MarketRhythm
 {
     [Description("快速轮动")]
@@ -466,9 +378,6 @@ public enum MarketRhythm
     OneSidedTrend
 }
 
-/// <summary>
-/// 仓位建议
-/// </summary>
 public enum PositionRecommendation
 {
     [Description("激进")]
@@ -485,9 +394,6 @@ public enum PositionRecommendation
 
 #region 新闻事件分析枚举
 
-/// <summary>
-/// 事件类型
-/// </summary>
 public enum EventType
 {
     [Description("公司公告")]
@@ -512,9 +418,6 @@ public enum EventType
     Other
 }
 
-/// <summary>
-/// 信息来源
-/// </summary>
 public enum InformationSource
 {
     [Description("官方")]
@@ -527,9 +430,6 @@ public enum InformationSource
     MarketRumor
 }
 
-/// <summary>
-/// 事件性质
-/// </summary>
 public enum EventNature
 {
     [Description("重大利好")]
@@ -548,9 +448,6 @@ public enum EventNature
     MajorNegative
 }
 
-/// <summary>
-/// 影响范围
-/// </summary>
 public enum ImpactScope
 {
     [Description("公司特定")]
@@ -563,9 +460,6 @@ public enum ImpactScope
     MarketWide
 }
 
-/// <summary>
-/// 市场反应预期
-/// </summary>
 public enum MarketReactionExpectation
 {
     [Description("过度反应")]
@@ -578,9 +472,6 @@ public enum MarketReactionExpectation
     Underreaction
 }
 
-/// <summary>
-/// 价格变化预期
-/// </summary>
 public enum PriceChangeExpectation
 {
     [Description("上涨")]
@@ -593,9 +484,6 @@ public enum PriceChangeExpectation
     Fluctuation
 }
 
-/// <summary>
-/// 投资影响评估
-/// </summary>
 public enum InvestmentImpactAssessment
 {
     [Description("机遇")]
@@ -609,4 +497,3 @@ public enum InvestmentImpactAssessment
 }
 
 #endregion
-

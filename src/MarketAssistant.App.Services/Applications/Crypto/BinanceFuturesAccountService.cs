@@ -26,6 +26,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     protected override string AccountEndpoint => "/fapi/v2/account";
     protected override string OrderEndpoint => "/fapi/v1/order";
     protected override string OpenOrdersEndpoint => "/fapi/v1/openOrders";
+    protected override string ExchangeInfoEndpoint => "/fapi/v1/exchangeInfo";
 
     /// <summary>
     /// 合约下单附加 positionSide（单向模式 BOTH / 双向模式 LONG/SHORT）。
@@ -143,87 +144,6 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
         }
     }
 
-    /// <summary>
-    /// 设置合约保证金模式（全仓/逐仓）。
-    /// 端点：POST /fapi/v1/marginType
-    /// </summary>
-    /// <param name="marginType">"ISOLATED"（逐仓）或 "CROSSED"（全仓）</param>
-    internal async Task SetMarginTypeAsync(string symbol, string marginType, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var marginTypeUpper = marginType.ToUpper();
-            if (marginTypeUpper is not ("ISOLATED" or "CROSSED"))
-                throw new ArgumentException("保证金模式必须为 ISOLATED 或 CROSSED");
-
-            var queryString = $"symbol={symbol.ToUpper()}&marginType={marginTypeUpper}";
-            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
-            var url = $"/fapi/v1/marginType?{signedQuery}";
-
-            var request = new HttpRequestMessage(HttpMethod.Post, url);
-            AuthService.AddAuthHeaders(request);
-
-            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
-            var response = await httpClient.SendAsync(request, cancellationToken);
-
-            // -4046: No need to change margin type（已经是目标模式）
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                if (errorContent.Contains("-4046"))
-                {
-                    Logger.LogInformation("{Label}保证金模式已是 {MarginType}，无需切换", Label, marginTypeUpper);
-                    return;
-                }
-            }
-
-            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}设置保证金模式", cancellationToken);
-            Logger.LogInformation("{Label}保证金模式已设置为 {MarginType}", Label, marginTypeUpper);
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogError(ex, "{Label}设置保证金模式失败 - 网络错误", Label);
-            throw new FriendlyException($"{Label}设置保证金模式失败: 网络连接错误", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            Logger.LogError(ex, "{Label}设置保证金模式失败", Label);
-            throw new FriendlyException($"{Label}设置保证金模式失败: {ex.Message}", ex);
-        }
-    }
-
-    /// <summary>
-    /// 查询合约成交明细。
-    /// 端点：GET /fapi/v1/userTrades
-    /// </summary>
-    internal async Task<List<BinanceFuturesUserTrade>> GetUserTradesAsync(string symbol, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var queryString = $"symbol={symbol.ToUpper()}&limit=100";
-            var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
-            var url = $"/fapi/v1/userTrades?{signedQuery}";
-
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            AuthService.AddAuthHeaders(request);
-
-            using var httpClient = HttpClientFactory.CreateClient(HttpClientName);
-            var response = await httpClient.SendAsync(request, cancellationToken);
-            await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}查询成交明细", cancellationToken);
-
-            return await response.Content.ReadFromJsonAsync<List<BinanceFuturesUserTrade>>(cancellationToken) ?? [];
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogError(ex, "{Label}查询成交明细失败 - 网络错误", Label);
-            throw new FriendlyException($"{Label}查询成交明细失败: 网络连接错误", ex);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            Logger.LogError(ex, "{Label}查询成交明细失败", Label);
-            throw new FriendlyException($"{Label}查询成交明细失败: {ex.Message}", ex);
-        }
-    }
 
     /// <summary>
     /// 将合约订单响应映射为统一的 BinanceOrderResponse。
@@ -327,51 +247,6 @@ internal sealed class BinanceFuturesPositionRisk
     public string PositionSide { get; set; } = string.Empty;
 
     public long UpdateTime { get; set; }
-}
-
-/// <summary>
-/// 币安合约成交明细（/fapi/v1/userTrades）
-/// </summary>
-internal sealed class BinanceFuturesUserTrade
-{
-    [JsonPropertyName("symbol")]
-    public string Symbol { get; set; } = string.Empty;
-
-    [JsonPropertyName("id")]
-    public long TradeId { get; set; }
-
-    [JsonPropertyName("orderId")]
-    public long OrderId { get; set; }
-
-    [JsonPropertyName("side")]
-    public string Side { get; set; } = string.Empty;
-
-    [JsonPropertyName("positionSide")]
-    public string PositionSide { get; set; } = string.Empty;
-
-    [JsonPropertyName("price")]
-    public string Price { get; set; } = string.Empty;
-
-    [JsonPropertyName("qty")]
-    public string Quantity { get; set; } = string.Empty;
-
-    [JsonPropertyName("quoteQty")]
-    public string QuoteQuantity { get; set; } = string.Empty;
-
-    [JsonPropertyName("realizedPnl")]
-    public string RealizedPnl { get; set; } = string.Empty;
-
-    [JsonPropertyName("commission")]
-    public string Commission { get; set; } = string.Empty;
-
-    [JsonPropertyName("commissionAsset")]
-    public string CommissionAsset { get; set; } = string.Empty;
-
-    [JsonPropertyName("buyer")]
-    public bool IsBuyer { get; set; }
-
-    [JsonPropertyName("time")]
-    public long Time { get; set; }
 }
 
 #endregion

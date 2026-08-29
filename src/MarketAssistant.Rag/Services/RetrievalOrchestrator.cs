@@ -93,6 +93,16 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         for (int qi = 0; qi < distinctQueries.Count; qi++)
         {
             var q = distinctQueries[qi];
+
+            // 防御校验：嵌入返回条数可能少于查询条数，越界会抛出异常
+            if (qi >= queryEmbeddings.Count)
+            {
+                _logger.LogWarning(
+                    "Query embedding missing for index {Index}, query: {Query} (embeddings: {Count})",
+                    qi, q, queryEmbeddings.Count);
+                continue;
+            }
+
             try
             {
                 var queryVector = queryEmbeddings[qi];

@@ -70,15 +70,16 @@
 
     <!-- ===== Danger 按钮 — 危险/删除操作 ===== -->
     <Style Selector="Button.btn-danger">
-        <Setter Property="Background" Value="{StaticResource DangerBackgroundBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource DangerTextBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource DangerPanelBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DangerPanelTextBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.btn-danger:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource DangerLightBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource DangerPanelBackgroundStrongBrush}"/>
     </Style>
     <Style Selector="Button.btn-danger:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource DangerTextBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource DangerPanelBorderBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
     </Style>
 
     <!-- ===== 按钮尺寸变体 ===== -->

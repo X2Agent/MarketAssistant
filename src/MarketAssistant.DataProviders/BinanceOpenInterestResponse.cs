@@ -11,10 +11,10 @@ public class BinanceOpenInterestResponse
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("sumOpenInterest")]
-    public string SumOpenInterest { get; set; } = string.Empty;
+    public decimal SumOpenInterest { get; set; }
 
     [JsonPropertyName("sumOpenInterestValue")]
-    public string SumOpenInterestValue { get; set; } = string.Empty;
+    public decimal SumOpenInterestValue { get; set; }
 
     [JsonPropertyName("timestamp")]
     public long Timestamp { get; set; }

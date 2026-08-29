@@ -49,10 +49,6 @@
         <Thickness x:Key="InputBoxMargin">12,4</Thickness>
         <Thickness x:Key="SendButtonMargin">12,0,0,0</Thickness>
         <Thickness x:Key="SendIconMargin">4,0,0,0</Thickness>
-        <BoxShadows x:Key="ChatAvatarShadow">0 2 4 0 #20000000</BoxShadows>
-        <BoxShadows x:Key="InputAreaBoxShadow">0 -2 8 0 #08000000</BoxShadows>
-        <BoxShadows x:Key="ChatBubbleShadow">0 1 3 0 #15000000</BoxShadows>
-        <BoxShadows x:Key="UserBubbleBoxShadow">0 2 4 0 #301976D2</BoxShadows>
     </UserControl.Resources>
 
     <DockPanel Background="{DynamicResource PageBackgroundBrush}">
@@ -141,7 +137,7 @@
                         Padding="0"
                         IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}">
                     <PathIcon Data="{StaticResource IconSend}" 
-                              Foreground="White" 
+                              Foreground="{StaticResource TextOnEmphasisBrush}" 
                               Width="{StaticResource SendIconSize}" Height="{StaticResource SendIconSize}"
                               Margin="{StaticResource SendIconMargin}"/> <!-- 微调图标位置使其视觉居中 -->
                     <Button.Styles>
@@ -207,8 +203,8 @@
                                     Background="{StaticResource PrimaryLightBrush}"
                                     VerticalAlignment="Top"
                                     Margin="{StaticResource AvatarLeftMargin}"
-                                    BoxShadow="{StaticResource ChatAvatarShadow}">
-                                <PathIcon Data="{StaticResource IconRobot}" Foreground="White" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
+                                    BoxShadow="{StaticResource SmallBoxShadow}">
+                                <PathIcon Data="{StaticResource IconRobot}" Foreground="{StaticResource TextOnEmphasisBrush}" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
                             </Border>
                             
                             <!-- 气泡内容 -->
@@ -221,7 +217,7 @@
                                 <Border Background="{DynamicResource CardBackgroundBrush}"
                                         CornerRadius="{StaticResource BubbleLeftCornerRadius}"
                                         Padding="{StaticResource CardPadding}"
-                                        BoxShadow="{StaticResource ChatBubbleShadow}"
+                                        BoxShadow="{StaticResource SubtleBoxShadow}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="{StaticResource DefaultBorderThickness}">
                                     <StackPanel>
@@ -255,7 +251,7 @@
                                         Padding="{StaticResource DefaultCardPadding}"
                                         BoxShadow="{StaticResource UserBubbleBoxShadow}">
                                     <TextBlock Text="{Binding Content}" 
-                                               Foreground="White" 
+                                               Foreground="{StaticResource TextOnEmphasisBrush}" 
                                                TextWrapping="Wrap"
                                                FontSize="{StaticResource LabelFontSize}"
                                                LineHeight="{StaticResource CompactLineHeight}"/>
@@ -269,8 +265,8 @@
                                     Background="{StaticResource SecondaryLightBrush}"
                                     VerticalAlignment="Top"
                                     Margin="{StaticResource AvatarRightMargin}"
-                                    BoxShadow="{StaticResource ChatAvatarShadow}">
-                                <PathIcon Data="{StaticResource IconUser}" Foreground="White" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
+                                    BoxShadow="{StaticResource SmallBoxShadow}">
+                                <PathIcon Data="{StaticResource IconUser}" Foreground="{StaticResource TextOnEmphasisBrush}" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
                             </Border>
                         </Grid>
                     </Panel>

@@ -13,11 +13,18 @@ public sealed class DiagnosticsTest
     public void TokenTracking_ShouldAttachUsageToCurrentMarketAssistantActivity()
     {
         Activity? stoppedActivity = null;
+        // 方法级并行下其他测试也会产生同名 Source 的 Activity，按名称过滤避免并行污染
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == MarketAssistantDiagnostics.SourceName,
             Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-            ActivityStopped = activity => stoppedActivity = activity
+            ActivityStopped = activity =>
+            {
+                if (activity.DisplayName == "test.agent.run")
+                {
+                    stoppedActivity = activity;
+                }
+            }
         };
         ActivitySource.AddActivityListener(listener);
         var middleware = new TokenTrackingMiddleware(NullLogger<TokenTrackingMiddleware>.Instance);
@@ -43,11 +50,18 @@ public sealed class DiagnosticsTest
     public void RecordException_ShouldSetErrorStatusWithoutRecordingMessage()
     {
         Activity? stoppedActivity = null;
+        // 方法级并行下其他测试也会产生同名 Source 的 Activity，按名称过滤避免并行污染
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == MarketAssistantDiagnostics.SourceName,
             Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
-            ActivityStopped = activity => stoppedActivity = activity
+            ActivityStopped = activity =>
+            {
+                if (activity.DisplayName == "test.failure")
+                {
+                    stoppedActivity = activity;
+                }
+            }
         };
         ActivitySource.AddActivityListener(listener);
 

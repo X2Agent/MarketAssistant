@@ -31,7 +31,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// 根据筛选条件筛选虚拟币
     /// 优先使用 CoinGecko（含市值/排名/供应量数据），失败时降级到 Binance（仅价格/成交量/涨跌幅）
     /// </summary>
-    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
+    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria, CancellationToken cancellationToken = default)
     {
         if (criteria is not CryptoCriteria cryptoCriteria)
         {
@@ -47,20 +47,25 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             List<ScreenerAssetInfo> results;
             try
             {
-                var markets = await FetchFromCoinGeckoAsync(cryptoCriteria);
+                var markets = await FetchFromCoinGeckoAsync(cryptoCriteria, cancellationToken);
                 var filtered = ApplyFilters(markets, cryptoCriteria);
                 var limited = filtered.Take(cryptoCriteria.Limit).ToList();
                 results = ConvertToScreenerInfo(limited);
                 _logger.LogInformation("CoinGecko 筛选完成，结果数量: {Count}", results.Count);
             }
-            catch (Exception ex) when (ex is not ArgumentException)
+            catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "CoinGecko 数据源不可用，降级到 Binance 兜底");
-                results = await FetchFromBinanceFallbackAsync(cryptoCriteria);
+                results = await FetchFromBinanceFallbackAsync(cryptoCriteria, cancellationToken);
                 _logger.LogInformation("Binance 兜底筛选完成，结果数量: {Count}", results.Count);
             }
 
             return results;
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务失败
+            throw;
         }
         catch (Exception ex)
         {
@@ -72,7 +77,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// <summary>
     /// 从CoinGecko获取数据
     /// </summary>
-    private async Task<List<CoinGeckoMarket>> FetchFromCoinGeckoAsync(CryptoCriteria criteria)
+    private async Task<List<CoinGeckoMarket>> FetchFromCoinGeckoAsync(CryptoCriteria criteria, CancellationToken cancellationToken)
     {
         // 确定排序方式
         var order = DetermineOrder(criteria);
@@ -96,7 +101,8 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             order: order,
             perPage: perPage,
             page: page,
-            priceChangePercentage: priceChangePercentage);
+            priceChangePercentage: priceChangePercentage,
+            cancellationToken: cancellationToken);
 
         return markets;
     }
@@ -173,9 +179,9 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// Binance 兜底筛选：当 CoinGecko 不可用时，从币安获取 USDT 交易对行情
     /// 注意：Binance 不提供市值/排名/供应量数据，相关筛选条件将被忽略
     /// </summary>
-    private async Task<List<ScreenerAssetInfo>> FetchFromBinanceFallbackAsync(CryptoCriteria criteria)
+    private async Task<List<ScreenerAssetInfo>> FetchFromBinanceFallbackAsync(CryptoCriteria criteria, CancellationToken cancellationToken)
     {
-        var tickers = await _binanceService.GetAll24hrTickersFullAsync();
+        var tickers = await _binanceService.GetAll24hrTickersFullAsync(cancellationToken);
 
         // 仅保留指定计价货币的交易对（默认 USDT），排除杠杆/稳定币交易对
         var quoteCurrency = string.IsNullOrWhiteSpace(criteria.QuoteCurrency) ? "USDT" : criteria.QuoteCurrency;

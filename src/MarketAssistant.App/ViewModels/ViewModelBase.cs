@@ -15,18 +15,12 @@ public abstract class ViewModelBase : ObservableObject
     /// </summary>
     protected MarketContext? MarketContext { get; private set; }
 
-    /// <summary>
-    /// Gets or sets a value indicating whether the view model is busy performing an operation.
-    /// </summary>
     public bool IsBusy
     {
         get => _isBusy;
         set => SetProperty(ref _isBusy, value);
     }
 
-    /// <summary>
-    /// 页面标题
-    /// </summary>
     public virtual string Title => string.Empty;
 
     protected ViewModelBase(ILogger? logger = null)
@@ -90,9 +84,6 @@ public abstract class ViewModelBase : ObservableObject
         marketContext.PropertyChanged += OnMarketContextPropertyChanged;
     }
 
-    /// <summary>
-    /// 取消订阅市场上下文的 PropertyChanged 事件
-    /// </summary>
     protected void UnsubscribeFromMarketChanges(MarketContext marketContext)
     {
         marketContext.PropertyChanged -= OnMarketContextPropertyChanged;

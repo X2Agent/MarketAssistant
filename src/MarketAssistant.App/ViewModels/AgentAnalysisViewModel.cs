@@ -229,8 +229,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
             await RefreshHistoryAsync(StockCode);
 
+            // 只取消上一个在飞分析，不 Dispose（其令牌仍被持有）
             _analysisCts?.Cancel();
-            _analysisCts?.Dispose();
             _analysisCts = new CancellationTokenSource();
             var runId = Guid.NewGuid();
             _activeAnalysisRunId = runId;
@@ -372,11 +372,17 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }, "加载历史报告");
     }
 
+    private bool _disposed;
+
     protected override void OnMarketChanged(MarketType newMarket)
     {
-        // 取消进行中的分析任务，避免旧市场的分析结果污染新市场
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（重置 UI 状态/启动加载）
+        if (_disposed)
+            return;
+
+        // 取消进行中的分析任务，避免旧市场的分析结果污染新市场；
+        // 只取消不 Dispose：在飞分析仍持有旧令牌
         _analysisCts?.Cancel();
-        _analysisCts?.Dispose();
         _analysisCts = null;
         _activeAnalysisRunId = null;
         _lastReport = null;
@@ -395,6 +401,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     public void Dispose()
     {
+        _disposed = true;
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();

@@ -44,11 +44,11 @@
     
     <!-- ========== 字体大小定义 ========== -->
     <x:Double x:Key="ExtraLargeFontSize">28</x:Double>
-    <x:Double x:Key="TitleFontSize">24</x:Double>
-    <x:Double x:Key="LargeFontSize">20</x:Double>
+    <x:Double x:Key="TitleFontSize">22</x:Double>
+    <x:Double x:Key="LargeFontSize">18</x:Double>
     <x:Double x:Key="SubTitleFontSize">18</x:Double>
     <x:Double x:Key="SectionTitleFontSize">16</x:Double>
-    <x:Double x:Key="MediumFontSize">15</x:Double>
+    <x:Double x:Key="MediumFontSize">14</x:Double>
     <x:Double x:Key="LabelFontSize">14</x:Double>
     <x:Double x:Key="BodyFontSize">13</x:Double>
     <x:Double x:Key="SmallFontSize">12</x:Double>
@@ -73,9 +73,8 @@
     <x:Double x:Key="SmallInputHeight">32</x:Double>
     
     <!-- 圆角半径 -->
-    <CornerRadius x:Key="LargeCornerRadius">16</CornerRadius>
     <CornerRadius x:Key="DefaultCornerRadius">12</CornerRadius>
-    <CornerRadius x:Key="MediumCornerRadius">10</CornerRadius>
+    <CornerRadius x:Key="MediumCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="SmallCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="TinyCornerRadius">4</CornerRadius>
@@ -189,6 +188,8 @@
     <x:Double x:Key="MediumAnimationSeconds">0.3</x:Double>
     <x:Double x:Key="SlowAnimationSeconds">0.6</x:Double>
     <x:Double x:Key="PulseAnimationSeconds">1.5</x:Double>
+    <!-- 注：Transition.Duration 为 TimeSpan 类型，Avalonia XAML 不支持 TimeSpan 资源 Token，
+         各样式中的 Duration 字面量统一收敛至阶梯值 0:0:0.15 / 0:0:0.3 / 0:0:0.6（150/300/600ms） -->
 
     <!-- ========== 动画变换 ========== -->
     <TranslateTransform x:Key="HoverLiftTransform" Y="-2"/>

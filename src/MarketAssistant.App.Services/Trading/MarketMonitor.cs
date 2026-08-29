@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -21,6 +22,8 @@ public class MarketMonitor : IDisposable
     private readonly AISignalStrategyExecutor _aiSignalExecutor;
     private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradingStrategyService _strategyService;
+    private readonly TradingDataService _dataService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -96,7 +99,9 @@ public class MarketMonitor : IDisposable
         AISignalStrategyExecutor aiSignalExecutor,
         OrderStateSyncService orderStateSyncService,
         TradingStrategyService strategyService,
+        TradingDataService dataService,
         BinanceUserDataStreamService userDataStreamService,
+        INotificationService notificationService,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -105,7 +110,9 @@ public class MarketMonitor : IDisposable
         _aiSignalExecutor = aiSignalExecutor;
         _orderStateSyncService = orderStateSyncService;
         _strategyService = strategyService;
+        _dataService = dataService;
         _userDataStreamService = userDataStreamService;
+        _notificationService = notificationService;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
         _strategyService.StrategiesChanged += OnStrategiesChanged;
@@ -152,13 +159,20 @@ public class MarketMonitor : IDisposable
     /// <summary>
     /// 停止后台监控
     /// </summary>
-    public async Task StopAsync()
+    public Task StopAsync() => TryStopAsync();
+
+    /// <summary>
+    /// 停止后台监控并报告是否完整停止。
+    /// </summary>
+    /// <returns>true = 所有在途策略任务已结束；false = 等待超时，仍有未完成任务，
+    /// 调用方（如交易模式切换）应据此中止后续操作</returns>
+    public async Task<bool> TryStopAsync()
     {
         await _lifecycleLock.WaitAsync();
         try
         {
             if (!_isRunning)
-                return;
+                return true;
 
             _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
             _userDataStreamService.OrderUpdate -= OnOrderUpdate;
@@ -183,9 +197,17 @@ public class MarketMonitor : IDisposable
                 {
                     await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(10));
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
+                catch (OperationCanceledException)
+                {
+                    // 停止取消使尚未进入执行的任务以 Canceled 结束：状态可能未持久化，
+                    // 必须报告"未完整停止"让调用方（如环境切换）中止，不能让异常穿透破坏返回值契约
+                    _logger.LogWarning("等待策略任务完成时被取消，部分状态可能未持久化");
+                    return false;
+                }
+                catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "等待策略任务完成时超时或出错，部分状态可能未持久化");
+                    return false;
                 }
             }
 
@@ -194,6 +216,7 @@ public class MarketMonitor : IDisposable
             _isRunning = false;
             _logger.LogInformation("MarketMonitor 已停止");
             StatusChanged?.Invoke(false);
+            return true;
         }
         finally
         {
@@ -399,7 +422,47 @@ public class MarketMonitor : IDisposable
 
             await ApplyTradeFailurePolicy(strategy, result.Success, result);
 
+            if (result.Success)
+                await CompleteOneShotStrategyAsync(strategy);
+            else
+                await CheckStrategyCompletionAsync(strategy);
+        }
+    }
+
+    /// <summary>
+    /// 一次性策略的成交后完结：止损/止盈/追踪止损语义上只执行一次（触发即出场或建仓），
+    /// 成交后必须置为 Completed，否则条件持续满足时每个价格 tick 都会再次下单，
+    /// 未设 MaxExecutions 的策略会反复打光账户资金。
+    /// </summary>
+    private async Task CompleteOneShotStrategyAsync(TradingStrategy strategy)
+    {
+        // 用户显式配置 MaxExecutions > 1 时尊重配置，仍按执行计数完结
+        if (strategy.MaxExecutions is > 1)
+        {
             await CheckStrategyCompletionAsync(strategy);
+            return;
+        }
+
+        var isOneShot = strategy.Type is StrategyType.StopLoss or StrategyType.TakeProfit or StrategyType.TrailingStop;
+        if (!isOneShot)
+        {
+            // 网格/DCA 可多次执行，仍按 MaxExecutions 计数完结
+            await CheckStrategyCompletionAsync(strategy);
+            return;
+        }
+
+        try
+        {
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
+            await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
+            _strategyLocks.TryRemove(strategy.Id, out _);
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            _logger.LogInformation(
+                "一次性策略已执行并完结: {StrategyId} {Type} {Symbol}", strategy.Id, strategy.Type, strategy.Symbol);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "完结一次性策略失败，可能重复触发: {StrategyId}", strategy.Id);
         }
     }
 
@@ -445,6 +508,8 @@ public class MarketMonitor : IDisposable
         try
         {
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, MonitorToken);
+            _notificationService.ShowWarning(
+                $"⚠ 策略已自动暂停：{strategy.Symbol} {strategy.Type} — {reason}");
         }
         catch (Exception ex)
         {
@@ -466,6 +531,8 @@ public class MarketMonitor : IDisposable
             StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
             StrategyType.TrailingStop => true,
             StrategyType.GridTrading => IsGridBreakOut(strategy, currentPrice),
+            // DCA 评估只会以卖出方向触发出场（止盈/止损清仓），卖出即平仓语义
+            StrategyType.DCA => strategy.Side == OrderSide.Sell,
             _ => false
         };
     }
@@ -503,10 +570,11 @@ public class MarketMonitor : IDisposable
         if (!strategy.MaxExecutions.HasValue)
             return;
 
-        var updated = await _strategyService.GetStrategyAsync(strategy.Id);
+        // 透传 MonitorToken：停止监控后不再执行 DB 查询/状态写回
+        var updated = await _dataService.GetStrategyAsync(strategy.Id, MonitorToken);
         if (updated != null && updated.ExecutionCount >= updated.MaxExecutions!.Value)
         {
-            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed);
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
@@ -518,11 +586,34 @@ public class MarketMonitor : IDisposable
         _cts?.Cancel();
         _cts?.Dispose();
         _priceChannel.Writer.TryComplete();
-        foreach (var kvp in _strategyLocks)
-            kvp.Value.Dispose();
-        _strategyLocks.Clear();
-        _strategyFailureCooldowns.Clear();
-        _lifecycleLock.Dispose();
+
+        Task[] pendingTasks;
+        lock (_pendingTasksLock)
+            pendingTasks = _pendingStrategyTasks.ToArray();
+
+        // 锁资源改为在后台等待在途任务收尾后释放：Dispose 常从 UI 线程触发（页面卸载/退出），
+        // 在途任务可能正等待 HITL 确认框（最长 60s），同步等待会冻结 UI；
+        // 后台等待 3 秒后释放，防止任务随后调用 Release/WaitAsync 抛 ObjectDisposedException
+        _ = Task.Run(async () =>
+        {
+            if (pendingTasks.Length > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(pendingTasks).WaitAsync(TimeSpan.FromSeconds(3));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Dispose 等待在途策略任务超时或失败，部分状态可能未持久化");
+                }
+            }
+
+            foreach (var kvp in _strategyLocks)
+                kvp.Value.Dispose();
+            _strategyLocks.Clear();
+            _strategyFailureCooldowns.Clear();
+            _lifecycleLock.Dispose();
+        });
 
         TradeExecuted = null;
         StatusChanged = null;

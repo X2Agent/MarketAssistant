@@ -111,18 +111,12 @@ public class AnalysisOrchestrationService : IDisposable
         }
     }
 
-    /// <summary>
-    /// 加载历史报告
-    /// </summary>
     public async Task<MarketAnalysisReport?> LoadHistoryReportAsync(
         long reportId, CancellationToken cancellationToken = default)
     {
         return await _archiveService.LoadAsync(reportId, cancellationToken);
     }
 
-    /// <summary>
-    /// 获取历史报告摘要
-    /// </summary>
     public async Task<List<ReportSummary>> GetReportHistoryAsync(
         string assetCode, CancellationToken cancellationToken = default)
     {

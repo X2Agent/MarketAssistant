@@ -5,6 +5,7 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
 using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -32,6 +33,11 @@ public class SentimentToolsTest
         _zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN");
 
         var services = new ServiceCollection();
+
+        // 注册 A 股数据提供者（ZhiTuMarketClient 等，AShareSentimentTools 构造依赖）
+        services.AddAShareDataProviders();
+        // BinanceMarketDataService 重构后依赖 IMemoryCache
+        services.AddMemoryCache();
 
         services.AddLogging(builder =>
         {

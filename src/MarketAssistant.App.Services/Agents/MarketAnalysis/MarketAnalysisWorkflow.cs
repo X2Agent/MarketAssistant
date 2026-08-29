@@ -168,11 +168,13 @@ public class MarketAnalysisWorkflow
 
             // 同一次 Run 的分析师与 Coordinator 绑定同一个 Runtime Client。
             // P1-07：协调器附带只读产物读取工具，全文按需获取而非随消息注入。
+            // Run ID 通过闭包捕获真实值，不暴露给 LLM 填写（LLM 传入伪造/格式错误的
+            // runId 会解析失败），工具仅暴露 analystName 参数。
+            var currentRunId = runId;
             var getArtifactTool = AIFunctionFactory.Create(
-                ([Description("本次分析的 Run ID（32 位十六进制）")] string runId,
-                  [Description("分析师名称")] string analystName,
+                ([Description("分析师名称")] string analystName,
                   CancellationToken ct)
-                    => _artifactStore.GetAsync(Guid.ParseExact(runId, "N"), analystName, ct),
+                    => _artifactStore.GetAsync(currentRunId, analystName, ct),
                 name: "get_analyst_artifact",
                 description: "读取本次运行中某位分析师的完整分析产物全文。仅在需要某维度细节时调用，不要凭摘要编造内容。");
 
@@ -505,9 +507,6 @@ public class MarketAnalysisWorkflow
         return $"分析 {assetSymbol} 的所有分析师已完成，但综合报告生成环节异常，请重试。如果问题持续，请检查 AI 模型配置是否正确";
     }
 
-    /// <summary>
-    /// 获取启用的分析师列表
-    /// </summary>
     private List<Type> GetEnabledAnalysts()
     {
         var enabledAnalysts = new List<Type>();
@@ -636,12 +635,6 @@ public class MarketAnalysisWorkflow
     /// 判断是否为分析师 Executor（排除系统 Executor）。
     /// </summary>
     private static bool IsAnalystExecutor(string executorId) => !IsSystemExecutor(executorId);
-
-    /// <summary>
-    /// 判断是否为 Dispatcher Executor。
-    /// </summary>
-    private static bool IsDispatcherExecutor(string executorId)
-        => GetExecutorNamePrefix(executorId) == "AnalysisDispatcher";
 
     /// <summary>
     /// 从工作流 ExecutorId 中提取分析师显示名称。

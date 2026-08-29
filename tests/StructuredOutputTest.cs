@@ -3,6 +3,7 @@ using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
@@ -188,11 +189,11 @@ public sealed class StructuredOutputTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void AddBusinessServices_ShouldRegisterAllAdaptiveCardParsers()
+    public void AddApplicationServices_ShouldRegisterAllAdaptiveCardParsers()
     {
         var services = new ServiceCollection();
 
-        services.AddBusinessServices();
+        services.AddApplicationServices();
 
         var parserRegistrations = services
             .Where(descriptor => descriptor.ServiceType == typeof(IJsonToAdaptiveCardParser))
@@ -206,6 +207,9 @@ public sealed class StructuredOutputTest
         Assert.IsTrue(parserRegistrations.Contains(typeof(SentimentCardParser)));
         Assert.IsTrue(parserRegistrations.Contains(typeof(NewsCardParser)));
         Assert.IsTrue(parserRegistrations.Contains(typeof(TechnicalCardParser)));
+
+        // 转换器消费整条解析器责任链，必须与解析器同容器注册
+        Assert.IsTrue(services.Any(descriptor => descriptor.ServiceType == typeof(AdaptiveCardConverter)));
     }
 
     [TestMethod]

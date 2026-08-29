@@ -49,6 +49,9 @@ public class ScoredResult
     public double LengthScore { get; init; }
     public double TotalScore { get; set; }
 
+    /// <summary>候选文本的词元集合缓存（分词一次、评分与多样性优化复用，避免每条候选重复分词）。</summary>
+    public HashSet<string>? TokenSet { get; set; }
+
     public ScoredResult(RagSearchCandidate item)
     {
         Item = item;
@@ -62,6 +65,7 @@ public class ScoredResult
 public class RerankerService : IRerankerService
 {
     private readonly ILogger<RerankerService> _logger;
+    // 权重与常量当前为静态默认值（所有实例共享）；如需运行时调参，可后续改为构造注入 ScoringWeights/ScoringConstants
     private static readonly ScoringWeights Weights = new();
     private static readonly ScoringConstants Constants = new();
 
@@ -132,6 +136,7 @@ public class RerankerService : IRerankerService
     private ScoredResult CalculateItemScore(RagSearchCandidate item, IReadOnlyList<TokenInfo> queryTokens, string query, double normalizedVectorSimilarity)
     {
         var text = GetFullText(item);
+        // 分词一次：相关性评分与后续多样性优化复用同一份词元
         var itemTokens = TokenizeWithBonus(text);
 
         var scores = new
@@ -149,6 +154,7 @@ public class RerankerService : IRerankerService
 
         return new ScoredResult(item)
         {
+            TokenSet = itemTokens.Select(t => t.Token).ToHashSet(StringComparer.OrdinalIgnoreCase),
             NormalizedVectorSimilarity = scores.Vector,
             RelevanceScore = scores.Relevance,
             FreshnessScore = scores.Freshness,
@@ -212,22 +218,18 @@ public class RerankerService : IRerankerService
         return contentScore > 0 ? contentScore : 0.5;
     }
 
-    /// <summary>
-    /// 计算长度评分
-    /// </summary>
     private static double CalculateLengthScore(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return 0.0;
 
         var length = text.Length;
-        return length switch
-        {
-            >= 200 and <= 1000 => 1.0,
-            >= 100 and <= 1500 => 0.8,
-            >= 50 and <= 2000 => 0.6,
-            < 50 => 0.3,
-            _ => Math.Max(0.2, 1.0 - (length - 2000) / 10000.0)
-        };
+        var min = Constants.IdealLengthMin;
+        var max = Constants.IdealLengthMax;
+        if (length >= min && length <= max) return 1.0;
+        if (length >= min / 2 && length <= max * 1.5) return 0.8;
+        if (length >= min / 4 && length <= max * 2) return 0.6;
+        if (length < min / 4) return 0.3;
+        return Math.Max(0.2, 1.0 - (length - max * 2) / 10000.0);
     }
 
     #endregion
@@ -241,25 +243,15 @@ public class RerankerService : IRerankerService
     {
         if (results.Count <= 1) return;
 
-        var tokenSetCache = new Dictionary<ScoredResult, HashSet<string>>();
-        foreach (var result in results)
-        {
-            var text = GetFullText(result.Item);
-            var tokens = TokenizeWithBonus(text)
-                .Select(t => t.Token)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            tokenSetCache[result] = tokens;
-        }
-
         for (int i = 0; i < results.Count; i++)
         {
             var current = results[i];
             var diversityScore = 1.0;
-            var tokensI = tokenSetCache[current];
+            var tokensI = current.TokenSet ?? [];
 
             for (int j = 0; j < i; j++)
             {
-                var tokensJ = tokenSetCache[results[j]];
+                var tokensJ = results[j].TokenSet ?? [];
                 var similarity = CalculateJaccardSimilarity(tokensI, tokensJ);
                 if (similarity > Constants.HighSimilarityThreshold)
                 {
@@ -271,9 +263,6 @@ public class RerankerService : IRerankerService
         }
     }
 
-    /// <summary>
-    /// 计算Jaccard相似度
-    /// </summary>
     private static double CalculateJaccardSimilarity(HashSet<string> a, HashSet<string> b)
     {
         if (a.Count == 0 || b.Count == 0) return 0.0;

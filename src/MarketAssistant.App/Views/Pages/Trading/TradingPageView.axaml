@@ -108,7 +108,7 @@
                             VerticalAlignment="Center"
                             ToolTip.Tip="{Binding TradingModeDescription}"
                             IsVisible="{Binding IsTestnetTradingMode}">
-                        <TextBlock Text="测试网" FontSize="{StaticResource SmallFontSize}" Foreground="White"/>
+                        <TextBlock Text="测试网" FontSize="{StaticResource SmallFontSize}" Foreground="{StaticResource TextOnEmphasisBrush}"/>
                     </Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">

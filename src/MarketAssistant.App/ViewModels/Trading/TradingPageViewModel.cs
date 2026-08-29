@@ -70,7 +70,8 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
 
     private void OnTradingModeChanged(CryptoTradingMode mode)
     {
-        UpdateTradingModeState(mode);
+        // 防御：ModeChanged 若由后台线程触发（如监控停止路径），绑定属性更新必须切回 UI 线程
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdateTradingModeState(mode));
     }
 
     private void UpdateTradingModeState(CryptoTradingMode mode)
@@ -83,6 +84,8 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _tradingEnvironmentService.ModeChanged -= OnTradingModeChanged;
+        // StrategyConfig 订阅了单例 MarketMonitor.StatusChanged，需一并释放避免泄漏
+        StrategyConfig.Dispose();
         TradeMonitor.Dispose();
         GC.SuppressFinalize(this);
     }

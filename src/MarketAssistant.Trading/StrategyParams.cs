@@ -11,6 +11,11 @@ public class GridTradingParams
     public decimal UpperPrice { get; set; }
 
     /// <summary>
+    /// 风险档案（Conservative/Balanced/Aggressive），供引擎在参数缺失时兜底
+    /// </summary>
+    public string RiskProfile { get; set; } = "Balanced";
+
+    /// <summary>
     /// 网格下界价格
     /// </summary>
     public decimal LowerPrice { get; set; }
@@ -40,14 +45,8 @@ public class GridTradingParams
     /// </summary>
     public decimal? TakeProfitPrice { get; set; }
 
-    /// <summary>
-    /// 计算网格间距
-    /// </summary>
     public decimal GridSpacing => GridCount > 1 ? (UpperPrice - LowerPrice) / GridCount : 0;
 
-    /// <summary>
-    /// 获取指定索引处的网格价格
-    /// </summary>
     public decimal GetGridPrice(int index) => LowerPrice + GridSpacing * index;
 }
 
@@ -56,6 +55,11 @@ public class GridTradingParams
 /// </summary>
 public class DCAParams
 {
+    /// <summary>
+    /// 风险档案（Conservative/Balanced/Aggressive），供引擎在参数缺失时兜底
+    /// </summary>
+    public string RiskProfile { get; set; } = "Balanced";
+
     /// <summary>
     /// 定投间隔（秒）
     /// </summary>
@@ -96,4 +100,19 @@ public class DCAParams
     /// 已加倍次数。用于上限判断，持久化在 CustomParams 中。
     /// </summary>
     public int DoubleBuyCount { get; set; }
+
+    /// <summary>
+    /// 定投止盈线（%）：持仓均价上涨达到此百分比时全部卖出获利了结。0 表示不启用。
+    /// </summary>
+    public decimal TakeProfitPercent { get; set; }
+
+    /// <summary>
+    /// 定投止损线（%）：持仓均价下跌达到此百分比时触发止损动作。0 表示不启用。
+    /// </summary>
+    public decimal StopLossPercent { get; set; }
+
+    /// <summary>
+    /// 止损动作：true = 触发止损线后清仓卖出；false = 仅暂停定投（保留持仓，保守默认）。
+    /// </summary>
+    public bool StopLossSellOut { get; set; }
 }

@@ -7,5 +7,7 @@ namespace MarketAssistant.Rag.Interfaces;
 public interface IDocumentBlockReader
 {
     bool CanRead(string filePath);
-    Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath);
+
+    /// <param name="cancellationToken">取消令牌：文档解析（含 PDF/DOCX 解码）阶段可取消</param>
+    Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default);
 }

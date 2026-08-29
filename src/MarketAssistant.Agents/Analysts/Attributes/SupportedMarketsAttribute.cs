@@ -9,7 +9,6 @@ namespace MarketAssistant.Agents.Analysts.Attributes;
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class SupportedMarketsAttribute : Attribute
 {
-    /// <summary>支持的市场列表。</summary>
     public MarketType[] Markets { get; }
 
     /// <summary>

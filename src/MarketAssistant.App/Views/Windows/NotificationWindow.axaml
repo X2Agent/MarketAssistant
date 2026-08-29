@@ -28,14 +28,14 @@
             <Border Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
-                    CornerRadius="{StaticResource LargeCornerRadius}"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
                     Background="{StaticResource NotificationIconSuccessBrush}"
                     VerticalAlignment="Center"
                     Margin="{StaticResource DefaultMargin}">
                 <TextBlock Text="✓"
                            FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"
-                           Foreground="White"
+                           Foreground="{StaticResource TextOnEmphasisBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"/>
             </Border>

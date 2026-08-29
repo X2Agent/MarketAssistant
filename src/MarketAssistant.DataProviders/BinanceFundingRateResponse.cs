@@ -11,7 +11,7 @@ public class BinanceFundingRateResponse
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("fundingRate")]
-    public string FundingRate { get; set; } = string.Empty;
+    public decimal FundingRate { get; set; }
 
     [JsonPropertyName("fundingTime")]
     public long FundingTime { get; set; }

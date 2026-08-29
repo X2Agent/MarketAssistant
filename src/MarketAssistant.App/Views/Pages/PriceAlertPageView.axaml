@@ -83,7 +83,7 @@
                             <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"
                                       Width="{StaticResource DefaultIconSize}"
                                       Height="{StaticResource DefaultIconSize}"
-                                      Foreground="White"
+                                      Foreground="{StaticResource TextOnEmphasisBrush}"
                                       HorizontalAlignment="Center"
                                       VerticalAlignment="Center"/>
                         </Border>
@@ -290,7 +290,7 @@
                                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                                             Padding="{StaticResource TagPadding}"
                                                             IsVisible="{Binding IsOneTime}">
-                                                        <TextBlock Text="一次性" FontSize="{StaticResource TinyFontSize}" Foreground="White"/>
+                                                        <TextBlock Text="一次性" FontSize="{StaticResource TinyFontSize}" Foreground="{StaticResource TextOnEmphasisBrush}"/>
                                                     </Border>
                                                     <Border Background="{DynamicResource SurfaceVariantBrush}"
                                                             CornerRadius="{StaticResource TinyCornerRadius}"
@@ -302,7 +302,7 @@
                                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                                             Padding="{StaticResource TagPadding}"
                                                             IsVisible="{Binding Triggered}">
-                                                        <TextBlock Text="已触发" FontSize="{StaticResource TinyFontSize}" Foreground="White"/>
+                                                        <TextBlock Text="已触发" FontSize="{StaticResource TinyFontSize}" Foreground="{StaticResource TextOnEmphasisBrush}"/>
                                                     </Border>
                                                 </StackPanel>
                                             </StackPanel>

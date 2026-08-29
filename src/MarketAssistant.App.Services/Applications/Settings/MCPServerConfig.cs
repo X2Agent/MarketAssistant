@@ -67,6 +67,17 @@ public class MCPServerConfig
     public bool AllowAllTools { get; set; } = false;
 
     /// <summary>
+    /// 工具白名单机制的当前配置版本号。
+    /// </summary>
+    public const int CurrentToolsSchemaVersion = 1;
+
+    /// <summary>
+    /// 配置结构版本。默认 0 表示旧版本保存的配置（JSON 无此字段或未经新版本 UI 确认），
+    /// 由 UI 提示用户重新勾选工具白名单后升级为 <see cref="CurrentToolsSchemaVersion"/> 并落盘。
+    /// </summary>
+    public int ToolsSchemaVersion { get; set; }
+
+    /// <summary>
     /// 获取传输选项字典
     /// </summary>
     /// <returns>传输选项字典</returns>

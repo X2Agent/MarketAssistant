@@ -3,6 +3,7 @@ using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
+using System.Security.Cryptography;
 
 namespace MarketAssistant.Rag.Services;
 
@@ -92,7 +93,7 @@ public class RagIngestionService : IRagIngestionService
         IDocumentBlockReader blockReader,
         CancellationToken cancellationToken)
     {
-        var blocks = (await blockReader.ReadBlocksAsync(filePath)).OrderBy(b => b.Order).ToList();
+        var blocks = (await blockReader.ReadBlocksAsync(filePath, cancellationToken)).OrderBy(b => b.Order).ToList();
         if (blocks.Count == 0)
         {
             _logger.LogWarning("Document contains no blocks: {File}", filePath);
@@ -123,7 +124,7 @@ public class RagIngestionService : IRagIngestionService
                 // 处理图片块的去重和嵌入生成
                 if (block is ImageBlock imageBlock && imageBlock.ImageBytes.Length > 0)
                 {
-                    imageMetadata = await ProcessImageBlockAsync(imageBlock, seenImageHashes);
+                    imageMetadata = await ProcessImageBlockAsync(imageBlock, seenImageHashes, cancellationToken);
                     if (imageMetadata == null) continue; // 跳过重复或处理失败的图片
                 }
 
@@ -213,15 +214,22 @@ public class RagIngestionService : IRagIngestionService
                         filePath, staleKeys.Count, newKeys.Count);
                 }
 
+                // 文档内容哈希：以原始字节流计算 SHA-256，避免整文件读入内存
+                string contentHash;
+                using (var fileStream = File.OpenRead(filePath))
+                {
+                    contentHash = Convert.ToHexString(SHA256.HashData(fileStream));
+                }
+
                 await _documentCatalog.ReplaceAsync(new RagDocumentCatalogEntry(
                     collectionName,
                     documentId,
                     filePath,
-                    RagDocumentId.Compute(File.ReadAllText(filePath)),
-                    newKeys,
-                    embeddingModelId ?? "unknown",
-                    embeddingDimension ?? RagConstants.EmbeddingDimension,
-                    DateTimeOffset.UtcNow), cancellationToken);
+                    RagDocumentId.Compute(contentHash),
+                            newKeys,
+                            embeddingModelId ?? "unknown",
+                            embeddingDimension ?? RagConstants.EmbeddingDimension,
+                            DateTimeOffset.UtcNow), cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -242,8 +250,9 @@ public class RagIngestionService : IRagIngestionService
     /// </summary>
     /// <param name="imageBlock">图片块</param>
     /// <param name="seenImageHashes">当前文档已见的图片哈希集合</param>
+    /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>图片元数据，如果跳过则返回null</returns>
-    private async Task<ImageMetadata?> ProcessImageBlockAsync(ImageBlock imageBlock, HashSet<string> seenImageHashes)
+    private async Task<ImageMetadata?> ProcessImageBlockAsync(ImageBlock imageBlock, HashSet<string> seenImageHashes, CancellationToken cancellationToken)
     {
         var imageHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(imageBlock.ImageBytes));
 
@@ -256,13 +265,13 @@ public class RagIngestionService : IRagIngestionService
         try
         {
             // 生成图片说明（Caption 成功即可被文本检索命中）
-            var caption = await _imageEmbeddingService.CaptionAsync(imageBlock.ImageBytes);
+            var caption = await _imageEmbeddingService.CaptionAsync(imageBlock.ImageBytes, cancellationToken);
 
             // 图像向量独立生成：CLIP 失败不降级为哈希向量，置 null 并依赖 Caption 召回
             Embedding<float>? imageEmbedding = null;
             try
             {
-                imageEmbedding = await _imageEmbeddingService.GenerateAsync(imageBlock.ImageBytes);
+                imageEmbedding = await _imageEmbeddingService.GenerateAsync(imageBlock.ImageBytes, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -277,6 +286,11 @@ public class RagIngestionService : IRagIngestionService
             var imagePath = imageBlock.ImagePath ?? $"image_{imageHash}.png";
 
             return new ImageMetadata(caption, imagePath, imageEmbedding);
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消必须向上传播，不得当作图片处理失败吞掉
+            throw;
         }
         catch (Exception ex)
         {

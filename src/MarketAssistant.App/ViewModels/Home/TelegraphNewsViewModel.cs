@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Services.Market;
@@ -10,12 +11,9 @@ using System.Diagnostics;
 
 namespace MarketAssistant.ViewModels.Home;
 
-/// <summary>
-/// 新闻快讯ViewModel
-/// </summary>
 public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private INewsUpdateService _newsUpdateService;
     private bool _disposed;
@@ -23,38 +21,28 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _telegraphRefreshCountdown = "";
 
-    /// <summary>
-    /// 新闻快讯集合
-    /// </summary>
     public ObservableCollection<Telegram> Telegraphs { get; } = new();
 
-    /// <summary>
-    /// 打开新闻命令
-    /// </summary>
     public IAsyncRelayCommand<Telegram> OpenNewsCommand { get; }
 
     public TelegraphNewsViewModel(
-        IServiceProvider serviceProvider,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<TelegraphNewsViewModel> logger)
         : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
 
-        // 根据当前市场类型获取对应的 NewsUpdateService
-        _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(_marketContext.CurrentMarket);
+        _newsUpdateService = _marketServiceRegistry.GetNewsUpdateService(_marketContext.CurrentMarket);
 
         OpenNewsCommand = new AsyncRelayCommand<Telegram>(OnOpenNewsAsync);
 
-        // 订阅新闻更新服务事件
         _newsUpdateService.NewsUpdated += OnNewsUpdated;
         _newsUpdateService.CountdownUpdated += OnCountdownUpdated;
 
-        // 订阅市场切换事件
         SubscribeToMarketChanges(_marketContext);
 
-        // 自动启动新闻更新
         _newsUpdateService.StartUpdates();
     }
 
@@ -65,32 +53,29 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            // 停止旧服务并取消事件订阅
+            // lambda 是排入 Dispatcher 队列后延迟执行的，期间本 VM 可能已被 Dispose；
+            // 不检查 _disposed 会给已释放的 VM 重新订阅单例事件并重启轮询，造成泄漏
+            if (_disposed)
+                return;
+
             _newsUpdateService.StopUpdates();
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;
             _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
 
-            // 获取新市场的服务
-            _newsUpdateService = _serviceProvider.GetRequiredKeyedService<INewsUpdateService>(newMarket);
+            _newsUpdateService = _marketServiceRegistry.GetNewsUpdateService(newMarket);
 
-            // 订阅新服务事件
             _newsUpdateService.NewsUpdated += OnNewsUpdated;
             _newsUpdateService.CountdownUpdated += OnCountdownUpdated;
 
-            // 清空旧新闻
             Telegraphs.Clear();
             TelegraphRefreshCountdown = "";
 
-            // 始终启动新闻更新
             _newsUpdateService.StartUpdates();
 
             Logger?.LogInformation("已切换到 {Market} 市场新闻源", newMarket);
         });
     }
 
-    /// <summary>
-    /// 处理新闻更新事件
-    /// </summary>
     private void OnNewsUpdated(object? sender, List<Telegram> news)
     {
         // Avalonia: 使用Dispatcher在UI线程执行
@@ -104,9 +89,6 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         });
     }
 
-    /// <summary>
-    /// 处理倒计时更新事件
-    /// </summary>
     private void OnCountdownUpdated(object? sender, string countdown)
     {
         // Avalonia: 使用Dispatcher在UI线程执行
@@ -116,9 +98,6 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
         });
     }
 
-    /// <summary>
-    /// 打开新闻
-    /// </summary>
     private async Task OnOpenNewsAsync(Telegram? telegram)
     {
         if (telegram == null || string.IsNullOrEmpty(telegram.Url))
@@ -126,7 +105,6 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
 
         await SafeExecuteAsync(async () =>
         {
-            // 使用系统默认浏览器打开URL
             var psi = new ProcessStartInfo
             {
                 FileName = telegram.Url,
@@ -138,24 +116,21 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// 释放资源
+    /// 释放资源（幂等：市场切换回调与 Dispose 存在交错可能，退订可安全重复执行）
     /// </summary>
     public void Dispose()
     {
         if (!_disposed)
         {
-            // 取消市场切换事件订阅
-            UnsubscribeFromMarketChanges(_marketContext);
-
-            // 取消新闻服务事件订阅
-            _newsUpdateService.NewsUpdated -= OnNewsUpdated;
-            _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
-
-            // 停止新闻更新服务
-            _newsUpdateService.StopUpdates();
-
             _disposed = true;
         }
+
+        UnsubscribeFromMarketChanges(_marketContext);
+
+        _newsUpdateService.NewsUpdated -= OnNewsUpdated;
+        _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
+
+        _newsUpdateService.StopUpdates();
 
         GC.SuppressFinalize(this);
     }

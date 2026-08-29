@@ -27,7 +27,7 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBox:focus">
-        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
     </Style>
     <Style Selector="TextBox:disabled">
         <Setter Property="Opacity" Value="0.5"/>

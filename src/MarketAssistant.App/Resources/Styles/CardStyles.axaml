@@ -41,10 +41,10 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
-                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
-                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
@@ -56,7 +56,7 @@
         <Setter Property="RenderTransform" Value="{StaticResource HoverLiftTransform}"/>
     </Style>
     <Style Selector="Border.strategy-card:focus, Border.stock-card:focus, Border.hot-stock-card:focus, Border.recent-stock-card:focus">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
         <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
         <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
     </Style>
@@ -73,9 +73,9 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.2"/>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
-                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
@@ -121,7 +121,7 @@
 
     <!-- 热门股票卡片 -->
     <Style Selector="Border.hot-stock-card">
-        <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
@@ -147,7 +147,7 @@
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
     <Style Selector="Border.news-card:focus">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
         <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
@@ -164,7 +164,7 @@
         <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>

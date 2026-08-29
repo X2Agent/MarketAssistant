@@ -38,12 +38,15 @@ public sealed class TradingDataServiceMigrationTest
         await TradingDataService.MigrateDatabaseSchemaAsync(connection);
 
         await AssertColumnExistsAsync(connection, "strategies", "environment");
-        await AssertColumnExistsAsync(connection, "strategies", "native_order_id");
         await AssertColumnExistsAsync(connection, "trade_records", "environment");
         await AssertColumnExistsAsync(connection, "positions", "environment");
         await AssertColumnExistsAsync(connection, "daily_stats", "environment");
         await AssertColumnExistsAsync(connection, "account_snapshots", "environment");
         await AssertColumnExistsAsync(connection, "risk_config", "environment");
+
+        // 新增的持久化列：下单类型与滑点容忍度（历史库通过 EnsureColumnAsync 补齐）
+        await AssertColumnExistsAsync(connection, "strategies", "order_type");
+        await AssertColumnExistsAsync(connection, "strategies", "slippage_tolerance");
 
         await AssertRowValueAsync(connection, "SELECT environment FROM strategies WHERE id = 'strategy-1'", LiveSpotEnvironment);
         await AssertRowValueAsync(connection, "SELECT environment FROM trade_records WHERE id = 'record-1'", LiveSpotEnvironment);

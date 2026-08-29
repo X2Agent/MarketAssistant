@@ -1,9 +1,9 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
@@ -24,9 +24,6 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
         _binanceService = binanceService;
     }
 
-    /// <summary>
-    /// 获取资金费率历史数据
-    /// </summary>
     public async Task<FundingRateHistory> GetFundingRateAsync(string symbol, CancellationToken cancellationToken = default)
     {
         try
@@ -54,7 +51,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
                 .OrderByDescending(h => h.FundingTime)
                 .Select(h => new FundingRatePoint
                 {
-                    Rate = decimal.Parse(h.FundingRate) * 100, // 转换为百分比
+                    Rate = h.FundingRate * 100, // 转换为百分比
                     FundingTime = h.FundingTime
                 })
                 .ToList();
@@ -65,7 +62,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             }
 
             // 4. 计算统计数据
-            var currentRate = decimal.Parse(premiumResponse.LastFundingRate, CultureInfo.InvariantCulture) * 100;
+            var currentRate = premiumResponse.LastFundingRate * 100;
             var currentTime = historyPoints[0].FundingTime;
             var averageRate = historyPoints.Average(p => p.Rate);
 
@@ -86,46 +83,37 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
         }
     }
 
-    /// <summary>
-    /// 获取全局账户多空比历史数据
-    /// </summary>
     public async Task<LongShortRatioHistory> GetGlobalLongShortRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default)
     {
         return await GetLongShortRatioHistoryAsync(
             symbol,
             period,
             limit,
-            "globalLongShortAccountRatio",
+            LongShortRatioEndpoint.GlobalLongShortAccountRatio,
             "全局账户多空比",
             cancellationToken
         );
     }
 
-    /// <summary>
-    /// 获取顶级交易员账户多空比历史数据
-    /// </summary>
     public async Task<LongShortRatioHistory> GetTopTraderAccountRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default)
     {
         return await GetLongShortRatioHistoryAsync(
             symbol,
             period,
             limit,
-            "topLongShortAccountRatio",
+            LongShortRatioEndpoint.TopLongShortAccountRatio,
             "顶级交易员账户多空比",
             cancellationToken
         );
     }
 
-    /// <summary>
-    /// 获取顶级交易员持仓多空比历史数据
-    /// </summary>
     public async Task<LongShortRatioHistory> GetTopTraderPositionRatioAsync(string symbol, Period period = Period.FiveMinutes, int limit = 30, CancellationToken cancellationToken = default)
     {
         return await GetLongShortRatioHistoryAsync(
             symbol,
             period,
             limit,
-            "topLongShortPositionRatio",
+            LongShortRatioEndpoint.TopLongShortPositionRatio,
             "顶级交易员持仓多空比",
             cancellationToken
         );
@@ -138,7 +126,7 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
         string symbol,
         Period period,
         int limit,
-        string endpoint,
+        LongShortRatioEndpoint endpoint,
         string dataType,
         CancellationToken cancellationToken = default)
     {
@@ -164,9 +152,10 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             var historyPoints = sortedData
                 .Select(h => new LongShortRatioPoint
                 {
-                    LongRatio = decimal.Parse(h.LongAccount, CultureInfo.InvariantCulture),
-                    ShortRatio = decimal.Parse(h.ShortAccount, CultureInfo.InvariantCulture),
-                    Ratio = decimal.Parse(h.LongShortRatio, CultureInfo.InvariantCulture),
+                    // 币安返回 0-1 小数，模型契约为百分比（%），需 ×100（与资金费率处理一致）
+                    LongRatio = h.LongAccount * 100,
+                    ShortRatio = h.ShortAccount * 100,
+                    Ratio = h.LongShortRatio,
                     Timestamp = h.Timestamp
                 })
                 .ToList();
@@ -197,9 +186,6 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
         }
     }
 
-    /// <summary>
-    /// 获取合约持仓量
-    /// </summary>
     public async Task<OpenInterest> GetOpenInterestAsync(string symbol, Period period = Period.OneHour, CancellationToken cancellationToken = default)
     {
         try
@@ -224,8 +210,8 @@ public sealed class CryptoSentimentTools : ICryptoSentimentTools
             var historyPoints = sortedData
                 .Select(h => new OpenInterestPoint
                 {
-                    SumOpenInterest = decimal.Parse(h.SumOpenInterest, CultureInfo.InvariantCulture),
-                    SumOpenInterestValue = decimal.Parse(h.SumOpenInterestValue, CultureInfo.InvariantCulture),
+                    SumOpenInterest = h.SumOpenInterest,
+                    SumOpenInterestValue = h.SumOpenInterestValue,
                     Timestamp = h.Timestamp
                 })
                 .ToList();

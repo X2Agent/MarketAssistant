@@ -8,9 +8,6 @@ namespace MarketAssistant.Infrastructure.Core;
 /// </summary>
 public static class ErrorMessageMapper
 {
-    /// <summary>
-    /// 获取用户友好的错误消息
-    /// </summary>
     public static string GetUserFriendlyMessage(Exception exception)
     {
         return exception switch
@@ -56,8 +53,8 @@ public static class ErrorMessageMapper
             JsonException => "数据解析失败，请检查数据格式",
 
             // 系统资源相关异常
+            // 注意：StackOverflowException 在 .NET 上直接终止进程、不可捕获，此处不做映射
             OutOfMemoryException => "内存不足，请关闭其他应用后重试",
-            StackOverflowException => "程序错误，请重启应用",
 
             // 数据库相关异常：通过类型名匹配，避免 Core 直接依赖 SQLite 包
             Exception ex when ex.GetType().Name.Contains("Sqlite", StringComparison.Ordinal)
@@ -70,9 +67,6 @@ public static class ErrorMessageMapper
         };
     }
 
-    /// <summary>
-    /// 获取带上下文的用户友好错误消息
-    /// </summary>
     public static string GetUserFriendlyMessageWithContext(Exception exception, string operationName)
     {
         var baseMessage = GetUserFriendlyMessage(exception);

@@ -1,14 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <RootNamespace>MarketAssistant</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>$(NoWarn);MAAI001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+    <!-- ITokenCounter：Token 计数统一入口（分块 token 限制） -->
+    <ProjectReference Include="..\MarketAssistant.Infrastructure\MarketAssistant.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

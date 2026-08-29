@@ -26,7 +26,6 @@ using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
-using MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
 using MarketAssistant.Infrastructure.Providers;
@@ -297,20 +296,12 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
-        // 延迟工厂：仅在向量化等真实场景解析，避免浏览设置页时构造嵌入/向量存储链路
-        services.AddSingleton<Func<IEmbeddingFactory>>(sp => sp.GetRequiredService<IEmbeddingFactory>);
+        services.AddSingleton<Infrastructure.Providers.IRagInfrastructureProvider, Infrastructure.Providers.RagInfrastructureProvider>();
         services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
+        services.AddSingleton<IImageCaptionClientFactory, ImageCaptionClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
-
-        // AdaptiveCard Parsers（责任链）
-        services.AddSingleton<IJsonToAdaptiveCardParser, CoordinatorCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, FinancialCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, FundamentalCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, SentimentCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, NewsCardParser>();
-        services.AddSingleton<IJsonToAdaptiveCardParser, TechnicalCardParser>();
 
         // MAF 中间件与会话级 Context Provider 工厂
         services.AddSingleton<TokenTrackingMiddleware>();
@@ -353,8 +344,6 @@ public static class BusinessServiceCollectionExtensions
             "rag-catalog.sqlite");
         services.AddSingleton<IRagDocumentCatalog>(_ => new SqliteRagDocumentCatalog(catalogPath));
 
-        services.AddSingleton<Func<VectorStore>>(sp => sp.GetRequiredService<VectorStore>);
-
         return services;
     }
 
@@ -386,8 +375,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AnalysisReportCache>();
         services.AddSingleton<TradingDataService>();
         services.AddSingleton<TradingEnvironmentService>();
-        // 打破 TradingEnvironmentService → MarketMonitor → BinanceUserDataStreamService → TradingEnvironmentService 的循环依赖
-        services.AddSingleton<Func<MarketMonitor>>(sp => () => sp.GetRequiredService<MarketMonitor>());
+        services.AddSingleton<IMarketMonitorProvider, MarketMonitorProvider>();
         // 交易所客户端由工厂按交易模式构建，组合根不感知具体交易所实现（P1-5）
         services.AddSingleton<IExchangeClientFactory, BinanceExchangeClientFactory>();
         services.AddSingleton<RoutingExchangeClient>(sp =>
@@ -418,9 +406,11 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddWorkflowServices(this IServiceCollection services)
     {
-        // 投资选择工作流
-        services.AddSingleton<ScreenInvestmentTargetsExecutor>();
-        services.AddSingleton<AnalyzeAssetsExecutor>();
+        // 投资选择工作流；Executor 为 Transient，由工作流在每次 Run 内重新解析，
+        // 避免 Singleton Executor 在并发分析间共享可变状态和模型引用。
+        services.AddTransient<ScreenInvestmentTargetsExecutor>();
+        services.AddTransient<AnalyzeAssetsExecutor>();
+        services.AddSingleton<IInvestmentExecutorFactory, InvestmentExecutorFactory>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 
@@ -454,7 +444,15 @@ public static class BusinessServiceCollectionExtensions
     public static ILoggingBuilder ConfigureLogging(this ILoggingBuilder logging, IUserSettingService userSettingService)
     {
         var logPath = userSettingService.CurrentSetting.LogPath;
-        try { Directory.CreateDirectory(logPath); } catch { }
+        try
+        {
+            Directory.CreateDirectory(logPath);
+        }
+        catch (Exception ex)
+        {
+            // 此时 Serilog 尚未配置，只能走 Console；后续 WriteTo.File 也会因目录缺失失败，提前暴露原因
+            Console.Error.WriteLine($"创建日志目录失败: {logPath}\n{ex}");
+        }
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()

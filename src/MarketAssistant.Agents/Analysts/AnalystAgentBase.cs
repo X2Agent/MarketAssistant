@@ -21,10 +21,6 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
 3. **缺失数据处理**：如果工具未能提供所需数据，或者数据不完整，必须在分析结果中明确说明""缺少数据支持""或""数据不可用""，不得进行无依据的猜测或试图掩盖。
 4. **拒绝幻觉**：对于未通过工具验证的信息，保持怀疑态度，不要将其作为分析依据。";
 
-    /// <summary>
-    /// 初始化分析师代理基类
-    /// 子类通过构造函数传递所有配置参数
-    /// </summary>
     protected AnalystAgentBase(
         IChatClient chatClient,
         string instructions,
@@ -58,9 +54,6 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
     {
     }
 
-    /// <summary>
-    /// 创建内部的 ChatClientAgent
-    /// </summary>
     private static AIAgent CreateInnerAgent(
         IChatClient chatClient,
         string instructions,

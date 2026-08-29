@@ -52,18 +52,22 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
             _logger.LogInformation("[步骤2/3] 使用市场类型: {MarketType}, 筛选服务: {ServiceType}",
                 originalRequest.MarketType, screenerService.GetType().Name);
 
-            // 调用筛选服务
-            List<ScreenerAssetInfo> assets = await screenerService.ScreenAsync(input.Criteria);
+            // 透传取消令牌，用户中断时立即终止上游 HTTP 请求
+            List<ScreenerAssetInfo> assets = await screenerService.ScreenAsync(input.Criteria, cancellationToken);
 
             _logger.LogInformation("[步骤2/3] 筛选完成，获得 {Count} 个投资标的", assets.Count);
 
-            // 返回筛选结果
             return new AssetScreeningResult
             {
                 ScreenedAssets = assets,
                 Criteria = input.Criteria,
                 OriginalRequest = originalRequest
             };
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得包装成业务错误
+            throw;
         }
         catch (FriendlyException)
         {

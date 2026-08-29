@@ -88,6 +88,7 @@ public class PdfMarkdownConverter : IMarkdownConverter
         var allFontSizes = new List<double>();
         var headingCandidates = new List<HeadingCandidate>();
         var wordCount = 0;
+        double fontSum = 0;
 
         // 分析整个文档以确定字体大小分布和潜在标题
         for (int pageNumber = 1; pageNumber <= Math.Min(document.NumberOfPages, 5); pageNumber++) // 只分析前5页以提高性能
@@ -104,17 +105,19 @@ public class PdfMarkdownConverter : IMarkdownConverter
                     {
                         var fontSize = word.Letters.First().FontSize;
                         allFontSizes.Add(fontSize);
+                        fontSum += fontSize;
                         wordCount++;
                     }
                 }
 
-                // 收集潜在的标题候选
+                // 收集潜在的标题候选（当前平均值由增量累加得出，避免逐行重算 Average）
                 foreach (var line in lines)
                 {
                     var text = line.Text.Trim();
                     if (!string.IsNullOrEmpty(text) && text.Length <= 100 && !text.EndsWith('.'))
                     {
-                        var fontSizeRatio = line.FontSize / (allFontSizes.Any() ? allFontSizes.Average() : 12.0);
+                        var currentAvgFontSize = wordCount > 0 ? fontSum / wordCount : 12.0;
+                        var fontSizeRatio = line.FontSize / currentAvgFontSize;
                         if (fontSizeRatio >= 1.1 || line.IsBold ||
                             ChapterNumberRegex.IsMatch(text) ||
                             ChineseSectionRegex.IsMatch(text) ||
@@ -380,24 +383,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
     {
         var processedIndices = new HashSet<int>();
 
-        // 调试输出：显示检测到的表格
-        if (tables.Any())
-        {
-            Console.WriteLine($"检测到 {tables.Count} 个表格:");
-            foreach (var table in tables)
-            {
-                Console.WriteLine($"  表格 {tables.IndexOf(table) + 1}: 行 {table.StartIndex}-{table.EndIndex}, 共 {table.Rows.Count} 行");
-                foreach (var row in table.Rows)
-                {
-                    Console.WriteLine($"    行内容: {row.Text.Trim()}");
-                }
-            }
-        }
-        else
-        {
-            Console.WriteLine("未检测到任何表格");
-        }
-
         // 改进的处理逻辑：按顺序处理所有行，确保表格和文本都正确处理
         for (int i = 0; i < lines.Count; i++)
         {
@@ -412,7 +397,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
             var table = tables.FirstOrDefault(t => i == t.StartIndex);
             if (table != null)
             {
-                Console.WriteLine($"处理表格，索引范围: {table.StartIndex} - {table.EndIndex}, 实际表格行: {string.Join(",", table.ActualRowIndices)}");
                 ProcessTable(table, markdown);
 
                 // 只标记实际的表格行为已处理，避免错误排除正常文本
@@ -478,12 +462,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
     {
         if (table.Rows.Count == 0) return;
 
-        Console.WriteLine($"处理表格: {table.Rows.Count} 行");
-        foreach (var row in table.Rows)
-        {
-            Console.WriteLine($"  表格行: '{row.Text}'");
-        }
-
         markdown.AppendLine();
 
         // 重新分析表格结构 - 更智能的方法
@@ -491,7 +469,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
 
         if (tableData.Count == 0)
         {
-            Console.WriteLine("无法识别表格结构，作为普通文本处理");
             // 如果无法识别为表格，作为普通段落处理
             foreach (var row in table.Rows)
             {
@@ -516,7 +493,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
         }
 
         markdown.AppendLine();
-        Console.WriteLine($"表格处理完成，生成 {tableData.Count} 行");
     }
 
     private List<List<string>> AnalyzeAndRestructureTable(List<StructuredLine> rows)

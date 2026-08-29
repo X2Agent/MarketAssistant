@@ -27,6 +27,7 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
+    private Task? _receiveTask;
     private string? _listenKey;
     private Timer? _keepaliveTimer;
     private bool _running;
@@ -34,8 +35,6 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
     /// <summary>收到订单状态变更回报时触发。</summary>
     public event Action<ExecutionReport>? OrderUpdate;
 
-    /// <summary>收到账户余额变动时触发。</summary>
-    public event Action<AccountUpdate>? AccountUpdate;
 
     public BinanceUserDataStreamService(
         IHttpClientFactory httpClientFactory,
@@ -73,14 +72,27 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             if (string.IsNullOrEmpty(_listenKey))
                 return;
 
-            _cts = new CancellationTokenSource();
+            // CTS 以局部变量捕获进 Timer/接收循环，回调不再读可被并发置 null 的字段
+            var cts = new CancellationTokenSource();
+            _cts = cts;
             _running = true;
 
             _keepaliveTimer = new Timer(
-                _ => _ = KeepaliveAsync(apiKey, httpClientName, _cts.Token),
+                _ =>
+                {
+                    // Timer 回调与 StopAsync 并发：CTS 可能已释放（Token 属性会抛 ODE），全部容错
+                    try
+                    {
+                        _ = KeepaliveAsync(apiKey, httpClientName, cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "ListenKey 续期任务调度失败");
+                    }
+                },
                 null, KeepaliveInterval, KeepaliveInterval);
 
-            _ = ConnectAndReceiveAsync(_listenKey, _cts.Token);
+            _receiveTask = ConnectAndReceiveAsync(_listenKey, cts.Token);
             _logger.LogInformation("币安现货用户数据流已启动（模式={Mode}）", _environmentService.CurrentMode);
         }
         finally
@@ -108,25 +120,43 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             if (_cts != null)
             {
                 await _cts.CancelAsync();
-                _cts.Dispose();
                 _cts = null;
             }
 
-            if (_ws != null)
+            // 等待接收循环退出后再释放 CTS：循环可能在带令牌的 Task.Delay/ConnectAsync 上
+            // 注册，先 Dispose 会让其抛 ObjectDisposedException 逃逸为未观察异常
+            var receiveTask = _receiveTask;
+            _receiveTask = null;
+            if (receiveTask != null)
             {
-                if (_ws.State == WebSocketState.Open)
+                try
+                {
+                    await receiveTask;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "等待用户数据流接收循环退出时出现异常");
+                }
+            }
+
+            // 先快照到局部变量再判空：重连循环与 StopAsync 并发时，
+            // 若先判字段再快照，两行之间字段可能被对方置 null 导致 NRE
+            var ws = _ws;
+            _ws = null;
+            if (ws != null)
+            {
+                if (ws.State == WebSocketState.Open)
                 {
                     try
                     {
-                        await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "stop", CancellationToken.None);
+                        await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "stop", CancellationToken.None);
                     }
                     catch
                     {
                         // 忽略关闭异常
                     }
                 }
-                _ws.Dispose();
-                _ws = null;
+                ws.Dispose();
             }
 
             if (_listenKey != null && TryGetSpotContext(out var apiKey, out var httpClientName))
@@ -145,9 +175,19 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
     private void OnModeChanged(CryptoTradingMode newMode)
     {
-        // 模式切换在 UI 线程触发，异步重启避免阻塞
+        // 模式切换在 UI 线程触发，异步重启避免阻塞；fire-and-forget 需自带异常观察
         if (_running)
-            _ = RestartAsync();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await RestartAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "模式切换后重启用户数据流失败");
+                }
+            });
     }
 
     private async Task RestartAsync()
@@ -246,12 +286,14 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
 
         while (!ct.IsCancellationRequested)
         {
-            _ws = new ClientWebSocket();
+            // 使用局部变量持有连接，避免与 StopAsync 并发时对字段判空后字段被置 null 的竞争
+            var ws = new ClientWebSocket();
+            _ws = ws;
             try
             {
                 _logger.LogInformation("连接币安用户数据流 WebSocket");
-                await _ws.ConnectAsync(new Uri(url), ct);
-                await ReceiveLoopAsync(_ws, ct);
+                await ws.ConnectAsync(new Uri(url), ct);
+                await ReceiveLoopAsync(ws, ct);
             }
             catch (OperationCanceledException)
             {
@@ -267,8 +309,10 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             }
             finally
             {
-                _ws.Dispose();
-                _ws = null;
+                ws.Dispose();
+                // 仅当字段仍指向本次连接时才清空，避免误清 StopAsync 已快照或重连后新赋值的实例
+                if (ReferenceEquals(_ws, ws))
+                    _ws = null;
             }
 
             if (ct.IsCancellationRequested)
@@ -278,7 +322,7 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
             {
                 await Task.Delay(5000, ct);
             }
-            catch (OperationCanceledException)
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
             {
                 return;
             }
@@ -329,37 +373,6 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
                         OrderUpdate?.Invoke(report);
                     break;
 
-                case "outboundAccountPosition":
-                    var account = JsonSerializer.Deserialize<OutboundAccountPosition>(json);
-                    if (account != null)
-                    {
-                        var updateTime = DateTimeOffset.FromUnixTimeMilliseconds(account.LastAccountUpdate).UtcDateTime;
-                        foreach (var b in account.Balances)
-                        {
-                            AccountUpdate?.Invoke(new AccountUpdate
-                            {
-                                Asset = b.Asset,
-                                Free = b.Free,
-                                Locked = b.Locked,
-                                UpdateTime = updateTime
-                            });
-                        }
-                    }
-                    break;
-
-                case "balanceUpdate":
-                    var delta = JsonSerializer.Deserialize<BalanceUpdate>(json);
-                    if (delta != null)
-                    {
-                        AccountUpdate?.Invoke(new AccountUpdate
-                        {
-                            Asset = delta.Asset,
-                            Free = delta.Delta,
-                            Locked = 0,
-                            UpdateTime = DateTimeOffset.FromUnixTimeMilliseconds(delta.ClearTime).UtcDateTime
-                        });
-                    }
-                    break;
             }
         }
         catch (Exception ex)
@@ -383,7 +396,9 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
         _keepaliveTimer?.Dispose();
         _cts?.Cancel();
         _cts?.Dispose();
-        _ws?.Dispose();
+        var ws = _ws;
+        _ws = null;
+        ws?.Dispose();
         _gate.Dispose();
         GC.SuppressFinalize(this);
     }

@@ -2,9 +2,6 @@ using MarketAssistant.Agents.Tools.Models.AShare;
 
 namespace MarketAssistant.Agents.Tools.Abstractions;
 
-/// <summary>
-/// 股票市场基础数据工具接口
-/// </summary>
 public interface IShareBasicTools : IBasicDataTools
 {
     /// <summary>

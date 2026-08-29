@@ -9,8 +9,6 @@ namespace MarketAssistant.Infrastructure.Providers;
 /// </summary>
 public static class StructuredOutputValidator
 {
-    private static readonly NullabilityInfoContext NullabilityContext = new();
-
     public static IReadOnlyList<string> Validate(object? value)
     {
         if (value is null)
@@ -20,16 +18,29 @@ public static class StructuredOutputValidator
 
         var errors = new List<string>();
         var visited = new HashSet<object>(ReferenceEqualityComparer.Instance);
-        ValidateNode(value, "$", errors, visited);
+        // NullabilityInfoContext 非线程安全（内部有可变缓存），且本类可能被并发调用，
+        // 故每次 Validate 新建实例而非共享 static readonly
+        var nullabilityContext = new NullabilityInfoContext();
+        ValidateNode(value, "$", errors, visited, nullabilityContext, depth: 0);
         return errors;
     }
+
+    /// <summary>递归验证的最大嵌套深度，防止异常深度结构导致栈溢出。</summary>
+    private const int MaxDepth = 32;
 
     private static void ValidateNode(
         object value,
         string path,
         List<string> errors,
-        HashSet<object> visited)
+        HashSet<object> visited,
+        NullabilityInfoContext nullabilityContext,
+        int depth)
     {
+        if (depth > MaxDepth)
+        {
+            throw new InvalidOperationException("结构化输出嵌套过深");
+        }
+
         var type = value.GetType();
         if (IsTerminalType(type))
         {
@@ -57,7 +68,7 @@ public static class StructuredOutputValidator
                 }
                 else
                 {
-                    ValidateNode(item, $"{path}[{index}]", errors, visited);
+                    ValidateNode(item, $"{path}[{index}]", errors, visited, nullabilityContext, depth + 1);
                 }
 
                 index++;
@@ -91,7 +102,7 @@ public static class StructuredOutputValidator
             var propertyValue = property.GetValue(value);
             if (propertyValue is null)
             {
-                if (NullabilityContext.Create(property).ReadState == NullabilityState.NotNull)
+                if (nullabilityContext.Create(property).ReadState == NullabilityState.NotNull)
                 {
                     errors.Add($"{path}.{property.Name}: 值不能为空");
                 }
@@ -99,7 +110,7 @@ public static class StructuredOutputValidator
                 continue;
             }
 
-            ValidateNode(propertyValue, $"{path}.{property.Name}", errors, visited);
+            ValidateNode(propertyValue, $"{path}.{property.Name}", errors, visited, nullabilityContext, depth + 1);
         }
     }
 

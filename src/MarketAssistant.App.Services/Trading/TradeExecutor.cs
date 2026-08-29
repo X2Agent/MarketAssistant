@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Net.Sockets;
+using MarketAssistant.Services.Trading.Exchanges;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -15,6 +17,7 @@ public class TradeExecutor : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
 
     private readonly IExchangeClient _exchangeClient;
+    private readonly TradingEnvironmentService? _environmentService;
     private readonly RiskManager _riskManager;
     private readonly TradingDataService _dataService;
     private readonly ILogger<TradeExecutor> _logger;
@@ -31,12 +34,14 @@ public class TradeExecutor : IDisposable
         [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         RiskManager riskManager,
         TradingDataService dataService,
-        ILogger<TradeExecutor> logger)
+        ILogger<TradeExecutor> logger,
+        TradingEnvironmentService? environmentService = null)
     {
         _exchangeClient = exchangeClient;
         _riskManager = riskManager;
         _dataService = dataService;
         _logger = logger;
+        _environmentService = environmentService;
     }
 
     /// <summary>
@@ -95,6 +100,12 @@ public class TradeExecutor : IDisposable
         bool requireClose = false,
         CancellationToken ct = default)
     {
+        // 环境快照：一次下单的判断（IsFutures/持仓/杠杆/下单）必须全部落在同一个客户端上。
+        // RoutingExchangeClient 每次调用独立解析活跃客户端，若无快照，用户在风控/确认等待期间
+        // 切换模拟盘/实盘会让这笔订单落到错误环境（真金白银场景下不可接受）。
+        var exchangeClient = ResolveClientSnapshot();
+        var modeAtEntry = _environmentService?.CurrentMode;
+
         // 风控校验和人工确认在 symbol 锁外完成，防止 ConfirmationCallback 等待期间
         // 持有 SemaphoreSlim，导致同一标的后续所有交易永久阻塞。
         var riskCheck = await _riskManager.ValidateOrderAsync(instrumentSymbol, side, quantity, currentPrice, type, ct);
@@ -145,11 +156,26 @@ public class TradeExecutor : IDisposable
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // 快照一致性复检：等待风控/用户确认期间交易模式可能已被切换，
+            // 与入口快照不一致时拒绝本笔订单，绝不把它路由到另一个环境
+            if (modeAtEntry.HasValue && _environmentService!.CurrentMode != modeAtEntry.Value)
+            {
+                _logger.LogError(
+                    "交易模式在确认期间被切换（{EntryMode} → {CurrentMode}），拒绝下单: {Symbol} {Side}",
+                    modeAtEntry.Value, _environmentService.CurrentMode, instrumentSymbol, side);
+                return new TradeResult
+                {
+                    Success = false,
+                    ErrorMessage = $"交易模式在确认期间被切换（{modeAtEntry.Value} → {_environmentService.CurrentMode}），本笔订单已取消，请重新发起",
+                    FailureCategory = TradeFailureCategory.Rejected
+                };
+            }
+
             // 锁内复检：风控校验与人工确认在锁外完成（防确认等待期间锁死同一标的），
             // 等待期间同一标的的其他现货卖出可能已消耗本地 FIFO 持仓。两笔并发卖出若都基于
             // 同一份持仓快照通过风控，会依次成交造成超卖与负持仓，故获取锁后必须重验。
             // 合约模式以交易所持仓为准且 reduceOnly 由交易所强制，无需本地复检。
-            if (side == OrderSide.Sell && !_exchangeClient.IsFutures)
+            if (side == OrderSide.Sell && !exchangeClient.IsFutures)
             {
                 var openPositions = await _dataService.GetOpenPositionsAsync(instrumentSymbol, ct).ConfigureAwait(false);
                 var availableQuantity = openPositions
@@ -171,6 +197,7 @@ public class TradeExecutor : IDisposable
             }
 
             return await ExecuteApprovedOrderAsync(
+                exchangeClient, modeAtEntry,
                 instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
                 strategyId, aiReasoning, requireClose, ct).ConfigureAwait(false);
         }
@@ -180,7 +207,17 @@ public class TradeExecutor : IDisposable
         }
     }
 
+    /// <summary>
+    /// 解析当前活跃客户端快照：RoutingExchangeClient 按当前模式路由，
+    /// 其他实现（单元测试 Mock）原样返回。
+    /// </summary>
+    private static IExchangeClient ResolveClientSnapshot(IExchangeClient client)
+        => client is RoutingExchangeClient router ? router.GetActiveClientSnapshot() : client;
+
+    private IExchangeClient ResolveClientSnapshot() => ResolveClientSnapshot(_exchangeClient);
+
     private async Task<TradeResult> ExecuteApprovedOrderAsync(
+        IExchangeClient exchangeClient, CryptoTradingMode? modeAtEntry,
         string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice,
         string strategyId, string? aiReasoning, bool requireClose,
@@ -195,11 +232,26 @@ public class TradeExecutor : IDisposable
 
             // 合约模式：判断本次操作是开仓还是平仓
             // 平仓 = 持有多头时卖出 / 持有空头时买入，需要 reduceOnly=true
-            var isFutures = _exchangeClient.IsFutures;
+            var isFutures = exchangeClient.IsFutures;
             var reduceOnly = false;
             if (isFutures)
             {
-                reduceOnly = await IsClosePositionAsync(instrumentSymbol, side, ct);
+                // 持仓查询失败时无法判定开/平仓：默认按开仓会把平仓单变成反向开仓（10x 风险敞口），
+                // 必须中止本笔订单（fail-closed），按网络类失败走短冷却后重试
+                var closePosition = await IsClosePositionAsync(exchangeClient, instrumentSymbol, side, ct);
+                if (!closePosition.HasValue)
+                {
+                    _logger.LogError(
+                        "查询合约持仓失败，无法判定开/平仓，拒绝下单以免平仓变反向开仓: {Symbol} {Side}",
+                        instrumentSymbol, side);
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = $"无法确认 {instrumentSymbol} 合约持仓状态，本笔订单已取消，请稍后重试",
+                        FailureCategory = TradeFailureCategory.Network
+                    };
+                }
+                reduceOnly = closePosition.Value;
 
                 // 退出型触发要求本笔为平仓：交易所无对应方向持仓时拒绝，
                 // 防止止损/追踪止损/网格破网/AI 硬性边界在持仓已平后反向开出新仓。
@@ -221,7 +273,7 @@ public class TradeExecutor : IDisposable
                 {
                     try
                     {
-                        await _exchangeClient.SetLeverageAsync(instrumentSymbol, DefaultFuturesLeverage, ct);
+                        await exchangeClient.SetLeverageAsync(instrumentSymbol, DefaultFuturesLeverage, ct);
                     }
                     catch (Exception ex)
                     {
@@ -240,14 +292,14 @@ public class TradeExecutor : IDisposable
             {
                 try
                 {
-                    response = await _exchangeClient.PlaceOrderAsync(
+                    response = await exchangeClient.PlaceOrderAsync(
                         instrumentSymbol, side, type, quantity,
                         type == OrderType.Limit ? limitPrice : null,
                         clientOrderId, reduceOnly,
                         stopPrice: null, trailingDelta: null, ct: ct);
                     break;
                 }
-                catch (HttpRequestException ex)
+                catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
                 {
                     lastNetworkException = ex;
                     if (attempt >= maxRetries)
@@ -316,12 +368,33 @@ public class TradeExecutor : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "交易执行失败: {InstrumentSymbol} {Side}", instrumentSymbol, side);
-            // 网络类异常（含重试耗尽）短期可恢复；其余归为其他失败由调用方按冷却策略处理
-            var category = ex is HttpRequestException or TimeoutException || ex.InnerException is HttpRequestException
+            // 网络类异常（含重试耗尽）短期可恢复；其余归为其他失败由调用方按冷却策略处理。
+            // 交易所异常统一被包装成 FriendlyException，必须沿 InnerException 链递归判定。
+            var category = IsTransient(ex)
                 ? TradeFailureCategory.Network
                 : TradeFailureCategory.Other;
             return new TradeResult { Success = false, ErrorMessage = ex.Message, FailureCategory = category };
         }
+    }
+
+    /// <summary>
+    /// 递归判定异常是否为瞬时（网络/超时）类，沿 InnerException 链检查。
+    /// 交易所客户端会把 HttpRequestException 包装成 FriendlyException 抛出，
+    /// 仅判断顶层类型会让重试与冷却分类全部失效。
+    /// 用户主动取消的 TaskCanceledException（令牌已取消）不算瞬时——重试过滤器
+    /// 另有 !ct.IsCancellationRequested 守卫，取消会直接落入 Other 类别而非重试。
+    /// </summary>
+    internal static bool IsTransient(Exception ex)
+    {
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            if (current is HttpRequestException or TimeoutException or SocketException)
+                return true;
+            // 令牌未被取消的 TaskCanceledException = HttpClient 超时触发的取消，属瞬时网络问题
+            if (current is TaskCanceledException taskCanceled && !taskCanceled.CancellationToken.IsCancellationRequested)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -333,12 +406,13 @@ public class TradeExecutor : IDisposable
     /// 判断合约交易方向是否为平仓操作。
     /// 持有多头（PositionAmt > 0）时卖出 = 平多
     /// 持有空头（PositionAmt < 0）时买入 = 平空
+    /// 返回 null 表示持仓查询失败、开/平仓无法判定（调用方必须中止下单）。
     /// </summary>
-    private async Task<bool> IsClosePositionAsync(string symbol, OrderSide side, CancellationToken ct)
+    private async Task<bool?> IsClosePositionAsync(IExchangeClient exchangeClient, string symbol, OrderSide side, CancellationToken ct)
     {
         try
         {
-            var positions = await _exchangeClient.GetPositionsAsync(symbol, ct);
+            var positions = await exchangeClient.GetPositionsAsync(symbol, ct);
             foreach (var pos in positions)
             {
                 if (!string.Equals(pos.Symbol, symbol, StringComparison.OrdinalIgnoreCase))
@@ -350,12 +424,13 @@ public class TradeExecutor : IDisposable
                 if (posAmt < 0 && side == OrderSide.Buy)
                     return true; // 平空
             }
+            return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "查询合约持仓失败，无法判断是否为平仓，默认按开仓处理: {Symbol}", symbol);
+            _logger.LogWarning(ex, "查询合约持仓失败，无法判断是否为平仓: {Symbol}", symbol);
+            return null;
         }
-        return false;
     }
 
     /// <summary>

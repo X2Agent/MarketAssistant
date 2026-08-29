@@ -47,6 +47,8 @@ public sealed class ClsQuoteClient
     public async Task<List<ClsStockSearchItem>> SearchStocksAsync(
         string keyword, CancellationToken cancellationToken = default)
     {
+        // 第三方接口签名（sign/sv 为抓包固定值），服务端更新后需手动同步；
+        // 若请求返回 401/403，应提示签名可能已过期。
         const string apiUrl = "https://www.cls.cn/api/sw?app=CailianpressWeb&os=web&sv=8.7.9&sign=b02d8f7bc4c45eeb3e86904203597da2";
 
         var body = new
@@ -61,7 +63,7 @@ public sealed class ClsQuoteClient
         };
 
         using var httpClient = _httpClientFactory.CreateClient("Cls");
-        httpClient.Timeout = TimeSpan.FromSeconds(10);
+        // 超时由统一命名客户端配置 / resilience 管线管理，不在调用点单独设置
 
         using var content = new StringContent(
             JsonSerializer.Serialize(body),

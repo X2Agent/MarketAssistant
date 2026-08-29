@@ -26,7 +26,7 @@ public static class StockSymbolConverter
         string digits = ExtractDigits(stockCode);
         if (string.IsNullOrEmpty(digits)) return stockCode; // 无法提取数字则返回原值
 
-        string prefix = GetExchangePrefix(digits);
+        string prefix = ResolveExchange(digits);
         return $"{prefix}{digits}".ToLowerInvariant();
     }
 
@@ -77,7 +77,7 @@ public static class StockSymbolConverter
         if (cleanCode.All(char.IsDigit))
         {
             string digits = cleanCode;
-            string suffix = GetExchangeSuffix(digits);
+            string suffix = ResolveExchange(digits);
             return $"{digits}.{suffix}";
         }
 
@@ -94,48 +94,24 @@ public static class StockSymbolConverter
     }
 
     /// <summary>
-    /// 根据股票代码数字获取交易所前缀（SH/SZ）
-    /// 上海证券交易所（SH）：60、688、900 开头
-    /// 深圳证券交易所（SZ）：00、002、003、300、301、399 开头
+    /// 根据代码数字统一解析所属交易所（单一判定入口，供各类格式转换复用）。
+    /// 上海证券交易所（SH）：6 开头（主板/科创板）、5 开头（基金 ETF/LOF）、11 开头（可转债）、9 开头（B股）
+    /// 深圳证券交易所（SZ）：0/3 开头（主板/创业板）、12 开头（可转债）、15/16 开头（基金 ETF）
+    /// 北京证券交易所（BJ）：8 开头（北交所/新三板）、43/92 开头
+    /// 默认：未知代码默认为上海证券交易所（保持与原有代码行为一致）
     /// </summary>
-    private static string GetExchangePrefix(string digits)
+    private static string ResolveExchange(string digits)
     {
-        // 上海证券交易所：60开头（主板）、688开头（科创板）、900开头（B股）
-        if (digits.StartsWith("60") ||
-            digits.StartsWith("688") ||
-            digits.StartsWith("900"))
-            return "SH";
+        // 北交所：8 开头（83/87/88 等）、43/92 开头
+        if (digits.StartsWith("8") || digits.StartsWith("43") || digits.StartsWith("92"))
+            return "BJ";
 
-        // 深圳证券交易所：其他所有情况
-        return "SZ";
-    }
-
-    /// <summary>
-    /// 根据股票代码数字获取交易所后缀（SH/SZ）
-    /// 上海证券交易所（SH）：600、601、603、605、688、900 开头
-    /// 深圳证券交易所（SZ）：000、001、002、003、300、301、399 开头
-    /// 默认：未知代码默认为上海证券交易所
-    /// </summary>
-    private static string GetExchangeSuffix(string digits)
-    {
-        // 深圳证券交易所：000/001（主板）、002（中小板）、003（主板）、300/301（创业板）、399（指数）
-        if (digits.StartsWith("000") || digits.StartsWith("001") ||
-            digits.StartsWith("002") || digits.StartsWith("003") ||
-            digits.StartsWith("300") || digits.StartsWith("301") ||
-            digits.StartsWith("399"))
-        {
+        // 深圳证券交易所：0/3 开头（主板/创业板）、12 开头（可转债）、15/16 开头（ETF/LOF）
+        if (digits.StartsWith("0") || digits.StartsWith("3") ||
+            digits.StartsWith("12") || digits.StartsWith("15") || digits.StartsWith("16"))
             return "SZ";
-        }
 
-        // 上海证券交易所：600/601/603/605（主板）、688（科创板）、900（B股）
-        if (digits.StartsWith("600") || digits.StartsWith("601") ||
-            digits.StartsWith("603") || digits.StartsWith("605") ||
-            digits.StartsWith("688") || digits.StartsWith("900"))
-        {
-            return "SH";
-        }
-
-        // 默认返回上海交易所（保持与原有代码行为一致）
+        // 其余默认上海证券交易所：6 开头（主板/科创板）、5 开头（ETF/LOF）、11 开头（可转债）、9 开头（B股）
         return "SH";
     }
 }

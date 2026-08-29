@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace MarketAssistant.DataProviders.AShare;
@@ -86,7 +87,8 @@ public sealed class SinaFundFlowClient
 
         return property.ValueKind switch
         {
-            JsonValueKind.String => double.TryParse(property.GetString(), out var value) ? value : 0,
+            // 新浪返回点分小数，必须按 InvariantCulture 解析，逗号小数区域下否则全部归零
+            JsonValueKind.String => double.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : 0,
             JsonValueKind.Number => property.GetDouble(),
             _ => 0
         };

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Services;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Notification;
@@ -12,14 +13,20 @@ namespace MarketAssistant.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    private readonly IServiceProvider _serviceProvider;
+    // 页面 ViewModel 由工厂在导航项点击时才实例化，避免构造主窗口时实例化全部页面
+    private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly NavigationService _navigationService;
     private readonly MarketContext _marketContext;
     private readonly INotificationService _notificationService;
     private bool _isSynchronizingNavigationSelection;
 
+    // 主导航与底部导航必须各自持有选中项：两个 ListBox 绑定同一属性时，
+    // 任一选中变化会让另一个列表把 SelectedIndex 归 -1 并回写 null，导致侧栏高亮丢失
     [ObservableProperty]
-    private NavigationItemViewModel? _selectedNavigationItem;
+    private NavigationItemViewModel? _selectedMainNavigationItem;
+
+    [ObservableProperty]
+    private NavigationItemViewModel? _selectedBottomNavigationItem;
 
     public ViewModelBase? CurrentPage => _navigationService.CurrentPage;
     public bool CanGoBack => _navigationService.CanGoBack;
@@ -55,14 +62,14 @@ public partial class MainWindowViewModel : ViewModelBase
     public bool IsCryptoMarket => _marketContext.CurrentMarket == MarketType.Crypto;
 
     public MainWindowViewModel(
-        IServiceProvider serviceProvider,
+        IPageViewModelFactory pageViewModelFactory,
         NavigationService navigationService,
         MarketContext marketContext,
         INotificationService notificationService,
         ILogger<MainWindowViewModel>? logger = null)
         : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _pageViewModelFactory = pageViewModelFactory;
         _navigationService = navigationService;
         _marketContext = marketContext;
         _notificationService = notificationService;
@@ -73,14 +80,12 @@ public partial class MainWindowViewModel : ViewModelBase
         RebuildNavigationItems();
         RebuildIndexTickers();
 
-        // 监听导航服务属性变更
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
-        // 监听市场切换事件
         SubscribeToMarketChanges(_marketContext);
 
-        // 默认导航到首页。SelectedNavigationItem 的变更回调负责实际导航，避免重复入栈。
-        SelectedNavigationItem = MainNavigationItems[0];
+        // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
+        SelectedMainNavigationItem = MainNavigationItems[0];
     }
 
     protected override void OnMarketChanged(MarketType newMarket)
@@ -97,44 +102,30 @@ public partial class MainWindowViewModel : ViewModelBase
         MainNavigationItems.Clear();
         BottomNavigationItems.Clear();
 
-        MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _serviceProvider.GetRequiredService<HomePageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("收藏", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _serviceProvider.GetRequiredService<FavoritesPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _serviceProvider.GetRequiredService<PriceAlertPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _serviceProvider.GetRequiredService<AssetSelectionPageViewModel>()));
+        MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
+        MainNavigationItems.Add(new NavigationItemViewModel("收藏", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
+        MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
+        MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
         // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
         if (IsTradingVisible())
         {
-            MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _serviceProvider.GetRequiredService<TradingPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _pageViewModelFactory.Create<TradingPageViewModel>()));
         }
 
         // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
-        BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _serviceProvider.GetRequiredService<SettingsPageViewModel>()));
-        BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _serviceProvider.GetRequiredService<AboutPageViewModel>()));
+        BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
+        BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
     }
 
     /// <summary>
     /// 按当前市场填充顶栏行情条。
-    /// 当前为示意数据。接入真实指数服务时仅需替换本方法：
+    /// 接入真实指数服务前保持为空（顶栏随 HasIndexTickers 自动隐藏）：
     /// 在 App.Services 对应市场模块（AShareMarketModule / CryptoMarketModule）注册
-    /// IIndexQuoteService（Keyed by MarketType），此处改为调用其接口即可，XAML 无需改动。
+    /// IIndexQuoteService（Keyed by MarketType），此处改为调用其接口填充即可，XAML 无需改动。
     /// </summary>
     private void RebuildIndexTickers()
     {
         IndexTickers.Clear();
-
-        if (_marketContext.CurrentMarket == MarketType.AShare)
-        {
-            IndexTickers.Add(new IndexTickerItemViewModel("上证", "3,387.52", "+1.24%", isUp: true));
-            IndexTickers.Add(new IndexTickerItemViewModel("深证", "10,892.41", "-0.38%", isUp: false));
-            IndexTickers.Add(new IndexTickerItemViewModel("创业", "2,156.30", "+0.82%", isUp: true));
-        }
-        else
-        {
-            // 加密市场展示指数类行情（与热门标的中的 BTC/ETH 等个币区分），避免信息重复
-            IndexTickers.Add(new IndexTickerItemViewModel("CoinDesk 20", "2,184.62", "+1.92%", isUp: true));
-            IndexTickers.Add(new IndexTickerItemViewModel("Bitwise 10", "4,356.18", "+2.35%", isUp: true));
-            IndexTickers.Add(new IndexTickerItemViewModel("DPI", "112.47", "-0.86%", isUp: false));
-        }
 
         OnPropertyChanged(nameof(HasIndexTickers));
     }
@@ -163,10 +154,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 _isSynchronizingNavigationSelection = true;
                 try
                 {
-                    SelectedNavigationItem = MainNavigationItems.FirstOrDefault(
-                        item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
-                        ?? BottomNavigationItems.FirstOrDefault(
+                    var mainItem = MainNavigationItems.FirstOrDefault(
                         item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
+                    SelectedMainNavigationItem = mainItem;
+                    SelectedBottomNavigationItem = mainItem == null
+                        ? BottomNavigationItems.FirstOrDefault(
+                            item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
+                        : null;
                 }
                 finally
                 {
@@ -176,9 +170,6 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    /// <summary>
-    /// 返回命令
-    /// </summary>
     [RelayCommand]
     private void GoBack()
     {
@@ -191,7 +182,6 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleMarket()
     {
-        // 切换市场类型
         var newMarket = _marketContext.CurrentMarket == MarketType.AShare
             ? MarketType.Crypto
             : MarketType.AShare;
@@ -202,11 +192,9 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// 按指定市场切换（顶栏分段切换器使用）
     /// </summary>
-    /// <param name="market">目标市场类型</param>
     [RelayCommand]
     private void SwitchMarket(MarketType market)
     {
-        // 已是目标市场则不重复切换刷新页面
         if (_marketContext.CurrentMarket == market)
             return;
 
@@ -218,24 +206,47 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     private void SwitchToMarket(MarketType newMarket)
     {
+        // 切市场会触发导航集合重建（Clear 使 ListBox 清空选中并回写 null），
+        // 必须先把当前页标题缓存到局部变量，切完按标题重新定位并导航
+        var currentTitle = SelectedMainNavigationItem?.Title ?? SelectedBottomNavigationItem?.Title;
+
         _marketContext.SwitchMarket(newMarket);
 
-        // 显示切换提示
         var marketName = newMarket == MarketType.AShare ? "A股市场" : "虚拟币市场";
         _notificationService.ShowSuccess($"已切换到{marketName}");
 
         Logger?.LogInformation("市场已切换到: {Market} ({MarketName})", newMarket, marketName);
 
-        // 刷新当前页面（重新加载数据）
-        if (SelectedNavigationItem != null)
+        // 按标题重新定位导航项：原市场特有的页面（如交易）在新市场不存在时回退到首页
+        var target = currentTitle != null
+            ? MainNavigationItems.FirstOrDefault(item => item.Title == currentTitle)
+              ?? BottomNavigationItems.FirstOrDefault(item => item.Title == currentTitle)
+            : null;
+        target ??= MainNavigationItems[0];
+
+        var viewModel = target.CreateViewModel();
+        _navigationService.NavigateToRoot(viewModel, target.Title);
+
+        // 同步两个列表的选中态（NavigateToRoot 会经 NavigationService 事件同步，此处兜底显式设置）
+        _isSynchronizingNavigationSelection = true;
+        try
         {
-            var currentTitle = SelectedNavigationItem.Title;
-            var viewModel = SelectedNavigationItem.CreateViewModel();
-            _navigationService.NavigateToRoot(viewModel, currentTitle);
+            SelectedMainNavigationItem = MainNavigationItems.Contains(target) ? target : null;
+            SelectedBottomNavigationItem = BottomNavigationItems.Contains(target) ? target : null;
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
         }
     }
 
-    partial void OnSelectedNavigationItemChanged(NavigationItemViewModel? value)
+    partial void OnSelectedMainNavigationItemChanged(NavigationItemViewModel? value)
+        => OnNavigationItemSelected(value);
+
+    partial void OnSelectedBottomNavigationItemChanged(NavigationItemViewModel? value)
+        => OnNavigationItemSelected(value);
+
+    private void OnNavigationItemSelected(NavigationItemViewModel? value)
     {
         if (value is null || _isSynchronizingNavigationSelection)
             return;

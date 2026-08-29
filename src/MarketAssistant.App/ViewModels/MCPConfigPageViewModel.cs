@@ -134,12 +134,47 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             {
                 ServerConfigs.Add(config);
             }
+
+            PromoteLegacyToolWhitelistConfigs();
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "加载MCP服务器配置失败");
             _notificationService?.ShowError(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "加载配置"));
         }
+    }
+
+    /// <summary>
+    /// 识别旧版本保存的配置并提示重新勾选工具白名单。
+    /// 旧配置 JSON 无 ToolsSchemaVersion 字段（反序列化为 0）；空白名单在现行语义下
+    /// 不再向 Agent 暴露任何工具，需提示用户重新勾选或开启“允许全部工具”。
+    /// 提示后仅升级已启用服务器的版本号并落盘，保证每台服务器只提示一次；
+    /// 禁用服务器保持旧版本号，待其启用并保存时自然升级。
+    /// </summary>
+    private void PromoteLegacyToolWhitelistConfigs()
+    {
+        var legacyEnabledConfigs = ServerConfigs
+            .Where(config => config.IsEnabled && config.ToolsSchemaVersion < MCPServerConfig.CurrentToolsSchemaVersion)
+            .ToList();
+
+        if (legacyEnabledConfigs.Count == 0)
+        {
+            return;
+        }
+
+        var serverNames = legacyEnabledConfigs
+            .Select(config => string.IsNullOrWhiteSpace(config.Name) ? config.Id : config.Name);
+        _notificationService?.ShowWarning(
+            "MCP 工具白名单机制已升级：未勾选工具的服务器默认不向 Agent 暴露任何工具。" +
+            $"请进入 MCP 配置页为「{string.Join("、", serverNames)}」重新勾选工具，或开启“允许全部工具”。",
+            10000);
+
+        foreach (var config in legacyEnabledConfigs)
+        {
+            config.ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion;
+        }
+
+        _configService.SaveConfigs();
     }
 
     /// <summary>
@@ -156,7 +191,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             Id = Guid.NewGuid().ToString(),
             TransportType = "stdio",
-            IsEnabled = true
+            IsEnabled = true,
+            ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion
         };
 
         LoadConfigToUI(_editingConfig);
@@ -186,7 +222,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             EnvironmentVariables = new Dictionary<string, string?>(SelectedConfig.EnvironmentVariables),
             Category = SelectedConfig.Category,
             AllowedTools = [.. SelectedConfig.AllowedTools],
-            AllowAllTools = SelectedConfig.AllowAllTools
+            AllowAllTools = SelectedConfig.AllowAllTools,
+            ToolsSchemaVersion = SelectedConfig.ToolsSchemaVersion
         };
         LoadConfigToUI(_editingConfig);
         IsEditing = true;
@@ -295,7 +332,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
                 IsEnabled = true,
                 EnvironmentVariables = ParseEnvironmentVariables(),
                 Category = _editingConfig.Category,
-                AllowedTools = [.. _editingConfig.AllowedTools]
+                AllowedTools = [.. _editingConfig.AllowedTools],
+                AllowAllTools = AllowAllTools,
+                ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion
             };
 
             // 设置超时
@@ -336,8 +375,10 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         {
             IsTesting = false;
 
-            // 3秒后清除状态信息
-            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+            // 3秒后清除状态信息（TestStatus 为 UI 绑定属性，回调经 Dispatcher 切回 UI 线程，
+            // 不依赖当前同步上下文，避免链路中加入 ConfigureAwait(false) 后调度失效）
+            _ = Task.Delay(3000).ContinueWith(
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => TestStatus = string.Empty));
         }
     }
 
@@ -407,7 +448,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         finally
         {
             IsTesting = false;
-            _ = Task.Delay(3000).ContinueWith(_ => TestStatus = string.Empty);
+            // TestStatus 为 UI 绑定属性，回调经 Dispatcher 切回 UI 线程（同上，不依赖同步上下文）
+            _ = Task.Delay(3000).ContinueWith(
+                _ => Avalonia.Threading.Dispatcher.UIThread.Post(() => TestStatus = string.Empty));
         }
     }
 
@@ -464,6 +507,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         config.Arguments = Arguments;
         config.IsEnabled = IsEnabled;
         config.AllowAllTools = AllowAllTools;
+        config.ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion;
         config.AllowedTools = AllowAllTools
             ? []
             : ToolItems.Where(item => item.IsSelected).Select(item => item.Name).ToList();

@@ -77,7 +77,7 @@
                                 HorizontalAlignment="Left">
                             <TextBlock Text="{Binding Version}"
                                        FontSize="{StaticResource TinyFontSize}"
-                                       Foreground="White"
+                                       Foreground="{StaticResource TextOnEmphasisBrush}"
                                        FontWeight="Bold"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"/>

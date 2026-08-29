@@ -29,6 +29,8 @@ public class CryptoMetricsToolsTest
         var services = new ServiceCollection();
 
         services.AddLogging();
+        // BinanceMarketDataService 重构后依赖 IMemoryCache
+        services.AddMemoryCache();
         // 注册命名 HttpClient（含 BaseAddress 与弹性策略），与生产配置一致
         services.AddNamedMarketHttpClients();
         // 注册虚拟币指标工具依赖的数据服务（Binance 行情 + CoinGecko 市场指标）

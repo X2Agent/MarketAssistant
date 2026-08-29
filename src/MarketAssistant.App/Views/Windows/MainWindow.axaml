@@ -127,7 +127,7 @@
                      注意：必须声明在主导航之前，否则作为 DockPanel 最后一个子元素会被 LastChildFill 当作填充项，Bottom 停靠失效导致两项不可见 -->
                 <ListBox DockPanel.Dock="Bottom"
                          ItemsSource="{Binding BottomNavigationItems}"
-                         SelectedItem="{Binding SelectedNavigationItem}"
+                         SelectedItem="{Binding SelectedBottomNavigationItem}"
                          Background="Transparent"
                          BorderThickness="{StaticResource NoBorderThickness}"
                          Padding="0"
@@ -135,7 +135,7 @@
 
                 <!-- 主导航（贴顶，DockPanel 最后的填充子项） -->
                 <ListBox ItemsSource="{Binding MainNavigationItems}"
-                         SelectedItem="{Binding SelectedNavigationItem}"
+                         SelectedItem="{Binding SelectedMainNavigationItem}"
                          Background="Transparent"
                          BorderThickness="{StaticResource NoBorderThickness}"
                          Padding="0"
@@ -184,10 +184,11 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                <!-- 行情条（模拟数据；贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker） -->
+                <!-- 行情条（贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker）；
+                     无真实指数数据时随 HasIndexTickers 自动隐藏 -->
                 <ItemsControl Grid.Column="2"
                               ItemsSource="{Binding IndexTickers}"
-                              IsVisible="{Binding !CanGoBack}"
+                              IsVisible="{Binding HasIndexTickers}"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Center"
                               Margin="{StaticResource SmallHorizontalMargin}">

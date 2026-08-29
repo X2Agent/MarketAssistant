@@ -1,16 +1,17 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
-using MarketAssistant.Views.Windows;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;
@@ -21,32 +22,86 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     private readonly TradingDataService _dataService;
     private readonly MarketMonitor _marketMonitor;
     private readonly IDialogService _dialogService;
+    private readonly BinanceMarketDataService _marketDataService;
+    private readonly INotificationService _notificationService;
     private bool _disposed;
 
     public ObservableCollection<TradingStrategy> Strategies { get; } = [];
 
     [ObservableProperty] private string _newSymbol = string.Empty;
-    [ObservableProperty] private StrategyType _newStrategyType;
 
-    partial void OnNewStrategyTypeChanged(StrategyType value)
+    /// <summary>当前选择的场景卡片（UI 唯一创建入口：智能策略 / 省心定投 / 区间网格）。</summary>
+    [ObservableProperty] private ScenarioKind _selectedScenario = ScenarioKind.AISmart;
+
+    /// <summary>当前选择的风险档案，驱动场景参数预填与引擎兜底护栏。</summary>
+    [ObservableProperty] private RiskProfile _selectedProfile = RiskProfile.Balanced;
+
+    partial void OnSelectedScenarioChanged(ScenarioKind value)
     {
-        OnPropertyChanged(nameof(IsGridTrading));
-        OnPropertyChanged(nameof(IsDCA));
-        OnPropertyChanged(nameof(IsBasicStrategy));
-        OnPropertyChanged(nameof(SideHintText));
+        OnPropertyChanged(nameof(IsAISmartScenario));
+        OnPropertyChanged(nameof(IsDCAScenario));
+        OnPropertyChanged(nameof(IsGridScenario));
+        ApplyScenarioPreset();
     }
 
-    [ObservableProperty] private OrderSide _newSide = OrderSide.Buy;
-
-    partial void OnNewSideChanged(OrderSide value)
+    partial void OnSelectedProfileChanged(RiskProfile value)
     {
-        OnPropertyChanged(nameof(SideHintText));
+        OnPropertyChanged(nameof(IsConservativeProfile));
+        OnPropertyChanged(nameof(IsBalancedProfile));
+        OnPropertyChanged(nameof(IsAggressiveProfile));
+        ApplyScenarioPreset();
     }
 
-    [ObservableProperty] private string _newTriggerPrice = string.Empty;
-    [ObservableProperty] private string _newQuantity = string.Empty;
-    [ObservableProperty] private string _newStopLossPrice = string.Empty;
-    [ObservableProperty] private string _newTakeProfitPrice = string.Empty;
+    public bool IsAISmartScenario
+    {
+        get => SelectedScenario == ScenarioKind.AISmart;
+        set { if (value) SelectedScenario = ScenarioKind.AISmart; }
+    }
+
+    public bool IsDCAScenario
+    {
+        get => SelectedScenario == ScenarioKind.DCA;
+        set { if (value) SelectedScenario = ScenarioKind.DCA; }
+    }
+
+    public bool IsGridScenario
+    {
+        get => SelectedScenario == ScenarioKind.Grid;
+        set { if (value) SelectedScenario = ScenarioKind.Grid; }
+    }
+
+    public bool IsConservativeProfile
+    {
+        get => SelectedProfile == RiskProfile.Conservative;
+        set { if (value) SelectedProfile = RiskProfile.Conservative; }
+    }
+
+    public bool IsBalancedProfile
+    {
+        get => SelectedProfile == RiskProfile.Balanced;
+        set { if (value) SelectedProfile = RiskProfile.Balanced; }
+    }
+
+    public bool IsAggressiveProfile
+    {
+        get => SelectedProfile == RiskProfile.Aggressive;
+        set { if (value) SelectedProfile = RiskProfile.Aggressive; }
+    }
+
+    public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
+
+    // ---- 智能策略（AI）参数 ----
+    [ObservableProperty] private string _aiBudgetUsdt = string.Empty;
+    [ObservableProperty] private string _aiIntervalSeconds = string.Empty;
+    [ObservableProperty] private string _aiConfidenceThreshold = string.Empty;
+    [ObservableProperty] private string _aiMaxPositionPercent = string.Empty;
+    [ObservableProperty] private string _aiStopLossPercent = string.Empty;
+    [ObservableProperty] private string _aiTakeProfitPercent = string.Empty;
+    [ObservableProperty] private bool _isAiTrailingExit;
+    [ObservableProperty] private string _aiTrailingPercent = string.Empty;
+    [ObservableProperty] private bool _aiShadowMode;
+    [ObservableProperty] private OrderSide _aiSide = OrderSide.Buy;
+
     [ObservableProperty] private bool _isCreating;
 
     /// <summary>
@@ -54,44 +109,54 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty] private string _validationError = string.Empty;
 
-    public StrategyType[] StrategyTypes { get; } = Enum.GetValues<StrategyType>();
-    public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
-
-    // Grid Trading 参数
+    // ---- 网格参数 ----
     [ObservableProperty] private string _gridUpperPrice = string.Empty;
     [ObservableProperty] private string _gridLowerPrice = string.Empty;
     [ObservableProperty] private string _gridCount = "10";
     [ObservableProperty] private string _gridQuantityPerGrid = string.Empty;
+    [ObservableProperty] private string _gridStopLossPrice = string.Empty;
+    [ObservableProperty] private string _gridTakeProfitPrice = string.Empty;
 
-    // DCA 参数
+    // ---- DCA 参数 ----
     [ObservableProperty] private string _dcaIntervalSeconds = "86400";
     [ObservableProperty] private string _dcaAmountPerInterval = string.Empty;
     [ObservableProperty] private string _dcaMaxBuyPrice = string.Empty;
     [ObservableProperty] private string _dcaDoubleBuyBelowPrice = string.Empty;
+    [ObservableProperty] private string _dcaTakeProfitPercent = string.Empty;
+    [ObservableProperty] private string _dcaStopLossPercent = string.Empty;
+    [ObservableProperty] private bool _dcaStopLossSellOut;
 
     /// <summary>
-    /// 当前选择的策略类型是否为网格交易
+    /// 按当前风险档案与场景预填表单参数（网格区间需现价，仅预填格数）。
     /// </summary>
-    public bool IsGridTrading => NewStrategyType == StrategyType.GridTrading;
+    private void ApplyScenarioPreset()
+    {
+        switch (SelectedScenario)
+        {
+            case ScenarioKind.AISmart:
+                var ai = ScenarioPresets.GetAISignalPreset(SelectedProfile);
+                AiIntervalSeconds = ai.AnalysisIntervalSeconds.ToString();
+                AiConfidenceThreshold = ai.ConfidenceThreshold.ToString();
+                AiMaxPositionPercent = ai.MaxPositionPercent.ToString(CultureInfo.InvariantCulture);
+                AiStopLossPercent = ai.StopLossPercent.ToString(CultureInfo.InvariantCulture);
+                AiTakeProfitPercent = ai.TakeProfitPercent.ToString(CultureInfo.InvariantCulture);
+                IsAiTrailingExit = ai.ExitStyle == ExitStyle.TrailingStop;
+                AiTrailingPercent = ai.TrailingPercent.ToString(CultureInfo.InvariantCulture);
+                break;
 
-    /// <summary>
-    /// 当前选择的策略类型是否为定投
-    /// </summary>
-    public bool IsDCA => NewStrategyType == StrategyType.DCA;
+            case ScenarioKind.DCA:
+                var dca = ScenarioPresets.GetDcaPreset(SelectedProfile);
+                DcaIntervalSeconds = dca.IntervalSeconds.ToString();
+                DcaTakeProfitPercent = dca.TakeProfitPercent.ToString(CultureInfo.InvariantCulture);
+                DcaStopLossPercent = dca.StopLossPercent.ToString(CultureInfo.InvariantCulture);
+                DcaStopLossSellOut = dca.StopLossSellOut;
+                break;
 
-    /// <summary>
-    /// 当前选择的策略类型是否为基础策略（非 Grid/DCA）
-    /// </summary>
-    public bool IsBasicStrategy => !IsGridTrading && !IsDCA;
-
-    /// <summary>
-    /// 针对现货交易者的方向提示：买入止损/止盈通常用于空头对冲，现货做多应选卖出。
-    /// </summary>
-    public string SideHintText =>
-        NewSide == OrderSide.Buy &&
-        (NewStrategyType == StrategyType.StopLoss || NewStrategyType == StrategyType.TakeProfit)
-            ? "⚠️ 买入方向的止损/止盈通常用于空头对冲（期货）；现货多头持仓请选「卖出」方向"
-            : string.Empty;
+            case ScenarioKind.Grid:
+                GridCount = ScenarioPresets.GetGridPreset(SelectedProfile).GridCount.ToString();
+                break;
+        }
+    }
 
     // 风控配置
     [ObservableProperty] private RiskConfig _riskConfig = new();
@@ -106,6 +171,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         TradingDataService dataService,
         MarketMonitor marketMonitor,
         IDialogService dialogService,
+        BinanceMarketDataService marketDataService,
+        INotificationService notificationService,
         ILogger<StrategyConfigViewModel> logger)
         : base(logger)
     {
@@ -113,8 +180,11 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         _dataService = dataService;
         _marketMonitor = marketMonitor;
         _dialogService = dialogService;
+        _marketDataService = marketDataService;
+        _notificationService = notificationService;
         IsMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
+        ApplyScenarioPreset();
         _ = InitializeAsync();
     }
 
@@ -128,8 +198,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     {
         await SafeExecuteAsync(async () =>
         {
-            RiskConfig = await _strategyService.LoadRiskConfigAsync();
-            var strategies = await _strategyService.GetAllStrategiesAsync();
+            RiskConfig = await _dataService.LoadRiskConfigAsync();
+            var strategies = await _dataService.GetAllStrategiesAsync();
             Strategies.Clear();
             foreach (var s in strategies)
                 Strategies.Add(s);
@@ -148,84 +218,208 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             ValidationError = string.Empty;
+            var symbol = NewSymbol.ToUpperInvariant().Trim();
 
-            var strategy = new TradingStrategy
+            TradingStrategy? strategy = SelectedScenario switch
             {
-                Symbol = NewSymbol.ToUpper().Trim(),
-                Type = NewStrategyType,
-                Status = StrategyStatus.Active,
-                Side = NewSide
+                ScenarioKind.AISmart => BuildAISignalStrategy(symbol),
+                ScenarioKind.DCA => BuildDCAStrategy(symbol),
+                ScenarioKind.Grid => BuildGridStrategy(symbol),
+                _ => null
             };
 
-            switch (NewStrategyType)
-            {
-                case StrategyType.GridTrading:
-                    if (!decimal.TryParse(GridUpperPrice, out var upper) ||
-                        !decimal.TryParse(GridLowerPrice, out var lower) ||
-                        !int.TryParse(GridCount, out var gridCount) ||
-                        !decimal.TryParse(GridQuantityPerGrid, out var qtyPerGrid))
-                    {
-                        ValidationError = "请填写完整的网格交易参数（上界价格、下界价格、网格数量、每格数量）";
-                        return;
-                    }
-
-                    var gridParams = new GridTradingParams
-                    {
-                        UpperPrice = upper,
-                        LowerPrice = lower,
-                        GridCount = gridCount,
-                        QuantityPerGrid = qtyPerGrid
-                    };
-                    strategy.CustomParams = JsonSerializer.Serialize(gridParams);
-                    strategy.TriggerPrice = lower; // 用下界作为参考触发价
-                    strategy.Quantity = qtyPerGrid;
-                    break;
-
-                case StrategyType.DCA:
-                    if (!decimal.TryParse(DcaAmountPerInterval, out var amount))
-                    {
-                        ValidationError = "请填写有效的定投金额（USDT）";
-                        return;
-                    }
-
-                    var dcaParams = new DCAParams { AmountPerInterval = amount };
-                    if (int.TryParse(DcaIntervalSeconds, out var interval))
-                        dcaParams.IntervalSeconds = interval;
-                    if (decimal.TryParse(DcaMaxBuyPrice, out var maxPrice))
-                        dcaParams.MaxBuyPrice = maxPrice;
-                    if (decimal.TryParse(DcaDoubleBuyBelowPrice, out var doublePrice))
-                        dcaParams.DoubleBuyBelowPrice = doublePrice;
-
-                    strategy.CustomParams = JsonSerializer.Serialize(dcaParams);
-                    strategy.TriggerPrice = maxPrice > 0 ? maxPrice : 0;
-                    // DCA 的 Quantity 存储每次定投的 USDT 金额（代币数量在执行时按实时价格换算）
-                    strategy.Quantity = amount;
-                    break;
-
-                default:
-                    if (!decimal.TryParse(NewTriggerPrice, out var triggerPrice) ||
-                        !decimal.TryParse(NewQuantity, out var quantity))
-                    {
-                        ValidationError = "请填写有效的触发价格和交易数量";
-                        return;
-                    }
-
-                    strategy.TriggerPrice = triggerPrice;
-                    strategy.Quantity = quantity;
-
-                    if (decimal.TryParse(NewStopLossPrice, out var sl))
-                        strategy.StopLossPrice = sl;
-                    if (decimal.TryParse(NewTakeProfitPrice, out var tp))
-                        strategy.TakeProfitPrice = tp;
-                    break;
-            }
+            if (strategy == null)
+                return; // 校验失败，ValidationError 已设置
 
             await _strategyService.SaveStrategyAsync(strategy);
             Strategies.Insert(0, strategy);
 
+            // 安全警示必须显式可见：本应用没有交易所原生条件单兜底，
+            // 止损/止盈/追踪止损全部由客户端按秒轮询执行，进程退出或网络中断期间不生效
+            _notificationService.ShowWarning(
+                "⚠ 注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
+
             ClearForm();
         }, "创建策略");
     }
+
+    /// <summary>构建智能策略（AI 信号）。止损/止盈价由 AI 决策给出，此处仅保存档案预设约束。</summary>
+    private TradingStrategy? BuildAISignalStrategy(string symbol)
+    {
+        if (!decimal.TryParse(AiBudgetUsdt, NumberStyles.Float, CultureInfo.InvariantCulture, out var budget) || budget <= 0)
+        {
+            ValidationError = "请填写有效的单次开仓预算（USDT）";
+            return null;
+        }
+        if (budget < RiskConfig.MinOrderAmount)
+        {
+            ValidationError = $"预算 {budget:F2} USDT 低于最小下单金额 {RiskConfig.MinOrderAmount:F2} USDT，容易被交易所拒绝";
+            return null;
+        }
+
+        var aiParams = new AISignalParams
+        {
+            RiskProfile = SelectedProfile.ToString(),
+            BudgetUsdt = budget,
+            AnalysisIntervalSeconds = ParseIntOr(AiIntervalSeconds, 600),
+            ConfidenceThreshold = ParseIntOr(AiConfidenceThreshold, 65),
+            MaxPositionPercent = ParseDecimalOr(AiMaxPositionPercent, 10),
+            StopLossPercent = ParseDecimalOr(AiStopLossPercent, 8),
+            TakeProfitPercent = ParseDecimalOr(AiTakeProfitPercent, 15),
+            ExitStyle = IsAiTrailingExit ? "TrailingStop" : "FixedStop",
+            TrailingPercent = ParseDecimalOr(AiTrailingPercent, 5),
+            ShadowMode = AiShadowMode
+        };
+
+        return new TradingStrategy
+        {
+            Symbol = symbol,
+            Type = StrategyType.AISignal,
+            Status = StrategyStatus.Active,
+            Side = AiSide,
+            // AI 场景的 Quantity 语义为单次开仓预算（USDT），实际下单量由执行器按置信度换算
+            Quantity = budget,
+            MaxPositionPercent = aiParams.MaxPositionPercent,
+            CustomParams = JsonSerializer.Serialize(aiParams)
+        };
+    }
+
+    /// <summary>构建省心定投策略。金额必须满足交易所最小下单金额，避免被拒后策略自动暂停。</summary>
+    private TradingStrategy? BuildDCAStrategy(string symbol)
+    {
+        if (!decimal.TryParse(DcaAmountPerInterval, NumberStyles.Float, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
+        {
+            ValidationError = "请填写有效的定投金额（USDT）";
+            return null;
+        }
+        if (amount < RiskConfig.MinOrderAmount)
+        {
+            ValidationError = $"定投金额 {amount:F2} USDT 低于最小下单金额 {RiskConfig.MinOrderAmount:F2} USDT，会被交易所拒绝";
+            return null;
+        }
+
+        var dcaParams = new DCAParams
+        {
+            RiskProfile = SelectedProfile.ToString(),
+            AmountPerInterval = amount,
+            IntervalSeconds = ParseIntOr(DcaIntervalSeconds, 86400),
+            MaxBuyPrice = ParseDecimalOr(DcaMaxBuyPrice, 0),
+            DoubleBuyBelowPrice = ParseDecimalOr(DcaDoubleBuyBelowPrice, 0),
+            TakeProfitPercent = ParseDecimalOr(DcaTakeProfitPercent, 0),
+            StopLossPercent = ParseDecimalOr(DcaStopLossPercent, 0),
+            StopLossSellOut = DcaStopLossSellOut
+        };
+
+        return new TradingStrategy
+        {
+            Symbol = symbol,
+            Type = StrategyType.DCA,
+            Status = StrategyStatus.Active,
+            Side = OrderSide.Buy,
+            TriggerPrice = dcaParams.MaxBuyPrice,
+            // DCA 的 Quantity 存储每次定投的 USDT 金额（代币数量在执行时按实时价格换算）
+            Quantity = amount,
+            CustomParams = JsonSerializer.Serialize(dcaParams)
+        };
+    }
+
+    /// <summary>构建区间网格策略。校验间距覆盖双边手续费，破网护栏未填时按档案百分比自动生成。</summary>
+    private TradingStrategy? BuildGridStrategy(string symbol)
+    {
+        if (!decimal.TryParse(GridUpperPrice, NumberStyles.Float, CultureInfo.InvariantCulture, out var upper) ||
+            !decimal.TryParse(GridLowerPrice, NumberStyles.Float, CultureInfo.InvariantCulture, out var lower) ||
+            !int.TryParse(GridCount, NumberStyles.Integer, CultureInfo.InvariantCulture, out var gridCount) ||
+            !decimal.TryParse(GridQuantityPerGrid, NumberStyles.Float, CultureInfo.InvariantCulture, out var qtyPerGrid))
+        {
+            ValidationError = "请填写完整的网格参数（上界价格、下界价格、网格数量、每格数量）";
+            return null;
+        }
+        if (upper <= lower || gridCount < 2 || qtyPerGrid <= 0)
+        {
+            ValidationError = "网格参数无效：上界须高于下界，网格数量 ≥ 2，每格数量 > 0";
+            return null;
+        }
+
+        // 间距必须覆盖双边手续费（单边 0.1%），否则每格利润被手续费吃掉
+        var midPrice = (upper + lower) / 2m;
+        var spacingPercent = midPrice > 0 ? (upper - lower) / gridCount / midPrice * 100m : 0;
+        if (spacingPercent < 0.2m)
+        {
+            ValidationError = $"网格间距 {spacingPercent:F3}% 低于双边手续费（0.2%），请加宽区间或减少格数";
+            return null;
+        }
+
+        var gridPreset = ScenarioPresets.GetGridPreset(SelectedProfile);
+        var gridParams = new GridTradingParams
+        {
+            RiskProfile = SelectedProfile.ToString(),
+            UpperPrice = upper,
+            LowerPrice = lower,
+            GridCount = gridCount,
+            QuantityPerGrid = qtyPerGrid,
+            // 破网护栏未填时按风险档案百分比自动生成，保证护栏永不缺失
+            StopLossPrice = ParseDecimalOrNullable(GridStopLossPrice) ?? lower * (1 - gridPreset.BreakoutStopLossPercent / 100m),
+            TakeProfitPrice = ParseDecimalOrNullable(GridTakeProfitPrice) ?? upper * (1 + gridPreset.BreakoutTakeProfitPercent / 100m)
+        };
+
+        return new TradingStrategy
+        {
+            Symbol = symbol,
+            Type = StrategyType.GridTrading,
+            Status = StrategyStatus.Active,
+            Side = OrderSide.Buy,
+            TriggerPrice = lower,
+            Quantity = qtyPerGrid,
+            CustomParams = JsonSerializer.Serialize(gridParams)
+        };
+    }
+
+    /// <summary>
+    /// 按当前价与风险档案自动生成网格区间（含破网护栏），消除手工定价门槛。
+    /// </summary>
+    [RelayCommand]
+    private async Task GenerateGridRangeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewSymbol))
+        {
+            ValidationError = "请先填写交易对";
+            return;
+        }
+        if (!decimal.TryParse(GridQuantityPerGrid, NumberStyles.Float, CultureInfo.InvariantCulture, out var qtyPerGrid) || qtyPerGrid <= 0)
+        {
+            ValidationError = "请先填写每格数量，再生成网格区间";
+            return;
+        }
+
+        await SafeExecuteAsync(async () =>
+        {
+            ValidationError = string.Empty;
+            var symbol = NewSymbol.ToUpperInvariant().Trim();
+            var ticker = await _marketDataService.Get24hrTickerAsync(symbol);
+            var lastPrice = ticker?.LastPrice;
+            if (lastPrice is not > 0)
+            {
+                ValidationError = $"无法获取 {symbol} 当前价格，请检查交易对或手动填写区间";
+                return;
+            }
+
+            var gridParams = ScenarioPresets.CreateGridParams(SelectedProfile, lastPrice.Value, qtyPerGrid);
+            GridUpperPrice = gridParams.UpperPrice.ToString(CultureInfo.InvariantCulture);
+            GridLowerPrice = gridParams.LowerPrice.ToString(CultureInfo.InvariantCulture);
+            GridCount = gridParams.GridCount.ToString();
+            GridStopLossPrice = gridParams.StopLossPrice?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            GridTakeProfitPrice = gridParams.TakeProfitPrice?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        }, "生成网格区间");
+    }
+
+    private static int ParseIntOr(string? text, int fallback)
+        => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : fallback;
+
+    private static decimal ParseDecimalOr(string? text, decimal fallback)
+        => decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : fallback;
+
+    private static decimal? ParseDecimalOrNullable(string? text)
+        => decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0 ? value : null;
 
     [RelayCommand]
     private async Task ToggleStrategyAsync(TradingStrategy strategy)
@@ -281,7 +475,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             var records = await _dataService.GetRecordsByStrategyAsync(strategy.Id);
 
             // 刷新策略最新状态（执行次数可能已被后台引擎更新）
-            var latest = await _strategyService.GetStrategyAsync(strategy.Id);
+            var latest = await _dataService.GetStrategyAsync(strategy.Id);
             if (latest != null)
             {
                 strategy.ExecutionCount = latest.ExecutionCount;
@@ -289,25 +483,15 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
                 strategy.LastTriggeredAt = latest.LastTriggeredAt;
             }
 
-            await Dispatcher.UIThread.InvokeAsync(async () =>
-            {
-                if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
-                    return;
-
-                var owner = desktop.Windows.FirstOrDefault(w => w.IsActive) ?? desktop.MainWindow;
-                if (owner == null) return;
-
-                var window = new StrategyExecutionWindow();
-                window.SetContent(strategy, records);
-                await window.ShowDialog(owner);
-            });
+            // 通过对话框服务展示，避免 ViewModel 直接 new 窗口（便于测试与解耦）
+            await _dialogService.ShowStrategyExecutionAsync(strategy, records);
         }, "查看策略执行历史");
     }
 
     [RelayCommand]
     private async Task SaveRiskConfigAsync()
     {
-        await _strategyService.SaveRiskConfigAsync(RiskConfig);
+        await _dataService.SaveRiskConfigAsync(RiskConfig);
     }
 
     [RelayCommand]
@@ -320,20 +504,19 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     private void ClearForm()
     {
         NewSymbol = string.Empty;
-        NewTriggerPrice = string.Empty;
-        NewQuantity = string.Empty;
-        NewStopLossPrice = string.Empty;
-        NewTakeProfitPrice = string.Empty;
         GridUpperPrice = string.Empty;
         GridLowerPrice = string.Empty;
-        GridCount = "10";
         GridQuantityPerGrid = string.Empty;
-        DcaIntervalSeconds = "86400";
+        GridStopLossPrice = string.Empty;
+        GridTakeProfitPrice = string.Empty;
         DcaAmountPerInterval = string.Empty;
         DcaMaxBuyPrice = string.Empty;
         DcaDoubleBuyBelowPrice = string.Empty;
+        AiBudgetUsdt = string.Empty;
+        AiShadowMode = false;
         ValidationError = string.Empty;
         IsCreating = false;
+        ApplyScenarioPreset();
     }
 
     public void Dispose()

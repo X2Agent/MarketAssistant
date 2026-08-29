@@ -1,631 +1,189 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MarketAssistant 配色方案对比与预览</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
-            background: #fafafa;
-            padding: 40px 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            text-align: center;
-            color: #212121;
-            margin-bottom: 40px;
-            font-size: 32px;
-        }
-
-        .comparison {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .panel {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .panel-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .old-scheme .panel-title {
-            color: #512BD4;
-        }
-
-        .new-scheme .panel-title {
-            color: #1976D2;
-        }
-
-        .color-block {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            padding: 12px;
-            border-radius: 8px;
-            background: #f5f5f5;
-        }
-
-        .color-swatch {
-            width: 60px;
-            height: 40px;
-            border-radius: 6px;
-            margin-right: 16px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .color-info {
-            flex: 1;
-        }
-
-        .color-name {
-            font-weight: 600;
-            font-size: 14px;
-            color: #212121;
-            margin-bottom: 4px;
-        }
-
-        .color-hex {
-            font-family: "Courier New", monospace;
-            font-size: 12px;
-            color: #757575;
-        }
-
-        .stock-example {
-            margin-top: 30px;
-            padding: 20px;
-            background: #fafafa;
-            border-radius: 8px;
-        }
-
-        .stock-card {
-            background: white;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-            border: 1px solid #e0e0e0;
-        }
-
-        .stock-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: #212121;
-            margin-bottom: 8px;
-        }
-
-        .stock-price {
-            font-size: 24px;
-            font-weight: bold;
-            color: #212121;
-            margin-bottom: 4px;
-        }
-
-        .stock-change {
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .up {
-            color: #F44336;
-        }
-
-        .down {
-            color: #4CAF50;
-        }
-
-        .neutral {
-            color: #9E9E9E;
-        }
-
-        .old-up {
-            color: #dc3545;
-        }
-
-        .old-down {
-            color: #28a745;
-        }
-
-        .warning {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            color: #856404;
-        }
-
-        .success {
-            background: #d4edda;
-            border: 1px solid #4CAF50;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            color: #155724;
-        }
-
-        .button-demo {
-            margin-top: 20px;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border-radius: 6px;
-            border: none;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-right: 12px;
-            margin-bottom: 12px;
-        }
-
-        .btn-primary-old {
-            background: #512BD4;
-            color: white;
-        }
-
-        .btn-primary-new {
-            background: #1976D2;
-            color: white;
-        }
-
-        .btn-secondary {
-            background: transparent;
-            color: #1976D2;
-            border: 2px solid #1976D2;
-        }
-
-        .btn-accent {
-            background: #FF6B35;
-            color: white;
-        }
-
-        @media (max-width: 768px) {
-            .comparison {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketAssistant 配色预览 v2.4</title>
+<style>
+  :root { --page-bg:#0A0E17; --page-surface:#111722; --page-elevated:#161C2A; --page-border:#1E2636; --page-text:#E4EAF5; --page-text-secondary:#8894A8; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Microsoft YaHei","PingFang SC",-apple-system,sans-serif; background:var(--page-bg); color:var(--page-text); padding:40px 24px; line-height:1.6; }
+  .container { max-width:1200px; margin:0 auto; }
+  header { text-align:center; margin-bottom:48px; }
+  header h1 { font-size:28px; font-weight:700; letter-spacing:1px; }
+  header .version { display:inline-block; margin-top:10px; padding:4px 14px; background:rgba(25,118,210,0.15); border:1px solid rgba(25,118,210,0.4); border-radius:12px; color:#42A5F5; font-size:13px; font-weight:600; }
+  header p { color:var(--page-text-secondary); font-size:14px; margin-top:12px; }
+  section { background:var(--page-surface); border:1px solid var(--page-border); border-radius:12px; padding:28px; margin-bottom:28px; }
+  section h2 { font-size:18px; font-weight:700; margin-bottom:6px; padding-bottom:12px; border-bottom:1px solid var(--page-border); }
+  section .desc { color:var(--page-text-secondary); font-size:13px; margin-bottom:18px; }
+  .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; }
+  .swatch { border-radius:10px; overflow:hidden; border:1px solid var(--page-border); }
+  .swatch .chip { height:72px; display:flex; align-items:center; justify-content:center; font-size:12px; font-family:Consolas,monospace; font-weight:600; }
+  .swatch .info { padding:10px 12px; background:var(--page-elevated); }
+  .swatch .name { font-size:13px; font-weight:600; }
+  .swatch .key { font-size:11px; color:var(--page-text-secondary); font-family:Consolas,monospace; margin-top:2px; }
+  .swatch .hex { font-size:11px; color:#42A5F5; font-family:Consolas,monospace; margin-top:2px; }
+  .row { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; margin-bottom:14px; }
+  .tile { border-radius:10px; padding:16px; border:1px solid var(--page-border); }
+  .tile .label { font-size:12px; font-family:Consolas,monospace; opacity:0.75; margin-bottom:4px; }
+  .tile .value { font-size:12px; font-family:Consolas,monospace; opacity:0.6; }
+  .status-list { list-style:none; }
+  .status-list li { padding:8px 0; font-size:14px; border-bottom:1px dashed var(--page-border); display:flex; gap:10px; align-items:baseline; }
+  .status-list li:last-child { border-bottom:none; }
+  .status-list .mark { flex-shrink:0; }
+  footer { text-align:center; color:var(--page-text-secondary); font-size:12px; margin-top:40px; }
+  .tag-demo { display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:4px; font-size:13px; font-weight:600; font-family:Consolas,monospace; }
+</style>
 </head>
-
 <body>
-    <div class="container">
-        <h1>🎨 MarketAssistant 配色方案对比</h1>
+<div class="container">
 
-        <div class="warning">
-            ⚠️ <strong>严重问题：</strong>原方案的涨跌颜色与中国用户认知习惯相反，会造成严重的用户混淆！
-        </div>
+  <header>
+    <h1>MarketAssistant 配色方案预览</h1>
+    <span class="version">v2.4 · 与实现同步</span>
+    <p>本页仅展示当前实际实现与设计系统规范一致的配色方案。所有取值摘自 <code>src/MarketAssistant.App/Resources/Styles/Colors.axaml</code>。</p>
+  </header>
 
-        <div class="success">
-            ✅ <strong>已修复：</strong>新方案采用"红涨绿跌"标准，符合中国股市习惯，同时采用金融行业标准的蓝色系。
-        </div>
-
-        <div class="comparison">
-            <!-- 原方案 -->
-            <div class="panel old-scheme">
-                <div class="panel-title">❌ 原配色方案（有问题）</div>
-
-                <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">主色调</h3>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #512BD4;"></div>
-                    <div class="color-info">
-                        <div class="color-name">Primary（紫色）</div>
-                        <div class="color-hex">#512BD4</div>
-                    </div>
-                </div>
-
-                <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">涨跌颜色（错误）</h3>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #dc3545;"></div>
-                    <div class="color-info">
-                        <div class="color-name">上涨 ❌ 应该是红色</div>
-                        <div class="color-hex">#dc3545（红色）</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #28a745;"></div>
-                    <div class="color-info">
-                        <div class="color-name">下跌 ❌ 应该是绿色</div>
-                        <div class="color-hex">#28a745（绿色）</div>
-                    </div>
-                </div>
-
-                <div class="stock-example">
-                    <h4 style="margin-bottom: 12px; color: #757575;">股价显示示例</h4>
-                    <div class="stock-card">
-                        <div class="stock-name">贵州茅台 (600519)</div>
-                        <div class="stock-price">￥1,850.00</div>
-                        <div class="stock-change old-up">▲ +25.00 (+1.37%)</div>
-                        <small style="color: #dc3545;">❌ 红色表示上涨（颜色虽对，但整体配置混乱）</small>
-                    </div>
-                    <div class="stock-card">
-                        <div class="stock-name">中国平安 (601318)</div>
-                        <div class="stock-price">￥52.30</div>
-                        <div class="stock-change old-down">▼ -0.80 (-1.51%)</div>
-                        <small style="color: #28a745;">❌ 绿色表示下跌（颜色虽对，但整体配置混乱）</small>
-                    </div>
-                </div>
-
-                <div class="button-demo">
-                    <button class="btn btn-primary-old">主要按钮</button>
-                    <small style="color: #757575; display: block; margin-top: 8px;">
-                        紫色不符合金融行业规范
-                    </small>
-                </div>
-            </div>
-
-            <!-- 新方案 -->
-            <div class="panel new-scheme">
-                <div class="panel-title">✅ 新配色方案（优化后）</div>
-
-                <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">主色调</h3>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #1976D2;"></div>
-                    <div class="color-info">
-                        <div class="color-name">Primary（金融蓝）</div>
-                        <div class="color-hex">#1976D2</div>
-                    </div>
-                </div>
-
-                <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">涨跌颜色（正确）</h3>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #F44336;"></div>
-                    <div class="color-info">
-                        <div class="color-name">上涨（Bullish）✅</div>
-                        <div class="color-hex">#F44336（红色）</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #4CAF50;"></div>
-                    <div class="color-info">
-                        <div class="color-name">下跌（Bearish）✅</div>
-                        <div class="color-hex">#4CAF50（绿色）</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #9E9E9E;"></div>
-                    <div class="color-info">
-                        <div class="color-name">平盘（Neutral）</div>
-                        <div class="color-hex">#9E9E9E（灰色）</div>
-                    </div>
-                </div>
-
-                <div class="stock-example">
-                    <h4 style="margin-bottom: 12px; color: #757575;">股价显示示例</h4>
-                    <div class="stock-card">
-                        <div class="stock-name">贵州茅台 (600519)</div>
-                        <div class="stock-price">￥1,850.00</div>
-                        <div class="stock-change up">▲ +25.00 (+1.37%)</div>
-                        <small style="color: #F44336;">✅ 红色表示上涨（符合认知）</small>
-                    </div>
-                    <div class="stock-card">
-                        <div class="stock-name">中国平安 (601318)</div>
-                        <div class="stock-price">￥52.30</div>
-                        <div class="stock-change down">▼ -0.80 (-1.51%)</div>
-                        <small style="color: #4CAF50;">✅ 绿色表示下跌（符合认知）</small>
-                    </div>
-                    <div class="stock-card">
-                        <div class="stock-name">工商银行 (601398)</div>
-                        <div class="stock-price">￥5.68</div>
-                        <div class="stock-change neutral">— 0.00 (0.00%)</div>
-                        <small style="color: #9E9E9E;">✅ 灰色表示平盘</small>
-                    </div>
-                </div>
-
-                <div class="button-demo">
-                    <button class="btn btn-primary-new">主要按钮</button>
-                    <button class="btn btn-secondary">次要按钮</button>
-                    <button class="btn btn-accent">强调按钮</button>
-                    <small style="color: #757575; display: block; margin-top: 8px;">
-                        蓝色系符合金融行业标准
-                    </small>
-                </div>
-            </div>
-        </div>
-
-        <!-- 功能色对比 -->
-        <div class="panel">
-            <div class="panel-title" style="color: #1976D2;">功能性颜色系统</div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #4CAF50;"></div>
-                    <div class="color-info">
-                        <div class="color-name">成功</div>
-                        <div class="color-hex">#4CAF50</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #FF9800;"></div>
-                    <div class="color-info">
-                        <div class="color-name">警告</div>
-                        <div class="color-hex">#FF9800</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #F44336;"></div>
-                    <div class="color-info">
-                        <div class="color-name">错误</div>
-                        <div class="color-hex">#F44336</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #2196F3;"></div>
-                    <div class="color-info">
-                        <div class="color-name">信息</div>
-                        <div class="color-hex">#2196F3</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 关键改进 -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-title" style="color: #1976D2;">🎯 关键改进总结</div>
-            <div style="display: grid; gap: 16px;">
-                <div style="padding: 12px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 4px;">
-                    <strong style="color: #2e7d32;">✅ 文化适配（关键）</strong>
-                    <p style="margin: 8px 0 0; color: #1b5e20; font-size: 14px;">
-                        修正了涨跌颜色错误，采用中国标准"红涨绿跌"
-                    </p>
-                </div>
-                <div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196F3; border-radius: 4px;">
-                    <strong style="color: #1565C0;">✅ 行业标准</strong>
-                    <p style="margin: 8px 0 0; color: #0d47a1; font-size: 14px;">
-                        主色调改为金融蓝，提升专业感和可信度
-                    </p>
-                </div>
-                <div style="padding: 12px; background: #fff3e0; border-left: 4px solid #FF9800; border-radius: 4px;">
-                    <strong style="color: #E65100;">✅ 可访问性</strong>
-                    <p style="margin: 8px 0 0; color: #E65100; font-size: 14px;">
-                        警告色对比度从2.3:1提升到3.0:1，满足WCAG标准
-                    </p>
-                </div>
-                <div style="padding: 12px; background: #f3e5f5; border-left: 4px solid #9C27B0; border-radius: 4px;">
-                    <strong style="color: #6A1B9A;">✅ 语义化</strong>
-                    <p style="margin: 8px 0 0; color: #4A148C; font-size: 14px;">
-                        新增Bullish/Bearish/Neutral语义化颜色定义
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 数据对比表 -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-title" style="color: #1976D2;">📊 量化对比数据</div>
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background: #f5f5f5;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;">指标</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">原方案</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">新方案</th>
-                        <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">改善</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">文化匹配度</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; color: #F44336;">
-                            0% ❌</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; color: #4CAF50;">
-                            100% ✅</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; font-weight: bold; color: #4CAF50;">
-                            +100%</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">行业标准符合度</td>
-                        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0;">30%</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; color: #4CAF50;">
-                            95%</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; font-weight: bold; color: #4CAF50;">
-                            +217%</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">WCAG可访问性得分</td>
-                        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0;">70分</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; color: #4CAF50;">
-                            92分</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; font-weight: bold; color: #4CAF50;">
-                            +31%</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid #e0e0e0;">暗色模式评分</td>
-                        <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0;">3/10</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; color: #4CAF50;">
-                            8/10</td>
-                        <td
-                            style="padding: 12px; text-align: center; border-bottom: 1px solid #e0e0e0; font-weight: bold; color: #4CAF50;">
-                            +167%</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px;">语义化程度</td>
-                        <td style="padding: 12px; text-align: center;">4/10</td>
-                        <td style="padding: 12px; text-align: center; color: #4CAF50;">9/10</td>
-                        <td style="padding: 12px; text-align: center; font-weight: bold; color: #4CAF50;">+125%</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- 完整配色板 -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-title" style="color: #1976D2;">🎨 完整配色板</div>
-
-            <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">品牌色系</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #1976D2;"></div>
-                    <div class="color-info">
-                        <div class="color-name">Primary</div>
-                        <div class="color-hex">#1976D2 - 主要按钮、链接</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #1565C0;"></div>
-                    <div class="color-info">
-                        <div class="color-name">PrimaryDark</div>
-                        <div class="color-hex">#1565C0 - 按下状态</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #42A5F5;"></div>
-                    <div class="color-info">
-                        <div class="color-name">PrimaryLight</div>
-                        <div class="color-hex">#42A5F5 - 悬停状态</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #424242;"></div>
-                    <div class="color-info">
-                        <div class="color-name">Secondary</div>
-                        <div class="color-hex">#424242 - 次要信息</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #FF6B35;"></div>
-                    <div class="color-info">
-                        <div class="color-name">Accent</div>
-                        <div class="color-hex">#FF6B35 - 行动召唤</div>
-                    </div>
-                </div>
-            </div>
-
-            <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">亮色主题</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #FAFAFA;"></div>
-                    <div class="color-info">
-                        <div class="color-name">PageBackground</div>
-                        <div class="color-hex">#FAFAFA - 页面背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #FFFFFF; border: 1px solid #e0e0e0;"></div>
-                    <div class="color-info">
-                        <div class="color-name">CardBackground</div>
-                        <div class="color-hex">#FFFFFF - 卡片背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #F5F5F5;"></div>
-                    <div class="color-info">
-                        <div class="color-name">ItemBackground</div>
-                        <div class="color-hex">#F5F5F5 - 项目背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #212121;"></div>
-                    <div class="color-info">
-                        <div class="color-name">PrimaryText</div>
-                        <div class="color-hex">#212121 - 主要文本</div>
-                    </div>
-                </div>
-            </div>
-
-            <h3 style="margin: 20px 0 12px; font-size: 16px; color: #757575;">暗色主题</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #121212;"></div>
-                    <div class="color-info">
-                        <div class="color-name">DarkPageBackground</div>
-                        <div class="color-hex">#121212 - 页面背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #1E1E1E;"></div>
-                    <div class="color-info">
-                        <div class="color-name">DarkCardBackground</div>
-                        <div class="color-hex">#1E1E1E - 卡片背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #2C2C2C;"></div>
-                    <div class="color-info">
-                        <div class="color-name">DarkItemBackground</div>
-                        <div class="color-hex">#2C2C2C - 项目背景</div>
-                    </div>
-                </div>
-                <div class="color-block">
-                    <div class="color-swatch" style="background: #FFFFFF;"></div>
-                    <div class="color-info">
-                        <div class="color-name">DarkPrimaryText</div>
-                        <div class="color-hex">#FFFFFF - 主要文本</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 实施状态 -->
-        <div class="panel" style="margin-top: 20px;">
-            <div class="panel-title" style="color: #1976D2;">🚀 实施状态</div>
-            <div style="display: grid; gap: 12px;">
-                <div style="display: flex; align-items: center; padding: 8px;">
-                    <span style="color: #4CAF50; font-size: 20px; margin-right: 12px;">✅</span>
-                    <span>配色方案已更新</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 8px;">
-                    <span style="color: #4CAF50; font-size: 20px; margin-right: 12px;">✅</span>
-                    <span>向后兼容性已保证</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 8px;">
-                    <span style="color: #4CAF50; font-size: 20px; margin-right: 12px;">✅</span>
-                    <span>编译测试通过</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 8px;">
-                    <span style="color: #FF9800; font-size: 20px; margin-right: 12px;">⏳</span>
-                    <span>待迁移到语义化命名</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 8px;">
-                    <span style="color: #FF9800; font-size: 20px; margin-right: 12px;">⏳</span>
-                    <span>待UI全面应用新配色</span>
-                </div>
-            </div>
-        </div>
-
-        <div
-            style="text-align: center; margin-top: 40px; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-            <h2 style="color: #1976D2; margin-bottom: 12px;">推荐立即实施</h2>
-            <p style="color: #757575; font-size: 16px; line-height: 1.6;">
-                这次配色优化修复了一个<strong style="color: #F44336;">严重的UX问题</strong>（涨跌颜色与文化习惯相反），<br>
-                同时全面提升了产品的专业性和可用性。<br>
-                <strong style="color: #4CAF50;">建议立即应用到生产环境。</strong>
-            </p>
-        </div>
-
-        <footer style="margin-top: 40px; padding: 20px; text-align: center; color: #9E9E9E; font-size: 14px;">
-            <p>MarketAssistant 配色方案 v2.0</p>
-            <p style="margin-top: 8px;">符合中国股市"红涨绿跌"标准 | 遵循金融行业规范 | 满足WCAG可访问性要求</p>
-        </footer>
+  <!-- 1 品牌色 -->
+  <section>
+    <h2>1. 品牌主色（Brand）</h2>
+    <p class="desc">专业金融蓝体系。PrimaryDark 用于按下态与强调标题；Accent 仅用于高风险/警示性操作点缀。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#1976D2;color:#FFFFFF">#1976D2</div><div class="info"><div class="name">主色</div><div class="key">Primary</div><div class="hex">brand-blue</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#0D47A1;color:#FFFFFF">#0D47A1</div><div class="info"><div class="name">主色-按下/深</div><div class="key">PrimaryDark</div><div class="hex">brand-blue-dark</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#42A5F5;color:#0A0E17">#42A5F5</div><div class="info"><div class="name">主色-浅</div><div class="key">PrimaryLight</div><div class="hex">brand-blue-light</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF6B35;color:#FFFFFF">#FF6B35</div><div class="info"><div class="name">强调色</div><div class="key">Accent</div><div class="hex">accent</div></div></div>
     </div>
-</body>
+  </section>
 
+  <!-- 2 市场语义色 -->
+  <section>
+    <h2>2. 市场语义色（Market Semantic）</h2>
+    <p class="desc">中国市场标准：红涨绿跌。标签一律带约 12% 透明度背景色块（BullishTagBackgroundBrush / BearishTagBackgroundBrush）。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#F44336;color:#FFFFFF">#F44336</div><div class="info"><div class="name">看涨-红</div><div class="key">BullishRed</div><div class="hex">bullish-red</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#4CAF50;color:#FFFFFF">#4CAF50</div><div class="info"><div class="name">看跌-绿</div><div class="key">BearishGreen</div><div class="hex">bearish-green</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#9E9E9E;color:#FFFFFF">#9E9E9E</div><div class="info"><div class="name">中性</div><div class="key">Neutral</div><div class="hex">neutral</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#1FF44336;color:#F44336">12% #F44336</div><div class="info"><div class="name">看涨标签背景</div><div class="key">BullishTagBackgroundBrush</div><div class="hex">bullish-bg</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#1F4CAF50;color:#4CAF50">12% #4CAF50</div><div class="info"><div class="name">看跌标签背景</div><div class="key">BearishTagBackgroundBrush</div><div class="hex">bearish-bg</div></div></div>
+    </div>
+    <p class="desc" style="margin-top:14px">标签效果预览：</p>
+    <div class="row">
+      <div class="tile" style="background:var(--page-elevated)"><span class="tag-demo" style="background:rgba(244,67,54,0.12);color:#F44336">▲ +2.35%</span></div>
+      <div class="tile" style="background:var(--page-elevated)"><span class="tag-demo" style="background:rgba(76,175,80,0.12);color:#4CAF50">▼ -1.26%</span></div>
+    </div>
+  </section>
+
+  <!-- 3 功能语义色 -->
+  <section>
+    <h2>3. 功能语义色（Functional Semantic）</h2>
+    <p class="desc">已收敛至 Tailwind 语义色体系（v2.2 裁决）。Success 不再与 BearishGreen 同值，Error 不再与 BullishRed 同值，消除语义冲突。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#10B981;color:#FFFFFF">#10B981</div><div class="info"><div class="name">成功</div><div class="key">Success</div><div class="hex">emerald-500</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#F59E0B;color:#0A0E17">#F59E0B</div><div class="info"><div class="name">警告</div><div class="key">Warning</div><div class="hex">amber-500</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#EF4444;color:#FFFFFF">#EF4444</div><div class="info"><div class="name">错误</div><div class="key">Error</div><div class="hex">red-500</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#3B82F6;color:#FFFFFF">#3B82F6</div><div class="info"><div class="name">信息</div><div class="key">Info</div><div class="hex">blue-500</div></div></div>
+    </div>
+    <p class="desc" style="margin-top:14px">交互状态（悬停变浅 / 按下变深）：</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#34D399;color:#0A0E17">#34D399</div><div class="info"><div class="name">成功-悬停</div><div class="key">SuccessHover</div><div class="hex">emerald-400</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#059669;color:#FFFFFF">#059669</div><div class="info"><div class="name">成功-按下</div><div class="key">SuccessPressed</div><div class="hex">emerald-600</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FBBF24;color:#0A0E17">#FBBF24</div><div class="info"><div class="name">警告-悬停</div><div class="key">WarningHover</div><div class="hex">amber-400</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#D97706;color:#FFFFFF">#D97706</div><div class="info"><div class="name">警告-按下</div><div class="key">WarningPressed</div><div class="hex">amber-600</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#60A5FA;color:#0A0E17">#60A5FA</div><div class="info"><div class="name">信息-悬停</div><div class="key">InfoHover</div><div class="hex">blue-400</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#2563EB;color:#FFFFFF">#2563EB</div><div class="info"><div class="name">信息-按下</div><div class="key">InfoPressed</div><div class="hex">blue-600</div></div></div>
+    </div>
+  </section>
+
+  <!-- 4 深色主题 -->
+  <section>
+    <h2>4. 深色主题（Dark Theme）</h2>
+    <p class="desc">带蓝调的四层背景体系，本页背景即取自该方案。</p>
+    <div class="row">
+      <div class="tile" style="background:#0A0E17"><div class="label" style="color:#E8ECF1">页面背景 · bg-base</div><div class="value" style="color:#E8ECF1">PageBackground · #0A0E17</div></div>
+      <div class="tile" style="background:#111722"><div class="label" style="color:#E8ECF1">卡片背景 · bg-card</div><div class="value" style="color:#E8ECF1">CardBackground · #111722</div></div>
+      <div class="tile" style="background:#161C2A"><div class="label" style="color:#E8ECF1">浮起背景 · bg-elevated</div><div class="value" style="color:#E8ECF1">ElevatedBackground · #161C2A</div></div>
+      <div class="tile" style="background:#1B2233"><div class="label" style="color:#E8ECF1">悬浮背景 · bg-hover</div><div class="value" style="color:#E8ECF1">HoverBackground · #1B2233</div></div>
+      <div class="tile" style="background:rgba(25,118,210,0.15)"><div class="label" style="color:#E8ECF1">选中背景 · bg-selected</div><div class="value" style="color:#E8ECF1">SelectedBackground · rgba(25,118,210,0.15)</div></div>
+    </div>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#1E2636;color:#E8ECF1">#1E2636</div><div class="info"><div class="name">边框-默认</div><div class="key">BorderBrush</div><div class="hex">border-default</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#2A3348;color:#E8ECF1">#2A3348</div><div class="info"><div class="name">边框-强</div><div class="key">BorderStrongBrush</div><div class="hex">border-strong</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#E8ECF1;color:#0A0E17">#E8ECF1</div><div class="info"><div class="name">主文本</div><div class="key">TextPrimaryBrush</div><div class="hex">text-primary</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#8894A8;color:#0A0E17">#8894A8</div><div class="info"><div class="name">次文本</div><div class="key">TextSecondaryBrush</div><div class="hex">text-secondary</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#5A6578;color:#E8ECF1">#5A6578</div><div class="info"><div class="name">禁用文本</div><div class="key">TextDisabledBrush</div><div class="hex">text-disabled</div></div></div>
+    </div>
+  </section>
+
+  <!-- 5 亮色主题 -->
+  <section>
+    <h2>5. 亮色主题（Light Theme）</h2>
+    <p class="desc">文本色已对齐设计系统 v2.2 目标值。</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#FAFAFA;color:#1A1D26;border-bottom:1px solid #E0E0E0">#FAFAFA</div><div class="info"><div class="name">页面背景</div><div class="key">PageBackground</div><div class="hex">bg-light-base</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF;color:#1A1D26;border-bottom:1px solid #E0E0E0">#FFFFFF</div><div class="info"><div class="name">卡片背景</div><div class="key">CardBackground</div><div class="hex">bg-light-card</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#1A1D26;color:#FFFFFF">#1A1D26</div><div class="info"><div class="name">主文本</div><div class="key">TextPrimaryBrush</div><div class="hex">text-primary-light</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#6B7280;color:#FFFFFF">#6B7280</div><div class="info"><div class="name">次文本</div><div class="key">TextSecondaryBrush</div><div class="hex">text-secondary-light</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#9CA3AF;color:#FFFFFF">#9CA3AF</div><div class="info"><div class="name">禁用文本</div><div class="key">TextDisabledBrush</div><div class="hex">text-disabled-light</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#261976D2;color:#1A1D26">15% #1976D2</div><div class="info"><div class="name">选中背景</div><div class="key">SelectedBackgroundBrush</div><div class="hex">bg-selected-light</div></div></div>
+    </div>
+  </section>
+
+  <!-- 6 状态面板 -->
+  <section>
+    <h2>6. 状态面板背景（Status Panels）</h2>
+    <p class="desc">主题感知的半透明面板，用于提示、警告与错误区块。</p>
+    <div class="row">
+      <div class="tile" style="background:rgba(16,185,129,0.10);border-color:rgba(16,185,129,0.30)"><div class="label" style="color:#10B981">成功面板 · SuccessPanel</div><div class="value" style="color:#10B981">10% 填充 + 30% 边框</div></div>
+      <div class="tile" style="background:rgba(245,158,11,0.10);border-color:rgba(245,158,11,0.30)"><div class="label" style="color:#F59E0B">警告面板 · WarningPanel</div><div class="value" style="color:#F59E0B">10% 填充 + 30% 边框</div></div>
+      <div class="tile" style="background:rgba(239,68,68,0.10);border-color:rgba(239,68,68,0.30)"><div class="label" style="color:#EF4444">危险面板 · DangerPanel</div><div class="value" style="color:#EF4444">10% 填充 + 30% 边框</div></div>
+      <div class="tile" style="background:rgba(25,118,210,0.10);border-color:rgba(25,118,210,0.30)"><div class="label" style="color:#42A5F5">信息面板 · InfoPanel</div><div class="value" style="color:#42A5F5">10% 填充 + 30% 边框</div></div>
+    </div>
+  </section>
+
+  <!-- 7 K线图主题 -->
+  <section>
+    <h2>7. K线图主题（v2.4）</h2>
+    <p class="desc">内嵌 WebView（klinecharts 9.x）由 C# 宿主按 ActualThemeVariant 注入 setTheme('dark'|'light') 并联动切换，两套 palette 均对齐设计系统令牌。</p>
+    <div class="row">
+      <div class="tile" style="background:#FFFFFF"><div class="label" style="color:#667085">浅色 · 图表背景</div><div class="value" style="color:#667085">#FFFFFF · 网格 #E6E9EF · 轴文本 #667085</div></div>
+      <div class="tile" style="background:#111722"><div class="label" style="color:#8894A8">深色 · 图表背景</div><div class="value" style="color:#8894A8">#111722 · 网格 #1E2636 · 轴文本 #8894A8</div></div>
+      <div class="tile" style="background:#F44336;color:#FFFFFF"><div class="label">涨 #F44336</div><div class="value">两主题一致（红涨绿跌）</div></div>
+      <div class="tile" style="background:#4CAF50;color:#FFFFFF"><div class="label">跌 #4CAF50</div><div class="value">两主题一致（红涨绿跌）</div></div>
+      <div class="tile" style="background:#1976D2;color:#FFFFFF"><div class="label">加载指示 · 浅色</div><div class="value">#1976D2 · 错误色 #EF4444</div></div>
+      <div class="tile" style="background:#42A5F5;color:#FFFFFF"><div class="label">加载指示 · 深色</div><div class="value">#42A5F5 · 十字线 #5A6680</div></div>
+    </div>
+  </section>
+
+  <!-- 8 同步状态 -->
+  <section>
+    <h2>8. 与实现的同步状态</h2>
+    <p class="desc">v2.4 轮收敛已完成以下项（详见 design-system.md 第 10/11 章）：</p>
+    <ul class="status-list">
+      <li><span class="mark">✅</span><span>功能语义色收敛至 Tailwind 体系（Success/Warning/Error/Info 及 Hover/Pressed），与涨跌色不再冲突</span></li>
+      <li><span class="mark">✅</span><span>遗留脏色清除：#dc3545、#007bff 及其画刷已删除；涨跌转换器改读设计系统资源（原 #e74c3c/#2ecc71）</span></li>
+      <li><span class="mark">✅</span><span>涨跌标签背景画刷（12% 透明度）已注册，可在视图中直接引用</span></li>
+      <li><span class="mark">✅</span><span>bg-selected 深色/亮色均改为品牌蓝 15% 填充</span></li>
+      <li><span class="mark">✅</span><span>PrimaryDark 对齐 brand-blue-dark #0D47A1</span></li>
+      <li><span class="mark">✅</span><span>亮色主题文本对齐 #1A1D26 / #6B7280 / #9CA3AF</span></li>
+      <li><span class="mark">✅</span><span>通知窗口配色迁入蓝调深色体系（#161C2A / #1E2636）</span></li>
+      <li><span class="mark">✅</span><span>视图 emoji 全部替换为 SVG 线性图标（feather 风格、语义配色）</span></li>
+      <li><span class="mark">✅</span><span>亮色硬编码语义色组（*Light/*Background/*Border/*Text）已整体删除，消费方统一走主题感知 *Panel 组</span></li>
+      <li><span class="mark">✅</span><span>缺失 Token 补齐：BorderActiveBrush（聚焦边框，暗 #42A5F5 / 亮 #1976D2）、DarkOverlayBrush 遮罩、NeutralTagBackgroundBrush</span></li>
+      <li><span class="mark">✅</span><span>字号/圆角阶梯收敛完成：15/20/24 → 14/18/22；圆角 10/16 并入 8/12（LargeCornerRadius 已删除）</span></li>
+      <li><span class="mark">✅</span><span>散落样式收敛：聊天侧栏 4 个本地阴影与页面硬编码遮罩全部迁至全局 Token（Sidebar/InputArea/UserBubble BoxShadow）</span></li>
+      <li><span class="mark">✅</span><span>涨跌标签 12% 背景落地：收藏页涨跌幅标签改为色块背景 + 同色文字（转换器支持 ConverterParameter=tag）</span></li>
+      <li><span class="mark">✅</span><span>通知窗口配色已对齐蓝调深色体系；嵌入式 Toast 形态列为 P3 体验增强储备（非偏差）</span></li>
+      <li><span class="mark">✅</span><span>K线图主题化（v2.4）：kline_chart.html 实现 setTheme，宿主按 ActualThemeVariant 注入联动（原深色主题下永久白底缺陷消除），兜底页配色同步对齐</span></li>
+      <li><span class="mark">✅</span><span>on-color 收敛（v2.4）：新增 TextOnEmphasisBrush，约 22 处 Foreground="White" 硬编码收敛为 Token 引用（含 btn-primary/btn-info 变体）</span></li>
+      <li><span class="mark">✅</span><span>动效时长收敛（v2.4）：0.2s×8 / 0.12s / 0.8s 统一归入 150/600ms 阶梯</span></li>
+      <li><span class="mark">✅</span><span>排版兼容区清理（v2.4）：featureTitle 与重复定义的 feature-title 删除</span></li>
+      <li><span class="mark">✅</span><span>本页文本色修正：#E8ECF1 → #E4EAF5（与规范 text-primary 对齐）</span></li>
+    </ul>
+    <p class="desc" style="margin-top:12px">✅ v2.4 收敛项已闭环，本页与 <code>Colors.axaml / Spacing.axaml / kline_chart.html</code> 实现一致。遗留待办：导航项尺寸（56/48 → 44×44）与导航图标（24 → 22px）见 design-system.md 第七章。</p>
+  </section>
+
+  <footer>MarketAssistant Design System · 配色预览 v2.4 · 与 Colors.axaml / kline_chart.html 实现同步 · 2026-08</footer>
+</div>
+</body>
 </html>

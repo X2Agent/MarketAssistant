@@ -32,7 +32,8 @@ public class MarketContext : INotifyPropertyChanged
     private readonly IUserSettingService _userSettingService;
     private readonly IServiceProvider _serviceProvider;
     private readonly object _marketLock = new();
-    private MarketType _currentMarket;
+    // volatile 保证无锁读取 CurrentMarket 时能立即看到其他线程的切换结果
+    private volatile MarketType _currentMarket;
 
     /// <summary>
     /// 当前激活的市场类型（静态快照，供 UI Converter 等无法直接依赖注入的场景读取）

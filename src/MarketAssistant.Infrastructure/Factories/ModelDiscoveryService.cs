@@ -28,8 +28,6 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
     private const string HttpClientName = "AnonymousOpenAI";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
-    private readonly HttpClient _httpClient = httpClientFactory.CreateClient(HttpClientName);
-
     public async Task<IReadOnlyList<string>> ListModelsAsync(
         ModelProvider provider,
         string? apiKey,
@@ -49,9 +47,11 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
         if (!string.IsNullOrWhiteSpace(apiKey))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
+        // 每次调用通过工厂创建客户端，避免 Singleton 缓存 HttpClient 受 DNS 变化影响
+        using var httpClient = httpClientFactory.CreateClient(HttpClientName);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(RequestTimeout);
-        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);

@@ -1,56 +1,45 @@
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
 using MarketAssistant.Services.Market;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels.Home;
 
-/// <summary>
-/// 最近查看资产ViewModel
-/// </summary>
 public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
 
     private IAssetHistoryService HistoryService =>
-        _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetAssetHistoryService(_marketContext.CurrentMarket);
 
     private IHomeAssetService HomeAssetService =>
-        _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetHomeAssetService(_marketContext.CurrentMarket);
 
     private IAssetInfoService AssetInfoService =>
-        _serviceProvider.GetRequiredKeyedService<IAssetInfoService>(_marketContext.CurrentMarket);
+        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
 
-    /// <summary>
-    /// 最近查看资产集合
-    /// </summary>
     public ObservableCollection<AssetItem> RecentAssets { get; } = new();
 
-    /// <summary>
-    /// 最近资产选择事件
-    /// </summary>
     public event EventHandler<AssetItem>? RecentAssetSelected;
 
     public RecentAssetsViewModel(
-        IServiceProvider serviceProvider,
+        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<RecentAssetsViewModel> logger)
         : base(logger)
     {
-        _serviceProvider = serviceProvider;
+        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
 
-        // 订阅市场切换事件
         SubscribeToMarketChanges(_marketContext);
 
-        // 自动加载最近资产
         _ = LoadRecentAssetsAsync();
     }
 
@@ -62,9 +51,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         _ = LoadRecentAssetsAsync();
     }
 
-    /// <summary>
-    /// 加载最近查看资产
-    /// </summary>
     [RelayCommand]
     private async Task LoadRecentAssetsAsync()
     {
@@ -83,9 +69,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         }, "加载最近查看资产");
     }
 
-    /// <summary>
-    /// 补全单个资产的实时价格与涨跌幅
-    /// </summary>
     private async Task EnrichWithQuoteAsync(AssetItem asset)
     {
         try
@@ -100,9 +83,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>
-    /// 添加资产到最近查看
-    /// </summary>
     public async Task AddToRecentAssetsAsync(AssetItem asset)
     {
         await SafeExecuteAsync(async () =>
@@ -112,21 +92,14 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         }, "添加到最近查看");
     }
 
-    /// <summary>
-    /// 选择最近资产
-    /// </summary>
     [RelayCommand]
     private void SelectRecentAsset(AssetItem? asset)
     {
         if (asset == null) return;
 
-        // 通知父ViewModel
         RecentAssetSelected?.Invoke(this, asset);
     }
 
-    /// <summary>
-    /// 添加到收藏
-    /// </summary>
     [RelayCommand]
     private async Task AddToFavoriteAsync(AssetItem? asset)
     {
@@ -138,9 +111,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         }, "添加收藏");
     }
 
-    /// <summary>
-    /// 释放资源
-    /// </summary>
     public void Dispose()
     {
         UnsubscribeFromMarketChanges(_marketContext);

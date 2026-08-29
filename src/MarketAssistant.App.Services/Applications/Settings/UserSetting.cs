@@ -170,6 +170,45 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _investmentPreference, value);
     }
 
+    /// <summary>
+    /// 深拷贝一份独立副本。
+    /// 设置页编辑必须基于副本（草稿模式）：直接编辑单例本体会让未保存的修改
+    /// （如交易模式改为实盘、半填的密钥）随任何一次切市场的整体落盘而静默生效。
+    /// 不能用 JSON 往返实现——密钥字段带 [JsonIgnore]，序列化会丢失。
+    /// </summary>
+    public UserSetting Clone()
+    {
+        var clone = new UserSetting
+        {
+            ProviderId = ProviderId,
+            EmbeddingModelId = EmbeddingModelId,
+            EmbeddingEndpoint = EmbeddingEndpoint,
+            EmbeddingApiKey = EmbeddingApiKey,
+            ProviderApiKeys = new Dictionary<string, string>(ProviderApiKeys, StringComparer.Ordinal),
+            ProviderModelIds = new Dictionary<string, string>(ProviderModelIds, StringComparer.Ordinal),
+            ProviderEndpoints = new Dictionary<string, string>(ProviderEndpoints, StringComparer.Ordinal),
+            LoadKnowledge = LoadKnowledge,
+            KnowledgeFileDirectory = KnowledgeFileDirectory,
+            Notification = Notification,
+            ZhiTuApiToken = ZhiTuApiToken,
+            ThemeMode = ThemeMode,
+            CurrentMarketType = CurrentMarketType,
+            CryptoTradingMode = CryptoTradingMode,
+            CoinGeckoApiKey = CoinGeckoApiKey,
+            BinanceApiKey = BinanceApiKey,
+            BinanceSecretKey = BinanceSecretKey,
+            BinanceFuturesTestnetApiKey = BinanceFuturesTestnetApiKey,
+            BinanceFuturesTestnetSecretKey = BinanceFuturesTestnetSecretKey,
+            LogPath = LogPath,
+            EnableWebSearch = EnableWebSearch,
+            WebSearchApiKey = WebSearchApiKey,
+            WebSearchProvider = WebSearchProvider,
+            EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
+            InvestmentPreference = InvestmentPreference.Clone()
+        };
+        return clone;
+    }
+
     #region INotifyPropertyChanged Implementation
 
     public event PropertyChangedEventHandler? PropertyChanged;

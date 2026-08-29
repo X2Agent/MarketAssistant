@@ -66,7 +66,7 @@
                 IsVisible="{Binding IsBusy}"
                 ZIndex="1000">
             <Border Background="{DynamicResource CardBackgroundBrush}"
-                    CornerRadius="{StaticResource LargeCornerRadius}"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
                     Padding="{StaticResource ProgressDialogPadding}"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
@@ -163,7 +163,7 @@
                                 Command="{Binding ExecuteAnalysisCommand}"
                                 IsEnabled="{Binding !IsBusy}"
                                 Background="{StaticResource PrimaryBrush}"
-                                Foreground="White"
+                                Foreground="{StaticResource TextOnEmphasisBrush}"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"/>
                         <Button Content="清除"
                                 Command="{Binding ClearContentCommand}"
@@ -274,7 +274,7 @@
                                                 <TextBlock Text="{Binding RecommendationScore, StringFormat={}{0:F0}}"
                                                            FontSize="{StaticResource MediumFontSize}"
                                                            FontWeight="Bold"
-                                                           Foreground="White"
+                                                           Foreground="{StaticResource TextOnEmphasisBrush}"
                                                            HorizontalAlignment="Center"/>
                                             </Border>
                                         </Grid>
@@ -403,7 +403,7 @@
                             IsVisible="{Binding HasRiskWarnings}">
                         <TextBlock Text="{Binding FormattedRiskWarnings}"
                                    FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{StaticResource WarningTextBrush}"
+                                   Foreground="{DynamicResource WarningPanelTextBrush}"
                                    TextWrapping="Wrap"
                                    LineHeight="{StaticResource DefaultLineHeight}"/>
                     </Border>

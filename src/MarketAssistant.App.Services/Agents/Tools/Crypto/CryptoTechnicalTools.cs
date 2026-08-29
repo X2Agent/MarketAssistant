@@ -55,7 +55,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return kdj;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币KDJ指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币KDJ指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -80,12 +80,15 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
                 .LastOrDefault(item => item.Macd is not null && item.Signal is not null)
                 ?? throw new FriendlyException($"MACD 指标结果为空: {assetSymbol}");
 
+            var diff = Round(result.Macd) ?? 0;
+            var dea = Round(result.Signal) ?? 0;
             var macd = new TechnicalMACD
             {
                 T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                Diff = Round(result.Macd) ?? 0,
-                Dea = Round(result.Signal) ?? 0,
-                Macd = Round(result.Histogram) ?? 0,
+                Diff = diff,
+                Dea = dea,
+                // 国内惯例 MACD 柱线 = 2*(DIFF-DEA)，与模型契约及 A 股智兔数据口径保持一致
+                Macd = 2 * (diff - dea),
                 Ema12 = Round(result.FastEma) ?? 0,
                 Ema26 = Round(result.SlowEma) ?? 0
             };
@@ -95,7 +98,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return macd;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币MACD指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币MACD指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -133,7 +136,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return boll;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币BOLL指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币BOLL指标失败: {ex.Message} (交易对: {assetSymbol})", ex);
@@ -174,7 +177,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
 
             return ma;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "计算虚拟币MA指标失败: {Symbol}", assetSymbol);
             throw new FriendlyException($"计算虚拟币MA指标失败: {ex.Message} (交易对: {assetSymbol})", ex);

@@ -28,13 +28,14 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
 
     public bool CanRead(string filePath)
     {
-        // 支持直接的Markdown文件或可转换为Markdown的文件
+        // 仅接受 Markdown 文件。此前额外接受可转换格式（.pdf/.docx），
+        // 且本 Reader 注册在 Docx/Pdf 专用 Reader 之前，导致后者永远不被选中。
+        // .pdf/.docx 交给各自的专用 Reader 处理。
         return filePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
-               filePath.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase) ||
-               _converterFactory.CanConvert(filePath);
+               filePath.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase);
     }
 
-    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath)
+    public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default)
     {
         string markdown;
 
@@ -42,7 +43,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
         if (filePath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
             filePath.EndsWith(".markdown", StringComparison.OrdinalIgnoreCase))
         {
-            markdown = await File.ReadAllTextAsync(filePath);
+            markdown = await File.ReadAllTextAsync(filePath, cancellationToken);
         }
         else
         {

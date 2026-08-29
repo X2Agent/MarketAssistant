@@ -76,7 +76,7 @@ public sealed class StockScreenerService : IAssetScreenerService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
+    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria, CancellationToken cancellationToken = default)
     {
         if (criteria is not StockCriteria stockCriteria)
         {
@@ -88,22 +88,22 @@ public sealed class StockScreenerService : IAssetScreenerService
 
         try
         {
-            await EnsureCookiesAsync();
+            await EnsureCookiesAsync(cancellationToken);
 
             var queryParams = BuildQueryParams(stockCriteria);
-            var stocks = await FetchFromXueqiuAsync(queryParams);
+            var stocks = await FetchFromXueqiuAsync(queryParams, cancellationToken);
 
             _logger.LogInformation("雪球选股完成，结果数量: {Count}", stocks.Count);
             return stocks.Cast<ScreenerAssetInfo>().ToList();
         }
-        catch (Exception ex) when (ex is not ArgumentException)
+        catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
         {
             _logger.LogError(ex, "雪球选股过程中发生错误");
             throw new FriendlyException($"筛选股票失败: {ex.Message}", ex);
         }
     }
 
-    private async Task EnsureCookiesAsync()
+    private async Task EnsureCookiesAsync(CancellationToken cancellationToken)
     {
         var cookies = _cookieContainer.GetCookies(new Uri("https://xueqiu.com"));
         if (cookies.Count > 0)
@@ -114,7 +114,7 @@ public sealed class StockScreenerService : IAssetScreenerService
         _logger.LogDebug("雪球 Cookie 为空，访问首页获取 Cookie");
         using var client = _httpClientFactory.CreateClient("Xueqiu");
         using var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -216,7 +216,7 @@ public sealed class StockScreenerService : IAssetScreenerService
                filterString;
     }
 
-    private async Task<List<ScreenerStockInfo>> FetchFromXueqiuAsync(string queryParams)
+    private async Task<List<ScreenerStockInfo>> FetchFromXueqiuAsync(string queryParams, CancellationToken cancellationToken)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         var url = $"{ScreenerEndpoint}?{queryParams}&_={timestamp}";
@@ -225,9 +225,9 @@ public sealed class StockScreenerService : IAssetScreenerService
 
         using var client = _httpClientFactory.CreateClient("Xueqiu");
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, cancellationToken);
 
-        var json = await response.Content.ReadAsStringAsync();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {

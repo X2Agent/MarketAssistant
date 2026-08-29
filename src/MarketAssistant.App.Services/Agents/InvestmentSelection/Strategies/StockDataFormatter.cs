@@ -20,7 +20,8 @@ public class StockDataFormatter : IAssetDataFormatter
         ("mc", "总市值_亿元", 2, 100_000_000),
         ("fmc", "流通市值_亿元", 2, 100_000_000),
         ("amount", "成交额_亿元", 2, 100_000_000),
-        ("volume", "成交量_万股", 2, 1),
+        // 雪球接口 volume 原始单位为股（amount 为元），与 amount→亿元 同源互证
+        ("volume", "成交量_万股", 2, 10_000),
         ("chgpct", "当日振幅_百分比", 2, 1),
         ("volume_ratio", "量比", 2, 1),
         ("tr", "换手率_百分比", 2, 1),

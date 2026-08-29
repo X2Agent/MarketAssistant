@@ -1,13 +1,10 @@
 <Project>
   <PropertyGroup>
-    <!-- 在非 Windows 平台上禁用 Windows 目标构建 -->
-    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">false</EnableWindowsTargeting>
-    
-    <!-- 在 macOS 上明确禁用 Windows 目标 -->
-    <EnableWindowsTargeting Condition="'$(RuntimeIdentifier)' == 'maccatalyst-x64' OR '$(RuntimeIdentifier)' == 'maccatalyst-arm64'">false</EnableWindowsTargeting>
-    
-    <!-- 排除 Windows 项目的构建 -->
-    <DefaultItemExcludes Condition="'$(OS)' != 'Windows_NT'">$(DefaultItemExcludes);**/*WinUI*/**</DefaultItemExcludes>
+    <!-- 集中管理所有工程的通用属性（原 WinUI/Windows TFM 相关段已移除：当前全部工程均为 net10.0，无 WinUI 目标） -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MarketAssistant</RootNamespace>
 
     <!-- VS 隔离构建（Isolated MSBuild）会在 obj-isolated/bin-isolated 生成第二套编译产物，
          默认 glob 会将其扫入 Compile 项，与 obj/bin 下的生成文件重复导致 CS0579。
@@ -18,9 +15,4 @@
     <!-- 如需调整，使用分号分隔：例如 zh-Hans;en-US;ja -->
     <SatelliteResourceLanguages>zh-Hans;en-us</SatelliteResourceLanguages>
   </PropertyGroup>
-  
-  <!-- 条件性排除 Windows 项目引用 -->
-  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
-    <ProjectReference Remove="**/*WinUI*/*.csproj" />
-  </ItemGroup>
 </Project>

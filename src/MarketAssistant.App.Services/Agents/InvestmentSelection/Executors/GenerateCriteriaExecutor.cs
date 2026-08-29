@@ -90,6 +90,11 @@ public sealed class GenerateCriteriaExecutor<TCriteria>
                 OriginalRequest = input
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤1/3-{MarketType}] 生成筛选条件失败", _strategy.SupportedMarketType);
@@ -97,7 +102,7 @@ public sealed class GenerateCriteriaExecutor<TCriteria>
             {
                 throw;
             }
-            throw new FriendlyException(ex.Message);
+            throw new FriendlyException($"生成筛选条件失败: {ex.Message}", ex);
         }
     }
 

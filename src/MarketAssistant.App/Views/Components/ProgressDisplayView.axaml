@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="200"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              x:Class="MarketAssistant.Views.Components.ProgressDisplayView"
              x:Name="Root">
 
@@ -50,11 +51,18 @@
         <StackPanel Spacing="{StaticResource DefaultIconSize}">
             
             <!-- 标题 -->
-            <TextBlock Text="🤖 AI 分析中..."
-                       FontSize="{StaticResource LargeFontSize}"
-                       FontWeight="Bold"
-                       HorizontalAlignment="Center"
-                       Foreground="{StaticResource PrimaryBrush}"/>
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="{StaticResource SmallSpacing}">
+                <svg:Svg Path="/Assets/Images/icon_ai.svg"
+                         Width="22" Height="22"
+                         VerticalAlignment="Center"/>
+                <TextBlock Text="AI 分析中..."
+                           FontSize="{StaticResource LargeFontSize}"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource PrimaryBrush}"/>
+            </StackPanel>
 
             <!-- 进度指示器区域 -->
             <StackPanel Spacing="{StaticResource LargeSpacing}" HorizontalAlignment="Center">
@@ -137,9 +145,10 @@
                     <StackPanel Orientation="Horizontal" 
                                 HorizontalAlignment="Center"
                                 Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="💡"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   VerticalAlignment="Center"/>
+                        <svg:Svg Path="/Assets/Images/icon_bulb.svg"
+                                 Width="{StaticResource LabelFontSize}"
+                                 Height="{StaticResource LabelFontSize}"
+                                 VerticalAlignment="Center"/>
                         <TextBlock Text="分析过程可能需要 1-3 分钟，请耐心等待"
                                    FontSize="{StaticResource SmallFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"

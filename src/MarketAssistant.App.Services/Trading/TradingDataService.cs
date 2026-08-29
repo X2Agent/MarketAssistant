@@ -86,13 +86,15 @@ public class TradingDataService : SqliteServiceBase
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             INSERT OR REPLACE INTO strategies
-                (id, environment, symbol, type, status, side, trigger_price, stop_loss_price, take_profit_price,
+                (id, environment, symbol, type, status, side, order_type, slippage_tolerance,
+                 trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
-                 execution_count, max_executions, trailing_peak_price, native_order_id)
+                 execution_count, max_executions, trailing_peak_price)
             VALUES
-                (@id, @environment, @symbol, @type, @status, @side, @triggerPrice, @slPrice, @tpPrice,
+                (@id, @environment, @symbol, @type, @status, @side, @orderType, @slippage,
+                 @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
-                 @execCount, @maxExec, @trailingPeak, @nativeOrderId)
+                 @execCount, @maxExec, @trailingPeak)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -100,6 +102,8 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@type", (int)strategy.Type);
         cmd.Parameters.AddWithValue("@status", (int)strategy.Status);
         cmd.Parameters.AddWithValue("@side", (int)strategy.Side);
+        cmd.Parameters.AddWithValue("@orderType", (int)strategy.OrderType);
+        cmd.Parameters.AddWithValue("@slippage", ToDb(strategy.SlippageTolerance));
         cmd.Parameters.AddWithValue("@triggerPrice", ToDb(strategy.TriggerPrice));
         cmd.Parameters.AddWithValue("@slPrice", ToDbNullable(strategy.StopLossPrice));
         cmd.Parameters.AddWithValue("@tpPrice", ToDbNullable(strategy.TakeProfitPrice));
@@ -111,7 +115,6 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
         cmd.Parameters.AddWithValue("@trailingPeak", ToDbNullable(strategy.TrailingPeakPrice));
-        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)strategy.NativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -191,7 +194,8 @@ public class TradingDataService : SqliteServiceBase
     /// 仅更新策略的最后评估时间（不增加执行计数），用于 AI 信号策略的评估节流：
     /// 无论 Agent 是否实际成交，一次评估后都记入冷却期，避免未成交时每个价格 tick 重复调用 LLM。
     /// </summary>
-    public async Task UpdateStrategyLastTriggeredAtAsync(string id, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyLastTriggeredAtAsync(string id, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -240,7 +244,8 @@ public class TradingDataService : SqliteServiceBase
         }
     }
 
-    public async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -253,9 +258,31 @@ public class TradingDataService : SqliteServiceBase
     }
 
     /// <summary>
+    /// 更新策略护栏位（止损/止盈价）。AI 决策生成护栏后调用，
+    /// 使 StrategyEngine 的硬性边界评估与 TradeExecutor 的风控检查立即生效。
+    /// </summary>
+    public async Task UpdateStrategyGuardrailsAsync(
+        string id, decimal? stopLossPrice, decimal? takeProfitPrice, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE strategies SET stop_loss_price = @stopLoss, take_profit_price = @takeProfit
+            WHERE id = @id AND environment = @environment
+            """;
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@stopLoss", ToDbNullable(stopLossPrice));
+        cmd.Parameters.AddWithValue("@takeProfit", ToDbNullable(takeProfitPrice));
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// 更新追踪止损的峰值/谷值价格（持久化，防止重启丢失）
     /// </summary>
-    public async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -264,21 +291,6 @@ public class TradingDataService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@peak", ToDbNullable(trailingPeakPrice));
-        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// 更新策略的原生条件单订单 ID（提交原生条件单后调用）
-    /// </summary>
-    public async Task UpdateStrategyNativeOrderIdAsync(string id, string? nativeOrderId, CancellationToken ct = default)
-    {
-        await EnsureInitializedAsync(InitializeDatabaseAsync);
-        await using var conn = await OpenConnectionAsync(ct);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE strategies SET native_order_id = @nativeOrderId WHERE id = @id AND environment = @environment";
-        cmd.Parameters.AddWithValue("@id", id);
-        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-        cmd.Parameters.AddWithValue("@nativeOrderId", (object?)nativeOrderId ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -612,58 +624,6 @@ public class TradingDataService : SqliteServiceBase
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// 计算指定交易标的的加权平均买入价（用于多头 PnL 估算）
-    /// </summary>
-    public async Task<decimal> GetAverageEntryPriceAsync(string symbol, CancellationToken ct = default)
-    {
-        await EnsureInitializedAsync(InitializeDatabaseAsync);
-        await using var conn = await OpenConnectionAsync(ct);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            SELECT CASE WHEN SUM(executed_qty) > 0
-                THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
-                ELSE 0 END
-            FROM trade_records
-            WHERE environment = @environment AND symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
-            """;
-        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-        cmd.Parameters.AddWithValue("@symbol", symbol);
-        cmd.Parameters.AddWithValue("@side", (int)OrderSide.Buy);
-        cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
-
-        var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
-        if (result is double d)
-            return (decimal)d;
-        return 0;
-    }
-
-    /// <summary>
-    /// 计算指定交易标的的加权平均卖出价（用于空头平仓 PnL 估算）
-    /// </summary>
-    public async Task<decimal> GetAverageSellPriceAsync(string symbol, CancellationToken ct = default)
-    {
-        await EnsureInitializedAsync(InitializeDatabaseAsync);
-        await using var conn = await OpenConnectionAsync(ct);
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            SELECT CASE WHEN SUM(executed_qty) > 0
-                THEN SUM(executed_qty * executed_price) / SUM(executed_qty)
-                ELSE 0 END
-            FROM trade_records
-            WHERE environment = @environment AND symbol = @symbol AND side = @side AND executed_qty > 0 AND status = @status
-            """;
-        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-        cmd.Parameters.AddWithValue("@symbol", symbol);
-        cmd.Parameters.AddWithValue("@side", (int)OrderSide.Sell);
-        cmd.Parameters.AddWithValue("@status", (int)TradeRecordStatus.Filled);
-
-        var result = await cmd.ExecuteScalarAsync(ct);
-        if (result is double d)
-            return (decimal)d;
-        return 0;
-    }
-
     #endregion
 
     #region 持仓 FIFO 追踪
@@ -811,7 +771,8 @@ public class TradingDataService : SqliteServiceBase
     /// <summary>
     /// 计算指定 symbol 的加权平均开仓价（仅未平仓部分，用于风控与 UI）
     /// </summary>
-    public async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual async Task<decimal> GetOpenPositionAvgEntryPriceAsync(string symbol, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
@@ -881,16 +842,23 @@ public class TradingDataService : SqliteServiceBase
     }
 
     /// <summary>
-    /// 获取历史最高账户价值（用于计算回撤）
+    /// 获取历史最高账户价值（用于计算回撤），支持时间窗口下限。
     /// </summary>
-    public async Task<decimal> GetPeakAccountValueAsync(CancellationToken ct = default)
+    /// <param name="since">仅统计 snapshot_at >= 该时刻的快照；传 null 时统计全部历史。
+    /// 传入滚动窗口起点（如 30 天前）后，峰值随窗口滑动自动"重置"，
+    /// 无需额外的重置接口：超出窗口的历史峰值不再参与回撤计算。</param>
+    public async Task<decimal> GetPeakAccountValueAsync(DateTime? since = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        // 金额列以 TEXT 存储，MAX 会按字符串比较，需 CAST 为数值后再取最大值
-        cmd.CommandText = "SELECT MAX(CAST(total_value_usdt AS REAL)) FROM account_snapshots WHERE environment = @environment";
+        // 金额列以 TEXT 存储，MAX 会按字符串比较，需 CAST 为数值后再取最大值；
+        // snapshot_at 统一为 "O" 格式 UTC 字符串，字典序与时间序一致，可直接比较
+        var where = since.HasValue ? " AND snapshot_at >= @since" : "";
+        cmd.CommandText = $"SELECT MAX(CAST(total_value_usdt AS REAL)) FROM account_snapshots WHERE environment = @environment{where}";
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        if (since.HasValue)
+            cmd.Parameters.AddWithValue("@since", since.Value.ToString("O"));
         var result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
         if (result is double d)
             return (decimal)d;
@@ -1000,6 +968,8 @@ public class TradingDataService : SqliteServiceBase
                 type INTEGER NOT NULL,
                 status INTEGER NOT NULL,
                 side INTEGER NOT NULL,
+                order_type INTEGER NOT NULL DEFAULT 0,
+                slippage_tolerance TEXT,
                 trigger_price TEXT NOT NULL,
                 stop_loss_price TEXT,
                 take_profit_price TEXT,
@@ -1010,8 +980,7 @@ public class TradingDataService : SqliteServiceBase
                 last_triggered_at TEXT,
                 execution_count INTEGER DEFAULT 0,
                 max_executions INTEGER,
-                trailing_peak_price TEXT,
-                native_order_id TEXT
+                trailing_peak_price TEXT
             )
             """,
         ["trade_records"] = """
@@ -1198,20 +1167,28 @@ public class TradingDataService : SqliteServiceBase
             Type = (StrategyType)reader.GetInt32(reader.GetOrdinal("type")),
             Status = (StrategyStatus)reader.GetInt32(reader.GetOrdinal("status")),
             Side = (OrderSide)reader.GetInt32(reader.GetOrdinal("side")),
-            TriggerPrice = (decimal)reader.GetDouble(reader.GetOrdinal("trigger_price")),
-            Quantity = (decimal)reader.GetDouble(reader.GetOrdinal("quantity")),
+            OrderType = (OrderType)reader.GetInt32(reader.GetOrdinal("order_type")),
+            TriggerPrice = ReadDecimal(reader, reader.GetOrdinal("trigger_price")),
+            Quantity = ReadDecimal(reader, reader.GetOrdinal("quantity")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")), CultureInfo.InvariantCulture),
             ExecutionCount = reader.GetInt32(reader.GetOrdinal("execution_count"))
         };
 
         var slOrd = reader.GetOrdinal("stop_loss_price");
-        if (!reader.IsDBNull(slOrd)) strategy.StopLossPrice = (decimal)reader.GetDouble(slOrd);
+        if (!reader.IsDBNull(slOrd)) strategy.StopLossPrice = ReadDecimal(reader, slOrd);
 
         var tpOrd = reader.GetOrdinal("take_profit_price");
-        if (!reader.IsDBNull(tpOrd)) strategy.TakeProfitPrice = (decimal)reader.GetDouble(tpOrd);
+        if (!reader.IsDBNull(tpOrd)) strategy.TakeProfitPrice = ReadDecimal(reader, tpOrd);
 
         var mpOrd = reader.GetOrdinal("max_position_percent");
-        if (!reader.IsDBNull(mpOrd)) strategy.MaxPositionPercent = (decimal)reader.GetDouble(mpOrd);
+        if (!reader.IsDBNull(mpOrd)) strategy.MaxPositionPercent = ReadDecimal(reader, mpOrd);
+
+        var slipOrd = reader.GetOrdinal("slippage_tolerance");
+        if (!reader.IsDBNull(slipOrd))
+        {
+            // 兼容 TEXT（新格式）与 REAL（历史数据）两种存储形态；显式写入的 0 视为有效配置
+            strategy.SlippageTolerance = ReadDecimal(reader, slipOrd);
+        }
 
         var cpOrd = reader.GetOrdinal("custom_params");
         if (!reader.IsDBNull(cpOrd)) strategy.CustomParams = reader.GetString(cpOrd);
@@ -1223,10 +1200,7 @@ public class TradingDataService : SqliteServiceBase
         if (!reader.IsDBNull(meOrd)) strategy.MaxExecutions = reader.GetInt32(meOrd);
 
         var trailingOrd = reader.GetOrdinal("trailing_peak_price");
-        if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = (decimal)reader.GetDouble(trailingOrd);
-
-        var nativeOrd = reader.GetOrdinal("native_order_id");
-        if (!reader.IsDBNull(nativeOrd)) strategy.NativeOrderId = reader.GetString(nativeOrd);
+        if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = ReadDecimal(reader, trailingOrd);
 
         return strategy;
     }
@@ -1240,17 +1214,17 @@ public class TradingDataService : SqliteServiceBase
             Symbol = reader.GetString(reader.GetOrdinal("symbol")),
             Side = (OrderSide)reader.GetInt32(reader.GetOrdinal("side")),
             OrderType = (OrderType)reader.GetInt32(reader.GetOrdinal("order_type")),
-            RequestedQty = (decimal)reader.GetDouble(reader.GetOrdinal("requested_qty")),
-            ExecutedQty = (decimal)reader.GetDouble(reader.GetOrdinal("executed_qty")),
-            ExecutedPrice = (decimal)reader.GetDouble(reader.GetOrdinal("executed_price")),
-            Commission = (decimal)reader.GetDouble(reader.GetOrdinal("commission")),
+            RequestedQty = ReadDecimal(reader, reader.GetOrdinal("requested_qty")),
+            ExecutedQty = ReadDecimal(reader, reader.GetOrdinal("executed_qty")),
+            ExecutedPrice = ReadDecimal(reader, reader.GetOrdinal("executed_price")),
+            Commission = ReadDecimal(reader, reader.GetOrdinal("commission")),
             Status = (TradeRecordStatus)reader.GetInt32(reader.GetOrdinal("status")),
             ExchangeOrderId = reader.GetInt64(reader.GetOrdinal("binance_order_id")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")), CultureInfo.InvariantCulture)
         };
 
         var rpOrd = reader.GetOrdinal("requested_price");
-        if (!reader.IsDBNull(rpOrd)) record.RequestedPrice = (decimal)reader.GetDouble(rpOrd);
+        if (!reader.IsDBNull(rpOrd)) record.RequestedPrice = ReadDecimal(reader, rpOrd);
 
         var caOrd = reader.GetOrdinal("commission_asset");
         if (!reader.IsDBNull(caOrd)) record.CommissionAsset = reader.GetString(caOrd);
@@ -1320,9 +1294,12 @@ public class TradingDataService : SqliteServiceBase
         SqliteTransaction transaction)
     {
         await EnsureColumnAsync(conn, transaction, "strategies", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
-        await EnsureColumnAsync(conn, transaction, "strategies", "native_order_id", "TEXT").ConfigureAwait(false);
         await EnsureColumnAsync(conn, transaction, "trade_records", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
         await EnsureColumnAsync(conn, transaction, "positions", "environment", $"TEXT NOT NULL DEFAULT '{LiveSpotEnvironment}'").ConfigureAwait(false);
+        // 滑点容忍度以 TEXT（十进制字符串）存储，与金额列存储策略一致；
+        // 历史库补充列时给出默认值，保证旧行读回为 Market / 0.003 的既有行为
+        await EnsureColumnAsync(conn, transaction, "strategies", "order_type", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
+        await EnsureColumnAsync(conn, transaction, "strategies", "slippage_tolerance", "TEXT DEFAULT '0.003'").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateAccountSnapshotsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateRiskConfigAsync(conn, transaction).ConfigureAwait(false);

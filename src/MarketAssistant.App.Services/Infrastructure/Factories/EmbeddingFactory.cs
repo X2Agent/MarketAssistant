@@ -1,14 +1,24 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using OpenAI;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
-public class EmbeddingFactory : IEmbeddingFactory
+/// <summary>
+/// 嵌入生成器工厂：按 (Endpoint, API Key 指纹, ModelId) 缓存底层客户端，
+/// 避免每次检索/向量化都新建 OpenAIClient 造成连接 churn。
+/// </summary>
+public class EmbeddingFactory : IEmbeddingFactory, IDisposable
 {
     private readonly IUserSettingService _userSettingService;
+    private readonly ConcurrentDictionary<string, IEmbeddingGenerator<string, Embedding<float>>> _generators = new();
+    private bool _disposed;
 
     public EmbeddingFactory(IUserSettingService userSettingService)
     {
@@ -17,6 +27,8 @@ public class EmbeddingFactory : IEmbeddingFactory
 
     public IEmbeddingGenerator<string, Embedding<float>> Create()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         var userSetting = _userSettingService.CurrentSetting;
         var modelId = userSetting.EmbeddingModelId;
         var apiKey = userSetting.EmbeddingApiKey;
@@ -33,6 +45,15 @@ public class EmbeddingFactory : IEmbeddingFactory
             throw new FriendlyException("嵌入服务 Endpoint 无效");
         }
 
+        // Key 不含明文密钥（只含指纹），缓存实例不泄漏密钥字符串本身
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(apiKey)));
+        var cacheKey = $"{endpointUri.AbsoluteUri}|{fingerprint}|{modelId}";
+
+        return _generators.GetOrAdd(cacheKey, _ => CreateGenerator(endpointUri, modelId, apiKey));
+    }
+
+    private static IEmbeddingGenerator<string, Embedding<float>> CreateGenerator(Uri endpointUri, string modelId, string apiKey)
+    {
         var client = new OpenAIClient(
             new ApiKeyCredential(apiKey),
             new OpenAIClientOptions
@@ -43,5 +64,19 @@ public class EmbeddingFactory : IEmbeddingFactory
                 RetryPolicy = new ClientRetryPolicy(3)
             });
         return client.GetEmbeddingClient(modelId).AsIEmbeddingGenerator();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+
+        foreach (var generator in _generators.Values)
+            (generator as IDisposable)?.Dispose();
+        _generators.Clear();
+
+        GC.SuppressFinalize(this);
     }
 }

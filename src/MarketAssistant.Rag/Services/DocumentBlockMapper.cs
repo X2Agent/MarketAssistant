@@ -27,6 +27,22 @@ public class DocumentBlockMapper
     }
 
     /// <summary>
+    /// 摄取前的文本归一化（只做无损处理）。
+    /// 兜底校验：归一化结果过度压缩或丢失全部有效内容时保留原文并记录错误，
+    /// 防止被破坏的文本带着错误数字进入向量库。
+    /// </summary>
+    private string NormalizeForIngestion(string text)
+    {
+        var normalized = _cleaning.Normalize(text);
+        if (!_cleaning.IsCleaningSuccessful(text, normalized))
+        {
+            // 兜底防线：保留原文，禁止可疑结果入库
+            return text.Trim();
+        }
+        return normalized;
+    }
+
+    /// <summary>
     /// 将文档块转换为文本段落
     /// </summary>
     /// <param name="block">文档块</param>
@@ -45,7 +61,7 @@ public class DocumentBlockMapper
             ImageMetadata? imageMetadata = null)
     {
         // P1-01：Key 统一为 {documentId}:{blockKind}:{order:D6}:{contentHashPrefix}，由调用方传入稳定 DocumentId
-        var sourceType = GetSourceTypeFromPath(filePath);
+        var sourceType = RagSourceType.InferFromPath(filePath);
         var paragraphs = new List<TextParagraph>();
         var nextOrder = baseOrder;
         var updatedSection = currentSection;
@@ -53,7 +69,7 @@ public class DocumentBlockMapper
         switch (block)
         {
             case TextBlock textBlock when !string.IsNullOrWhiteSpace(textBlock.Text):
-                var cleaned = _cleaning.Clean(textBlock.Text);
+                var cleaned = NormalizeForIngestion(textBlock.Text);
                 var chunks = _chunking.Chunk(filePath, cleaned);
                 foreach (var chunk in chunks)
                 {
@@ -81,7 +97,7 @@ public class DocumentBlockMapper
                 break;
 
             case HeadingBlock headingBlock when !string.IsNullOrWhiteSpace(headingBlock.Text):
-                var headingText = _cleaning.Clean(headingBlock.Text).Trim();
+                var headingText = NormalizeForIngestion(headingBlock.Text).Trim();
                 if (!string.IsNullOrEmpty(headingText))
                 {
                     var hash = Sha256Hex(headingText);
@@ -111,7 +127,7 @@ public class DocumentBlockMapper
 
             case ListBlock listBlock when listBlock.Items?.Count > 0:
                 var listText = listBlock.Text;
-                var cleanedList = _cleaning.Clean(listText).Trim();
+                var cleanedList = NormalizeForIngestion(listText).Trim();
                 if (!string.IsNullOrEmpty(cleanedList))
                 {
                     var hash = Sha256Hex(cleanedList);
@@ -181,17 +197,6 @@ public class DocumentBlockMapper
     /// </summary>
     private static string MakeKey(string documentId, int blockKind, int order, string contentHash)
         => $"{documentId}:{blockKind}:{order:D6}:{contentHash[..8]}";
-
-    private static string GetSourceTypeFromPath(string filePath)
-        => Path.GetExtension(filePath).ToLowerInvariant() switch
-        {
-            ".pdf" => "pdf",
-            ".docx" => "docx",
-            ".md" => "markdown",
-            ".txt" => "text",
-            _ when filePath.StartsWith("http", StringComparison.OrdinalIgnoreCase) => "web",
-            _ => "unknown"
-        };
 
     private static string Sha256Hex(string input)
     {

@@ -133,10 +133,20 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
 
             return result;
         }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得伪装成"分析失败"的默认结果
+            throw;
+        }
+        catch (FriendlyException)
+        {
+            // 校验失败等业务异常已包含用户友好信息，向上抛出让工作流以错误呈现
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤3/3-{MarketType}] AI分析失败", originalRequest.MarketType);
-            return CreateDefaultResult($"分析失败: {ex.Message}");
+            throw new FriendlyException($"AI 分析失败: {ex.Message}", ex);
         }
     }
 

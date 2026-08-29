@@ -40,24 +40,24 @@
         </Style>
     </UserControl.Styles>
 
-    <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
-        <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
+    <!-- 根用 Panel 叠放各状态，使空态/加载占位可撑满整页垂直居中 -->
+    <Panel Background="{DynamicResource CardBackgroundBrush}">
 
-            <!-- 加载指示器 -->
-            <StackPanel IsVisible="{Binding IsBusy}"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="{StaticResource LargeSpacing}">
-                <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
-                <TextBlock Text="正在加载收藏列表..."
-                           FontSize="{StaticResource LabelFontSize}"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-            </StackPanel>
+        <!-- 加载指示器 -->
+        <StackPanel IsVisible="{Binding IsBusy}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="{StaticResource LargeSpacing}">
+            <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
+            <TextBlock Text="正在加载收藏列表..."
+                       FontSize="{StaticResource LabelFontSize}"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
 
-            <!-- 内容区域（非加载状态） -->
-            <StackPanel IsVisible="{Binding !IsBusy}">
-            <!-- 空视图 -->
+        <!-- 内容区域（非加载状态） -->
+        <Grid IsVisible="{Binding !IsBusy}">
+            <!-- 空视图：垂直居中 -->
             <StackPanel IsVisible="{Binding !Assets.Count}"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -75,13 +75,14 @@
                            FontSize="{StaticResource SmallFontSize}" />
             </StackPanel>
             <!-- 收藏网格（对齐原型 fav-grid：auto-fill 自适应换行） -->
-            <ItemsControl ItemsSource="{Binding Assets}"
-                          IsVisible="{Binding Assets.Count}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+            <ScrollViewer IsVisible="{Binding Assets.Count}">
+                <ItemsControl ItemsSource="{Binding Assets}"
+                              Margin="{StaticResource PagePadding}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="assets:AssetInfo">
                         <Border Classes="fav-card"
@@ -139,22 +140,22 @@
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                VerticalAlignment="Center"/>
                                     <Border Grid.Column="1"
-                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"
+                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"
                                             CornerRadius="{StaticResource TinyCornerRadius}"
                                             Padding="{StaticResource TinyPadding}"
                                             VerticalAlignment="Center">
                                         <TextBlock Text="{Binding ChangePercentage}"
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    FontWeight="Bold"
-                                                   Foreground="White"/>
+                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
                                     </Border>
                                 </Grid>
                             </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Panel>
 </UserControl>

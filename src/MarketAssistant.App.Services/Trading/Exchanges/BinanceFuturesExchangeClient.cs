@@ -53,36 +53,4 @@ public sealed class BinanceFuturesExchangeClient : BinanceExchangeClient
 
         await _futuresAccountService.SetLeverageAsync(instrumentSymbol, leverage, ct);
     }
-
-    /// <summary>
-    /// 设置合约保证金模式（全仓/逐仓）。
-    /// </summary>
-    public override async Task SetMarginTypeAsync(string instrumentSymbol, string marginType, CancellationToken ct = default)
-    {
-        await _futuresAccountService.SetMarginTypeAsync(instrumentSymbol, marginType, ct);
-    }
-
-    /// <summary>
-    /// 查询合约成交明细。
-    /// </summary>
-    public override async Task<List<ExchangeTradeDetail>> GetUserTradesAsync(string instrumentSymbol, CancellationToken ct = default)
-    {
-        var trades = await _futuresAccountService.GetUserTradesAsync(instrumentSymbol, ct);
-
-        return trades.Select(t => new ExchangeTradeDetail
-        {
-            Symbol = t.Symbol,
-            TradeId = t.TradeId,
-            OrderId = t.OrderId,
-            Side = t.Side,
-            PositionSide = t.PositionSide,
-            Price = decimal.TryParse(t.Price, NumberStyles.Number, CultureInfo.InvariantCulture, out var p) ? p : 0,
-            Quantity = decimal.TryParse(t.Quantity, NumberStyles.Number, CultureInfo.InvariantCulture, out var q) ? q : 0,
-            QuoteQuantity = decimal.TryParse(t.QuoteQuantity, NumberStyles.Number, CultureInfo.InvariantCulture, out var qq) ? qq : 0,
-            Commission = decimal.TryParse(t.Commission, NumberStyles.Number, CultureInfo.InvariantCulture, out var c) ? c : 0,
-            CommissionAsset = t.CommissionAsset,
-            IsBuyer = t.IsBuyer,
-            Time = t.Time
-        }).ToList();
-    }
 }

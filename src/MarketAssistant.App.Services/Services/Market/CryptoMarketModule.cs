@@ -63,7 +63,8 @@ public sealed class CryptoMarketModule : IMarketModule
         // 工作流
         services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>(MarketType.Crypto);
         services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();
-        services.AddSingleton<GenerateCriteriaExecutor<CryptoCriteria>>();
+        // Transient：由投资选择工作流在每次 Run 内重新解析，避免并发共享状态
+        services.AddTransient<GenerateCriteriaExecutor<CryptoCriteria>>();
 
         // 交易所客户端
         services.AddKeyedSingleton<IExchangeClient>(

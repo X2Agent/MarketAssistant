@@ -1,4 +1,5 @@
 using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
@@ -10,8 +11,6 @@ namespace MarketAssistant.Services.Trading;
 /// </summary>
 public class RiskManager
 {
-    private static readonly string[] QuoteAssets = { "USDT", "USDC", "BUSD", "BTC", "ETH", "BNB" };
-
     private readonly TradingDataService _dataService;
     private readonly CryptoPortfolioService _portfolioService;
     private readonly IExchangeClient _exchangeClient;
@@ -60,7 +59,9 @@ public class RiskManager
         AccountBalanceSummary portfolioSummary;
         try
         {
-            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct).ConfigureAwait(false);
+            // 风控路径必须实时估值：3 秒缓存仅供 UI 展示，1 秒级价格 tick 下
+            // 连发订单若共用同一份快照会绕过仓位上限
+            portfolioSummary = await _portfolioService.GetAccountBalanceSummaryAsync(ct, useCache: false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -93,7 +94,7 @@ public class RiskManager
             // 单 symbol 仓位上限（仅买入时检查）
             if (config.MaxSinglePositionPercent > 0 && side == OrderSide.Buy)
             {
-                var baseAsset = ExtractBaseAsset(instrumentSymbol);
+                var baseAsset = TryExtractBaseAsset(instrumentSymbol);
                 if (!string.IsNullOrEmpty(baseAsset))
                 {
                     var symbolValue = portfolioSummary.Assets
@@ -111,7 +112,7 @@ public class RiskManager
             // - 合约：做空（卖出开空）无需持仓校验；平多（卖出平多）需检查多头持仓
             if (side == OrderSide.Sell)
             {
-                var baseAsset = ExtractBaseAsset(instrumentSymbol);
+                var baseAsset = TryExtractBaseAsset(instrumentSymbol);
                 if (string.IsNullOrEmpty(baseAsset))
                 {
                     // fail-closed：无法解析基础资产意味着无法校验持仓充足性，必须拒绝而非跳过校验
@@ -137,8 +138,11 @@ public class RiskManager
                     }
                     catch (Exception ex)
                     {
-                        // 查询交易所持仓失败时不阻止交易（可能是网络问题），仅记录警告
-                        _logger.LogWarning(ex, "查询交易所持仓用于风控校验失败，跳过合约平多校验: {Symbol}", instrumentSymbol);
+                        // fail-closed：无法确认交易所持仓就放行，平多单可能在持仓已平后
+                        // 以 reduceOnly=false 落地变成反向开仓，与基础资产解析失败的拒单策略保持一致
+                        _logger.LogError(ex, "查询交易所持仓用于风控校验失败，拒绝交易（fail-closed）: {Symbol}", instrumentSymbol);
+                        return RiskCheckResult.Reject(
+                            $"无法查询 {instrumentSymbol} 的交易所持仓，合约卖出校验失败（fail-closed）");
                     }
                 }
                 else
@@ -156,10 +160,24 @@ public class RiskManager
                 }
             }
 
-            // 最大回撤熔断
+            // 买入订单校验报价资产（USDT）可用余额：
+            // - 现货：本地余额（Free + Locked）必须覆盖订单金额，防止下单后因余额不足被交易所拒绝
+            // - 合约：以交易所保证金为准，跳过本地余额校验（杠杆下占用保证金远小于订单名义价值）
+            if (side == OrderSide.Buy && !_exchangeClient.IsFutures)
+            {
+                var availableQuote = CryptoPortfolioService.GetUsdtBalance(portfolioSummary);
+                if (orderValueUSDT > availableQuote)
+                    return RiskCheckResult.Reject(
+                        $"买入金额 {orderValueUSDT:F2} USDT 超过可用余额 {availableQuote:F2} USDT");
+            }
+
+            // 最大回撤熔断：峰值取最近 30 天滚动窗口，
+            // 窗口随时间滑动，历史峰值自动"过期"，无需手动重置
             if (config.MaxDrawdownPercent > 0)
             {
-                var peakValue = await _dataService.GetPeakAccountValueAsync(ct).ConfigureAwait(false);
+                var peakValue = await _dataService
+                    .GetPeakAccountValueAsync(DateTime.UtcNow.AddDays(-30), ct)
+                    .ConfigureAwait(false);
                 if (peakValue > 0)
                 {
                     var drawdownPercent = (peakValue - totalUSDT) / peakValue * 100;
@@ -206,17 +224,16 @@ public class RiskManager
     }
 
     /// <summary>
-    /// 从交易对符号提取基础资产（如 BTCUSDT → BTC）
+    /// 从交易对符号提取基础资产（如 BTCUSDT → BTC、BTCFDUSD → BTC）。
+    /// 复用统一的 <see cref="CryptoSymbolConverter.ExtractBaseCurrency"/>；
+    /// 转换器对未匹配到已知计价后缀的输入会原样返回，此时视为解析失败返回 null。
     /// </summary>
-    private static string ExtractBaseAsset(string instrumentSymbol)
+    private static string? TryExtractBaseAsset(string instrumentSymbol)
     {
-        // 常见报价资产后缀
-        foreach (var quote in QuoteAssets)
-        {
-            if (instrumentSymbol.EndsWith(quote, StringComparison.OrdinalIgnoreCase))
-                return instrumentSymbol[..^quote.Length];
-        }
-        return string.Empty;
+        var baseAsset = CryptoSymbolConverter.ExtractBaseCurrency(instrumentSymbol);
+        return string.Equals(baseAsset, instrumentSymbol, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : baseAsset;
     }
 
 }

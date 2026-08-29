@@ -1,9 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <RootNamespace>MarketAssistant</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
     <!-- SK 搜索连接器及泛型 ITextSearch 接口仍是实验性 API，当前无稳定替代。 -->
     <NoWarn>$(NoWarn);MAAI001;SKEXP0001;SKEXP0050</NoWarn>
   </PropertyGroup>
@@ -27,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AdaptiveCards" />
     <PackageReference Include="AngleSharp" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Markdig" />
