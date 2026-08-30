@@ -52,9 +52,6 @@ public static class ServiceCollectionExtensions
         // 使 HITL 确认不依赖交易监控页存活（单例构造即接管订阅）
         services.AddSingleton<TradeConfirmationService>();
 
-        // 市场服务注册表：ViewModel 通过具名门面按市场解析 Keyed Service，避免 Func 委托堆叠与服务定位反模式
-        services.AddSingleton<IMarketServiceRegistry, MarketServiceRegistry>();
-
         return services;
     }
 

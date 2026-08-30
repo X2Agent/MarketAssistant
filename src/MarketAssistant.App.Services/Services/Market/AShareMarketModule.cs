@@ -30,13 +30,10 @@ public sealed class AShareMarketModule : IMarketModule
         services.AddKeyedSingleton<IMarketCapability, AShareMarketCapability>(MarketType.AShare);
 
         // Agent 工具
-        services.AddKeyedSingleton<IShareBasicTools, AShareBasicTools>(MarketType.AShare);
         services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IShareFinancialTools, AShareFinancialTools>(MarketType.AShare);
         services.AddKeyedSingleton<IFinancialTools, AShareFinancialTools>(MarketType.AShare);
         services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);
         services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);
-        services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
         services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
 
         // 快讯 & 新闻
@@ -48,6 +45,7 @@ public sealed class AShareMarketModule : IMarketModule
                 sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         // 资产服务
+        services.AddKeyedSingleton<IRealtimeQuoteService, NoopRealtimeQuoteService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetInfoService, AShareAssetInfoService>(MarketType.AShare);
         services.AddKeyedSingleton<IHomeAssetService, HomeAssetService>(MarketType.AShare);
         services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.AShare);

@@ -13,29 +13,26 @@ namespace MarketAssistant.ViewModels.Home;
 
 public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
 {
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
 
     private IAssetHistoryService HistoryService =>
-        _marketServiceRegistry.GetAssetHistoryService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IAssetHistoryService>();
 
     private IHomeAssetService HomeAssetService =>
-        _marketServiceRegistry.GetHomeAssetService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IHomeAssetService>();
 
     private IAssetInfoService AssetInfoService =>
-        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IAssetInfoService>();
 
     public ObservableCollection<AssetItem> RecentAssets { get; } = new();
 
     public event EventHandler<AssetItem>? RecentAssetSelected;
 
     public RecentAssetsViewModel(
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<RecentAssetsViewModel> logger)
         : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
 
         SubscribeToMarketChanges(_marketContext);

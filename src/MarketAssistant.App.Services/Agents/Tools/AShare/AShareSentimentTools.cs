@@ -13,7 +13,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股市场情绪工具实现
 /// </summary>
-public sealed class AShareSentimentTools : IShareSentimentTools
+public sealed class AShareSentimentTools : ISentimentTools
 {
     private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;

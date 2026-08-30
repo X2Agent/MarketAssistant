@@ -12,7 +12,7 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币基础数据工具实现（使用服务层获取数据）
 /// </summary>
-public sealed class CryptoBasicTools : ICryptoBasicTools
+public sealed class CryptoBasicTools : IBasicDataTools
 {
     private readonly ILogger<CryptoBasicTools> _logger;
     private readonly BinanceMarketDataService _binanceService;

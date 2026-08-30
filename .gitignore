@@ -3,7 +3,9 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
-# Windows 保留设备名（误生成时 git 会反复列出，磁盘上实际不存在）
+# Windows 保留设备名：Git Bash `> nul` 误重定向会在磁盘生成实体文件；
+# Windows 下无法删除/重命名（Win32 设备名保留，8 种方式实测失败），需在 POSIX 环境清理。
+# 已从 git 索引移除（git rm），此处忽略防止再次被 git 追踪
 nul
 
 # User-specific files
@@ -403,6 +405,9 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 .idea/
+
+# 仓库根目录下所有以 . 开头的文件夹（各工具的本地缓存/配置目录）
+/.[!.]*/
 
 # Secrets and credentials
 .secrets

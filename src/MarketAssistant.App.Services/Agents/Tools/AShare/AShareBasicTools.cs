@@ -12,7 +12,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股基础数据工具实现
 /// </summary>
-public sealed class AShareBasicTools : IShareBasicTools
+public sealed class AShareBasicTools : IBasicDataTools
 {
     /// <summary>CLS 行情接口请求字段列表。</summary>
     private const string QuoteFields =

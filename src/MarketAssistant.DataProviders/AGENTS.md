@@ -12,7 +12,6 @@ MarketAssistant.DataProviders/
 ├── BinanceMarketDataModels.cs     ← Binance 本地模型（24hrTicker、ExchangeInfo）
 ├── BinanceWebSocketService.cs     ← Binance WebSocket 实时价格推送
 ├── CoinGeckoApiService.cs         ← CoinGecko REST API（市值、排名、涨跌幅）
-├── CoinDeskApiService.cs          ← CoinDesk REST API（项目元数据、新闻）
 ├── AShare/                        ← A 股数据客户端（P1-05 下沉）
 │   ├── ClsQuoteClient.cs          ← 财联社行情 /quote/stock/basic 与搜索 /api/sw
 │   ├── ZhiTuMarketClient.cs       ← 智兔财务/技术指标/K线/资金流/公司资料
@@ -31,7 +30,6 @@ MarketAssistant.DataProviders/
 |------|------|---------|
 | **Binance** | `api.binance.com` / `fapi.binance.com` | 部分地区受限，需 VPN/代理 |
 | **CoinGecko** | `api.coingecko.com` | 免费版有频率限制（~24 req/min），`CoinGeckoApiService` 内置限流 |
-| **CoinDesk** | `data-api.coindesk.com` | 无特殊限制 |
 | **财联社 (Cls)** | `x-quote.cls.cn` / `www.cls.cn` | 命名 HttpClient `Cls`；行情无需签名 |
 | **智兔 (ZhiTu)** | `api.zhituapi.com` | 命名 HttpClient `ZhiTu`；Token 由调用方传入，禁止硬编码 |
 | **东方财富** | `search-api-web.eastmoney.com` | 命名 HttpClient `EastMoneySearch`；返回 JSONP 需剥离 |

@@ -21,7 +21,7 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// 职责：提供市场深度数据、综合市场指标和衍生计算指标
 /// 数据源：币安（市场深度）、CoinGecko（市场指标、交易量分布）
 /// </remarks>
-public sealed class CryptoMetricsTools : ICryptoMetricsTools
+public sealed class CryptoMetricsTools : IFinancialTools
 {
     private readonly BinanceMarketDataService _binanceService;
     private readonly CoinGeckoApiService _coinGeckoService;

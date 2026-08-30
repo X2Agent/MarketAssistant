@@ -11,23 +11,20 @@ namespace MarketAssistant.ViewModels.Home;
 
 public partial class HotAssetsViewModel : ViewModelBase, IDisposable
 {
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
 
     private IHomeAssetService HomeAssetService =>
-        _marketServiceRegistry.GetHomeAssetService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IHomeAssetService>();
 
     public ObservableCollection<HotAsset> HotAssets { get; } = new();
 
     public event EventHandler<HotAsset>? HotAssetSelected;
 
     public HotAssetsViewModel(
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<HotAssetsViewModel> logger)
         : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
 
         SubscribeToMarketChanges(_marketContext);

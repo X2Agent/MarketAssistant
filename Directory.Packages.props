@@ -22,8 +22,7 @@
     <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.87.0" />
     <!-- Data / docs / parsing -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.11" />
-    <!-- 显式固定 2.1.12+：Microsoft.Data.Sqlite 传递引入的 2.1.11 捆绑 SQLite < 3.50.2，
-         存在高危漏洞 CVE-2025-6965（GHSA-2m69-gcr7-jv3q），直接引用覆盖传递版本 -->
+    <!-- 显式固定 3.0.5：覆盖 Microsoft.Data.Sqlite 传递引入的旧捆绑版本，规避 SQLite 历史 CVE -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <PackageVersion Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageVersion Include="Markdig" Version="1.3.2" />

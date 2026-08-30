@@ -1,17 +1,9 @@
-using MarketAssistant.Agents.Tools.Models;
-
 namespace MarketAssistant.Agents.Tools.Abstractions;
 
+/// <summary>
+/// 新闻数据工具的 DI 分发标记接口，用于 <c>[RequiresTools]</c> 声明和 Keyed DI 注册。
+/// 本身不定义业务方法，具体 API 由市场实现类提供（AShareNewsTools / CryptoNewsTools）。
+/// </summary>
 public interface INewsDataTools : IToolsProvider
 {
-    /// <summary>
-    /// 获取资产相关的新闻（对于A股从财联社等获取，对于虚拟币从Twitter/X获取）
-    /// </summary>
-    Task<List<NewsItem>> GetNewsAsync(string assetSymbol, int count = 10, CancellationToken cancellationToken = default);
 }
-
-
-
-
-
-

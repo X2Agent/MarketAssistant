@@ -68,7 +68,7 @@ public class NewsDataToolsTest
     public async Task GetNewsAsync_AShare_ShouldReturnValidData()
     {
         // Arrange - 贵州茅台 SH600519，东方财富搜索 API（公开免费）
-        var service = _serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.AShare);
+        var service = (AShareNewsTools)_serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.AShare);
 
         // Act - 真实调用东方财富搜索 API
         var newsData = await service.GetNewsAsync("SH600519");
@@ -97,7 +97,7 @@ public class NewsDataToolsTest
     public async Task GetNewsAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange - BTC，CoinTelegraph RSS 免费源
-        var service = _serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.Crypto);
+        var service = (CryptoNewsTools)_serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.Crypto);
 
         // Act - 真实调用 CoinTelegraph RSS
         var newsData = await service.GetNewsAsync("btc");

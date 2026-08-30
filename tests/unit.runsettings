@@ -2,8 +2,9 @@
 <RunSettings>
   <RunConfiguration>
     <MaxCpuCount>0</MaxCpuCount>
-    <!-- 默认只跑单元测试；Integration/E2E 需显式指定过滤器运行 -->
-    <TestCaseFilter>TestCategory=Unit</TestCaseFilter>
+    <!-- 黑名单策略：默认排除 Integration/E2E/Evaluation，其余（Unit + 无 TestCategory）默认运行；
+         避免无 TestCategory 的测试被静默排除。新增测试默认会被执行，除非显式归入被排除类别。 -->
+    <TestCaseFilter>TestCategory!=Integration&amp;TestCategory!=E2E&amp;TestCategory!=Evaluation</TestCaseFilter>
 
   </RunConfiguration>
   <MSTest>

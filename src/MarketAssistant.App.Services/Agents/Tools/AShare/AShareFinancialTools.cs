@@ -12,7 +12,7 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股财务数据工具实现
 /// </summary>
-public sealed class AShareFinancialTools : IShareFinancialTools
+public sealed class AShareFinancialTools : IFinancialTools
 {
     private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;

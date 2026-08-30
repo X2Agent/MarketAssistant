@@ -14,6 +14,8 @@ MarketAssistant.slnx
 ├── src/MarketAssistant.Agents/         ← Agent 契约层（MAF）            → 有独立 AGENTS.md
 ├── src/MarketAssistant.Rag/            ← RAG 基础能力层                → 有独立 AGENTS.md
 ├── src/MarketAssistant.DataProviders/  ← 数据提供者（Binance 等）      → 有独立 AGENTS.md
+├── src/MarketAssistant.Trading/        ← 交易抽象与共享交易模型         → 有独立 AGENTS.md
+├── src/MarketAssistant.Infrastructure/ ← 基础设施层（模型发现、Token 化）
 ├── tests/                              ← 单元测试工程
 ├── scripts/                            ← 构建脚本
 └── docs/                               ← 设计文档
@@ -24,15 +26,16 @@ MarketAssistant.slnx
 ```
 Core（无依赖）
  ↑
- ├── Rag → Core
+ ├── Rag → Core, Infrastructure
  ├── DataProviders → Core
- ├── Agents → Core
+ ├── Agents → Core, Trading, Infrastructure
  ├── Infrastructure → Core
- ├── App.Services → Core, Agents, DataProviders, Rag, Infrastructure
- └── App → Core, Agents, DataProviders, App.Services, Rag
+ ├── Trading → Core
+ ├── App.Services → Core, Agents, Trading, DataProviders, Rag, Infrastructure
+ └── App → Core, Agents, Trading, DataProviders, App.Services, Rag
 ```
 
-核心技术栈：.NET 10 / C# 13 · Avalonia 11.x · Microsoft Agent Framework (MAF) · Semantic Kernel SQLiteVec · Serilog
+核心技术栈：.NET 10 / C# 13 · Avalonia 12.x · Microsoft Agent Framework (MAF) · Semantic Kernel SQLiteVec · Serilog
 
 ---
 
@@ -113,7 +116,7 @@ dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 
 ## 发布
 
-详见根目录 `BUILD.md`。快速命令：
+详见 [`scripts/BUILD.md`](scripts/BUILD.md)。快速命令：
 
 ```powershell
 # Windows 一键发布
