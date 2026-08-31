@@ -1,3 +1,5 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Applications.AlertCenter;
 
 /// <summary>
@@ -67,5 +69,19 @@ public sealed class AlertSuppressionPolicy
             new QuotaState(windowStart, count),
             isMerge,
             isMerge ? false : canNotify);
+    }
+
+    /// <summary>
+    /// A 股价格类告警的休市静默判定：非交易时段只落库不弹窗（休市行情无变化，弹窗无行动价值）。
+    /// Critical 级别例外——确认级价格告警需即时触达并驱动交易联动门。
+    /// </summary>
+    public static bool IsSilencedByTradingSession(AlertEvent alert, bool isTradingSession)
+    {
+        ArgumentNullException.ThrowIfNull(alert);
+
+        return !isTradingSession
+               && alert.MarketType == MarketType.AShare
+               && alert.Source == AlertSource.PriceAlert
+               && alert.Level != AlertLevel.Critical;
     }
 }

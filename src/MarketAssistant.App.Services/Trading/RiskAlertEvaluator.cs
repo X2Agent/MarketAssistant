@@ -94,7 +94,8 @@ public sealed class RiskAlertEvaluator
     public async Task EvaluateRejectionSafeAsync(TradingStrategy strategy, TradeResult? tradeResult)
     {
         var reason = tradeResult?.ErrorMessage ?? "交易被拒绝";
-        if (reason.StartsWith("用户拒绝", StringComparison.Ordinal))
+        // 用户主动拒绝 / 确认超时类失败由策略状态信号告警（AlertSource.Signal）覆盖，避免同一事件双告警
+        if (TradeRejectionReason.IsUserRejection(reason))
             return;
 
         try

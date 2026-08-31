@@ -39,7 +39,7 @@
   - `ConfirmTicks` / `ConfirmSeconds`（去抖确认期：条件需持续成立才触发）；
   - `CooldownMinutes`（冷却期：触发后 M 分钟内不重复）；
   - `TradingImpact`（枚举：None / RequireConfirmation，本期仅这两种）。
-- `AlertDedupeState`：内存态去抖/冷却状态，不落库，重启重置可接受。
+- 去抖/冷却状态：内存态，不落库，重启重置可接受。实现为 `AlertSuppressionPolicy.MergeState`（按去重键）与 `QuotaState`（全局配额窗口），未采用原计划的单一 `AlertDedupeState` 命名——合并状态按去重键、配额状态全局共享，生命周期不同，拆开后纯逻辑可直接单测。
 
 ## 三、AlertCenterService
 
@@ -47,8 +47,8 @@
 - 抑制逻辑：
   - 冷却期内同类告警合并；
   - 全局每小时配额（默认 20 条），超限只落库不弹窗；Critical 不受限，但同类 5 分钟内合并为一条"发生 N 次"；
-  - 静默窗口：A 股非交易时段不评估价格类告警（复用现有交易时段判断），Critical 例外。
-- 触达：`AlertRaised` → `INotificationService` 弹窗；新增 `AlertCenterPageView` + ViewModel 呈现历史。
+  - 静默窗口：A 股非交易时段的价格类告警只落库不弹窗，**Critical 例外**（确认级告警需即时触达并驱动交易联动门）。判定落在告警中心抑制层（`AlertSuppressionPolicy.IsSilencedByTradingSession`）；轮询层休市时仅继续评估确认级规则，普通规则跳过以省去无效行情请求。注：项目内原无可复用的交易时段判断（`IsMarketOpen` / `IsTradingTime` 全库无实现），故新建 `AShareTradingHours`（东八区 09:30–11:30 / 13:00–15:00，含 Windows / IANA 时区 ID 回退）。
+- 触达：`AlertRaised` → `INotificationService` 弹窗；历史页实现为 `AlertHistoryView` + `AlertHistoryViewModel`，作为"价格预警"页内的"告警历史"标签呈现（未采用原计划的独立 `AlertCenterPageView` 导航页——三类告警共用一份历史即可，独立页会稀释规则入口）；主窗口导航以未读徽标跨类提示。
 - 用户偏好加入 `UserSetting`（免打扰时段、每小时配额），`SettingsPageViewModel` 增配置项。
 
 ## 四、迁移现有价格告警
@@ -61,13 +61,17 @@
 - 挂接在 `MarketMonitor` 价格消费管线中，与 AI 信号评估同级，**不侵入 `RiskManager`**。
 - 触发项：
   - 持仓回撤达到熔断阈值的一定比例（如 80%）→ Warning；
-  - AI 信号被风控 Reject / RequireConfirmation → Warning；
+  - 策略触发被风控 Reject / RequireConfirmation 拒绝 → Warning（`Source=Risk`）；用户主动拒绝或人工确认超时改由信号告警覆盖（`Source=Signal`），二者按 `TradeRejectionReason.IsUserRejection` 互斥分流，避免同一事件双告警；
   - `BinanceWebSocketService` 断线 / 数据源异常 → Critical，重连恢复后发 Info。
+- 信号类告警由同层的 `SignalAlertEvaluator`（`AlertSource.Signal`）产出：策略自动暂停（用户拒绝路径，Warning）、策略完结（Info）、AI 信号成交（Info）。`MarketMonitor` 因此不再持有 `INotificationService`，最后一处直连弹窗（策略自动暂停提示）已收敛到告警中心。
 
 ## 六、确认级交易联动（IAlertGate）
 
 - 新增轻量 DI 单例 `IAlertGate`：`IsGated(MarketType, symbol)` —— 该标的是否存在 `TradingImpact=RequireConfirmation` 且触发中的告警。
-- `TradeExecutor` 在风控校验后、确认环节前查询 `IAlertGate`：命中则强制走 `ConfirmationCallback` 人工确认（即使风控结果为 Pass），弹窗文案说明"因告警触发需确认"。
+- `TradeExecutor` 在风控校验后、确认环节前查询 `IAlertGate`：命中则强制走 `ConfirmationCallback` 人工确认（即使风控结果为 Pass），弹窗文案说明"因告警触发需确认"；无确认订阅者时拒绝下单而非放行。
+- 实现补充（原计划未列）：
+  - **保护性平仓豁免**：`requireClose = true`（止损 / 止盈 / 追踪止损等退出型触发）不受门限制，避免"因告警反而无法及时离场"这一更危险的结果；
+  - **门判定当前仅覆盖 Crypto**：`TradeExecutor` 本身是 Crypto keyed 服务，A 股侧尚无自动交易链路，A 股告警门仅用于 UI 呈现。
 - 原则：**告警事件 ≠ 交易指令**，不自动下单、不修改 `RiskManager`。
 
 ## 七、接线
@@ -78,6 +82,13 @@
 ## 八、验证与实施顺序
 
 - `dotnet build MarketAssistant.slnx -c Debug` 通过。
-- 可选：为触发判定（去抖/冷却/限次）与配额/合并逻辑补单元测试。
+- 单元测试已补齐：触发判定（去抖/确认期/冷却/限次）、抑制策略（合并/配额/免打扰/休市静默）、告警中心集成（落库/合并/未读/联动门）、交易门与交易时段、信号告警分流。`dotnet test --filter TestCategory=Unit` 360/360 通过；`dotnet format --verify-no-changes` 无差异。
 
 实施顺序：模型与 AlertCenterService → 通知/历史页 → 价格告警迁移 → 风险评估器 → IAlertGate 交易联动 → 设置项 → 构建验证。
+
+## 九、实现取舍与遗留
+
+- **`TradingImpact` 与 `Level` 耦合**：价格告警中 `TradingImpact = RequireConfirmation` 映射为 `AlertLevel.Critical`（`PriceAlertService.RaiseAlertSafeAsync`），因此确认级规则天然绕过每小时配额、免打扰时段与休市静默。取舍是"确认级必达"优先于"弹窗噪声"；若噪声过大可改为两维解耦（级别由规则单独配置）。
+- **门与告警状态均为内存态**：重启后 `AlertGate` 清空，同时 `PriceAlertService.LoadRulesAsync` 将规则 `Triggered` 重置为 false，两者一致，不会出现"规则显示已触发但门未生效"的残留。
+- **信号告警覆盖面**：当前仅上报策略自动暂停（用户拒绝路径）、策略完结、AI 信号成交三类；策略手动启停、网格/DCA 常规成交暂不上报，按实际噪声反馈再决定是否纳入。
+- **遗留死代码**：`PriceAlertRule.AlertModeText`（"一次性/持续"）全库无引用（视图使用内联 `IsOneTime` 标签），待小改动清理。

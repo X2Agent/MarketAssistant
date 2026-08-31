@@ -402,6 +402,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
         services.AddSingleton<RiskAlertEvaluator>();
+        services.AddSingleton<SignalAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();

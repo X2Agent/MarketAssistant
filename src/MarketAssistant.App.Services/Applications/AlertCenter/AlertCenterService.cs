@@ -88,7 +88,11 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
             _alertGate.Activate(alert.MarketType, alert.Symbol);
         }
 
-        if (decision.ShouldNotify && settings.Notification && !IsInQuietHours(settings, alert.Level))
+        // 触达抑制三重：每小时配额（policy 内判定）+ A 股休市静默 + 用户免打扰时段；
+        // 均只压弹窗，告警仍落库、确认级交易联动门仍登记
+        var isSessionSilenced = AlertSuppressionPolicy.IsSilencedByTradingSession(
+            alert, AShareTradingHours.IsTradingSession());
+        if (decision.ShouldNotify && !isSessionSilenced && settings.Notification && !IsInQuietHours(settings, alert.Level))
             Notify(alert);
 
         AlertRaised?.Invoke(alert);

@@ -9,12 +9,14 @@ public sealed class AlertSuppressionPolicyTest
     private static AlertEvent CreateAlert(
         AlertLevel level = AlertLevel.Warning,
         string title = "测试告警",
-        string symbol = "BTCUSDT") => new()
+        string symbol = "BTCUSDT",
+        MarketType marketType = MarketType.Crypto,
+        AlertSource source = AlertSource.PriceAlert) => new()
         {
-            MarketType = MarketType.Crypto,
+            MarketType = marketType,
             Symbol = symbol,
             Level = level,
-            Source = AlertSource.PriceAlert,
+            Source = source,
             Title = title,
             Content = "内容"
         };
@@ -154,5 +156,40 @@ public sealed class AlertSuppressionPolicyTest
         Assert.IsTrue(later.ShouldNotify);
         Assert.AreEqual(1, later.NewQuotaState.Count);
         Assert.AreEqual(now.AddHours(1).AddSeconds(1), later.NewQuotaState.WindowStartUtc);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void IsSilencedByTradingSession_ASharePriceWarning_ShouldSilence()
+    {
+        var alert = CreateAlert(marketType: MarketType.AShare);
+
+        Assert.IsTrue(AlertSuppressionPolicy.IsSilencedByTradingSession(alert, isTradingSession: false));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void IsSilencedByTradingSession_CriticalOrInSessionOrCrypto_ShouldNotSilence()
+    {
+        // Critical（确认级价格告警）例外：休市也须即时触达并驱动交易联动门
+        Assert.IsFalse(AlertSuppressionPolicy.IsSilencedByTradingSession(
+            CreateAlert(level: AlertLevel.Critical, marketType: MarketType.AShare), isTradingSession: false));
+
+        // 交易时段内不静默
+        Assert.IsFalse(AlertSuppressionPolicy.IsSilencedByTradingSession(
+            CreateAlert(marketType: MarketType.AShare), isTradingSession: true));
+
+        // 虚拟币 7×24，不受 A 股休市影响
+        Assert.IsFalse(AlertSuppressionPolicy.IsSilencedByTradingSession(
+            CreateAlert(), isTradingSession: false));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void IsSilencedByTradingSession_NonPriceSource_ShouldNotSilence()
+    {
+        var alert = CreateAlert(marketType: MarketType.AShare, source: AlertSource.Signal);
+
+        Assert.IsFalse(AlertSuppressionPolicy.IsSilencedByTradingSession(alert, isTradingSession: false));
     }
 }

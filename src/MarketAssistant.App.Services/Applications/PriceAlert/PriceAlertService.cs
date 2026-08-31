@@ -301,11 +301,14 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
                         .ToList();
                 }
 
-                if (rules.Count == 0)
-                    continue;
-
-                // 非交易时段静默：休市行情无变化，避免停牌/休市数据反复触发
+                // 非交易时段仅评估确认级规则：休市行情无变化，普通规则反复触发无行动价值且浪费轮询请求；
+                // 确认级规则映射为 Critical 告警，需保证交易联动门及时登记（弹窗静默由告警中心统一处理）
                 if (!AShareTradingHours.IsTradingSession())
+                    rules = rules
+                        .Where(r => r.TradingImpact == AlertTradingImpact.RequireConfirmation)
+                        .ToList();
+
+                if (rules.Count == 0)
                     continue;
 
                 foreach (var rule in rules)
