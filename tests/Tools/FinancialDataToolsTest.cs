@@ -54,7 +54,7 @@ public class FinancialDataToolsTest
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         // 注册被测试的服务（仅 A股）
-        services.AddKeyedSingleton<IShareFinancialTools, AShareFinancialTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IFinancialTools, AShareFinancialTools>(MarketType.AShare);
 
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -89,7 +89,7 @@ public class FinancialDataToolsTest
         RequireZhiTuToken();
 
         // Arrange - 贵州茅台 SH600519
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareFinancialTools>(MarketType.AShare);
+        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取资产负债表
         var balanceSheets = await service.GetBalanceSheetAsync("SH600519");
@@ -125,7 +125,7 @@ public class FinancialDataToolsTest
         RequireZhiTuToken();
 
         // Arrange - 贵州茅台 SH600519
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareFinancialTools>(MarketType.AShare);
+        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取利润表
         var incomeStatements = await service.GetIncomeStatementAsync("SH600519");
@@ -162,7 +162,7 @@ public class FinancialDataToolsTest
         RequireZhiTuToken();
 
         // Arrange - 贵州茅台 SH600519
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareFinancialTools>(MarketType.AShare);
+        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取现金流量表
         var cashFlowStatements = await service.GetCashFlowStatementAsync("SH600519");
@@ -201,7 +201,7 @@ public class FinancialDataToolsTest
         RequireZhiTuToken();
 
         // Arrange - 贵州茅台 SH600519
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareFinancialTools>(MarketType.AShare);
+        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取财务主要指标
         var ratios = await service.GetFinancialRatiosAsync("SH600519");
@@ -234,7 +234,7 @@ public class FinancialDataToolsTest
         RequireZhiTuToken();
 
         // Arrange - 贵州茅台 SH600519
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareFinancialTools>(MarketType.AShare);
+        var service = (AShareFinancialTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取股本结构
         var capitalStructure = await service.GetCapitalStructureAsync("SH600519");

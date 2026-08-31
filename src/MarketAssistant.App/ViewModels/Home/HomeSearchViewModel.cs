@@ -11,13 +11,12 @@ namespace MarketAssistant.ViewModels.Home;
 
 public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 {
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private CancellationTokenSource? _debounceCts;
     private const int DebounceDelayMs = 200;
 
     private IHomeAssetService HomeAssetService =>
-        _marketServiceRegistry.GetHomeAssetService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IHomeAssetService>();
 
     [ObservableProperty]
     private string _searchQuery = string.Empty;
@@ -39,12 +38,10 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     public event EventHandler<AssetItem>? AssetSelected;
 
     public HomeSearchViewModel(
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<HomeSearchViewModel> logger)
         : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
     }
 

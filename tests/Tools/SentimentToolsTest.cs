@@ -61,9 +61,9 @@ public class SentimentToolsTest
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         // 注册被测试的服务
-        services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
         services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
+        services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
@@ -86,7 +86,7 @@ public class SentimentToolsTest
     public async Task GetFundFlowAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareSentimentTools>(MarketType.AShare);
+        var service = (AShareSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.AShare);
 
         // Act
         var sentimentData = await service.GetFundFlowAsync("SH600519");
@@ -118,7 +118,7 @@ public class SentimentToolsTest
     public async Task GetFundingRateAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var fundingRateHistory = await service.GetFundingRateAsync("BTC");
@@ -146,7 +146,7 @@ public class SentimentToolsTest
     public async Task GetGlobalLongShortRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetGlobalLongShortRatioAsync("BTC");
@@ -180,7 +180,7 @@ public class SentimentToolsTest
     public async Task GetTopTraderAccountRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetTopTraderAccountRatioAsync("BTC");
@@ -209,7 +209,7 @@ public class SentimentToolsTest
     public async Task GetTopTraderPositionRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetTopTraderPositionRatioAsync("BTC");
@@ -238,7 +238,7 @@ public class SentimentToolsTest
     public async Task GetOpenInterestAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetOpenInterestAsync("BTC");

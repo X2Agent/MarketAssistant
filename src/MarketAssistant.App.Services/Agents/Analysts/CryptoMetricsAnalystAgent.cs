@@ -16,7 +16,7 @@ namespace MarketAssistant.Services.Agents.Analysts;
 /// </summary>
 [DisplayName("项目指标分析师")]
 [Description("专注于加密资产的市场指标分析：市值、供应量、流动性分布与波动性")]
-[RequiresTools(typeof(ICryptoMetricsTools))]
+[RequiresTools(typeof(IFinancialTools))]
 [SupportedMarkets(MarketType.Crypto)]
 public class CryptoMetricsAnalystAgent : AnalystAgentBase
 {

@@ -7,12 +7,10 @@ using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 
 namespace MarketAssistant.ViewModels;
@@ -21,10 +19,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 {
     public override string Title => "资产详情";
 
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
-    private readonly BinanceWebSocketService _wsService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
+
+    /// <summary>当前绑定事件的实时行情服务。导航参数携带的市场与当前绑定不一致时重新绑定。</summary>
+    private IRealtimeQuoteService? _quoteService;
 
     [ObservableProperty]
     private KLineType _currentKLineType = KLineType.Daily;
@@ -73,13 +72,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
-        IMarketServiceRegistry marketServiceRegistry,
-        MarketContext marketContext,
-        BinanceWebSocketService wsService) : base(logger)
+        MarketContext marketContext) : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry ?? throw new ArgumentNullException(nameof(marketServiceRegistry));
         _marketContext = marketContext;
-        _wsService = wsService;
 
         ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
@@ -152,7 +147,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         try
         {
-            var klineService = _marketServiceRegistry.GetKLineService(_marketContext.CurrentMarket);
+            var klineService = _marketContext.GetService<IKLineService>();
             // IKLineService.GetKLineDataAsync 暂不支持 CancellationToken，
             // 仅能通过取消令牌在返回后丢弃过期结果
             var kLineDataList = await klineService.GetKLineDataAsync(assetCode, CurrentKLineType);
@@ -238,23 +233,52 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             {
                 _ = LoadAssetDataAsync(parameter.Code);
 
-                // 3. 虚拟币市场订阅 WebSocket 实时价格
+                // 3. 支持实时推送的市场订阅实时价格
                 // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
                 var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
-                if (effectiveMarket == MarketType.Crypto)
+                if (_marketContext.GetService<IMarketCapability>(effectiveMarket).SupportsRealtime)
                 {
-                    // 订阅前先取消订阅，防止重复
-                    _wsService.PriceUpdated -= OnDetailPriceUpdated;
-                    _wsService.PriceUpdated += OnDetailPriceUpdated;
-                    _ = _wsService.SubscribeAsync(WebSocketSubscriberKeys.AssetDetail, [ToBinanceFormat(parameter.Code)]);
+                    BindRealtimeQuoteService(_marketContext.GetService<IRealtimeQuoteService>(effectiveMarket));
+                    // 订阅前先整体替换，防止重复
+                    _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.AssetDetail, [parameter.Code]);
+                }
+                else
+                {
+                    DetachRealtimeQuoteService();
                 }
             }
         }
     }
 
-    private void OnDetailPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    /// <summary>
+    /// 绑定实时行情服务事件。导航到不同市场的资产时，先解除旧服务的事件与订阅再绑定新服务。
+    /// </summary>
+    private void BindRealtimeQuoteService(IRealtimeQuoteService service)
     {
-        if (!ToBinanceFormat(AssetCode).Equals(symbol, StringComparison.OrdinalIgnoreCase))
+        if (ReferenceEquals(service, _quoteService))
+            return;
+
+        DetachRealtimeQuoteService();
+        _quoteService = service;
+        _quoteService.PriceUpdated += OnDetailPriceUpdated;
+    }
+
+    /// <summary>
+    /// 解除当前实时行情服务的事件与订阅。用于切到无实时推送的市场或页面离开时清理。
+    /// </summary>
+    private void DetachRealtimeQuoteService()
+    {
+        if (_quoteService == null)
+            return;
+
+        _quoteService.PriceUpdated -= OnDetailPriceUpdated;
+        _ = _quoteService.UnsubscribeAllAsync(RealtimeQuoteSubscriberKeys.AssetDetail);
+        _quoteService = null;
+    }
+
+    private void OnDetailPriceUpdated(string code, decimal lastPrice, decimal changePercent)
+    {
+        if (!AssetCode.Equals(code, StringComparison.OrdinalIgnoreCase))
             return;
 
         Dispatcher.UIThread.InvokeAsync(() =>
@@ -268,14 +292,13 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void OnNavigatedFrom()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        _quoteService?.PriceUpdated -= OnDetailPriceUpdated;
     }
 
     public void Dispose()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _wsService.PriceUpdated -= OnDetailPriceUpdated;
-        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.AssetDetail);
+        DetachRealtimeQuoteService();
         GC.SuppressFinalize(this);
     }
 }

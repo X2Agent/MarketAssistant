@@ -42,7 +42,6 @@ public enum SelectionModeType
 public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 {
     private readonly InvestmentSelectionService _investmentSelectionService;
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
 
@@ -214,12 +213,10 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     public AssetSelectionPageViewModel(
         ILogger<AssetSelectionPageViewModel> logger,
         InvestmentSelectionService investmentSelectionService,
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         IDialogService dialogService) : base(logger)
     {
         _investmentSelectionService = investmentSelectionService;
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
         SubscribeToMarketChanges(_marketContext);
         _dialogService = dialogService;
@@ -294,7 +291,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             code = stock.Symbol.Substring(2);
         }
 
-        var favoriteService = _marketServiceRegistry.GetFavoriteService(_marketContext.CurrentMarket);
+        var favoriteService = _marketContext.GetService<IFavoriteService>();
         if (await favoriteService.IsFavoriteAsync(code, market))
         {
             await _dialogService.ShowMessageAsync("提示", $"{stock.Name} ({stock.Symbol}) 已在自选列表中");

@@ -35,7 +35,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private static readonly TimeSpan SearchDebounceDelay = TimeSpan.FromMilliseconds(300);
 
     private readonly PriceAlertService _alertService;
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
     private readonly IUserSettingService _userSettingService;
@@ -49,7 +48,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// 当前市场对应的资产信息服务（Keyed Service，跟随市场切换）。
     /// </summary>
     private IAssetInfoService AssetInfoService =>
-        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IAssetInfoService>();
 
     /// <summary>
     /// 当前页面的规则列表（仅展示当前市场的规则）
@@ -160,7 +159,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
 
     public PriceAlertPageViewModel(
         PriceAlertService alertService,
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         IDialogService dialogService,
         IUserSettingService userSettingService,
@@ -168,7 +166,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         : base(logger)
     {
         _alertService = alertService;
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
         _dialogService = dialogService;
         _userSettingService = userSettingService;

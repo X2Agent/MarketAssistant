@@ -47,10 +47,10 @@
         <Style Selector="Button.trade-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="TextBlock.Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style Selector="Button.trade-tab:selected /template/ Border#PART_Indicator">
+        <Style Selector="Button.trade-tab.selected /template/ Border#PART_Indicator">
             <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
         </Style>
-        <Style Selector="Button.trade-tab:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="Button.trade-tab.selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="TextBlock.Foreground" Value="{StaticResource PrimaryBrush}"/>
             <Setter Property="TextBlock.FontWeight" Value="SemiBold"/>
         </Style>

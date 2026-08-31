@@ -7,23 +7,22 @@ using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.ViewModels;
 
 public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>, IDisposable
 {
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
-    private readonly BinanceWebSocketService _wsService;
+
+    /// <summary>当前绑定事件的市场实时行情服务。市场切换后解析到不同实现时重新绑定。</summary>
+    private IRealtimeQuoteService? _quoteService;
 
     /// <summary>
     /// 用于取消上一次加载任务的 CTS，防止并发加载导致列表闪烁或重复项。
@@ -32,7 +31,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private CancellationTokenSource? _loadCts;
 
     /// <summary>
-    /// WebSocket 标的（Binance 格式）→ 展示对象的索引。
+    /// 实时行情标的（应用层资产代码）→ 展示对象的索引。
     /// tick 回调在后台线程先查索引：非本页标的直接返回，避免无谓的 UI 线程派发与逐项扫描。
     /// </summary>
     private readonly ConcurrentDictionary<string, AssetInfo> _assetIndex = new(StringComparer.OrdinalIgnoreCase);
@@ -50,32 +49,47 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private DispatcherTimer? _priceFlushTimer;
 
     private IFavoriteService FavoriteService =>
-        _marketServiceRegistry.GetFavoriteService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IFavoriteService>();
 
     private IAssetInfoService AssetInfoService =>
-        _marketServiceRegistry.GetAssetInfoService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IAssetInfoService>();
 
     private IAssetCacheService CacheService =>
-        _marketServiceRegistry.GetAssetCacheService(_marketContext.CurrentMarket);
+        _marketContext.GetService<IAssetCacheService>();
 
     public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
 
     public FavoritesPageViewModel(
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         IDialogService dialogService,
-        BinanceWebSocketService wsService,
         ILogger<FavoritesPageViewModel> logger)
         : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
         _dialogService = dialogService;
-        _wsService = wsService;
-        _wsService.PriceUpdated += OnWebSocketPriceUpdated;
+        BindRealtimeQuoteService();
         SubscribeToMarketChanges(_marketContext);
         _ = LoadFavoriteAssetsAsync();
         WeakReferenceMessenger.Default.Register(this);
+    }
+
+    /// <summary>
+    /// 绑定当前市场的实时行情服务事件。市场切换后 keyed 解析到不同实现时，
+    /// 先解除旧服务的事件与订阅再绑定新服务，避免旧市场行情继续推送。
+    /// </summary>
+    private void BindRealtimeQuoteService()
+    {
+        var service = _marketContext.GetService<IRealtimeQuoteService>();
+        if (ReferenceEquals(service, _quoteService))
+            return;
+
+        if (_quoteService != null)
+        {
+            _quoteService.PriceUpdated -= OnRealtimePriceUpdated;
+            _ = _quoteService.UnsubscribeAllAsync(RealtimeQuoteSubscriberKeys.Favorites);
+        }
+        _quoteService = service;
+        _quoteService.PriceUpdated += OnRealtimePriceUpdated;
     }
 
     /// <summary>
@@ -84,10 +98,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     /// </summary>
     protected override void OnMarketChanged(MarketType newMarket)
     {
-        // 事件来自单例 MarketContext，Dispose 后不得再触发（重启加载/WebSocket 订阅）
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（重启加载/实时行情订阅）
         if (_disposed)
             return;
 
+        BindRealtimeQuoteService();
         _ = LoadFavoriteAssetsAsync();
     }
 
@@ -112,12 +127,12 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
             RebuildAssetIndex();
 
-            // 以完整集合替换收藏页订阅：虚拟币市场订阅自选交易对；
+            // 以完整集合替换收藏页订阅：支持实时推送的市场订阅自选资产；
             // 其他市场传空集合，确保切换市场后不残留上一市场的订阅
-            var symbols = _marketContext.CurrentMarket == MarketType.Crypto
-                ? Assets.Select(a => ToBinanceFormat(a.Code)).ToList()
+            var codes = _marketContext.CurrentCapability.SupportsRealtime
+                ? Assets.Select(a => a.Code).ToList()
                 : [];
-            _ = _wsService.SubscribeAsync(WebSocketSubscriberKeys.Favorites, symbols);
+            _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.Favorites, codes);
         }, "加载收藏列表");
     }
 
@@ -219,8 +234,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 if (assetToRemove != null)
                 {
                     Assets.Remove(assetToRemove);
-                    _assetIndex.TryRemove(ToBinanceFormat(assetToRemove.Code), out _);
-                    _pendingPriceUpdates.TryRemove(ToBinanceFormat(assetToRemove.Code), out _);
+                    _assetIndex.TryRemove(assetToRemove.Code, out _);
+                    _pendingPriceUpdates.TryRemove(assetToRemove.Code, out _);
                 }
 
                 await FavoriteService.RemoveFavoriteAsync(asset.Code, asset.Market);
@@ -232,16 +247,16 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     }
 
     /// <summary>
-    /// WebSocket 实时价格更新回调（后台线程）。
+    /// 实时价格更新回调（后台线程），参数为应用层资产代码。
     /// 索引未命中（非本页标的）直接返回，不产生任何 UI 线程派发；
     /// 命中则暂存最新值，由 250ms 节流定时器批量刷新，避免高频 tick 逐条打 UI。
     /// </summary>
-    private void OnWebSocketPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    private void OnRealtimePriceUpdated(string code, decimal lastPrice, decimal changePercent)
     {
-        if (!_assetIndex.ContainsKey(symbol))
+        if (!_assetIndex.ContainsKey(code))
             return;
 
-        _pendingPriceUpdates[symbol] = (lastPrice, changePercent);
+        _pendingPriceUpdates[code] = (lastPrice, changePercent);
         EnsurePriceFlushTimer();
     }
 
@@ -253,7 +268,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _assetIndex.Clear();
         foreach (var asset in Assets)
         {
-            _assetIndex[ToBinanceFormat(asset.Code)] = asset;
+            _assetIndex[asset.Code] = asset;
         }
     }
 
@@ -315,8 +330,11 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             _priceFlushTimer = null;
         }
         UnsubscribeFromMarketChanges(_marketContext);
-        _wsService.PriceUpdated -= OnWebSocketPriceUpdated;
-        _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.Favorites);
+        if (_quoteService != null)
+        {
+            _quoteService.PriceUpdated -= OnRealtimePriceUpdated;
+            _ = _quoteService.UnsubscribeAllAsync(RealtimeQuoteSubscriberKeys.Favorites);
+        }
         WeakReferenceMessenger.Default.UnregisterAll(this);
         GC.SuppressFinalize(this);
     }

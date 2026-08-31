@@ -45,7 +45,7 @@ public class CryptoMetricsToolsTest
         userSettingServiceMock.Setup(x => x.CurrentSetting).Returns(userSetting);
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
-        services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IFinancialTools, CryptoMetricsTools>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
     }
@@ -63,7 +63,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetVolumeDistributionAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetVolumeDistributionAsync("BTC");
 
@@ -83,7 +83,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public void GetFunctions_ShouldReturnValidAIFunctions()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var functions = service.GetFunctions().ToList();
 
@@ -95,7 +95,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetOHLCVAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetOHLCVAsync("BTCUSDT", interval: MarketInterval.OneDay, limit: 10);
 
@@ -120,7 +120,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetOrderBookDepthAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetOrderBookDepthAsync("BTCUSDT", limit: 10);
 
@@ -137,7 +137,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetRecentTradesAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetRecentTradesAsync("BTCUSDT", limit: 100);
 
@@ -152,7 +152,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetMarketMetricsAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetMarketMetricsAsync("BTC");
 
@@ -168,7 +168,7 @@ public class CryptoMetricsToolsTest
     [TestCategory("Integration")]
     public async Task GetVolatilityMetricsAsync_ShouldReturnValidData()
     {
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoMetricsTools>(MarketType.Crypto);
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
 
         var result = await service.GetVolatilityMetricsAsync("BTCUSDT", days: 30);
 

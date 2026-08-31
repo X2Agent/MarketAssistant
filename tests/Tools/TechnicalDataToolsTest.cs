@@ -87,7 +87,7 @@ public class TechnicalDataToolsTest
     public async Task GetKDJAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
+        var service = (AShareTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
 
         // Act
         var indicator = await service.GetKDJAsync("SH600519");
@@ -109,7 +109,7 @@ public class TechnicalDataToolsTest
     public async Task GetMACDAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
+        var service = (AShareTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
 
         // Act
         var indicator = await service.GetMACDAsync("SH600519");
@@ -132,7 +132,7 @@ public class TechnicalDataToolsTest
     public async Task GetBOLLAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
+        var service = (AShareTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
 
         // Act
         var indicator = await service.GetBOLLAsync("SH600519");
@@ -152,7 +152,7 @@ public class TechnicalDataToolsTest
     public async Task GetMAAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
+        var service = (AShareTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.AShare);
 
         // Act
         var indicator = await service.GetMAAsync("SH600519");
@@ -175,7 +175,7 @@ public class TechnicalDataToolsTest
     public async Task GetKDJAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
+        var service = (CryptoTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
 
         // Act
         var indicator = await service.GetKDJAsync("BTCUSDT");
@@ -197,7 +197,7 @@ public class TechnicalDataToolsTest
     public async Task GetMACDAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
+        var service = (CryptoTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
 
         // Act
         var indicator = await service.GetMACDAsync("BTCUSDT");
@@ -220,7 +220,7 @@ public class TechnicalDataToolsTest
     public async Task GetBOLLAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
+        var service = (CryptoTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
 
         // Act
         var indicator = await service.GetBOLLAsync("BTCUSDT");
@@ -240,7 +240,7 @@ public class TechnicalDataToolsTest
     public async Task GetMAAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
+        var service = (CryptoTechnicalTools)_serviceProvider!.GetRequiredKeyedService<ITechnicalDataTools>(MarketType.Crypto);
 
         // Act
         var indicator = await service.GetMAAsync("BTCUSDT");

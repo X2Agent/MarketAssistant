@@ -13,7 +13,6 @@ namespace MarketAssistant.ViewModels.Home;
 
 public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
 {
-    private readonly IMarketServiceRegistry _marketServiceRegistry;
     private readonly MarketContext _marketContext;
     private INewsUpdateService _newsUpdateService;
     private bool _disposed;
@@ -26,15 +25,13 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     public IAsyncRelayCommand<Telegram> OpenNewsCommand { get; }
 
     public TelegraphNewsViewModel(
-        IMarketServiceRegistry marketServiceRegistry,
         MarketContext marketContext,
         ILogger<TelegraphNewsViewModel> logger)
         : base(logger)
     {
-        _marketServiceRegistry = marketServiceRegistry;
         _marketContext = marketContext;
 
-        _newsUpdateService = _marketServiceRegistry.GetNewsUpdateService(_marketContext.CurrentMarket);
+        _newsUpdateService = _marketContext.GetService<INewsUpdateService>();
 
         OpenNewsCommand = new AsyncRelayCommand<Telegram>(OnOpenNewsAsync);
 
@@ -62,7 +59,7 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
             _newsUpdateService.NewsUpdated -= OnNewsUpdated;
             _newsUpdateService.CountdownUpdated -= OnCountdownUpdated;
 
-            _newsUpdateService = _marketServiceRegistry.GetNewsUpdateService(newMarket);
+            _newsUpdateService = _marketContext.GetService<INewsUpdateService>(newMarket);
 
             _newsUpdateService.NewsUpdated += OnNewsUpdated;
             _newsUpdateService.CountdownUpdated += OnCountdownUpdated;

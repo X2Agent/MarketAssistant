@@ -147,8 +147,8 @@ public sealed class McpService : IAsyncDisposable
         return config.TransportType.ToLowerInvariant() switch
         {
             "stdio" => CreateStdioTransport(config),
-            "sse" => CreateSseTransport(config),
-            "streamablehttp" => CreateStreamableHttpTransport(config),
+            "sse" => CreateHttpTransport(config, HttpTransportMode.AutoDetect),
+            "streamablehttp" => CreateHttpTransport(config, HttpTransportMode.StreamableHttp),
             _ => throw new NotSupportedException($"不支持的传输类型: {config.TransportType}")
         };
     }
@@ -379,22 +379,12 @@ public sealed class McpService : IAsyncDisposable
         return [.. parts];
     }
 
-    private static IClientTransport CreateSseTransport(MCPServerConfig config)
+    private static IClientTransport CreateHttpTransport(MCPServerConfig config, HttpTransportMode mode)
     {
         return new HttpClientTransport(new HttpClientTransportOptions
         {
             Name = config.Name,
-            TransportMode = HttpTransportMode.AutoDetect,
-            Endpoint = new Uri(config.Command)
-        });
-    }
-
-    private static IClientTransport CreateStreamableHttpTransport(MCPServerConfig config)
-    {
-        return new HttpClientTransport(new HttpClientTransportOptions
-        {
-            Name = config.Name,
-            TransportMode = HttpTransportMode.StreamableHttp,
+            TransportMode = mode,
             Endpoint = new Uri(config.Command)
         });
     }

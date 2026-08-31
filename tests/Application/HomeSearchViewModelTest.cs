@@ -24,37 +24,6 @@ namespace TestMarketAssistant.Application;
 [TestClass]
 public class HomeSearchViewModelTest
 {
-    private sealed class StubMarketServiceRegistry : IMarketServiceRegistry
-    {
-        private readonly IServiceProvider _serviceProvider;
-
-        public StubMarketServiceRegistry(IServiceProvider serviceProvider)
-        {
-            _serviceProvider = serviceProvider;
-        }
-
-        public IKLineService GetKLineService(MarketType marketType)
-            => throw new NotSupportedException();
-
-        public IAssetInfoService GetAssetInfoService(MarketType marketType)
-            => throw new NotSupportedException();
-
-        public INewsUpdateService GetNewsUpdateService(MarketType marketType)
-            => throw new NotSupportedException();
-
-        public IHomeAssetService GetHomeAssetService(MarketType marketType)
-            => _serviceProvider.GetRequiredKeyedService<IHomeAssetService>(marketType);
-
-        public IAssetHistoryService GetAssetHistoryService(MarketType marketType)
-            => throw new NotSupportedException();
-
-        public IFavoriteService GetFavoriteService(MarketType marketType)
-            => throw new NotSupportedException();
-
-        public IAssetCacheService GetAssetCacheService(MarketType marketType)
-            => throw new NotSupportedException();
-    }
-
     private static HomeSearchViewModel CreateViewModel()
     {
         var services = new ServiceCollection();
@@ -67,7 +36,6 @@ public class HomeSearchViewModelTest
         var marketContext = new MarketContext(userSettingService.Object, serviceProvider);
 
         return new HomeSearchViewModel(
-            new StubMarketServiceRegistry(serviceProvider),
             marketContext,
             NullLogger<HomeSearchViewModel>.Instance);
     }

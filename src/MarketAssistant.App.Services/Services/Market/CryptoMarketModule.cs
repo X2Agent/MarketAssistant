@@ -32,13 +32,10 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddKeyedSingleton<IMarketCapability, CryptoMarketCapability>(MarketType.Crypto);
 
         // Agent 工具
-        services.AddKeyedSingleton<ICryptoBasicTools, CryptoBasicTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IFinancialTools, CryptoMetricsTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ITechnicalDataTools, CryptoTechnicalTools>(MarketType.Crypto);
         services.AddKeyedSingleton<INewsDataTools, CryptoNewsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ITradingExecutionTools, CryptoTradingExecutionTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IStrategyTools, CryptoStrategyTools>(MarketType.Crypto);
@@ -52,6 +49,7 @@ public sealed class CryptoMarketModule : IMarketModule
                 sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         // 资产服务
+        services.AddKeyedSingleton<IRealtimeQuoteService, CryptoRealtimeQuoteService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
         services.AddKeyedSingleton<IHomeAssetService, HomeAssetService>(MarketType.Crypto);
         services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.Crypto);

@@ -8,8 +8,9 @@
 
     <!-- VS 隔离构建（Isolated MSBuild）会在 obj-isolated/bin-isolated 生成第二套编译产物，
          默认 glob 会将其扫入 Compile 项，与 obj/bin 下的生成文件重复导致 CS0579。
+         obj-workbuddy/bin-workbuddy 为 WorkBuddy 隔离构建目录，同样需排除。
          此处显式排除，防止生成文件被编译两份。 -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj-isolated/**;**/bin-isolated/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj-isolated/**;**/bin-isolated/**;**/obj-workbuddy/**;**/bin-workbuddy/**</DefaultItemExcludes>
 
     <!-- 限制发布/输出的卫星资源语种，避免生成大量无用语言目录 -->
     <!-- 如需调整，使用分号分隔：例如 zh-Hans;en-US;ja -->

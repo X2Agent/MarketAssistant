@@ -74,7 +74,7 @@ public class BasicDataToolsTest
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         // 注册被测试的服务（A股 + 虚拟币，含基接口与子接口）
-        services.AddKeyedSingleton<IShareBasicTools, AShareBasicTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
         services.AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(MarketType.AShare);
 
         _serviceProvider = services.BuildServiceProvider();
@@ -115,7 +115,7 @@ public class BasicDataToolsTest
     public async Task GetAssetInfoAsync_AShare_ShouldReturnValidQuoteInfo()
     {
         // Arrange - 贵州茅台 SH600519，财联社公开行情接口
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareBasicTools>(MarketType.AShare);
+        var service = (AShareBasicTools)_serviceProvider!.GetRequiredKeyedService<IBasicDataTools>(MarketType.AShare);
 
         // Act - 验证工具能真实调用财联社 API 并返回结构化数据
         var quoteInfo = await service.GetAssetInfoAsync("SH600519");
@@ -142,7 +142,7 @@ public class BasicDataToolsTest
         RequireZhiTuToken();
 
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareBasicTools>(MarketType.AShare);
+        var service = (AShareBasicTools)_serviceProvider!.GetRequiredKeyedService<IBasicDataTools>(MarketType.AShare);
 
         // Act - 真实调用智兔 API 获取公司基本面
         var companyInfo = await service.GetCompanyInfoAsync("SH600519");
@@ -163,7 +163,7 @@ public class BasicDataToolsTest
     public async Task GetAssetInfoAsync_AShare_MultipleSymbols_ShouldAllReturnValidData()
     {
         // Arrange - 验证多只股票的真实行情
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareBasicTools>(MarketType.AShare);
+        var service = (AShareBasicTools)_serviceProvider!.GetRequiredKeyedService<IBasicDataTools>(MarketType.AShare);
         var symbols = new[] { "SH600519", "SZ000001", "SH600036" };
         var expectedNames = new[] { "茅台", "平安", "招商" };
 

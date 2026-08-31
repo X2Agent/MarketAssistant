@@ -66,6 +66,7 @@ MarketAssistant.App/
 
 - `MarketAssistant.App` 不再承载 Agent Tool、Workflow、RAG、交易引擎等运行时代码。
 - 新增 Agent/Tool/Workflow/业务服务时，放到 `MarketAssistant.App.Services`；新增文档解析、向量化、检索、重排等 RAG 基础能力时，放到 `MarketAssistant.Rag`；本项目只保留 UI 相关适配。
+- ViewModel 禁止直接注入 `MarketAssistant.DataProviders` 的具体实现类（如 `BinanceMarketDataService`、`BinanceWebSocketService`）；行情/实时数据应经 `MarketAssistant.App.Services` 编排层暴露的抽象访问，避免多市场抽象泄漏到 UI 层。
 - `skills/` 作为内容文件随 App 输出，由运行时从输出目录加载；不要在 UI 层复制第二套 Skill 加载逻辑。
 - 版本号定义在 `.csproj` 的 `<Version>` 属性中，运行时通过 `AppInfo.Version` 获取。
 

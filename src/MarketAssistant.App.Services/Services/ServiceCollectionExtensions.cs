@@ -297,6 +297,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
         services.AddSingleton<Infrastructure.Providers.IRagInfrastructureProvider, Infrastructure.Providers.RagInfrastructureProvider>();
+        services.AddSingleton<Infrastructure.Providers.DocumentVectorizationService>();
         services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
         services.AddSingleton<IImageCaptionClientFactory, ImageCaptionClientFactory>();
