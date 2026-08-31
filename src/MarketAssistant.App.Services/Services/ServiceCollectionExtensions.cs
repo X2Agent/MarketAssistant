@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
@@ -359,6 +360,12 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
         services.AddSingleton<BinanceUserDataStreamService>();
+
+        // 统一告警中心：AlertGate 单实例（AlertCenterService 与 TradeExecutor 共享）
+        services.AddSingleton<AlertGate>();
+        services.AddSingleton<IAlertGate>(sp => sp.GetRequiredService<AlertGate>());
+        services.AddSingleton<IAlertCenterService, AlertCenterService>();
+
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -394,6 +401,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AISignalStrategyExecutor>();
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
+        services.AddSingleton<RiskAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();

@@ -60,6 +60,38 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public bool Notification { get; set; } = true;
 
+    /// <summary>每小时告警弹窗配额上限（Critical 不受限）。</summary>
+    private int _alertHourlyQuota = 20;
+    public int AlertHourlyQuota
+    {
+        get => _alertHourlyQuota;
+        set => SetProperty(ref _alertHourlyQuota, Math.Clamp(value, 1, 200));
+    }
+
+    /// <summary>是否启用告警免打扰时段（Critical 不受免打扰限制）。</summary>
+    private bool _alertQuietHoursEnabled;
+    public bool AlertQuietHoursEnabled
+    {
+        get => _alertQuietHoursEnabled;
+        set => SetProperty(ref _alertQuietHoursEnabled, value);
+    }
+
+    /// <summary>免打扰起始小时（本地时间 0-23）。</summary>
+    private int _alertQuietStartHour = 23;
+    public int AlertQuietStartHour
+    {
+        get => _alertQuietStartHour;
+        set => SetProperty(ref _alertQuietStartHour, Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>免打扰结束小时（本地时间 0-23，支持跨零点区间）。</summary>
+    private int _alertQuietEndHour = 7;
+    public int AlertQuietEndHour
+    {
+        get => _alertQuietEndHour;
+        set => SetProperty(ref _alertQuietEndHour, Math.Clamp(value, 0, 23));
+    }
+
     [JsonIgnore]
     public string ZhiTuApiToken { get; set; } = "";
 
@@ -190,6 +222,10 @@ public class UserSetting : INotifyPropertyChanged
             LoadKnowledge = LoadKnowledge,
             KnowledgeFileDirectory = KnowledgeFileDirectory,
             Notification = Notification,
+            AlertHourlyQuota = AlertHourlyQuota,
+            AlertQuietHoursEnabled = AlertQuietHoursEnabled,
+            AlertQuietStartHour = AlertQuietStartHour,
+            AlertQuietEndHour = AlertQuietEndHour,
             ZhiTuApiToken = ZhiTuApiToken,
             ThemeMode = ThemeMode,
             CurrentMarketType = CurrentMarketType,

@@ -1,6 +1,9 @@
 # 统一告警中心（AlertCenter）重构方案
 
-> 状态：待审查。审查通过后再择机实施，本文档仅作设计留存，未做任何代码改动。
+> 状态：已在分支 `refactor/alert-center` 实施。价格告警去抖/冷却/限次、告警落库与历史页、
+> 未读徽标、风险与行情连接告警、确认级交易联动门（`IAlertGate`）均已接入，
+> 单元测试见 `tests/Application/AlertCenterTest.cs`、`AlertSuppressionPolicyTest.cs`、
+> `AlertGateTest.cs`、`PriceAlertRuleAdvancedTest.cs`。
 
 ## 背景与现状
 

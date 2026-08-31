@@ -9,7 +9,7 @@
 ```
 MarketAssistant.App.Services/
 ├── Agents/                        ← Agent 实现、工作流、执行器、工具实现
-├── Applications/                  ← 面向 UI 的业务服务（Assets/Home/Favorites/Analysis 等）
+├── Applications/                  ← 面向 UI 的业务服务（Assets/Home/Favorites/Analysis/AlertCenter 等）
 ├── Infrastructure/                ← 工厂、配置、通用运行时适配
 ├── Services/                      ← 横切服务（Archive/Browser/Cache/Market/Mcp/Settings 等）
 └── Trading/                       ← 交易引擎、风控、持久化与监控
@@ -41,6 +41,27 @@ MarketAssistant.App.Services/
 - 分析师实现放在 `Agents/Analysts/`，统一通过 `IAnalystAgentFactory` 创建。
 - 工作流实现放在 `Agents/*Workflow*/`，执行器放在 `Executors/`。
 - 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 `FileAgentSkillsProvider` 加载，不在这里重复存放一份。
+
+---
+
+## 统一告警中心（Applications/AlertCenter）
+
+价格 / 风险 / 信号三类告警的唯一出口，设计详见 `docs/plan/alert-center-refactor-plan.md`。
+
+| 文件 | 职责 |
+|------|------|
+| `AlertEvent.cs` | 告警模型：`AlertLevel`（Info/Warning/Critical）、`AlertSource`、`AlertTradingImpact`、去重键 `DedupeKey` |
+| `IAlertCenterService.cs` / `AlertCenterService.cs` | 落库（`alert_events` 表）、抑制、弹窗触达、联动门登记/释放、历史与未读查询 |
+| `AlertSuppressionPolicy.cs` | 纯逻辑：同类 5 分钟合并窗口 + 全局每小时配额（Critical 不受限），无 IO 便于单测 |
+| `AlertGate.cs` | `IAlertGate` 内存计数门：某标的是否存在触发中的确认级告警 |
+| `AShareTradingHours.cs` | A 股交易时段判定，非交易时段跳过价格告警评估 |
+
+新增告警来源时的约定：
+
+- 一律通过 `IAlertCenterService.RaiseAlertAsync(AlertEvent)` 上报，**不要**在业务服务里直接调用 `INotificationService` 弹告警窗（弹窗由告警中心统一按级别、免打扰时段与配额分发）。
+- 需要"告警期间该标的 AI 交易强制人工确认"时，把 `AlertEvent.TradingImpact` 置为 `RequireConfirmation`；条件解除后必须调用 `RaiseAlertClearedAsync(source, marketType, symbol, title)` 释放联动门，否则该标的会持续被门控。
+- 保护性平仓（`requireClose`）不受联动门影响，确保告警期间仍能及时离场。
+- 抑制状态为内存态，重启清零可接受；持久化只存告警记录本身。
 
 ---
 

@@ -45,6 +45,14 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     /// </summary>
     public event Action<string, decimal, decimal>? PriceUpdated;
 
+    /// <summary>连接中断时触发（断线进入重连流程）。</summary>
+    public event Action? ConnectionInterrupted;
+
+    /// <summary>断线后成功恢复连接时触发（首次连接不触发）。</summary>
+    public event Action? ConnectionRestored;
+
+    private int _connectionInterrupted;
+
     public BinanceWebSocketService(ILogger<BinanceWebSocketService> logger)
     {
         _logger = logger;
@@ -166,6 +174,45 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         _ws = ws;
         _cts = cts;
         _ = ReceiveLoopAsync(ws, cts.Token);
+
+        // 曾发生过断线才通知恢复，首次连接不打扰
+        if (Interlocked.Exchange(ref _connectionInterrupted, 0) == 1)
+        {
+            _logger.LogInformation("Binance WebSocket 已重连成功");
+            NotifyConnectionRestored();
+        }
+    }
+
+    /// <summary>
+    /// 通知订阅方连接已恢复。订阅方异常不得影响连接生命周期主链路。
+    /// </summary>
+    private void NotifyConnectionRestored()
+    {
+        try
+        {
+            ConnectionRestored?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "ConnectionRestored 订阅方处理异常");
+        }
+    }
+
+    /// <summary>
+    /// 通知订阅方连接已中断。断线路径（服务端关闭/网络异常）统一走这里。
+    /// </summary>
+    private void NotifyConnectionInterrupted()
+    {
+        Interlocked.Exchange(ref _connectionInterrupted, 1);
+        try
+        {
+            ConnectionInterrupted?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            // 订阅方异常不影响重连主链路
+            _logger.LogWarning(ex, "ConnectionInterrupted 订阅方处理异常");
+        }
     }
 
     private async Task ReceiveLoopAsync(ClientWebSocket ws, CancellationToken ct)
@@ -187,6 +234,7 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
                         _logger.LogInformation("Binance WebSocket 服务端关闭连接");
+                        NotifyConnectionInterrupted();
                         return;
                     }
                     messageStream.Write(buffer, 0, result.Count);
@@ -206,6 +254,7 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
             // 网络断开、socket 被并发释放等均视为断线；仅当本连接仍是当前连接时才重连，
             // 避免旧循环把新连接顶掉
             _logger.LogWarning(ex, "Binance WebSocket 断开，将在 {Delay}ms 后重连", ReconnectDelayMs);
+            NotifyConnectionInterrupted();
             await ScheduleReconnectIfCurrentAsync(ws, ct);
         }
     }

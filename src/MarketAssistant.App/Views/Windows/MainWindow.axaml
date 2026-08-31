@@ -58,6 +58,15 @@
                                 Height="{StaticResource DefaultIconSize}"
                                 Path="{Binding SelectedIconPath}"
                                 IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                        <!-- 告警未读徽标（仅告警导航项在存在未读时显示） -->
+                        <Ellipse Width="10"
+                                 Height="10"
+                                 Fill="{StaticResource ErrorBrush}"
+                                 Stroke="{DynamicResource CardBackgroundBrush}"
+                                 StrokeThickness="1.5"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Top"
+                                 IsVisible="{Binding HasUnreadBadge}"/>
                     </Panel>
                 </DataTemplate>
             </Border.Resources>

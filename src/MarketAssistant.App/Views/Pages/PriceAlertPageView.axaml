@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:views="using:MarketAssistant.Views.Pages"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:alert="using:MarketAssistant.Applications.PriceAlert"
              xmlns:converts="using:MarketAssistant.Converters"
@@ -65,7 +66,16 @@
                 </Grid>
             </controls:CardView.Header>
 
-            <Grid RowDefinitions="Auto,Auto,Auto,*">
+            <Grid RowDefinitions="Auto,*">
+                <TabControl Grid.Row="0"
+                            SelectedIndex="{Binding SelectedTabIndex}">
+                    <TabItem Header="告警规则"/>
+                    <TabItem Header="告警历史"/>
+                </TabControl>
+
+                <!-- 规则管理（原有内容，仅在"告警规则"标签页显示） -->
+                <Grid Grid.Row="1" RowDefinitions="Auto,Auto,Auto,*"
+                      IsVisible="{Binding !IsHistoryTabSelected}">
                 <Border Grid.Row="0"
                         Background="{DynamicResource SelectedBackgroundBrush}"
                         BorderBrush="{StaticResource PrimaryBrush}"
@@ -173,6 +183,67 @@
                             <TextBlock Text="{Binding ValidationError}"
                                        Classes="form-error"
                                        IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                            <!-- 高级选项：去抖 / 冷却 / 限次 / 交易联动（默认收起，保持常用创建路径简洁） -->
+                            <Expander HorizontalAlignment="Stretch"
+                                      IsExpanded="{Binding IsAdvancedOptionsExpanded, Mode=TwoWay}">
+                                <Expander.Header>
+                                    <TextBlock Text="高级选项（去抖确认 / 冷却 / 触发次数 / 交易联动）"
+                                               FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                </Expander.Header>
+                                <StackPanel Spacing="{StaticResource CompactSpacing}"
+                                            Margin="{StaticResource TinyMargin}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*"
+                                          ColumnSpacing="{StaticResource SmallSpacing}">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="去抖确认（连续行情次数）"
+                                                   Classes="form-label"
+                                                   VerticalAlignment="Center"/>
+                                        <NumericUpDown Grid.Column="1"
+                                                       Value="{Binding NewRuleConfirmTicks, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="100"
+                                                       Increment="1"
+                                                       ShowButtonSpinner="False"
+                                                       Width="110"
+                                                       HorizontalAlignment="Left"
+                                                       ToolTip.Tip="条件需连续满足指定行情次数才触发，0 表示立即触发"/>
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="冷却时间（分钟）"
+                                                   Classes="form-label"
+                                                   VerticalAlignment="Center"/>
+                                        <NumericUpDown Grid.Column="3"
+                                                       Value="{Binding NewRuleCooldownMinutes, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="1440"
+                                                       Increment="5"
+                                                       ShowButtonSpinner="False"
+                                                       Width="110"
+                                                       HorizontalAlignment="Left"
+                                                       ToolTip.Tip="两次触发之间的最小间隔，0 表示不冷却"/>
+
+                                        <TextBlock Grid.Column="4"
+                                                   Text="最大触发次数"
+                                                   Classes="form-label"
+                                                   VerticalAlignment="Center"/>
+                                        <NumericUpDown Grid.Column="5"
+                                                       Value="{Binding NewRuleMaxTriggerCount, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="1000"
+                                                       Increment="1"
+                                                       ShowButtonSpinner="False"
+                                                       Width="110"
+                                                       HorizontalAlignment="Left"
+                                                       ToolTip.Tip="达到次数后规则不再触发，0 表示不限；勾选“仅提醒一次”时恒为 1 次"/>
+                                    </Grid>
+
+                                    <CheckBox Content="确认级告警：触发期间该标的的 AI 交易信号强制人工确认（条件离开告警区间后自动解除）"
+                                              IsChecked="{Binding NewRuleRequireConfirmation}"
+                                              VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Expander>
 
                             <Border Background="{DynamicResource SurfaceVariantBrush}"
                                     CornerRadius="{StaticResource TinyCornerRadius}"
@@ -342,6 +413,11 @@
                                                            FontFamily="{StaticResource DataFontFamily}"
                                                            FontWeight="Bold"/>
                                             </StackPanel>
+                                            <TextBlock Text="{Binding RuleOptionsText}"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding RuleOptionsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
@@ -393,6 +469,12 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </Grid>
+                </Grid>
+
+                <!-- 告警历史（仅在"告警历史"标签页显示） -->
+                <views:AlertHistoryView Grid.Row="1"
+                                        DataContext="{Binding AlertHistory}"
+                                        IsVisible="{Binding $parent[UserControl].((vm:PriceAlertPageViewModel)DataContext).IsHistoryTabSelected}"/>
             </Grid>
         </controls:CardView>
     </ScrollViewer>

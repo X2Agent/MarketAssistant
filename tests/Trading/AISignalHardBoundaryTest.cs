@@ -20,7 +20,8 @@ public sealed class AISignalHardBoundaryTest
     [TestCategory("Unit")]
     public async Task StopLoss_Triggered_ShouldCloseInverse_AndCompleteStrategy_AndRestoreSide()
     {
-        var tradeExecutor = new Mock<TradeExecutor>(null!, null!, null!, NullLogger<TradeExecutor>.Instance, null);
+        var tradeExecutor = new Mock<TradeExecutor>(
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: true,
@@ -44,7 +45,8 @@ public sealed class AISignalHardBoundaryTest
     [TestCategory("Unit")]
     public async Task StopLoss_Triggered_WithoutPosition_ShouldCompleteWithoutOrdering()
     {
-        var tradeExecutor = new Mock<TradeExecutor>(null!, null!, null!, NullLogger<TradeExecutor>.Instance, null);
+        var tradeExecutor = new Mock<TradeExecutor>(
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: false,
@@ -71,7 +73,8 @@ public sealed class AISignalHardBoundaryTest
     [TestCategory("Unit")]
     public async Task StopLoss_Triggered_CloseFailed_StrategyShouldStayActive()
     {
-        var tradeExecutor = new Mock<TradeExecutor>(null!, null!, null!, NullLogger<TradeExecutor>.Instance, null);
+        var tradeExecutor = new Mock<TradeExecutor>(
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: true,

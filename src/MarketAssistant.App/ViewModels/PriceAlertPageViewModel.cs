@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Services.Dialog;
@@ -38,6 +39,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
     private readonly IUserSettingService _userSettingService;
+    private readonly IAlertCenterService _alertCenterService;
 
     /// <summary>
     /// 资产下拉列表加载取消令牌，避免快速切换市场时竞态覆盖。
@@ -102,6 +104,36 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private bool _newRuleIsOneTime;
 
     /// <summary>
+    /// 是否展开高级选项（去抖 / 冷却 / 限次 / 交易联动）
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAdvancedOptionsExpanded;
+
+    /// <summary>
+    /// 新规则 - 去抖确认：条件需连续满足的行情 tick 数，0 表示立即触发。
+    /// </summary>
+    [ObservableProperty]
+    private int _newRuleConfirmTicks;
+
+    /// <summary>
+    /// 新规则 - 冷却分钟数：两次触发之间的最小间隔，0 表示不冷却。
+    /// </summary>
+    [ObservableProperty]
+    private int _newRuleCooldownMinutes;
+
+    /// <summary>
+    /// 新规则 - 最大触发次数，0 表示不限（与"仅提醒一次"互斥，后者恒为 1 次）。
+    /// </summary>
+    [ObservableProperty]
+    private int _newRuleMaxTriggerCount;
+
+    /// <summary>
+    /// 新规则 - 是否升级为确认级告警：触发期间该标的的 AI 交易信号强制走人工确认。
+    /// </summary>
+    [ObservableProperty]
+    private bool _newRuleRequireConfirmation;
+
+    /// <summary>
     /// 新规则 - 市场类型（跟随当前市场）
     /// </summary>
     public MarketType NewRuleMarketType => _marketContext.CurrentMarket;
@@ -157,11 +189,43 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public bool IsNotificationEnabled => _userSettingService.CurrentSetting.Notification;
 
+    /// <summary>页内标签页：0 = 规则管理，1 = 告警历史。</summary>
+    [ObservableProperty]
+    private int _selectedTabIndex;
+
+    /// <summary>当前是否选中历史标签页。</summary>
+    public bool IsHistoryTabSelected => SelectedTabIndex == 1;
+
+    /// <summary>告警历史子 ViewModel。</summary>
+    public AlertHistoryViewModel AlertHistory { get; }
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsHistoryTabSelected));
+
+        // 进入历史标签页即视为已阅：清除未读徽标（MainWindowViewModel 经 AlertsChanged 刷新）
+        if (value == 1)
+            _ = MarkAllAlertsReadAsync();
+    }
+
+    private async Task MarkAllAlertsReadAsync()
+    {
+        try
+        {
+            await _alertCenterService.MarkAllReadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "进入历史页标记告警已读失败");
+        }
+    }
+
     public PriceAlertPageViewModel(
         PriceAlertService alertService,
         MarketContext marketContext,
         IDialogService dialogService,
         IUserSettingService userSettingService,
+        IAlertCenterService alertCenterService,
         ILogger<PriceAlertPageViewModel> logger)
         : base(logger)
     {
@@ -169,6 +233,9 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
         _dialogService = dialogService;
         _userSettingService = userSettingService;
+        _alertCenterService = alertCenterService;
+        AlertHistory = new AlertHistoryViewModel(alertCenterService, logger);
+
         _alertService.RulesChanged += OnRulesChanged;
         _alertService.RuleQuoteUpdated += OnRuleQuoteUpdated;
         SubscribeToMarketChanges(_marketContext);
@@ -287,6 +354,10 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             Condition = source.Condition,
             TargetPrice = source.TargetPrice,
             IsOneTime = source.IsOneTime,
+            MaxTriggerCount = source.MaxTriggerCount,
+            ConfirmTicks = source.ConfirmTicks,
+            CooldownMinutes = source.CooldownMinutes,
+            TradingImpact = source.TradingImpact,
             Triggered = source.Triggered,
             Enabled = source.Enabled,
             CreatedAt = source.CreatedAt
@@ -367,6 +438,12 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
                 Condition = NewRuleCondition,
                 TargetPrice = targetValue,
                 IsOneTime = NewRuleIsOneTime,
+                MaxTriggerCount = NewRuleIsOneTime ? 1 : NewRuleMaxTriggerCount,
+                ConfirmTicks = NewRuleConfirmTicks,
+                CooldownMinutes = NewRuleCooldownMinutes,
+                TradingImpact = NewRuleRequireConfirmation
+                    ? AlertTradingImpact.RequireConfirmation
+                    : AlertTradingImpact.None,
                 Enabled = true
             };
 
@@ -375,6 +452,11 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             NewRuleSelectedAsset = null;
             NewRuleAssetText = string.Empty;
             NewRuleTargetValue = string.Empty;
+            NewRuleConfirmTicks = 0;
+            NewRuleCooldownMinutes = 0;
+            NewRuleMaxTriggerCount = 0;
+            NewRuleRequireConfirmation = false;
+            NewRuleIsOneTime = false;
 
             Logger?.LogInformation("添加价格告警: {Code} {Condition} {Value}", asset.Code, rule.Condition, targetValue);
         }, "添加告警规则");
@@ -447,6 +529,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _assetLoadCts = null;
         _alertService.RulesChanged -= OnRulesChanged;
         _alertService.RuleQuoteUpdated -= OnRuleQuoteUpdated;
+        AlertHistory.Dispose();
         UnsubscribeFromMarketChanges(_marketContext);
         GC.SuppressFinalize(this);
     }

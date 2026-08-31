@@ -92,6 +92,47 @@
                         <Border Height="{StaticResource DividerHeight}"
                                 Background="{DynamicResource BorderBrush}"/>
 
+                        <!-- 告警中心 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="告警中心"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="控制告警弹窗频率与免打扰时段（紧急告警不受限制）"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                <TextBlock Text="每小时弹窗上限" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertHourlyQuota, Mode=TwoWay}"
+                                               Minimum="1"
+                                               Maximum="200"
+                                               Increment="1"
+                                               Width="120"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" VerticalAlignment="Center">
+                                <CheckBox IsChecked="{Binding UserSetting.AlertQuietHoursEnabled}"
+                                          Content="启用免打扰时段"/>
+                                <TextBlock Text="从" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietStartHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="90"/>
+                                <TextBlock Text="点至" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietEndHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="90"/>
+                                <TextBlock Text="点（支持跨零点）" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
                         <!-- 日志文件 -->
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="日志文件"

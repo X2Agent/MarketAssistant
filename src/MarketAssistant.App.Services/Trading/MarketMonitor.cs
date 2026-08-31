@@ -24,6 +24,7 @@ public class MarketMonitor : IDisposable
     private readonly TradingStrategyService _strategyService;
     private readonly TradingDataService _dataService;
     private readonly INotificationService _notificationService;
+    private readonly RiskAlertEvaluator _riskAlertEvaluator;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -79,6 +80,9 @@ public class MarketMonitor : IDisposable
     // 适配 BinanceWebSocketService.PriceUpdated 事件签名（Action<string, decimal, decimal>）
     // 到不含 changePercent 的 OnPriceUpdated 处理方法，需存储委托实例以支持 -= 取消订阅
     private readonly Action<string, decimal, decimal> _priceUpdatedAdapter;
+    // 适配 ConnectionInterrupted/ConnectionRestored（Action）以便 Dispose 时 -=
+    private readonly Action _connectionInterruptedAdapter;
+    private readonly Action _connectionRestoredAdapter;
 
     public bool IsRunning => _isRunning;
 
@@ -102,6 +106,7 @@ public class MarketMonitor : IDisposable
         TradingDataService dataService,
         BinanceUserDataStreamService userDataStreamService,
         INotificationService notificationService,
+        RiskAlertEvaluator riskAlertEvaluator,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -113,8 +118,15 @@ public class MarketMonitor : IDisposable
         _dataService = dataService;
         _userDataStreamService = userDataStreamService;
         _notificationService = notificationService;
+        _riskAlertEvaluator = riskAlertEvaluator;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
+        _connectionInterruptedAdapter = () =>
+            _ = _riskAlertEvaluator.NotifyConnectionInterruptedSafeAsync();
+        _connectionRestoredAdapter = () =>
+            _ = _riskAlertEvaluator.NotifyConnectionRestoredSafeAsync();
+        _webSocketService.ConnectionInterrupted += _connectionInterruptedAdapter;
+        _webSocketService.ConnectionRestored += _connectionRestoredAdapter;
         _strategyService.StrategiesChanged += OnStrategiesChanged;
     }
 
@@ -247,6 +259,9 @@ public class MarketMonitor : IDisposable
     private void OnPriceUpdated(string symbol, decimal lastPrice)
     {
         _priceChannel.Writer.TryWrite((symbol, lastPrice));
+
+        // 风险巡检自带 60 秒节流，价格驱动即可，不必单独起定时器
+        _ = _riskAlertEvaluator.EvaluateAccountRiskSafeAsync(MonitorToken);
     }
 
     /// <summary>
@@ -486,6 +501,7 @@ public class MarketMonitor : IDisposable
         {
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
             await PauseStrategyAfterRejectionAsync(strategy, tradeResult);
+            await _riskAlertEvaluator.EvaluateRejectionSafeAsync(strategy, tradeResult);
             return;
         }
 
@@ -618,6 +634,8 @@ public class MarketMonitor : IDisposable
         TradeExecuted = null;
         StatusChanged = null;
         _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
+        _webSocketService.ConnectionInterrupted -= _connectionInterruptedAdapter;
+        _webSocketService.ConnectionRestored -= _connectionRestoredAdapter;
         _userDataStreamService.OrderUpdate -= OnOrderUpdate;
         _strategyService.StrategiesChanged -= OnStrategiesChanged;
 
