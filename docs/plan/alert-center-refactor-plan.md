@@ -92,3 +92,14 @@
 - **门与告警状态均为内存态**：重启后 `AlertGate` 清空，同时 `PriceAlertService.LoadRulesAsync` 将规则 `Triggered` 重置为 false，两者一致，不会出现"规则显示已触发但门未生效"的残留。
 - **信号告警覆盖面**：当前仅上报策略自动暂停（用户拒绝路径）、策略完结、AI 信号成交三类；策略手动启停、网格/DCA 常规成交暂不上报，按实际噪声反馈再决定是否纳入。
 - **遗留死代码**：`PriceAlertRule.AlertModeText`（"一次性/持续"）全库无引用（视图使用内联 `IsOneTime` 标签），待小改动清理。
+- **静默告警仍消耗每小时配额**：配额在 `AlertSuppressionPolicy.Evaluate` 内递增，而休市/免打扰抑制在其外部判定，因此被压掉弹窗的告警仍计入配额。未修——修正需把抑制判定并入 policy（涉及将 `AShareTradingHours` 注入纯逻辑层的可测性设计）；若实测夜间噪声明显挤占白天配额再处理。
+
+## 十、审计后补修（第二轮）
+
+对首轮实现逐项审计，发现并修复 3 个计划外缺陷：
+
+- **联动门泄漏**：`PriceAlertService.RemoveRuleAsync` 删除规则时未释放确认级联动门（禁用路径已释放），导致删除"触发中的确认级规则"后该标的 AI 信号被永久强制人工确认，仅重启可解。现删除路径同样调用 `RaiseAlertClearedSafeAsync`；Risk/Signal 评估器 `TradingImpact` 恒为 `None`，不经此路径。
+- **`ConfirmSeconds` 能力不可达**：模型、建表、持久化、判定、摘要文本齐备，但表单仅有 `ConfirmTicks`。已补"去抖持续（秒）"输入（`PriceAlertPageView.axaml` + `NewRuleConfirmSeconds`）。tick 间隔在 A 股（20s 轮询）与币安（WS 推送）下语义不同，秒维度才是跨市场一致的判定口径。
+- **`alert_events` 无界增长**：原实现只有 INSERT/SELECT。新增 30 天保留期，随启动初始化执行一次 `PruneExpiredAlertsAsync`（用 `datetime()` 解析比较，避免 ISO-8601 偏移写法下字符串长度差异导致误判）。
+
+测试：新增 `Initialize_ShouldPruneAlertsBeyondRetentionPeriod`，`dotnet test --filter TestCategory=Unit` 361/361 通过。门泄漏与 `ConfirmSeconds` 属服务装配/表单绑定，`PriceAlertService` 依赖 `BinanceWebSocketService`、`ClsQuoteClient` 具体类且无既有测试替身，未补自动化覆盖，由构建与代码走查保证。

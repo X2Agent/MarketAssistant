@@ -239,6 +239,23 @@
                                                        ToolTip.Tip="达到次数后规则不再触发，0 表示不限；勾选“仅提醒一次”时恒为 1 次"/>
                                     </Grid>
 
+                                    <Grid ColumnDefinitions="Auto,*,Auto,*"
+                                          ColumnSpacing="{StaticResource SmallSpacing}">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="去抖持续（秒）"
+                                                   Classes="form-label"
+                                                   VerticalAlignment="Center"/>
+                                        <NumericUpDown Grid.Column="1"
+                                                       Value="{Binding NewRuleConfirmSeconds, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Maximum="600"
+                                                       Increment="5"
+                                                       ShowButtonSpinner="False"
+                                                       Width="110"
+                                                       HorizontalAlignment="Left"
+                                                       ToolTip.Tip="条件需持续满足的秒数，与连续次数同时配置时取更严判定；0 表示不限制"/>
+                                    </Grid>
+
                                     <CheckBox Content="确认级告警：触发期间该标的的 AI 交易信号强制人工确认（条件离开告警区间后自动解除）"
                                               IsChecked="{Binding NewRuleRequireConfirmation}"
                                               VerticalAlignment="Center"/>

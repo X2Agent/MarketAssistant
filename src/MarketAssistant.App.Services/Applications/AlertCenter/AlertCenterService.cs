@@ -20,6 +20,9 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
     private readonly AlertGate _alertGate;
     private readonly AlertSuppressionPolicy _policy = new();
 
+    /// <summary>历史告警保留期：超期记录在启动初始化时裁剪，避免 alert_events 无界增长。</summary>
+    private static readonly TimeSpan RetentionPeriod = TimeSpan.FromDays(30);
+
     private readonly object _stateSync = new();
     private readonly Dictionary<string, AlertSuppressionPolicy.MergeState> _mergeStates =
         new(StringComparer.Ordinal);
@@ -204,6 +207,26 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
             CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events(is_read);
             """;
         await cmd.ExecuteNonQueryAsync();
+
+        await PruneExpiredAlertsAsync();
+    }
+
+    /// <summary>
+    /// 裁剪超过保留期的历史告警（随启动初始化执行一次）。
+    /// created_at 以 ISO-8601 round-trip 文本存储，用 datetime() 解析后比较，
+    /// 避免不同时区偏移写法下的字符串长度差异导致误判。
+    /// </summary>
+    private async Task PruneExpiredAlertsAsync()
+    {
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM alert_events WHERE datetime(created_at) < datetime(@cutoff)";
+        cmd.Parameters.AddWithValue(
+            "@cutoff", (DateTime.UtcNow - RetentionPeriod).ToString("O", CultureInfo.InvariantCulture));
+
+        var deleted = await cmd.ExecuteNonQueryAsync();
+        if (deleted > 0)
+            Logger.LogInformation("已裁剪 {Count} 条超过 {Days} 天保留期的历史告警", deleted, RetentionPeriod.Days);
     }
 
     private async Task InsertAlertAsync(AlertEvent alert, CancellationToken cancellationToken)

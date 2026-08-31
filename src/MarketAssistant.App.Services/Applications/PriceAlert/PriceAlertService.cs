@@ -227,6 +227,11 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
             _rules.RemoveAll(r => r.Id == ruleId);
         }
 
+        // 规则删除后不再跟踪其条件区间，必须释放可能残留的确认级联动门，
+        // 否则该标的的 AI 交易信号会被永久强制人工确认（仅重启可解）
+        if (rule.TradingImpact == AlertTradingImpact.RequireConfirmation)
+            await RaiseAlertClearedSafeAsync(rule);
+
         RulesChanged?.Invoke();
         QueueCryptoSubscriptionRefresh();
     }

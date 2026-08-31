@@ -1,3 +1,4 @@
+using System.Globalization;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
@@ -174,6 +175,30 @@ public sealed class AlertCenterTest
         Assert.AreEqual(1, (await GetTestAlertsAsync()).Count(a => a.IsRead));
     }
 
+    /// <summary>
+    /// 历史告警保留期裁剪：超过保留期的记录在初始化（应用重启）时被清除，保留期内记录不受影响。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task Initialize_ShouldPruneAlertsBeyondRetentionPeriod()
+    {
+        await _service.RaiseAlertAsync(CreateAlert("保留期内告警"));
+        await InsertRawAlertAsync("超期告警", DateTime.UtcNow.AddDays(-60));
+        Assert.AreEqual(2, (await GetTestAlertsAsync()).Count);
+
+        // 新建实例并初始化，模拟应用重启触发裁剪
+        var restarted = new AlertCenterService(
+            _notification,
+            _settings,
+            new AlertGate(),
+            LoggerFactory.Create(_ => { }).CreateLogger<AlertCenterService>());
+        await restarted.InitializeAsync();
+
+        var stored = await GetTestAlertsAsync();
+        Assert.AreEqual(1, stored.Count);
+        Assert.AreEqual("保留期内告警", stored[0].Title);
+    }
+
     private static AlertEvent CreateAlert(
         string title,
         AlertLevel level = AlertLevel.Warning,
@@ -207,6 +232,27 @@ public sealed class AlertCenterTest
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
         cmd.Parameters.AddWithValue("@symbol", TestSymbol);
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>直接写入一条指定时间的告警，用于构造超出保留期的历史数据。</summary>
+    private static async Task InsertRawAlertAsync(string title, DateTime createdAtUtc)
+    {
+        await using var conn = new SqliteConnection($"Data Source={DbPath}");
+        await conn.OpenAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO alert_events (id, market_type, symbol, level, source, title, content, created_at, is_read, trading_impact, occurrence_count)
+            VALUES (@id, @marketType, @symbol, @level, @source, @title, @content, @createdAt, 0, 0, 1)
+            """;
+        cmd.Parameters.AddWithValue("@id", Guid.NewGuid().ToString("N"));
+        cmd.Parameters.AddWithValue("@marketType", (int)MarketType.Crypto);
+        cmd.Parameters.AddWithValue("@symbol", TestSymbol);
+        cmd.Parameters.AddWithValue("@level", (int)AlertLevel.Warning);
+        cmd.Parameters.AddWithValue("@source", (int)AlertSource.PriceAlert);
+        cmd.Parameters.AddWithValue("@title", title);
+        cmd.Parameters.AddWithValue("@content", "测试内容");
+        cmd.Parameters.AddWithValue("@createdAt", createdAtUtc.ToString("O", CultureInfo.InvariantCulture));
         await cmd.ExecuteNonQueryAsync();
     }
 

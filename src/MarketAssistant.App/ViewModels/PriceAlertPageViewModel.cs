@@ -116,6 +116,13 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private int _newRuleConfirmTicks;
 
     /// <summary>
+    /// 新规则 - 去抖持续秒数：条件需持续满足的秒数，0 表示不限制。
+    /// 与连续次数同时配置时取更严判定，用于消除 A 股轮询与币安推送的频率差异。
+    /// </summary>
+    [ObservableProperty]
+    private int _newRuleConfirmSeconds;
+
+    /// <summary>
     /// 新规则 - 冷却分钟数：两次触发之间的最小间隔，0 表示不冷却。
     /// </summary>
     [ObservableProperty]
@@ -440,6 +447,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
                 IsOneTime = NewRuleIsOneTime,
                 MaxTriggerCount = NewRuleIsOneTime ? 1 : NewRuleMaxTriggerCount,
                 ConfirmTicks = NewRuleConfirmTicks,
+                ConfirmSeconds = NewRuleConfirmSeconds,
                 CooldownMinutes = NewRuleCooldownMinutes,
                 TradingImpact = NewRuleRequireConfirmation
                     ? AlertTradingImpact.RequireConfirmation
@@ -453,6 +461,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             NewRuleAssetText = string.Empty;
             NewRuleTargetValue = string.Empty;
             NewRuleConfirmTicks = 0;
+            NewRuleConfirmSeconds = 0;
             NewRuleCooldownMinutes = 0;
             NewRuleMaxTriggerCount = 0;
             NewRuleRequireConfirmation = false;
