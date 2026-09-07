@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
+using MarketAssistant.Applications.AlertCenter;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Trading.Exchanges;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -20,6 +22,7 @@ public class TradeExecutor : IDisposable
     private readonly TradingEnvironmentService? _environmentService;
     private readonly RiskManager _riskManager;
     private readonly TradingDataService _dataService;
+    private readonly IAlertGate? _alertGate;
     private readonly ILogger<TradeExecutor> _logger;
 
     /// <summary>
@@ -35,13 +38,15 @@ public class TradeExecutor : IDisposable
         RiskManager riskManager,
         TradingDataService dataService,
         ILogger<TradeExecutor> logger,
-        TradingEnvironmentService? environmentService = null)
+        TradingEnvironmentService? environmentService = null,
+        IAlertGate? alertGate = null)
     {
         _exchangeClient = exchangeClient;
         _riskManager = riskManager;
         _dataService = dataService;
         _logger = logger;
         _environmentService = environmentService;
+        _alertGate = alertGate;
     }
 
     /// <summary>
@@ -148,6 +153,37 @@ public class TradeExecutor : IDisposable
                 ErrorMessage = $"风控拒绝: {riskCheck.Reason}",
                 FailureCategory = TradeFailureCategory.Rejected
             };
+        }
+        else if (!requireClose && _alertGate?.IsGated(MarketType.Crypto, instrumentSymbol) == true)
+        {
+            // 告警交易联动：确认级告警触发期间，该标的的新开仓信号强制升级为人工确认。
+            // requireClose 的退出型触发（止损/止盈等保护性平仓）豁免，确保告警期间仍能及时离场。
+            _logger.LogWarning("存在触发中的确认级告警，强制人工确认: {Symbol} {Side}", instrumentSymbol, side);
+
+            if (ConfirmationRequested != null)
+            {
+                var approved = await ConfirmationRequested.Invoke(
+                    instrumentSymbol, side, currentPrice, quantity,
+                    "该标的当前存在触发中的紧急告警，交易需人工确认");
+                if (!approved)
+                    return new TradeResult
+                    {
+                        Success = false,
+                        ErrorMessage = "用户拒绝交易: 存在触发中的确认级告警",
+                        FailureCategory = TradeFailureCategory.Rejected
+                    };
+
+                _logger.LogInformation("用户已确认告警联动交易: {Symbol} {Side}", instrumentSymbol, side);
+            }
+            else
+            {
+                return new TradeResult
+                {
+                    Success = false,
+                    ErrorMessage = "存在触发中的确认级告警，需人工确认（无确认订阅者）",
+                    FailureCategory = TradeFailureCategory.Rejected
+                };
+            }
         }
 
         // 仅在实际调用交易所 API 时持有 symbol 锁，防止同一标的并发重复下单

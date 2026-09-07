@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Threading.Channels;
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.DataProviders;
-using MarketAssistant.Services.Notification;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
@@ -23,7 +22,8 @@ public class MarketMonitor : IDisposable
     private readonly OrderStateSyncService _orderStateSyncService;
     private readonly TradingStrategyService _strategyService;
     private readonly TradingDataService _dataService;
-    private readonly INotificationService _notificationService;
+    private readonly RiskAlertEvaluator _riskAlertEvaluator;
+    private readonly SignalAlertEvaluator _signalAlertEvaluator;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -79,6 +79,9 @@ public class MarketMonitor : IDisposable
     // 适配 BinanceWebSocketService.PriceUpdated 事件签名（Action<string, decimal, decimal>）
     // 到不含 changePercent 的 OnPriceUpdated 处理方法，需存储委托实例以支持 -= 取消订阅
     private readonly Action<string, decimal, decimal> _priceUpdatedAdapter;
+    // 适配 ConnectionInterrupted/ConnectionRestored（Action）以便 Dispose 时 -=
+    private readonly Action _connectionInterruptedAdapter;
+    private readonly Action _connectionRestoredAdapter;
 
     public bool IsRunning => _isRunning;
 
@@ -101,7 +104,8 @@ public class MarketMonitor : IDisposable
         TradingStrategyService strategyService,
         TradingDataService dataService,
         BinanceUserDataStreamService userDataStreamService,
-        INotificationService notificationService,
+        RiskAlertEvaluator riskAlertEvaluator,
+        SignalAlertEvaluator signalAlertEvaluator,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -112,9 +116,16 @@ public class MarketMonitor : IDisposable
         _strategyService = strategyService;
         _dataService = dataService;
         _userDataStreamService = userDataStreamService;
-        _notificationService = notificationService;
+        _riskAlertEvaluator = riskAlertEvaluator;
+        _signalAlertEvaluator = signalAlertEvaluator;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
+        _connectionInterruptedAdapter = () =>
+            _ = _riskAlertEvaluator.NotifyConnectionInterruptedSafeAsync();
+        _connectionRestoredAdapter = () =>
+            _ = _riskAlertEvaluator.NotifyConnectionRestoredSafeAsync();
+        _webSocketService.ConnectionInterrupted += _connectionInterruptedAdapter;
+        _webSocketService.ConnectionRestored += _connectionRestoredAdapter;
         _strategyService.StrategiesChanged += OnStrategiesChanged;
     }
 
@@ -247,6 +258,9 @@ public class MarketMonitor : IDisposable
     private void OnPriceUpdated(string symbol, decimal lastPrice)
     {
         _priceChannel.Writer.TryWrite((symbol, lastPrice));
+
+        // 风险巡检自带 60 秒节流，价格驱动即可，不必单独起定时器
+        _ = _riskAlertEvaluator.EvaluateAccountRiskSafeAsync(MonitorToken);
     }
 
     /// <summary>
@@ -400,6 +414,10 @@ public class MarketMonitor : IDisposable
             if (result.TradeExecuted && result.Record != null)
                 TradeExecuted?.Invoke(result.Record);
 
+            // 信号告警留痕：AI 信号产出并成交时上报 Info，使告警历史成为自动化决策的审计线索
+            if (result.Outcome == AISignalOutcome.Executed)
+                await _signalAlertEvaluator.NotifySignalExecutedSafeAsync(strategy, currentPrice);
+
             // HOLD/无持仓完结是正常路径：不进失败冷却，重试频率由
             // StrategyEngine 的 LastTriggeredAt（analysisInterval）节流
             if (result.Outcome != AISignalOutcome.NoTrade)
@@ -459,6 +477,7 @@ public class MarketMonitor : IDisposable
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
             _logger.LogInformation(
                 "一次性策略已执行并完结: {StrategyId} {Type} {Symbol}", strategy.Id, strategy.Type, strategy.Symbol);
+            await _signalAlertEvaluator.NotifyStrategyCompletedSafeAsync(strategy);
         }
         catch (Exception ex)
         {
@@ -486,6 +505,7 @@ public class MarketMonitor : IDisposable
         {
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
             await PauseStrategyAfterRejectionAsync(strategy, tradeResult);
+            await _riskAlertEvaluator.EvaluateRejectionSafeAsync(strategy, tradeResult);
             return;
         }
 
@@ -496,7 +516,7 @@ public class MarketMonitor : IDisposable
 
     /// <summary>
     /// 拒绝类失败后暂停策略：状态置为 Paused（用户可在策略页重新启用），
-    /// 并弹通知让用户知晓（策略静默停摆比反复重试更危险）。
+    /// 并经告警中心让用户知晓（策略静默停摆比反复重试更危险）。
     /// </summary>
     private async Task PauseStrategyAfterRejectionAsync(TradingStrategy strategy, TradeResult? tradeResult)
     {
@@ -508,8 +528,7 @@ public class MarketMonitor : IDisposable
         try
         {
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, MonitorToken);
-            _notificationService.ShowWarning(
-                $"⚠ 策略已自动暂停：{strategy.Symbol} {strategy.Type} — {reason}");
+            await _signalAlertEvaluator.NotifyStrategyPausedSafeAsync(strategy, tradeResult);
         }
         catch (Exception ex)
         {
@@ -578,6 +597,7 @@ public class MarketMonitor : IDisposable
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
             _strategyLocks.TryRemove(strategy.Id, out _);
             _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            await _signalAlertEvaluator.NotifyStrategyCompletedSafeAsync(updated);
         }
     }
 
@@ -618,6 +638,8 @@ public class MarketMonitor : IDisposable
         TradeExecuted = null;
         StatusChanged = null;
         _webSocketService.PriceUpdated -= _priceUpdatedAdapter;
+        _webSocketService.ConnectionInterrupted -= _connectionInterruptedAdapter;
+        _webSocketService.ConnectionRestored -= _connectionRestoredAdapter;
         _userDataStreamService.OrderUpdate -= OnOrderUpdate;
         _strategyService.StrategiesChanged -= OnStrategiesChanged;
 

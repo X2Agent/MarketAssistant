@@ -1,0 +1,159 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:MarketAssistant.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="420"
+             x:Class="MarketAssistant.Views.Components.AnalystResultCardView"
+             x:DataType="vm:AnalystCardViewModel"
+             x:Name="Root">
+
+    <UserControl.Styles>
+        <!-- 评级徽标：Positive 红涨 / Negative 绿跌 / Neutral 灰 -->
+        <Style Selector="Border.ratingBadge">
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.ratingBadge TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
+        </Style>
+        <Style Selector="Border.ratingBadge.tonePositive">
+            <Setter Property="Background" Value="{StaticResource UpColorBrush}"/>
+        </Style>
+        <Style Selector="Border.ratingBadge.toneNegative">
+            <Setter Property="Background" Value="{StaticResource DownColorBrush}"/>
+        </Style>
+        <Style Selector="Border.ratingBadge.toneNeutral">
+            <Setter Property="Background" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <!-- 评分条 -->
+        <Style Selector="ProgressBar.scoreBar">
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        </Style>
+        <!-- 关键数据 chip -->
+        <Style Selector="Border.kvChip">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="Margin" Value="0,3,6,0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- 卡片数据经 Card 属性传入（本控件的 DataContext 是宿主的 ChatMessageAdapter），
+         内部绑定统一锚定到 Card 提供的 AnalystCardViewModel，避免编译绑定因 DataContext 类型不匹配全部失效 -->
+    <StackPanel Spacing="8" DataContext="{Binding Card, ElementName=Root}">
+
+        <!-- 评级徽标行 -->
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasRating}">
+            <Border Classes="ratingBadge tonePositive" IsVisible="{Binding RatingIsPositive}">
+                <TextBlock Text="{Binding RatingText}"/>
+            </Border>
+            <Border Classes="ratingBadge toneNegative" IsVisible="{Binding RatingIsNegative}">
+                <TextBlock Text="{Binding RatingText}"/>
+            </Border>
+            <Border Classes="ratingBadge toneNeutral" IsVisible="{Binding RatingIsNeutral}">
+                <TextBlock Text="{Binding RatingText}"/>
+            </Border>
+        </StackPanel>
+
+        <!-- 评分条 -->
+        <ItemsControl ItemsSource="{Binding ScoreBars}" IsVisible="{Binding HasScoreBars}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AnalystScoreBarItem">
+                    <Grid ColumnDefinitions="72,*,36" Margin="0,2" VerticalAlignment="Center">
+                        <TextBlock Grid.Column="0"
+                                   Text="{Binding Label}"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <ProgressBar Grid.Column="1"
+                                     Classes="scoreBar"
+                                     Value="{Binding NormalizedValue}"
+                                     Maximum="100"
+                                     Margin="8,0"
+                                     VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding ValueText}"
+                                   FontSize="11"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   FontFamily="Consolas, 'Cascadia Mono', monospace"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </Grid>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- 核心观点 -->
+        <ItemsControl ItemsSource="{Binding KeyPoints}" IsVisible="{Binding HasKeyPoints}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <StackPanel Orientation="Horizontal" Margin="0,1">
+                        <Border Width="3" Height="12" CornerRadius="1.5"
+                                Background="{StaticResource PrimaryBrush}"
+                                VerticalAlignment="Center" Margin="0,1,7,1"/>
+                        <TextBlock Text="{Binding}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- 关键数据 -->
+        <ItemsControl ItemsSource="{Binding KeyValues}" IsVisible="{Binding HasKeyValues}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AnalystKeyValueItem">
+                    <Border Classes="kvChip">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding Label}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding Value}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- 风险提示 -->
+        <Border IsVisible="{Binding HasRisks}"
+                Background="{DynamicResource DangerPanelBackgroundBrush}"
+                CornerRadius="4"
+                Padding="8,6">
+            <StackPanel Spacing="2">
+                <TextBlock Text="主要风险"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource DangerPanelTextBrush}"/>
+                <ItemsControl ItemsSource="{Binding Risks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{Binding}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource DangerPanelTextBrush}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

@@ -219,12 +219,8 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
             target.Add(normalized);
     }
 
-    private string FormatFailures()
-        => string.Join("；", _failedMessages.Select(message =>
-            $"{message.AuthorName ?? "未知分析师"}({ExtractFailureReason(message.Text)})"));
-
     /// <summary>
-    /// 构建发给 Coordinator 的载荷：降级说明（仅降级路径）+ 系统指引 + 各分析师摘要（全文已落盘，通过工具读取）+ 维度缺失说明。
+    /// 构建发给 Coordinator 的载荷：降级说明（仅降级路径）+ 系统指引 + 各分析师摘要（全文已落盘，通过工具读取）+ 维度缺失说明 + 失败标记。
     /// 落盘失败的条目自动回退为全文注入。
     /// </summary>
     private async Task<List<ChatMessage>> BuildCoordinatorPayloadAsync(
@@ -262,6 +258,14 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
             {
                 AuthorName = SystemNoticeAuthorName
             });
+        }
+
+        // 失败标记原样附入载荷（P2 展示层修复）：协调阶段不计为有效结论，
+        // 但报告/侧边栏需要它们渲染「分析师执行失败」灰色占位卡片；
+        // 维度缺失说明已告知协调器如实标注数据局限，失败标记本身不再额外约束提示词。
+        foreach (var failure in failures)
+        {
+            messages.Add(failure);
         }
 
         return messages;
@@ -322,21 +326,9 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
            $"本次运行 ID 为 {_runId:N}。需要任何维度的具体数据时，必须调用 get_analyst_artifact 工具读取全文；" +
            "严禁仅依据摘要编造数值、评级或细节。";
 
-    private static string ExtractFailureReason(string? markerText)
-    {
-        if (string.IsNullOrEmpty(markerText))
-            return "未知错误";
-
-        // 标记格式见 AnalystFailureMessages.BuildFailureText：前缀 + 空格 + "AgentName: reason"。
-        // 流式失败时标记前可能拼接了部分正文，故先定位标记再取其后的 "AgentName: reason" 段。
-        var markerIndex = markerText.IndexOf(AnalystFailureMessages.FailureMarkerPrefix, StringComparison.Ordinal);
-        if (markerIndex < 0)
-            return markerText;
-
-        var afterMarker = markerText[(markerIndex + AnalystFailureMessages.FailureMarkerPrefix.Length)..].TrimStart();
-        var separatorIndex = afterMarker.IndexOf(": ", StringComparison.Ordinal);
-        return separatorIndex >= 0 ? afterMarker[(separatorIndex + 2)..] : afterMarker;
-    }
+    private string FormatFailures()
+        => string.Join("；", _failedMessages.Select(message =>
+            $"{message.AuthorName ?? "未知分析师"}({AnalystFailureMessages.ExtractFailureReason(message.Text)})"));
 
     /// <summary>
     /// 降级说明：告知协调器本次结果不完整，需在报告中注明。
@@ -348,7 +340,7 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
     private string BuildMissingDimensionNote(IReadOnlyList<ChatMessage> failedMessages)
         => AnalystFailureMessages.BuildMissingDimensionNote(
             failedMessages.Select(message =>
-                $"{message.AuthorName ?? "未知分析师"}（{ExtractFailureReason(message.Text)}）").ToList());
+                $"{message.AuthorName ?? "未知分析师"}（{AnalystFailureMessages.ExtractFailureReason(message.Text)}）").ToList());
 
     private static bool IsAnalystTextMessage(ChatMessage message)
         => message.Role == ChatRole.Assistant && !string.IsNullOrWhiteSpace(message.Text);

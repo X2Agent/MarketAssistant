@@ -145,6 +145,16 @@
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.news-card:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
     </Style>
     <Style Selector="Border.news-card:focus">
         <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>

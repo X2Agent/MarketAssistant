@@ -19,7 +19,7 @@ public partial class SettingsPageViewModel
     [ObservableProperty]
     private ObservableCollection<string> _models = [];
 
-    // 服务商列表（目录运行期不变，缓存实例避免 ComboBox 每次绑定求值新建 List）
+    // 服务商列表（目录运行期不变，缓存实例避免下拉框每次绑定求值新建 List）
     public List<ModelProvider> Providers { get; } = ModelProviderCatalog.Providers.ToList();
 
     [ObservableProperty]

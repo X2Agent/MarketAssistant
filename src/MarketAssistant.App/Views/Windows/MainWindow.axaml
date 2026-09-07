@@ -58,6 +58,15 @@
                                 Height="{StaticResource DefaultIconSize}"
                                 Path="{Binding SelectedIconPath}"
                                 IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
+                        <!-- 告警未读徽标（仅告警导航项在存在未读时显示） -->
+                        <Ellipse Width="10"
+                                 Height="10"
+                                 Fill="{StaticResource ErrorBrush}"
+                                 Stroke="{DynamicResource CardBackgroundBrush}"
+                                 StrokeThickness="1.5"
+                                 HorizontalAlignment="Right"
+                                 VerticalAlignment="Top"
+                                 IsVisible="{Binding HasUnreadBadge}"/>
                     </Panel>
                 </DataTemplate>
             </Border.Resources>
@@ -91,7 +100,7 @@
                             AutomationProperties.Name="切换市场"
                             CornerRadius="{StaticResource DefaultCornerRadius}"
                             HorizontalAlignment="Center"
-                            Padding="0"
+                            Padding="{StaticResource NoPadding}"
                             Background="Transparent"
                             BorderThickness="{StaticResource NoBorderThickness}"
                             Command="{Binding ToggleMarketCommand}">
@@ -130,7 +139,7 @@
                          SelectedItem="{Binding SelectedBottomNavigationItem}"
                          Background="Transparent"
                          BorderThickness="{StaticResource NoBorderThickness}"
-                         Padding="0"
+                         Padding="{StaticResource NoPadding}"
                          ItemTemplate="{StaticResource NavRailItemTemplate}"/>
 
                 <!-- 主导航（贴顶，DockPanel 最后的填充子项） -->
@@ -138,7 +147,7 @@
                          SelectedItem="{Binding SelectedMainNavigationItem}"
                          Background="Transparent"
                          BorderThickness="{StaticResource NoBorderThickness}"
-                         Padding="0"
+                         Padding="{StaticResource NoPadding}"
                          ItemTemplate="{StaticResource NavRailItemTemplate}"/>
             </DockPanel>
         </Border>
@@ -245,7 +254,7 @@
 
                 <!-- A股 / 虚拟币 分段市场切换器（二级页面对齐原型 tb-mkt：与行情条一并隐藏） -->
                 <Border Grid.Column="3"
-                        Padding="2"
+                        Padding="{StaticResource TinyPadding}"
                         VerticalAlignment="Center"
                         Background="{DynamicResource SurfaceVariantBrush}"
                         CornerRadius="{StaticResource DefaultCornerRadius}"
@@ -269,7 +278,7 @@
                                 Classes.active="{Binding IsAShareMarket}"
                                 Command="{Binding SwitchMarketCommand}"
                                 CommandParameter="{x:Static infra:MarketType.AShare}"
-                                Padding="12,4"
+                                Padding="{StaticResource SegmentButtonPadding}"
                                 CornerRadius="{StaticResource DefaultCornerRadius}"
                                 BorderThickness="{StaticResource NoBorderThickness}"
                                 AutomationProperties.Name="切换到A股市场">
@@ -281,7 +290,7 @@
                                 Classes.active="{Binding IsCryptoMarket}"
                                 Command="{Binding SwitchMarketCommand}"
                                 CommandParameter="{x:Static infra:MarketType.Crypto}"
-                                Padding="12,4"
+                                Padding="{StaticResource SegmentButtonPadding}"
                                 CornerRadius="{StaticResource DefaultCornerRadius}"
                                 BorderThickness="{StaticResource NoBorderThickness}"
                                 AutomationProperties.Name="切换到虚拟币市场">

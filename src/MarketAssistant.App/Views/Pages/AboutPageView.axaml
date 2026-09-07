@@ -30,7 +30,7 @@
                         <Button Grid.Column="1"
                                 Background="Transparent"
                                 BorderThickness="{StaticResource NoBorderThickness}"
-                                Padding="0"
+                                Padding="{StaticResource NoPadding}"
                                 Width="{StaticResource SmallIconSize}"
                                 Height="{StaticResource SmallIconSize}"
                                 ToolTip.Tip="在 GitHub 上查看源码"

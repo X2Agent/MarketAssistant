@@ -3,6 +3,7 @@ using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Providers;
+using MarketAssistant.Services.Agents.MarketAnalysis.Artifacts;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
@@ -21,6 +22,8 @@ public sealed partial class CoordinatorExecutor : Executor
 {
     private readonly AIAgent _coordinatorAgent;
     private readonly ILogger<CoordinatorExecutor> _logger;
+    private readonly Guid _runId;
+    private readonly IAnalystArtifactStore _artifactStore;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
@@ -40,10 +43,14 @@ public sealed partial class CoordinatorExecutor : Executor
 
     public CoordinatorExecutor(
         AIAgent coordinatorAgent,
+        Guid runId,
+        IAnalystArtifactStore artifactStore,
         ILogger<CoordinatorExecutor> logger)
         : base("Coordinator")
     {
         _coordinatorAgent = coordinatorAgent ?? throw new ArgumentNullException(nameof(coordinatorAgent));
+        _runId = runId;
+        _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -237,14 +244,16 @@ public sealed partial class CoordinatorExecutor : Executor
                 coordinatorResult.InvestmentRating);
 
             // 创建最终报告
-            // 仅保存过滤后的分析师消息（不含工具调用细节），避免归档时序列化 FunctionResultContent 失败
+            // 仅保存过滤后的分析师消息（不含工具调用细节），避免归档时序列化 FunctionResultContent 失败。
+            // 协调对话内使用摘要以省 Token（P1-07），但报告/聊天/导出面向用户，
+            // 需从产物存储还原全文，保证展示的是分析师完整结论而非内部摘要指令；
+            // 系统说明（SystemNotice）与落盘失败的条目在回填时分别被跳过或保留原文。
+            var reportAnalystMessages = await RehydrateAnalystArtifactsAsync(filteredMessages, cancellationToken);
+
             var finalReport = new MarketAnalysisReport
             {
                 AssetSymbol = assetSymbol,
-                AnalystMessages = new List<ChatMessage>(filteredMessages)
-                {
-                    coordinatorMessage!
-                },
+                AnalystMessages = [.. reportAnalystMessages, coordinatorMessage!],
                 CoordinatorResult = coordinatorResult,
                 CreatedAt = DateTime.UtcNow
             };
@@ -266,6 +275,80 @@ public sealed partial class CoordinatorExecutor : Executor
             _logger.LogError(ex, "协调分析师生成报告时发生错误，标的: {AssetSymbol}",
                 await context.ReadStateAsync<string>(WorkflowStateKeys.AssetSymbol, WorkflowStateKeys.Scope, cancellationToken) ?? "未知");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 将上游传入的摘要消息回填为产物全文（P1-07 展示层修复）：
+    /// 聚合器为节省 Token 仅向协调器传摘要、全文落盘。报告/聊天/导出等展示层
+    /// 复用 <c>report.AnalystMessages</c>，因此这里在生成报告前将全文读回，
+    /// 失败的分析师失败标记与无产物条目原样保留。
+    /// </summary>
+    private async ValueTask<List<ChatMessage>> RehydrateAnalystArtifactsAsync(
+        IReadOnlyList<ChatMessage> analystMessages,
+        CancellationToken cancellationToken)
+    {
+        var rehydrated = new List<ChatMessage>(analystMessages.Count);
+        var artifactCount = 0;
+
+        foreach (var message in analystMessages)
+        {
+            // 失败标记消息无产物可回填，原样保留供 UI 展示失败原因
+            if (AnalystFailureMessages.IsFailureMarker(message.Text))
+            {
+                rehydrated.Add(message);
+                continue;
+            }
+
+            // 跳过系统说明消息（如产物读取指引、维度缺失说明 SystemNotice），避免内部指令进入展示层
+            if (message.Role == ChatRole.System ||
+                string.Equals(message.AuthorName, "SystemNotice", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var artifact = message.AuthorName is null
+                ? null
+                : await ReadArtifactSafelyAsync(message.AuthorName, cancellationToken);
+
+            if (artifact is null)
+            {
+                rehydrated.Add(message);
+                continue;
+            }
+
+            rehydrated.Add(new ChatMessage(ChatRole.Assistant, artifact)
+            {
+                AuthorName = message.AuthorName
+            });
+            artifactCount++;
+        }
+
+        _logger.LogInformation(
+            "分析师产物回填完成，输入消息: {InputCount}，回填全文: {ArtifactCount}，输出消息: {OutputCount}",
+            analystMessages.Count, artifactCount, rehydrated.Count);
+
+        return rehydrated;
+    }
+
+    /// <summary>
+    /// 读取产物全文；不存在或读取失败时返回 null（保留摘要消息，不阻断报告生成）。
+    /// </summary>
+    private async Task<string?> ReadArtifactSafelyAsync(string analystName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _artifactStore.GetAsync(_runId, analystName, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取分析师产物失败，保留摘要消息: Run: {RunId}, Analyst: {Analyst}",
+                _runId.ToString("N"), analystName);
+            return null;
         }
     }
 

@@ -1,4 +1,5 @@
-using Avalonia.Platform.Storage;
+﻿using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
@@ -10,6 +11,7 @@ using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows.Input;
 
 namespace MarketAssistant.ViewModels;
@@ -41,6 +43,27 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     [ObservableProperty]
     private string _failedAnalystsInfo = string.Empty;
+
+    /// <summary>
+    /// 当前流程阶段（步骤条高亮）
+    /// </summary>
+    [ObservableProperty]
+    private AnalysisPhase _analysisPhase = AnalysisPhase.Preparing;
+
+    /// <summary>
+    /// 各分析师的运行状态行（逐位展示，运行中带实时耗时）
+    /// </summary>
+    public ObservableCollection<AnalystRunItemViewModel> AnalystRunItems { get; } = [];
+
+    /// <summary>
+    /// 平滑百分比插值计时器：目标百分比由完成事件驱动（阶梯式），
+    /// 计时器按固定步长逼近目标值，避免 0→50→100 的跳变观感
+    /// </summary>
+    private readonly DispatcherTimer _progressSmoothTimer;
+    private double _smoothedPercent;
+    private double _targetPercent;
+    private const double SmoothStepSize = 2.0;
+    private static readonly TimeSpan SmoothTickInterval = TimeSpan.FromMilliseconds(30);
 
     /// <summary>
     /// 当前会话是否已有可展示的分析报告（成功产出或加载历史报告后为 true）
@@ -141,6 +164,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
 
+        _progressSmoothTimer = new DispatcherTimer(SmoothTickInterval, DispatcherPriority.Background, OnProgressSmoothTimerTick);
+        _progressSmoothTimer.Stop();
+
         SubscribeToMarketChanges(marketContext);
 
         ChatSidebarViewModel = chatSidebarViewModel;
@@ -190,13 +216,163 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         {
             IsAnalysisInProgress = e.IsInProgress;
             AnalysisStage = e.StageDescription;
-            AnalysisProgressPercent = e.ProgressPercent;
 
             if (e.FailedAnalysts.Count > 0)
             {
                 FailedAnalystsInfo = $"部分分析师失败: {string.Join(", ", e.FailedAnalysts)}";
             }
+
+            // 终态事件（完成/失败/取消）均携带分析师快照，行条目由快照直接定格
+            if (e.Analysts.Count > 0)
+            {
+                AnalysisPhase = e.Phase;
+                SyncAnalystRunItems(e.Analysts);
+            }
+
+            UpdateTargetPercent(e);
+
+            if (!_progressSmoothTimer.IsEnabled)
+            {
+                _progressSmoothTimer.Start();
+            }
         });
+    }
+
+    /// <summary>
+    /// 将最新快照同步到逐分析师状态行：按显示名增量更新，保持行顺序稳定，避免整体重建闪烁
+    /// </summary>
+    private void SyncAnalystRunItems(IReadOnlyList<AnalystRunSnapshot> snapshots)
+    {
+        var existing = AnalystRunItems.ToDictionary(i => i.DisplayName, i => i);
+        foreach (var snapshot in snapshots)
+        {
+            if (existing.TryGetValue(snapshot.DisplayName, out var item))
+            {
+                item.UpdateFrom(snapshot);
+            }
+            else
+            {
+                AnalystRunItems.Add(AnalystRunItemViewModel.From(snapshot));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 根据进度事件计算目标百分比：
+    /// 分析阶段对运行中的分析师按耗时折算部分完成度，使百分比持续平滑推进而非停在整档
+    /// </summary>
+    private void UpdateTargetPercent(AnalysisProgressEventArgs e)
+    {
+        if (!e.IsInProgress)
+        {
+            _targetPercent = 100;
+            return;
+        }
+
+        _targetPercent = e.Phase switch
+        {
+            AnalysisPhase.Preparing => 3,
+            AnalysisPhase.Analyzing when e.Analysts.Count > 0 => 5 + Math.Clamp(
+                e.Analysts.Sum(a => a.Status switch
+                {
+                    AnalystRunStatus.Completed or AnalystRunStatus.Failed => 1.0,
+                    AnalystRunStatus.Running => EstimateRunningCredit(a.Elapsed.TotalSeconds),
+                    _ => 0.0
+                }) / e.Analysts.Count * 80.0, 0, 80),
+            AnalysisPhase.Aggregating => 89,
+            AnalysisPhase.Reporting => 95,
+            AnalysisPhase.Completed => 100,
+            _ => _targetPercent
+        };
+    }
+
+    /// <summary>
+    /// 运行中分析师的完成度估算：前 60 秒线性增长至 70%，之后渐近逼近 90%
+    /// </summary>
+    private static double EstimateRunningCredit(double elapsedSeconds)
+        => elapsedSeconds <= 60
+            ? elapsedSeconds / 60 * 0.7
+            : 0.7 + (1 - Math.Exp(-(elapsedSeconds - 60) / 120)) * 0.2;
+
+    /// <summary>
+    /// 平滑百分比插值：按固定步长逼近目标值，同时刷新运行中分析师的实时耗时
+    /// </summary>
+    private void OnProgressSmoothTimerTick(object? sender, EventArgs e)
+    {
+        var hasRunning = false;
+        foreach (var item in AnalystRunItems)
+        {
+            if (item.Status == AnalystRunStatus.Running)
+            {
+                item.RefreshElapsed();
+                hasRunning = true;
+            }
+        }
+
+        if (hasRunning && AnalysisProgressPercent < 100)
+        {
+            RecomputeTargetPercentFromItems();
+        }
+
+        var delta = _targetPercent - _smoothedPercent;
+        if (Math.Abs(delta) > 0.01)
+        {
+            _smoothedPercent += Math.Clamp(delta, -SmoothStepSize, SmoothStepSize);
+        }
+
+        var rounded = (int)Math.Round(Math.Clamp(_smoothedPercent, 0, 100));
+        if (rounded != AnalysisProgressPercent)
+        {
+            AnalysisProgressPercent = rounded;
+        }
+
+        if (!IsAnalysisInProgress && !hasRunning && Math.Abs(_targetPercent - _smoothedPercent) <= 0.01)
+        {
+            _progressSmoothTimer.Stop();
+        }
+    }
+    /// <summary>
+    /// 分析执行中：按运行中分析师的实时耗时持续重算目标百分比，
+    /// 使两位分析师进度事件之间的空闲期百分比仍平滑推进，而非长时间停滞。
+    /// 仅在存在运行中条目时生效，避免覆盖阶段事件给出的目标值（聚合 89% / 报告 95%）
+    /// </summary>
+    private void RecomputeTargetPercentFromItems()
+    {
+        var hasRunning = false;
+        var credit = 0.0;
+        foreach (var item in AnalystRunItems)
+        {
+            if (item.Status == AnalystRunStatus.Pending)
+                continue;
+
+            if (item.Status == AnalystRunStatus.Running)
+            {
+                hasRunning = true;
+                credit += EstimateRunningCredit(item.CurrentElapsed.TotalSeconds);
+            }
+            else
+            {
+                credit += 1.0;
+            }
+        }
+
+        if (hasRunning)
+        {
+            _targetPercent = 5 + Math.Clamp(credit / AnalystRunItems.Count * 80.0, 0, 80);
+        }
+    }
+    /// <summary>
+    /// 重置进度展示状态（新一次分析开始或市场切换时调用）
+    /// </summary>
+    private void ResetProgressDisplay()
+    {
+        _smoothedPercent = 0;
+        _targetPercent = 0;
+        _progressSmoothTimer.Stop();
+        AnalysisProgressPercent = 0;
+        AnalysisPhase = AnalysisPhase.Preparing;
+        FailedAnalystsInfo = string.Empty;
+        AnalystRunItems.Clear();
     }
 
     private void CancelAnalysis()
@@ -220,9 +396,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         {
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                ResetProgressDisplay();
                 AnalysisStage = "准备开始...";
-                FailedAnalystsInfo = string.Empty;
-                AnalysisProgressPercent = 0;
                 HasActiveReport = false;
                 AnalysisFailureMessage = string.Empty;
             });
@@ -390,8 +565,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         // 重置分析状态
         IsAnalysisInProgress = false;
         AnalysisStage = "等待开始分析";
-        AnalysisProgressPercent = 0;
-        FailedAnalystsInfo = string.Empty;
+        ResetProgressDisplay();
         CanExportReport = false;
         HasActiveReport = false;
         AnalysisFailureMessage = string.Empty;
@@ -402,6 +576,8 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     public void Dispose()
     {
         _disposed = true;
+        _progressSmoothTimer.Stop();
+        _progressSmoothTimer.Tick -= OnProgressSmoothTimerTick;
         _orchestrationService.ProgressChanged -= OnAnalysisProgressChanged;
         _analysisCts?.Cancel();
         _analysisCts?.Dispose();
@@ -417,6 +593,113 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }
 
         GC.SuppressFinalize(this);
+    }
+}
+
+/// <summary>
+/// 进度面板中的单个分析师状态行视图模型。
+/// </summary>
+public partial class AnalystRunItemViewModel : ObservableObject
+{
+    private long _runningStartedTimestamp;
+
+    [ObservableProperty]
+    private string _displayName = string.Empty;
+
+    [ObservableProperty]
+    private AnalystRunStatus _status = AnalystRunStatus.Pending;
+
+    [ObservableProperty]
+    private string _elapsedText = "--:--";
+
+    /// <summary>状态徽标文本（完成 ✓ / 失败 ✗ / 其他为空）</summary>
+    [ObservableProperty]
+    private string _statusMark = string.Empty;
+
+    public bool IsCompleted => Status == AnalystRunStatus.Completed;
+
+    public bool IsFailed => Status == AnalystRunStatus.Failed;
+
+    public bool IsRunning => Status == AnalystRunStatus.Running;
+
+    /// <summary>等待执行的灰色静默点</summary>
+    public bool IsPending => Status == AnalystRunStatus.Pending;
+
+    /// <summary>终态（完成/失败）则不再需要呼吸动画</summary>
+    public bool IsLive => IsRunning;
+
+    public static AnalystRunItemViewModel From(AnalystRunSnapshot snapshot)
+    {
+        var item = new AnalystRunItemViewModel { DisplayName = snapshot.DisplayName };
+        item.ApplySnapshot(snapshot);
+        return item;
+    }
+
+    /// <summary>
+    /// 用最新快照增量更新本行；从运行态转为终态时定格耗时
+    /// </summary>
+    public void UpdateFrom(AnalystRunSnapshot snapshot)
+    {
+        ApplySnapshot(snapshot);
+    }
+
+    /// <summary>
+    /// 计时器驱动：刷新运行中条目的实时耗时显示
+    /// </summary>
+    public void RefreshElapsed()
+    {
+        if (Status != AnalystRunStatus.Running)
+            return;
+
+        ElapsedText = FormatElapsed(Stopwatch.GetElapsedTime(_runningStartedTimestamp));
+    }
+
+    /// <summary>当前实时耗时（运行中取本地 Stopwatch；仅供进度预估消费运行中条目）</summary>
+    public TimeSpan CurrentElapsed => Status == AnalystRunStatus.Running
+        ? Stopwatch.GetElapsedTime(_runningStartedTimestamp)
+        : TimeSpan.Zero;
+
+    private void ApplySnapshot(AnalystRunSnapshot snapshot)
+    {
+        Status = snapshot.Status;
+        if (snapshot.Status == AnalystRunStatus.Running && _runningStartedTimestamp == 0)
+        {
+            // 运行起点只记录一次：无论经 UpdateFrom 还是 From 首见 Running 快照都确保有起点，
+            // 避免 Stopwatch.GetElapsedTime(0) 把进程运行时长误算为耗时
+            _runningStartedTimestamp = Stopwatch.GetTimestamp();
+        }
+        StatusMark = snapshot.Status switch
+        {
+            AnalystRunStatus.Completed => "✓",
+            AnalystRunStatus.Failed => "✗",
+            _ => string.Empty
+        };
+        if (snapshot.Status == AnalystRunStatus.Running)
+        {
+            ElapsedText = FormatElapsed(Stopwatch.GetElapsedTime(_runningStartedTimestamp));
+        }
+        else
+        {
+            // 终态耗时以工作流快照为准；从未运行过的条目（如取消时仍 Pending）保持 --:--
+            ElapsedText = snapshot.Elapsed > TimeSpan.Zero
+                ? FormatElapsed(snapshot.Elapsed)
+                : "--:--";
+        }
+
+        OnPropertyChanged(nameof(IsCompleted));
+        OnPropertyChanged(nameof(IsFailed));
+        OnPropertyChanged(nameof(IsRunning));
+        OnPropertyChanged(nameof(IsPending));
+        OnPropertyChanged(nameof(IsLive));
+    }
+
+    /// <summary>
+    /// 耗时格式化为 mm:ss（金融终端风格等宽字体展示）
+    /// </summary>
+    private static string FormatElapsed(TimeSpan elapsed)
+    {
+        var totalSeconds = (int)elapsed.TotalSeconds;
+        return $"{totalSeconds / 60:D2}:{totalSeconds % 60:D2}";
     }
 }
 

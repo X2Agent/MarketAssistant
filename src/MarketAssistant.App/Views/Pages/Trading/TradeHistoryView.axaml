@@ -112,7 +112,7 @@
                                     <!-- AI 推理展开 -->
                                     <Expander Header="AI 决策推理"
                                               IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                              Padding="0">
+                                              Padding="{StaticResource NoPadding}">
                                         <TextBlock Text="{Binding AIReasoning}"
                                                    TextWrapping="Wrap"
                                                    FontSize="{StaticResource SmallFontSize}"

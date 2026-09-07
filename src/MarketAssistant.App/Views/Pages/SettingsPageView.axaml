@@ -3,6 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
+              xmlns:providers="using:MarketAssistant.Infrastructure.Providers"
+
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
@@ -92,6 +94,55 @@
                         <Border Height="{StaticResource DividerHeight}"
                                 Background="{DynamicResource BorderBrush}"/>
 
+                        <!-- 告警中心 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="告警中心"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="控制告警弹窗频率与免打扰时段（紧急告警不受限制）"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                            <!-- 每小时弹窗上限：标签在上、控件在下靠左，与其他表单行统一 -->
+                            <TextBlock Text="每小时弹窗上限" Classes="form-label"/>
+                            <NumericUpDown Value="{Binding UserSetting.AlertHourlyQuota, Mode=TwoWay}"
+                                           Minimum="1"
+                                           Maximum="200"
+                                           Increment="1"
+                                           Width="200"
+                                           HorizontalAlignment="Left"/>
+                            <!-- 免打扰时段：标签在上、开关在左、起止行缩进随动 -->
+                            <TextBlock Text="免打扰时段" Classes="form-label"/>
+                            <CheckBox IsChecked="{Binding UserSetting.AlertQuietHoursEnabled}"
+                                      Content="启用免打扰时段"/>
+                            <!-- 免打扰时段起止：未启用时整行禁用置灰 -->
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="{StaticResource SmallSpacing}"
+                                        Margin="{StaticResource SmallLeftMargin}"
+                                        IsEnabled="{Binding UserSetting.AlertQuietHoursEnabled}">
+                                <TextBlock Text="从" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietStartHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="110"
+                                               HorizontalAlignment="Left"/>
+                                <TextBlock Text="点至" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietEndHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="110"
+                                               HorizontalAlignment="Left"/>
+                                <TextBlock Text="点（支持跨零点）" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
                         <!-- 日志文件 -->
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="日志文件"
@@ -123,11 +174,22 @@
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="服务商"
                                        Classes="form-label"/>
-                            <ComboBox ItemsSource="{Binding Providers}"
-                                      SelectedItem="{Binding SelectedProvider}"
-                                      DisplayMemberBinding="{Binding DisplayName}"
-                                      PlaceholderText="选择服务商"
-                                      HorizontalAlignment="Stretch"/>
+                            <AutoCompleteBox ItemsSource="{Binding Providers}"
+                                             SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
+                                             FilterMode="Contains"
+                                             MinimumPrefixLength="0"
+                                             ValueMemberBinding="{Binding DisplayName}"
+                                             PlaceholderText="选择或搜索服务商"
+                                             MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                             HorizontalAlignment="Stretch"
+                                             GotFocus="OnProviderBoxGotFocus"
+                                             DropDownClosed="OnProviderBoxDropDownClosed">
+                                <AutoCompleteBox.ItemTemplate>
+                                    <DataTemplate x:DataType="providers:ModelProvider">
+                                        <TextBlock Text="{Binding DisplayName}"/>
+                                    </DataTemplate>
+                                </AutoCompleteBox.ItemTemplate>
+                            </AutoCompleteBox>
                         </StackPanel>
 
                         <StackPanel Spacing="{StaticResource DefaultSpacing}"
@@ -171,13 +233,15 @@
                                        Classes="form-label"/>
                             <Grid ColumnDefinitions="*,Auto"
                                   ColumnSpacing="{StaticResource DefaultSpacing}">
-                                <ComboBox Grid.Column="0"
-                                          IsEditable="True"
-                                          ItemsSource="{Binding Models}"
-                                          Text="{Binding ModelId, Mode=TwoWay}"
-                                          PlaceholderText="选择或输入模型 ID"
-                                          MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
-                                          HorizontalAlignment="Stretch"/>
+                                <AutoCompleteBox Grid.Column="0"
+                                                 ItemsSource="{Binding Models}"
+                                                 Text="{Binding ModelId, Mode=TwoWay}"
+                                                 FilterMode="Contains"
+                                                 MinimumPrefixLength="0"
+                                                 PlaceholderText="选择或输入模型 ID"
+                                                 MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                                 HorizontalAlignment="Stretch"
+                                                 GotFocus="OnModelBoxGotFocus"/>
                                 <Button Grid.Column="1"
                                         Classes="btn-info"
                                         Command="{Binding FetchModelsCommand}"

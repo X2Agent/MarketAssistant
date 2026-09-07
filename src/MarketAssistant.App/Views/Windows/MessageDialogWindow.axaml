@@ -34,7 +34,7 @@
                     <DataTemplate DataType="windows:MessageDialogWindow+DialogButton">
                         <Button Content="{Binding Text}"
                                 MinWidth="{StaticResource SmallButtonMinWidth}"
-                                Padding="16,8"
+                                Padding="{StaticResource PagePadding}"
                                 Classes.btn-primary="{Binding IsPrimary}"
                                 Click="OnButtonClick"/>
                     </DataTemplate>

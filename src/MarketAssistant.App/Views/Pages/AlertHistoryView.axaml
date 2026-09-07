@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:alert="using:MarketAssistant.Applications.AlertCenter"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="MarketAssistant.Views.Pages.AlertHistoryView"
+             x:DataType="vm:AlertHistoryViewModel">
+
+    <Design.DataContext>
+        <vm:AlertHistoryViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="{StaticResource BottomMargin}">
+            <TextBlock Grid.Column="0"
+                       Text="最近告警事件（价格 / 风险 / 系统）"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <Button Grid.Column="1"
+                    Content="全部已读"
+                    Command="{Binding MarkAllReadCommand}"
+                    Classes="btn-secondary"
+                    Margin="{StaticResource SmallRightMargin}"/>
+            <Button Grid.Column="2"
+                    Content="刷新"
+                    Command="{Binding RefreshCommand}"
+                    Classes="btn-secondary"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Alerts}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="alert:AlertEvent">
+                        <Border Margin="{StaticResource SmallBottomMargin}"
+                                Padding="{StaticResource DefaultCardPadding}"
+                                CornerRadius="{StaticResource CardCornerRadius}"
+                                Background="{DynamicResource CardBackgroundBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="{StaticResource DefaultBorderThickness}">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <Panel Grid.Column="0" VerticalAlignment="Top" Margin="{StaticResource StatusDotMargin}">
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" IsVisible="{Binding IsLevelInfo}"/>
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource WarningBrush}" IsVisible="{Binding IsLevelWarning}"/>
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource ErrorBrush}" IsVisible="{Binding IsLevelCritical}"/>
+                                </Panel>
+
+                                <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Border Background="{DynamicResource HoverBackgroundBrush}"
+                                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                                Padding="{StaticResource TagPadding}"
+                                                IsVisible="{Binding IsLevelCritical}">
+                                            <TextBlock Text="紧急"
+                                                       FontSize="{StaticResource TinyFontSize}"
+                                                       Foreground="{StaticResource ErrorBrush}"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding OccurrenceText}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding Content}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding SymbolText}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding LevelText}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="{Binding LocalTimeText}"
+                                                   FontSize="{StaticResource TinyFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

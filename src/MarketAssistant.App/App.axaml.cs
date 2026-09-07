@@ -39,6 +39,10 @@ public partial class App : Application
         var priceAlertService = ServiceProvider.GetRequiredService<PriceAlertService>();
         _ = InitializePriceAlertServiceAsync(priceAlertService);
 
+        // 初始化统一告警中心：建 alert_events 表，确保启动后首个告警可立即落库
+        _ = InitializeAlertCenterServiceAsync(
+            ServiceProvider.GetRequiredService<MarketAssistant.Applications.AlertCenter.IAlertCenterService>());
+
         // 激活 HITL 交易确认服务：DI 单例是惰性创建的，仅注册不会实例化，
         // 必须显式解析一次让构造函数完成对 TradeExecutor.ConfirmationRequested 的订阅，
         // 否则自动交易的超阈值订单会因无订阅者被静默拒绝
@@ -92,6 +96,22 @@ public partial class App : Application
             {
                 Log.Error(notifyEx, "价格预警服务初始化失败的通知发送失败");
             }
+        }
+    }
+
+    /// <summary>
+    /// 初始化统一告警中心（建表），失败仅记录日志：告警写入会随首次调用重试
+    /// </summary>
+    private static async Task InitializeAlertCenterServiceAsync(
+        MarketAssistant.Applications.AlertCenter.IAlertCenterService alertCenterService)
+    {
+        try
+        {
+            await alertCenterService.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "统一告警中心初始化失败");
         }
     }
 

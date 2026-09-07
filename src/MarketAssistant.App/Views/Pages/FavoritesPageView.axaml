@@ -87,7 +87,7 @@
                     <DataTemplate x:DataType="assets:AssetInfo">
                         <Border Classes="fav-card"
                                 Width="290"
-                                Margin="0,0,12,12"
+                                Margin="{StaticResource CardGridMargin}"
                                 Tapped="OnStockItemTapped"
                                 KeyDown="OnStockItemKeyDown"
                                 Focusable="True"
@@ -113,7 +113,7 @@
                                             Cursor="Hand"
                                             Background="Transparent"
                                             BorderThickness="{StaticResource NoBorderThickness}"
-                                            Padding="0"
+                                            Padding="{StaticResource NoPadding}"
                                             Tapped="OnDeleteButtonTapped"
                                             Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}"
                                             CommandParameter="{Binding .}">

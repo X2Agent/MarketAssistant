@@ -68,7 +68,7 @@
                     BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
                     Margin="{StaticResource SmallHorizontalMargin}"
-                    Padding="0"
+                    Padding="{StaticResource NoPadding}"
                     CornerRadius="{StaticResource DefaultCornerRadius}"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"

@@ -102,6 +102,16 @@
         <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <!-- 内部文本框：水平垂直居中，避免窄宽度下数字被步进按钮遮挡裁切 -->
+    <Style Selector="NumericUpDown /template/ TextBox#PART_TextBox">
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="NumericUpDown:disabled">
+        <Setter Property="Opacity" Value="0.5"/>
     </Style>
 
     <!-- ===== 表单标签 ===== -->

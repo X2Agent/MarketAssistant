@@ -236,6 +236,8 @@ public class CoinGeckoCoinDetail
     public CoinGeckoCoinCommunityData? CommunityData { get; set; }
     [JsonPropertyName("developer_data")]
     public CoinGeckoCoinDeveloperData? DeveloperData { get; set; }
+    [JsonPropertyName("detail_platforms")]
+    public Dictionary<string, JsonElement?>? DetailPlatforms { get; set; }
     [JsonPropertyName("market_cap_rank")]
     public int? MarketCapRank { get; set; }
     [JsonPropertyName("coingecko_rank")]

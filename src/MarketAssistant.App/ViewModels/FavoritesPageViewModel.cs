@@ -123,7 +123,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
             // 集合修改须在 UI 线程执行（加载可能由后台事件触发进入），避免跨线程操作 ObservableCollection
             await Dispatcher.UIThread.InvokeAsync(Assets.Clear);
 
-            await UpdateAssetDataProgressivelyAsync(favoritesCodes, ct);
+            await UpdateAssetDataAsync(favoritesCodes, ct);
 
             RebuildAssetIndex();
 
@@ -137,48 +137,41 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     }
 
     /// <summary>
-    /// 渐进式加载资产实时数据（限制并发数，避免同时打开过多浏览器页面）
+    /// 加载收藏资产数据：先命中本地缓存，未命中的部分一次性交给
+    /// <see cref="IAssetInfoService.GetAssetInfosAsync"/> 批量获取
+    /// （虚拟币实现为单次批量行情请求），再统一按请求顺序上 UI。
     /// </summary>
-    private async Task UpdateAssetDataProgressivelyAsync(List<FavoriteAsset> favorites, CancellationToken ct)
+    private async Task UpdateAssetDataAsync(List<FavoriteAsset> favorites, CancellationToken ct)
     {
-        const int maxConcurrency = 3;
-        using var semaphore = new SemaphoreSlim(maxConcurrency);
+        var results = new AssetInfo?[favorites.Count];
+        var missingIndexes = new List<int>();
 
-        var tasks = favorites.Select(async favorite =>
+        for (var i = 0; i < favorites.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
-            await semaphore.WaitAsync(ct);
-            try
+            var cached = await CacheService.GetCachedAssetInfoAsync(favorites[i].Code);
+            results[i] = cached;
+            if (cached == null)
             {
-                var assetInfo = await CacheService.GetCachedAssetInfoAsync(favorite.Code);
+                missingIndexes.Add(i);
+            }
+        }
 
-                if (assetInfo == null)
+        if (missingIndexes.Count > 0)
+        {
+            var missing = missingIndexes.Select(index => favorites[index]).ToList();
+            var fetched = await AssetInfoService.GetAssetInfosAsync(missing, ct);
+
+            for (var i = 0; i < missingIndexes.Count; i++)
+            {
+                var info = fetched[i];
+                results[missingIndexes[i]] = info;
+                if (info != null)
                 {
-                    assetInfo = await AssetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market);
-                    if (assetInfo != null)
-                    {
-                        CacheService.CacheAssetInfo(favorite.Code, assetInfo);
-                    }
+                    CacheService.CacheAssetInfo(missing[i].Code, info);
                 }
-
-                return assetInfo;
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Logger?.LogError(ex, $"加载资产 {favorite.Code} 数据时出错");
-                return null;
-            }
-            finally
-            {
-                semaphore.Release();
-            }
-        });
-
-        var results = await Task.WhenAll(tasks);
+        }
 
         // 落 UI 前复查取消：旧加载在新的 Clear 之后到达时不得再追加（防残留/重复条目）
         ct.ThrowIfCancellationRequested();

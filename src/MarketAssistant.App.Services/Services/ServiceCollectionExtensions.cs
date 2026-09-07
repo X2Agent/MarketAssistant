@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
@@ -34,6 +35,7 @@ using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.DataProviders;
 using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.DataProviders.Web3;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Rag.Services;
 using MarketAssistant.Services.Market;
@@ -67,6 +69,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddNamedMarketHttpClients();
         services.AddAShareDataProviders();
+        services.AddWeb3DataProviders();
         services.AddAgentTools();
         services.AddAgentInfrastructure();
         services.AddRagServices();
@@ -224,6 +227,22 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
+        // Web3 链上数据：DexScreener（多链 DEX 行情，免费无 Key）与 GoPlus（安全审计/蜜罐检测，免费有限速）
+        services.AddHttpClient("DexScreener", client =>
+        {
+            client.BaseAddress = new Uri("https://api.dexscreener.com/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MarketAssistant/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler();
+
+        services.AddHttpClient("GoPlus", client =>
+        {
+            client.BaseAddress = new Uri("https://api.gopluslabs.io/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler();
+
         services.AddHttpClient("GitHub", client =>
         {
             client.BaseAddress = new Uri(AppInfo.GitHubApiBaseUrl);
@@ -359,6 +378,12 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
         services.AddSingleton<BinanceUserDataStreamService>();
+
+        // 统一告警中心：AlertGate 单实例（AlertCenterService 与 TradeExecutor 共享）
+        services.AddSingleton<AlertGate>();
+        services.AddSingleton<IAlertGate>(sp => sp.GetRequiredService<AlertGate>());
+        services.AddSingleton<IAlertCenterService, AlertCenterService>();
+
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
@@ -394,6 +419,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AISignalStrategyExecutor>();
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
+        services.AddSingleton<RiskAlertEvaluator>();
+        services.AddSingleton<SignalAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();

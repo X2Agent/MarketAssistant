@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Services;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
@@ -18,7 +19,18 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly NavigationService _navigationService;
     private readonly MarketContext _marketContext;
     private readonly INotificationService _notificationService;
+    private readonly IAlertCenterService _alertCenterService;
     private bool _isSynchronizingNavigationSelection;
+
+    /// <summary>告警中心未读数（导航徽标）。AlertsChanged 时刷新。</summary>
+    [ObservableProperty]
+    private int _unreadAlertCount;
+
+    /// <summary>是否存在未读告警（控制导航图标徽标可见性）。</summary>
+    public bool HasUnreadAlerts => UnreadAlertCount > 0;
+
+    partial void OnUnreadAlertCountChanged(int value)
+        => OnPropertyChanged(nameof(HasUnreadAlerts));
 
     // 主导航与底部导航必须各自持有选中项：两个 ListBox 绑定同一属性时，
     // 任一选中变化会让另一个列表把 SelectedIndex 归 -1 并回写 null，导致侧栏高亮丢失
@@ -66,6 +78,7 @@ public partial class MainWindowViewModel : ViewModelBase
         NavigationService navigationService,
         MarketContext marketContext,
         INotificationService notificationService,
+        IAlertCenterService alertCenterService,
         ILogger<MainWindowViewModel>? logger = null)
         : base(logger)
     {
@@ -73,6 +86,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _navigationService = navigationService;
         _marketContext = marketContext;
         _notificationService = notificationService;
+        _alertCenterService = alertCenterService;
 
         MainNavigationItems = new ObservableCollection<NavigationItemViewModel>();
         BottomNavigationItems = new ObservableCollection<NavigationItemViewModel>();
@@ -82,10 +96,38 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
+        // 订阅告警中心：新告警/合并/已读时刷新导航未读徽标
+        _alertCenterService.AlertsChanged += OnAlertsChanged;
+        _ = RefreshUnreadAlertCountAsync();
+
         SubscribeToMarketChanges(_marketContext);
 
         // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
         SelectedMainNavigationItem = MainNavigationItems[0];
+    }
+
+    /// <summary>告警集合变化回调：切回 UI 线程刷新未读数。</summary>
+    private void OnAlertsChanged()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = RefreshUnreadAlertCountAsync());
+    }
+
+    /// <summary>从告警中心拉取未读数并同步导航徽标，失败静默（不影响主流程）。</summary>
+    private async Task RefreshUnreadAlertCountAsync()
+    {
+        try
+        {
+            UnreadAlertCount = await _alertCenterService.GetUnreadCountAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "刷新告警未读数失败");
+        }
+
+        // 切市场会重建导航集合（徽标状态被重置），每次刷新都重新定位告警项回填
+        var alertItem = MainNavigationItems.FirstOrDefault(item => item.Title == "告警");
+        if (alertItem != null)
+            alertItem.HasUnreadBadge = UnreadAlertCount > 0;
     }
 
     protected override void OnMarketChanged(MarketType newMarket)
@@ -95,6 +137,9 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
         RebuildIndexTickers();
+
+        // 导航集合重建后徽标状态被重置，按当前未读数回填
+        _ = RefreshUnreadAlertCountAsync();
     }
 
     private void RebuildNavigationItems()
@@ -266,6 +311,14 @@ public class NavigationItemViewModel : ViewModelBase
     public string IconPath { get; }
     public string SelectedIconPath { get; }
     public Func<ViewModelBase> CreateViewModel { get; }
+
+    /// <summary>是否显示未读徽标（仅告警导航项在存在未读告警时为 true）。</summary>
+    private bool _hasUnreadBadge;
+    public bool HasUnreadBadge
+    {
+        get => _hasUnreadBadge;
+        set => SetProperty(ref _hasUnreadBadge, value);
+    }
 
     public NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel)
     {
