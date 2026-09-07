@@ -15,6 +15,9 @@ public class CryptoAssetInfoService : IAssetInfoService
     /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
     private const int HotAssetCount = 10;
 
+    /// <summary>币安批量 24hr ticker 单次请求的最大交易对数（API 上限 100）</summary>
+    private const int BinanceTickerBatchSize = 100;
+
     private readonly BinanceMarketDataService _binanceService;
     private readonly CoinGeckoApiService _coinGeckoService;
     private readonly ICryptoAliasRegistry _aliasRegistry;
@@ -81,6 +84,55 @@ public class CryptoAssetInfoService : IAssetInfoService
 
         _logger.LogInformation("成功获取虚拟币详情: {Symbol}", symbol);
         return assetInfo;
+    }
+
+    /// <summary>
+    /// 批量获取收藏资产行情：仅用一次（按 100 个一组）币安批量 24hr ticker 请求。
+    /// 市值字段留空——收藏列表不展示市值，逐个调用 CoinGecko 会触发限流并拖慢首屏；
+    /// 详情页 <see cref="GetAssetInfoAsync"/> 仍按需获取市值。
+    /// </summary>
+    public async Task<List<AssetInfo?>> GetAssetInfosAsync(
+        IReadOnlyList<FavoriteAsset> favorites, CancellationToken cancellationToken = default)
+    {
+        if (favorites.Count == 0)
+        {
+            return [];
+        }
+
+        var symbols = favorites
+            .Select(favorite => ToBinanceFormat(favorite.Code))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var tickers = new Dictionary<string, Binance24hrTicker>(StringComparer.OrdinalIgnoreCase);
+        foreach (var chunk in symbols.Chunk(BinanceTickerBatchSize))
+        {
+            foreach (var ticker in await _binanceService.Get24hrTickersAsync(chunk.ToList(), cancellationToken))
+            {
+                tickers[ticker.Symbol] = ticker;
+            }
+        }
+
+        return favorites.Select(favorite =>
+        {
+            var symbol = ToBinanceFormat(favorite.Code);
+            if (!tickers.TryGetValue(symbol, out var ticker))
+            {
+                _logger.LogWarning("批量行情未返回 {Symbol}，使用兜底信息展示", symbol);
+                return (AssetInfo?)CreateFallbackAssetInfo(favorite);
+            }
+
+            return (AssetInfo?)new AssetInfo
+            {
+                Code = symbol,
+                Name = ExtractBaseCurrency(ticker.Symbol),
+                MarketType = MarketType.Crypto,
+                Market = "Binance",
+                CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
+                ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
+                Volume24h = FormatVolume(ticker.Volume)
+            };
+        }).ToList();
     }
 
     public async Task<List<HotAsset>> GetHotAssetsAsync()
@@ -154,6 +206,18 @@ public class CryptoAssetInfoService : IAssetInfoService
     }
 
     #region 辅助方法
+
+    /// <summary>
+    /// 行情缺失时的兜底 AssetInfo：以基础币种名称展示，等待实时行情推送补齐。
+    /// </summary>
+    private AssetInfo CreateFallbackAssetInfo(FavoriteAsset favorite)
+        => new()
+        {
+            Code = ToBinanceFormat(favorite.Code),
+            Name = ExtractBaseCurrency(favorite.Code),
+            MarketType = MarketType.Crypto,
+            Market = "Binance"
+        };
 
     /// <summary>
     /// 获取所有交易对信息（使用 IMemoryCache 缓存，只获取 TRADING 状态）

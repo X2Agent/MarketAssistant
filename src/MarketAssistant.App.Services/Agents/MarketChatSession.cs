@@ -255,6 +255,9 @@ public class MarketChatSession : IDisposable
             var text = message.Text;
             if (string.IsNullOrWhiteSpace(text)) continue;
 
+            // 跳过系统内部说明（如产物读取指引 SystemNotice），避免内部指令污染聊天上下文
+            if (message.Role == ChatRole.System) continue;
+
             index++;
             var author = message.AuthorName ?? $"分析师{index}";
             sb.AppendLine($"### {author}");

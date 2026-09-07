@@ -13,7 +13,7 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="{StaticResource BottomMargin}">
             <TextBlock Grid.Column="0"
                        Text="最近告警事件（价格 / 风险 / 系统）"
                        VerticalAlignment="Center"
@@ -22,7 +22,7 @@
                     Content="全部已读"
                     Command="{Binding MarkAllReadCommand}"
                     Classes="btn-secondary"
-                    Margin="0,0,8,0"/>
+                    Margin="{StaticResource SmallRightMargin}"/>
             <Button Grid.Column="2"
                     Content="刷新"
                     Command="{Binding RefreshCommand}"
@@ -33,34 +33,34 @@
             <ItemsControl ItemsSource="{Binding Alerts}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="alert:AlertEvent">
-                        <Border Margin="0,0,0,8"
-                                Padding="12"
-                                CornerRadius="8"
+                        <Border Margin="{StaticResource SmallBottomMargin}"
+                                Padding="{StaticResource DefaultCardPadding}"
+                                CornerRadius="{StaticResource CardCornerRadius}"
                                 Background="{DynamicResource CardBackgroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1">
+                                BorderThickness="{StaticResource DefaultBorderThickness}">
                             <Grid ColumnDefinitions="Auto,*,Auto">
-                                <Panel Grid.Column="0" VerticalAlignment="Top" Margin="0,5,10,0">
+                                <Panel Grid.Column="0" VerticalAlignment="Top" Margin="{StaticResource StatusDotMargin}">
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" IsVisible="{Binding IsLevelInfo}"/>
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource WarningBrush}" IsVisible="{Binding IsLevelWarning}"/>
                                     <Ellipse Width="8" Height="8" Fill="{StaticResource ErrorBrush}" IsVisible="{Binding IsLevelCritical}"/>
                                 </Panel>
 
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                                         <TextBlock Text="{Binding Title}"
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
                                         <Border Background="{DynamicResource HoverBackgroundBrush}"
-                                                CornerRadius="4"
-                                                Padding="4,1"
+                                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                                Padding="{StaticResource TagPadding}"
                                                 IsVisible="{Binding IsLevelCritical}">
                                             <TextBlock Text="紧急"
-                                                       FontSize="11"
+                                                       FontSize="{StaticResource TinyFontSize}"
                                                        Foreground="{StaticResource ErrorBrush}"/>
                                         </Border>
                                         <TextBlock Text="{Binding OccurrenceText}"
-                                                   FontSize="11"
+                                                   FontSize="{StaticResource TinyFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
@@ -71,13 +71,13 @@
 
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <TextBlock Text="{Binding SymbolText}"
-                                                   FontSize="11"
+                                                   FontSize="{StaticResource TinyFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         <TextBlock Text="{Binding LevelText}"
-                                                   FontSize="11"
+                                                   FontSize="{StaticResource TinyFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                         <TextBlock Text="{Binding LocalTimeText}"
-                                                   FontSize="11"
+                                                   FontSize="{StaticResource TinyFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     </StackPanel>
                                 </StackPanel>

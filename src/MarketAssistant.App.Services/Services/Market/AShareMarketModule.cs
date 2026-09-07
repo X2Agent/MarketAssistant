@@ -35,6 +35,7 @@ public sealed class AShareMarketModule : IMarketModule
         services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);
         services.AddKeyedSingleton<INewsDataTools, AShareNewsTools>(MarketType.AShare);
         services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
+        services.AddKeyedSingleton<IOnChainTools, NoopOnChainTools>(MarketType.AShare);
 
         // 快讯 & 新闻
         services.AddKeyedSingleton<ITelegramService, AShareTelegramService>(MarketType.AShare);

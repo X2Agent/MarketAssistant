@@ -23,10 +23,12 @@
         <!-- 主内容区域 -->
         <Grid ClipToBounds="True">
             <!-- 进度显示区域 - 仅在分析时显示 -->
-            <views:ProgressDisplayView 
+            <views:ProgressDisplayView
                 IsVisible="{Binding IsBusy}"
                 AnalysisStage="{Binding AnalysisStage}"
                 ProgressPercent="{Binding AnalysisProgressPercent}"
+                AnalysisPhase="{Binding AnalysisPhase}"
+                AnalystRunItems="{Binding AnalystRunItems}"
                 FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
                 CancelCommand="{Binding CancelAnalysisCommand}"/>
 
@@ -40,7 +42,7 @@
                         Background="Transparent"
                         BorderBrush="{DynamicResource DividerBrush}"
                         BorderThickness="{StaticResource BottomBorderThickness}"
-                        Padding="8,0">
+                        Padding="{StaticResource SmallHorizontalPadding}">
                     <Button HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Width="{StaticResource SmallIconButtonSize}"
@@ -48,7 +50,7 @@
                             CornerRadius="{StaticResource SmallCornerRadius}"
                             Background="Transparent"
                             BorderThickness="{StaticResource NoBorderThickness}"
-                            Padding="0"
+                            Padding="{StaticResource NoPadding}"
                             FontSize="{StaticResource LargeFontSize}"
                             Content="⋮"
                             Foreground="{DynamicResource TextPrimaryBrush}"
@@ -112,7 +114,7 @@
                                                    FontWeight="SemiBold"
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   Margin="8,4,8,4"
+                                                   Margin="{StaticResource SectionTitleMargin}"
                                                    IsVisible="{Binding HasReportHistory}"/>
 
                                         <!-- 历史报告列表（可滚动） -->
@@ -127,7 +129,7 @@
                                                                 HorizontalContentAlignment="Left"
                                                                 Background="Transparent"
                                                                 BorderThickness="{StaticResource NoBorderThickness}"
-                                                                Padding="8,4"
+                                                                Padding="{StaticResource ListItemPadding}"
                                                                 Margin="{StaticResource TinyBottomMargin}"
                                                                 Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
                                                                 CommandParameter="{Binding}">
@@ -153,7 +155,7 @@
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Center"
-                                                   Margin="0,12"
+                                                   Margin="{StaticResource DefaultVerticalMargin}"
                                                    IsVisible="{Binding !HasReportHistory}"/>
                                     </StackPanel>
                                 </Border>
@@ -185,8 +187,9 @@
                         ZIndex="999" 
                         IsHitTestVisible="False"/>
 
-                    <!-- 智能对话 FAB -->
-                    <Button HorizontalAlignment="Right"
+                    <!-- 智能助手 FAB -->
+                    <Button Margin="{StaticResource FABMargin}"
+                            HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
                             ZIndex="1000"
                             Width="{StaticResource FABSize}"
@@ -195,9 +198,9 @@
                             Background="{StaticResource PrimaryBrush}"
                             Foreground="{StaticResource TextOnEmphasisBrush}"
                             BorderThickness="{StaticResource NoBorderThickness}"
-                            Padding="0"
+                            Padding="{StaticResource NoPadding}"
                             Command="{Binding ToggleChatSidebarCommand}"
-                            ToolTip.Tip="智能对话"
+                            ToolTip.Tip="智能助手"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center">
                         <svg:Svg Path="/Assets/Images/icon_chat.svg"

@@ -49,8 +49,8 @@
                     <ListBox ItemsSource="{Binding ServerConfigs}"
                              SelectedItem="{Binding SelectedConfig, Mode=TwoWay}"
                              Background="Transparent"
-                             BorderThickness="0"
-                             Padding="0"
+                             BorderThickness="{StaticResource NoBorderThickness}"
+                             Padding="{StaticResource NoPadding}"
                              Margin="{StaticResource SmallPadding}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="MCP 服务器列表">
@@ -261,7 +261,7 @@
                                               MaxHeight="220">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
+                                            <CheckBox IsChecked="{Binding IsSelected}" Margin="{StaticResource TinyVerticalMargin}">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                                     <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
                                                     <TextBlock Text="{Binding Description}"

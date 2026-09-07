@@ -61,7 +61,7 @@
                                 MaxHeight="{StaticResource DropDownMaxHeight}"
                                 Background="{DynamicResource CardBackgroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}"
-                                BorderThickness="1"
+                                BorderThickness="{StaticResource DefaultBorderThickness}"
                                 CornerRadius="{StaticResource SmallCornerRadius}"
                                 ClipToBounds="True">
                             <ListBox x:Name="SearchResultsList"
@@ -69,8 +69,8 @@
                                      SelectedItem="{Binding Search.SelectedResult, Mode=TwoWay}"
                                      SelectionMode="Single"
                                      Background="Transparent"
-                                     BorderThickness="0"
-                                     Padding="0">
+                                     BorderThickness="{StaticResource NoBorderThickness}"
+                                     Padding="{StaticResource NoPadding}">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate x:DataType="assets:AssetItem">
                                         <StackPanel Margin="{StaticResource TinyMargin}"
@@ -349,7 +349,7 @@
                                                 Tapped="OnPreventTapped"
                                                 Width="{StaticResource SmallIconSize}"
                                                 Height="{StaticResource SmallIconSize}"
-                                                Padding="0"
+                                                Padding="{StaticResource NoPadding}"
                                                 HorizontalAlignment="Right" VerticalAlignment="Center">
                                             <svg:Svg Path="/Assets/Images/tab_favorites.svg"
                                                      Width="{StaticResource MiniIconSize}"

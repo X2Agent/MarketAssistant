@@ -35,6 +35,7 @@ using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
 using MarketAssistant.DataProviders;
 using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.DataProviders.Web3;
 using MarketAssistant.Rag.Interfaces;
 using MarketAssistant.Rag.Services;
 using MarketAssistant.Services.Market;
@@ -68,6 +69,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddNamedMarketHttpClients();
         services.AddAShareDataProviders();
+        services.AddWeb3DataProviders();
         services.AddAgentTools();
         services.AddAgentInfrastructure();
         services.AddRagServices();
@@ -223,6 +225,22 @@ public static class BusinessServiceCollectionExtensions
         {
             client.BaseAddress = new Uri("https://universal-api.panewslab.com");
             client.Timeout = TimeSpan.FromSeconds(10);
+        }).AddStandardResilienceHandler();
+
+        // Web3 链上数据：DexScreener（多链 DEX 行情，免费无 Key）与 GoPlus（安全审计/蜜罐检测，免费有限速）
+        services.AddHttpClient("DexScreener", client =>
+        {
+            client.BaseAddress = new Uri("https://api.dexscreener.com/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MarketAssistant/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler();
+
+        services.AddHttpClient("GoPlus", client =>
+        {
+            client.BaseAddress = new Uri("https://api.gopluslabs.io/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         }).AddStandardResilienceHandler();
 
         services.AddHttpClient("GitHub", client =>

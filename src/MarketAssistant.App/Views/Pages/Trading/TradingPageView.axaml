@@ -32,7 +32,7 @@
                         <Border x:Name="PART_Indicator"
                                 Height="2"
                                 VerticalAlignment="Bottom"
-                                Margin="10,0"
+                                Margin="{StaticResource SmallHorizontalMargin}"
                                 CornerRadius="1,1,0,0"
                                 Background="Transparent"/>
                     </Panel>

@@ -151,6 +151,32 @@ public sealed class AlertCenterTest
         Assert.IsFalse(_gate.IsGated(MarketType.Crypto, TestSymbol));
     }
 
+    /// <summary>
+    /// 同一标的多条不同条件的确认级规则：门键含标题，各规则独立登记/释放，
+    /// 防止后触发覆盖先触发导致门计数无法归零（标的水久门控）。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task RaiseAlert_MultipleConfirmationRulesSameSymbol_ShouldTrackGatesIndependently()
+    {
+        var above = CreateAlert("确认级涨破", AlertLevel.Critical, AlertTradingImpact.RequireConfirmation);
+        var below = CreateAlert("确认级跌破", AlertLevel.Critical, AlertTradingImpact.RequireConfirmation);
+
+        await _service.RaiseAlertAsync(above);
+        await _service.RaiseAlertAsync(below);
+        Assert.IsTrue(_gate.IsGated(MarketType.Crypto, TestSymbol));
+
+        // 释放其中一条，另一条仍触发中，门保持生效
+        await _service.RaiseAlertClearedAsync(
+            AlertSource.PriceAlert, MarketType.Crypto, TestSymbol, "确认级涨破");
+        Assert.IsTrue(_gate.IsGated(MarketType.Crypto, TestSymbol));
+
+        // 两条全部释放，门应彻底关闭（修复前第二次 Remove 因键被覆盖而失败，门残留）
+        await _service.RaiseAlertClearedAsync(
+            AlertSource.PriceAlert, MarketType.Crypto, TestSymbol, "确认级跌破");
+        Assert.IsFalse(_gate.IsGated(MarketType.Crypto, TestSymbol));
+    }
+
     [TestMethod]
     [TestCategory("Unit")]
     public async Task RaiseAlert_NonConfirmationImpact_ShouldNotTouchGate()

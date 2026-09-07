@@ -20,6 +20,9 @@ public class CryptoProjectInfo
     [Description("其他多平台标识ID")]
     public Dictionary<string, string> AlternativeIds { get; set; } = new();
 
+    [Description("该代币在各区块链上的合约地址（键为平台 ID，如 ethereum、binance-smart-chain；来自 CoinGecko）。多链代币会包含多条；用于确定审计与链上查询所需的链与合约")]
+    public Dictionary<string, string> ContractAddresses { get; set; } = new();
+
     [Description("简短项目描述")]
     public string DescriptionSnippet { get; set; } = string.Empty;
 

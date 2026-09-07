@@ -267,6 +267,11 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
             rule.Triggered = false;
         }
 
+        // 禁用确认级规则时释放交易联动门：规则已不再跟踪条件区间，
+        // 否则该标的 AI 交易信号会被永久强制人工确认（仅重启可解）
+        if (!newEnabled && rule.TradingImpact == AlertTradingImpact.RequireConfirmation)
+            await RaiseAlertClearedSafeAsync(rule);
+
         RulesChanged?.Invoke();
         QueueCryptoSubscriptionRefresh();
     }
@@ -401,10 +406,8 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
 
         if (autoDisabled)
         {
-            // 一次性规则触发后即停用，不再跟踪条件区间：同步释放联动门，避免残留阻塞该标的自动交易
-            if (!shouldClearGate && rule.TradingImpact == AlertTradingImpact.RequireConfirmation)
-                _ = RaiseAlertClearedSafeAsync(rule);
-
+            // 一次性规则触发后即停用，不再跟踪条件区间。其确认级告警在上报时已按 IsOneTime
+            // 降为 None、未登记联动门，无需在此释放；仅持久化停用状态并刷新订阅
             _ = PersistRuleDisabledAsync(ruleId);
             QueueCryptoSubscriptionRefresh();
         }
@@ -446,7 +449,9 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
                 Source = AlertSource.PriceAlert,
                 Title = BuildAlertTitle(rule),
                 Content = BuildAlertContent(rule, lastPrice, changePercent),
-                TradingImpact = rule.TradingImpact
+                // 一次性规则触发即停用，不存在"持续触发中"状态，不登记交易联动门，
+                // 否则门随规则停用后永不释放，该标的 AI 信号会被永久强制人工确认
+                TradingImpact = rule.IsOneTime ? AlertTradingImpact.None : rule.TradingImpact
             });
         }
         catch (Exception ex)

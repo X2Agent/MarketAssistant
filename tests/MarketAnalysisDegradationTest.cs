@@ -55,15 +55,16 @@ public sealed class MarketAnalysisDegradationTest
                 Assert.IsFalse(string.IsNullOrWhiteSpace(report.CoordinatorResult.Summary));
 
                 var texts = report.AnalystMessages.Select(message => message.Text ?? string.Empty).ToList();
-                // P1-07：协调载荷为摘要而非全文，摘要应包含显示名与工具读取指引
-                Assert.IsTrue(texts.Any(text => text.Contains("结论摘要", StringComparison.Ordinal) && text.Contains("NewsEventAnalyst", StringComparison.Ordinal)),
-                    $"存活分析师的结论摘要应进入报告\n--- 诊断日志 ---\n{string.Join("\n", diagnosticLogs.TakeLast(80))}");
-                Assert.IsTrue(texts.Any(text => text.Contains("get_analyst_artifact", StringComparison.Ordinal)),
-                    "协调载荷应包含产物读取工具指引");
-                Assert.IsTrue(texts.All(text => !AnalystFailureMessages.IsFailureMarker(text)),
-                    "失败标记不应进入报告载荷");
-                Assert.IsTrue(texts.Any(text => text.StartsWith(AnalystFailureMessages.MissingDimensionNotePrefix, StringComparison.Ordinal)),
-                    "报告中应包含维度缺失说明");
+                // P1-07 展示层修复：报告/侧边栏展示回填后的产物全文，内部摘要与系统指引（SystemNotice）不进入报告
+                Assert.IsTrue(texts.Any(text => text.Contains("正常的新闻事件分析结论", StringComparison.Ordinal)),
+                    $"存活分析师的产物全文应经回填进入报告\n--- 诊断日志 ---\n{string.Join("\n", diagnosticLogs.TakeLast(80))}");
+                Assert.IsTrue(texts.All(text => !text.Contains("结论摘要", StringComparison.Ordinal) &&
+                        !text.Contains("get_analyst_artifact", StringComparison.Ordinal)),
+                    "系统内部说明与结论摘要不应进入报告展示层");
+                Assert.IsTrue(texts.Any(text => AnalystFailureMessages.IsFailureMarker(text) &&
+                        text.Contains("FundamentalAnalyst", StringComparison.Ordinal) &&
+                        text.Contains(ThrowingChatClient.FailureReason, StringComparison.Ordinal)),
+                    "失败分析师的失败标记应保留在报告消息中，供侧边栏渲染失败占位卡片");
 
                 Assert.IsTrue(coordinatorRequests.Count == 1, "协调分析师应被恰好调用一次");
                 Assert.IsTrue(progressEvents.Any(args => args.FailedAnalysts.Count > 0),

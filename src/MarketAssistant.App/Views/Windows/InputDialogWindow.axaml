@@ -31,13 +31,13 @@
                         Content="确定"
                         Classes="btn-primary"
                         MinWidth="{StaticResource SmallButtonMinWidth}"
-                        Padding="16,8"
+                        Padding="{StaticResource PagePadding}"
                         Click="OnOkClick"/>
                 <Button Name="CancelButton"
                         Content="取消"
                         Classes="btn-secondary"
                         MinWidth="{StaticResource SmallButtonMinWidth}"
-                        Padding="16,8"
+                        Padding="{StaticResource PagePadding}"
                         Click="OnCancelClick"/>
             </StackPanel>
         </StackPanel>

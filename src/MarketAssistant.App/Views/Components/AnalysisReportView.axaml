@@ -251,7 +251,7 @@
                                          Width="{StaticResource LargeFontSize}"
                                          Height="{StaticResource LargeFontSize}"
                                          VerticalAlignment="Center"/>
-                                <TextBlock Text="投资亮点" Classes="section-title" Margin="0"/>
+                                <TextBlock Text="投资亮点" Classes="section-title" Margin="{StaticResource NoMargin}"/>
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding InvestmentHighlights}">
                                 <ItemsControl.ItemTemplate>
@@ -280,7 +280,7 @@
                                          Width="{StaticResource LargeFontSize}"
                                          Height="{StaticResource LargeFontSize}"
                                          VerticalAlignment="Center"/>
-                                <TextBlock Text="风险因素" Classes="section-title" Margin="0"/>
+                                <TextBlock Text="风险因素" Classes="section-title" Margin="{StaticResource NoMargin}"/>
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding RiskFactors}">
                                 <ItemsControl.ItemTemplate>
@@ -382,7 +382,7 @@
                                      Width="{StaticResource LargeFontSize}"
                                      Height="{StaticResource LargeFontSize}"
                                      VerticalAlignment="Center"/>
-                            <TextBlock Text="分析质量评估" Classes="section-title" Margin="0"/>
+                            <TextBlock Text="分析质量评估" Classes="section-title" Margin="{StaticResource NoMargin}"/>
                         </StackPanel>
 
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{StaticResource LargeSpacing}">

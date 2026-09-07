@@ -363,6 +363,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
             IsOneTime = source.IsOneTime,
             MaxTriggerCount = source.MaxTriggerCount,
             ConfirmTicks = source.ConfirmTicks,
+            ConfirmSeconds = source.ConfirmSeconds,
             CooldownMinutes = source.CooldownMinutes,
             TradingImpact = source.TradingImpact,
             Triggered = source.Triggered,

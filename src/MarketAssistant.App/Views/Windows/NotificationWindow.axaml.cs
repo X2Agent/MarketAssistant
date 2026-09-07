@@ -18,10 +18,11 @@ public partial class NotificationWindow : Window
     private const double MarginFromEdge = 16;
     private const double StackGap = 8;
 
-    private static readonly Color SuccessColor = Color.Parse("#4CAF50");
-    private static readonly Color ErrorColor = Color.Parse("#F44336");
-    private static readonly Color WarningColor = Color.Parse("#FF9800");
-    private static readonly Color InfoColor = Color.Parse("#2196F3");
+    // 图标底色对齐设计系统语义色（Colors.axaml 中 Success/Error/Warning/Info）
+    private static readonly Color SuccessColor = Color.Parse("#10B981");
+    private static readonly Color ErrorColor = Color.Parse("#EF4444");
+    private static readonly Color WarningColor = Color.Parse("#F59E0B");
+    private static readonly Color InfoColor = Color.Parse("#3B82F6");
 
     // 堆叠槽位（0 = 底部基准位，向上依次偏移），由 NotificationService 分配
     private int _slot;

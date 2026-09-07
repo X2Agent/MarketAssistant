@@ -28,8 +28,10 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         new(StringComparer.Ordinal);
     private AlertSuppressionPolicy.QuotaState _quotaState = AlertSuppressionPolicy.QuotaState.Empty;
 
-    /// <summary>触发中的确认级告警：(来源, 市场, 标的) → 告警 Id，供告警解除时释放联动门。</summary>
-    private readonly Dictionary<(AlertSource Source, MarketType MarketType, string Symbol), string>
+    /// <summary>触发中的确认级告警：(来源, 市场, 标的, 标题) → 告警 Id，供告警解除时释放联动门。
+    /// 键含标题：同一标的多条不同条件的确认级规则各自独立登记，解除时精确匹配，
+    /// 避免后触发覆盖先触发导致门计数无法归零。</summary>
+    private readonly Dictionary<(AlertSource Source, MarketType MarketType, string Symbol, string Title), string>
         _activeGatedAlerts = new();
 
     /// <inheritdoc />
@@ -84,7 +86,7 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         {
             lock (_stateSync)
             {
-                _activeGatedAlerts[(alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol))] =
+                _activeGatedAlerts[(alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol), alert.Title)] =
                     mergedAlertId ?? alert.Id;
             }
 
@@ -107,7 +109,7 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         AlertSource source, MarketType marketType, string symbol, string title,
         CancellationToken cancellationToken = default)
     {
-        var gateKey = (source, marketType, AlertEvent.NormalizeSymbol(symbol));
+        var gateKey = (source, marketType, AlertEvent.NormalizeSymbol(symbol), title);
         lock (_stateSync)
         {
             if (_activeGatedAlerts.Remove(gateKey))

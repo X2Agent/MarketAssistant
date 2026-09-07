@@ -39,6 +39,7 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ITradingExecutionTools, CryptoTradingExecutionTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IStrategyTools, CryptoStrategyTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IOnChainTools, CryptoOnChainTools>(MarketType.Crypto);
 
         // 快讯 & 新闻
         services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>(MarketType.Crypto);

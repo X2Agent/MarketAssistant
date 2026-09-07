@@ -37,6 +37,48 @@ public static class AnalystFailureMessages
         => $"{MissingDimensionNotePrefix} 以下分析师本次执行失败，其维度结论缺失：{string.Join("；", failedAnalystDescriptions)}。" +
            "综合报告必须明确标注该数据局限，不得虚构缺失维度的结论。";
 
+    /// <summary>
+    /// 从失败标记文本中提取失败分析师的 Agent 名称（ASCII 名，如 <c>FundamentalAnalyst</c>）。
+    /// 标记格式见 <see cref="BuildFailureText"/>：前缀 + 空格 + "AgentName: reason"；
+    /// 流式失败时标记前可能拼接了部分正文，故先定位标记再取其后段落。
+    /// 非失败标记文本返回 null。
+    /// </summary>
+    public static string? ExtractAgentName(string? markerText)
+    {
+        if (string.IsNullOrWhiteSpace(markerText) || !IsFailureMarker(markerText))
+            return null;
+
+        var afterMarker = SliceAfterMarker(markerText);
+        var separatorIndex = afterMarker.IndexOf(": ", StringComparison.Ordinal);
+        return separatorIndex >= 0 ? afterMarker[..separatorIndex] : afterMarker;
+    }
+
+    /// <summary>
+    /// 从失败标记文本中提取失败原因（不含 Agent 名称）；
+    /// 非失败标记文本原样返回，空文本返回「未知错误」。
+    /// </summary>
+    public static string ExtractFailureReason(string? markerText)
+    {
+        if (string.IsNullOrEmpty(markerText))
+            return "未知错误";
+
+        if (!IsFailureMarker(markerText))
+            return markerText;
+
+        var afterMarker = SliceAfterMarker(markerText);
+        var separatorIndex = afterMarker.IndexOf(": ", StringComparison.Ordinal);
+        return separatorIndex >= 0 ? afterMarker[(separatorIndex + 2)..] : afterMarker;
+    }
+
+    /// <summary>
+    /// 截取失败标记前缀之后（并去除起始空白）的文本段。
+    /// </summary>
+    private static string SliceAfterMarker(string markerText)
+    {
+        var markerIndex = markerText.IndexOf(FailureMarkerPrefix, StringComparison.Ordinal);
+        return markerText[(markerIndex + FailureMarkerPrefix.Length)..].TrimStart();
+    }
+
     private static string NormalizeReason(string reason)
     {
         var normalized = reason.ReplaceLineEndings(" ").Trim();

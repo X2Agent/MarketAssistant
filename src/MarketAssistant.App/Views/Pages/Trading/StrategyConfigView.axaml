@@ -35,7 +35,7 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <!-- 场景卡片单选按钮 -->
+        <!-- 场景卡片单选：无默认圆点，选中态为主色描边 + 右上角对勾 -->
         <Style Selector="RadioButton.scenario-card">
             <Setter Property="Padding" Value="12,10"/>
             <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
@@ -43,12 +43,70 @@
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <Panel>
+                            <ContentPresenter x:Name="PART_ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                            <PathIcon x:Name="CheckMark"
+                                      Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z"
+                                      Width="16" Height="16"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Top"
+                                      Foreground="{StaticResource PrimaryBrush}"
+                                      IsVisible="False"/>
+                        </Panel>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
         </Style>
-        <Style Selector="RadioButton.scenario-card:checked /template/ Border#RootBorder">
+        <Style Selector="RadioButton.scenario-card:pointerover /template/ Border#Root">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
+        </Style>
+        <Style Selector="RadioButton.scenario-card:checked /template/ Border#Root">
             <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        </Style>
+        <Style Selector="RadioButton.scenario-card:checked /template/ PathIcon#CheckMark">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <!-- 风险档案分段选择胶囊 -->
+        <Style Selector="RadioButton.profile-chip">
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.profile-chip:pointerover /template/ Border#Root">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        </Style>
+        <Style Selector="RadioButton.profile-chip:checked">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         </Style>
     </UserControl.Styles>
 
@@ -221,7 +279,8 @@
                                     <TextBlock Text="智能策略（AI）" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="AI 结构化决策，自动附加止盈止损护栏"
-                                           FontSize="{StaticResource SmallFontSize}" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsDCAScenario}" Classes="scenario-card">
@@ -233,7 +292,8 @@
                                     <TextBlock Text="省心定投" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="定期买入，止盈自动卖出、止损自动暂停"
-                                           FontSize="{StaticResource SmallFontSize}" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsGridScenario}" Classes="scenario-card">
@@ -245,33 +305,46 @@
                                     <TextBlock Text="区间网格" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="震荡区间低买高卖，破网自动护栏"
-                                           FontSize="{StaticResource SmallFontSize}" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- 风险档案：驱动参数预填与引擎兜底护栏 -->
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="风险档案:" VerticalAlignment="Center"
-                                       FontSize="{StaticResource LabelFontSize}"
+                        <!-- 风险档案：驱动参数预填与引擎兜底护栏，分段胶囊样式 -->
+                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="风险档案" VerticalAlignment="Center"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                        CornerRadius="{StaticResource SmallCornerRadius}"
+                                        Padding="3"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsConservativeProfile}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_shield.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="保守" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </RadioButton>
+                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsBalancedProfile}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_scale.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="稳健" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </RadioButton>
+                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsAggressiveProfile}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_rocket.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="进取" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </RadioButton>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="影响各场景参数预填与引擎兜底护栏（创建后可在高级参数中手动调整）"
+                                       FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <RadioButton GroupName="RiskProfile" IsChecked="{Binding IsConservativeProfile}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_shield.svg" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="保守" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton GroupName="RiskProfile" IsChecked="{Binding IsBalancedProfile}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_scale.svg" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="稳健" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
-                            <RadioButton GroupName="RiskProfile" IsChecked="{Binding IsAggressiveProfile}">
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_rocket.svg" Width="14" Height="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="进取" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </RadioButton>
                         </StackPanel>
 
                         <!-- 共用字段 -->

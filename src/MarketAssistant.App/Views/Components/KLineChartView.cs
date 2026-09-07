@@ -192,13 +192,14 @@ public class KLineChartView : UserControl
             }
 
             // 监听 WebView 加载完成事件（必须在 NavigateToString 之前注册；仅订阅一次，避免重试后重复触发）
+            var webView = EnsureWebView();
             if (!_navigationHandlerSubscribed)
             {
-                _webView.NavigationCompleted += OnWebViewNavigated;
+                webView.NavigationCompleted += OnWebViewNavigated;
                 _navigationHandlerSubscribed = true;
             }
 
-            _webView.NavigateToString(htmlContent);
+            webView.NavigateToString(htmlContent);
         }
         catch (Exception ex)
         {

@@ -103,3 +103,14 @@
 - **`alert_events` 无界增长**：原实现只有 INSERT/SELECT。新增 30 天保留期，随启动初始化执行一次 `PruneExpiredAlertsAsync`（用 `datetime()` 解析比较，避免 ISO-8601 偏移写法下字符串长度差异导致误判）。
 
 测试：新增 `Initialize_ShouldPruneAlertsBeyondRetentionPeriod`，`dotnet test --filter TestCategory=Unit` 361/361 通过。门泄漏与 `ConfirmSeconds` 属服务装配/表单绑定，`PriceAlertService` 依赖 `BinanceWebSocketService`、`ClsQuoteClient` 具体类且无既有测试替身，未补自动化覆盖，由构建与代码走查保证。
+
+## 十一、审计后补修（第三轮）
+
+对照方案逐项复核代码，修复 3 处门管理缺陷与 1 处展示缺陷：
+
+- **禁用路径联动门泄漏（第二轮误判）**：第二轮称"禁用路径已释放"，实际 `PriceAlertService.ToggleRuleAsync` 禁用规则时同样未释放确认级联动门，仅删除路径已释放。现禁用路径在 `newEnabled == false` 且 `TradingImpact == RequireConfirmation` 时同样调用 `RaiseAlertClearedSafeAsync`，否则禁用触发中的确认级规则后该标的 AI 信号被永久强制人工确认。
+- **同标的多条确认级规则门计数泄漏**：`AlertCenterService._activeGatedAlerts` 键原为 `(Source, MarketType, Symbol)`（不含标题），同一标的两条不同条件的确认级规则先后触发→解除时，后触发覆盖先触发，第二次 `RaiseAlertClearedAsync` 的 `Remove` 失败、门计数不归零，标的水久门控。现键扩展为 `(Source, MarketType, Symbol, Title)`，各规则独立登记/释放。
+- **一次性确认级规则门永久残留**：一次性规则触发即停用，但原实现 `autoDisabled` 分支先 `RaiseAlertClearedAsync`（门尚未登记，`Remove` 失败）、后 `RaiseAlertAsync`（`Activate` 生效），导致门随规则停用后永不释放。现 `RaiseAlertSafeAsync` 对一次性规则将 `TradingImpact` 降为 `None`（弹窗级别仍为 `Critical`），不再登记门；`autoDisabled` 分支不再释放。
+- **规则列表摘要漏显"持续秒"**：`PriceAlertPageViewModel.CreateDisplayRule` 未复制 `ConfirmSeconds`，导致 `RuleOptionsText` 不显示"持续 X 秒"。已补复制。
+
+测试：新增 `RaiseAlert_MultipleConfirmationRulesSameSymbol_ShouldTrackGatesIndependently`，告警相关测试 `dotnet test --filter FullyQualifiedName~Alert` 51/51 通过；`dotnet build MarketAssistant.slnx -c Debug` 0 错误。

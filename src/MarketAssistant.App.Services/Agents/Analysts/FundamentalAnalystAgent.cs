@@ -17,6 +17,7 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [Description("整合了策略分析师和股票研究分析师的功能")]
 [RequiredAnalyst]
 [RequiresTools(typeof(IBasicDataTools))]
+[RequiresTools(typeof(IOnChainTools))]
 public class FundamentalAnalystAgent : AnalystAgentBase
 {
     public FundamentalAnalystAgent(

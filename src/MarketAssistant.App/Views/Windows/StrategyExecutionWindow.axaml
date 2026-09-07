@@ -108,7 +108,7 @@
                                         </TextBlock>
                                         <Expander Header="AI 决策推理"
                                                   IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                  Padding="0">
+                                                  Padding="{StaticResource NoPadding}">
                                             <TextBlock Text="{Binding AIReasoning}" TextWrapping="Wrap"
                                                        FontSize="{StaticResource SmallFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -131,7 +131,7 @@
                 <Button Content="关闭"
                         Click="OnCloseClick"
                         MinWidth="{StaticResource SmallButtonMinWidth}"
-                        Padding="16,8"/>
+                        Padding="{StaticResource PagePadding}"/>
             </StackPanel>
         </Grid>
     </Border>
