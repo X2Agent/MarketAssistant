@@ -1,22 +1,19 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
-/// <summary>
-/// 选股模式项
-/// </summary>
 public partial class SelectionModeItem : ObservableObject
 {
     [ObservableProperty]
@@ -35,9 +32,6 @@ public partial class SelectionModeItem : ObservableObject
     private bool _isSelected;
 }
 
-/// <summary>
-/// 选股模式类型
-/// </summary>
 public enum SelectionModeType
 {
     UserRequirement,
@@ -45,13 +39,9 @@ public enum SelectionModeType
     QuickStrategy
 }
 
-/// <summary>
-/// AI选股功能的ViewModel
-/// </summary>
 public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 {
     private readonly InvestmentSelectionService _investmentSelectionService;
-    private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
 
@@ -140,22 +130,28 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     };
 
     /// <summary>
-    /// 当前按钮文本
+    /// 当前按钮文本（随模式与市场类型切换，如"开始选股"/"开始选币"）
     /// </summary>
-    public string CurrentButtonText => SelectedMode?.ModeType switch
+    public string CurrentButtonText
     {
-        SelectionModeType.UserRequirement => "开始选股",
-        SelectionModeType.NewsAnalysis => "基于新闻选股",
-        _ => "开始分析"
-    };
+        get
+        {
+            var noun = _marketContext.CurrentMarket == MarketType.Crypto ? "选币" : "选股";
+            return SelectedMode?.ModeType switch
+            {
+                SelectionModeType.UserRequirement => $"开始{noun}",
+                SelectionModeType.NewsAnalysis => $"基于新闻{noun}",
+                _ => "开始分析"
+            };
+        }
+    }
 
     /// <summary>
-    /// 推荐投资标的列表（用于UI绑定）
+    /// 推荐投资标的列表（用于UI绑定）。
+    /// 集合实例保持不变、结果变更时原地替换内容：
+    /// 每次绑定求值新建集合会让整个 ItemsControl 重建（丢滚动位置）
     /// </summary>
-    public ObservableCollection<InvestmentRecommendation> RecommendedStocks =>
-        SelectionResult?.Recommendations != null
-            ? new ObservableCollection<InvestmentRecommendation>(SelectionResult.Recommendations)
-            : new ObservableCollection<InvestmentRecommendation>();
+    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = new();
 
     /// <summary>
     /// 格式化的风险提示文本（用于UI绑定）
@@ -214,18 +210,13 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         ? "📈 推荐虚拟币"
         : "📈 推荐股票";
 
-    /// <summary>
-    /// 构造函数（使用依赖注入）
-    /// </summary>
     public AssetSelectionPageViewModel(
         ILogger<AssetSelectionPageViewModel> logger,
         InvestmentSelectionService investmentSelectionService,
-        IServiceProvider serviceProvider,
         MarketContext marketContext,
         IDialogService dialogService) : base(logger)
     {
         _investmentSelectionService = investmentSelectionService;
-        _serviceProvider = serviceProvider;
         _marketContext = marketContext;
         SubscribeToMarketChanges(_marketContext);
         _dialogService = dialogService;
@@ -247,13 +238,24 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectionResultChanged(InvestmentSelectionResult? value)
     {
-        OnPropertyChanged(nameof(RecommendedStocks));
+        RecommendedStocks.Clear();
+        if (value?.Recommendations != null)
+        {
+            foreach (var recommendation in value.Recommendations)
+                RecommendedStocks.Add(recommendation);
+        }
         OnPropertyChanged(nameof(FormattedRiskWarnings));
         OnPropertyChanged(nameof(HasRiskWarnings));
     }
 
+    private bool _disposed;
+
     protected override void OnMarketChanged(MarketType newMarket)
     {
+        // 事件来自单例 MarketContext，Dispose 后不得再触发（更新状态/启动加载）
+        if (_disposed)
+            return;
+
         OnPropertyChanged(nameof(LoadingText));
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(ModeLabel));
@@ -289,7 +291,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             code = stock.Symbol.Substring(2);
         }
 
-        var favoriteService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(_marketContext.CurrentMarket);
+        var favoriteService = _marketContext.GetService<IFavoriteService>();
         if (await favoriteService.IsFavoriteAsync(code, market))
         {
             await _dialogService.ShowMessageAsync("提示", $"{stock.Name} ({stock.Symbol}) 已在自选列表中");
@@ -483,6 +485,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         UnsubscribeFromMarketChanges(_marketContext);
         GC.SuppressFinalize(this);
     }

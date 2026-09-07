@@ -20,18 +20,18 @@ namespace MarketAssistant.Agents.Tools;
 public class GroundingSearchTools : IToolsProvider
 {
     private readonly IRetrievalOrchestrator _orchestrator;
-    private readonly IWebTextSearchFactory _webTextSearchFactory;
+    private readonly IWebSearchService _webSearchService;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<GroundingSearchTools> _logger;
 
     public GroundingSearchTools(
         IRetrievalOrchestrator orchestrator,
-        IWebTextSearchFactory webTextSearchFactory,
+        IWebSearchService webSearchService,
         IUserSettingService userSettingService,
         ILogger<GroundingSearchTools> logger)
     {
         _orchestrator = orchestrator;
-        _webTextSearchFactory = webTextSearchFactory;
+        _webSearchService = webSearchService;
         _userSettingService = userSettingService;
         _logger = logger;
     }
@@ -39,7 +39,8 @@ public class GroundingSearchTools : IToolsProvider
     [Description("综合信息检索工具。可同时检索互联网公开信息和内部知识库（如用户文档、历史研报）。")]
     public async Task<List<TextSearchResult>> SearchAsync(
         [Description("搜索的查询语句或关键词。")] string query,
-        [Description("返回结果数量，建议3-6个")] int top = 6)
+        [Description("返回结果数量，建议3-6个")] int top = 6,
+        CancellationToken cancellationToken = default)
     {
         // 参数约束：避免极端模式使用和极端参数
         if (top <= 0) top = 3;
@@ -56,8 +57,13 @@ public class GroundingSearchTools : IToolsProvider
 
         try
         {
-            var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top);
+            var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top, cancellationToken);
             return searchResults.Take(top).ToList();
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消必须向上传播，不得吞成空结果
+            throw;
         }
         catch (Exception ex)
         {
@@ -73,54 +79,46 @@ public class GroundingSearchTools : IToolsProvider
         string query,
         bool hasKnowledgeEnabled,
         bool hasWebSearchEnabled,
-        int top)
+        int top,
+        CancellationToken cancellationToken)
     {
         _logger.LogInformation("执行搜索策略 - 知识库: {Knowledge}, 网络: {Web}, 查询: {Query}",
             hasKnowledgeEnabled, hasWebSearchEnabled, query);
 
-        try
+        // 并行执行启用的搜索方式（各路搜索内部已做失败隔离，不会互相拖垮）
+        var tasks = new List<Task<IReadOnlyList<TextSearchResult>>>();
+
+        if (hasKnowledgeEnabled)
         {
-            // 并行执行启用的搜索方式
-            var tasks = new List<Task<IReadOnlyList<TextSearchResult>>>();
-
-            if (hasKnowledgeEnabled)
-            {
-                tasks.Add(ExecuteKnowledgeSearch(query, top));
-            }
-
-            if (hasWebSearchEnabled)
-            {
-                tasks.Add(ExecuteWebSearch(query, top));
-            }
-
-            // 如果没有启用任何搜索方式
-            if (tasks.Count == 0)
-            {
-                return [];
-            }
-
-            // 等待所有任务完成
-            var results = await Task.WhenAll(tasks);
-
-            // 合并所有结果
-            return CombineResults(results);
+            tasks.Add(ExecuteKnowledgeSearch(query, top, cancellationToken));
         }
-        catch (Exception ex)
+
+        if (hasWebSearchEnabled)
         {
-            _logger.LogError(ex, "搜索策略执行失败: {Query}", query);
+            tasks.Add(ExecuteWebSearch(query, top, cancellationToken));
+        }
+
+        // 如果没有启用任何搜索方式
+        if (tasks.Count == 0)
+        {
             return [];
         }
+
+        // 等待所有任务完成并合并结果
+        var results = await Task.WhenAll(tasks);
+        return CombineResults(results);
     }
 
-    /// <summary>
-    /// 执行知识库搜索
-    /// </summary>
-    private async Task<IReadOnlyList<TextSearchResult>> ExecuteKnowledgeSearch(string query, int top)
+    private async Task<IReadOnlyList<TextSearchResult>> ExecuteKnowledgeSearch(string query, int top, CancellationToken cancellationToken)
     {
         try
         {
             var collectionName = UserSetting.VectorCollectionName;
-            return await _orchestrator.RetrieveAsync(query, collectionName, top);
+            return await _orchestrator.RetrieveAsync(query, collectionName, top, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -130,37 +128,24 @@ public class GroundingSearchTools : IToolsProvider
     }
 
     /// <summary>
-    /// 执行网络搜索
+    /// 执行网络搜索。失败时仅记录告警并返回空结果，
+    /// 不让网络搜索异常拖垮已经成功的知识库结果。
     /// </summary>
-    private async Task<IReadOnlyList<TextSearchResult>> ExecuteWebSearch(string query, int top)
+    private async Task<IReadOnlyList<TextSearchResult>> ExecuteWebSearch(string query, int top, CancellationToken cancellationToken)
     {
-        var textSearch = _webTextSearchFactory.Create();
-        if (textSearch is null)
-        {
-            _logger.LogWarning("网络搜索服务不可用");
-            return new List<TextSearchResult>();
-        }
-
         try
         {
-            var testSearchResults = await textSearch.GetTextSearchResultsAsync(query, new TextSearchOptions
-            {
-                Top = top
-            });
-            var results = new List<TextSearchResult>();
-            await foreach (var r in testSearchResults.Results)
-            {
-                results.Add(r);
-            }
-
-            return results;
+            return await _webSearchService.SearchAsync(query, top, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "网络搜索失败: {Query}", query);
+            _logger.LogWarning(ex, "网络搜索失败，忽略网络结果: {Query}", query);
+            return new List<TextSearchResult>();
         }
-
-        return new List<TextSearchResult>();
     }
 
     /// <summary>

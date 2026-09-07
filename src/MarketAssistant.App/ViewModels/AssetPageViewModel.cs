@@ -1,31 +1,29 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
+
 
 namespace MarketAssistant.ViewModels;
 
-/// <summary>
-/// 资产详情页ViewModel
-/// </summary>
 public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
     public override string Title => "资产详情";
 
-    private readonly IServiceProvider _serviceProvider;
     private readonly MarketContext _marketContext;
-    private readonly BinanceWebSocketService _wsService;
     private CancellationTokenSource? _loadingCancellationTokenSource;
+
+    /// <summary>当前绑定事件的实时行情服务。导航参数携带的市场与当前绑定不一致时重新绑定。</summary>
+    private IRealtimeQuoteService? _quoteService;
 
     [ObservableProperty]
     private KLineType _currentKLineType = KLineType.Daily;
@@ -54,9 +52,16 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     [ObservableProperty]
     private decimal _priceChange;
 
-    /// <summary>
-    /// 计算属性用于UI绑定
-    /// </summary>
+    /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
+    public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
+
+    /// <summary>涨跌额展示文本（按量级格式化，适配低价币）</summary>
+    public string PriceChangeText => PriceFormatter.Format(PriceChange);
+
+    partial void OnCurrentPriceChanged(decimal value) => OnPropertyChanged(nameof(CurrentPriceText));
+
+    partial void OnPriceChangeChanged(decimal value) => OnPropertyChanged(nameof(PriceChangeText));
+
     public bool IsMinuteSelected => CurrentKLineType == KLineType.Minute15;
     public bool IsDailySelected => CurrentKLineType == KLineType.Daily;
     public bool IsWeeklySelected => CurrentKLineType == KLineType.Weekly;
@@ -67,33 +72,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
-        IServiceProvider serviceProvider,
-        MarketContext marketContext,
-        BinanceWebSocketService wsService) : base(logger)
+        MarketContext marketContext) : base(logger)
     {
-        _serviceProvider = serviceProvider;
         _marketContext = marketContext;
-        _wsService = wsService;
 
         ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
     }
 
-    /// <summary>
-    /// 设置资产代码（异步加载数据，避免阻塞UI）
-    /// </summary>
-    private void SetAssetCode(string code)
-    {
-        AssetCode = code;
-        if (!string.IsNullOrEmpty(code))
-        {
-            _ = LoadAssetDataAsync(code);
-        }
-    }
-
-    /// <summary>
-    /// 当K线类型变化时通知相关UI属性
-    /// </summary>
     partial void OnCurrentKLineTypeChanged(KLineType value)
     {
         OnPropertyChanged(nameof(IsMinuteSelected));
@@ -107,9 +93,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 刷新资产数据
-    /// </summary>
     [RelayCommand]
     private async Task RefreshDataAsync()
     {
@@ -119,9 +102,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 导航到资产分析页面
-    /// </summary>
     private void NavigateToAnalysisAsync()
     {
         if (string.IsNullOrEmpty(AssetCode))
@@ -130,9 +110,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         WeakReferenceMessenger.Default.Send(new NavigationMessage("Analysis", new AssetNavigationParameter(AssetCode, AssetName)));
     }
 
-    /// <summary>
-    /// 改变K线类型
-    /// </summary>
     private void ChangeKLineTypeAsync(string? type)
     {
         if (string.IsNullOrEmpty(type))
@@ -153,14 +130,13 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 加载资产K线数据
-    /// </summary>
     private async Task LoadAssetDataAsync(string assetCode)
     {
         if (string.IsNullOrEmpty(assetCode))
             return;
 
+        // 取消上一次加载，避免并发加载；只取消不 Dispose——
+        // 在飞操作仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
         _loadingCancellationTokenSource?.Cancel();
         _loadingCancellationTokenSource = new CancellationTokenSource();
         var cancellationToken = _loadingCancellationTokenSource.Token;
@@ -171,17 +147,17 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(_marketContext.CurrentMarket);
+            var klineService = _marketContext.GetService<IKLineService>();
+            // IKLineService.GetKLineDataAsync 暂不支持 CancellationToken，
+            // 仅能通过取消令牌在返回后丢弃过期结果
             var kLineDataList = await klineService.GetKLineDataAsync(assetCode, CurrentKLineType);
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // 在 UI 线程上更新 ObservableCollection，避免后台线程修改绑定属性
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                KLineData = new ObservableCollection<KLineData>(kLineDataList);
-                CalculatePriceInfo(kLineDataList);
-            });
+            // 方法从 UI 线程启动且未脱离同步上下文，await 之后天然回到 UI 线程，
+            // 无需再手动 InvokeAsync
+            KLineData = new ObservableCollection<KLineData>(kLineDataList);
+            CalculatePriceInfo(kLineDataList);
         }
         catch (OperationCanceledException)
         {
@@ -199,9 +175,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    /// <summary>
-    /// 计算价格相关信息
-    /// </summary>
     private void CalculatePriceInfo(List<KLineData> data)
     {
         if (data.Count == 0)
@@ -232,11 +205,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             IsBusy = true;
             HasError = false;
 
-            // 2. 设置基本信息（立即显示）
             AssetName = !string.IsNullOrEmpty(parameter.Name) ? parameter.Name : parameter.Code;
             AssetCode = parameter.Code;
 
-            // 3. 如果导航参数中包含价格信息，立即显示
             if (parameter.CurrentPrice.HasValue)
             {
                 CurrentPrice = parameter.CurrentPrice.Value;
@@ -249,33 +220,65 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             }
             else
             {
-                // 清空旧数据
                 CurrentPrice = 0;
                 PriceChangePercent = 0;
                 PriceChange = 0;
             }
 
-            // 4. 在后台线程加载完整数据（不阻塞导航）
-            // GoBack 重新激活时不重复加载，避免重复订阅 WebSocket 和重复请求
+            // 2. 异步加载完整数据（不阻塞导航）。
+            // 不要包 Task.Run：OnNavigatedTo 已在 UI 线程，LoadAssetDataAsync 第一个 await
+            // 之后自动回到 UI 线程，包 Task.Run 会把 IsBusy/HasError 等绑定属性丢到线程池线程写入，
+            // 触发 Avalonia 跨线程异常
             if (!isReactivation)
             {
-                _ = Task.Run(async () => await LoadAssetDataAsync(parameter.Code));
+                _ = LoadAssetDataAsync(parameter.Code);
 
-                // 5. 虚拟币市场订阅 WebSocket 实时价格
-                if (_marketContext.CurrentMarket == MarketType.Crypto)
+                // 3. 支持实时推送的市场订阅实时价格
+                // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
+                var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
+                if (_marketContext.GetService<IMarketCapability>(effectiveMarket).SupportsRealtime)
                 {
-                    // 订阅前先取消订阅，防止重复
-                    _wsService.PriceUpdated -= OnDetailPriceUpdated;
-                    _wsService.PriceUpdated += OnDetailPriceUpdated;
-                    _ = _wsService.SubscribeAsync([ToBinanceFormat(parameter.Code)]);
+                    BindRealtimeQuoteService(_marketContext.GetService<IRealtimeQuoteService>(effectiveMarket));
+                    // 订阅前先整体替换，防止重复
+                    _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.AssetDetail, [parameter.Code]);
+                }
+                else
+                {
+                    DetachRealtimeQuoteService();
                 }
             }
         }
     }
 
-    private void OnDetailPriceUpdated(string symbol, decimal lastPrice, decimal changePercent)
+    /// <summary>
+    /// 绑定实时行情服务事件。导航到不同市场的资产时，先解除旧服务的事件与订阅再绑定新服务。
+    /// </summary>
+    private void BindRealtimeQuoteService(IRealtimeQuoteService service)
     {
-        if (!ToBinanceFormat(AssetCode).Equals(symbol, StringComparison.OrdinalIgnoreCase))
+        if (ReferenceEquals(service, _quoteService))
+            return;
+
+        DetachRealtimeQuoteService();
+        _quoteService = service;
+        _quoteService.PriceUpdated += OnDetailPriceUpdated;
+    }
+
+    /// <summary>
+    /// 解除当前实时行情服务的事件与订阅。用于切到无实时推送的市场或页面离开时清理。
+    /// </summary>
+    private void DetachRealtimeQuoteService()
+    {
+        if (_quoteService == null)
+            return;
+
+        _quoteService.PriceUpdated -= OnDetailPriceUpdated;
+        _ = _quoteService.UnsubscribeAllAsync(RealtimeQuoteSubscriberKeys.AssetDetail);
+        _quoteService = null;
+    }
+
+    private void OnDetailPriceUpdated(string code, decimal lastPrice, decimal changePercent)
+    {
+        if (!AssetCode.Equals(code, StringComparison.OrdinalIgnoreCase))
             return;
 
         Dispatcher.UIThread.InvokeAsync(() =>
@@ -289,14 +292,13 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void OnNavigatedFrom()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        _quoteService?.PriceUpdated -= OnDetailPriceUpdated;
     }
 
     public void Dispose()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _loadingCancellationTokenSource?.Dispose();
-        _wsService.PriceUpdated -= OnDetailPriceUpdated;
+        DetachRealtimeQuoteService();
         GC.SuppressFinalize(this);
     }
 }

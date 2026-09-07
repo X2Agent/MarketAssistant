@@ -4,7 +4,8 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -55,6 +56,7 @@ public class AShareKLineServiceTest
         var services = new ServiceCollection();
         services.AddSingleton(mockUserSettingService.Object);
         services.AddLogging();
+        services.AddAShareDataProviders();
 
         services.AddHttpClient("ZhiTu", client =>
         {
@@ -241,7 +243,7 @@ public class AShareKLineServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GetKLineDataAsync_EmptyCode_ShouldThrowArgumentException()
+    public async Task GetKLineDataAsync_EmptyCode_ShouldThrowFriendlyException()
     {
         // Arrange
         var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);

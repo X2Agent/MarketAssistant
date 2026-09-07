@@ -29,6 +29,14 @@ public interface IUserSettingService
     void UpdateSettings(UserSetting setting);
 
     /// <summary>
+    /// 在与持久化相同的同步边界内变更设置并保存。
+    /// 跨线程修改设置（如交易线程切换环境、市场上下文切换市场）必须走此入口，
+    /// 避免锁外变更与 <see cref="SaveSettings"/> 的并发序列化产生撕裂状态；
+    /// UI 双向绑定在 UI 线程上的直接属性变更可继续使用 <see cref="CurrentSetting"/> + <see cref="SaveSettings"/>。
+    /// </summary>
+    void UpdateSetting(Action<UserSetting> mutate);
+
+    /// <summary>
     /// 重置设置为默认值
     /// </summary>
     void ResetSettings();

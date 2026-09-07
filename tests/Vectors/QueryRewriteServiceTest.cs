@@ -15,18 +15,6 @@ public class QueryRewriteServiceTest : BaseAgentTest
         _service = _serviceProvider.GetRequiredService<IQueryRewriteService>();
     }
 
-    #region Service Resolution Tests
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void Service_ShouldBeResolvedFromContainer()
-    {
-        // Assert
-        Assert.IsNotNull(_service);
-    }
-
-    #endregion
-
     #region Input Validation Tests
 
 
@@ -129,13 +117,18 @@ public class QueryRewriteServiceTest : BaseAgentTest
         Assert.IsNotNull(result);
         Assert.IsTrue(result.Count > 0);
 
-        // Should generate variants with synonyms
-        var allResults = string.Join(", ", result);
-        Console.WriteLine($"All variants: {allResults}");
+        // 应通过同义词替换生成变体（如"股票"→"证券"/"股份"/"个股"等）
+        var hasSynonymVariant = result.Any(r =>
+            r.Contains("证券") || r.Contains("股份") || r.Contains("股权") ||
+            r.Contains("个股") || r.Contains("股价") ||
+            r.Contains("上涨") || r.Contains("攀升") || r.Contains("走高"));
+        Assert.IsTrue(hasSynonymVariant,
+            $"应生成包含同义词替换的变体，实际: {string.Join(", ", result)}");
 
         foreach (var variant in result)
         {
             Assert.IsFalse(string.IsNullOrWhiteSpace(variant));
+            Console.WriteLine($"Generated variant: {variant}");
         }
     }
 

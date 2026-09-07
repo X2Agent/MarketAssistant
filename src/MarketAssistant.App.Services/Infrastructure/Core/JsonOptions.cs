@@ -1,6 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 
 namespace MarketAssistant.Infrastructure.Core;
 

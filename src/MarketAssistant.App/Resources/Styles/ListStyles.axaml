@@ -10,14 +10,14 @@
     <Style Selector="ListBoxItem">
         <Setter Property="Padding" Value="{StaticResource SmallMargin}"/>
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
 
     <!-- ===== 数据列表行 — 金融数据专用 ===== -->
     <Style Selector="ListBoxItem.data-row">
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="MinHeight" Value="44"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="BorderThickness" Value="{StaticResource BottomBorderThickness}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
     </Style>
     <Style Selector="ListBoxItem.data-row:pointerover /template/ ContentPresenter">
@@ -35,14 +35,14 @@
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="MinHeight" Value="44"/>
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
 
     <!-- ===== 股票代码列表项 ===== -->
     <Style Selector="ListBoxItem.stock-item">
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="BorderThickness" Value="{StaticResource BottomBorderThickness}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
         <Setter Property="Transitions">
             <Transitions>

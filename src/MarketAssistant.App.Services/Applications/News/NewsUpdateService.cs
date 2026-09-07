@@ -36,10 +36,28 @@ public class NewsUpdateService : INewsUpdateService
             throw new ObjectDisposedException(nameof(NewsUpdateService));
 
         if (_updateLoopTask != null && !_updateLoopTask.IsCompleted)
+        {
+            // 旧循环尚未退出（刚调用过 StopUpdates）：串行排队，待其退出后再启动，
+            // 避免两个循环并存导致 NewsUpdated 短暂双发
+            _logger?.LogInformation("旧更新循环停止中，待其退出后自动重启");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _updateLoopTask;
+                }
+                catch
+                {
+                    // 循环内部已记录异常
+                }
+                StartUpdates();
+            });
             return;
+        }
 
-        _cts = new CancellationTokenSource();
-        _updateLoopTask = UpdateLoopAsync(_cts.Token);
+        var cts = new CancellationTokenSource();
+        _cts = cts;
+        _updateLoopTask = UpdateLoopAsync(cts.Token);
 
         _logger?.LogInformation("新闻更新定时器已启动");
     }
@@ -49,13 +67,11 @@ public class NewsUpdateService : INewsUpdateService
     /// </summary>
     public void StopUpdates()
     {
-        if (_cts != null)
-        {
-            _cts.Cancel();
-            _cts.Dispose();
-            _cts = null;
-        }
-        _updateLoopTask = null;
+        // 只取消不 Dispose：循环可能正阻塞在带令牌的 Task.Delay 上，
+        // 先 Dispose 会让后续注册抛 ObjectDisposedException（CTS 无关联计时器，跳过 Dispose 安全）
+        _cts?.Cancel();
+        _cts = null;
+        // 保留 _updateLoopTask 直至旧循环退出，StartUpdates 依赖 IsCompleted 防止双循环
         _logger?.LogInformation("新闻更新定时器已停止");
     }
 

@@ -22,8 +22,12 @@ public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
     {
         base.BaseInitialize();
 
-        // 从 DI 容器获取所有服务
-        _embeddingGenerator = _serviceProvider.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+        // 从 DI 容器获取所有服务（嵌入生成器仅在 JINA_API_KEY 已配置时注册，缺失时给出明确失败原因）
+        _embeddingGenerator = _serviceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
+        if (_embeddingGenerator is null)
+        {
+            Assert.Fail("JINA_API_KEY 环境变量未配置，无法创建嵌入生成器进行真实场景验证");
+        }
         _vectorStore = _serviceProvider.GetRequiredService<VectorStore>();
         _retrievalOrchestrator = _serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
 

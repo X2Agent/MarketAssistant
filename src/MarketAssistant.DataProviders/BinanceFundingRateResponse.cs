@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安资金费率 API 响应模型
@@ -11,7 +11,7 @@ public class BinanceFundingRateResponse
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("fundingRate")]
-    public string FundingRate { get; set; } = string.Empty;
+    public decimal FundingRate { get; set; }
 
     [JsonPropertyName("fundingTime")]
     public long FundingTime { get; set; }

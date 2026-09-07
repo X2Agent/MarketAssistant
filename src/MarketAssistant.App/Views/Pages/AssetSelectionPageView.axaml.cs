@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.ViewModels;
@@ -17,23 +18,39 @@ public partial class AssetSelectionPageView : UserControl
 
     private void OnBorderTapped(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is not Control control || DataContext is not AssetSelectionPageViewModel viewModel)
-            return;
-
-        // 处理选股模式卡片点击
-        if (control.DataContext is SelectionModeItem mode)
+        if (e.Source is Control control && ActivateCard(control))
         {
-            viewModel.SelectModeCommand.Execute(mode);
-            e.Handled = true;
-        }
-        // 处理快速策略卡片点击
-        else if (control.DataContext is QuickSelectionStrategyInfo strategy)
-        {
-            viewModel.ExecuteQuickSelectionCommand.Execute(strategy);
             e.Handled = true;
         }
     }
+
+    private void OnCardKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is Key.Enter or Key.Space && sender is Control control && ActivateCard(control))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private bool ActivateCard(Control control)
+    {
+        if (DataContext is not AssetSelectionPageViewModel viewModel)
+        {
+            return false;
+        }
+
+        if (control.DataContext is SelectionModeItem mode)
+        {
+            viewModel.SelectModeCommand.Execute(mode);
+            return true;
+        }
+
+        if (control.DataContext is QuickSelectionStrategyInfo strategy)
+        {
+            viewModel.ExecuteQuickSelectionCommand.Execute(strategy);
+            return true;
+        }
+
+        return false;
+    }
 }
-
-
-

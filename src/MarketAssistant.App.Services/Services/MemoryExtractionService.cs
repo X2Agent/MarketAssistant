@@ -1,9 +1,9 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using System.Text.Json;
 
 namespace MarketAssistant.Services;
 
@@ -75,7 +75,7 @@ public class MemoryExtractionService
     private async Task<ExtractedMemories?> ExtractMemoriesAsync(
         IReadOnlyList<ChatMessage> history, CancellationToken ct)
     {
-        var chatClient = _chatClientFactory.CreateClient();
+        var runtime = _chatClientFactory.CreateRuntime();
 
         var conversationText = new StringBuilder();
         foreach (var msg in history.TakeLast(20))
@@ -94,17 +94,7 @@ public class MemoryExtractionService
             {{conversationText}}
             </conversation>
 
-            请以 JSON 格式返回提取结果，仅包含确实值得记住的内容（不要生造）：
-            ```json
-            {
-              "memories": [
-                {"category": "preference|correction|conclusion|profile", "key": "简短唯一标识", "value": "简洁的记忆内容"}
-              ],
-              "relations": [
-                {"subject": "主体", "predicate": "关注|持有|分析过|属于行业|影响", "object": "客体"}
-              ]
-            }
-            ```
+            返回符合请求响应格式的结构化结果，仅包含确实值得记住的内容，不要生造。
 
             规则：
             - memories: 只提取用户明确表达的偏好、被纠正的认知、重要结论、个人信息
@@ -112,10 +102,21 @@ public class MemoryExtractionService
             - 如果没有值得提取的内容，返回空数组
             - key 和 value 用中文，保持简洁
             """;
+        prompt = StructuredOutputOptions.AppendSchemaInstructions(
+            prompt,
+            typeof(ExtractedMemories),
+            runtime.StructuredOutputMode);
 
-        var response = await chatClient.GetResponseAsync(
+        var response = await runtime.Client.GetResponseAsync(
             [new ChatMessage(ChatRole.User, prompt)],
-            new ChatOptions { Temperature = 0.1f, MaxOutputTokens = 500 },
+            new ChatOptions
+            {
+                ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
+                    typeof(ExtractedMemories),
+                    runtime.StructuredOutputMode),
+                Temperature = 0.1f,
+                MaxOutputTokens = 500
+            },
             ct);
 
         var text2 = response.Text;

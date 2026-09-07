@@ -28,14 +28,14 @@
             <Border Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
-                    CornerRadius="{StaticResource LargeCornerRadius}"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
                     Background="{StaticResource NotificationIconSuccessBrush}"
                     VerticalAlignment="Center"
                     Margin="{StaticResource DefaultMargin}">
                 <TextBlock Text="✓"
                            FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"
-                           Foreground="White"
+                           Foreground="{StaticResource TextOnEmphasisBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"/>
             </Border>
@@ -43,12 +43,17 @@
             <!-- 消息内容 -->
             <StackPanel Grid.Column="1"
                         VerticalAlignment="Center">
-                <TextBlock Name="MessageText"
-                           Text="操作成功"
-                           FontSize="{StaticResource LabelFontSize}"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource NotificationTextLightBrush}"
-                           TextWrapping="Wrap"/>
+                <ScrollViewer MaxHeight="88"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock Name="MessageText"
+                               Text="操作成功"
+                               FontSize="{StaticResource LabelFontSize}"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource NotificationTextLightBrush}"
+                               TextWrapping="Wrap"
+                               LineHeight="20"/>
+                </ScrollViewer>
             </StackPanel>
             
             <!-- 关闭按钮 -->
@@ -63,7 +68,7 @@
                     BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
                     Margin="{StaticResource SmallHorizontalMargin}"
-                    Padding="0"
+                    Padding="{StaticResource NoPadding}"
                     CornerRadius="{StaticResource DefaultCornerRadius}"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"

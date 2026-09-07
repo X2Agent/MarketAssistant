@@ -1,10 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace MarketAssistant.ViewModels;
 
@@ -13,7 +15,11 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 {
-    private readonly MarketChatSession _chatSession;
+    private readonly IMarketChatSessionFactory _chatSessionFactory;
+    private readonly AdaptiveCardConverter _adaptiveCardConverter;
+    private MarketChatSession? _chatSession;
+    private string? _pendingContextStockCode;
+    private List<ChatMessage>? _pendingAnalysisMessages;
 
     public ObservableCollection<ChatMessageAdapter> ChatMessages { get; } = [];
 
@@ -33,14 +39,23 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
     private CancellationTokenSource? _currentCancellationTokenSource;
 
+    /// <summary>
+    /// 流式内容刷新到 UI 的最小间隔：把逐 chunk 的高频赋值合并为按时间片批量刷新
+    /// </summary>
+    private static readonly TimeSpan ContentFlushInterval = TimeSpan.FromMilliseconds(100);
+    private static readonly long FlushIntervalTicks = ContentFlushInterval.Ticks * Stopwatch.Frequency / TimeSpan.TicksPerSecond;
+    private long _lastFlushTimestamp;
+
     public IAsyncRelayCommand SendMessageCommand { get; }
 
     public ChatSidebarViewModel(
         ILogger<ChatSidebarViewModel> logger,
-        IMarketChatSessionFactory chatSessionFactory)
+        IMarketChatSessionFactory chatSessionFactory,
+        AdaptiveCardConverter adaptiveCardConverter)
         : base(logger)
     {
-        _chatSession = chatSessionFactory.Create();
+        _chatSessionFactory = chatSessionFactory;
+        _adaptiveCardConverter = adaptiveCardConverter;
 
         SendMessageCommand = new AsyncRelayCommand(SendMessageAsync, CanSendMessage);
     }
@@ -67,7 +82,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         if (string.IsNullOrWhiteSpace(UserInput))
             return;
 
-        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" });
+        var userMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.User, UserInput.Trim()) { AuthorName = "用户" }, _adaptiveCardConverter);
         ChatMessages.Add(userMessage);
 
         var currentInput = UserInput;
@@ -76,7 +91,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         IsProcessing = true;
         SendButtonText = "⏹";
 
-        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" })
+        var aiMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, "") { AuthorName = "市场分析助手" }, _adaptiveCardConverter)
         {
             Status = MessageStatus.Sending
         };
@@ -84,29 +99,36 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
 
         try
         {
+            EnsureChatSession();
             _currentCancellationTokenSource = new CancellationTokenSource();
             var contentBuilder = new System.Text.StringBuilder();
             bool hasReceivedContent = false;
+            _lastFlushTimestamp = 0L;
 
-            await foreach (var chunk in _chatSession.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
+            await foreach (var chunk in _chatSession!.SendMessageStreamAsync(currentInput, _currentCancellationTokenSource.Token))
             {
-                if (!string.IsNullOrEmpty(chunk))
-                {
-                    contentBuilder.Append(chunk);
+                if (string.IsNullOrEmpty(chunk))
+                    continue;
 
-                    if (!hasReceivedContent)
-                    {
-                        hasReceivedContent = true;
-                        aiMessage.Status = MessageStatus.Streaming;
-                        aiMessage.Content = chunk;
-                    }
-                    else
-                    {
-                        aiMessage.Content = contentBuilder.ToString();
-                    }
+                contentBuilder.Append(chunk);
+
+                if (!hasReceivedContent)
+                {
+                    hasReceivedContent = true;
+                    aiMessage.Status = MessageStatus.Streaming;
+                }
+
+                // chunk 合并节流：逐 chunk 全量赋值会让绑定→重渲染管线高频空转，
+                // 按固定间隔把累积内容批量刷到 Content，流结束后再补一次最终刷新
+                var now = Stopwatch.GetTimestamp();
+                if (now - _lastFlushTimestamp >= FlushIntervalTicks)
+                {
+                    _lastFlushTimestamp = now;
+                    aiMessage.Content = contentBuilder.ToString();
                 }
             }
 
+            aiMessage.Content = contentBuilder.ToString();
             aiMessage.Status = MessageStatus.Sent;
         }
         catch (OperationCanceledException)
@@ -139,18 +161,43 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private void EnsureChatSession()
+    {
+        if (_chatSession is not null)
+            return;
+
+        _chatSession = _chatSessionFactory.Create(_pendingContextStockCode ?? StockCode);
+
+        if (_pendingContextStockCode is not null && _pendingAnalysisMessages is not null)
+        {
+            _chatSession!.InjectAnalysisContext(_pendingContextStockCode, _pendingAnalysisMessages);
+            _pendingContextStockCode = null;
+            _pendingAnalysisMessages = null;
+        }
+    }
+
     /// <summary>
     /// 添加欢迎消息
     /// </summary>
     private void AddWelcomeMessage()
     {
         var content = string.IsNullOrEmpty(StockCode)
-            ? "欢迎使用智能对话功能！请先选择要分析的股票。"
-            : $"欢迎使用智能对话功能！当前股票：{StockCode}。请开始分析后查看历史对话。";
+            ? "欢迎使用智能助手！请先选择要分析的股票。"
+            : $"欢迎使用智能助手！当前股票：{StockCode}。请开始分析后查看历史对话。";
 
-        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" });
+        var welcomeMessage = new ChatMessageAdapter(new ChatMessage(ChatRole.Assistant, content) { AuthorName = "市场分析助手" }, _adaptiveCardConverter);
         ChatMessages.Add(welcomeMessage);
     }
+
+    /// <summary>
+    /// 判断分析消息是否适合在聊天侧栏展示：
+    /// 过滤系统内部说明（产物读取指引、维度缺失说明等），
+    /// 保留分析师的真实结论文本与失败标记（失败标记渲染为灰色占位卡片）。
+    /// </summary>
+    private static bool IsDisplayableAnalystMessage(ChatMessage message)
+        => message.Role != ChatRole.System &&
+           !string.Equals(message.AuthorName, "SystemNotice", StringComparison.Ordinal) &&
+           !string.IsNullOrWhiteSpace(message.Text);
 
     /// <summary>
     /// 使用分析结果初始化对话上下文。
@@ -160,17 +207,27 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
     {
         StockCode = stockCode;
 
-        var messages = analysisMessages.ToList();
-        _chatSession.InjectAnalysisContext(stockCode, messages);
+        var messages = analysisMessages
+            .Where(IsDisplayableAnalystMessage)
+            .ToList();
+        if (_chatSession is not null)
+        {
+            _chatSession.InjectAnalysisContext(stockCode, messages);
+        }
+        else
+        {
+            _pendingContextStockCode = stockCode;
+            _pendingAnalysisMessages = messages;
+        }
 
         ChatMessages.Clear();
 
         bool hasVisibleMessages = false;
         foreach (var message in messages)
         {
-            if (string.IsNullOrWhiteSpace(message.Text)) continue;
+            if (!IsDisplayableAnalystMessage(message)) continue;
 
-            ChatMessages.Add(new ChatMessageAdapter(message));
+            ChatMessages.Add(new ChatMessageAdapter(message, _adaptiveCardConverter));
             hasVisibleMessages = true;
         }
 
@@ -182,7 +239,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
         {
             var contextMessage = new ChatMessageAdapter(
                 new ChatMessage(ChatRole.System, $"以上是关于 {stockCode} 的分析数据，可基于这些信息继续提问。")
-                { AuthorName = "系统" });
+                { AuthorName = "系统" }, _adaptiveCardConverter);
             ChatMessages.Add(contextMessage);
         }
 
@@ -203,7 +260,7 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _chatSession.Dispose();
+        _chatSession?.Dispose();
         _currentCancellationTokenSource?.Cancel();
         _currentCancellationTokenSource?.Dispose();
         _currentCancellationTokenSource = null;

@@ -16,7 +16,7 @@
         <Setter Property="LineHeight" Value="34"/>
     </Style>
 
-    <!-- H2 — 区块大标题（如 "热门标的"、"7x24快讯"） -->
+    <!-- H2 — 区块大标题（如 "热门资产"、"7x24快讯"） -->
     <Style Selector="TextBlock.h2">
         <Setter Property="FontSize" Value="{StaticResource TitleFontSize}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -108,30 +108,31 @@
         <Setter Property="LineHeight" Value="16"/>
     </Style>
 
-    <!-- ===== 金融数据文本 (Monospace / Data) ===== -->
+    <!-- ===== 金融数据文本 (Data) ===== -->
+    <!-- 数据字体：等宽数字保证多列价格/百分比纵向对齐 -->
 
-    <!-- Data — 等宽数字（价格、百分比、成交量） -->
+    <!-- Data — 数据文本（价格、百分比、成交量） -->
     <Style Selector="TextBlock.data">
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
         <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
     </Style>
 
     <!-- Data-Large — 大号数据（如当前价） -->
     <Style Selector="TextBlock.data-lg">
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
         <Setter Property="FontSize" Value="{StaticResource ExtraLargeFontSize}"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
     </Style>
 
     <!-- Data-Small — 小号数据（表格数值） -->
     <Style Selector="TextBlock.data-sm">
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
     </Style>
 
     <!-- ===== 语义化文本 ===== -->
@@ -161,25 +162,9 @@
 
     <!-- Text-Code — 代码/标的代码 -->
     <Style Selector="TextBlock.text-code">
-        <Setter Property="FontFamily" Value="avares://MarketAssistant.App/Assets/Fonts#JetBrains Mono"/>
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-    </Style>
-
-    <!-- ===== 兼容旧样式（逐步迁移） ===== -->
-
-    <!-- featureTitle — 功能标题（保持兼容） -->
-    <Style Selector="TextBlock.featureTitle">
-        <Setter Property="FontSize" Value="16"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
-    <!-- feature-title — 卡片内功能标题 -->
-    <Style Selector="TextBlock.feature-title">
-        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
     </Style>
 
 </Styles>

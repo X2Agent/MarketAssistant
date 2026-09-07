@@ -7,7 +7,7 @@ namespace MarketAssistant.Infrastructure.Core;
 /// <summary>
 /// 从大模型返回文本中稳健提取并反序列化 JSON 的通用工具。
 ///
-/// 某些 LLM 提供商即使指定了 <c>ChatResponseFormat.ForJsonSchema</c>，仍可能在 JSON 前后
+/// 某些 LLM 提供商不支持请求级 JSON Schema，或即使请求了结构化输出仍会在 JSON 前后
 /// 输出多余文本（前缀词、思考过程、markdown 代码块标记等）。本工具通过多层兜底策略
 /// 定位并解析真正的 JSON 片段，避免因首字符非 <c>{</c>/<c>[</c> 而解析失败。
 /// </summary>

@@ -4,7 +4,8 @@ using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ namespace TestMarketAssistant.Tools;
 /// ISentimentTools 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class SentimentToolsTest
 {
     private ServiceProvider? _serviceProvider;
@@ -31,6 +33,11 @@ public class SentimentToolsTest
         _zhiTuApiToken = Environment.GetEnvironmentVariable("ZHITU_API_TOKEN");
 
         var services = new ServiceCollection();
+
+        // 注册 A 股数据提供者（ZhiTuMarketClient 等，AShareSentimentTools 构造依赖）
+        services.AddAShareDataProviders();
+        // BinanceMarketDataService 重构后依赖 IMemoryCache
+        services.AddMemoryCache();
 
         services.AddLogging(builder =>
         {
@@ -54,9 +61,9 @@ public class SentimentToolsTest
         services.AddSingleton<IUserSettingService>(userSettingServiceMock.Object);
 
         // 注册被测试的服务
-        services.AddKeyedSingleton<IShareSentimentTools, AShareSentimentTools>(MarketType.AShare);
         services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
-        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<ISentimentTools, AShareSentimentTools>(MarketType.AShare);
+        services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
 
         _serviceProvider = services.BuildServiceProvider();
@@ -79,7 +86,7 @@ public class SentimentToolsTest
     public async Task GetFundFlowAsync_AShare_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IShareSentimentTools>(MarketType.AShare);
+        var service = (AShareSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.AShare);
 
         // Act
         var sentimentData = await service.GetFundFlowAsync("SH600519");
@@ -111,7 +118,7 @@ public class SentimentToolsTest
     public async Task GetFundingRateAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var fundingRateHistory = await service.GetFundingRateAsync("BTC");
@@ -139,15 +146,33 @@ public class SentimentToolsTest
     public async Task GetGlobalLongShortRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetGlobalLongShortRatioAsync("BTC");
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Symbol);
-        Assert.IsTrue(result.History.Count > 0);
+        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsTrue(result.CurrentLongRatio > 0, $"当前多头占比应 > 0，实际: {result.CurrentLongRatio}");
+        Assert.IsTrue(result.CurrentShortRatio > 0, $"当前空头占比应 > 0，实际: {result.CurrentShortRatio}");
+        // 多头 + 空头占比应接近 100%
+        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+            $"多头({result.CurrentLongRatio}) + 空头({result.CurrentShortRatio}) 占比应接近 100%");
+        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+
+        // 验证历史数据点的不变式：多空占比互补 + 时间戳递增有效
+        foreach (var point in result.History)
+        {
+            Assert.IsTrue(point.LongRatio > 0 && point.ShortRatio > 0,
+                $"历史点多空占比应 > 0，Long={point.LongRatio}, Short={point.ShortRatio}");
+            Assert.IsTrue(Math.Abs(point.LongRatio + point.ShortRatio - 100m) < 1m,
+                $"历史点多空占比应互补，Long={point.LongRatio}, Short={point.ShortRatio}");
+            Assert.IsTrue(point.Timestamp > 0, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
+        }
+
+        _logger?.LogInformation("全球多空比: {Symbol} 当前多={Long}% 空={Short}% 比率={Ratio} 历史={Count}",
+            result.Symbol, result.CurrentLongRatio, result.CurrentShortRatio, result.CurrentRatio, result.History.Count);
     }
 
     [TestMethod]
@@ -155,15 +180,28 @@ public class SentimentToolsTest
     public async Task GetTopTraderAccountRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetTopTraderAccountRatioAsync("BTC");
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Symbol);
-        Assert.IsTrue(result.History.Count > 0);
+        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsTrue(result.CurrentLongRatio > 0 && result.CurrentShortRatio > 0,
+            $"头部账户多空占比应 > 0，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
+        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+            $"头部账户多空占比应接近 100%，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
+        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+
+        foreach (var point in result.History)
+        {
+            Assert.IsTrue(point.LongRatio > 0 && point.ShortRatio > 0,
+                $"历史点多空占比应 > 0，Long={point.LongRatio}, Short={point.ShortRatio}");
+        }
+
+        _logger?.LogInformation("头部账户多空比: {Symbol} 多={Long}% 空={Short}% 历史={Count}",
+            result.Symbol, result.CurrentLongRatio, result.CurrentShortRatio, result.History.Count);
     }
 
     [TestMethod]
@@ -171,15 +209,28 @@ public class SentimentToolsTest
     public async Task GetTopTraderPositionRatioAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetTopTraderPositionRatioAsync("BTC");
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Symbol);
-        Assert.IsTrue(result.History.Count > 0);
+        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsTrue(result.CurrentLongRatio > 0 && result.CurrentShortRatio > 0,
+            $"头部持仓多空占比应 > 0，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
+        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+            $"头部持仓多空占比应接近 100%，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
+        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+
+        foreach (var point in result.History)
+        {
+            Assert.IsTrue(point.LongRatio > 0 && point.ShortRatio > 0,
+                $"历史点多空占比应 > 0，Long={point.LongRatio}, Short={point.ShortRatio}");
+        }
+
+        _logger?.LogInformation("头部持仓多空比: {Symbol} 多={Long}% 空={Short}% 历史={Count}",
+            result.Symbol, result.CurrentLongRatio, result.CurrentShortRatio, result.History.Count);
     }
 
     [TestMethod]
@@ -187,15 +238,29 @@ public class SentimentToolsTest
     public async Task GetOpenInterestAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<ICryptoSentimentTools>(MarketType.Crypto);
+        var service = (CryptoSentimentTools)_serviceProvider!.GetRequiredKeyedService<ISentimentTools>(MarketType.Crypto);
 
         // Act
         var result = await service.GetOpenInterestAsync("BTC");
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsNotNull(result.Symbol);
-        Assert.IsTrue(result.History.Count > 0);
+        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsTrue(result.CurrentOpenInterest > 0, $"当前持仓量应 > 0，实际: {result.CurrentOpenInterest}");
+        Assert.IsTrue(result.CurrentOpenInterestValue > 0, $"当前持仓价值应 > 0，实际: {result.CurrentOpenInterestValue}");
+        Assert.IsTrue(result.CurrentTimestamp > 0, $"当前时间戳应 > 0，实际: {result.CurrentTimestamp}");
+        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+
+        // 验证历史数据点：持仓量与持仓价值均 > 0
+        foreach (var point in result.History)
+        {
+            Assert.IsTrue(point.SumOpenInterest > 0, $"历史点持仓量应 > 0，实际: {point.SumOpenInterest}");
+            Assert.IsTrue(point.SumOpenInterestValue > 0, $"历史点持仓价值应 > 0，实际: {point.SumOpenInterestValue}");
+            Assert.IsTrue(point.Timestamp > 0, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
+        }
+
+        _logger?.LogInformation("持仓量: {Symbol} 当前={OI} 价值={Value} 历史={Count}",
+            result.Symbol, result.CurrentOpenInterest, result.CurrentOpenInterestValue, result.History.Count);
     }
 
     #endregion

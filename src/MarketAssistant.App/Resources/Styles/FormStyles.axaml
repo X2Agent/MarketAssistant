@@ -27,7 +27,7 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBox:focus">
-        <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
     </Style>
     <Style Selector="TextBox:disabled">
         <Setter Property="Opacity" Value="0.5"/>
@@ -41,9 +41,9 @@
     <!-- ===== 搜索框 ===== -->
     <Style Selector="TextBox.search-input">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
-        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Padding" Value="12,8"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
     </Style>
 
@@ -102,6 +102,16 @@
         <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <!-- 内部文本框：水平垂直居中，避免窄宽度下数字被步进按钮遮挡裁切 -->
+    <Style Selector="NumericUpDown /template/ TextBox#PART_TextBox">
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="NumericUpDown:disabled">
+        <Setter Property="Opacity" Value="0.5"/>
     </Style>
 
     <!-- ===== 表单标签 ===== -->
@@ -109,21 +119,21 @@
         <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
         <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Setter Property="Margin" Value="{StaticResource TinyBottomMargin}"/>
     </Style>
 
     <!-- ===== 表单辅助文本 ===== -->
     <Style Selector="TextBlock.form-hint">
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 
     <!-- ===== 表单错误文本 ===== -->
     <Style Selector="TextBlock.form-error">
         <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
         <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 
 </Styles>

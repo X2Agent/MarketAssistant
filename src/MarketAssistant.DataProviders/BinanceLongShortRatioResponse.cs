@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安多空比 API 响应模型
@@ -17,13 +17,13 @@ public class BinanceLongShortRatioResponse
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("longShortRatio")]
-    public string LongShortRatio { get; set; } = string.Empty;
+    public decimal LongShortRatio { get; set; }
 
     [JsonPropertyName("longAccount")]
-    public string LongAccount { get; set; } = string.Empty;
+    public decimal LongAccount { get; set; }
 
     [JsonPropertyName("shortAccount")]
-    public string ShortAccount { get; set; } = string.Empty;
+    public decimal ShortAccount { get; set; }
 
     [JsonPropertyName("timestamp")]
     public long Timestamp { get; set; }

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using MarketAssistant.Applications.Cache;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 

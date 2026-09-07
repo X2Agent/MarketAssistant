@@ -4,24 +4,21 @@ using Avalonia.Data.Converters;
 namespace MarketAssistant.Converters;
 
 /// <summary>
-/// �ɿ�ֵ�ɼ���ת���� - ��ֵΪ null ʱ���� false������ IsVisible ��
+/// 可空值可见性转换器 - 当值为 null 时返回 false，用于 IsVisible 绑定
 /// </summary>
 public class NullableVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // ����Ƿ�Ϊ null
         if (value == null)
             return false;
 
-        // ����ַ����Ƿ�Ϊ��
         if (value is string str && string.IsNullOrWhiteSpace(str))
             return false;
 
-        // ����ֵ���ͣ�����Ƿ���ֵ
         var type = value.GetType();
 
-        // ����� Nullable<T> ����
+        // 处理 Nullable<T> 类型
         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
         {
             var hasValueProperty = type.GetProperty("HasValue");
@@ -35,7 +32,7 @@ public class NullableVisibilityConverter : IValueConverter
         return true;
     }
 
-    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         throw new NotImplementedException("NullableVisibilityConverter does not support ConvertBack");
     }

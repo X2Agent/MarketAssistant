@@ -3,6 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
+              xmlns:providers="using:MarketAssistant.Infrastructure.Providers"
+
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
@@ -11,7 +13,42 @@
 
     <UserControl.Resources>
         <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <Thickness x:Key="GridItemMargin">0,0,8,16</Thickness>
+        <!-- 手风琴（对齐原型 section-card）内边距 -->
+        <Thickness x:Key="ExpanderHeaderPadding">16,12,16,12</Thickness>
+        <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
     </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- 设置分组手风琴：卡片式可折叠分组 -->
+        <Style Selector="Expander.section-card">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+        <Style Selector="Expander.section-card TextBlock.section-title">
+            <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="Path.Spin">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="Infinite">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="RotateTransform.Angle" Value="0"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="RotateTransform.Angle" Value="360"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </UserControl.Styles>
 
     <Design.DataContext>
         <vm:SettingsPageViewModel/>
@@ -19,105 +56,325 @@
 
     <Grid RowDefinitions="*,Auto">
         <!-- 主内容区域 -->
-        <ScrollViewer Grid.Row="0" Grid.RowSpan="2" Background="{DynamicResource CardBackgroundBrush}">
-            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource ImmersivePageMargin}">
+        <ScrollViewer Grid.Row="0" Background="{DynamicResource CardBackgroundBrush}">
+            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
 
-                <!-- 外观设置 -->
-                <controls:CardView Header="外观设置">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <TextBlock Text="主题"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                            <RadioButton Content="跟随系统"
-                                         IsChecked="{Binding IsThemeDefault}"
-                                         GroupName="Theme"/>
-                            <RadioButton Content="浅色"
-                                         IsChecked="{Binding IsThemeLight}"
-                                         GroupName="Theme"/>
-                            <RadioButton Content="深色"
-                                         IsChecked="{Binding IsThemeDark}"
-                                         GroupName="Theme"/>
+                <!-- 通用设置（主题 + 通知 + 日志） -->
+                <Expander Classes="section-card" IsExpanded="True" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="通用设置" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                        <!-- 主题 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="主题"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                <RadioButton Content="跟随系统"
+                                             IsChecked="{Binding IsThemeDefault}"
+                                             GroupName="Theme"/>
+                                <RadioButton Content="浅色"
+                                             IsChecked="{Binding IsThemeLight}"
+                                             GroupName="Theme"/>
+                                <RadioButton Content="深色"
+                                             IsChecked="{Binding IsThemeDark}"
+                                             GroupName="Theme"/>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
-                </controls:CardView>
 
-                <!-- 模型设置区域 -->
-                <controls:CardView Header="模型设置(硅基流动)">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <!-- 模型选择 -->
-                        <ComboBox ItemsSource="{Binding Models}"
-                                  SelectedItem="{Binding UserSetting.ModelId}"
-                                  PlaceholderText="模型选择"
-                                  HorizontalAlignment="Stretch"
-                                  IsEnabled="{Binding Models.Count}"/>
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
 
-                        <!-- API密钥 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="API密钥"
+                        <CheckBox IsChecked="{Binding UserSetting.Notification}"
+                                  Content="开启通知"/>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 告警中心 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="告警中心"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="控制告警弹窗频率与免打扰时段（紧急告警不受限制）"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                            <!-- 每小时弹窗上限：标签在上、控件在下靠左，与其他表单行统一 -->
+                            <TextBlock Text="每小时弹窗上限" Classes="form-label"/>
+                            <NumericUpDown Value="{Binding UserSetting.AlertHourlyQuota, Mode=TwoWay}"
+                                           Minimum="1"
+                                           Maximum="200"
+                                           Increment="1"
+                                           Width="200"
+                                           HorizontalAlignment="Left"/>
+                            <!-- 免打扰时段：标签在上、开关在左、起止行缩进随动 -->
+                            <TextBlock Text="免打扰时段" Classes="form-label"/>
+                            <CheckBox IsChecked="{Binding UserSetting.AlertQuietHoursEnabled}"
+                                      Content="启用免打扰时段"/>
+                            <!-- 免打扰时段起止：未启用时整行禁用置灰 -->
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="{StaticResource SmallSpacing}"
+                                        Margin="{StaticResource SmallLeftMargin}"
+                                        IsEnabled="{Binding UserSetting.AlertQuietHoursEnabled}">
+                                <TextBlock Text="从" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietStartHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="110"
+                                               HorizontalAlignment="Left"/>
+                                <TextBlock Text="点至" VerticalAlignment="Center"/>
+                                <NumericUpDown Value="{Binding UserSetting.AlertQuietEndHour, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="23"
+                                               Increment="1"
+                                               Width="110"
+                                               HorizontalAlignment="Left"/>
+                                <TextBlock Text="点（支持跨零点）" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 日志文件 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="日志文件"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="日志文件路径"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
-                                         Text="{Binding UserSetting.ApiKey}"
-                                         PlaceholderText="请输入API密钥"
+                                         Text="{Binding UserSetting.LogPath}"
+                                         PlaceholderText="请输入日志文件路径"/>
+                                <Button Grid.Column="1"
+                                        Content="浏览"
+                                        Classes="btn-info"
+                                        Command="{Binding SelectLogPathCommand}"
+                                        Margin="{StaticResource SmallLeftMargin}"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 模型服务配置 -->
+                <Expander Classes="section-card" IsExpanded="False" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="模型与服务" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="服务商"
+                                       Classes="form-label"/>
+                            <AutoCompleteBox ItemsSource="{Binding Providers}"
+                                             SelectedItem="{Binding SelectedProvider, Mode=TwoWay}"
+                                             FilterMode="Contains"
+                                             MinimumPrefixLength="0"
+                                             ValueMemberBinding="{Binding DisplayName}"
+                                             PlaceholderText="选择或搜索服务商"
+                                             MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                             HorizontalAlignment="Stretch"
+                                             GotFocus="OnProviderBoxGotFocus"
+                                             DropDownClosed="OnProviderBoxDropDownClosed">
+                                <AutoCompleteBox.ItemTemplate>
+                                    <DataTemplate x:DataType="providers:ModelProvider">
+                                        <TextBlock Text="{Binding DisplayName}"/>
+                                    </DataTemplate>
+                                </AutoCompleteBox.ItemTemplate>
+                            </AutoCompleteBox>
+                        </StackPanel>
+
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                                    IsVisible="{Binding SupportsApiKeyConfiguration}">
+                            <TextBlock Text="API Key"
+                                       Classes="form-label"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding ApiKey, Mode=TwoWay}"
+                                         PlaceholderText="输入服务商 API Key"
                                          PasswordChar="●"/>
                                 <Button Grid.Column="1"
-                                        Content="获取密钥"
-                                        Classes="btn-primary"
+                                        Content="申请"
+                                        Classes="btn-secondary"
                                         Command="{Binding OpenModelApiWebsiteCommand}"
-                                        Margin="{StaticResource SmallLeftMargin}"/>
+                                        IsVisible="{Binding ProviderApiKeyUrl, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                        ToolTip.Tip="打开服务商 API Key 页面"/>
                             </Grid>
-                        </StackPanel>
-                    </StackPanel>
-                </controls:CardView>
-
-                <!-- 嵌入模型设置 -->
-                <controls:CardView Header="嵌入模型设置">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <!-- API端点 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="API端点"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.EmbeddingEndpoint}"
-                                     PlaceholderText="嵌入服务API端点"/>
+                            <TextBlock Text="{Binding ApiKeyHint}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <!-- API密鑰 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="API密鑰"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0"
-                                         Text="{Binding UserSetting.EmbeddingApiKey}"
-                                         PlaceholderText="请输入嵌入服务API密鑰"
-                                         PasswordChar="&#9679;"/>
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                                    IsVisible="{Binding CanOverrideEndpoint}">
+                            <TextBlock Text="API Base URL"
+                                       Classes="form-label"/>
+                            <TextBox Text="{Binding Endpoint, Mode=TwoWay}"
+                                     PlaceholderText="{Binding EndpointPlaceholder}"
+                                     ToolTip.Tip="留空使用服务商默认地址；填写后可连接代理或私有部署"/>
+                            <TextBlock Text="{Binding EffectiveEndpoint, StringFormat='当前连接地址：{0}'}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="模型 ID"
+                                       Classes="form-label"/>
+                            <Grid ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="{StaticResource DefaultSpacing}">
+                                <AutoCompleteBox Grid.Column="0"
+                                                 ItemsSource="{Binding Models}"
+                                                 Text="{Binding ModelId, Mode=TwoWay}"
+                                                 FilterMode="Contains"
+                                                 MinimumPrefixLength="0"
+                                                 PlaceholderText="选择或输入模型 ID"
+                                                 MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                                 HorizontalAlignment="Stretch"
+                                                 GotFocus="OnModelBoxGotFocus"/>
                                 <Button Grid.Column="1"
-                                        Content="获取密鑰"
                                         Classes="btn-info"
-                                        Command="{Binding OpenEmbeddingApiWebsiteCommand}"
-                                        Margin="{StaticResource SmallLeftMargin}"/>
+                                        Command="{Binding FetchModelsCommand}"
+                                        MinWidth="{StaticResource MediumButtonMinWidth}"
+                                        ToolTip.Tip="从当前服务商刷新模型目录">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="{StaticResource DefaultSpacing}">
+                                        <PathIcon Data="{StaticResource RefreshIcon}"
+                                                  Width="{StaticResource TinyIconSize}"
+                                                  Height="{StaticResource TinyIconSize}"
+                                                  IsVisible="{Binding !IsLoadingModels}"/>
+                                        <Path Data="{StaticResource LoadingIcon}"
+                                              Fill="White"
+                                              Width="{StaticResource TinyIconSize}"
+                                              Height="{StaticResource TinyIconSize}"
+                                              Classes="Spin"
+                                              RenderTransformOrigin="50%,50%"
+                                              IsVisible="{Binding IsLoadingModels}"/>
+                                        <TextBlock Text="刷新模型"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </Grid>
+                            <TextBlock Text="{Binding ModelDiscoveryHint}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
-                        <!-- 嵌入模型ID -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 嵌入模型 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="嵌入模型"
                                        FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="API端点"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.EmbeddingEndpoint}"
+                                         PlaceholderText="嵌入服务API端点"/>
+                            </StackPanel>
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="API密钥"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding UserSetting.EmbeddingApiKey}"
+                                             PlaceholderText="请输入嵌入服务API密钥"
+                                             PasswordChar="●"/>
+                                    <Button Grid.Column="1"
+                                            Content="获取密钥"
+                                            Classes="btn-info"
+                                            Command="{Binding OpenEmbeddingApiWebsiteCommand}"
+                                            Margin="{StaticResource SmallLeftMargin}"/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="嵌入模型"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.EmbeddingModelId}"
+                                         PlaceholderText="嵌入模型ID"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Web Search -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="Web Search"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <CheckBox IsChecked="{Binding UserSetting.EnableWebSearch}"
+                                      Content="启用Web Search功能"/>
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                                        IsEnabled="{Binding UserSetting.EnableWebSearch}">
+                                <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                    <TextBlock Text="搜索平台选择"
+                                               FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                        <RadioButton Content="Bing"
+                                                     GroupName="SearchProvider"
+                                                     IsChecked="{Binding IsBingProvider}"/>
+                                        <RadioButton Content="Brave"
+                                                     GroupName="SearchProvider"
+                                                     IsChecked="{Binding IsBraveProvider}"/>
+                                        <RadioButton Content="Tavily"
+                                                     GroupName="SearchProvider"
+                                                     IsChecked="{Binding IsTavilyProvider}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                    <TextBlock Text="Web Search API Key"
+                                               FontSize="{StaticResource LabelFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
+                                             PasswordChar="●"
+                                             PlaceholderText="请输入Web Search API Key"/>
+                                </StackPanel>
+                                <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{StaticResource ErrorBrush}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- MCP 服务 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="MCP 服务"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="配置MCP服务器，用于连接外部服务"
+                                       FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.EmbeddingModelId}"
-                                     PlaceholderText="嵌入模型ID"/>
+                            <Button Content="MCP服务器配置"
+                                    Classes="btn-info"
+                                    Command="{Binding NavigateToMCPConfigCommand}"
+                                    HorizontalAlignment="Left"/>
                         </StackPanel>
                     </StackPanel>
-                </controls:CardView>
+                </Expander>
 
                 <!-- 市场设置区域 -->
-                <controls:CardView Header="市场设置">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                <Expander Classes="section-card" IsExpanded="False" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="市场与偏好" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                         <!-- 市场类型选择 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="市场类型"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -132,7 +389,7 @@
                         </StackPanel>
 
                         <!-- A股市场API配置 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}" 
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}" 
                                     IsVisible="{Binding IsAShareMarket}">
                             <TextBlock Text="ZhiTu API令牌"
                                        FontSize="{StaticResource LabelFontSize}"
@@ -140,6 +397,7 @@
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.ZhiTuApiToken}"
+                                         PasswordChar="●"
                                          PlaceholderText="请输入ZhiTu API令牌"/>
                                 <Button Grid.Column="1"
                                         Content="获取令牌"
@@ -150,12 +408,21 @@
                         </StackPanel>
 
                         <!-- 虚拟币市场API配置 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}" 
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}" 
                                     IsVisible="{Binding IsCryptoMarket}">
+                            <TextBlock Text="交易环境与 API 密钥"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="交易模式切换与 Binance API 密钥配置已移至交易页面的「API 密钥」标签页，密钥使用 AES-GCM 加密独立存储。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+
                             <!-- CoinGecko API密钥 -->
                             <TextBlock Text="CoinGecko API密钥（可选）"
                                        FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="{StaticResource SmallTopMargin}"/>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding UserSetting.CoinGeckoApiKey}"
@@ -170,69 +437,55 @@
                             <TextBlock Text="用于获取代币市值、供应量等数据。免费版有限额但无需API Key"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-
-                            <!-- Binance API 配置 -->
-                            <TextBlock Text="Binance API Key（交易功能必须）"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       Margin="0,8,0,0"/>
-                            <TextBox Text="{Binding UserSetting.BinanceApiKey}"
-                                     PlaceholderText="请输入 Binance API Key"
-                                     PasswordChar="●"/>
-
-                            <TextBlock Text="Binance Secret Key"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBox Text="{Binding UserSetting.BinanceSecretKey}"
-                                     PlaceholderText="请输入 Binance Secret Key"
-                                     PasswordChar="●"/>
-                            <TextBlock Text="用于自主交易功能。请确保 API Key 仅开启现货交易权限，不要开启提现权限"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource WarningBrush}"/>
                         </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 投资偏好 -->
+                        <Grid ColumnDefinitions="*,16,*">
+                            <!-- 风险承受能力 -->
+                            <StackPanel Grid.Column="0" Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="风险承受能力"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <ComboBox ItemsSource="{Binding RiskToleranceOptions}"
+                                          SelectedItem="{Binding UserSetting.InvestmentPreference.RiskTolerance}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <!-- 投资期限 -->
+                            <StackPanel Grid.Column="2" Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="投资期限"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <ComboBox ItemsSource="{Binding InvestmentHorizonOptions}"
+                                          SelectedItem="{Binding UserSetting.InvestmentPreference.InvestmentHorizon}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
-                </controls:CardView>
-
-                <!-- 投资偏好设置 -->
-                <controls:CardView Header="投资偏好设置">
-                    <Grid ColumnDefinitions="*,16,*">
-                        <!-- 风险承受能力 -->
-                        <StackPanel Grid.Column="0" Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="风险承受能力"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <ComboBox ItemsSource="{Binding RiskToleranceOptions}"
-                                      SelectedItem="{Binding UserSetting.InvestmentPreference.RiskTolerance}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </StackPanel>
-
-                        <!-- 投资期限 -->
-                        <StackPanel Grid.Column="2" Spacing="{StaticResource SmallSpacing}">
-                            <TextBlock Text="投资期限"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <ComboBox ItemsSource="{Binding InvestmentHorizonOptions}"
-                                      SelectedItem="{Binding UserSetting.InvestmentPreference.InvestmentHorizon}"
-                                      HorizontalAlignment="Stretch">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
-                        </StackPanel>
-                    </Grid>
-                </controls:CardView>
+                </Expander>
 
                 <!-- 知识库设置区域 -->
-                <controls:CardView Header="知识库设置">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                <Expander Classes="section-card" IsExpanded="False" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="知识库设置" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                         <!-- 是否加载知识库 -->
                         <CheckBox IsChecked="{Binding UserSetting.LoadKnowledge}"
                                   Content="加载知识库"/>
@@ -240,7 +493,7 @@
                         <StackPanel Spacing="{StaticResource DefaultSpacing}" 
                                     IsEnabled="{Binding UserSetting.LoadKnowledge}">
                             <!-- 知识文件目录 -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
                                 <TextBlock Text="知识文件目录"
                                            FontSize="{StaticResource LabelFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -258,7 +511,7 @@
                             </StackPanel>
 
                             <!-- 知识库向量化 -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
                                 <TextBlock Text="知识库向量化"
                                            FontSize="{StaticResource LabelFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -271,18 +524,18 @@
                                     <PathIcon Data="{StaticResource LoadingIcon}"
                                               Width="{StaticResource DefaultIconSize}"
                                               Height="{StaticResource DefaultIconSize}"
-                                              Foreground="{DynamicResource PrimaryBrush}"
+                                              Foreground="{StaticResource PrimaryBrush}"
                                               IsVisible="{Binding IsVectorizing}"/>
                                 </StackPanel>
                                 
                                 <!-- 向量化进度 -->
-                                <StackPanel IsVisible="{Binding IsVectorizing}" Spacing="{StaticResource SmallSpacing}">
+                                <StackPanel IsVisible="{Binding IsVectorizing}" Spacing="{StaticResource DefaultSpacing}">
                                     <ProgressBar Value="{Binding VectorizingProgress}"
                                                  Maximum="100"
                                                  Height="{StaticResource ProgressBarHeight}"/>
                                     <TextBlock Text="{Binding VectorizingProgressText}"
                                                FontSize="{StaticResource BodyFontSize}"
-                                               Foreground="{DynamicResource PrimaryBrush}"
+                                               Foreground="{StaticResource PrimaryBrush}"
                                                FontWeight="Medium"/>
                                 </StackPanel>
                                 
@@ -293,18 +546,21 @@
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
-                </controls:CardView>
+                </Expander>
 
                 <!-- 市场分析师角色设置区域 -->
-                <controls:CardView Header="市场分析师角色设置">
-                    <StackPanel Spacing="{StaticResource LargeSpacing}">
-                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                <Expander Classes="section-card" IsExpanded="False" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="市场分析师角色设置" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="选择参与分析讨论的角色"
                                        FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBlock Text="注意：启用的角色越多，消耗的Token越多"
                                        FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{Binding AnalystRoles}">
@@ -317,7 +573,7 @@
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="Auto,*" 
                                           RowDefinitions="Auto,Auto" 
-                                          Margin="0,0,8,16">
+                                          Margin="{StaticResource GridItemMargin}">
                                         <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
                                                   IsChecked="{Binding IsEnabled}"
                                                   IsEnabled="{Binding !IsRequired}"
@@ -339,88 +595,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
-                </controls:CardView>
+                </Expander>
 
-                <!-- 通知设置区域 -->
-                <controls:CardView Header="通知设置">
-                    <CheckBox IsChecked="{Binding UserSetting.Notification}"
-                              Content="开启通知"/>
-                </controls:CardView>
-
-                <!-- 日志设置区域 -->
-                <controls:CardView Header="日志设置">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="日志文件路径"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBox Grid.Column="0"
-                                     Text="{Binding UserSetting.LogPath}"
-                                     PlaceholderText="请输入日志文件路径"/>
-                            <Button Grid.Column="1"
-                                    Content="浏览"
-                                    Classes="btn-info"
-                                    Command="{Binding SelectLogPathCommand}"
-                                    Margin="{StaticResource SmallLeftMargin}"/>
-                        </Grid>
-                    </StackPanel>
-                </controls:CardView>
-
-                <!-- Web Search设置区域 -->
-                <controls:CardView Header="Web Search设置">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <!-- 是否启用Web Search -->
-                        <CheckBox IsChecked="{Binding UserSetting.EnableWebSearch}"
-                                  Content="启用Web Search功能"/>
-
-                        <StackPanel Spacing="{StaticResource DefaultSpacing}" 
-                                    IsEnabled="{Binding UserSetting.EnableWebSearch}">
-                            <!-- 搜索平台选择 -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="搜索平台选择"
-                                           FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                                    <RadioButton Content="Bing" 
-                                                 GroupName="SearchProvider"
-                                                 IsChecked="{Binding IsBingProvider}"/>
-                                    <RadioButton Content="Brave" 
-                                                 GroupName="SearchProvider"
-                                                 IsChecked="{Binding IsBraveProvider}"/>
-                                    <RadioButton Content="Tavily" 
-                                                 GroupName="SearchProvider"
-                                                 IsChecked="{Binding IsTavilyProvider}"/>
-                                </StackPanel>
-                            </StackPanel>
-                            
-                            <!-- API Key -->
-                            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="Web Search API Key"
-                                           FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <TextBox Text="{Binding UserSetting.WebSearchApiKey}"
-                                         PlaceholderText="请输入Web Search API Key"/>
-                            </StackPanel>
-                            
-                            <TextBlock Text="注意：启用Web Search功能需要配置有效的API Key"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
-                        </StackPanel>
-                    </StackPanel>
-                </controls:CardView>
-
-                <!-- MCP服务器配置区域 -->
-                <controls:CardView Header="MCP服务器配置">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="配置MCP服务器，用于连接外部服务"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <Button Content="MCP服务器配置"
-                                Classes="btn-info"
-                                Command="{Binding NavigateToMCPConfigCommand}"
-                                HorizontalAlignment="Left"/>
-                    </StackPanel>
-                </controls:CardView>
             </StackPanel>
         </ScrollViewer>
 
@@ -435,8 +611,7 @@
                         Spacing="{StaticResource DefaultSpacing}">
                 <Button Content="重置"
                         Command="{Binding ResetCommand}"
-                        Background="{DynamicResource TextSecondaryBrush}"
-                        Foreground="White"
+                        Classes="btn-secondary"
                         MinWidth="{StaticResource MediumButtonMinWidth}"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"/>

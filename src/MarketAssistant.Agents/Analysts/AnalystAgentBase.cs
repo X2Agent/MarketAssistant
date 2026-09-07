@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.PromptConfiguration;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
@@ -20,10 +21,6 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
 3. **缺失数据处理**：如果工具未能提供所需数据，或者数据不完整，必须在分析结果中明确说明""缺少数据支持""或""数据不可用""，不得进行无依据的猜测或试图掩盖。
 4. **拒绝幻觉**：对于未通过工具验证的信息，保持怀疑态度，不要将其作为分析依据。";
 
-    /// <summary>
-    /// 初始化分析师代理基类
-    /// 子类通过构造函数传递所有配置参数
-    /// </summary>
     protected AnalystAgentBase(
         IChatClient chatClient,
         string instructions,
@@ -32,13 +29,12 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         float temperature,
         float topP,
         int? topK,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        AIContextProvider[]? aiContextProviders = null)
         : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
-            temperature, topP, topK, responseFormat, tools,
-            skillsProvider != null ? [skillsProvider, .. (aiContextProviders ?? [])] : aiContextProviders))
+            temperature, topP, topK, resultType, structuredOutputMode, tools, aiContextProviders))
     {
     }
 
@@ -48,19 +44,16 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
     protected AnalystAgentBase(
         IChatClient chatClient,
         AnalystPromptConfig config,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        AIContextProvider[]? aiContextProviders = null)
         : this(chatClient, config.Instructions, config.Name, config.Description,
               config.Temperature, config.TopP, config.TopK,
-              responseFormat, tools, aiContextProviders, skillsProvider)
+              resultType, structuredOutputMode, tools, aiContextProviders)
     {
     }
 
-    /// <summary>
-    /// 创建内部的 ChatClientAgent
-    /// </summary>
     private static AIAgent CreateInnerAgent(
         IChatClient chatClient,
         string instructions,
@@ -69,10 +62,18 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
         float temperature,
         float topP,
         int? topK,
-        ChatResponseFormat? responseFormat,
+        Type resultType,
+        StructuredOutputMode structuredOutputMode,
         IList<AITool>? tools,
         AIContextProvider[]? aiContextProviders)
     {
+        instructions = StructuredOutputOptions.AppendSchemaInstructions(
+            instructions,
+            resultType,
+            structuredOutputMode);
+        var responseFormat = StructuredOutputOptions.CreateResponseFormat(
+            resultType,
+            structuredOutputMode);
         var options = new ChatClientAgentOptions
         {
             Name = name,

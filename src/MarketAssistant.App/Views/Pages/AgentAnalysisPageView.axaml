@@ -7,6 +7,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              xmlns:models="using:MarketAssistant.Services.Archive"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AgentAnalysisPageView"
              x:DataType="vm:AgentAnalysisViewModel"
@@ -22,11 +23,12 @@
         <!-- 主内容区域 -->
         <Grid ClipToBounds="True">
             <!-- 进度显示区域 - 仅在分析时显示 -->
-            <views:ProgressDisplayView 
+            <views:ProgressDisplayView
                 IsVisible="{Binding IsBusy}"
-                IsAnalysisInProgress="{Binding IsAnalysisInProgress}"
                 AnalysisStage="{Binding AnalysisStage}"
                 ProgressPercent="{Binding AnalysisProgressPercent}"
+                AnalysisPhase="{Binding AnalysisPhase}"
+                AnalystRunItems="{Binding AnalystRunItems}"
                 FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
                 CancelCommand="{Binding CancelAnalysisCommand}"/>
 
@@ -39,16 +41,16 @@
                         Height="48"
                         Background="Transparent"
                         BorderBrush="{DynamicResource DividerBrush}"
-                        BorderThickness="0,0,0,1"
-                        Padding="8,0">
+                        BorderThickness="{StaticResource BottomBorderThickness}"
+                        Padding="{StaticResource SmallHorizontalPadding}">
                     <Button HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Width="{StaticResource SmallIconButtonSize}"
                             Height="{StaticResource SmallIconButtonSize}"
                             CornerRadius="{StaticResource SmallCornerRadius}"
                             Background="Transparent"
-                            BorderThickness="0"
-                            Padding="0"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            Padding="{StaticResource NoPadding}"
                             FontSize="{StaticResource LargeFontSize}"
                             Content="⋮"
                             Foreground="{DynamicResource TextPrimaryBrush}"
@@ -87,21 +89,24 @@
                                         <Button HorizontalAlignment="Stretch"
                                                 HorizontalContentAlignment="Left"
                                                 Background="Transparent"
-                                                BorderThickness="0"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
                                                 Padding="{StaticResource CompactCardPadding}"
                                                 Margin="{StaticResource TinyBottomMargin}"
                                                 Command="{Binding ExportReportCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
-                                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                                <TextBlock Text="📄" FontSize="{StaticResource LabelFontSize}" VerticalAlignment="Center"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
                                         <!-- 分隔线 -->
-                                        <Border Height="1"
+                                        <Border Height="{StaticResource DividerHeight}"
                                                 Background="{DynamicResource DividerBrush}"
-                                                Margin="0,4"
+                                                Margin="{StaticResource TinyVerticalMargin}"
                                                 IsVisible="{Binding HasReportHistory}"/>
 
                                         <!-- 历史报告标题 -->
@@ -109,7 +114,7 @@
                                                    FontWeight="SemiBold"
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   Margin="8,4,8,4"
+                                                   Margin="{StaticResource SectionTitleMargin}"
                                                    IsVisible="{Binding HasReportHistory}"/>
 
                                         <!-- 历史报告列表（可滚动） -->
@@ -123,12 +128,12 @@
                                                         <Button HorizontalAlignment="Stretch"
                                                                 HorizontalContentAlignment="Left"
                                                                 Background="Transparent"
-                                                                BorderThickness="0"
-                                                                Padding="8,6"
-                                                                Margin="0,0,0,2"
+                                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                                Padding="{StaticResource ListItemPadding}"
+                                                                Margin="{StaticResource TinyBottomMargin}"
                                                                 Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
                                                                 CommandParameter="{Binding}">
-                                                            <StackPanel Spacing="2">
+                                                            <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                                 <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
                                                                            FontSize="{StaticResource SmallFontSize}"
                                                                            FontWeight="SemiBold"/>
@@ -150,7 +155,7 @@
                                                    FontSize="{StaticResource SmallFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    HorizontalAlignment="Center"
-                                                   Margin="0,12"
+                                                   Margin="{StaticResource DefaultVerticalMargin}"
                                                    IsVisible="{Binding !HasReportHistory}"/>
                                     </StackPanel>
                                 </Border>
@@ -159,8 +164,9 @@
                     </Button>
                 </Border>
 
-                <!-- 报告内容区域 -->
-                <Grid Grid.Row="1">
+                <!-- 报告内容区域（仅在成功产出报告后展示） -->
+                <Grid Grid.Row="1"
+                      IsVisible="{Binding HasActiveReport}">
                     <!-- 智能分析报告区域 -->
                     <ContentControl Content="{Binding AnalysisReportViewModel}">
                         <ContentControl.ContentTemplate>
@@ -181,41 +187,94 @@
                         ZIndex="999" 
                         IsHitTestVisible="False"/>
 
-                    <!-- 智能对话 FAB -->
-                    <Button Content="💬"
+                    <!-- 智能助手 FAB -->
+                    <Button Margin="{StaticResource FABMargin}"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
                             ZIndex="1000"
-                            Margin="{StaticResource FABMargin}"
-                            FontSize="{StaticResource TitleFontSize}"
                             Width="{StaticResource FABSize}"
                             Height="{StaticResource FABSize}"
                             CornerRadius="{StaticResource FABCornerRadius}"
-                            Background="{DynamicResource PrimaryBrush}"
-                            Foreground="White"
-                            BorderThickness="0"
-                            Padding="0"
+                            Background="{StaticResource PrimaryBrush}"
+                            Foreground="{StaticResource TextOnEmphasisBrush}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
+                            Padding="{StaticResource NoPadding}"
                             Command="{Binding ToggleChatSidebarCommand}"
-                            ToolTip.Tip="智能对话"
+                            ToolTip.Tip="智能助手"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center">
+                        <svg:Svg Path="/Assets/Images/icon_chat.svg"
+                                 Width="24" Height="24"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"/>
                         <Button.Styles>
                             <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{DynamicResource PrimaryLightBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
                             </Style>
                             <Style Selector="Button:pressed /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{DynamicResource PrimaryDarkBrush}"/>
+                                <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
                             </Style>
                         </Button.Styles>
                     </Button>
                 </Grid>
+
+                <!-- 分析未完成状态：分析失败或取消且无报告可展示时出现 -->
+                <Border Grid.Row="1"
+                        IsVisible="{Binding !HasActiveReport}"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        CornerRadius="{StaticResource DefaultCornerRadius}"
+                        Padding="{StaticResource DefaultCardPadding}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="{StaticResource ProgressDialogWidth}">
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <svg:Svg Path="/Assets/Images/icon_warning.svg"
+                                 Width="28" Height="28"
+                                 HorizontalAlignment="Center"/>
+
+                        <TextBlock Text="分析未完成"
+                                   FontSize="{StaticResource LargeFontSize}"
+                                   FontWeight="Bold"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+                        <TextBlock Text="{Binding AnalysisFailureMessage}"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding AnalysisFailureMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <Button Content="重新分析"
+                                Command="{Binding RetryAnalysisCommand}"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource PrimaryBrush}"
+                                Foreground="{StaticResource TextOnEmphasisBrush}"
+                                BorderThickness="{StaticResource NoBorderThickness}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                Padding="{StaticResource CompactCardPadding}">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+                                </Style>
+                                <Style Selector="Button:pressed /template/ ContentPresenter">
+                                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
 
         <!-- 半透明遮罩层：点击可关闭侧边栏 -->
-        <Border Background="#80000000"
+        <Border Background="{DynamicResource DarkOverlayBrush}"
                 IsVisible="{Binding IsChatSidebarVisible}"
                 ZIndex="1500"
+                Focusable="False"
                 Tapped="OnOverlayTapped"/>
 
         <!-- 聊天侧边栏（浮层，右对齐） -->
@@ -227,7 +286,7 @@
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource LeftBorderThickness}"
-                BoxShadow="-4 0 16 0 #40000000">
+                BoxShadow="{StaticResource SidebarBoxShadow}">
             <ContentControl Content="{Binding ChatSidebarViewModel}">
                 <ContentControl.ContentTemplate>
                     <DataTemplate x:DataType="vm:ChatSidebarViewModel">

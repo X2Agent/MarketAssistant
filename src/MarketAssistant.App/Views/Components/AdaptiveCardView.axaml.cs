@@ -102,9 +102,9 @@ public partial class AdaptiveCardView : UserControl
         tb[!TextBlock.ForegroundProperty] = textBlock.Color switch
         {
             AdaptiveTextColor.Accent => new DynamicResourceExtension("AccentBrush"),
-            AdaptiveTextColor.Good => new DynamicResourceExtension("SuccessDeepTextBrush"),
-            AdaptiveTextColor.Warning => new DynamicResourceExtension("WarningDarkTextBrush"),
-            AdaptiveTextColor.Attention => new DynamicResourceExtension("ErrorDarkTextBrush"),
+            AdaptiveTextColor.Good => new DynamicResourceExtension("SuccessPanelTextBrush"),
+            AdaptiveTextColor.Warning => new DynamicResourceExtension("WarningPanelTextBrush"),
+            AdaptiveTextColor.Attention => new DynamicResourceExtension("DangerPanelTextBrush"),
             _ => textBlock.IsSubtle
                 ? new DynamicResourceExtension("TextSecondaryBrush")
                 : new DynamicResourceExtension("TextPrimaryBrush")
@@ -152,8 +152,8 @@ public partial class AdaptiveCardView : UserControl
         }
         else if (container.Style == AdaptiveContainerStyle.Attention)
         {
-            border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerBackgroundBrush");
-            border[!Border.BorderBrushProperty] = new DynamicResourceExtension("ErrorDarkTextBrush");
+            border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerPanelBackgroundBrush");
+            border[!Border.BorderBrushProperty] = new DynamicResourceExtension("DangerPanelBorderBrush");
             border.BorderThickness = new Thickness(3, 0, 0, 0);
             border.CornerRadius = new CornerRadius(ContainerCornerRadius, 0, 0, ContainerCornerRadius);
         }

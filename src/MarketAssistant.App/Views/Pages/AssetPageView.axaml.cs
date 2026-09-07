@@ -1,7 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
-using MarketAssistant.ViewModels;
-using System.ComponentModel;
 
 namespace MarketAssistant.Views.Pages;
 

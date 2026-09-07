@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Infrastructure.Factories;
+using MarketAssistant.Services.Agents.Analysts;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,23 +18,23 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     private const string StockSymbol = "sz002594";
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public void TestAnalystAgentFactory_CreateFinancialAnalyst_ShouldSucceed()
     {
         RequireLlm();
         var agentFactory = _serviceProvider.GetRequiredService<IAnalystAgentFactory>();
-        var agent = agentFactory.CreateAnalyst(typeof(FinancialAnalystAgent));
+        var agent = agentFactory.CreateAnalyst(typeof(FinancialAnalystAgent), _chatClientFactory.CreateRuntime());
 
         Assert.IsNotNull(agent, "应该成功创建 FinancialAnalyst");
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestNewsEventAnalyst_CallsNewsToolCorrectly()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(NewsEventAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(NewsEventAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -48,12 +49,12 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestFundamentalAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(FundamentalAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(FundamentalAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -68,12 +69,12 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestCoordinatorAnalyst_HandlesMultipleAnalystInputs()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(CoordinatorAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(CoordinatorAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var fundamentalJson = """
@@ -126,12 +127,12 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestFinancialAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(FinancialAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(FinancialAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -152,12 +153,12 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestMarketSentimentAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(MarketSentimentAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(MarketSentimentAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(
@@ -177,12 +178,12 @@ public class AnalystAgentFactoryTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestTechnicalAnalyst_CallsToolsCorrectly()
     {
         RequireLlm();
 
-        var agent = _analystAgentFactory.CreateAnalyst(typeof(TechnicalAnalystAgent));
+        var agent = _analystAgentFactory.CreateAnalyst(typeof(TechnicalAnalystAgent), _chatClientFactory.CreateRuntime());
         Assert.IsNotNull(agent);
 
         var evaluator = CreateAnalystEvaluator(

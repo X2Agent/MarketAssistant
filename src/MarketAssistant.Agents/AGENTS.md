@@ -31,22 +31,16 @@ MarketAssistant.Agents/
 ├── TokenManagement/
 │   └── TokenEstimator.cs              ← Token 估算（中文 ~1.5 字/token）
 └── Tools/
-    ├── Abstractions/                  ← 工具接口定义（市场无关）
-    │   ├── IBasicDataTools.cs         ← 基础数据（基类）
-    │   ├── IShareBasicTools.cs        ← A 股基础数据
-    │   ├── ICryptoBasicTools.cs       ← 加密货币基础数据
-    │   ├── IFinancialTools.cs         ← 财务数据（基类）
-    │   ├── IShareFinancialTools.cs    ← A 股财务
-    │   ├── ICryptoMetricsTools.cs     ← 加密货币指标
-    │   ├── ISentimentTools.cs         ← 情绪数据（基类）
-    │   ├── IShareSentimentTools.cs    ← A 股情绪
-    │   ├── ICryptoSentimentTools.cs   ← 加密货币情绪
+    ├── Abstractions/                  ← 工具接口定义（纯标记，DI 分发 key）
+    │   ├── IBasicDataTools.cs         ← 基础数据
+    │   ├── IFinancialTools.cs         ← 财务/市场数据
+    │   ├── ISentimentTools.cs         ← 情绪数据
     │   ├── ITechnicalDataTools.cs     ← 技术分析数据
     │   ├── INewsDataTools.cs          ← 新闻数据
     │   ├── IStrategyTools.cs          ← 策略管理
     │   └── ITradingExecutionTools.cs  ← 交易执行
     └── Models/                        ← 工具返回值模型
-        ├── AssetQuoteInfo.cs, MarketInterval.cs, NewsItem.cs
+        ├── MarketInterval.cs, NewsItem.cs
         ├── AShare/                    ← A 股数据模型
         ├── Crypto/                    ← 加密货币数据模型（含 Binance/CoinGecko/CoinDesk 响应）
         └── Technical/                 ← 技术指标模型（KDJ/MACD/BOLL/MA）
@@ -65,10 +59,10 @@ MarketAssistant.Agents/
 
 ### 工具接口扩展
 
-1. 接口定义在 `Tools/Abstractions/`，市场特定接口继承基类接口（如 `IShareBasicTools : IBasicDataTools`）。
-2. 每个工具接口需暴露 `GetFunctions()` 方法，返回 MAF 可调用的函数列表。
+1. 工具接口（`Tools/Abstractions/`）为**纯标记接口**：只做 `[RequiresTools]` 声明与 Keyed DI 分发的类型 key，**不定义业务方法**。
+2. 业务方法定义在具体实现类（`MarketAssistant.App.Services/Agents/Tools/`），经 `[Description]` 特性 + `GetFunctions()` 反射暴露给模型；市场差异化靠"不同实现类方法集 + keyed 注册的 marketType"表达。
 3. 返回值模型放在 `Tools/Models/` 对应市场子目录。
-4. 具体实现位于 `MarketAssistant.App.Services/Agents/Tools/`，注册为 Keyed Service。
+4. 具体实现注册为 Keyed Service（如 `AddKeyedSingleton<IBasicDataTools, AShareBasicTools>(AShare)`）。
 
 ### 分析模型扩展
 

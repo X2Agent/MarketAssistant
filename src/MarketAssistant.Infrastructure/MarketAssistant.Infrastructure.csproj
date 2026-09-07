@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TestMarketAssistant" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 模型接入基础设施：Chat/Embedding 客户端工厂、服务商发现与策略（P1-4 拆分第一步） -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Token 计数统一入口（ITokenCounter）：Tiktoken cl100k_base -->
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+  </ItemGroup>
+</Project>

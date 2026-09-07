@@ -32,12 +32,15 @@ public class MarketContext : INotifyPropertyChanged
     private readonly IUserSettingService _userSettingService;
     private readonly IServiceProvider _serviceProvider;
     private readonly object _marketLock = new();
-    private MarketType _currentMarket;
+    // volatile 保证无锁读取 CurrentMarket 时能立即看到其他线程的切换结果
+    private volatile MarketType _currentMarket;
 
     /// <summary>
     /// 当前激活的市场类型（静态快照，供 UI Converter 等无法直接依赖注入的场景读取）
     /// </summary>
-    public static MarketType CurrentMarketType { get; private set; }
+    private static volatile MarketType s_currentMarketType;
+
+    public static MarketType CurrentMarketType => s_currentMarketType;
 
     /// <summary>
     /// 当前激活的市场类型
@@ -49,14 +52,25 @@ public class MarketContext : INotifyPropertyChanged
         _userSettingService = userSettingService;
         _serviceProvider = serviceProvider;
         _currentMarket = _userSettingService.CurrentSetting.CurrentMarketType;
-        CurrentMarketType = _currentMarket;
+        s_currentMarketType = _currentMarket;
     }
 
     /// <summary>
     /// 获取当前市场的能力声明
     /// </summary>
-    public IMarketCapability CurrentCapability =>
-        _serviceProvider.GetRequiredKeyedService<IMarketCapability>(CurrentMarket);
+    public IMarketCapability CurrentCapability => GetService<IMarketCapability>();
+
+    /// <summary>
+    /// 解析当前市场的 Keyed 服务（统一入口，替代已废弃的 MarketServiceRegistry 门面）
+    /// </summary>
+    public T GetService<T>() where T : class =>
+        _serviceProvider.GetRequiredKeyedService<T>(CurrentMarket);
+
+    /// <summary>
+    /// 解析指定市场的 Keyed 服务
+    /// </summary>
+    public T GetService<T>(MarketType marketType) where T : class =>
+        _serviceProvider.GetRequiredKeyedService<T>(marketType);
 
     /// <summary>
     /// 市场切换事件，供后端服务订阅以清理状态或暂停后台任务。
@@ -77,11 +91,11 @@ public class MarketContext : INotifyPropertyChanged
                 return;
             previousMarket = _currentMarket;
             _currentMarket = newMarket;
-            CurrentMarketType = newMarket;
+            s_currentMarketType = newMarket;
         }
 
-        _userSettingService.CurrentSetting.CurrentMarketType = newMarket;
-        _userSettingService.SaveSettings();
+        // 与持久化共用同步边界，避免与其它线程的设置保存交错
+        _userSettingService.UpdateSetting(setting => setting.CurrentMarketType = newMarket);
         OnPropertyChanged(nameof(CurrentMarket));
         MarketChanged?.Invoke(this, new MarketChangedEventArgs(previousMarket, newMarket));
     }

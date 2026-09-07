@@ -26,6 +26,10 @@ public class TradingAgent : DelegatingAIAgent
 
     private static AIAgent CreateInnerAgent(IChatClient chatClient, IList<AITool> tools)
     {
+        var functionInvokingClient = new FunctionInvokingChatClient(chatClient)
+        {
+            MaximumIterationsPerRequest = 20
+        };
         var options = new ChatClientAgentOptions
         {
             Name = AgentName,
@@ -36,10 +40,11 @@ public class TradingAgent : DelegatingAIAgent
                 Temperature = 0.1f,
                 TopP = 0.1f,
                 Tools = tools
-            }
+            },
+            UseProvidedChatClientAsIs = true
         };
 
-        return new ChatClientAgent(chatClient, options);
+        return new ChatClientAgent(functionInvokingClient, options);
     }
 
     private static string BuildSystemPrompt() => """

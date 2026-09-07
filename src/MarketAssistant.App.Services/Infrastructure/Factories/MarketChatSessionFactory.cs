@@ -34,7 +34,7 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
     private readonly KnowledgeGraphTools _knowledgeGraphTools;
     private readonly AgentSkillsProvider? _skillsProvider;
     private readonly TokenTrackingMiddleware _tokenTracking;
-    private readonly ConversationCompressionMiddleware _compressionMiddleware;
+    private readonly ConversationCompactionProviderFactory _compactionProviderFactory;
     private readonly LayeredMemoryContextProvider _layeredMemoryProvider;
     private readonly ChatSessionPersistenceService _sessionPersistence;
     private readonly MemoryExtractionService _memoryExtraction;
@@ -48,7 +48,7 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
         SessionSearchTools sessionSearchTools,
         KnowledgeGraphTools knowledgeGraphTools,
         TokenTrackingMiddleware tokenTracking,
-        ConversationCompressionMiddleware compressionMiddleware,
+        ConversationCompactionProviderFactory compactionProviderFactory,
         LayeredMemoryContextProvider layeredMemoryProvider,
         ChatSessionPersistenceService sessionPersistence,
         MemoryExtractionService memoryExtraction,
@@ -63,7 +63,7 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
         _knowledgeGraphTools = knowledgeGraphTools;
         _skillsProvider = skillsProvider;
         _tokenTracking = tokenTracking;
-        _compressionMiddleware = compressionMiddleware;
+        _compactionProviderFactory = compactionProviderFactory;
         _layeredMemoryProvider = layeredMemoryProvider;
         _sessionPersistence = sessionPersistence;
         _memoryExtraction = memoryExtraction;
@@ -71,11 +71,12 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
 
     public MarketChatSession Create(string? initialStockCode = null)
     {
-        var chatClient = _chatClientFactory.CreateClient();
+        var runtime = _chatClientFactory.CreateRuntime();
         var logger = _loggerFactory.CreateLogger<MarketChatSession>();
+        var compactionProvider = _compactionProviderFactory.Create(runtime.Client);
 
         return new MarketChatSession(
-            chatClient,
+            runtime.Client,
             logger,
             mcpToolProvider: _mcpToolProvider,
             searchTools: _searchTools,
@@ -84,10 +85,14 @@ public class MarketChatSessionFactory : IMarketChatSessionFactory
             knowledgeGraphTools: _knowledgeGraphTools,
             skillsProvider: _skillsProvider,
             tokenTracking: _tokenTracking,
-            compressionMiddleware: _compressionMiddleware,
+            compactionProvider: compactionProvider,
             layeredMemoryProvider: _layeredMemoryProvider,
             sessionPersistence: _sessionPersistence,
             memoryExtraction: _memoryExtraction,
-            initialStockCode: initialStockCode);
+            initialStockCode: initialStockCode,
+            providerId: runtime.ProviderId,
+            modelId: runtime.ModelId,
+            endpoint: runtime.Endpoint,
+            runtimeConfigurationFingerprint: runtime.ConfigurationFingerprint);
     }
 }

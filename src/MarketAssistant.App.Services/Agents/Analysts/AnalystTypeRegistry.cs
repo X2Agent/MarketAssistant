@@ -1,6 +1,7 @@
 using System.Reflection;
+using MarketAssistant.Agents.Analysts;
 
-namespace MarketAssistant.Agents.Analysts;
+namespace MarketAssistant.Services.Agents.Analysts;
 
 /// <summary>
 /// 统一发现当前应用中已加载的分析师实现类型。

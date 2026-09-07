@@ -28,30 +28,8 @@ public class DocxFileTest : BaseAgentTest
         // 获取DOCX读取器
         _reader = _readerFactory.GetReader("test.docx")!;
 
-        // 获取测试项目根目录
-        var testProjectDir = GetTestProjectDirectory();
-        _testDocxFile = Path.Combine(testProjectDir, "demo.docx");
-
-        // 确保测试文件存在
+        _testDocxFile = Path.Combine(AppContext.BaseDirectory, "demo.docx");
         Assert.IsTrue(File.Exists(_testDocxFile), $"测试文件不存在: {_testDocxFile}");
-    }
-
-    private static string GetTestProjectDirectory()
-    {
-        // 从当前执行目录向上查找，直到找到包含demo.docx的目录
-        var currentDir = Directory.GetCurrentDirectory();
-        var dir = new DirectoryInfo(currentDir);
-
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "demo.docx")))
-            {
-                return dir.FullName;
-            }
-            dir = dir.Parent;
-        }
-
-        throw new FileNotFoundException("无法找到包含demo.docx的测试项目目录。请确保demo.docx文件存在于TestMarketAssistant项目目录中。");
     }
 
     #region Converter Tests
@@ -94,12 +72,6 @@ public class DocxFileTest : BaseAgentTest
 
         // Assert - 验证基本的Markdown结构
         Assert.IsNotNull(result);
-
-        // 如果文档包含标题，应该有#符号
-        if (result.Contains("#"))
-        {
-            Assert.IsTrue(result.Contains("#"), "应该包含Markdown标题标记");
-        }
 
         // 验证文档不是完全空白
         var trimmedResult = result.Trim();
@@ -216,8 +188,9 @@ public class DocxFileTest : BaseAgentTest
             Console.WriteLine($"{kvp.Key}: {kvp.Value} 个");
         }
 
-        // 验证至少有一种块类型
-        Assert.IsTrue(blockTypeCount.Count > 0, "应该至少有一种块类型");
+        // 验证 demo.docx 含多种块类型（标题/正文/列表/表格等）
+        Assert.IsTrue(blockTypeCount.Count >= 2,
+            $"demo.docx 应至少包含 2 种块类型以验证多类型解析，实际: {string.Join(", ", blockTypeCount.Keys)}");
     }
 
     [TestMethod]

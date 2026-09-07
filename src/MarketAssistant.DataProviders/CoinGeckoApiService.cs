@@ -1,11 +1,12 @@
 using System.Net.Http.Json;
+using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// CoinGecko API服务（含客户端限流，免费版 30 次/分钟）
@@ -15,9 +16,17 @@ public sealed class CoinGeckoApiService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CoinGeckoApiService> _logger;
 
-    private static readonly SemaphoreSlim Throttle = new(1, 1);
-    private static DateTime _lastRequestTime = DateTime.MinValue;
-    private const int MinRequestIntervalMs = 2500;
+    // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔。
+    // QueueLimit 有限：突发排队超过 8 个直接失败并抛错（无界排队会让调用方长时间悬挂）
+    private static readonly TokenBucketRateLimiter Throttle = new(new TokenBucketRateLimiterOptions
+    {
+        TokenLimit = 1,
+        TokensPerPeriod = 1,
+        ReplenishmentPeriod = TimeSpan.FromMilliseconds(2500),
+        QueueLimit = 8,
+        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+        AutoReplenishment = true
+    });
 
     // 支持 API 返回的字符串数值/null 自动容错转换为 decimal?（CoinGeckoMarket 全为 decimal?）
     private static readonly JsonSerializerOptions CoinGeckoJsonOptions = new()
@@ -39,27 +48,15 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<T> ThrottledExecuteAsync<T>(Func<HttpClient, Task<T>> action, CancellationToken cancellationToken)
     {
-        await Throttle.WaitAsync(cancellationToken);
-        try
-        {
-            var elapsed = (DateTime.UtcNow - _lastRequestTime).TotalMilliseconds;
-            if (elapsed < MinRequestIntervalMs)
-                await Task.Delay((int)(MinRequestIntervalMs - elapsed), cancellationToken);
+        // AcquireAsync 在令牌不足时按 QueueLimit 排队等待，天然实现串行 + 固定间隔
+        using RateLimitLease lease = await Throttle.AcquireAsync(1, cancellationToken);
+        if (!lease.IsAcquired)
+            throw new InvalidOperationException("CoinGecko 限流租约获取失败");
 
-            using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
-            var result = await action(httpClient);
-            _lastRequestTime = DateTime.UtcNow;
-            return result;
-        }
-        finally
-        {
-            Throttle.Release();
-        }
+        using var httpClient = _httpClientFactory.CreateClient("CoinGecko");
+        return await action(httpClient);
     }
 
-    /// <summary>
-    /// 获取市场数据（支持筛选）
-    /// </summary>
     public async Task<List<CoinGeckoMarket>> GetCoinsMarketsAsync(
         string vsCurrency = "usd",
         string? category = null,
@@ -100,9 +97,6 @@ public sealed class CoinGeckoApiService
         }, cancellationToken);
     }
 
-    /// <summary>
-    /// 获取单币种市场数据（含价格变化百分比）
-    /// </summary>
     public async Task<JsonArray?> GetCoinMarketDataAsync(
         string coinId,
         string vsCurrency = "usd",
@@ -117,9 +111,6 @@ public sealed class CoinGeckoApiService
             cancellationToken);
     }
 
-    /// <summary>
-    /// 获取币种在各交易所的交易对数据
-    /// </summary>
     public async Task<CoinGeckoTickersResponse?> GetCoinTickersAsync(
         string coinId,
         CancellationToken cancellationToken = default)
@@ -130,14 +121,11 @@ public sealed class CoinGeckoApiService
         return await ThrottledExecuteAsync(async httpClient =>
             await httpClient.GetFromJsonAsync<CoinGeckoTickersResponse>(
                 url,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                CoinGeckoJsonOptions,
                 cancellationToken),
             cancellationToken);
     }
 
-    /// <summary>
-    /// 搜索币种
-    /// </summary>
     public async Task<CoinGeckoSearchResponse?> SearchCoinsAsync(
         string query,
         CancellationToken cancellationToken = default)
@@ -149,7 +137,7 @@ public sealed class CoinGeckoApiService
         {
             var response = await httpClient.GetFromJsonAsync<CoinGeckoSearchResponse>(
                 url,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true },
+                CoinGeckoJsonOptions,
                 cancellationToken);
 
             _logger.LogInformation("CoinGecko搜索结果: {Count}个币种", response?.Coins?.Count ?? 0);
@@ -199,9 +187,9 @@ public sealed class CoinGeckoApiService
     /// </summary>
     private async Task<string?> ResolveCoinIdAsync(string baseSymbol, CancellationToken cancellationToken)
     {
-        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）
-        var mappedId = MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.ToCoinGeckoId(baseSymbol);
-        if (!string.IsNullOrEmpty(mappedId) && !string.Equals(mappedId, baseSymbol, StringComparison.OrdinalIgnoreCase))
+        // 优先使用内置映射表（覆盖主流币种，避免一次 HTTP 请求）。
+        // TryGet 区分"未命中"与"映射值恰与输入相同"（如 dai→dai），后者不再白打一次 /coins/list
+        if (MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.TryGetCoinGeckoId(baseSymbol, out var mappedId))
         {
             return mappedId;
         }
@@ -222,7 +210,7 @@ public sealed class CoinGeckoApiService
                 return hit?.Id;
             }, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "调用 /coins/list 解析 coinId 失败: {Symbol}", baseSymbol);
             return null;
@@ -248,6 +236,8 @@ public class CoinGeckoCoinDetail
     public CoinGeckoCoinCommunityData? CommunityData { get; set; }
     [JsonPropertyName("developer_data")]
     public CoinGeckoCoinDeveloperData? DeveloperData { get; set; }
+    [JsonPropertyName("detail_platforms")]
+    public Dictionary<string, JsonElement?>? DetailPlatforms { get; set; }
     [JsonPropertyName("market_cap_rank")]
     public int? MarketCapRank { get; set; }
     [JsonPropertyName("coingecko_rank")]
@@ -347,28 +337,73 @@ public class CoinGeckoMarket
     public string Symbol { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Image { get; set; } = string.Empty;
-    public decimal? Current_Price { get; set; }
-    public decimal? Market_Cap { get; set; }
-    public int? Market_Cap_Rank { get; set; }
-    public decimal? Fully_Diluted_Valuation { get; set; }
-    public decimal? Total_Volume { get; set; }
-    public decimal? High_24h { get; set; }
-    public decimal? Low_24h { get; set; }
-    public decimal? Price_Change_24h { get; set; }
-    public decimal? Price_Change_Percentage_24h { get; set; }
-    public decimal? Market_Cap_Change_24h { get; set; }
-    public decimal? Market_Cap_Change_Percentage_24h { get; set; }
-    public decimal? Circulating_Supply { get; set; }
-    public decimal? Total_Supply { get; set; }
-    public decimal? Max_Supply { get; set; }
-    public decimal? Ath { get; set; }
-    public decimal? Ath_Change_Percentage { get; set; }
-    public DateTime? Ath_Date { get; set; }
-    public decimal? Atl { get; set; }
-    public decimal? Atl_Change_Percentage { get; set; }
-    public DateTime? Atl_Date { get; set; }
-    public DateTime? Last_Updated { get; set; }
 
-    public decimal? Price_Change_Percentage_7d_In_Currency { get; set; }
-    public decimal? Price_Change_Percentage_30d_In_Currency { get; set; }
+    [JsonPropertyName("current_price")]
+    public decimal? CurrentPrice { get; set; }
+
+    [JsonPropertyName("market_cap")]
+    public decimal? MarketCap { get; set; }
+
+    [JsonPropertyName("market_cap_rank")]
+    public int? MarketCapRank { get; set; }
+
+    [JsonPropertyName("fully_diluted_valuation")]
+    public decimal? FullyDilutedValuation { get; set; }
+
+    [JsonPropertyName("total_volume")]
+    public decimal? TotalVolume { get; set; }
+
+    [JsonPropertyName("high_24h")]
+    public decimal? High24h { get; set; }
+
+    [JsonPropertyName("low_24h")]
+    public decimal? Low24h { get; set; }
+
+    [JsonPropertyName("price_change_24h")]
+    public decimal? PriceChange24h { get; set; }
+
+    [JsonPropertyName("price_change_percentage_24h")]
+    public decimal? PriceChangePercentage24h { get; set; }
+
+    [JsonPropertyName("market_cap_change_24h")]
+    public decimal? MarketCapChange24h { get; set; }
+
+    [JsonPropertyName("market_cap_change_percentage_24h")]
+    public decimal? MarketCapChangePercentage24h { get; set; }
+
+    [JsonPropertyName("circulating_supply")]
+    public decimal? CirculatingSupply { get; set; }
+
+    [JsonPropertyName("total_supply")]
+    public decimal? TotalSupply { get; set; }
+
+    [JsonPropertyName("max_supply")]
+    public decimal? MaxSupply { get; set; }
+
+    [JsonPropertyName("ath")]
+    public decimal? Ath { get; set; }
+
+    [JsonPropertyName("ath_change_percentage")]
+    public decimal? AthChangePercentage { get; set; }
+
+    [JsonPropertyName("ath_date")]
+    public DateTime? AthDate { get; set; }
+
+    [JsonPropertyName("atl")]
+    public decimal? Atl { get; set; }
+
+    [JsonPropertyName("atl_change_percentage")]
+    public decimal? AtlChangePercentage { get; set; }
+
+    [JsonPropertyName("atl_date")]
+    public DateTime? AtlDate { get; set; }
+
+    [JsonPropertyName("last_updated")]
+    public DateTime? LastUpdated { get; set; }
+
+    [JsonPropertyName("price_change_percentage_7d_in_currency")]
+    public decimal? PriceChangePercentage7dInCurrency { get; set; }
+
+    [JsonPropertyName("price_change_percentage_30d_in_currency")]
+    public decimal? PriceChangePercentage30dInCurrency { get; set; }
 }

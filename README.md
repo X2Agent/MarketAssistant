@@ -13,9 +13,11 @@
 - `MarketAssistant.Agents`：Agent 契约层，定义分析师基类、工具抽象、分析模型和提示词配置加载。
 - `MarketAssistant.DataProviders`：外部行情与资讯数据接入层。
 - `MarketAssistant.Trading`：交易抽象与共享交易模型。
+- `MarketAssistant.Rag`：RAG 基础能力层（文档解析、向量化、检索、重排）。
+- `MarketAssistant.Infrastructure`：基础设施层（模型发现、Token 化、结构化输出校验）。
 - `MarketAssistant.Core`：基础模型、异常、转换器和市场枚举等通用能力。
 
-当前依赖关系为：`Core <- Trading/DataProviders <- Agents/App.Services <- App`，其中 `Agents` 额外依赖 `Trading` 中的共享交易抽象，`App` 作为 UI 宿主还直接引用部分共享模型与服务。
+当前依赖关系为：`Core` 无依赖；`Rag` 依赖 `Core`/`Infrastructure`；`DataProviders` 依赖 `Core`；`Agents` 依赖 `Core`/`Trading`/`Infrastructure`；`Infrastructure` 依赖 `Core`；`Trading` 依赖 `Core`；`App.Services` 依赖 `Core`/`Agents`/`Trading`/`DataProviders`/`Rag`/`Infrastructure`；`App` 依赖 `Core`/`Agents`/`Trading`/`DataProviders`/`App.Services`/`Rag`。
 
 ## 📊 主要功能
 
@@ -26,13 +28,14 @@
 
 ### AI 多分析师协作分析
 
-通过 Fan-Out/Fan-In 工作流，5 位专业 AI 分析师并行分析后由协调分析师综合判断：
+通过 Fan-Out/Fan-In 工作流，6 位专业 AI 分析师并行分析后由协调分析师综合判断：
 
 - **基本面分析师**：公司/项目基本情况、行业地位、长期价值
 - **技术分析师**：K 线图形态、MACD/KDJ/BOLL 等技术指标、交易策略
 - **财务分析师**：财务报表、偿债能力、盈利质量、现金流
 - **市场情绪分析师**：市场情绪、资金流向、投资者行为
 - **新闻事件分析师**：新闻事件、公告解读、突发事件影响
+- **指标分析师（虚拟币）**：Crypto 专属的市场深度、波动率、衍生指标
 - **协调分析师**：整合上述分析、解决分歧、生成最终投资建议
 
 ### AI 选股功能
@@ -41,12 +44,15 @@
 - **新闻驱动选股**：基于市场新闻事件进行选股
 - **快速策略选股**：预设多种选股策略（价值股、成长股、大盘股、小盘股、红利股）
 
-### 自主交易（虚拟币）
+### 自主交易（虚拟币，实验功能）
+
+> ⚠️ **实验功能。** 仅虚拟币市场可用，由市场能力自动控制：切换到虚拟币市场后导航栏出现「交易」入口（A 股市场不支持交易）。
+> 使用即表示你理解：可能产生真实资金损失、需要配置交易所 API 密钥、下单操作可能无法撤销。请优先使用测试网/Demo 模式验证。
 
 - 策略配置：止损/止盈/追踪止损/AI 信号策略
 - 实时监控：Binance WebSocket 实时价格监控
 - 风控管理：多维度风控（仓位限制、单日亏损限制等）
-- 当前交易执行链以 `IExchangeClient` 统一抽象接入 Binance 现货能力，合约支持仍在规划中
+- 交易执行链以 `IExchangeClient` 统一抽象接入 Binance 现货与 U 本位合约，支持实盘现货/实盘合约/合约测试网/现货 Demo 多模式切换与人工下单确认
 
 ### 文档向量化（RAG）
 
@@ -147,7 +153,7 @@ MarketAssistant支持Model Context Protocol (MCP)服务器配置，可以集成�
 
 ## 🛠️ 技术栈
 
-- **UI 框架**：Avalonia UI 11.3
+- **UI 框架**：Avalonia UI 12.x
 - **运行时**：.NET 10.0
 - **AI 框架**：MAF (Microsoft Agent Framework)
 - **向量存储**：Semantic Kernel SQLiteVec

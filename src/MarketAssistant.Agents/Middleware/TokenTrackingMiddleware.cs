@@ -1,8 +1,10 @@
 using MarketAssistant.Agents.TokenManagement;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace MarketAssistant.Agents.Middleware;
 
@@ -49,7 +51,7 @@ public sealed class TokenTrackingMiddleware
         var inputTokens = usage?.InputTokenCount ?? TokenEstimator.EstimateTotalTokens(messages);
         var outputTokens = usage?.OutputTokenCount ?? TokenEstimator.EstimateTotalTokens(response.Messages);
 
-        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, innerAgent.Name,
+        LogAndAccumulate(session, inputTokens, outputTokens, innerAgent.Name,
             isPrecise: usage != null);
 
         return response;
@@ -65,7 +67,7 @@ public sealed class TokenTrackingMiddleware
         AIAgent innerAgent,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        int outputCharCount = 0;
+        var outputText = new StringBuilder();
         UsageDetails? streamingUsage = null;
         var agentName = innerAgent.Name ?? "Unknown";
 
@@ -81,22 +83,20 @@ public sealed class TokenTrackingMiddleware
             }
 
             if (update.Text is { Length: > 0 } text)
-            {
-                outputCharCount += text.Length;
-            }
+                outputText.Append(text);
 
             yield return update;
         }
 
-        // 优先使用精确值，回退到字符估算
+        // 优先使用精确值；无 Usage 时对真实输出文本估算，避免用空格字符严重低估。
         var inputTokens = streamingUsage?.InputTokenCount ?? TokenEstimator.EstimateTotalTokens(messages);
-        var outputTokens = streamingUsage?.OutputTokenCount ?? TokenEstimator.EstimateTokens(new string(' ', outputCharCount));
+        var outputTokens = streamingUsage?.OutputTokenCount ?? TokenEstimator.EstimateTokens(outputText.ToString());
 
-        LogAndAccumulate(session, (int)inputTokens, (int)outputTokens, agentName,
+        LogAndAccumulate(session, inputTokens, outputTokens, agentName,
             isPrecise: streamingUsage != null);
     }
 
-    private void LogAndAccumulate(AgentSession? session, int inputTokens, int outputTokens, string? agentName,
+    internal void LogAndAccumulate(AgentSession? session, long inputTokens, long outputTokens, string? agentName,
         bool isPrecise = false)
     {
         _logger.LogDebug(
@@ -104,42 +104,56 @@ public sealed class TokenTrackingMiddleware
             agentName ?? "Unknown", inputTokens, outputTokens,
             isPrecise ? "提供商精确值" : "估算值");
 
+        var activity = System.Diagnostics.Activity.Current;
+        if (activity?.Source.Name == MarketAssistantDiagnostics.SourceName)
+        {
+            activity.SetTag("gen_ai.usage.input_tokens", inputTokens);
+            activity.SetTag("gen_ai.usage.output_tokens", outputTokens);
+            activity.SetTag("marketassistant.token_usage.precise", isPrecise);
+        }
+
         if (session == null) return;
 
-        var cumulativeInput = session.StateBag.TryGetValue<string>(InputTokensKey, out var existing)
-            && int.TryParse(existing, out var existingVal)
-            ? existingVal + inputTokens
-            : inputTokens;
-        var cumulativeOutput = session.StateBag.TryGetValue<string>(OutputTokensKey, out var existingOut)
-            && int.TryParse(existingOut, out var existingOutVal)
-            ? existingOutVal + outputTokens
-            : outputTokens;
-
-        session.StateBag.SetValue(InputTokensKey, cumulativeInput.ToString());
-        session.StateBag.SetValue(OutputTokensKey, cumulativeOutput.ToString());
-
-        // 熔断：累计 Token 超过上限时抛出异常，终止 Agent 执行，防止工具调用循环失控
-        var total = cumulativeInput + cumulativeOutput;
-        if (total > MaxCumulativeTokens)
+        lock (session)
         {
-            _logger.LogWarning(
-                "Token 熔断触发 [{Agent}] - 累计 {Total} 超过上限 {Limit}（输入 {In}, 输出 {Out}）",
-                agentName ?? "Unknown", total, MaxCumulativeTokens, cumulativeInput, cumulativeOutput);
-            throw new InvalidOperationException(
-                $"Agent 累计 Token 用量 {total} 超过熔断上限 {MaxCumulativeTokens}，已终止执行以防止工具调用循环失控");
+            var cumulativeInput = session.StateBag.TryGetValue<string>(InputTokensKey, out var existing)
+                && long.TryParse(existing, out var existingVal)
+                ? checked(existingVal + inputTokens)
+                : inputTokens;
+            var cumulativeOutput = session.StateBag.TryGetValue<string>(OutputTokensKey, out var existingOut)
+                && long.TryParse(existingOut, out var existingOutVal)
+                ? checked(existingOutVal + outputTokens)
+                : outputTokens;
+
+            session.StateBag.SetValue(InputTokensKey, cumulativeInput.ToString());
+            session.StateBag.SetValue(OutputTokensKey, cumulativeOutput.ToString());
+
+            // 熔断：累计 Token 超过上限时抛出异常，终止 Agent 执行，防止工具调用循环失控
+            var total = checked(cumulativeInput + cumulativeOutput);
+            if (total > MaxCumulativeTokens)
+            {
+                _logger.LogWarning(
+                    "Token 熔断触发 [{Agent}] - 累计 {Total} 超过上限 {Limit}（输入 {In}, 输出 {Out}）",
+                    agentName ?? "Unknown", total, MaxCumulativeTokens, cumulativeInput, cumulativeOutput);
+                throw new InvalidOperationException(
+                    $"Agent 累计 Token 用量 {total} 超过熔断上限 {MaxCumulativeTokens}，已终止执行以防止工具调用循环失控");
+            }
         }
     }
 
     /// <summary>
     /// 从 Session 的 StateBag 中读取累计 Token 数
     /// </summary>
-    public static (int Input, int Output) GetCumulativeTokens(AgentSession? session)
+    public static (long Input, long Output) GetCumulativeTokens(AgentSession? session)
     {
         if (session == null) return (0, 0);
 
-        var input = session.StateBag.TryGetValue<string>(InputTokensKey, out var i) && int.TryParse(i, out var iv) ? iv : 0;
-        var output = session.StateBag.TryGetValue<string>(OutputTokensKey, out var o) && int.TryParse(o, out var ov) ? ov : 0;
-        return (input, output);
+        lock (session)
+        {
+            var input = session.StateBag.TryGetValue<string>(InputTokensKey, out var i) && long.TryParse(i, out var iv) ? iv : 0;
+            var output = session.StateBag.TryGetValue<string>(OutputTokensKey, out var o) && long.TryParse(o, out var ov) ? ov : 0;
+            return (input, output);
+        }
     }
 
     /// <summary>

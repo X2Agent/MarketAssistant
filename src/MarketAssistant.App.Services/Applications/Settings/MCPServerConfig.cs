@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MarketAssistant.Applications.Settings;
 
 /// <summary>
@@ -38,6 +40,7 @@ public class MCPServerConfig
     /// <summary>
     /// 环境变量，用于stdio类型
     /// </summary>
+    [JsonIgnore]
     public Dictionary<string, string?> EnvironmentVariables { get; set; } = new();
 
     /// <summary>
@@ -52,9 +55,27 @@ public class MCPServerConfig
     public string Category { get; set; } = "general";
 
     /// <summary>
-    /// 允许的工具名称列表（白名单），为空则允许所有工具
+    /// 允许的工具名称列表（白名单）。为空表示不暴露任何工具；
+    /// 只有显式设置 <see cref="AllowAllTools"/> = true 才会加载该服务器全部工具。
     /// </summary>
     public List<string> AllowedTools { get; set; } = [];
+
+    /// <summary>
+    /// 是否允许加载全部工具。默认 false；开启后忽略 <see cref="AllowedTools"/> 白名单。
+    /// 属于高危选项，仅应在明确信任该服务器时启用。
+    /// </summary>
+    public bool AllowAllTools { get; set; } = false;
+
+    /// <summary>
+    /// 工具白名单机制的当前配置版本号。
+    /// </summary>
+    public const int CurrentToolsSchemaVersion = 1;
+
+    /// <summary>
+    /// 配置结构版本。默认 0 表示旧版本保存的配置（JSON 无此字段或未经新版本 UI 确认），
+    /// 由 UI 提示用户重新勾选工具白名单后升级为 <see cref="CurrentToolsSchemaVersion"/> 并落盘。
+    /// </summary>
+    public int ToolsSchemaVersion { get; set; }
 
     /// <summary>
     /// 获取传输选项字典

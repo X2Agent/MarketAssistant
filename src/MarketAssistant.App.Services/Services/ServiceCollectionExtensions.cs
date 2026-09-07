@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
@@ -28,20 +29,27 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Infrastructure.Http;
+using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Rag.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Cache;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
+using MarketAssistant.DataProviders.Web3;
+using MarketAssistant.Rag.Interfaces;
+using MarketAssistant.Rag.Services;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Mcp;
 using MarketAssistant.Services.Settings;
-using MarketAssistant.Trading;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
-using MarketAssistant.Trading.Exchanges;
+using MarketAssistant.Trading.Models;
+using MarketAssistant.Services.Trading.Exchanges;
 using System.Net;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.VectorData;
 using Polly.RateLimiting;
 using Serilog;
 using System.Threading.RateLimiting;
@@ -60,6 +68,8 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddMemoryCache();
         services.AddNamedMarketHttpClients();
+        services.AddAShareDataProviders();
+        services.AddWeb3DataProviders();
         services.AddAgentTools();
         services.AddAgentInfrastructure();
         services.AddRagServices();
@@ -68,6 +78,11 @@ public static class BusinessServiceCollectionExtensions
         services.AddWorkflowServices();
         services.AddMarketModules();
         services.AddSingleton<IReleaseService, GitHubReleaseService>();
+        services.AddSingleton<Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore>(_ => new Agents.MarketAnalysis.Artifacts.FileAnalystArtifactStore(
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                AppInfo.AppName,
+                "analyst-artifacts")));
         return services;
     }
 
@@ -100,6 +115,26 @@ public static class BusinessServiceCollectionExtensions
         services.AddHttpClient("BinanceFutures", client =>
         {
             client.BaseAddress = new Uri("https://fapi.binance.com");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler(options =>
+        {
+            ConfigureBinanceRateLimiter(options);
+        });
+
+        // 合约 Testnet（demo-fapi.binance.com）—— 与现货 Testnet 完全独立，需单独 API Key
+        services.AddHttpClient("BinanceFuturesTestnet", client =>
+        {
+            client.BaseAddress = new Uri("https://demo-fapi.binance.com");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        }).AddStandardResilienceHandler(options =>
+        {
+            ConfigureBinanceRateLimiter(options);
+        });
+
+        // 现货 Demo（demo-api.binance.com）—— 使用实盘账户的虚拟余额，需在 binance.com 申请 Demo API Key
+        services.AddHttpClient("BinanceSpotDemo", client =>
+        {
+            client.BaseAddress = new Uri("https://demo-api.binance.com");
             client.Timeout = TimeSpan.FromSeconds(30);
         }).AddStandardResilienceHandler(options =>
         {
@@ -192,6 +227,22 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
+        // Web3 链上数据：DexScreener（多链 DEX 行情，免费无 Key）与 GoPlus（安全审计/蜜罐检测，免费有限速）
+        services.AddHttpClient("DexScreener", client =>
+        {
+            client.BaseAddress = new Uri("https://api.dexscreener.com/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MarketAssistant/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler();
+
+        services.AddHttpClient("GoPlus", client =>
+        {
+            client.BaseAddress = new Uri("https://api.gopluslabs.io/");
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler();
+
         services.AddHttpClient("GitHub", client =>
         {
             client.BaseAddress = new Uri(AppInfo.GitHubApiBaseUrl);
@@ -205,6 +256,14 @@ public static class BusinessServiceCollectionExtensions
         services.AddHttpClient("GitHubDownload", client =>
         {
             client.Timeout = TimeSpan.FromMinutes(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
+        });
+
+        // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
+        services.AddHttpClient("AnonymousOpenAI", client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(3);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
@@ -255,21 +314,28 @@ public static class BusinessServiceCollectionExtensions
     private static IServiceCollection AddAgentInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
-        services.AddSingleton<IWebTextSearchFactory, WebTextSearchFactory>();
+        services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
+        services.AddSingleton<Infrastructure.Providers.IRagInfrastructureProvider, Infrastructure.Providers.RagInfrastructureProvider>();
+        services.AddSingleton<Infrastructure.Providers.DocumentVectorizationService>();
+        services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
+        services.AddSingleton<IImageCaptionClientFactory, ImageCaptionClientFactory>();
         services.AddSingleton<IAnalystAgentFactory, AnalystAgentFactory>();
         services.AddSingleton<AnalystPromptLoader>();
 
-        // MAF 中间件
+        // MAF 中间件与会话级 Context Provider 工厂
         services.AddSingleton<TokenTrackingMiddleware>();
-        services.AddSingleton<ConversationCompressionMiddleware>(sp =>
-            new ConversationCompressionMiddleware(
-                () => sp.GetRequiredService<IChatClientFactory>().CreateClient(),
-                sp.GetRequiredService<ILogger<ConversationCompressionMiddleware>>()));
+        services.AddSingleton<ConversationCompactionProviderFactory>();
 
         services.AddSingleton(sp =>
             new AgentSkillsProvider(
-                skillPath: Path.Combine(AppContext.BaseDirectory, "skills")));
+                skillPath: Path.Combine(AppContext.BaseDirectory, "skills"),
+                options: new AgentSkillsProviderOptions
+                {
+                    DisableLoadSkillApproval = true,
+                    DisableReadSkillResourceApproval = true,
+                    DisableRunSkillScriptApproval = true
+                }));
 
         services.AddSingleton<MCPServerConfigService>();
         services.AddSingleton<McpToolAuditLogger>();
@@ -291,6 +357,13 @@ public static class BusinessServiceCollectionExtensions
             "vector.sqlite");
         services.AddSqliteVectorStore(_ => $"Data Source={store}");
 
+        // P1-01：文档段落清单（与向量库同目录的旁路 SQLite）
+        var catalogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            AppInfo.AppName,
+            "rag-catalog.sqlite");
+        services.AddSingleton<IRagDocumentCatalog>(_ => new SqliteRagDocumentCatalog(catalogPath));
+
         return services;
     }
 
@@ -304,10 +377,15 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
+        services.AddSingleton<BinanceUserDataStreamService>();
+
+        // 统一告警中心：AlertGate 单实例（AlertCenterService 与 TradeExecutor 共享）
+        services.AddSingleton<AlertGate>();
+        services.AddSingleton<IAlertGate>(sp => sp.GetRequiredService<AlertGate>());
+        services.AddSingleton<IAlertCenterService, AlertCenterService>();
+
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
-        services.AddSingleton<BinanceAuthService>();
-        services.AddSingleton<BinanceAccountService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
 
         return services;
@@ -319,11 +397,30 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddTradingServices(this IServiceCollection services)
     {
+        services.AddSingleton<ITradingCredentialStore, TradingCredentialStore>();
         services.AddSingleton<AnalysisReportCache>();
         services.AddSingleton<TradingDataService>();
+        services.AddSingleton<TradingEnvironmentService>();
+        services.AddSingleton<IMarketMonitorProvider, MarketMonitorProvider>();
+        // 交易所客户端由工厂按交易模式构建，组合根不感知具体交易所实现（P1-5）
+        services.AddSingleton<IExchangeClientFactory, BinanceExchangeClientFactory>();
+        services.AddSingleton<RoutingExchangeClient>(sp =>
+        {
+            var factory = sp.GetRequiredService<IExchangeClientFactory>();
+            var clients = Enum.GetValues<CryptoTradingMode>()
+                .ToDictionary(mode => mode, factory.Create);
+            return new RoutingExchangeClient(
+                sp.GetRequiredService<TradingEnvironmentService>(),
+                clients);
+        });
+        services.AddSingleton<TradingStrategyService>();
         services.AddSingleton<RiskManager>();
         services.AddSingleton<StrategyEngine>();
+        services.AddSingleton<AISignalStrategyExecutor>();
+        services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
+        services.AddSingleton<RiskAlertEvaluator>();
+        services.AddSingleton<SignalAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();
         services.AddSingleton<CryptoPortfolioService>();
         services.AddSingleton<ITradingAgentFactory, TradingAgentFactory>();
@@ -337,15 +434,15 @@ public static class BusinessServiceCollectionExtensions
 
     private static IServiceCollection AddWorkflowServices(this IServiceCollection services)
     {
-        // 投资选择工作流
-        services.AddSingleton<ScreenInvestmentTargetsExecutor>();
-        services.AddSingleton<AnalyzeAssetsExecutor>();
+        // 投资选择工作流；Executor 为 Transient，由工作流在每次 Run 内重新解析，
+        // 避免 Singleton Executor 在并发分析间共享可变状态和模型引用。
+        services.AddTransient<ScreenInvestmentTargetsExecutor>();
+        services.AddTransient<AnalyzeAssetsExecutor>();
+        services.AddSingleton<IInvestmentExecutorFactory, InvestmentExecutorFactory>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 
-        // 市场分析工作流
-        services.AddSingleton<AnalysisAggregatorExecutor>();
-        services.AddSingleton<CoordinatorExecutor>();
+        // 市场分析工作流；Executor 在每次 Run 内创建，避免共享可变状态和模型固化。
         services.AddSingleton<MarketAnalysisWorkflow>();
         services.AddSingleton<AnalysisOrchestrationService>();
 
@@ -375,7 +472,15 @@ public static class BusinessServiceCollectionExtensions
     public static ILoggingBuilder ConfigureLogging(this ILoggingBuilder logging, IUserSettingService userSettingService)
     {
         var logPath = userSettingService.CurrentSetting.LogPath;
-        try { Directory.CreateDirectory(logPath); } catch { }
+        try
+        {
+            Directory.CreateDirectory(logPath);
+        }
+        catch (Exception ex)
+        {
+            // 此时 Serilog 尚未配置，只能走 Console；后续 WriteTo.File 也会因目录缺失失败，提前暴露原因
+            Console.Error.WriteLine($"创建日志目录失败: {logPath}\n{ex}");
+        }
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()

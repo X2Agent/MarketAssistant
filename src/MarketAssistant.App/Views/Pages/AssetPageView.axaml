@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
 			 xmlns:components="using:MarketAssistant.Views.Components"
              xmlns:converts="using:MarketAssistant.Converters"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AssetPageView"
              x:DataType="vm:AssetPageViewModel">
@@ -21,7 +22,7 @@
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
         
         <!-- 资产基本信息卡片 -->
-        <controls:CardView Grid.Row="0" Padding="{StaticResource CardPadding}">
+        <controls:CardView Grid.Row="0">
             <Grid ColumnDefinitions="*,Auto">
                 
                 <!-- 左侧：资产信息（Grid布局优化） -->
@@ -35,20 +36,22 @@
                                    FontWeight="Bold"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
                         
-                        <Border Background="{DynamicResource InfoBrush}" 
+                        <Border Background="{StaticResource InfoBrush}" 
                                 CornerRadius="{StaticResource TinyCornerRadius}" 
                                 Padding="{StaticResource TinyPadding}"
                                 VerticalAlignment="Center">
                             <TextBlock Text="{Binding AssetCode}" 
+                                       FontFamily="{StaticResource DataFontFamily}"
                                        FontSize="{StaticResource TinyFontSize}" 
                                        FontWeight="Bold" 
-                                       Foreground="White" />
+                                       Foreground="{StaticResource TextOnEmphasisBrush}" />
                         </Border>
                     </StackPanel>
                     
                     <!-- 第二行/第三行左侧：价格 -->
                     <TextBlock Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
-                               Text="{Binding CurrentPrice, StringFormat={}{0:F2}}" 
+                               Text="{Binding CurrentPriceText}" 
+                               FontFamily="{StaticResource DataFontFamily}"
                                FontSize="{StaticResource TitleFontSize}"
                                FontWeight="Bold"
                                Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"
@@ -63,7 +66,8 @@
                                 Margin="{StaticResource TinyBottomMargin}">
                          <TextBlock FontSize="{StaticResource LabelFontSize}" 
                                     FontWeight="Bold"
-                                    Text="{Binding PriceChange, StringFormat={}{0:F2}}"
+                                    FontFamily="{StaticResource DataFontFamily}"
+                                    Text="{Binding PriceChangeText}"
                                     Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
                          <TextBlock FontSize="{StaticResource LabelFontSize}" 
                                     FontWeight="Bold"
@@ -88,8 +92,8 @@
                     <Button Classes="action-button"
                             Command="{Binding NavigateToAnalysisCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="🤖"/>
-                            <TextBlock Text="AI分析"/>
+                            <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="AI分析" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     
@@ -97,8 +101,8 @@
                     <Button Classes="action-button"
                             Command="{Binding RefreshDataCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="🔄"/>
-                            <TextBlock Text="刷新"/>
+                            <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="刷新" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -122,7 +126,7 @@
                                 Spacing="{StaticResource DefaultSpacing}"
                                 VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource SuccessBrush}" 
+                            <Border Background="{StaticResource ErrorBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -132,7 +136,7 @@
                                        VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{DynamicResource ErrorBrush}" 
+                            <Border Background="{StaticResource SuccessBrush}" 
                                     Width="{StaticResource IndicatorSize}" 
                                     Height="{StaticResource IndicatorSize}" 
                                     CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -230,17 +234,17 @@
             <StackPanel HorizontalAlignment="Center" 
                         VerticalAlignment="Center" 
                         Spacing="{StaticResource DefaultSpacing}">
-                <TextBlock Text="⚠️" 
-                           FontSize="{StaticResource LargeIconSize}" 
-                           HorizontalAlignment="Center" />
+                <svg:Svg Path="/Assets/Images/icon_danger.svg"
+                         Width="48" Height="48"
+                         HorizontalAlignment="Center"/>
                 <TextBlock Text="数据加载失败" 
                            FontSize="{StaticResource SubTitleFontSize}"
                            FontWeight="Bold"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{StaticResource ErrorBrush}"
                            HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding ErrorMessage}" 
                            FontSize="{StaticResource LabelFontSize}"
-                           Foreground="{DynamicResource ErrorBrush}"
+                           Foreground="{StaticResource ErrorBrush}"
                            HorizontalAlignment="Center" 
                            TextAlignment="Center"
                            MaxWidth="{StaticResource MaxDialogWidth}"

@@ -71,19 +71,25 @@ public sealed class McpToolContextProvider : AIContextProvider
 
             if (_invalidated)
             {
-                // 释放旧连接后重新加载
-                await _mcpService.ResetConnectionsAsync();
+                // 仅使活动连接映射失效。旧 Agent 工具仍持有底层 Client，不能在刷新时立即释放。
+                await _mcpService.ResetConnectionsAsync(cancellationToken);
                 _invalidated = false;
             }
 
             var enabledConfigs = _mcpService.GetEnabledConfigs();
-            if (enabledConfigs.Count == 0)
+
+            // 对话会话只注入 general/search 分类的服务器，code 等其他分类不默认进入市场分析 Chat
+            var chatConfigs = enabledConfigs
+                .Where(c => string.Equals(c.Category, "general", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(c.Category, "search", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (chatConfigs.Count == 0)
             {
                 _cachedTools = [];
                 return _cachedTools;
             }
 
-            _cachedTools = await _mcpService.GetAIToolsAsync(enabledConfigs);
+            _cachedTools = await _mcpService.GetAIToolsAsync(chatConfigs);
             _logger.LogInformation("McpToolContextProvider 加载了 {Count} 个 MCP 工具", _cachedTools.Count);
 
             return _cachedTools;

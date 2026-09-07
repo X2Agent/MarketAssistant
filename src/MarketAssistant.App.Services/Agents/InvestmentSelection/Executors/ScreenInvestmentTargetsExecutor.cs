@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
 /// <summary>
-/// 步骤2: 执行投资标的筛选的 Executor（共用，支持多市场）
+/// 步骤2: 执行投资标的筛选（共用，支持多市场）
 /// 通过 IAssetScreenerService 接口抽象，根据市场类型动态选择筛选服务
 /// </summary>
 public sealed partial class ScreenInvestmentTargetsExecutor : Executor
@@ -18,7 +18,8 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
 
     public ScreenInvestmentTargetsExecutor(
         IServiceProvider serviceProvider,
-        ILogger<ScreenInvestmentTargetsExecutor> logger) : base("ScreenInvestmentTargets")
+        ILogger<ScreenInvestmentTargetsExecutor> logger)
+        : base("ScreenInvestmentTargets")
     {
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -51,18 +52,22 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
             _logger.LogInformation("[步骤2/3] 使用市场类型: {MarketType}, 筛选服务: {ServiceType}",
                 originalRequest.MarketType, screenerService.GetType().Name);
 
-            // 调用筛选服务
-            List<ScreenerAssetInfo> assets = await screenerService.ScreenAsync(input.Criteria);
+            // 透传取消令牌，用户中断时立即终止上游 HTTP 请求
+            List<ScreenerAssetInfo> assets = await screenerService.ScreenAsync(input.Criteria, cancellationToken);
 
             _logger.LogInformation("[步骤2/3] 筛选完成，获得 {Count} 个投资标的", assets.Count);
 
-            // 返回筛选结果
             return new AssetScreeningResult
             {
                 ScreenedAssets = assets,
                 Criteria = input.Criteria,
                 OriginalRequest = originalRequest
             };
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得包装成业务错误
+            throw;
         }
         catch (FriendlyException)
         {
@@ -76,4 +81,3 @@ public sealed partial class ScreenInvestmentTargetsExecutor : Executor
         }
     }
 }
-

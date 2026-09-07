@@ -5,7 +5,8 @@ using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,6 +20,7 @@ namespace TestMarketAssistant.Tools;
 /// - 虚拟币 GetNewsAsync：调用 CoinTelegraph RSS（https://cointelegraph.com/rss），免费、无需密钥
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class NewsDataToolsTest
 {
     private ServiceProvider? _serviceProvider;
@@ -29,6 +31,7 @@ public class NewsDataToolsTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
         services.AddSingleton<IUserSettingService, UserSettingService>();
@@ -65,7 +68,7 @@ public class NewsDataToolsTest
     public async Task GetNewsAsync_AShare_ShouldReturnValidData()
     {
         // Arrange - 贵州茅台 SH600519，东方财富搜索 API（公开免费）
-        var service = _serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.AShare);
+        var service = (AShareNewsTools)_serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.AShare);
 
         // Act - 真实调用东方财富搜索 API
         var newsData = await service.GetNewsAsync("SH600519");
@@ -94,7 +97,7 @@ public class NewsDataToolsTest
     public async Task GetNewsAsync_Crypto_ShouldReturnValidData()
     {
         // Arrange - BTC，CoinTelegraph RSS 免费源
-        var service = _serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.Crypto);
+        var service = (CryptoNewsTools)_serviceProvider!.GetRequiredKeyedService<INewsDataTools>(MarketType.Crypto);
 
         // Act - 真实调用 CoinTelegraph RSS
         var newsData = await service.GetNewsAsync("btc");

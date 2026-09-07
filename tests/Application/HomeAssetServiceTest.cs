@@ -3,8 +3,9 @@ using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
@@ -27,6 +28,7 @@ public class HomeAssetServiceTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
         services.AddHttpClient();
@@ -59,8 +61,8 @@ public class HomeAssetServiceTest
     [TestCleanup]
     public async Task Cleanup()
     {
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
-        await _serviceProvider?.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare).ClearHistoryAsync();
+        await _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto).ClearHistoryAsync();
 
         if (_serviceProvider != null)
         {

@@ -27,7 +27,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestBasicChatAsync()
     {
         var responseBuilder = new System.Text.StringBuilder();
@@ -42,7 +42,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestStockContextChatAsync()
     {
         _chatSession.SetCurrentStock("sz002594");
@@ -61,7 +61,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestConversationHistoryAsync()
     {
         await foreach (var _ in _chatSession.SendMessageStreamAsync("什么是市盈率？")) { }
@@ -84,7 +84,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestClearHistoryAsync()
     {
         await foreach (var _ in _chatSession.SendMessageStreamAsync("测试消息")) { }
@@ -99,8 +99,8 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
-    public async Task TestContextWindowManagementAsync()
+    [TestCategory("Integration")]
+    public async Task TestMultiTurnHistoryAccumulationAsync()
     {
         _chatSession.SetCurrentStock("sz002594");
 
@@ -110,12 +110,12 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count > 0);
+        Assert.IsTrue(history.Count > 0, "多轮对话后历史不应为空");
         Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestTopicGuidanceAsync()
     {
         _chatSession.SetCurrentStock("sz002594");
@@ -134,7 +134,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestStreamingResponseAsync()
     {
         _chatSession.SetCurrentStock("sz000001");
@@ -152,8 +152,8 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
-    public async Task TestCancellationAsync()
+    [TestCategory("Integration")]
+    public async Task TestStopCurrentRequest_OnIdleSession_IsSafeAsync()
     {
         Assert.IsFalse(_chatSession.IsProcessing, "新会话初始不应处于处理中状态");
 
@@ -170,7 +170,7 @@ public class MarketChatSessionTest : BaseAgentTest
     }
 
     [TestMethod]
-    [TestCategory("Agent")]
+    [TestCategory("Integration")]
     public async Task TestIntelligentAnalysisAsync()
     {
         _chatSession.SetCurrentStock("sz002594");

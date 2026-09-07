@@ -2,25 +2,16 @@ using Microsoft.Extensions.AI;
 
 namespace MarketAssistant.Agents.MarketAnalysis.Models;
 
-/// <summary>
-/// 最终的市场分析报告
-/// </summary>
 public sealed class MarketAnalysisReport
 {
     private readonly string _assetSymbol = string.Empty;
 
-    /// <summary>
-    /// 分析标的代码
-    /// </summary>
     public string AssetSymbol
     {
         get => _assetSymbol;
         init => _assetSymbol = value;
     }
 
-    /// <summary>
-    /// 各专业分析师的消息
-    /// </summary>
     public List<ChatMessage> AnalystMessages { get; init; } = new();
 
     /// <summary>
@@ -30,9 +21,6 @@ public sealed class MarketAnalysisReport
     /// </summary>
     public CoordinatorResult CoordinatorResult { get; init; } = new();
 
-    /// <summary>
-    /// 报告创建时间
-    /// </summary>
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 }
 

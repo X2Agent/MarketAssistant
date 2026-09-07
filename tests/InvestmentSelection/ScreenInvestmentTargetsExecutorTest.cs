@@ -34,13 +34,6 @@ public class ScreenInvestmentTargetsExecutorTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void Constructor_WithValidParameters_ShouldCreateInstance()
-    {
-        Assert.IsNotNull(_executor);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public void Constructor_WithNullServiceProvider_ShouldThrowException()
     {
         Assert.ThrowsExactly<ArgumentNullException>(() =>
@@ -53,14 +46,5 @@ public class ScreenInvestmentTargetsExecutorTest
     {
         Assert.ThrowsExactly<ArgumentNullException>(() =>
             new ScreenInvestmentTargetsExecutor(_mockServiceProvider.Object, null!));
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public void MockScreenerService_ShouldBeResolvableFromServiceProvider()
-    {
-        var resolved = _mockServiceProvider.Object.GetService(typeof(IAssetScreenerService));
-        Assert.IsNotNull(resolved, "IAssetScreenerService 应可从 ServiceProvider 解析");
-        Assert.AreSame(_mockScreenerService.Object, resolved);
     }
 }

@@ -2,39 +2,70 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="200"
+             xmlns:vm="clr-namespace:MarketAssistant.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="360"
              x:Class="MarketAssistant.Views.Components.ProgressDisplayView"
              x:Name="Root">
 
     <UserControl.Styles>
-        <!-- 脉动动画样式 -->
-        <Style Selector="Ellipse.Pulse">
+        <!-- 运行中分析师的呼吸点 -->
+        <Style Selector="Ellipse.PulseDot">
             <Style.Animations>
-                <Animation Duration="0:0:1.5" IterationCount="Infinite">
+                <Animation Duration="0:0:1.2" IterationCount="Infinite">
                     <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="0.3"/>
+                        <Setter Property="Opacity" Value="0.35"/>
                     </KeyFrame>
                     <KeyFrame Cue="50%">
-                        <Setter Property="Opacity" Value="0.8"/>
+                        <Setter Property="Opacity" Value="1"/>
                     </KeyFrame>
                     <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="0.3"/>
+                        <Setter Property="Opacity" Value="0.35"/>
                     </KeyFrame>
                 </Animation>
             </Style.Animations>
         </Style>
-        <!-- 旋转动画样式 -->
-        <Style Selector="Path.Spin">
-            <Style.Animations>
-                <Animation Duration="0:0:1" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="RotateTransform.Angle" Value="0"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="RotateTransform.Angle" Value="360"/>
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
+        <!-- 步骤条：未激活 -->
+        <Style Selector="Border.phaseStep">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,3"/>
+        </Style>
+        <Style Selector="Border.phaseStep TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <!-- 步骤条：当前阶段高亮 -->
+        <Style Selector="Border.phaseStep.active">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="Border.phaseStep.active TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <!-- 步骤条：已完成 -->
+        <Style Selector="Border.phaseStep.done">
+            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+        </Style>
+        <Style Selector="Border.phaseStep.done TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+        <!-- 步骤间连接线 -->
+        <Style Selector="Border.phaseLink">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="2"/>
+            <Setter Property="Margin" Value="4,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Background" Value="{DynamicResource BorderBrush}"/>
+        </Style>
+        <Style Selector="Border.phaseLink.done">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+        <!-- 分析师状态行 -->
+        <Style Selector="Border.analystRow">
+            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Margin" Value="0,2"/>
         </Style>
     </UserControl.Styles>
     
@@ -47,79 +78,132 @@
             VerticalAlignment="Center"
             Width="{StaticResource ProgressDialogWidth}">
         
-        <StackPanel Spacing="{StaticResource DefaultIconSize}">
-            
-            <!-- 标题 -->
-            <TextBlock Text="🤖 AI 分析中..."
-                       FontSize="{StaticResource LargeFontSize}"
-                       FontWeight="Bold"
-                       HorizontalAlignment="Center"
-                       Foreground="{DynamicResource PrimaryBrush}"/>
+        <StackPanel Spacing="14">
 
-            <!-- 进度指示器区域 -->
-            <StackPanel Spacing="{StaticResource LargeSpacing}" HorizontalAlignment="Center">
-                
-                <!-- 圆形脉动指示器 -->
-                <Grid Width="{StaticResource ProgressCircleSize}" 
-                      Height="{StaticResource ProgressCircleSize}"
-                      HorizontalAlignment="Center">
-                    
-                    <!-- 外圆 - 脉动效果 -->
-                    <Ellipse Width="{StaticResource ProgressCircleSize}" 
-                             Height="{StaticResource ProgressCircleSize}"
-                             Fill="{DynamicResource PrimaryBrush}"
-                             Opacity="0.1"
-                             Classes="Pulse"/>
-                    
-                    <!-- 旋转的 Loading 图标 -->
-                    <Path Classes="Spin"
-                          Width="32" Height="32"
-                          Data="M16,4 A12,12 0 1,1 4,16"
-                          Stroke="{DynamicResource PrimaryBrush}"
-                          StrokeThickness="4"
-                          StrokeLineCap="Round"
-                          RenderTransformOrigin="50%,50%"/>
-                </Grid>
+            <!-- 标题 -->
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        Spacing="{StaticResource SmallSpacing}">
+                <TextBlock Text="AI 分析中..."
+                           FontSize="{StaticResource LargeFontSize}"
+                           FontWeight="Bold"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource PrimaryBrush}"/>
             </StackPanel>
 
-            <!-- 进度条 -->
-            <StackPanel Spacing="{StaticResource TinySpacing}">
-                <ProgressBar Value="{Binding #Root.ProgressPercent}" 
-                             Maximum="100" 
-                             Height="8" 
-                             CornerRadius="4"
-                             Foreground="{DynamicResource PrimaryBrush}"
-                             Background="{DynamicResource SurfaceVariantBrush}"
-                             Width="{StaticResource ProgressBarWidth}"/>
-                <TextBlock Text="{Binding #Root.ProgressPercent, StringFormat='{}{0}%'}"
-                           FontSize="{StaticResource SmallFontSize}"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <!-- 流程步骤条：准备 → 分析 → 聚合 → 报告 → 完成 -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Border x:Name="PhaseStep0" Classes="phaseStep"><TextBlock Text="准备"/></Border>
+                <Border x:Name="PhaseLink0" Classes="phaseLink"/>
+                <Border x:Name="PhaseStep1" Classes="phaseStep"><TextBlock Text="分析"/></Border>
+                <Border x:Name="PhaseLink1" Classes="phaseLink"/>
+                <Border x:Name="PhaseStep2" Classes="phaseStep"><TextBlock Text="聚合"/></Border>
+                <Border x:Name="PhaseLink2" Classes="phaseLink"/>
+                <Border x:Name="PhaseStep3" Classes="phaseStep"><TextBlock Text="报告"/></Border>
+                <Border x:Name="PhaseLink3" Classes="phaseLink"/>
+                <Border x:Name="PhaseStep4" Classes="phaseStep"><TextBlock Text="完成"/></Border>
+            </StackPanel>
+
+            <!-- 大号百分比 + 进度条 -->
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding #Root.ProgressPercent}"
+                               FontSize="36"
+                               FontWeight="Bold"
+                               FontFamily="Consolas, 'Cascadia Mono', monospace"
+                               Foreground="{StaticResource PrimaryBrush}"/>
+                    <TextBlock Text="%"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Margin="2,0,0,5"
+                               VerticalAlignment="Bottom"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <ProgressBar Value="{Binding #Root.ProgressPercent}"
+                             Maximum="100"
+                             Height="{StaticResource ProgressBarHeight}"
+                             CornerRadius="{StaticResource TinyCornerRadius}"
+                             Foreground="{StaticResource PrimaryBrush}"
+                             Background="{DynamicResource SurfaceVariantBrush}"/>
             </StackPanel>
 
             <!-- 阶段说明 -->
-            <StackPanel Spacing="{StaticResource SmallSpacing}">
-                <TextBlock Text="{Binding #Root.AnalysisStage}"
-                           FontSize="{StaticResource LabelFontSize}"
-                           FontWeight="Medium"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextPrimaryBrush}"/>
-            </StackPanel>
+            <TextBlock Text="{Binding #Root.AnalysisStage}"
+                       FontSize="{StaticResource LabelFontSize}"
+                       FontWeight="Medium"
+                       HorizontalAlignment="Center"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+            <!-- 逐分析师状态行 -->
+            <ItemsControl ItemsSource="{Binding #Root.AnalystRunItems}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AnalystRunItemViewModel">
+                        <Border Classes="analystRow">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                <Grid Grid.Column="0" Width="12" Height="12" VerticalAlignment="Center">
+                                    <!-- 运行中：呼吸点 -->
+                                    <Ellipse Width="9" Height="9"
+                                             Fill="{StaticResource PrimaryBrush}"
+                                             Classes="PulseDot"
+                                             IsVisible="{Binding IsRunning}"/>
+                                    <!-- 等待：静默灰点 -->
+                                    <Ellipse Width="9" Height="9"
+                                             Fill="{DynamicResource TextSecondaryBrush}"
+                                             Opacity="0.4"
+                                             IsVisible="{Binding IsPending}"/>
+                                    <!-- 完成：绿点 -->
+                                    <Ellipse Width="9" Height="9"
+                                             Fill="{DynamicResource SuccessBrush}"
+                                             IsVisible="{Binding IsCompleted}"/>
+                                    <!-- 失败：红点 -->
+                                    <Ellipse Width="9" Height="9"
+                                             Fill="{DynamicResource ErrorBrush}"
+                                             IsVisible="{Binding IsFailed}"/>
+                                </Grid>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DisplayName}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding ElapsedText}"
+                                           VerticalAlignment="Center"
+                                           FontSize="{StaticResource MiniFontSize}"
+                                           FontFamily="Consolas, 'Cascadia Mono', monospace"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Grid.Column="3"
+                                           Text="{Binding StatusMark}"
+                                           Width="16"
+                                           TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           FontWeight="Bold"
+                                           IsVisible="{Binding IsCompleted}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
 
             <!-- 失败分析师提示 -->
-            <Border Background="{DynamicResource DangerLightBrush}"
+            <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
                     CornerRadius="{StaticResource SmallCornerRadius}"
                     Padding="{StaticResource CompactCardPadding}"
                     IsVisible="{Binding #Root.FailedAnalystsInfo, 
                         Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Text="{Binding #Root.FailedAnalystsInfo}"
                            FontSize="{StaticResource SmallFontSize}"
-                           Foreground="{DynamicResource DangerTextBrush}"
+                           Foreground="{DynamicResource DangerPanelTextBrush}"
                            HorizontalAlignment="Center"
                            TextWrapping="Wrap"/>
             </Border>
 
-            <!-- 取消按钮 + 提示信息 -->
+            <!-- 取消按钮 -->
             <StackPanel Spacing="{StaticResource SmallSpacing}">
                 <Button Content="取消分析"
                         Command="{Binding #Root.CancelCommand}"
@@ -128,24 +212,6 @@
                         Foreground="{DynamicResource TextSecondaryBrush}"
                         FontSize="{StaticResource SmallFontSize}"
                         Padding="{StaticResource CompactCardPadding}"/>
-
-                <Border Background="{DynamicResource PageBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
-                        CornerRadius="{StaticResource CardCornerRadius}"
-                        Padding="{StaticResource DefaultCardPadding}">
-                    <StackPanel Orientation="Horizontal" 
-                                HorizontalAlignment="Center"
-                                Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="💡"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="分析过程可能需要 1-3 分钟，请耐心等待"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
             </StackPanel>
         </StackPanel>
     </Border>

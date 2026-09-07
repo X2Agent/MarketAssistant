@@ -6,9 +6,9 @@
              x:Class="MarketAssistant.Views.Components.AdaptiveCardView">
     <Border Background="{DynamicResource CardBackgroundBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="1"
-            CornerRadius="8"
-            Padding="12">
-        <StackPanel x:Name="CardContainer" Spacing="8" />
+            BorderThickness="{StaticResource DefaultBorderThickness}"
+            CornerRadius="{StaticResource CardCornerRadius}"
+            Padding="{StaticResource DefaultPadding}">
+        <StackPanel x:Name="CardContainer" Spacing="{StaticResource SmallSpacing}" />
     </Border>
 </UserControl>

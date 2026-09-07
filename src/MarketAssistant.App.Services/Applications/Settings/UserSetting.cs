@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Applications.Settings;
 
@@ -9,17 +10,33 @@ namespace MarketAssistant.Applications.Settings;
 /// </summary>
 public class UserSetting : INotifyPropertyChanged
 {
-    public string ModelId { get; set; } = "";
+    /// <summary>
+    /// 模型服务商 ID（对应 ModelProviderCatalog 中的 Id）
+    /// </summary>
+    public string ProviderId { get; set; } = "";
+
+    /// <summary>
+    /// 按服务商保存模型 ID，切换服务商时恢复各自选择。
+    /// </summary>
+    public Dictionary<string, string> ProviderModelIds { get; set; } = new();
 
     public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
     public string EmbeddingEndpoint { get; set; } = "https://api.jina.ai";
 
+    [JsonIgnore]
     public string EmbeddingApiKey { get; set; } = "";
 
-    public string Endpoint { get; set; } = "https://api.siliconflow.cn";
+    /// <summary>
+    /// 按服务商保存自定义 Endpoint，空值表示使用目录默认地址。
+    /// </summary>
+    public Dictionary<string, string> ProviderEndpoints { get; set; } = new();
 
-    public string ApiKey { get; set; } = "";
+    /// <summary>
+    /// 按服务商 ID 存储各自的 API Key
+    /// </summary>
+    [JsonIgnore]
+    public Dictionary<string, string> ProviderApiKeys { get; set; } = new();
 
     private bool _loadKnowledge;
     public bool LoadKnowledge
@@ -38,8 +55,44 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _knowledgeFileDirectory, value);
     }
 
-    public bool Notification { get; set; }
+    /// <summary>
+    /// 是否显示桌面通知。默认开启，避免新安装用户创建告警后无感知。
+    /// </summary>
+    public bool Notification { get; set; } = true;
 
+    /// <summary>每小时告警弹窗配额上限（Critical 不受限）。</summary>
+    private int _alertHourlyQuota = 20;
+    public int AlertHourlyQuota
+    {
+        get => _alertHourlyQuota;
+        set => SetProperty(ref _alertHourlyQuota, Math.Clamp(value, 1, 200));
+    }
+
+    /// <summary>是否启用告警免打扰时段（Critical 不受免打扰限制）。</summary>
+    private bool _alertQuietHoursEnabled;
+    public bool AlertQuietHoursEnabled
+    {
+        get => _alertQuietHoursEnabled;
+        set => SetProperty(ref _alertQuietHoursEnabled, value);
+    }
+
+    /// <summary>免打扰起始小时（本地时间 0-23）。</summary>
+    private int _alertQuietStartHour = 23;
+    public int AlertQuietStartHour
+    {
+        get => _alertQuietStartHour;
+        set => SetProperty(ref _alertQuietStartHour, Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>免打扰结束小时（本地时间 0-23，支持跨零点区间）。</summary>
+    private int _alertQuietEndHour = 7;
+    public int AlertQuietEndHour
+    {
+        get => _alertQuietEndHour;
+        set => SetProperty(ref _alertQuietEndHour, Math.Clamp(value, 0, 23));
+    }
+
+    [JsonIgnore]
     public string ZhiTuApiToken { get; set; } = "";
 
     /// <summary>
@@ -63,20 +116,43 @@ public class UserSetting : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 虚拟币交易模式
+    /// </summary>
+    private CryptoTradingMode _cryptoTradingMode = CryptoTradingMode.LiveSpot;
+    public CryptoTradingMode CryptoTradingMode
+    {
+        get => _cryptoTradingMode;
+        set => SetProperty(ref _cryptoTradingMode, value);
+    }
+
+    /// <summary>
     /// CoinGecko API 密钥（Demo 版免费，需在 https://www.coingecko.com/api/dashboard 注册获取）
     /// /coins/markets 等端点现要求携带 Demo Key，留空可能导致虚拟币筛选失败
     /// </summary>
+    [JsonIgnore]
     public string CoinGeckoApiKey { get; set; } = "";
 
     /// <summary>
     /// Binance API Key（交易功能必须）
     /// </summary>
+    [JsonIgnore]
     public string BinanceApiKey { get; set; } = "";
 
     /// <summary>
     /// Binance Secret Key（交易功能必须）
     /// </summary>
+    [JsonIgnore]
     public string BinanceSecretKey { get; set; } = "";
+
+    /// <summary>
+    /// Binance Futures Testnet API Key（在 demo-fapi.binance.com 生成）
+    /// </summary>
+    public string BinanceFuturesTestnetApiKey { get; set; } = "";
+
+    /// <summary>
+    /// Binance Futures Testnet Secret Key
+    /// </summary>
+    public string BinanceFuturesTestnetSecretKey { get; set; } = "";
 
     /// <summary>
     /// 日志文件路径
@@ -101,6 +177,7 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// Web Search API Key
     /// </summary>
+    [JsonIgnore]
     public string WebSearchApiKey { get; set; } = "";
 
     /// <summary>
@@ -123,6 +200,49 @@ public class UserSetting : INotifyPropertyChanged
     {
         get => _investmentPreference;
         set => SetProperty(ref _investmentPreference, value);
+    }
+
+    /// <summary>
+    /// 深拷贝一份独立副本。
+    /// 设置页编辑必须基于副本（草稿模式）：直接编辑单例本体会让未保存的修改
+    /// （如交易模式改为实盘、半填的密钥）随任何一次切市场的整体落盘而静默生效。
+    /// 不能用 JSON 往返实现——密钥字段带 [JsonIgnore]，序列化会丢失。
+    /// </summary>
+    public UserSetting Clone()
+    {
+        var clone = new UserSetting
+        {
+            ProviderId = ProviderId,
+            EmbeddingModelId = EmbeddingModelId,
+            EmbeddingEndpoint = EmbeddingEndpoint,
+            EmbeddingApiKey = EmbeddingApiKey,
+            ProviderApiKeys = new Dictionary<string, string>(ProviderApiKeys, StringComparer.Ordinal),
+            ProviderModelIds = new Dictionary<string, string>(ProviderModelIds, StringComparer.Ordinal),
+            ProviderEndpoints = new Dictionary<string, string>(ProviderEndpoints, StringComparer.Ordinal),
+            LoadKnowledge = LoadKnowledge,
+            KnowledgeFileDirectory = KnowledgeFileDirectory,
+            Notification = Notification,
+            AlertHourlyQuota = AlertHourlyQuota,
+            AlertQuietHoursEnabled = AlertQuietHoursEnabled,
+            AlertQuietStartHour = AlertQuietStartHour,
+            AlertQuietEndHour = AlertQuietEndHour,
+            ZhiTuApiToken = ZhiTuApiToken,
+            ThemeMode = ThemeMode,
+            CurrentMarketType = CurrentMarketType,
+            CryptoTradingMode = CryptoTradingMode,
+            CoinGeckoApiKey = CoinGeckoApiKey,
+            BinanceApiKey = BinanceApiKey,
+            BinanceSecretKey = BinanceSecretKey,
+            BinanceFuturesTestnetApiKey = BinanceFuturesTestnetApiKey,
+            BinanceFuturesTestnetSecretKey = BinanceFuturesTestnetSecretKey,
+            LogPath = LogPath,
+            EnableWebSearch = EnableWebSearch,
+            WebSearchApiKey = WebSearchApiKey,
+            WebSearchProvider = WebSearchProvider,
+            EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
+            InvestmentPreference = InvestmentPreference.Clone()
+        };
+        return clone;
     }
 
     #region INotifyPropertyChanged Implementation

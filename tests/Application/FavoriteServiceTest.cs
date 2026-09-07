@@ -1,7 +1,8 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,13 +22,16 @@ public class FavoriteServiceTest
     public void Setup()
     {
         var services = new ServiceCollection();
+        services.AddAShareDataProviders();
 
         // 注册依赖服务
-        services.AddHttpClient();
         services.AddMemoryCache();
         services.AddLogging();
         services.AddSingleton<IUserSettingService, UserSettingService>();
+        services.AddTestMarketDataHttpClients();
         services.AddSingleton<MarketContext>();
+        services.AddSingleton<CoinGeckoApiService>();
+        services.AddSingleton<ICryptoAliasRegistry, CryptoAliasRegistry>();
         services.AddSingleton<BinanceMarketDataService>();
 
         // 注册 AssetInfoService（FavoriteService 的依赖）
@@ -46,12 +50,12 @@ public class FavoriteServiceTest
     {
         // 清理收藏
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         await aShareService.ClearFavoritesAsync();
         await cryptoService.ClearFavoritesAsync();
 
-        await _serviceProvider.DisposeAsync();
+        await _serviceProvider!.DisposeAsync();
     }
 
     [TestMethod]
@@ -137,25 +141,11 @@ public class FavoriteServiceTest
 
     [TestMethod]
     [TestCategory("Integration")]
-    public async Task AddFavorite_Crypto_ShouldStoreAsset()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
-
-        // Act
-        await service.AddFavoriteAsync("BTCUSDT", "");
-
-        // Assert
-        Assert.IsTrue(await service.IsFavoriteAsync("BTCUSDT", ""));
-    }
-
-    [TestMethod]
-    [TestCategory("Integration")]
     public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.Crypto);
 
         // Act
         await aShareService.AddFavoriteAsync("SH600519", "");

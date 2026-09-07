@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace MarketAssistant.Services.Data;
+namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安溢价指数 API 响应模型
@@ -11,10 +11,10 @@ public class BinancePremiumIndexResponse
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("markPrice")]
-    public string MarkPrice { get; set; } = string.Empty;
+    public decimal MarkPrice { get; set; }
 
     [JsonPropertyName("lastFundingRate")]
-    public string LastFundingRate { get; set; } = string.Empty;
+    public decimal LastFundingRate { get; set; }
 
     [JsonPropertyName("nextFundingTime")]
     public long NextFundingTime { get; set; }

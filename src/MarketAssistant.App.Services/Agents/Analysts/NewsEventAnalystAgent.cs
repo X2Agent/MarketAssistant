@@ -1,12 +1,14 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.PromptConfiguration;
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 
-namespace MarketAssistant.Agents.Analysts;
+namespace MarketAssistant.Services.Agents.Analysts;
 
 /// <summary>
 /// 新闻事件分析师代理
@@ -17,27 +19,19 @@ namespace MarketAssistant.Agents.Analysts;
 [RequiresTools(typeof(INewsDataTools))]
 public class NewsEventAnalystAgent : AnalystAgentBase
 {
-    private static readonly object Schema = AIJsonUtilities.CreateJsonSchema(typeof(NewsEventAnalysisResult));
-
-    private static readonly ChatResponseFormat ResponseFormat = ChatResponseFormat.ForJsonSchema(
-        schema: (JsonElement)Schema,
-        schemaName: nameof(NewsEventAnalysisResult),
-        schemaDescription: "新闻事件分析师的结构化分析结果，包含事件解读、影响评估和投资启示"
-    );
-
     public NewsEventAnalystAgent(
         IChatClient chatClient,
         IList<AITool> tools,
-        AnalystPromptLoader promptLoader,
-        AIContextProvider[]? aiContextProviders = null,
-        AgentSkillsProvider? skillsProvider = null)
+        AnalystPromptConfig config,
+        StructuredOutputMode structuredOutputMode,
+        AIContextProvider[]? aiContextProviders = null)
         : base(
             chatClient,
-            promptLoader.GetConfig("NewsEventAnalyst"),
-            ResponseFormat,
+            config,
+            typeof(NewsEventAnalysisResult),
+            structuredOutputMode,
             tools,
-            aiContextProviders,
-            skillsProvider)
+            aiContextProviders)
     {
     }
 }

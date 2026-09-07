@@ -85,9 +85,6 @@ public partial class AnalysisReportViewModel : ViewModelBase
     private string _qualityLevelText = string.Empty;
 
     [ObservableProperty]
-    private string _qualityLevelColor = string.Empty;
-
-    [ObservableProperty]
     private bool _hasQualityMetrics;
 
     public ObservableCollection<string> MissingDataDimensions { get; } = new();
@@ -175,12 +172,6 @@ public partial class AnalysisReportViewModel : ViewModelBase
                 Agents.MarketAnalysis.Models.AnalysisQualityLevel.Low => "低",
                 _ => "未知"
             };
-            QualityLevelColor = qm.OverallQualityLevel switch
-            {
-                Agents.MarketAnalysis.Models.AnalysisQualityLevel.High => "Success",
-                Agents.MarketAnalysis.Models.AnalysisQualityLevel.Medium => "Warning",
-                _ => "Danger"
-            };
             MissingDataDimensions.Clear();
             foreach (var dim in qm.MissingDataDimensions)
                 MissingDataDimensions.Add(dim);
@@ -231,7 +222,6 @@ public partial class AnalysisReportViewModel : ViewModelBase
         AnalystConsensusPercent = 0;
         LimitationsNote = string.Empty;
         QualityLevelText = string.Empty;
-        QualityLevelColor = string.Empty;
         HasQualityMetrics = false;
     }
 }

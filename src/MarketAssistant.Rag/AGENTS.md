@@ -13,7 +13,7 @@ MarketAssistant.Rag/
 ├── Infrastructure/
 │   └── Factories/
 │       ├── IEmbeddingFactory.cs         ← 文本嵌入生成器工厂契约
-│       └── IWebTextSearchFactory.cs     ← Web 搜索工厂契约
+│       └── IWebSearchService.cs         ← Web 搜索执行契约
 ├── Interfaces/
 │   ├── IRagIngestionService.cs          ← 文档摄取接口
 │   ├── IRetrievalOrchestrator.cs        ← 检索编排接口

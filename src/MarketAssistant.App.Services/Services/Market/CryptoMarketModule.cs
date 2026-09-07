@@ -13,7 +13,7 @@ using MarketAssistant.Applications.Home;
 using MarketAssistant.Applications.News;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Trading.Abstractions;
-using MarketAssistant.Trading.Exchanges;
+using MarketAssistant.Services.Trading.Exchanges;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -32,16 +32,14 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddKeyedSingleton<IMarketCapability, CryptoMarketCapability>(MarketType.Crypto);
 
         // Agent 工具
-        services.AddKeyedSingleton<ICryptoBasicTools, CryptoBasicTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IBasicDataTools, CryptoBasicTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoMetricsTools, CryptoMetricsTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IFinancialTools, CryptoMetricsTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ITechnicalDataTools, CryptoTechnicalTools>(MarketType.Crypto);
         services.AddKeyedSingleton<INewsDataTools, CryptoNewsTools>(MarketType.Crypto);
-        services.AddKeyedSingleton<ICryptoSentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ISentimentTools, CryptoSentimentTools>(MarketType.Crypto);
         services.AddKeyedSingleton<ITradingExecutionTools, CryptoTradingExecutionTools>(MarketType.Crypto);
         services.AddKeyedSingleton<IStrategyTools, CryptoStrategyTools>(MarketType.Crypto);
+        services.AddKeyedSingleton<IOnChainTools, CryptoOnChainTools>(MarketType.Crypto);
 
         // 快讯 & 新闻
         services.AddKeyedSingleton<ITelegramService, CryptoTelegramService>(MarketType.Crypto);
@@ -52,6 +50,7 @@ public sealed class CryptoMarketModule : IMarketModule
                 sp.GetRequiredService<ILogger<NewsUpdateService>>()));
 
         // 资产服务
+        services.AddKeyedSingleton<IRealtimeQuoteService, CryptoRealtimeQuoteService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetInfoService, CryptoAssetInfoService>(MarketType.Crypto);
         services.AddKeyedSingleton<IHomeAssetService, HomeAssetService>(MarketType.Crypto);
         services.AddKeyedSingleton<IFavoriteService, FavoriteService>(MarketType.Crypto);
@@ -63,9 +62,12 @@ public sealed class CryptoMarketModule : IMarketModule
         // 工作流
         services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>(MarketType.Crypto);
         services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();
-        services.AddSingleton<GenerateCriteriaExecutor<CryptoCriteria>>();
+        // Transient：由投资选择工作流在每次 Run 内重新解析，避免并发共享状态
+        services.AddTransient<GenerateCriteriaExecutor<CryptoCriteria>>();
 
         // 交易所客户端
-        services.AddKeyedSingleton<IExchangeClient, BinanceExchangeClient>(MarketType.Crypto);
+        services.AddKeyedSingleton<IExchangeClient>(
+            MarketType.Crypto,
+            (sp, _) => sp.GetRequiredService<RoutingExchangeClient>());
     }
 }

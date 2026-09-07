@@ -62,6 +62,13 @@ public class HotAsset
     /// </summary>
     public string FormattedMetric => FormatMetric(MetricValue);
 
+    /// <summary>
+    /// 行尾标签文本：A 股显示所属板块，加密货币显示核心指标（如"24h量 2.41B"）
+    /// </summary>
+    public string TagText => MarketType == MarketType.Crypto
+        ? $"{MetricLabel} {FormattedMetric}"
+        : SectorName ?? string.Empty;
+
     private static string FormatMetric(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))

@@ -71,20 +71,19 @@ public class BaseAgentTest
         IsLlmAvailable = !string.IsNullOrEmpty(apiKey);
 
         var modelId = "deepseek-ai/DeepSeek-V3.2";
-        var endpoint = "https://api.siliconflow.cn";
 
         services.AddApplicationServices();
 
         // 必须在 AddApplicationServices 之后注册，覆盖其内部的真实 UserSettingService
         var testUserSetting = new UserSetting
         {
+            ProviderId = "SiliconFlow",
             ZhiTuApiToken = zhiTuApiToken,
-            ModelId = modelId,
+            ProviderModelIds = new Dictionary<string, string> { ["SiliconFlow"] = modelId },
             EmbeddingModelId = "jina-embeddings-v5-text-small",
             EmbeddingEndpoint = "https://api.jina.ai",
             EmbeddingApiKey = embeddingApiKey,
-            Endpoint = endpoint,
-            ApiKey = apiKey,
+            ProviderApiKeys = new Dictionary<string, string> { ["SiliconFlow"] = apiKey },
             EnabledAnalystRoles = new Dictionary<string, bool>
             {
                 { "FinancialAnalystAgent", true },

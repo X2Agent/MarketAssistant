@@ -1,5 +1,6 @@
 using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace MarketAssistant.Rag.Services;
@@ -51,6 +52,9 @@ public class QueryRewriteService : IQueryRewriteService
 
     // 预编译正则表达式
     private static readonly Regex ChineseWordRegex = new(@"[\u4e00-\u9fa5]{2,}", RegexOptions.Compiled);
+
+    // 拉丁字母键（如 AI/GDP）的词边界正则缓存：避免 "AI" 命中 "wait"、"GDP" 命中其他字母串的子串误替换
+    private static readonly ConcurrentDictionary<string, Regex> LatinKeyRegexCache = new(StringComparer.OrdinalIgnoreCase);
 
     public QueryRewriteService(ILogger<QueryRewriteService> logger)
     {
@@ -118,15 +122,34 @@ public class QueryRewriteService : IQueryRewriteService
         return s;
     }
 
-    /// <summary>
-    /// 生成同义词变体
-    /// </summary>
+    /// <remarks>
+    /// 拉丁字母键使用 ASCII 边界正则替换（避免子串误命中，如 "AI" 命中 "chain"）；
+    /// 中文键保持简单子串替换。
+    /// </remarks>
     private static IEnumerable<string> GenerateSynonymVariants(string query)
     {
         foreach (var kvp in SynonymMap)
         {
-            if (query.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
+            if (char.IsAsciiLetter(kvp.Key[0]))
             {
+                // 拉丁字母键：ASCII 边界正则匹配（大小写不敏感），未命中则跳过。
+                // 不能用 \b：.NET 把 CJK 字符算作 word char，"AI选股" 里 AI 与汉字之间不存在 \b，
+                // 会漏匹配最常见的中文混合查询；纯 ASCII 前后视断言既防误命中又保住 CJK 相邻
+                var wordRegex = LatinKeyRegexCache.GetOrAdd(kvp.Key, static key =>
+                    new Regex(@$"(?<![A-Za-z0-9]){Regex.Escape(key)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase | RegexOptions.Compiled));
+                if (!wordRegex.IsMatch(query))
+                {
+                    continue;
+                }
+
+                foreach (var synonym in kvp.Value)
+                {
+                    yield return wordRegex.Replace(query, synonym);
+                }
+            }
+            else if (query.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                // 中文键：保持原有子串替换逻辑
                 foreach (var synonym in kvp.Value)
                 {
                     yield return query.Replace(kvp.Key, synonym, StringComparison.OrdinalIgnoreCase);
@@ -187,9 +210,6 @@ public class QueryRewriteService : IQueryRewriteService
                       .ToList();
     }
 
-    /// <summary>
-    /// 移除停用词
-    /// </summary>
     private static string RemoveStopWords(string query)
     {
         var words = query.Split([' ', '，', '。', '、'], StringSplitOptions.RemoveEmptyEntries);

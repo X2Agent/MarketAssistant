@@ -1,6 +1,6 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Cache;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
@@ -12,6 +12,12 @@ namespace MarketAssistant.Applications.Assets;
 /// </summary>
 public class CryptoAssetInfoService : IAssetInfoService
 {
+    /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
+    private const int HotAssetCount = 10;
+
+    /// <summary>币安批量 24hr ticker 单次请求的最大交易对数（API 上限 100）</summary>
+    private const int BinanceTickerBatchSize = 100;
+
     private readonly BinanceMarketDataService _binanceService;
     private readonly CoinGeckoApiService _coinGeckoService;
     private readonly ICryptoAliasRegistry _aliasRegistry;
@@ -32,9 +38,6 @@ public class CryptoAssetInfoService : IAssetInfoService
         _memoryCache = memoryCache;
     }
 
-    /// <summary>
-    /// 搜索虚拟币（支持名称和代码）
-    /// </summary>
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(keyword))
@@ -44,10 +47,8 @@ public class CryptoAssetInfoService : IAssetInfoService
 
         keyword = keyword.Trim().ToUpperInvariant();
 
-        // 获取所有交易对信息（已过滤为 TRADING 状态）
         var symbols = await GetSymbolsAsync(cancellationToken);
 
-        // 搜索匹配的交易对
         var results = symbols
             .Where(s => s.BaseAsset.Contains(keyword))
             .Select(s => (Name: s.BaseAsset, Code: s.Symbol))
@@ -58,16 +59,10 @@ public class CryptoAssetInfoService : IAssetInfoService
         return results;
     }
 
-    /// <summary>
-    /// 获取虚拟币详细信息
-    /// </summary>
     public async Task<AssetInfo> GetAssetInfoAsync(string code, string market = "", CancellationToken cancellationToken = default)
     {
-
-        // 格式化交易对代码
         string symbol = ToBinanceFormat(code);
 
-        // 调用币安服务获取24小时价格统计
         var ticker = await _binanceService.Get24hrTickerAsync(symbol, cancellationToken);
 
         if (ticker == null)
@@ -75,14 +70,13 @@ public class CryptoAssetInfoService : IAssetInfoService
             throw new FriendlyException("获取币安行情数据失败");
         }
 
-        // 构建资产信息
         var assetInfo = new AssetInfo
         {
             Code = symbol,
-            Name = ExtractBaseCurrency(ticker.Symbol), // 提取基础币种
+            Name = ExtractBaseCurrency(ticker.Symbol),
             MarketType = MarketType.Crypto,
             Market = "Binance",
-            CurrentPrice = FormatPrice(ticker.LastPrice),
+            CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
             ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
             Volume24h = FormatVolume(ticker.Volume),
             MarketCap = await FetchMarketCapAsync(ExtractBaseCurrency(ticker.Symbol), cancellationToken)
@@ -93,11 +87,56 @@ public class CryptoAssetInfoService : IAssetInfoService
     }
 
     /// <summary>
-    /// 获取热门虚拟币（按24小时交易量排序）
+    /// 批量获取收藏资产行情：仅用一次（按 100 个一组）币安批量 24hr ticker 请求。
+    /// 市值字段留空——收藏列表不展示市值，逐个调用 CoinGecko 会触发限流并拖慢首屏；
+    /// 详情页 <see cref="GetAssetInfoAsync"/> 仍按需获取市值。
     /// </summary>
+    public async Task<List<AssetInfo?>> GetAssetInfosAsync(
+        IReadOnlyList<FavoriteAsset> favorites, CancellationToken cancellationToken = default)
+    {
+        if (favorites.Count == 0)
+        {
+            return [];
+        }
+
+        var symbols = favorites
+            .Select(favorite => ToBinanceFormat(favorite.Code))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var tickers = new Dictionary<string, Binance24hrTicker>(StringComparer.OrdinalIgnoreCase);
+        foreach (var chunk in symbols.Chunk(BinanceTickerBatchSize))
+        {
+            foreach (var ticker in await _binanceService.Get24hrTickersAsync(chunk.ToList(), cancellationToken))
+            {
+                tickers[ticker.Symbol] = ticker;
+            }
+        }
+
+        return favorites.Select(favorite =>
+        {
+            var symbol = ToBinanceFormat(favorite.Code);
+            if (!tickers.TryGetValue(symbol, out var ticker))
+            {
+                _logger.LogWarning("批量行情未返回 {Symbol}，使用兜底信息展示", symbol);
+                return (AssetInfo?)CreateFallbackAssetInfo(favorite);
+            }
+
+            return (AssetInfo?)new AssetInfo
+            {
+                Code = symbol,
+                Name = ExtractBaseCurrency(ticker.Symbol),
+                MarketType = MarketType.Crypto,
+                Market = "Binance",
+                CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
+                ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
+                Volume24h = FormatVolume(ticker.Volume)
+            };
+        }).ToList();
+    }
+
     public async Task<List<HotAsset>> GetHotAssetsAsync()
     {
-        // 调用币安服务获取所有交易对的24小时统计
         var tickers = await _binanceService.GetAll24hrTickersAsync();
 
         if (tickers == null || tickers.Count == 0)
@@ -109,27 +148,24 @@ public class CryptoAssetInfoService : IAssetInfoService
         // 稳定币列表（用于过滤稳定币互换交易对）
         var stablecoins = new[] { "USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD", "USDP" };
 
-        // 筛选USDT交易对，排除稳定币互换（需同时满足：基础币种是稳定币 且 价格接近1.0），按24小时交易量排序，取前8个
         var hotAssets = tickers
             .Where(t => t.Symbol.EndsWith("USDT") && t.Symbol != "USDT")
-            // 过滤稳定币互换交易对（基础币种是稳定币 且 价格接近1.0，同时满足才过滤）
             .Where(t =>
             {
                 var baseCurrency = ExtractBaseCurrency(t.Symbol);
                 var isStablecoin = stablecoins.Contains(baseCurrency);
                 var isPriceNearOne = t.LastPrice >= 0.95m && t.LastPrice <= 1.05m;
 
-                // 只有同时满足"是稳定币"且"价格接近1.0"才过滤掉（返回false）
                 return !(isStablecoin && isPriceNearOne);
             })
             .OrderByDescending(t => t.QuoteVolume)
-            .Take(8)
+            .Take(HotAssetCount)
             .Select(t => new HotAsset
             {
                 Name = ExtractBaseCurrency(t.Symbol),
                 Code = t.Symbol,
                 Market = "Binance",
-                CurrentPrice = FormatPrice(t.LastPrice),
+                CurrentPrice = PriceFormatter.Format(t.LastPrice),
                 ChangePercentage = FormatOpenClosePercentage(t.OpenPrice, t.LastPrice),
                 MarketType = MarketType.Crypto,
                 MetricLabel = "交易量",
@@ -142,9 +178,6 @@ public class CryptoAssetInfoService : IAssetInfoService
         return hotAssets;
     }
 
-    /// <summary>
-    /// 从CoinGecko获取真实市值数据
-    /// </summary>
     private async Task<string> FetchMarketCapAsync(string baseCurrency, CancellationToken cancellationToken)
     {
         try
@@ -175,22 +208,31 @@ public class CryptoAssetInfoService : IAssetInfoService
     #region 辅助方法
 
     /// <summary>
+    /// 行情缺失时的兜底 AssetInfo：以基础币种名称展示，等待实时行情推送补齐。
+    /// </summary>
+    private AssetInfo CreateFallbackAssetInfo(FavoriteAsset favorite)
+        => new()
+        {
+            Code = ToBinanceFormat(favorite.Code),
+            Name = ExtractBaseCurrency(favorite.Code),
+            MarketType = MarketType.Crypto,
+            Market = "Binance"
+        };
+
+    /// <summary>
     /// 获取所有交易对信息（使用 IMemoryCache 缓存，只获取 TRADING 状态）
     /// </summary>
     private async Task<List<BinanceSymbolInfo>> GetSymbolsAsync(CancellationToken cancellationToken)
     {
-        // 尝试从缓存获取
         if (_memoryCache.TryGetValue(CacheKeys.CryptoSymbols, out List<BinanceSymbolInfo>? cachedSymbols) && cachedSymbols != null)
         {
             return cachedSymbols;
         }
 
-        // 调用币安服务获取交易所信息
         var exchangeInfo = await _binanceService.GetExchangeInfoAsync(cancellationToken);
 
         var tradingSymbols = exchangeInfo?.Symbols ?? new List<BinanceSymbolInfo>();
 
-        // 设置缓存（1小时过期）
         var cacheOptions = new MemoryCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
@@ -201,29 +243,6 @@ public class CryptoAssetInfoService : IAssetInfoService
         return tradingSymbols;
     }
 
-    /// <summary>
-    /// 格式化价格显示
-    /// </summary>
-    private string FormatPrice(decimal price)
-    {
-        // 根据价格大小选择精度
-        if (price >= 1000)
-        {
-            return price.ToString("N2"); // 1000+ 显示2位小数
-        }
-        else if (price >= 1)
-        {
-            return price.ToString("N4"); // 1-1000 显示4位小数
-        }
-        else
-        {
-            return price.ToString("N6"); // <1 显示6位小数
-        }
-    }
-
-    /// <summary>
-    /// 格式化百分比显示
-    /// </summary>
     private string FormatPercentage(decimal? percent)
     {
         if (!percent.HasValue)
@@ -248,9 +267,6 @@ public class CryptoAssetInfoService : IAssetInfoService
         return $"{changePercent:F2}%";
     }
 
-    /// <summary>
-    /// 格式化交易量显示（K, M, B）
-    /// </summary>
     private string FormatVolume(decimal volume)
     {
         if (volume >= 1_000_000_000)

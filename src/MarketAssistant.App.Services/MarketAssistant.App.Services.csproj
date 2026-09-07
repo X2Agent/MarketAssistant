@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <RootNamespace>MarketAssistant</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <NoWarn>$(NoWarn);MAAI001</NoWarn>
-    <InternalsVisibleTo>TestMarketAssistant</InternalsVisibleTo>
+    <!-- SK 搜索连接器及泛型 ITextSearch 接口仍是实验性 API，当前无稳定替代。 -->
+    <NoWarn>$(NoWarn);MAAI001;SKEXP0001;SKEXP0050</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TestMarketAssistant" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />
@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MarketAssistant.Core\MarketAssistant.Core.csproj" />
+    <ProjectReference Include="..\MarketAssistant.Infrastructure\MarketAssistant.Infrastructure.csproj" />
     <ProjectReference Include="..\MarketAssistant.Agents\MarketAssistant.Agents.csproj" />
     <ProjectReference Include="..\MarketAssistant.Trading\MarketAssistant.Trading.csproj" />
     <ProjectReference Include="..\MarketAssistant.DataProviders\MarketAssistant.DataProviders.csproj" />
@@ -22,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AdaptiveCards" />
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Agents.AI" />
@@ -32,10 +33,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- 覆盖 Microsoft.Data.Sqlite 传递引入的 SQLitePCLRaw 2.1.11（CVE-2025-6965） -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OllamaSharp" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" />
     <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
     <PackageReference Include="ModelContextProtocol" />

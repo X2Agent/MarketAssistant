@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using MarketAssistant.Agents.Tools.Abstractions;
-using MarketAssistant.Services.Data;
-using MarketAssistant.Trading;
+using MarketAssistant.DataProviders;
+using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
@@ -22,7 +24,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
 
     public CryptoTradingExecutionTools(
         CryptoPortfolioService portfolioService,
-        IExchangeClient exchangeClient,
+        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
         BinanceMarketDataService marketDataService,
         TradeExecutor tradeExecutor,
         ILogger<CryptoTradingExecutionTools> logger)
@@ -37,13 +39,13 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
     public async Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)
     {
-        return await _portfolioService.GetAccountBalanceSummaryAsync();
+        return await _portfolioService.GetAccountBalanceSummaryAsync(cancellationToken);
     }
 
     [Description("查询当前持仓列表，显示每个币种的数量、入场均价、当前价和未实现盈亏")]
     public async Task<List<PositionInfo>> GetCurrentPositionsAsync(CancellationToken cancellationToken = default)
     {
-        return await _portfolioService.GetCurrentPositionsAsync();
+        return await _portfolioService.GetCurrentPositionsAsync(cancellationToken);
     }
 
     [Description("下单交易。所有订单会先经过风控检查。symbol格式如BTCUSDT，side为Buy或Sell，type为Market或Limit")]
@@ -60,7 +62,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         {
             try
             {
-                var ticker = await _marketDataService.Get24hrTickerAsync(symbol);
+                var ticker = await _marketDataService.Get24hrTickerAsync(symbol, cancellationToken);
                 if (ticker != null)
                     effectivePrice = ticker.LastPrice;
             }
@@ -77,7 +79,8 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         return await _tradeExecutor.ExecuteOrderAsync(
             symbol, side, type, quantity, effectivePrice,
             type == OrderType.Limit ? price : null,
-            strategyId: strategyId);
+            strategyId: strategyId,
+            ct: cancellationToken);
     }
 
     [Description("查询指定订单的状态")]
@@ -86,7 +89,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         [Description("Binance订单ID")] long orderId,
         CancellationToken cancellationToken = default)
     {
-        var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString());
+        var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString(), cancellationToken);
         return new OrderStatusInfo
         {
             OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
@@ -105,7 +108,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     {
         try
         {
-            await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString());
+            await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString(), cancellationToken);
             return true;
         }
         catch (Exception ex)

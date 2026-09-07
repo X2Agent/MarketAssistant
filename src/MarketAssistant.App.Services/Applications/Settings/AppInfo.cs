@@ -93,6 +93,16 @@ public static class AppInfo
     public const string UserSettingsFileName = "usersettings.json";
 
     /// <summary>
+    /// 用户设置中的敏感信息安全存储名称。
+    /// </summary>
+    public const string UserSecretsStoreName = "usersecrets.bin";
+
+    /// <summary>
+    /// MCP 配置安全存储名称。
+    /// </summary>
+    public const string McpSecretsStoreName = "mcpservers.bin";
+
+    /// <summary>
     /// MCP服务器配置文件名称
     /// </summary>
     public const string MCPServerConfigFileName = "mcpservers.json";

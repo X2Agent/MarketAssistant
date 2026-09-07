@@ -13,6 +13,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddRagServices(this IServiceCollection services)
     {
+        // Token 计数统一入口（进程内单例，词表延迟加载一次）
+        services.AddSingleton<MarketAssistant.Infrastructure.Tokenization.ITokenCounter,
+            MarketAssistant.Infrastructure.Tokenization.TiktokenTokenCounter>();
+
         services.AddSingleton<ITextCleaningService, TextCleaningService>();
         services.AddSingleton<ITextChunkingService, TextChunkingService>();
 
@@ -44,6 +48,7 @@ public static class ServiceCollectionExtensions
         // 专为金融场景优化：信任度评分 + 关键词加成 + 时效性 + 多样性优化
         services.AddSingleton<IRerankerService, RerankerService>();
         services.AddSingleton<IQueryRewriteService, QueryRewriteService>();
+        services.AddSingleton<IContextExpansionService, ContextExpansionService>();
 
         services.AddSingleton<IRetrievalOrchestrator, RetrievalOrchestrator>();
 

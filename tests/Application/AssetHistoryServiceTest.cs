@@ -31,12 +31,12 @@ public class AssetHistoryServiceTest
     public async Task Cleanup()
     {
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
         await aShareService.ClearHistoryAsync();
         await cryptoService.ClearHistoryAsync();
 
-        await _serviceProvider.DisposeAsync();
+        await _serviceProvider!.DisposeAsync();
     }
 
     [TestMethod]
@@ -94,47 +94,11 @@ public class AssetHistoryServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task AddHistory_Crypto_ShouldStoreAsset()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
-        var asset = new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" };
-
-        // Act
-        await service.AddHistoryAsync(asset);
-        var history = await service.GetHistoryAsync();
-
-        // Assert
-        Assert.IsNotNull(history);
-        Assert.AreEqual(1, history.Count);
-        Assert.AreEqual("BTCUSDT", history[0].Code);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
-    public async Task GetHistory_Crypto_ShouldReturnRecentAssets()
-    {
-        // Arrange
-        var service = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
-        await service.AddHistoryAsync(new AssetItem { Code = "BTCUSDT", Name = "Bitcoin" });
-        await service.AddHistoryAsync(new AssetItem { Code = "ETHUSDT", Name = "Ethereum" });
-
-        // Act
-        var history = await service.GetHistoryAsync();
-
-        // Assert
-        Assert.IsNotNull(history);
-        Assert.AreEqual(2, history.Count);
-        Assert.AreEqual("ETHUSDT", history[0].Code); // 最新的在前面
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public async Task AShareAndCrypto_ShouldHaveSeparateStorage()
     {
         // Arrange
         var aShareService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.AShare);
-        var cryptoService = _serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
+        var cryptoService = _serviceProvider!.GetRequiredKeyedService<IAssetHistoryService>(MarketType.Crypto);
 
         // Act
         await aShareService.AddHistoryAsync(new AssetItem { Code = "SH600519", Name = "贵州茅台" });

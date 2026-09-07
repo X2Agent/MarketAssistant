@@ -1,5 +1,5 @@
 using MarketAssistant.Applications.AssetScreener.Models;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.AssetScreener;
@@ -31,7 +31,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// 根据筛选条件筛选虚拟币
     /// 优先使用 CoinGecko（含市值/排名/供应量数据），失败时降级到 Binance（仅价格/成交量/涨跌幅）
     /// </summary>
-    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria)
+    public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria, CancellationToken cancellationToken = default)
     {
         if (criteria is not CryptoCriteria cryptoCriteria)
         {
@@ -47,20 +47,25 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             List<ScreenerAssetInfo> results;
             try
             {
-                var markets = await FetchFromCoinGeckoAsync(cryptoCriteria);
+                var markets = await FetchFromCoinGeckoAsync(cryptoCriteria, cancellationToken);
                 var filtered = ApplyFilters(markets, cryptoCriteria);
                 var limited = filtered.Take(cryptoCriteria.Limit).ToList();
                 results = ConvertToScreenerInfo(limited);
                 _logger.LogInformation("CoinGecko 筛选完成，结果数量: {Count}", results.Count);
             }
-            catch (Exception ex) when (ex is not ArgumentException)
+            catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
             {
                 _logger.LogWarning(ex, "CoinGecko 数据源不可用，降级到 Binance 兜底");
-                results = await FetchFromBinanceFallbackAsync(cryptoCriteria);
+                results = await FetchFromBinanceFallbackAsync(cryptoCriteria, cancellationToken);
                 _logger.LogInformation("Binance 兜底筛选完成，结果数量: {Count}", results.Count);
             }
 
             return results;
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户取消必须向上传播，不得包装成业务失败
+            throw;
         }
         catch (Exception ex)
         {
@@ -72,7 +77,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// <summary>
     /// 从CoinGecko获取数据
     /// </summary>
-    private async Task<List<CoinGeckoMarket>> FetchFromCoinGeckoAsync(CryptoCriteria criteria)
+    private async Task<List<CoinGeckoMarket>> FetchFromCoinGeckoAsync(CryptoCriteria criteria, CancellationToken cancellationToken)
     {
         // 确定排序方式
         var order = DetermineOrder(criteria);
@@ -96,7 +101,8 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             order: order,
             perPage: perPage,
             page: page,
-            priceChangePercentage: priceChangePercentage);
+            priceChangePercentage: priceChangePercentage,
+            cancellationToken: cancellationToken);
 
         return markets;
     }
@@ -113,33 +119,33 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             filtered = condition.Code.ToLowerInvariant() switch
             {
                 "market_cap" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Market_Cap >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Market_Cap <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.MarketCap >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.MarketCap <= condition.MaxValue)),
 
                 "market_cap_rank" => filtered.Where(m =>
-                    m.Market_Cap_Rank.HasValue &&
-                    (!condition.MinValue.HasValue || m.Market_Cap_Rank >= (int)condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Market_Cap_Rank <= (int)condition.MaxValue)),
+                    m.MarketCapRank.HasValue &&
+                    (!condition.MinValue.HasValue || m.MarketCapRank >= (int)condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.MarketCapRank <= (int)condition.MaxValue)),
 
                 "volume_24h" or "total_volume" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Total_Volume >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Total_Volume <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.TotalVolume >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.TotalVolume <= condition.MaxValue)),
 
                 "price_change_24h" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_24h >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_24h <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage24h >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage24h <= condition.MaxValue)),
 
                 "price_change_7d" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_7d_In_Currency >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_7d_In_Currency <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage7dInCurrency >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage7dInCurrency <= condition.MaxValue)),
 
                 "price_change_30d" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Price_Change_Percentage_30d_In_Currency >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Price_Change_Percentage_30d_In_Currency <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.PriceChangePercentage30dInCurrency >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.PriceChangePercentage30dInCurrency <= condition.MaxValue)),
 
                 "current_price" or "price" => filtered.Where(m =>
-                    (!condition.MinValue.HasValue || m.Current_Price >= condition.MinValue) &&
-                    (!condition.MaxValue.HasValue || m.Current_Price <= condition.MaxValue)),
+                    (!condition.MinValue.HasValue || m.CurrentPrice >= condition.MinValue) &&
+                    (!condition.MaxValue.HasValue || m.CurrentPrice <= condition.MaxValue)),
 
                 _ => filtered
             };
@@ -154,18 +160,18 @@ public sealed class CryptoScreenerService : IAssetScreenerService
         {
             Name = m.Name,
             Symbol = m.Symbol.ToUpperInvariant(),
-            Current = m.Current_Price ?? 0,
-            Pct = m.Price_Change_Percentage_24h ?? 0,
-            Amount = m.Total_Volume ?? 0,
-            Mc = m.Market_Cap ?? 0,
-            Fmc = m.Fully_Diluted_Valuation ?? 0,
-            Volume = m.Total_Volume ?? 0,
-            MarketCapRank = m.Market_Cap_Rank ?? 0,
-            PriceChange7d = m.Price_Change_Percentage_7d_In_Currency ?? 0,
-            PriceChange30d = m.Price_Change_Percentage_30d_In_Currency ?? 0,
-            CirculatingSupply = m.Circulating_Supply ?? 0,
-            TotalSupply = m.Total_Supply ?? 0,
-            MaxSupply = m.Max_Supply
+            Current = m.CurrentPrice ?? 0,
+            Pct = m.PriceChangePercentage24h ?? 0,
+            Amount = m.TotalVolume ?? 0,
+            Mc = m.MarketCap ?? 0,
+            Fmc = m.FullyDilutedValuation ?? 0,
+            Volume = m.TotalVolume ?? 0,
+            MarketCapRank = m.MarketCapRank ?? 0,
+            PriceChange7d = m.PriceChangePercentage7dInCurrency ?? 0,
+            PriceChange30d = m.PriceChangePercentage30dInCurrency ?? 0,
+            CirculatingSupply = m.CirculatingSupply ?? 0,
+            TotalSupply = m.TotalSupply ?? 0,
+            MaxSupply = m.MaxSupply
         }).ToList();
     }
 
@@ -173,9 +179,9 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// Binance 兜底筛选：当 CoinGecko 不可用时，从币安获取 USDT 交易对行情
     /// 注意：Binance 不提供市值/排名/供应量数据，相关筛选条件将被忽略
     /// </summary>
-    private async Task<List<ScreenerAssetInfo>> FetchFromBinanceFallbackAsync(CryptoCriteria criteria)
+    private async Task<List<ScreenerAssetInfo>> FetchFromBinanceFallbackAsync(CryptoCriteria criteria, CancellationToken cancellationToken)
     {
-        var tickers = await _binanceService.GetAll24hrTickersFullAsync();
+        var tickers = await _binanceService.GetAll24hrTickersFullAsync(cancellationToken);
 
         // 仅保留指定计价货币的交易对（默认 USDT），排除杠杆/稳定币交易对
         var quoteCurrency = string.IsNullOrWhiteSpace(criteria.QuoteCurrency) ? "USDT" : criteria.QuoteCurrency;

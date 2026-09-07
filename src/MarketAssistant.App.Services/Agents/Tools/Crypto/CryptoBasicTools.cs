@@ -1,10 +1,11 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Crypto;
-using MarketAssistant.Services.Data;
+using MarketAssistant.DataProviders;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
+using System.Text.Json;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
@@ -12,7 +13,7 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币基础数据工具实现（使用服务层获取数据）
 /// </summary>
-public sealed class CryptoBasicTools : ICryptoBasicTools
+public sealed class CryptoBasicTools : IBasicDataTools
 {
     private readonly ILogger<CryptoBasicTools> _logger;
     private readonly BinanceMarketDataService _binanceService;
@@ -154,7 +155,8 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
                 Change7dPercent = coinDetail.MarketData?.PriceChangePercentage7dInCurrency?.GetValueOrDefault("usd"),
                 Change30dPercent = coinDetail.MarketData?.PriceChangePercentage30dInCurrency?.GetValueOrDefault("usd"),
                 Rankings = ExtractRankings(coinDetail),
-                Industries = coinDetail.Categories ?? new List<string>()
+                Industries = coinDetail.Categories ?? new List<string>(),
+                ContractAddresses = ExtractContractAddresses(coinDetail)
             };
 
             _logger.LogInformation("成功获取虚拟币项目信息: {Name} ({Symbol})", projectInfo.Name, symbol);
@@ -189,6 +191,27 @@ public sealed class CryptoBasicTools : ICryptoBasicTools
     {
         if (detail.MarketCapRank == null) return null;
         return new RankingInfo { MarketCapRank = detail.MarketCapRank };
+    }
+
+    /// <summary>
+    /// 从 CoinGecko 详情的 detail_platforms 提取各链合约地址（仅保留字符串型地址值）。
+    /// 中心化视角回答"某代币部署在哪些链上"，供链上工具（审计/交易对）确定 chainId + tokenAddress。
+    /// </summary>
+    private static Dictionary<string, string> ExtractContractAddresses(CoinGeckoCoinDetail? detail)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (detail?.DetailPlatforms == null)
+            return result;
+
+        foreach (var (platform, value) in detail.DetailPlatforms)
+        {
+            if (value is { ValueKind: JsonValueKind.String } element &&
+                element.GetString() is { Length: > 0 } address)
+            {
+                result[platform] = address;
+            }
+        }
+        return result;
     }
 
     public IEnumerable<AIFunction> GetFunctions()

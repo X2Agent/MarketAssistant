@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -11,25 +12,10 @@ using System.Security.Cryptography;
 namespace MarketAssistant.Rag.Services;
 
 /// <summary>
-/// CLIP图像嵌入服务（多模态RAG的核心组件）
-/// 
-/// 【学习要点】：
-/// 1. 多模态AI：处理图像和文本的AI模型
-/// 2. CLIP模型：OpenAI发布的多模态模型，可以将图像和文本映射到同一个空间
-/// 3. 降级策略：构建系统的可靠性保障，在服务失败时自动切换到备用方案
-/// 4. ONNX运行时：跨平台的机器学习推理引擎，用于部署机器学习模型
-/// 
-/// 【功能概要】：
-/// - 双重能力：图像嵌入（向量化） + 图像描述生成（Caption）
-/// - 分层降级：CLIP模型 -> 哈希（图像） / 多模态服务 -> 占位符（文本）
-/// - 资源管理：实现IDisposable自动释放ONNX会话资源
-/// - 延迟初始化：首次调用时才加载模型，优化启动速度
-/// 
-/// 【技术栈】：
-/// - Microsoft.ML.OnnxRuntime：ONNX模型推理
-/// - SkiaSharp：跨平台图像处理
-/// - Microsoft.SemanticKernel：多模态服务编排
-/// - Microsoft.Extensions.AI：AI嵌入标准接口
+/// CLIP 图像嵌入服务（多模态 RAG 组件）。
+/// 双重能力：图像嵌入（ONNX 推理）+ 图像描述生成（Caption，可选多模态服务）。
+/// 降级策略：图像嵌入失败抛出异常由调用方降级为 Caption 文本召回；
+/// Caption 不可用或失败时返回占位符。ONNX 会话延迟到首次调用时加载。
 /// </summary>
 public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 {
@@ -40,52 +26,39 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     private static readonly float[] ImageNetMean = { 0.485f, 0.456f, 0.406f };
     private static readonly float[] ImageNetStd = { 0.229f, 0.224f, 0.225f };
 
-    // 【依赖注入】：服务的依赖项
-    private readonly ILogger<ClipImageEmbeddingService> _logger;          // 结构化日志记录
-    private readonly IChatCompletionService? _chat;                       // 多模态聊天服务（可选）
-    private readonly string? _modelPath;                                  // CLIP ONNX模型文件路径
+    private readonly ILogger<ClipImageEmbeddingService> _logger;
+    private readonly IChatCompletionService? _chat;
+    private readonly string? _modelPath;
 
-    // 【状态管理】：ONNX推理会话和初始化标志
-    private InferenceSession? _session;                                   // ONNX运行时推理会话
-    private bool _initAttempted;                                          // 防止重复初始化的标志
+    private InferenceSession? _session;
+    private volatile bool _initAttempted;
+    private readonly object _initLock = new();
 
     /// <summary>
-    /// 构造函数：使用依赖注入获取服务，支持环境变量配置模型路径
-    /// 
-    /// 【学习要点】：
-    /// - 依赖注入模式：通过IServiceProvider获取可选服务，遵循单一职责原则
-    /// - 配置优先级：环境变量 > 默认路径，适应不同部署环境
-    /// - 延迟加载：构造时不加载模型，首次使用时才初始化
+    /// 构造函数：模型路径优先取环境变量 CLIP_IMAGE_ONNX，否则用本地默认路径。
+    /// Caption 客户端由工厂延迟创建，AI 未配置时为 null（Caption 降级为占位符）。
     /// </summary>
-    public ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IServiceProvider sp)
+    public ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IImageCaptionClientFactory captionClientFactory)
     {
         _logger = logger;
-        // 尝试获取聊天服务（多模态Caption功能），可选
-        _chat = sp.GetService<IChatCompletionService>();
+        _chat = captionClientFactory.Create();
 
-        // 模型路径配置：优先环境变量，否则使用本地默认路径
         _modelPath = Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")
                      ?? Path.Combine(AppContext.BaseDirectory, "models", "clip-image.onnx");
     }
 
     /// <summary>
-    /// 生成图像嵌入向量（RAG系统的核心功能）
-    /// 
-    /// 【学习要点】：
-    /// - 异常降级：CLIP模型异常 -> 哈希算法，确保系统稳定性
-    /// - 异步编程：使用Task.Run将计算密集型任务移至后台线程，避免阻塞UI
-    /// - 向量归一化：确保向量在单位超球面上，便于余弦相似度计算
-    /// - 维度统一：统一到TargetDim维度，支持哈希降级
-    /// 
-    /// 【实现细节】：
-    /// - ONNX推理：使用预训练CLIP模型进行图像编码
-    /// - 预处理：将图像预处理为标准张量格式
-    /// - 内存管理：使用using确保资源及时释放
+    /// 生成图像嵌入向量（ONNX 推理 + 归一化）。
+    /// 失败语义：任何失败都抛出 InvalidOperationException，由调用方降级为 Caption 文本召回；
+    /// 不降级为哈希向量，也不产出零向量（P1-03）。
     /// </summary>
     public async Task<Embedding<float>> GenerateAsync(byte[] imageBytes, CancellationToken ct = default)
     {
         try
         {
+            // 取消优先于一切降级/不可用判断
+            ct.ThrowIfCancellationRequested();
+
             // 步骤1：确保ONNX会话已初始化
             EnsureSession();
             if (_session is not null)
@@ -94,8 +67,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                 var (imageInput, imageOutput) = ResolveVisionIO();
                 if (imageInput == null || imageOutput == null)
                 {
-                    _logger.LogWarning("Cannot resolve model input/output structure, falling back to hash");
-                    return new Embedding<float>(HashToVector(imageBytes, TargetDim));
+                    _logger.LogWarning("Cannot resolve model input/output structure; image embedding unavailable");
+                    throw new InvalidOperationException("CLIP 模型输入输出结构无法解析，图像嵌入不可用");
                 }
 
                 // 步骤3~6：在后台线程执行预处理 + 推理 + 后处理（支持取消）
@@ -119,6 +92,9 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
                 return new Embedding<float>(vec);
             }
+
+            // P1-03：CLIP 模型不可用时不再降级为哈希向量
+            throw new InvalidOperationException("CLIP 模型不可用，图像嵌入未生成");
         }
         catch (OperationCanceledException)
         {
@@ -126,21 +102,15 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
         }
         catch (Exception ex)
         {
-            // 异常处理：CLIP推理失败时记录日志并降级
-            _logger.LogDebug(ex, "CLIP embedding failed, fallback to hash vector");
+            // P1-03：CLIP 失败不再降级为哈希向量——哈希向量无语义，
+            // 不得混入与文本同维度的语义检索空间。调用方应跳过图像向量并依赖 Caption 文本召回。
+            _logger.LogWarning(ex, "CLIP 图像嵌入失败，本图不生成图像向量（Caption 文本召回不受影响）");
+            throw new InvalidOperationException("CLIP 图像嵌入不可用", ex);
         }
-
-        // 降级策略：生成哈希向量作为备用
-        return new Embedding<float>(HashToVector(imageBytes, TargetDim));
     }
 
     /// <summary>
-    /// 解析ONNX模型的输入输出节点名称
-    /// 
-    /// 【自适应】：自动适配模型的图像输入和输出节点名称
-    /// 常见名称：
-    /// - imageInput: 图像输入节点名称 ("pixel_values", "image")  
-    /// - imageOutput: 图像输出节点名称 ("image_embeds", "pooler_output")
+    /// 解析 ONNX 模型的输入输出节点名称，自动适配不同 CLIP 导出模型的常见命名。
     /// </summary>
     private (string? imageInput, string? imageOutput) ResolveVisionIO()
     {
@@ -170,11 +140,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 创建模型输入列表（处理多输入模型）
-    /// 
-    /// 【兼容性】：
-    /// 某些CLIP模型可能需要多输入（如文本+图像双塔模型）
-    /// 此方法确保提供图像输入，并为不需要的文本输入提供空/默认值
+    /// 创建模型输入列表。部分 CLIP 导出模型带文本双塔输入，
+    /// 对非图像输入补空张量，保证单图推理可执行。
     /// </summary>
     private List<NamedOnnxValue> CreateModelInputs(string imageInputName, DenseTensor<float> imageTensor)
     {
@@ -217,17 +184,8 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 生成图像描述（多模态生成能力，可选）
-    /// 
-    /// 【学习要点】：
-    /// - 多模态提示：结合文本指令和图像数据的复杂提示
-    /// - 降级保护：服务不可用或异常时，返回占位符
-    /// - 异步处理：支持取消令牌，避免长时阻塞
-    /// 
-    /// 【业务价值】：
-    /// - 增强搜索：为图像提供文本描述，支持文本搜索
-    /// - 可访问性：辅助视障用户理解图像内容
-    /// - 降级兼容：无文本描述时，图像内容仍可被索引（虽然不准确）
+    /// 生成图像描述（多模态生成能力，可选）。
+    /// 多模态服务不可用或生成失败时降级为占位符，图像仍可被索引。
     /// </summary>
     public async Task<string> CaptionAsync(byte[] imageBytes, CancellationToken ct = default)
     {
@@ -270,47 +228,50 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 延迟初始化ONNX推理会话（单例/缓存模式）
-    /// 
-    /// 【学习要点】：
-    /// - 延迟加载：避免启动时加载大模型影响性能
-    /// - 状态锁：使用标志位确保只尝试一次，避免重复失败
-    /// - 资源检查：验证模型文件存在性，提供清晰的错误信息
-    /// - 异常吞没：初始化失败不影响降级功能的可用性
-    /// 
-    /// 【设计模式】：
-    /// - 懒加载模式：通过标志位控制初始化
-    /// - 资源管理：ONNX会话需在Dispose时正确释放
+    /// 延迟初始化 ONNX 推理会话。双检查锁保证并发下仅创建一个会话；
+    /// 初始化失败不抛出（仅标记已尝试），由 GenerateAsync 因会话不可用而失败，
+    /// 调用方降级为 Caption 文本召回。
     /// </summary>
     private void EnsureSession()
     {
-        // 检查点：防止重复初始化尝试
+        // 快速路径：已初始化过（无论成败）则直接返回
         if (_initAttempted) return;
-        _initAttempted = true;
 
-        try
+        // 双检查锁：并发首次调用时仅允许一个线程创建 InferenceSession，
+        // 其余线程等待后复用同一会话（或复用"初始化已失败"的结果），不会重复加载模型
+        lock (_initLock)
         {
-            // 资源检查：验证模型文件路径
-            if (!string.IsNullOrWhiteSpace(_modelPath) && File.Exists(_modelPath))
+            if (_initAttempted) return;
+            try
             {
-                // 创建ONNX运行时推理会话
-                _session = new InferenceSession(_modelPath);
+                // 资源检查：验证模型文件路径
+                if (!string.IsNullOrWhiteSpace(_modelPath) && File.Exists(_modelPath))
+                {
+                    // 创建ONNX运行时推理会话
+                    _session = new InferenceSession(_modelPath);
 
-                // 记录模型信息（输入输出节点）便于调试
-                LogModelInfo();
+                    // 记录模型信息（输入输出节点）便于调试
+                    LogModelInfo();
 
-                _logger.LogInformation("Loaded CLIP image ONNX model: {Path}", _modelPath);
+                    _logger.LogInformation("Loaded CLIP image ONNX model: {Path}", _modelPath);
+                }
+                else
+                {
+                    // 警告：配置的模型不存在时发出提示（不降级为哈希向量，图像嵌入将不可用）
+                    _logger.LogWarning("CLIP model not found at {Path}, image embedding will be unavailable", _modelPath);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // 警告：配置的模型不存在时发出提示
-                _logger.LogWarning("CLIP model not found at {Path}, using hash fallback", _modelPath);
+                // 初始化失败：记录错误但不抛出，GenerateAsync 会因会话不可用而抛出，
+                // 由调用方降级为 Caption 文本召回
+                _logger.LogWarning(ex, "Failed to init CLIP model session; image embedding will be unavailable");
             }
-        }
-        catch (Exception ex)
-        {
-            // 初始化失败：记录错误但不抛出异常，保证降级可用
-            _logger.LogWarning(ex, "Failed to init CLIP model session; fallback to hash embedding");
+            finally
+            {
+                // 无论成败只尝试一次，避免失败后反复加载模型
+                _initAttempted = true;
+            }
         }
     }
 
@@ -348,11 +309,9 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 图像预处理：将原始字节转换为CLIP模型所需的标准张量
-    /// 
-    /// 【处理流程】：图像解码 -> 缩放到224x224 -> ImageNet标准化 -> CHW张量格式
-    /// CLIP 模型训练时使用 ImageNet 均值和方差标准化，不做标准化会导致
-    /// 图像嵌入与文本嵌入向量空间错位，跨模态检索失效。
+    /// 图像预处理：解码 → 缩放到 224x224 → ImageNet 标准化 → CHW 张量。
+    /// 必须用 CLIP 训练时的均值方差标准化，否则图像与文本嵌入向量空间错位，
+    /// 跨模态检索失效。预处理失败必须抛出，静默零张量会污染多模态召回。
     /// </summary>
     private static DenseTensor<float> PreprocessToTensor(byte[] bytes)
     {
@@ -392,26 +351,17 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
 
             return new DenseTensor<float>(tensorData, new[] { 1, channels, size, size });
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // 异常降级：返回全零张量确保不崩溃
-            return new DenseTensor<float>(new float[1 * channels * size * size], new[] { 1, channels, size, size });
+            // 预处理失败必须抛出：静默返回全零张量会被当作合法输入跑完推理，
+            // 产出语义上无意义的零向量入库，污染多模态召回
+            throw new InvalidOperationException($"图像预处理失败: {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    /// 向量归一化和维度调整（确保向量数学正确性）
-    /// 
-    /// 【学习要点】：
-    /// - L2归一化：||v|| = 1，确保余弦相似度计算准确
-    /// - 维度对齐：不同模型输出维度可能不同，需要统一
-    /// - 鲁棒性：处理零向量和维度不匹配情况
-    /// - 零填充/截断：避免循环填充引入周期性模式破坏余弦相似度
-    /// 
-    /// 【数学原理】：
-    /// - L2范数：||v|| = sqrt(v1² + v2² + ... + vn²)
-    /// - 归一化：v_norm = v / ||v||
-    /// - 余弦相似度：cos(θ) = (a·b) / (||a|| · ||b||)，归一化后为 a·b
+    /// 向量归一化与维度调整：L2 归一化保证余弦相似度计算准确；
+    /// 目标维度不足零填充、超长截断（零填充不引入伪周期模式）。
     /// </summary>
     /// <param name="src">原始输出向量</param>
     /// <param name="dim">目标维度</param>
@@ -441,49 +391,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     }
 
     /// <summary>
-    /// 哈希向量生成（降级兜底方案）
-    /// 
-    /// 【学习要点】：
-    /// - 确定性：相同输入始终产生相同输出，保证验证一致性
-    /// - 哈希算法：SHA256提供良好的数据分布特性
-    /// - 伪随机性：哈希值具有统计随机性，适合作为随机向量
-    /// - 降级无关：不依赖外部模型，作为最后的防线
-    /// 
-    /// 【实现思路】：
-    /// - 确定性：相同字节数组产生相同哈希
-    /// - 分布均匀：SHA256确保输出在[0,1]范围内均匀分布
-    /// - 简单可靠：无外部依赖，永不失败
-    /// </summary>
-    /// <param name="bytes">原始图像字节数组</param>
-    /// <param name="dim">目标向量维度</param>
-    /// <returns>基于哈希的伪随机向量</returns>
-    private static float[] HashToVector(byte[] bytes, int dim)
-    {
-        // 计算哈希值：使用SHA256算法
-        using var sha = SHA256.Create();
-        var h = sha.ComputeHash(bytes);
-
-        // 生成向量：将哈希字节转换为浮点数
-        var vec = new float[dim];
-        for (int i = 0; i < dim; i++)
-            vec[i] = h[i % h.Length] / 255f;  // 将字节值[0,255]转换为[0,1]
-
-        return vec;
-    }
-
-    /// <summary>
-    /// 资源释放：正确释放ONNX推理会话
-    /// 
-    /// 【学习要点】：
-    /// - 资源管理：ONNX会话包含非托管资源，需显式释放
-    /// - IDisposable模式：.NET资源管理的标准模式
-    /// - 内存泄漏预防：机器学习模型通常占用大量内存
-    /// - 最佳实践：在容器生命周期结束时调用Dispose
-    /// 
-    /// 【实现细节】：
-    /// - 显式释放：避免长期占用GPU/CPU内存
-    /// - 空值检查：_session可能为null（重复释放安全）
-    /// - 托管资源：_logger, _chatCompletion等由DI容器管理，无需手动释放
+    /// 释放 ONNX 推理会话的非托管资源（重复释放安全）。
     /// </summary>
     public void Dispose()
     {

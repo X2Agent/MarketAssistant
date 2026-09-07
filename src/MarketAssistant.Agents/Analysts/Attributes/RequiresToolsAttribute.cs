@@ -7,9 +7,6 @@ namespace MarketAssistant.Agents.Analysts.Attributes;
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
 public sealed class RequiresToolsAttribute : Attribute
 {
-    /// <summary>
-    /// 所需的工具接口类型
-    /// </summary>
     public Type ToolInterfaceType { get; }
 
     public RequiresToolsAttribute(Type toolInterfaceType)

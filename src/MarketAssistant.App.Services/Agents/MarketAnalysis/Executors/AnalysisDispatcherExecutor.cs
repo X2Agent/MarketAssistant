@@ -10,7 +10,7 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 ///
 /// 职责：
 /// 1. 接收标的代码
-/// 2. 保存必要的配置到 workflow state
+/// 2. 保存标的代码到 workflow state（供 CoordinatorExecutor 读取）
 /// 3. 广播 ChatMessage 给所有分析师（通过 SendMessageAsync）
 /// 4. 广播 TurnToken 触发分析师开始处理（AIAgent 收到 ChatMessage 后不会自动处理，必须收到 TurnToken 才会调用 LLM）
 /// </summary>
@@ -20,15 +20,12 @@ public sealed partial class AnalysisDispatcherExecutor : Executor
 {
     private const string AnalysisPromptTemplate = "请对标的 {0} 进行专业分析，提供投资建议。";
 
-    private readonly int _expectedAnalystCount;
     private readonly ILogger<AnalysisDispatcherExecutor> _logger;
 
     public AnalysisDispatcherExecutor(
-        int expectedAnalystCount,
         ILogger<AnalysisDispatcherExecutor> logger)
         : base("AnalysisDispatcher")
     {
-        _expectedAnalystCount = expectedAnalystCount;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -45,20 +42,13 @@ public sealed partial class AnalysisDispatcherExecutor : Executor
 
         try
         {
-            _logger.LogInformation(
-                "分发器开始处理标的 {AssetSymbol} 的分析请求，期望 {Count} 位分析师",
-                assetSymbol, _expectedAnalystCount);
+            _logger.LogInformation("分发器开始处理标的 {AssetSymbol} 的分析请求", assetSymbol);
 
             // https://github.com/microsoft/agent-framework/issues/2162
             // 保存配置到 workflow state（显式指定 scope 确保跨 Executor 可见）
             await context.QueueStateUpdateAsync(
                 WorkflowStateKeys.AssetSymbol,
                 assetSymbol,
-                WorkflowStateKeys.Scope,
-                cancellationToken);
-            await context.QueueStateUpdateAsync(
-                WorkflowStateKeys.ExpectedAnalystCount,
-                _expectedAnalystCount,
                 WorkflowStateKeys.Scope,
                 cancellationToken);
 
@@ -74,9 +64,7 @@ public sealed partial class AnalysisDispatcherExecutor : Executor
                 new TurnToken(emitEvents: true),
                 cancellationToken);
 
-            _logger.LogInformation(
-                "分发器已将分析任务分发给 {Count} 位分析师，标的: {AssetSymbol}",
-                _expectedAnalystCount, assetSymbol);
+            _logger.LogInformation("分发器已将分析任务分发给各分析师，标的: {AssetSymbol}", assetSymbol);
         }
         catch (Exception ex)
         {

@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
+using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
@@ -12,18 +13,18 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股市场情绪工具实现
 /// </summary>
-public sealed class AShareSentimentTools : IShareSentimentTools
+public sealed class AShareSentimentTools : ISentimentTools
 {
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ZhiTuMarketClient _zhiTuClient;
     private readonly IUserSettingService _userSettingService;
     private readonly ILogger<AShareSentimentTools> _logger;
 
     public AShareSentimentTools(
-        IHttpClientFactory httpClientFactory,
+        ZhiTuMarketClient zhiTuClient,
         IUserSettingService userSettingService,
         ILogger<AShareSentimentTools> logger)
     {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _logger = logger;
     }
@@ -35,13 +36,8 @@ public sealed class AShareSentimentTools : IShareSentimentTools
         {
             var stockCode = new string(assetSymbol.Where(char.IsDigit).ToArray());
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
-            var url = $"/hs/history/transaction/{stockCode}?token={token}&lt=20";
 
-            using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
-            var response = await httpClient.GetStringAsync(url, cancellationToken);
-
-            var dailyFlows = JsonSerializer.Deserialize<List<ZhiTuFundFlowData>>(response, JsonOptions.AShareApiOptions)
-                ?? throw new FriendlyException($"获取资金流向数据为空: {assetSymbol}");
+            var dailyFlows = await _zhiTuClient.GetTransactionHistoryAsync<ZhiTuFundFlowData>(stockCode, token, cancellationToken);
 
             if (dailyFlows.Count == 0)
                 throw new FriendlyException($"获取资金流向数据为空: {assetSymbol}");

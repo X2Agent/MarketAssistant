@@ -30,13 +30,13 @@ public class TextParagraph
     public Embedding<float> TextEmbedding { get; set; } = default!;
 
     /// <summary>
-    /// Optional associated image uri (for cross-modal retrieval).
+    /// Optional associated image uri（图片说明/Caption 检索场景）。
     /// </summary>
     [VectorStoreData]
     public string? ImageUri { get; init; }
 
     /// <summary>
-    /// Optional image embedding for cross-modal search (same dimension as text for late fusion use-cases).
+    /// Optional image embedding。SQLiteVec 要求非空：CLIP 不可用时写全零向量作为明确的“不可用”标记（与任意向量正交，不参与有效排序）；检索依赖 Caption 文本向量。
     /// </summary>
     [VectorStoreVector(RagConstants.EmbeddingDimension, DistanceFunction = DistanceFunction.CosineDistance, IndexKind = IndexKind.Hnsw)]
     public Embedding<float>? ImageEmbedding { get; set; }

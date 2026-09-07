@@ -4,14 +4,14 @@ using Avalonia.Data.Converters;
 namespace MarketAssistant.Converters;
 
 /// <summary>
-/// �ɿ�ֵת���� - ���ڸ�ʽ������Ϊ null ����ֵ
+/// 可空值格式化转换器 - 当值为 null 时返回回退值
 /// </summary>
 public class NullableValueConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // ������ʽ��format|fallback
-        // ���磺"{0:F2}Ԫ|����" �� "+{0:F1}%|--"
+        // 参数格式：format|fallback
+        // 例如："{0:F2}元|--" 或 "+{0:F1}%|--"
         var parameterStr = parameter as string ?? "{0}|--";
         var parts = parameterStr.Split('|');
         var format = parts.Length > 0 ? parts[0] : "{0}";
@@ -20,19 +20,16 @@ public class NullableValueConverter : IValueConverter
         if (value == null)
             return fallback;
 
-        // ���� decimal?
         if (value is decimal decimalValue)
         {
             return string.Format(culture, format, decimalValue);
         }
 
-        // ���� float?
         if (value is float floatValue)
         {
             return string.Format(culture, format, floatValue);
         }
 
-        // ���� int?
         if (value is int intValue)
         {
             return string.Format(culture, format, intValue);

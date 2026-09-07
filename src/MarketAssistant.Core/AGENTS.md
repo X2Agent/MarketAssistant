@@ -1,6 +1,6 @@
 # MarketAssistant.Core — AGENTS.md
 
-共享基础层，提供全局枚举、工具类、异常处理和基础扩展，被所有其他项目引用。**零项目依赖**——仅依赖 `Microsoft.Extensions.Logging.Abstractions` 和 `Microsoft.Data.Sqlite`。
+共享基础层，提供全局枚举、工具类、异常处理和基础扩展，被所有其他项目引用。**零项目依赖**——仅依赖 `Microsoft.Extensions.Logging.Abstractions`。
 
 ---
 
@@ -18,7 +18,6 @@ MarketAssistant.Core/
 │   │   └── LlmJsonExtractor.cs        ← LLM 返回文本 JSON 稳健提取/反序列化
 │   ├── Extensions/
 │   │   └── EnumExtensions.cs          ← GetDescription() 扩展
-│   └── NavigationParameters.cs        ← 导航参数（StockNavigationParameter）
 ```
 
 ---

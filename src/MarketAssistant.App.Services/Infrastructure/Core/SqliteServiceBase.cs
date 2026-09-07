@@ -81,8 +81,8 @@ public abstract class SqliteServiceBase
 
         lock (_initLock)
         {
-            // 如果之前失败，重置允许重试
-            if (_initializeTask?.IsFaulted == true)
+            // 如果之前失败或被取消，重置允许重试（取消的任务 await 会永久抛 TaskCanceledException）
+            if (_initializeTask is { IsFaulted: true } or { IsCanceled: true })
                 _initializeTask = null;
 
             _initializeTask ??= initializeFunc();

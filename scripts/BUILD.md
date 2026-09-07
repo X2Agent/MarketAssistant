@@ -419,7 +419,7 @@ dpkg-sig --sign builder MarketAssistant_1.0.0_amd64.deb
 ### 通用配置
 
 - **目标框架**: `net10.0`
-- **UI 框架**: Avalonia UI 11.3.8
+- **UI 框架**: Avalonia UI 12.1.1
 - **发布模式**: 自包含 (self-contained)
 - **ReadyToRun**: 启用（提高启动性能）
 - **UseAppHost**: 启用（创建平台原生可执行文件）

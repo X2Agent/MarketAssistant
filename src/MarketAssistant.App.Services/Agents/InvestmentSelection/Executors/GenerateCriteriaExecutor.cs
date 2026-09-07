@@ -1,3 +1,4 @@
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Applications.AssetScreener.Models;
@@ -9,20 +10,16 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 
 /// <summary>
-/// 泛型筛选条件生成 Executor
+/// 泛型筛选条件生成器
 /// 将用户需求或新闻内容转换为结构化的筛选条件
 /// </summary>
-public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>
+public sealed class GenerateCriteriaExecutor<TCriteria>
+    : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>
     where TCriteria : IScreeningCriteria
 {
     private readonly IChatClientFactory _chatClientFactory;
     private readonly ICriteriaGenerationStrategy<TCriteria> _strategy;
     private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger;
-
-    private static readonly JsonSerializerOptions SchemaOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
 
     public GenerateCriteriaExecutor(
         IChatClientFactory chatClientFactory,
@@ -58,21 +55,22 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
 
             string userPrompt = _strategy.BuildUserPrompt(input);
 
-            var chatClient = _chatClientFactory.CreateClient();
-
-            var schema = AIJsonUtilities.CreateJsonSchema(typeof(TCriteria), serializerOptions: SchemaOptions);
+            var runtime = _chatClientFactory.CreateRuntime();
+            systemPrompt = StructuredOutputOptions.AppendSchemaInstructions(
+                systemPrompt,
+                typeof(TCriteria),
+                runtime.StructuredOutputMode);
 
             var chatOptions = new ChatOptions
             {
-                ResponseFormat = ChatResponseFormat.ForJsonSchema(
-                    schema: schema,
-                    schemaName: typeof(TCriteria).Name,
-                    schemaDescription: $"包含筛选条件的{_strategy.SupportedMarketType}筛选参数"),
+                ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
+                    typeof(TCriteria),
+                    runtime.StructuredOutputMode),
                 Temperature = 0.1f,
                 MaxOutputTokens = input.IsNewsAnalysis ? 3500 : 2000
             };
 
-            var response = await chatClient.GetResponseAsync(
+            var response = await runtime.Client.GetResponseAsync(
                     [
                         new ChatMessage(ChatRole.System, systemPrompt),
                         new ChatMessage(ChatRole.User, userPrompt)
@@ -80,7 +78,7 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
                     chatOptions,
                     cancellationToken);
 
-            var criteria = _strategy.DeserializeCriteria(response.Text);
+            var criteria = _strategy.DeserializeCriteria(response.Text, input);
 
             _logger.LogInformation("[步骤1/3-{MarketType}] 筛选条件生成完成，包含 {Count} 个条件",
                 _strategy.SupportedMarketType,
@@ -92,6 +90,11 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
                 OriginalRequest = input
             };
         }
+        catch (OperationCanceledException)
+        {
+            // 用户主动取消必须向上传播，不得包装成业务错误
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[步骤1/3-{MarketType}] 生成筛选条件失败", _strategy.SupportedMarketType);
@@ -99,7 +102,7 @@ public sealed class GenerateCriteriaExecutor<TCriteria> : Executor<InvestmentSel
             {
                 throw;
             }
-            throw new FriendlyException(ex.Message);
+            throw new FriendlyException($"生成筛选条件失败: {ex.Message}", ex);
         }
     }
 

@@ -48,6 +48,15 @@ public class InvestmentPreference : INotifyPropertyChanged
         set => SetProperty(ref _investmentHorizon, value);
     }
 
+    /// <summary>
+    /// 深拷贝一份独立副本（配合 UserSetting.Clone 的草稿模式）。
+    /// </summary>
+    public InvestmentPreference Clone() => new()
+    {
+        RiskTolerance = RiskTolerance,
+        InvestmentHorizon = InvestmentHorizon
+    };
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)

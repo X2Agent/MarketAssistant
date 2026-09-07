@@ -8,7 +8,6 @@
 scripts/
 ├── build-release.ps1          # 主构建脚本（跨平台）
 ├── BUILD.md                   # 详细构建文档
-├── PACKAGING.md               # 打包技术细节
 ├── README.md                  # 本文件
 ├── macos/                     # macOS 打包资源
 │   ├── build-app-bundle.sh   # macOS .app bundle 构建脚本
@@ -60,12 +59,6 @@ pwsh scripts/build-release.ps1 -Platform macOS
   - 代码签名配置
   - GitHub Actions 自动化
   - 故障排除
-
-- **[PACKAGING.md](PACKAGING.md)** - 打包技术细节
-  - macOS .app bundle 结构
-  - Linux .deb/.rpm 包规范
-  - Info.plist 配置
-  - Desktop Entry 规范
 
 - **[macos/CREATE_ICON.md](macos/CREATE_ICON.md)** - macOS 图标创建
   - 从 PNG 创建 ICNS
@@ -234,7 +227,6 @@ dotnet clean MarketAssistant.slnx
 ## 📚 相关文档
 
 - [BUILD.md](BUILD.md) - 详细构建指南
-- [PACKAGING.md](PACKAGING.md) - 打包技术细节
 - [../AGENTS.md](../AGENTS.md) - 开发者指南
 - [../README.md](../README.md) - 项目主文档
 
