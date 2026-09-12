@@ -22,15 +22,4 @@ public partial class AgentAnalysisPageView : UserControl
             }
         };
     }
-
-    /// <summary>
-    /// 点击遮罩层关闭侧边栏
-    /// </summary>
-    private void OnOverlayTapped(object? sender, TappedEventArgs e)
-    {
-        if (DataContext is AgentAnalysisViewModel vm)
-        {
-            vm.ToggleChatSidebarCommand.Execute(null);
-        }
-    }
 }

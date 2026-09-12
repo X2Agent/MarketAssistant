@@ -51,4 +51,10 @@ public class TradingStrategy
 
     [Description("追踪止损的峰值/谷值价格")]
     public decimal? TrailingPeakPrice { get; set; }
+
+    /// <summary>
+    /// 交易所侧保护性条件单的参数指纹（类型|方向|数量|触发价|回调基点）。
+    /// 对账时与策略当前参数比对，不一致则撤旧挂新；挂单成功后回写。
+    /// </summary>
+    public string? ConditionOrderFingerprint { get; set; }
 }

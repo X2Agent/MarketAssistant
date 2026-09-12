@@ -102,8 +102,6 @@ public partial class PriceAlertRule : ObservableObject
 
     public string StatusText => IsOneTime && Triggered ? "重新启用" : Enabled ? "禁用" : "启用";
 
-    public string AlertModeText => IsOneTime ? "一次性" : "持续";
-
     /// <summary>
     /// 高级选项摘要（去抖 / 冷却 / 限次 / 交易联动），全部为默认配置时返回空字符串。
     /// </summary>

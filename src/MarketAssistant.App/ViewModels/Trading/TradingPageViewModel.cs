@@ -1,12 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;
 
-public partial class TradingPageViewModel : ViewModelBase, IDisposable
+public partial class TradingPageViewModel : ViewModelBase, IDisposable, INavigationAware<AssetNavigationParameter>
 {
     private readonly TradingEnvironmentService _tradingEnvironmentService;
 
@@ -79,6 +80,23 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable
         CurrentTradingModeText = TradingEnvironmentService.GetModeDisplayName(mode);
         TradingModeDescription = TradingEnvironmentService.GetModeDescription(mode);
         OnPropertyChanged(nameof(IsTestnetTradingMode));
+    }
+
+    /// <summary>
+    /// 从标的详情页携带资产进入：预填策略配置的交易对并切到配置页签。
+    /// 参数为空或类型不符时仅停留在交易页默认视图（尽力而为，不阻断导航）。
+    /// </summary>
+    public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
+    {
+        if (parameter is null || string.IsNullOrWhiteSpace(parameter.Code))
+            return;
+
+        StrategyConfig.NewSymbol = parameter.Code;
+        SelectedTabIndex = 0;
+    }
+
+    public void OnNavigatedFrom()
+    {
     }
 
     public void Dispose()

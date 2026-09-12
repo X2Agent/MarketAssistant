@@ -8,6 +8,24 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Services.Trading;
 
 /// <summary>
+/// 策略触发结果：策略本体保持只读，有效方向/数量与出场语义承载在独立字段。
+/// StrategyEngine 不再修改策略本体的 Side/Quantity，避免返回对象被持久化时污染策略配置。
+/// </summary>
+public sealed record StrategyTrigger
+{
+    public required TradingStrategy Strategy { get; init; }
+
+    public OrderSide EffectiveSide { get; init; }
+
+    public decimal EffectiveQuantity { get; init; }
+
+    /// <summary>
+    /// 出场语义（止损/破网/AI 硬边界）：合约下 requireClose=true 只减仓不反向开仓。
+    /// </summary>
+    public bool RequireClose { get; init; }
+}
+
+/// <summary>
 /// 策略引擎，管理用户策略并评估触发条件。
 /// 止损/止盈/追踪止损均由客户端按价格 tick 轮询评估并执行，
 /// 进程退出或网络中断期间不生效（创建策略时会向用户明确提示该限制）。
@@ -19,6 +37,16 @@ public class StrategyEngine
     private readonly RoutingExchangeClient _exchangeClient;
     private readonly TradingEnvironmentService _environmentService;
     private readonly ILogger<StrategyEngine> _logger;
+    private readonly object _strategiesCacheLock = new();
+
+    /// <summary>
+    /// 活跃策略快照缓存 TTL。价格 tick 约每秒到达，逐 tick 全量查询活跃策略是纯开销；
+    /// 策略增删改经 <see cref="TradingStrategyService.StrategiesChanged"/> 即时失效，
+    /// 绕过服务直写 DB 的路径（如追踪峰值持久化）由 TTL 兜底。
+    /// </summary>
+    private static readonly TimeSpan StrategiesCacheTtl = TimeSpan.FromSeconds(2);
+    private List<TradingStrategy>? _activeStrategiesCache;
+    private DateTime _activeStrategiesCacheAtUtc;
 
     public StrategyEngine(
         TradingDataService dataService,
@@ -32,6 +60,35 @@ public class StrategyEngine
         _exchangeClient = exchangeClient;
         _environmentService = environmentService;
         _logger = logger;
+
+        // 本引擎为单例，订阅策略变更广播以即时失效快照缓存
+        _strategyService.StrategiesChanged += OnStrategiesChanged;
+    }
+
+    private void OnStrategiesChanged(object? sender, EventArgs e)
+    {
+        lock (_strategiesCacheLock)
+            _activeStrategiesCache = null;
+    }
+
+    /// <summary>
+    /// 获取活跃策略快照：TTL 内复用缓存，避免逐 tick 查询 DB。
+    /// </summary>
+    private async Task<List<TradingStrategy>> GetActiveStrategiesSnapshotAsync(CancellationToken ct)
+    {
+        lock (_strategiesCacheLock)
+        {
+            if (_activeStrategiesCache != null && DateTime.UtcNow - _activeStrategiesCacheAtUtc < StrategiesCacheTtl)
+                return _activeStrategiesCache;
+        }
+
+        var strategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
+        lock (_strategiesCacheLock)
+        {
+            _activeStrategiesCache = strategies;
+            _activeStrategiesCacheAtUtc = DateTime.UtcNow;
+        }
+        return strategies;
     }
 
     /// <summary>
@@ -41,16 +98,14 @@ public class StrategyEngine
         => await _dataService.UpdateStrategyTrailingPeakAsync(strategyId, null, ct);
 
     /// <summary>
-    /// 评估指定交易标的的所有活跃策略，返回触发的策略列表。
-    /// 注意：此方法会修改返回列表中策略对象的 <see cref="TradingStrategy.Side"/> 和
-    /// <see cref="TradingStrategy.Quantity"/> 字段（用于反映触发时的有效方向和数量，
-    /// 如网格交易、DCA 等动态计算值），调用方依赖这些副作用将策略传递给交易执行器。
+    /// 评估指定交易标的的所有活跃策略，返回触发结果列表。
+    /// 策略本体保持只读；有效方向/数量与出场语义见 <see cref="StrategyTrigger"/>。
     /// </summary>
-    public async Task<List<TradingStrategy>> EvaluateAndUpdateStrategiesAsync(
+    public async Task<List<StrategyTrigger>> EvaluateAndUpdateStrategiesAsync(
         string symbol, decimal currentPrice, CancellationToken ct = default)
     {
-        var activeStrategies = await _strategyService.GetStrategiesByStatusAsync(StrategyStatus.Active, ct);
-        var triggered = new List<TradingStrategy>();
+        var activeStrategies = await GetActiveStrategiesSnapshotAsync(ct);
+        var triggered = new List<StrategyTrigger>();
 
         foreach (var strategy in activeStrategies)
         {
@@ -66,18 +121,33 @@ public class StrategyEngine
             var (triggeredFlag, effectiveSide, effectiveQty) = await IsTriggeredAsync(strategy, currentPrice, ct);
             if (triggeredFlag)
             {
-                strategy.Side = effectiveSide;
-                strategy.Quantity = effectiveQty;
                 _logger.LogInformation(
                     "策略触发: {StrategyId} {Type} {Symbol} 触发价:{TriggerPrice} 当前价:{CurrentPrice}",
                     strategy.Id, strategy.Type, symbol, strategy.TriggerPrice, currentPrice);
 
-                triggered.Add(strategy);
+                triggered.Add(new StrategyTrigger
+                {
+                    Strategy = strategy,
+                    EffectiveSide = effectiveSide,
+                    EffectiveQuantity = effectiveQty,
+                    RequireClose = IsExitTrigger(strategy)
+                });
             }
         }
 
         return triggered;
     }
+
+    private static bool IsExitTrigger(TradingStrategy strategy) => strategy.Type switch
+    {
+        StrategyType.StopLoss => true,
+        StrategyType.TrailingStop => true,
+        // 止盈：卖出方向为持有多头获利了结（平仓语义），买入方向为建仓，不视为出场
+        StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
+        // Grid/DCA/AISignal 的出场语义依赖有效方向（网格破网、DCA 出场卖出），
+        // 由 MarketMonitor.IsExitOnlyStrategy 按 trigger.EffectiveSide 复核，此处保持非出场
+        _ => false
+    };
 
     private async Task<(bool Triggered, OrderSide Side, decimal Qty)> IsTriggeredAsync(
         TradingStrategy strategy, decimal currentPrice, CancellationToken ct)
@@ -231,22 +301,9 @@ public class StrategyEngine
         TradingStrategy strategy, CancellationToken ct)
     {
         var intervalSeconds = DefaultAISignalIntervalSeconds;
-
-        if (!string.IsNullOrEmpty(strategy.CustomParams))
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(strategy.CustomParams);
-                var root = doc.RootElement;
-                if (root.TryGetProperty("analysisInterval", out var intervalEl))
-                    intervalSeconds = intervalEl.GetInt32();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "解析 AISignal 参数失败，使用默认间隔 {DefaultInterval}s: {StrategyId}",
-                    DefaultAISignalIntervalSeconds, strategy.Id);
-            }
-        }
+        var aiParams = AISignalParams.FromJson(strategy.CustomParams);
+        if (aiParams is { AnalysisIntervalSeconds: > 0 })
+            intervalSeconds = aiParams.AnalysisIntervalSeconds;
 
         if (strategy.LastTriggeredAt.HasValue)
         {

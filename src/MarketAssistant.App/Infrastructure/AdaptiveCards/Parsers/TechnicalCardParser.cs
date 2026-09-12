@@ -22,7 +22,7 @@ public class TechnicalCardParser : BaseAdaptiveCardParser<TechnicalAnalysisResul
             FallbackText = $"技术分析报告：当前趋势{summaryTrend} (强度 {summaryScore})，请查看完整报告。",
             Speak = "技术分析报告已生成。"
         };
-        AddHeader(card.Body, "📈 技术分析报告", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "技术分析报告", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_chart.svg");
 
         // 1. Pattern & Price in 2 columns
         var topCols = new AdaptiveColumnSet();

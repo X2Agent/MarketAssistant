@@ -5,6 +5,7 @@ using MarketAssistant.Applications;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Assets;
+using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
@@ -52,6 +53,18 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     [ObservableProperty]
     private decimal _priceChange;
 
+    /// <summary>当前标的是否已加入自选（按详情页所属市场判定）。</summary>
+    [ObservableProperty]
+    private bool _isFavorite;
+
+    /// <summary>收藏按钮文案：已自选显示“已自选”，否则“加入自选”。</summary>
+    public string FavoriteLabel => IsFavorite ? "已自选" : "加入自选";
+
+    partial void OnIsFavoriteChanged(bool value) => OnPropertyChanged(nameof(FavoriteLabel));
+
+    /// <summary>当前市场是否支持交易（决定“快捷交易”按钮可见性，A 股隐藏）。</summary>
+    public bool CanTrade => _marketContext.CurrentCapability.SupportsTrading;
+
     /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
     public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
 
@@ -69,6 +82,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     public IRelayCommand<string> ChangeKLineTypeCommand { get; private set; }
     public IRelayCommand NavigateToAnalysisCommand { get; private set; }
+    public IRelayCommand NavigateToTradingCommand { get; private set; }
+    public IAsyncRelayCommand ToggleFavoriteCommand { get; private set; }
 
     public AssetPageViewModel(
         ILogger<AssetPageViewModel> logger,
@@ -78,6 +93,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         ChangeKLineTypeCommand = new RelayCommand<string>(ChangeKLineTypeAsync);
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
+        NavigateToTradingCommand = new RelayCommand(NavigateToTradingAsync);
+        ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
     }
 
     partial void OnCurrentKLineTypeChanged(KLineType value)
@@ -108,6 +125,87 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             return;
 
         WeakReferenceMessenger.Default.Send(new NavigationMessage("Analysis", new AssetNavigationParameter(AssetCode, AssetName)));
+    }
+
+    private void NavigateToTradingAsync()
+    {
+        if (string.IsNullOrEmpty(AssetCode))
+            return;
+
+        WeakReferenceMessenger.Default.Send(new NavigationMessage("Trading", new AssetNavigationParameter(AssetCode, AssetName)));
+    }
+
+    /// <summary>
+    /// 将详情页资产代码归一化为收藏存储所用的 code（统一走 <see cref="FavoriteCodeNormalizer"/>），
+    /// 并保留交易所/来源标记用于展示：A 股取 SH/SZ 前缀，虚拟币固定 Binance。
+    /// </summary>
+    private string NormalizeFavoriteCode(out string market)
+    {
+        var rawCode = AssetCode.Trim();
+        var normalized = FavoriteCodeNormalizer.Normalize(rawCode, _marketContext.CurrentMarket);
+
+        if (_marketContext.CurrentMarket == MarketType.Crypto)
+        {
+            market = "Binance";
+        }
+        else
+        {
+            // A 股：归一化剥离了前缀时还原交易所标记；收藏判定按 code + market_type，标记仅供行情映射
+            market = normalized.Length < rawCode.Length
+                ? rawCode[..2].ToUpperInvariant()
+                : string.Empty;
+        }
+
+        return normalized;
+    }
+
+    /// <summary>按当前市场刷新收藏状态，失败静默（不影响详情页主流程）。</summary>
+    private async Task RefreshFavoriteStateAsync()
+    {
+        if (string.IsNullOrEmpty(AssetCode))
+        {
+            IsFavorite = false;
+            return;
+        }
+
+        try
+        {
+            var favoriteService = _marketContext.GetService<IFavoriteService>();
+            var code = NormalizeFavoriteCode(out var market);
+            IsFavorite = await favoriteService.IsFavoriteAsync(code, market);
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "刷新资产 {AssetCode} 收藏状态失败", AssetCode);
+        }
+    }
+
+    private async Task ToggleFavoriteAsync()
+    {
+        if (string.IsNullOrEmpty(AssetCode))
+            return;
+
+        try
+        {
+            var favoriteService = _marketContext.GetService<IFavoriteService>();
+            var code = NormalizeFavoriteCode(out var market);
+
+            if (IsFavorite)
+            {
+                await favoriteService.RemoveFavoriteAsync(code, market);
+            }
+            else
+            {
+                await favoriteService.AddFavoriteAsync(code, market);
+            }
+
+            // 以数据库真实状态回显，避免本地取反与持久化状态漂移
+            await RefreshFavoriteStateAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "切换资产 {AssetCode} 收藏状态失败", AssetCode);
+        }
     }
 
     private void ChangeKLineTypeAsync(string? type)
@@ -247,6 +345,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                     DetachRealtimeQuoteService();
                 }
             }
+
+            // 4. 刷新收藏状态（首次进入与 GoBack 重新激活均需同步）
+            _ = RefreshFavoriteStateAsync();
         }
     }
 

@@ -85,7 +85,9 @@ public sealed class StrategyEngineTriggerTest
 
         Assert.AreEqual(0, above.Count, "高于触发价时不应触发卖出止损");
         Assert.AreEqual(1, below.Count, "跌破触发价应触发止损");
-        Assert.AreEqual(OrderSide.Sell, below[0].Side);
+        Assert.AreEqual(strategy, below[0].Strategy, "策略本体应保持引用一致");
+        Assert.AreEqual(OrderSide.Sell, below[0].EffectiveSide);
+        Assert.IsTrue(below[0].RequireClose, "止损为纯退出语义");
     }
 
     [TestMethod]
@@ -102,7 +104,8 @@ public sealed class StrategyEngineTriggerTest
 
         Assert.AreEqual(0, below.Count, "低于触发价时不应触发止盈");
         Assert.AreEqual(1, above.Count, "涨破触发价应触发止盈");
-        Assert.AreEqual(OrderSide.Sell, above[0].Side);
+        Assert.AreEqual(OrderSide.Sell, above[0].EffectiveSide);
+        Assert.IsTrue(above[0].RequireClose, "卖出止盈为获利了结（平仓语义）");
     }
 
     [TestMethod]
@@ -119,7 +122,8 @@ public sealed class StrategyEngineTriggerTest
 
         Assert.AreEqual(0, first.Count, "首次评估仅记录峰值，不应触发");
         Assert.AreEqual(1, second.Count, "从峰值回撤 6% > 5% 回退比例应触发");
-        Assert.AreEqual(OrderSide.Sell, second[0].Side);
+        Assert.AreEqual(OrderSide.Sell, second[0].EffectiveSide);
+        Assert.IsTrue(second[0].RequireClose, "追踪止损为纯退出语义");
         ctx.Data.Verify(
             data => data.UpdateStrategyTrailingPeakAsync(strategy.Id, 100m, It.IsAny<CancellationToken>()),
             Times.Once, "峰值 100 应被持久化");
@@ -180,17 +184,17 @@ public sealed class StrategyEngineTriggerTest
             .Returns(Task.CompletedTask);
 
         var down = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 94m);
-        // 引擎会原地修改策略对象（文档化副作用），上穿评估会覆盖 Side，需先快照下穿结果
         var downCount = down.Count;
-        var downSide = downCount > 0 ? down[0].Side : default(OrderSide);
-        var downQty = downCount > 0 ? down[0].Quantity : 0m;
+        var downSide = downCount > 0 ? down[0].EffectiveSide : default(OrderSide);
+        var downQty = downCount > 0 ? down[0].EffectiveQuantity : 0m;
         var up = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 106m);
 
         Assert.AreEqual(1, downCount, $"下穿应触发一次，落库参数: {persistedAfterDown}");
         Assert.AreEqual(OrderSide.Buy, downSide, "下穿网格线应买入");
         Assert.AreEqual(1m, downQty);
         Assert.AreEqual(1, up.Count);
-        Assert.AreEqual(OrderSide.Sell, up[0].Side, "上穿网格线应卖出");
+        Assert.AreEqual(OrderSide.Sell, up[0].EffectiveSide, "上穿网格线应卖出");
+        Assert.AreSame(strategy, down[0].Strategy, "策略本体不应被改写，仅有效字段承载触发值");
     }
 
     [TestMethod]
@@ -216,8 +220,10 @@ public sealed class StrategyEngineTriggerTest
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 100m);
 
         Assert.AreEqual(1, triggered.Count, "无持仓且间隔已过应触发买入");
-        Assert.AreEqual(OrderSide.Buy, triggered[0].Side);
-        Assert.AreEqual(1m, triggered[0].Quantity, "100 USDT ÷ 100 价格 = 1 BTC");
+        Assert.AreEqual(OrderSide.Buy, triggered[0].EffectiveSide);
+        Assert.AreEqual(1m, triggered[0].EffectiveQuantity, "100 USDT ÷ 100 价格 = 1 BTC");
+        Assert.IsFalse(triggered[0].RequireClose, "DCA 建仓买入不是出场语义");
+        Assert.AreEqual(OrderSide.Buy, strategy.Side, "策略本体 Side 不应被引擎改写");
     }
 
     [TestMethod]
@@ -247,8 +253,8 @@ public sealed class StrategyEngineTriggerTest
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 115m);
 
         Assert.AreEqual(1, triggered.Count);
-        Assert.AreEqual(OrderSide.Sell, triggered[0].Side, "止盈应卖出");
-        Assert.AreEqual(1.5m, triggered[0].Quantity, "应卖出剩余持仓（2 - 0.5）");
+        Assert.AreEqual(OrderSide.Sell, triggered[0].EffectiveSide, "止盈应卖出");
+        Assert.AreEqual(1.5m, triggered[0].EffectiveQuantity, "应卖出剩余持仓（2 - 0.5）");
     }
 
     [TestMethod]
@@ -310,7 +316,43 @@ public sealed class StrategyEngineTriggerTest
         var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 79m);
 
         Assert.AreEqual(1, triggered.Count);
-        Assert.AreEqual(OrderSide.Sell, triggered[0].Side);
-        Assert.AreEqual(1m, triggered[0].Quantity);
+        Assert.AreEqual(OrderSide.Sell, triggered[0].EffectiveSide);
+        Assert.AreEqual(1m, triggered[0].EffectiveQuantity);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task AISignal_ConfiguredInterval_GatesEvaluation()
+    {
+        var ctx = CreateEngine();
+        var aiParams = new AISignalParams { AnalysisIntervalSeconds = 3600 };
+        var strategy = CreateStrategy(StrategyType.AISignal, OrderSide.Buy, JsonSerializer.Serialize(aiParams));
+        strategy.LastTriggeredAt = DateTime.UtcNow.AddSeconds(-120);
+        SetupStrategies(ctx, strategy);
+
+        var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 100m);
+
+        Assert.AreEqual(0, triggered.Count, "距上次评估 120s < 配置间隔 3600s，不应触发");
+        ctx.Data.Verify(
+            data => data.UpdateStrategyLastTriggeredAtAsync(strategy.Id, It.IsAny<CancellationToken>()),
+            Times.Never, "未触发时不应更新节流时间");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task AISignal_ElapsedBeyondConfiguredInterval_Triggers()
+    {
+        var ctx = CreateEngine();
+        var aiParams = new AISignalParams { AnalysisIntervalSeconds = 60 };
+        var strategy = CreateStrategy(StrategyType.AISignal, OrderSide.Buy, JsonSerializer.Serialize(aiParams));
+        strategy.LastTriggeredAt = DateTime.UtcNow.AddSeconds(-120);
+        SetupStrategies(ctx, strategy);
+
+        var triggered = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 100m);
+
+        Assert.AreEqual(1, triggered.Count, "距上次评估 120s > 配置间隔 60s，应触发");
+        ctx.Data.Verify(
+            data => data.UpdateStrategyLastTriggeredAtAsync(strategy.Id, It.IsAny<CancellationToken>()),
+            Times.Once, "触发时应立即持久化节流时间");
     }
 }

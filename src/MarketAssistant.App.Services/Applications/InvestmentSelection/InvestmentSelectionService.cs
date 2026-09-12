@@ -145,7 +145,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.ValueInvestment,
                 Name = "价值投资",
-                Icon = "💎",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_shield.svg",
                 Description = "筛选PE低、PB低、ROE高的优质价值标的",
                 Scenario = "适合稳健型投资者，追求长期价值投资",
                 RiskLevel = "低风险"
@@ -154,7 +154,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.GrowthInvestment,
                 Name = "成长投资",
-                Icon = "🚀",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_rocket.svg",
                 Description = "筛选营收和利润高增长的成长型标的",
                 Scenario = "适合积极型投资者，追求高成长收益",
                 RiskLevel = "中高风险"
@@ -163,7 +163,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.ActiveTrading,
                 Name = "活跃标的",
-                Icon = "🔥",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg",
                 Description = "筛选换手率高、成交活跃的热门标的",
                 Scenario = "适合短线交易者，追求市场热点",
                 RiskLevel = "高风险"
@@ -172,7 +172,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.LargeCap,
                 Name = "大盘标的",
-                Icon = "🏢",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_grid.svg",
                 Description = "筛选市值大、业绩稳定的蓝筹标的",
                 Scenario = "适合保守型投资者，追求稳定收益",
                 RiskLevel = "低风险"
@@ -181,7 +181,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.SmallCap,
                 Name = "小盘标的",
-                Icon = "🌱",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_bulb.svg",
                 Description = "筛选市值较小、具有成长潜力的标的",
                 Scenario = "适合风险偏好较高的投资者",
                 RiskLevel = "高风险"
@@ -190,7 +190,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.HighYield,
                 Name = "高股息",
-                Icon = "💰",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_money.svg",
                 Description = "筛选股息率高、分红稳定的高股息标的",
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"
@@ -209,7 +209,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.ValueInvestment,
                 Name = "价值币种",
-                Icon = "💎",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_shield.svg",
                 Description = "筛选市值大、技术成熟、社区活跃的主流币种",
                 Scenario = "适合稳健型投资者，追求长期持有价值币",
                 RiskLevel = "低风险"
@@ -218,7 +218,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.GrowthInvestment,
                 Name = "高成长币",
-                Icon = "🚀",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_rocket.svg",
                 Description = "筛选7日/30日涨幅较高、交易量增长的高成长币种",
                 Scenario = "适合积极型投资者，追求高收益潜力币",
                 RiskLevel = "中高风险"
@@ -227,7 +227,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.ActiveTrading,
                 Name = "热门币种",
-                Icon = "🔥",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg",
                 Description = "筛选24h交易量大、价格波动活跃的热门币种",
                 Scenario = "适合短线交易者，追捧市场热点币",
                 RiskLevel = "高风险"
@@ -236,7 +236,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.LargeCap,
                 Name = "主流大币",
-                Icon = "🏢",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_grid.svg",
                 Description = "筛选市值排名前50、流动性充足的蓝筹主流币",
                 Scenario = "适合保守型投资者，追求稳定的主流币",
                 RiskLevel = "低风险"
@@ -245,7 +245,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.SmallCap,
                 Name = "潜力小币",
-                Icon = "🌱",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_bulb.svg",
                 Description = "筛选市值排名100-500、具有创新性的潜力币种",
                 Scenario = "适合风险偏好较高的投资者，寻找黑马币",
                 RiskLevel = "高风险"
@@ -254,7 +254,7 @@ public class InvestmentSelectionService
             {
                 Strategy = QuickSelectionStrategy.HighYield,
                 Name = "高波动币",
-                Icon = "⚡",
+                IconPath = "avares://MarketAssistant/Assets/Images/icon_money.svg",
                 Description = "筛选24h价格波动大于±5%的高波动币种",
                 Scenario = "适合激进型交易者，追求短期高波动收益",
                 RiskLevel = "高风险"

@@ -63,13 +63,21 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         await EnsureInitializedAsync(InitializeDatabaseAsync);
 
         var settings = _userSettingService.CurrentSetting;
+        // 触达抑制（休市静默 / 用户关闭通知 / 免打扰时段）在配额评估前算好传入 policy：
+        // 被抑制的告警只落库不弹窗，也不消耗每小时配额，避免静默期噪声挤占交易时段配额
+        var isSessionSilenced = AlertSuppressionPolicy.IsSilencedByTradingSession(
+            alert, AShareTradingHours.IsTradingSession());
+        var suppressNotification =
+            isSessionSilenced || !settings.Notification || IsInQuietHours(settings, alert.Level);
+
         AlertSuppressionPolicy.Decision decision;
         lock (_stateSync)
         {
             var mergeState = _mergeStates.GetValueOrDefault(alert.DedupeKey)
                              ?? AlertSuppressionPolicy.MergeState.Empty;
             decision = _policy.Evaluate(
-                alert, mergeState, _quotaState, settings.AlertHourlyQuota, DateTime.UtcNow);
+                alert, mergeState, _quotaState, settings.AlertHourlyQuota, DateTime.UtcNow,
+                suppressNotification);
             _mergeStates[alert.DedupeKey] = decision.NewMergeState;
             _quotaState = decision.NewQuotaState;
         }
@@ -93,11 +101,9 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
             _alertGate.Activate(alert.MarketType, alert.Symbol);
         }
 
-        // 触达抑制三重：每小时配额（policy 内判定）+ A 股休市静默 + 用户免打扰时段；
-        // 均只压弹窗，告警仍落库、确认级交易联动门仍登记
-        var isSessionSilenced = AlertSuppressionPolicy.IsSilencedByTradingSession(
-            alert, AShareTradingHours.IsTradingSession());
-        if (decision.ShouldNotify && !isSessionSilenced && settings.Notification && !IsInQuietHours(settings, alert.Level))
+        // policy 已统一判定触达抑制（配额 + 静默），被抑制的告警仍落库、
+        // 确认级交易联动门仍登记
+        if (decision.ShouldNotify)
             Notify(alert);
 
         AlertRaised?.Invoke(alert);

@@ -474,6 +474,11 @@ public class BinanceOrderResponse
     public string Side { get; set; } = string.Empty;
 
     /// <summary>
+    /// 条件单触发价（StopMarket/TakeProfitMarket 订单）。
+    /// </summary>
+    public string StopPrice { get; set; } = string.Empty;
+
+    /// <summary>
     /// 成交流水（仅 POST /api/v3/order 响应包含，查询接口不返回）。
     /// 用于汇总手续费。
     /// </summary>

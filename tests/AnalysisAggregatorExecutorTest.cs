@@ -34,8 +34,8 @@ public sealed class AnalysisAggregatorExecutorTest
 
         Assert.AreEqual(1, sentBatches.Count, "凑齐成功+失败后应恰好派发一次");
         var payload = sentBatches[0];
-        // 载荷：系统指引 + 成功分析师摘要 + 维度缺失说明（P1-07 摘要化后多一条系统指引）
-        Assert.AreEqual(3, payload.Count);
+        // 载荷：系统指引 + 成功分析师摘要 + 维度缺失说明 + 失败标记原样（渲染失败占位卡片）
+        Assert.AreEqual(4, payload.Count);
         System.IO.File.WriteAllLines(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "agg-debug.txt"), payload.Select(m => $"author={m.AuthorName} text={m.Text}"));
         StringAssert.Contains(payload[0].Text, "get_analyst_artifact", "首条应为工具使用指引");
         StringAssert.Contains(payload[1].Text, "【NewsEventAnalyst】结论摘要", "成功条目应为摘要而非全文");
@@ -43,6 +43,7 @@ public sealed class AnalysisAggregatorExecutorTest
         StringAssert.Contains(payload[2].Text, AnalystFailureMessages.MissingDimensionNotePrefix);
         StringAssert.Contains(payload[2].Text, "FundamentalAnalyst");
         StringAssert.Contains(payload[2].Text, "模型超时");
+        StringAssert.Contains(payload[3].Text, "模型超时", "失败标记应原样附入载荷");
 
         // 全文应已落盘，可按 runId+analyst 读回
         var artifact = await store.GetAsync(TestRunId, "NewsEventAnalyst");

@@ -70,6 +70,7 @@
 	<PackageReference Include="Svg.Skia" />
 	<!-- Avalonia 官方 WebView（MIT 开源,无需许可证） -->
 	<PackageReference Include="Avalonia.Controls.WebView" />
+	<PackageReference Include="Avalonia.Controls.DataGrid" />
 	<PackageReference Include="Markdown.Avalonia" />
 	<PackageReference Include="YamlDotNet" />
   </ItemGroup>

@@ -11,12 +11,12 @@
     <UserControl.Styles>
         <!-- 评级徽标：Positive 红涨 / Negative 绿跌 / Neutral 灰 -->
         <Style Selector="Border.ratingBadge">
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
             <Setter Property="Padding" Value="10,3"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Border.ratingBadge TextBlock">
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         </Style>
@@ -32,14 +32,14 @@
         <!-- 评分条 -->
         <Style Selector="ProgressBar.scoreBar">
             <Setter Property="Height" Value="6"/>
-            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         </Style>
         <!-- 关键数据 chip -->
         <Style Selector="Border.kvChip">
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
             <Setter Property="Padding" Value="8,3"/>
             <Setter Property="Margin" Value="0,3,6,0"/>
         </Style>
@@ -69,7 +69,7 @@
                     <Grid ColumnDefinitions="72,*,36" Margin="0,2" VerticalAlignment="Center">
                         <TextBlock Grid.Column="0"
                                    Text="{Binding Label}"
-                                   FontSize="11"
+                                   FontSize="{StaticResource TinyFontSize}"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -81,10 +81,10 @@
                                      VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="2"
                                    Text="{Binding ValueText}"
-                                   FontSize="11"
+                                   FontSize="{StaticResource TinyFontSize}"
                                    HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
-                                   FontFamily="Consolas, 'Cascadia Mono', monospace"
+                                   FontFamily="{StaticResource DataFontFamily}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
                     </Grid>
                 </DataTemplate>
@@ -100,7 +100,7 @@
                                 Background="{StaticResource PrimaryBrush}"
                                 VerticalAlignment="Center" Margin="0,1,7,1"/>
                         <TextBlock Text="{Binding}"
-                                   FontSize="12"
+                                   FontSize="{StaticResource SmallFontSize}"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
                     </StackPanel>
@@ -120,10 +120,10 @@
                     <Border Classes="kvChip">
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock Text="{Binding Label}"
-                                       FontSize="11"
+                                       FontSize="{StaticResource TinyFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBlock Text="{Binding Value}"
-                                       FontSize="11"
+                                       FontSize="{StaticResource TinyFontSize}"
                                        FontWeight="SemiBold"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
@@ -136,18 +136,18 @@
         <!-- 风险提示 -->
         <Border IsVisible="{Binding HasRisks}"
                 Background="{DynamicResource DangerPanelBackgroundBrush}"
-                CornerRadius="4"
+                CornerRadius="{StaticResource TinyCornerRadius}"
                 Padding="8,6">
             <StackPanel Spacing="2">
                 <TextBlock Text="主要风险"
-                           FontSize="11"
+                           FontSize="{StaticResource TinyFontSize}"
                            FontWeight="Bold"
                            Foreground="{DynamicResource DangerPanelTextBrush}"/>
                 <ItemsControl ItemsSource="{Binding Risks}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="x:String">
                             <TextBlock Text="{Binding}"
-                                       FontSize="12"
+                                       FontSize="{StaticResource SmallFontSize}"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource DangerPanelTextBrush}"/>
                         </DataTemplate>

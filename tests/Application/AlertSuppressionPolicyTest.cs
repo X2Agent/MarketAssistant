@@ -160,6 +160,52 @@ public sealed class AlertSuppressionPolicyTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public void Evaluate_Suppressed_ShouldNotConsumeQuota_AndResumeAfterUnsuppressed()
+    {
+        var policy = new AlertSuppressionPolicy();
+        var now = DateTime.UtcNow;
+
+        // 静默期（休市/免打扰/关闭通知）内多条告警：只落库不弹窗，配额零消耗
+        var quota = AlertSuppressionPolicy.QuotaState.Empty;
+        for (var i = 0; i < 3; i++)
+        {
+            var decision = policy.Evaluate(
+                CreateAlert(title: $"静默告警{i}"), AlertSuppressionPolicy.MergeState.Empty, quota, 3,
+                now.AddMinutes(i), suppressNotification: true);
+            quota = decision.NewQuotaState;
+            Assert.IsFalse(decision.ShouldNotify, "静默告警不应弹窗");
+        }
+
+        Assert.AreEqual(0, quota.Count, "静默告警不应消耗配额");
+
+        // 静默解除后，完整配额立即可用（合并窗口按各自键独立，不受影响）
+        var resumed = policy.Evaluate(
+            CreateAlert(title: "交易时段告警"), AlertSuppressionPolicy.MergeState.Empty, quota, 3,
+            now.AddMinutes(10));
+
+        Assert.IsTrue(resumed.ShouldNotify, "静默解除后配额未被占用，应可正常触达");
+        Assert.AreEqual(1, resumed.NewQuotaState.Count);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void Evaluate_SuppressedCritical_ShouldNotConsumeQuota()
+    {
+        var policy = new AlertSuppressionPolicy();
+        var now = DateTime.UtcNow;
+
+        // Critical 原不受配额限制，但被抑制时同样不弹窗不计数（口径统一）
+        var decision = policy.Evaluate(
+            CreateAlert(level: AlertLevel.Critical, title: "静默紧急告警"),
+            AlertSuppressionPolicy.MergeState.Empty, AlertSuppressionPolicy.QuotaState.Empty, 5,
+            now, suppressNotification: true);
+
+        Assert.IsFalse(decision.ShouldNotify);
+        Assert.AreEqual(0, decision.NewQuotaState.Count);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public void IsSilencedByTradingSession_ASharePriceWarning_ShouldSilence()
     {
         var alert = CreateAlert(marketType: MarketType.AShare);

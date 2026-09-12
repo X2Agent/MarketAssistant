@@ -105,7 +105,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             await HomeAssetService.AddToFavoriteAsync(asset);
-        }, "添加收藏");
+        }, "加入自选");
     }
 
     public void Dispose()

@@ -91,9 +91,19 @@ public class ExchangeOrderResult
 {
     public string Symbol { get; set; } = string.Empty;
     public string OrderId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 客户端自定义订单 ID。条件单对账依赖它按前缀识别本应用挂出的订单。
+    /// </summary>
+    public string ClientOrderId { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string Side { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 条件单触发价（StopMarket/TakeProfitMarket）。对账时用于检测策略参数漂移。
+    /// </summary>
+    public decimal StopPrice { get; set; }
     public decimal RequestedQty { get; set; }
     public decimal ExecutedQty { get; set; }
     public decimal Price { get; set; }

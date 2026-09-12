@@ -38,7 +38,7 @@ public sealed class CoordinatorResult
     [Description("置信度百分比，基于信息完整性和一致性。评分标准：" + ScoringStandards.Confidence)]
     public float ConfidencePercentage { get; set; }
 
-    [Description("各维度评分，包含基本面、技术面、财务面、市场情绪和新闻事件的评分。评分范围 1-10。评分标准：" + ScoringStandards.Performance)]
+    [Description("各维度评分，包含基本面、技术面、财务面、市场情绪、新闻事件的评分，以及虚拟币专属指标评分（仅 Crypto 有效）。评分范围 1-10。评分标准：" + ScoringStandards.Performance)]
     public AnalysisDimensionScores DimensionScores { get; set; } = new();
 
     [MinLength(1)]
@@ -136,4 +136,12 @@ public sealed class AnalysisDimensionScores
     [Range(1, 10)]
     [Description("新闻事件评分")]
     public float News { get; set; }
+
+    /// <summary>
+    /// 虚拟币专属指标评分（市值/流动性/波动率/市场结构综合）。
+    /// A 股分析固定为 null；Crypto 分析缺数据时为 null。
+    /// </summary>
+    [Range(1, 10)]
+    [Description("虚拟币指标评分（仅 Crypto 市场有效，无数据时为 null）")]
+    public float? CryptoMetrics { get; set; }
 }

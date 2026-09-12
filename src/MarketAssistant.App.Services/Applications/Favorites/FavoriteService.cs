@@ -53,6 +53,19 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
             CREATE INDEX IF NOT EXISTS idx_fav_mt ON favorite_assets(market_type);
             """;
         await cmd.ExecuteNonQueryAsync();
+
+        // 存量数据归一化迁移（幂等）：历史数据存在小写/带 SH/SZ 前缀的代码，
+        // 与归一化后的查询（大写、无前缀）无法匹配，导致详情页收藏状态判定失败。
+        // 顺序：先按归一化后的键去重（保留最早一条），再统一大写，最后剥离 A 股交易所前缀。
+        await using var migrateCmd = conn.CreateCommand();
+        migrateCmd.CommandText = """
+            DELETE FROM favorite_assets
+            WHERE id NOT IN (SELECT MIN(id) FROM favorite_assets GROUP BY UPPER(code), market_type);
+            UPDATE favorite_assets SET code = UPPER(code);
+            UPDATE favorite_assets SET code = SUBSTR(code, 3)
+            WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ');
+            """;
+        await migrateCmd.ExecuteNonQueryAsync();
     }
 
     public async Task AddFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
@@ -62,6 +75,8 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 
         code = code.Trim();
         market = market.Trim();
+        // 写入前统一归一化，保证与查询端（详情页/首页）的代码格式一致
+        code = FavoriteCodeNormalizer.Normalize(code, _marketType);
 
         try
         {
@@ -98,7 +113,7 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                DELETE FROM favorite_assets WHERE code = @code AND market_type = @marketType
+                DELETE FROM favorite_assets WHERE UPPER(code) = @code AND market_type = @marketType
                 """;
             cmd.Parameters.AddWithValue("@code", code);
             cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
@@ -127,7 +142,7 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                SELECT COUNT(1) FROM favorite_assets WHERE code = @code AND market_type = @marketType
+                SELECT COUNT(1) FROM favorite_assets WHERE UPPER(code) = @code AND market_type = @marketType
                 """;
             cmd.Parameters.AddWithValue("@code", code);
             cmd.Parameters.AddWithValue("@marketType", (int)_marketType);

@@ -49,8 +49,8 @@ public sealed class ChartPatternTrend
 [Description("关键价位分析")]
 public sealed class KeyPriceLevels
 {
-    [Range(0.01, 100000)]
-    [Description("当前价格，单位：元")]
+    [Range(0.00000001, 10000000)]
+    [Description("当前价格。A 股单位：元；虚拟币单位：USDT")]
     public decimal CurrentPrice { get; set; }
 
     [MinLength(1)]
@@ -127,16 +127,16 @@ public sealed class TradingStrategyRecommendation
     [Description("操作方向")]
     public OperationRecommendation OperationDirection { get; set; }
 
-    [Range(0.01, 100000)]
-    [Description("目标价位区间下限，单位：元，无法预测时设为null")]
+    [Range(0.00000001, 10000000)]
+    [Description("目标价位区间下限。A 股单位：元；虚拟币单位：USDT，无法预测时设为null")]
     public decimal? TargetPriceLow { get; set; }
 
-    [Range(0.01, 100000)]
-    [Description("目标价位区间上限，单位：元，无法预测时设为null")]
+    [Range(0.00000001, 10000000)]
+    [Description("目标价位区间上限。A 股单位：元；虚拟币单位：USDT，无法预测时设为null")]
     public decimal? TargetPriceHigh { get; set; }
 
-    [Range(0.01, 100000)]
-    [Description("止损价格点位，单位：元，无法预测时设为null")]
+    [Range(0.00000001, 10000000)]
+    [Description("止损价格点位。A 股单位：元；虚拟币单位：USDT，无法预测时设为null")]
     public decimal? StopLossPrice { get; set; }
 
     [Description("持仓周期")]

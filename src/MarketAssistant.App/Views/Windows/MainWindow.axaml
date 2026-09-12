@@ -45,17 +45,17 @@
             <Border.Resources>
                 <!-- 导航项模板：图标 + 活跃态左侧指示条（主导航与底部导航共享） -->
                 <DataTemplate x:Key="NavRailItemTemplate" x:DataType="vm:NavigationItemViewModel">
-                    <Panel Width="{StaticResource DefaultIconSize}"
-                           Height="{StaticResource DefaultIconSize}"
+                    <Panel Width="{StaticResource NavIconSize}"
+                           Height="{StaticResource NavIconSize}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            ToolTip.Tip="{Binding Title}">
-                        <svg:Svg Width="{StaticResource DefaultIconSize}"
-                                Height="{StaticResource DefaultIconSize}"
+                        <svg:Svg Width="{StaticResource NavIconSize}"
+                                Height="{StaticResource NavIconSize}"
                                 Path="{Binding IconPath}"
                                 IsVisible="{Binding !IsVisible, ElementName=SelectedIcon}"/>
-                        <svg:Svg x:Name="SelectedIcon" Width="{StaticResource DefaultIconSize}"
-                                Height="{StaticResource DefaultIconSize}"
+                        <svg:Svg x:Name="SelectedIcon" Width="{StaticResource NavIconSize}"
+                                Height="{StaticResource NavIconSize}"
                                 Path="{Binding SelectedIconPath}"
                                 IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
                         <!-- 告警未读徽标（仅告警导航项在存在未读时显示） -->
@@ -74,8 +74,8 @@
                 <Style Selector="ListBoxItem">
                     <Setter Property="Padding" Value="0"/>
                     <Setter Property="Margin" Value="{StaticResource SmallMargin}"/>
-                    <Setter Property="Width" Value="{StaticResource FABSize}"/>
-                    <Setter Property="Height" Value="{StaticResource AppLogoSize}"/>
+                    <Setter Property="Width" Value="{StaticResource NavItemSize}"/>
+                    <Setter Property="Height" Value="{StaticResource NavItemSize}"/>
                     <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
                     <Setter Property="Background" Value="Transparent"/>
                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -214,7 +214,8 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:IndexTickerItemViewModel">
-                            <Panel VerticalAlignment="Center">
+                            <!-- ClipToBounds：极窄窗口下单元格内容溢出时按块裁剪，避免与相邻块文字重叠 -->
+                            <Panel VerticalAlignment="Center" ClipToBounds="True">
                                 <!-- 块间竖分隔线（对齐原型 tb-tsep） -->
                                 <Border Classes="ticker-sep"
                                         Width="{StaticResource DividerHeight}"
@@ -246,13 +247,21 @@
                                                VerticalAlignment="Center"
                                                IsVisible="{Binding IsDown}"
                                                Foreground="{StaticResource BearishBrush}"/>
+                                    <!-- 中性/无涨跌语义（平盘、主导率、恐惧贪婪分类） -->
+                                    <TextBlock Text="{Binding ChangeText}"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource SmallFontSize}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding IsNeutral}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </StackPanel>
                             </Panel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- A股 / 虚拟币 分段市场切换器（二级页面对齐原型 tb-mkt：与行情条一并隐藏） -->
+                <!-- A股 / 虚拟币 分段市场切换器（二级页面隐藏：详情页等市场特定上下文下，
+                     切市场会丢失页面上下文，故不提供入口；行情条为被动背景信息，保持常驻） -->
                 <Border Grid.Column="3"
                         Padding="{StaticResource TinyPadding}"
                         VerticalAlignment="Center"
@@ -270,7 +279,7 @@
                         </Style>
                         <Style Selector="Button.market-switch-btn.active">
                             <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
                         </Style>
                     </Border.Styles>
                     <StackPanel Orientation="Horizontal" Spacing="2">

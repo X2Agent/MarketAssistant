@@ -64,6 +64,26 @@ public class AssetInfo : INotifyPropertyChanged
     /// </summary>
     public string? Volume24h { get; set; }
 
+    /// <summary>
+    /// 现价数值（从 <see cref="CurrentPrice"/> 解析，去除千分位逗号）。
+    /// 供表格视图按数值排序使用；无法解析时为 0。
+    /// </summary>
+    public decimal PriceValue => TryParseNumber(CurrentPrice);
+
+    /// <summary>
+    /// 涨跌幅数值（从 <see cref="ChangePercentage"/> 解析，去除百分号与正号）。
+    /// 供表格视图按数值排序使用；无法解析时为 0。
+    /// </summary>
+    public decimal ChangePercentValue => TryParseNumber(ChangePercentage?.TrimEnd('%'));
+
+    private static decimal TryParseNumber(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 0;
+        var cleaned = text.Replace(",", "").Replace("+", "").Trim();
+        return decimal.TryParse(cleaned, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : 0;
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

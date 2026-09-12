@@ -48,4 +48,17 @@ public partial class FavoritesPageView : UserControl
             viewModel.SelectFavoriteAssetCommand?.Execute(asset);
         }
     }
+
+    /// <summary>
+    /// 表格视图行双击：进入标的详情（与卡片单击行为一致）。
+    /// </summary>
+    private void OnGridRowDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is DataGrid grid &&
+            grid.SelectedItem is AssetInfo asset &&
+            DataContext is FavoritesPageViewModel viewModel)
+        {
+            viewModel.SelectFavoriteAssetCommand?.Execute(asset);
+        }
+    }
 }

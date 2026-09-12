@@ -18,22 +18,30 @@
         <x:Double x:Key="HistoryListMaxHeight">240</x:Double>
     </UserControl.Resources>
 
-    <!-- 遮罩式布局：主内容全宽，侧边栏作为浮层叠加在右侧 -->
-    <Panel>
-        <!-- 主内容区域 -->
-        <Grid ClipToBounds="True">
-            <!-- 进度显示区域 - 仅在分析时显示 -->
-            <views:ProgressDisplayView
-                IsVisible="{Binding IsBusy}"
-                AnalysisStage="{Binding AnalysisStage}"
-                ProgressPercent="{Binding AnalysisProgressPercent}"
-                AnalysisPhase="{Binding AnalysisPhase}"
-                AnalystRunItems="{Binding AnalystRunItems}"
-                FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
-                CancelCommand="{Binding CancelAnalysisCommand}"/>
+    <!-- 并列分屏工作区 (Docked Assistant)：主内容研报区 + 伴侣侧边栏 -->
+    <Grid>
+        <!-- 进度显示区域 - 仅在分析时显示 -->
+        <views:ProgressDisplayView
+            IsVisible="{Binding IsBusy}"
+            AnalysisStage="{Binding AnalysisStage}"
+            ProgressPercent="{Binding AnalysisProgressPercent}"
+            AnalysisPhase="{Binding AnalysisPhase}"
+            AnalystRunItems="{Binding AnalystRunItems}"
+            FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
+            CancelCommand="{Binding CancelAnalysisCommand}"/>
 
-            <!-- 分析完成后的内容区域 -->
-            <Grid IsVisible="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}"
+        <!-- 分析完成后的并列内容区域 -->
+        <Grid IsVisible="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}">
+            <Grid.ColumnDefinitions>
+                <!-- 主研报视图列 -->
+                <ColumnDefinition Width="*"/>
+                <!-- 伴侣侧边栏列 (展开或折叠) -->
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧：主研报区 -->
+            <Grid Grid.Column="0"
+                  ClipToBounds="True"
                   RowDefinitions="Auto,*">
 
                 <!-- 顶部工具栏：包含更多操作菜单按钮 -->
@@ -187,7 +195,7 @@
                         ZIndex="999" 
                         IsHitTestVisible="False"/>
 
-                    <!-- 智能助手 FAB -->
+                    <!-- 智能助手 FAB（伴侣侧边栏打开时隐藏） -->
                     <Button Margin="{StaticResource FABMargin}"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
@@ -200,6 +208,7 @@
                             BorderThickness="{StaticResource NoBorderThickness}"
                             Padding="{StaticResource NoPadding}"
                             Command="{Binding ToggleChatSidebarCommand}"
+                            IsVisible="{Binding !IsChatSidebarVisible}"
                             ToolTip.Tip="智能助手"
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center">
@@ -268,33 +277,25 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- 右侧：并列常驻/展开的 AI 伴侣助手侧边栏 (无遮罩，边看研报边提问) -->
+            <Border Grid.Column="1"
+                    IsVisible="{Binding IsChatSidebarVisible}"
+                    Width="{StaticResource SidebarDefaultWidth}"
+                    MinWidth="{StaticResource SidebarMinWidth}"
+                    MaxWidth="{StaticResource SidebarMaxWidth}"
+                    Background="{DynamicResource CardBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="{StaticResource LeftBorderThickness}">
+                <ContentControl Content="{Binding ChatSidebarViewModel}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate x:DataType="vm:ChatSidebarViewModel">
+                            <views:ChatSidebarView DataContext="{Binding}"
+                                                  CloseCommand="{Binding #ParentPage.((vm:AgentAnalysisViewModel)DataContext).ToggleChatSidebarCommand}" />
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            </Border>
         </Grid>
-
-        <!-- 半透明遮罩层：点击可关闭侧边栏 -->
-        <Border Background="{DynamicResource DarkOverlayBrush}"
-                IsVisible="{Binding IsChatSidebarVisible}"
-                ZIndex="1500"
-                Focusable="False"
-                Tapped="OnOverlayTapped"/>
-
-        <!-- 聊天侧边栏（浮层，右对齐） -->
-        <Border IsVisible="{Binding IsChatSidebarVisible}"
-                HorizontalAlignment="Right"
-                Width="{StaticResource SidebarDefaultWidth}"
-                MaxWidth="{StaticResource SidebarMaxWidth}"
-                ZIndex="2000"
-                Background="{DynamicResource CardBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource LeftBorderThickness}"
-                BoxShadow="{StaticResource SidebarBoxShadow}">
-            <ContentControl Content="{Binding ChatSidebarViewModel}">
-                <ContentControl.ContentTemplate>
-                    <DataTemplate x:DataType="vm:ChatSidebarViewModel">
-                        <views:ChatSidebarView DataContext="{Binding}"
-                                              CloseCommand="{Binding #ParentPage.((vm:AgentAnalysisViewModel)DataContext).ToggleChatSidebarCommand}" />
-                    </DataTemplate>
-                </ContentControl.ContentTemplate>
-            </ContentControl>
-        </Border>
-    </Panel>
+    </Grid>
 </UserControl>

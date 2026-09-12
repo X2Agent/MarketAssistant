@@ -52,9 +52,9 @@ public class QuickSelectionStrategyInfo
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// 策略图标
+    /// 策略矢量图标资源路径 (SVG)
     /// </summary>
-    public string Icon { get; set; } = string.Empty;
+    public string IconPath { get; set; } = string.Empty;
 
     /// <summary>
     /// 策略描述

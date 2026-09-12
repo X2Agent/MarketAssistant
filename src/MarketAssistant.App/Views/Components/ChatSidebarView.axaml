@@ -6,6 +6,7 @@
              xmlns:converts="using:MarketAssistant.Converters"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:components="using:MarketAssistant.Views.Components"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Components.ChatSidebarView"
              x:DataType="vm:ChatSidebarViewModel"
@@ -239,7 +240,10 @@
                                                 Padding="{StaticResource CardPadding}"
                                                 IsVisible="{Binding IsAnalystFailure}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                                <TextBlock Text="⚠" VerticalAlignment="Top" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <svg:Svg Path="avares://MarketAssistant/Assets/Images/icon_warning.svg"
+                                                         Width="{StaticResource TinyIconSize}"
+                                                         Height="{StaticResource TinyIconSize}"
+                                                         VerticalAlignment="Top"/>
                                                 <TextBlock Text="{Binding FailureNoticeText}"
                                                            TextWrapping="Wrap"
                                                            FontSize="{StaticResource LabelFontSize}"

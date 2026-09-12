@@ -46,6 +46,10 @@ public static class MarkdownReportExporter
         sb.AppendLine($"| 财务面 | {ds.Financial:F1} |");
         sb.AppendLine($"| 市场情绪 | {ds.Sentiment:F1} |");
         sb.AppendLine($"| 新闻事件 | {ds.News:F1} |");
+        if (ds.CryptoMetrics.HasValue)
+        {
+            sb.AppendLine($"| 虚拟币指标 | {ds.CryptoMetrics.Value:F1} |");
+        }
         sb.AppendLine();
 
         AppendListSection(sb, "操作建议", cr.OperationSuggestions);

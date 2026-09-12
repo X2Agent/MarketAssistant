@@ -49,9 +49,19 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<NavigationItemViewModel> BottomNavigationItems { get; }
 
     /// <summary>
-    /// 顶栏行情条（当前为模拟数据，待接入真实指数服务）
+    /// 顶栏行情条（市场级聚合指标：A 股三大指数 / Crypto 总市值·主导率·恐惧贪婪）
     /// </summary>
     public ObservableCollection<IndexTickerItemViewModel> IndexTickers { get; }
+
+    /// <summary>行情条定时刷新器（30s），构造时创建并启动。</summary>
+    private Avalonia.Threading.DispatcherTimer? _tickerTimer;
+
+    /// <summary>
+    /// 行情条刷新请求代数：每次发起刷新自增，仅最新一代结果落地。
+    /// 替代 bool 防重入——切市场时若旧请求在飞，新请求不会被丢弃，旧结果落地前被淘汰，
+    /// 消除"切市场后行情条残留上一个市场数据"的竞态。
+    /// </summary>
+    private int _tickerRequestId;
 
     /// <summary>
     /// 行情条是否可见（无数据时整段隐藏，对齐设计系统裁决 #6）
@@ -92,7 +102,8 @@ public partial class MainWindowViewModel : ViewModelBase
         BottomNavigationItems = new ObservableCollection<NavigationItemViewModel>();
         IndexTickers = new ObservableCollection<IndexTickerItemViewModel>();
         RebuildNavigationItems();
-        RebuildIndexTickers();
+        _ = RefreshIndexTickersAsync();
+        StartTickerTimer();
 
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
@@ -136,7 +147,7 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
-        RebuildIndexTickers();
+        _ = RefreshIndexTickersAsync();
 
         // 导航集合重建后徽标状态被重置，按当前未读数回填
         _ = RefreshUnreadAlertCountAsync();
@@ -148,7 +159,7 @@ public partial class MainWindowViewModel : ViewModelBase
         BottomNavigationItems.Clear();
 
         MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("收藏", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
+        MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
         MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
         MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
         // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
@@ -163,17 +174,54 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 按当前市场填充顶栏行情条。
-    /// 接入真实指数服务前保持为空（顶栏随 HasIndexTickers 自动隐藏）：
-    /// 在 App.Services 对应市场模块（AShareMarketModule / CryptoMarketModule）注册
-    /// IIndexQuoteService（Keyed by MarketType），此处改为调用其接口填充即可，XAML 无需改动。
+    /// 按当前市场拉取市场级聚合指标填充顶栏行情条。
+    /// 通过 Keyed 解析 <see cref="IIndexQuoteService"/>（A 股=三大指数，Crypto=总市值/主导率/恐惧贪婪）；
+    /// 无数据或失败时保持为空，顶栏随 <see cref="HasIndexTickers"/> 自动隐藏。
+    /// 并发策略：允许并发刷新，落地前校验请求代数，仅最新一代结果生效。
     /// </summary>
-    private void RebuildIndexTickers()
+    private async Task RefreshIndexTickersAsync()
     {
-        IndexTickers.Clear();
+        // 发起即自增代数：切市场/定时刷新并发时，只有最新一代的结果落地
+        var requestId = Interlocked.Increment(ref _tickerRequestId);
 
-        OnPropertyChanged(nameof(HasIndexTickers));
+        try
+        {
+            var market = _marketContext.CurrentMarket;
+            var items = await _marketContext.GetService<IIndexQuoteService>(market).GetLatestAsync();
+
+            // 拉取期间已发起过更新的刷新或已切市场，丢弃过期结果
+            if (requestId != Volatile.Read(ref _tickerRequestId) || market != _marketContext.CurrentMarket)
+                return;
+
+            IndexTickers.Clear();
+            foreach (var item in items)
+            {
+                IndexTickers.Add(IndexTickerItemViewModel.FromTrend(item.Name, item.Value, item.ChangeText, item.Trend));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogWarning(ex, "刷新顶栏行情条失败");
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(HasIndexTickers));
+        }
     }
+
+    /// <summary>启动行情条 30s 定时刷新（惰性创建于 UI 线程）。</summary>
+    private void StartTickerTimer()
+    {
+        _tickerTimer ??= new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(30),
+        };
+        _tickerTimer.Tick -= OnTickerTimerTick;
+        _tickerTimer.Tick += OnTickerTimerTick;
+        _tickerTimer.Start();
+    }
+
+    private void OnTickerTimerTick(object? sender, EventArgs e) => _ = RefreshIndexTickersAsync();
 
     /// <summary>
     /// 交易导航可见性：仅当前市场支持交易时可见（如虚拟币）；A 股始终不可见。

@@ -66,6 +66,11 @@ public class TradingDataService
         => _strategies.UpdateStrategyTriggeredWithParamsAsync(id, customParams, ct);
 
     /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual Task UpdateStrategyConditionOrderFingerprintAsync(
+        string id, string? fingerprint, CancellationToken ct = default)
+        => _strategies.UpdateStrategyConditionOrderFingerprintAsync(id, fingerprint, ct);
+
+    /// <remarks>virtual 供单元测试替换。</remarks>
     public virtual Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
         => _strategies.UpdateStrategyCustomParamsAsync(id, customParams, ct);
 

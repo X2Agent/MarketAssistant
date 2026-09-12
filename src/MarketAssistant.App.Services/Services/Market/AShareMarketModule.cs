@@ -55,6 +55,9 @@ public sealed class AShareMarketModule : IMarketModule
         services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>(MarketType.AShare);
 
+        // 顶栏行情条：A 股三大指数（新浪 hq 指数端点）
+        services.AddKeyedSingleton<IIndexQuoteService, AShareIndexQuoteService>(MarketType.AShare);
+
         // 工作流
         services.AddKeyedSingleton<IAssetDataFormatter, StockDataFormatter>(MarketType.AShare);
         services.AddSingleton<ICriteriaGenerationStrategy<StockCriteria>, StockCriteriaGenerationStrategy>();
