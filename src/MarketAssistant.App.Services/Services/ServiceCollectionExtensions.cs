@@ -189,6 +189,25 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.Referrer = new Uri("https://vip.stock.finance.sina.com.cn/");
         }).AddStandardResilienceHandler();
 
+        // 新浪指数简版行情（顶栏行情条 A 股三大指数）
+        // hq.sinajs.cn 强制校验 Referer，缺失返回 403；响应为 GBK 编码（客户端侧解码）
+        services.AddHttpClient("SinaHq", client =>
+        {
+            client.BaseAddress = new Uri("https://hq.sinajs.cn");
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Referrer = new Uri("https://finance.sina.com.cn/");
+        }).AddStandardResilienceHandler();
+
+        // alternative.me 恐惧贪婪指数（顶栏行情条 Crypto 市场情绪指标，免费无需 Key）
+        services.AddHttpClient("AlternativeMe", client =>
+        {
+            client.BaseAddress = new Uri("https://api.alternative.me/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MarketAssistant/1.0");
+        }).AddStandardResilienceHandler();
+
         // 雪球选股 API（支持全部 38 个筛选指标，Cookie 跨请求共享）
         services.AddSingleton<CookieContainer>();
         services.AddHttpClient("Xueqiu", client =>
@@ -378,6 +397,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<BinanceMarketDataService>();
         services.AddSingleton<BinanceWebSocketService>();
         services.AddSingleton<BinanceUserDataStreamService>();
+        services.AddSingleton<AlternativeMeClient>();
 
         // 统一告警中心：AlertGate 单实例（AlertCenterService 与 TradeExecutor 共享）
         services.AddSingleton<AlertGate>();
@@ -419,6 +439,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AISignalStrategyExecutor>();
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
+        services.AddSingleton<ExchangeConditionOrderService>();
         services.AddSingleton<RiskAlertEvaluator>();
         services.AddSingleton<SignalAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();

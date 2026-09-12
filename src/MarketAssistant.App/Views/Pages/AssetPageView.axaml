@@ -88,6 +88,25 @@
                             Orientation="Horizontal" 
                             Spacing="{StaticResource SmallSpacing}"
                             VerticalAlignment="Center">
+                    <!-- 加入/取消自选 -->
+                    <Button Classes="action-button"
+                            Command="{Binding ToggleFavoriteCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                            <svg:Svg Path="/Assets/Images/tab_favorites.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- 快捷交易（仅支持交易的市场可见，A 股隐藏） -->
+                    <Button Classes="action-button"
+                            Command="{Binding NavigateToTradingCommand}"
+                            IsVisible="{Binding CanTrade}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                            <svg:Svg Path="/Assets/Images/icon_money.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="快捷交易" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <!-- AI分析按钮 -->
                     <Button Classes="action-button"
                             Command="{Binding NavigateToAnalysisCommand}">

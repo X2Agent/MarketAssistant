@@ -399,6 +399,10 @@ public sealed partial class CoordinatorExecutor : Executor
         result.DimensionScores.Financial = Math.Clamp(result.DimensionScores.Financial, 1, 10);
         result.DimensionScores.Sentiment = Math.Clamp(result.DimensionScores.Sentiment, 1, 10);
         result.DimensionScores.News = Math.Clamp(result.DimensionScores.News, 1, 10);
+        if (result.DimensionScores.CryptoMetrics.HasValue)
+        {
+            result.DimensionScores.CryptoMetrics = Math.Clamp(result.DimensionScores.CryptoMetrics.Value, 1, 10);
+        }
     }
 
     private void LogMessageDiagnostics(string stage, IEnumerable<ChatMessage> messages)

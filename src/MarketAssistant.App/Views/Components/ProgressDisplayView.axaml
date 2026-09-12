@@ -111,7 +111,7 @@
                     <TextBlock Text="{Binding #Root.ProgressPercent}"
                                FontSize="36"
                                FontWeight="Bold"
-                               FontFamily="Consolas, 'Cascadia Mono', monospace"
+                               FontFamily="{StaticResource DataFontFamily}"
                                Foreground="{StaticResource PrimaryBrush}"/>
                     <TextBlock Text="%"
                                FontSize="16"
@@ -173,7 +173,7 @@
                                            Text="{Binding ElapsedText}"
                                            VerticalAlignment="Center"
                                            FontSize="{StaticResource MiniFontSize}"
-                                           FontFamily="Consolas, 'Cascadia Mono', monospace"
+                                           FontFamily="{StaticResource DataFontFamily}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 <TextBlock Grid.Column="3"
                                            Text="{Binding StatusMark}"

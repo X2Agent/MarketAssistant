@@ -49,14 +49,24 @@
                     VerticalAlignment="Center"
                     Spacing="{StaticResource LargeSpacing}">
             <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
-            <TextBlock Text="正在加载收藏列表..."
+            <TextBlock Text="正在加载自选列表..."
                        FontSize="{StaticResource LabelFontSize}"
                        HorizontalAlignment="Center"
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
         </StackPanel>
 
         <!-- 内容区域（非加载状态） -->
-        <Grid IsVisible="{Binding !IsBusy}">
+        <Grid IsVisible="{Binding !IsBusy}" RowDefinitions="Auto,*">
+            <!-- 视图切换分段器（有数据时显示）：当前视图按钮禁用，另一视图可点 -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
+                        Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource PagePadding}"
+                        IsVisible="{Binding Assets.Count}">
+                <Button Classes="action-button" Content="卡片视图"
+                        Command="{Binding ShowCardViewCommand}" IsEnabled="{Binding IsTableView}"/>
+                <Button Classes="action-button" Content="表格视图"
+                        Command="{Binding ShowTableViewCommand}" IsEnabled="{Binding IsCardView}"/>
+            </StackPanel>
+            <Panel Grid.Row="1">
             <!-- 空视图：垂直居中 -->
             <StackPanel IsVisible="{Binding !Assets.Count}"
                         HorizontalAlignment="Center"
@@ -66,16 +76,16 @@
                          Width="{StaticResource LargeIconSize}"
                          Height="{StaticResource LargeIconSize}"
                          HorizontalAlignment="Center"/>
-                <TextBlock Text="暂无收藏资产"
+                <TextBlock Text="暂无自选资产"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextSecondaryBrush}" />
-                <TextBlock Text="在资产详情页点击收藏按钮添加"
+                <TextBlock Text="在资产详情页点击「加入自选」添加"
                            HorizontalAlignment="Center"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            FontSize="{StaticResource SmallFontSize}" />
             </StackPanel>
             <!-- 收藏网格（对齐原型 fav-grid：auto-fill 自适应换行） -->
-            <ScrollViewer IsVisible="{Binding Assets.Count}">
+            <ScrollViewer IsVisible="{Binding IsCardView}">
                 <ItemsControl ItemsSource="{Binding Assets}"
                               Margin="{StaticResource PagePadding}">
                     <ItemsControl.ItemsPanel>
@@ -156,6 +166,66 @@
                 </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+
+            <!-- 高密度表格视图（对齐 design.md 4.7 Dense Table）：列头点击排序，行双击进详情 -->
+            <DataGrid ItemsSource="{Binding Assets}"
+                      IsVisible="{Binding IsTableView}"
+                      Margin="{StaticResource PagePadding}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      GridLinesVisibility="Horizontal"
+                      HeadersVisibility="Column"
+                      CanUserResizeColumns="True"
+                      DoubleTapped="OnGridRowDoubleTapped">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="代码" Binding="{Binding Code}"
+                                        FontFamily="{StaticResource DataFontFamily}" Width="Auto"/>
+                    <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="现价" Binding="{Binding CurrentPrice}"
+                                        SortMemberPath="PriceValue"
+                                        FontFamily="{StaticResource DataFontFamily}"
+                                        Width="Auto"/>
+                    <DataGridTemplateColumn Header="涨跌幅" SortMemberPath="ChangePercentValue" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="assets:AssetInfo">
+                                <Border Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"
+                                        CornerRadius="{StaticResource TinyCornerRadius}"
+                                        Padding="{StaticResource TinyPadding}"
+                                        Margin="{StaticResource TinyMargin}"
+                                        HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ChangePercentage}"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource SmallFontSize}"
+                                               FontWeight="Bold"
+                                               Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="操作" Width="Auto">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate x:DataType="assets:AssetInfo">
+                                <Button Width="{StaticResource TinyIconButtonSize}"
+                                        Height="{StaticResource TinyIconButtonSize}"
+                                        Background="Transparent"
+                                        BorderThickness="{StaticResource NoBorderThickness}"
+                                        Padding="{StaticResource NoPadding}"
+                                        Cursor="Hand"
+                                        ToolTip.Tip="移出自选"
+                                        HorizontalAlignment="Center"
+                                        Command="{Binding $parent[DataGrid].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}"
+                                        CommandParameter="{Binding .}">
+                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
+                                              Width="{StaticResource TinyIconSize}"
+                                              Height="{StaticResource TinyIconSize}"
+                                              Foreground="{StaticResource ErrorBrush}"/>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+            </Panel>
         </Grid>
     </Panel>
 </UserControl>

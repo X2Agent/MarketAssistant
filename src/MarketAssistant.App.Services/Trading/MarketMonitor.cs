@@ -20,6 +20,7 @@ public class MarketMonitor : IDisposable
     private readonly TradeExecutor _tradeExecutor;
     private readonly AISignalStrategyExecutor _aiSignalExecutor;
     private readonly OrderStateSyncService _orderStateSyncService;
+    private readonly ExchangeConditionOrderService _conditionOrderService;
     private readonly TradingStrategyService _strategyService;
     private readonly TradingDataService _dataService;
     private readonly RiskAlertEvaluator _riskAlertEvaluator;
@@ -31,13 +32,14 @@ public class MarketMonitor : IDisposable
     private bool _isRunning;
     private Task? _consumerTask;
 
-    private readonly Channel<(string Symbol, decimal Price)> _priceChannel =
-        Channel.CreateBounded<(string, decimal)>(new BoundedChannelOptions(1000)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            FullMode = BoundedChannelFullMode.DropOldest
-        });
+    // 价格管线：每个 symbol 仅保留最新价。写入方更新 map 并在首次标记时入队 symbol，
+    // 消费端处理完移除标记——高负载下同一 symbol 的中间价自动合并为最新一次，避免逐条处理过期 tick
+    // （网格快速穿越多线时，后续线由后续 tick 的处理继续，不会跳线丢失）。
+    // symbol 通道无界是安全的：仅在有新价且无待处理标记时入队，在途条目数受活跃 symbol 数约束。
+    private readonly ConcurrentDictionary<string, decimal> _latestPrices = new();
+    private readonly ConcurrentDictionary<string, byte> _pendingPriceSymbols = new();
+    private readonly Channel<string> _pendingSymbolChannel = Channel.CreateUnbounded<string>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
 
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _strategyLocks = new();
 
@@ -101,6 +103,7 @@ public class MarketMonitor : IDisposable
         TradeExecutor tradeExecutor,
         AISignalStrategyExecutor aiSignalExecutor,
         OrderStateSyncService orderStateSyncService,
+        ExchangeConditionOrderService conditionOrderService,
         TradingStrategyService strategyService,
         TradingDataService dataService,
         BinanceUserDataStreamService userDataStreamService,
@@ -113,6 +116,7 @@ public class MarketMonitor : IDisposable
         _tradeExecutor = tradeExecutor;
         _aiSignalExecutor = aiSignalExecutor;
         _orderStateSyncService = orderStateSyncService;
+        _conditionOrderService = conditionOrderService;
         _strategyService = strategyService;
         _dataService = dataService;
         _userDataStreamService = userDataStreamService;
@@ -127,6 +131,7 @@ public class MarketMonitor : IDisposable
         _webSocketService.ConnectionInterrupted += _connectionInterruptedAdapter;
         _webSocketService.ConnectionRestored += _connectionRestoredAdapter;
         _strategyService.StrategiesChanged += OnStrategiesChanged;
+        _orderStateSyncService.TradeRecordFilled += OnTradeRecordFilled;
     }
 
     /// <summary>
@@ -157,6 +162,9 @@ public class MarketMonitor : IDisposable
 
             _userDataStreamService.OrderUpdate += OnOrderUpdate;
             await _userDataStreamService.StartAsync();
+
+            // 条件单对账：启动即对账一次（接管重启前的交易所挂单），之后周期补挂/撤孤儿单
+            await _conditionOrderService.StartAsync();
 
             _logger.LogInformation("MarketMonitor 已启动，监控 {Count} 个交易标的", instrumentSymbols.Count);
             StatusChanged?.Invoke(true);
@@ -189,6 +197,9 @@ public class MarketMonitor : IDisposable
             _userDataStreamService.OrderUpdate -= OnOrderUpdate;
             await _userDataStreamService.StopAsync();
             _cts?.Cancel();
+
+            // 仅停对账循环，不撤交易所挂单：条件单常驻交易所，监控停止期间保护依然有效
+            _conditionOrderService.Stop();
 
             if (_consumerTask != null)
             {
@@ -257,7 +268,9 @@ public class MarketMonitor : IDisposable
 
     private void OnPriceUpdated(string symbol, decimal lastPrice)
     {
-        _priceChannel.Writer.TryWrite((symbol, lastPrice));
+        _latestPrices[symbol] = lastPrice;
+        if (_pendingPriceSymbols.TryAdd(symbol, 0))
+            _pendingSymbolChannel.Writer.TryWrite(symbol);
 
         // 风险巡检自带 60 秒节流，价格驱动即可，不必单独起定时器
         _ = _riskAlertEvaluator.EvaluateAccountRiskSafeAsync(MonitorToken);
@@ -297,19 +310,34 @@ public class MarketMonitor : IDisposable
     {
         try
         {
-            await foreach (var (symbol, price) in _priceChannel.Reader.ReadAllAsync(ct))
+            await foreach (var symbol in _pendingSymbolChannel.Reader.ReadAllAsync(ct))
             {
+                // 先清待处理标记再取价：两步之间到来的新价会重新入队，最新价不会丢失
+                _pendingPriceSymbols.TryRemove(symbol, out _);
+                if (!_latestPrices.TryRemove(symbol, out var price))
+                    continue;
+
                 try
                 {
                     await _orderStateSyncService.SyncPendingOrdersAsync(symbol, ct: ct);
                     var triggered = await _strategyEngine.EvaluateAndUpdateStrategiesAsync(symbol, price, ct);
-                    foreach (var strategy in triggered)
+                    foreach (var trigger in triggered)
                     {
                         // 执行失败后处于冷却期的策略跳过，防止每 tick 重复触发请求风暴
-                        if (IsInFailureCooldown(strategy.Id))
+                        if (IsInFailureCooldown(trigger.Strategy.Id))
                             continue;
 
-                        var task = ExecuteWithStrategyLockAsync(strategy, price, ct);
+                        // 交易所条件单已兜底：平仓由交易所触发（权威），客户端执行跳过防止双触发。
+                        // 引擎的峰值追踪/状态评估在本次 Evaluate 中已照常完成
+                        if (_conditionOrderService.HasLiveOrder(trigger.Strategy.Id))
+                        {
+                            _logger.LogDebug(
+                                "策略 {Id} 已由交易所条件单保护，跳过客户端触发执行",
+                                trigger.Strategy.Id);
+                            continue;
+                        }
+
+                        var task = ExecuteWithStrategyLockAsync(trigger, price, ct);
                         lock (_pendingTasksLock)
                             _pendingStrategyTasks.Add(task);
                         // 任务完成后自动从列表移除，避免无限增长
@@ -339,6 +367,8 @@ public class MarketMonitor : IDisposable
             return;
 
         _ = RefreshSubscriptionsOnChangeAsync();
+        // 策略增删改后立即对账条件单：新保护策略补挂、删除的策略撤孤儿单、编辑的策略漂移重建
+        _ = _conditionOrderService.ReconcileSafeAsync();
     }
 
     private async Task RefreshSubscriptionsOnChangeAsync()
@@ -357,24 +387,24 @@ public class MarketMonitor : IDisposable
     /// 带策略级锁的异步执行，防止同一策略并发触发
     /// </summary>
     private async Task ExecuteWithStrategyLockAsync(
-        TradingStrategy strategy, decimal price, CancellationToken ct)
+        StrategyTrigger trigger, decimal price, CancellationToken ct)
     {
-        var strategyLock = _strategyLocks.GetOrAdd(strategy.Id, _ => new SemaphoreSlim(1, 1));
+        var strategyLock = _strategyLocks.GetOrAdd(trigger.Strategy.Id, _ => new SemaphoreSlim(1, 1));
         if (!await strategyLock.WaitAsync(0, ct))
         {
-            _logger.LogDebug("策略 {Id} 正在执行中，跳过本次触发", strategy.Id);
+            _logger.LogDebug("策略 {Id} 正在执行中，跳过本次触发", trigger.Strategy.Id);
             return;
         }
 
         try
         {
-            await HandleTriggeredStrategyAsync(strategy, price);
+            await HandleTriggeredStrategyAsync(trigger, price);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "策略执行异常: {StrategyId}", strategy.Id);
+            _logger.LogError(ex, "策略执行异常: {StrategyId}", trigger.Strategy.Id);
             // 未分类异常（未走到 TradeResult 分类）按常规冷却处理
-            RecordStrategyFailureCooldown(strategy.Id, StrategyFailureCooldown);
+            RecordStrategyFailureCooldown(trigger.Strategy.Id, StrategyFailureCooldown);
         }
         finally
         {
@@ -406,8 +436,9 @@ public class MarketMonitor : IDisposable
         return true;
     }
 
-    private async Task HandleTriggeredStrategyAsync(TradingStrategy strategy, decimal currentPrice)
+    private async Task HandleTriggeredStrategyAsync(StrategyTrigger trigger, decimal currentPrice)
     {
+        var strategy = trigger.Strategy;
         if (strategy.Type == StrategyType.AISignal)
         {
             var result = await _aiSignalExecutor.ExecuteAsync(strategy, currentPrice, MonitorToken);
@@ -429,10 +460,15 @@ public class MarketMonitor : IDisposable
         {
             // 网格交易：交易成功后原子地持久化更新后的网格参数，防止计数和参数不一致
             var pendingCustomParams = strategy.Type == StrategyType.GridTrading ? strategy.CustomParams : null;
-            var result = await _tradeExecutor.ExecuteTradeAsync(
-                strategy, currentPrice,
+            // 引擎预计算的出场语义 + 本地动态复核取并集：任一判定为出场即按 requireClose 平仓，
+            // 网格破网/DCA 出场等动态语义仍按有效方向复核，避免引擎误标导致反向开仓。
+            var exitTrigger = trigger with
+            {
+                RequireClose = trigger.RequireClose || IsExitOnlyStrategy(trigger, currentPrice)
+            };
+            var result = await _tradeExecutor.ExecuteTriggeredTradeAsync(
+                exitTrigger, currentPrice,
                 pendingCustomParams: pendingCustomParams,
-                requireClose: IsExitOnlyStrategy(strategy, currentPrice),
                 ct: MonitorToken);
 
             if (result.Success && result.Record != null)
@@ -541,17 +577,19 @@ public class MarketMonitor : IDisposable
     /// 防止合约模式下退出型触发在持仓已平后反向开出新仓。
     /// 止损/追踪止损为纯退出；止盈仅 Sell 侧为退出（Buy 侧语义为限价建仓）；
     /// 网格仅破网（价格突破网格边界且触及止损/止盈位）为清仓退出，普通网格线买卖仍是开平仓组合。
+    /// 按有效方向判定（trigger.EffectiveSide），避免策略本体 Side 被复用污染。
     /// </summary>
-    private static bool IsExitOnlyStrategy(TradingStrategy strategy, decimal currentPrice)
+    private static bool IsExitOnlyStrategy(StrategyTrigger trigger, decimal currentPrice)
     {
+        var strategy = trigger.Strategy;
         return strategy.Type switch
         {
             StrategyType.StopLoss => true,
-            StrategyType.TakeProfit => strategy.Side == OrderSide.Sell,
+            StrategyType.TakeProfit => trigger.EffectiveSide == OrderSide.Sell,
             StrategyType.TrailingStop => true,
             StrategyType.GridTrading => IsGridBreakOut(strategy, currentPrice),
             // DCA 评估只会以卖出方向触发出场（止盈/止损清仓），卖出即平仓语义
-            StrategyType.DCA => strategy.Side == OrderSide.Sell,
+            StrategyType.DCA => trigger.EffectiveSide == OrderSide.Sell,
             _ => false
         };
     }
@@ -584,6 +622,53 @@ public class MarketMonitor : IDisposable
         }
     }
 
+    /// <summary>
+    /// 交易所侧条件单成交（对账路径感知）：完结一次性保护策略并通知 UI。
+    /// 本地持仓 FIFO 与日统计已由 ReconcileTradeRecordAsync 回写，此处只补策略状态闭环。
+    /// </summary>
+    private void OnTradeRecordFilled(TradeRecord record)
+    {
+        if (string.IsNullOrEmpty(record.StrategyId) || record.StrategyId == "manual")
+            return;
+
+        _ = HandleProtectiveOrderFilledAsync(record);
+    }
+
+    private async Task HandleProtectiveOrderFilledAsync(TradeRecord record)
+    {
+        try
+        {
+            var strategy = await _dataService.GetStrategyAsync(record.StrategyId, MonitorToken);
+            if (strategy == null || !ExchangeConditionOrderService.IsProtectiveExitStrategy(strategy))
+            {
+                _conditionOrderService.ClearLiveOrder(record.StrategyId);
+                return;
+            }
+
+            TradeExecuted?.Invoke(record);
+
+            if (strategy.Status != StrategyStatus.Active)
+            {
+                _conditionOrderService.ClearLiveOrder(strategy.Id);
+                return;
+            }
+
+            await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
+            await _strategyEngine.ClearPeakPriceAsync(strategy.Id);
+            _strategyLocks.TryRemove(strategy.Id, out _);
+            _strategyFailureCooldowns.TryRemove(strategy.Id, out _);
+            _conditionOrderService.ClearLiveOrder(strategy.Id);
+            _logger.LogInformation(
+                "交易所条件单已成交，策略自动完结: {StrategyId} {Type} {Symbol}",
+                strategy.Id, strategy.Type, strategy.Symbol);
+            await _signalAlertEvaluator.NotifyStrategyCompletedSafeAsync(strategy);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "处理条件单成交回写失败: {RecordId} {StrategyId}", record.Id, record.StrategyId);
+        }
+    }
+
     private async Task CheckStrategyCompletionAsync(TradingStrategy strategy)
     {
         if (!strategy.MaxExecutions.HasValue)
@@ -605,7 +690,7 @@ public class MarketMonitor : IDisposable
     {
         _cts?.Cancel();
         _cts?.Dispose();
-        _priceChannel.Writer.TryComplete();
+        _pendingSymbolChannel.Writer.TryComplete();
 
         Task[] pendingTasks;
         lock (_pendingTasksLock)
@@ -642,6 +727,7 @@ public class MarketMonitor : IDisposable
         _webSocketService.ConnectionRestored -= _connectionRestoredAdapter;
         _userDataStreamService.OrderUpdate -= OnOrderUpdate;
         _strategyService.StrategiesChanged -= OnStrategiesChanged;
+        _orderStateSyncService.TradeRecordFilled -= OnTradeRecordFilled;
 
         GC.SuppressFinalize(this);
     }

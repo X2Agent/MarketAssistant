@@ -59,6 +59,9 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>(MarketType.Crypto);
 
+        // 顶栏行情条：全网总市值+涨跌幅、BTC 主导率（CoinGecko /global）与恐惧贪婪指数（alternative.me）
+        services.AddKeyedSingleton<IIndexQuoteService, CryptoIndexQuoteService>(MarketType.Crypto);
+
         // 工作流
         services.AddKeyedSingleton<IAssetDataFormatter, CryptoDataFormatter>(MarketType.Crypto);
         services.AddSingleton<ICriteriaGenerationStrategy<CryptoCriteria>, CryptoCriteriaGenerationStrategy>();

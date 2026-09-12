@@ -1,9 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Styling;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Views.Controls;
 using System.Text.Json;
 
 namespace MarketAssistant.Views.Components;
@@ -78,6 +81,7 @@ public class KLineChartView : UserControl
     private void InitializeComponent()
     {
         var grid = new Grid();
+        grid[!Grid.BackgroundProperty] = new DynamicResourceExtension("CardBackgroundBrush");
         _rootGrid = grid;
 
         _webView = CreateWebView();
@@ -86,14 +90,24 @@ public class KLineChartView : UserControl
         {
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
-            IsVisible = true
+            IsVisible = true,
+            Spacing = 12
         };
-        _loadingPanel.Children.Add(new TextBlock
+        var loadingDots = new LoadingDots
+        {
+            DotSize = 8,
+            DotSpacing = 6,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var loadingText = new TextBlock
         {
             Text = "正在加载图表...",
             FontSize = 14,
             HorizontalAlignment = HorizontalAlignment.Center
-        });
+        };
+        loadingText[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
+        _loadingPanel.Children.Add(loadingDots);
+        _loadingPanel.Children.Add(loadingText);
 
         _errorPanel = new StackPanel
         {
@@ -102,19 +116,23 @@ public class KLineChartView : UserControl
             IsVisible = false,
             Spacing = 12
         };
-        _errorPanel.Children.Add(new TextBlock
+        var errorTitle = new TextBlock
         {
             Text = "图表加载失败",
             FontSize = 14,
+            FontWeight = FontWeight.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center
-        });
+        };
+        errorTitle[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("DangerPanelTextBrush");
+        _errorPanel.Children.Add(errorTitle);
 
         _errorText = new TextBlock
         {
             FontSize = 12,
-            Opacity = 0.7,
-            HorizontalAlignment = HorizontalAlignment.Center
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap
         };
+        _errorText[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
         _errorPanel.Children.Add(_errorText);
 
         _retryButton = new Button
@@ -122,6 +140,7 @@ public class KLineChartView : UserControl
             Content = "重试",
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        _retryButton.Classes.Add("btn-secondary");
         _retryButton.Click += (s, e) => _ = InitializeChartAsync();
         _errorPanel.Children.Add(_retryButton);
 

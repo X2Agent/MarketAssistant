@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications;
@@ -58,6 +59,21 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _marketContext.GetService<IAssetCacheService>();
 
     public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
+
+    /// <summary>是否处于表格视图（false 为卡片视图）。对齐 design.md 4.7 双模态。</summary>
+    [ObservableProperty]
+    private bool _isTableView;
+
+    /// <summary>是否处于卡片视图（供分段器与卡片容器绑定）。</summary>
+    public bool IsCardView => !IsTableView;
+
+    partial void OnIsTableViewChanged(bool value) => OnPropertyChanged(nameof(IsCardView));
+
+    [RelayCommand]
+    private void ShowCardView() => IsTableView = false;
+
+    [RelayCommand]
+    private void ShowTableView() => IsTableView = true;
 
     public FavoritesPageViewModel(
         MarketContext marketContext,
@@ -212,8 +228,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         if (asset == null) return;
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
-            "取消收藏",
-            $"确定要取消收藏 {asset.Name}({asset.Code}) 吗？",
+            "移出自选",
+            $"确定要将 {asset.Name}({asset.Code}) 移出自选吗？",
             "确定",
             "取消"
         );
@@ -233,9 +249,9 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
                 await FavoriteService.RemoveFavoriteAsync(asset.Code, asset.Market);
 
-                Logger?.LogInformation($"已取消收藏资产: {asset.Name}({asset.Code})");
+                Logger?.LogInformation($"已将资产移出自选: {asset.Name}({asset.Code})");
                 await Task.CompletedTask;
-            }, "取消收藏");
+            }, "移出自选");
         }
     }
 

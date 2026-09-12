@@ -20,6 +20,13 @@ public sealed class OrderStateSyncService
     private readonly TradingDataService _dataService;
     private readonly CryptoPortfolioService _portfolioService;
     private readonly ILogger<OrderStateSyncService> _logger;
+
+    /// <summary>
+    /// 交易记录转为成交终态（Filled）时触发，携带最新记录。
+    /// 供策略层完结一次性保护策略（如交易所侧条件单成交后的自动完结）；
+    /// 本地持仓 FIFO 与日统计已由 <see cref="TradingDataService.ReconcileTradeRecordAsync"/> 回写。
+    /// </summary>
+    public event Action<TradeRecord>? TradeRecordFilled;
     private readonly ConcurrentDictionary<string, DateTime> _lastSyncAt =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _syncGate = new(1, 1);
@@ -113,6 +120,10 @@ public sealed class OrderStateSyncService
                         {
                             updatedCount++;
                         }
+
+                        // 首次到达成交终态：通知策略层完结保护策略（条件单成交自动离场）
+                        if (previousStatus != TradeRecordStatus.Filled && record.Status == TradeRecordStatus.Filled)
+                            TradeRecordFilled?.Invoke(record);
                     }
                     catch (Exception ex) when (ex is FriendlyException or HttpRequestException)
                     {

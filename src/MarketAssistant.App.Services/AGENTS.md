@@ -46,7 +46,7 @@ MarketAssistant.App.Services/
 
 ## 统一告警中心（Applications/AlertCenter）
 
-价格 / 风险 / 信号三类告警的唯一出口，设计详见 `docs/plan/alert-center-refactor-plan.md`。
+价格 / 风险 / 信号三类告警的唯一出口。
 
 | 文件 | 职责 |
 |------|------|

@@ -121,9 +121,11 @@ public class BinanceExchangeClient : IExchangeClient
         {
             Symbol = response.Symbol,
             OrderId = response.OrderId.ToString(),
+            ClientOrderId = response.ClientOrderId,
             Status = response.Status,
             Side = response.Side,
             Type = response.Type,
+            StopPrice = decimal.TryParse(response.StopPrice, NumberStyles.Number, CultureInfo.InvariantCulture, out var sp) ? sp : 0,
             RequestedQty = decimal.TryParse(response.OrigQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var rq) ? rq : 0,
             ExecutedQty = decimal.TryParse(response.ExecutedQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var eq) ? eq : 0,
             Price = decimal.TryParse(response.Price, NumberStyles.Number, CultureInfo.InvariantCulture, out var p) ? p : 0,

@@ -191,6 +191,9 @@
 
     <!-- ========== 导航栏尺寸 ========== -->
     <GridLength x:Key="NavRailWidth">72</GridLength>
+    <!-- 导航项点击区域与图标：design.md Phase 2.5 收敛（56/48 → 44×44，图标 24 → 22px） -->
+    <x:Double x:Key="NavItemSize">44</x:Double>
+    <x:Double x:Key="NavIconSize">22</x:Double>
     <Thickness x:Key="MarketLabelMargin">0,4,0,8</Thickness>
     
     <!-- ========== 动画时长定义 ========== -->

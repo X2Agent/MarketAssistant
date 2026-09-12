@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:models="using:MarketAssistant.Applications.InvestmentSelection.Models"
              xmlns:converts="using:MarketAssistant.Converters"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.AssetSelectionPageView"
              x:DataType="vm:AssetSelectionPageViewModel"
@@ -112,9 +113,10 @@
                                     KeyDown="OnCardKeyDown"
                                     AutomationProperties.Name="{Binding Name}">
                                 <StackPanel Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Icon}"
-                                               FontSize="{StaticResource LargeFontSize}"
-                                               HorizontalAlignment="Center"/>
+                                    <svg:Svg Path="{Binding IconPath}"
+                                             Width="{StaticResource DefaultIconSize}"
+                                             Height="{StaticResource DefaultIconSize}"
+                                             HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding Name}"
                                                FontSize="{StaticResource LabelFontSize}"
                                                FontWeight="SemiBold"
@@ -191,25 +193,30 @@
                                         Focusable="True"
                                         KeyDown="OnCardKeyDown"
                                         AutomationProperties.Name="{Binding Name}">
-                                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                        <Border Width="30"
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{StaticResource SmallSpacing}">
+                                        <!-- 图标：左侧垂直居中 -->
+                                        <Border Grid.Column="0"
+                                                Width="30"
                                                 Height="30"
                                                 CornerRadius="{StaticResource SmallCornerRadius}"
                                                 Background="{DynamicResource SurfaceVariantBrush}"
-                                                HorizontalAlignment="Left">
-                                            <TextBlock Text="{Binding Icon}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"/>
+                                                VerticalAlignment="Center">
+                                            <svg:Svg Path="{Binding IconPath}"
+                                                     Width="{StaticResource TinyIconSize}"
+                                                     Height="{StaticResource TinyIconSize}"
+                                                     HorizontalAlignment="Center"
+                                                     VerticalAlignment="Center"/>
                                         </Border>
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontSize="{StaticResource LabelFontSize}"
-                                                   FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Description}"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="{StaticResource LabelFontSize}"
+                                                       FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Description}"
+                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

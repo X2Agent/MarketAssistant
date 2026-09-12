@@ -58,15 +58,52 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         return true;
     }
 
-    protected void AddHeader(IList<AdaptiveElement> container, string title, AdaptiveTextColor color)
+    protected void AddHeader(IList<AdaptiveElement> container, string title, AdaptiveTextColor color, string? iconPath = null)
     {
-        container.Add(new AdaptiveTextBlock
+        if (!string.IsNullOrEmpty(iconPath))
         {
-            Text = title,
-            Size = AdaptiveTextSize.Medium,
-            Weight = AdaptiveTextWeight.Bolder,
-            Color = color
-        });
+            var colSet = new AdaptiveColumnSet { Spacing = AdaptiveSpacing.Small };
+            colSet.Columns.Add(new AdaptiveColumn
+            {
+                Width = "auto",
+                VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                Items =
+                {
+                    new AdaptiveImage
+                    {
+                        Url = new Uri(iconPath, UriKind.RelativeOrAbsolute),
+                        PixelWidth = 20,
+                        PixelHeight = 20
+                    }
+                }
+            });
+            colSet.Columns.Add(new AdaptiveColumn
+            {
+                Width = "stretch",
+                VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                Items =
+                {
+                    new AdaptiveTextBlock
+                    {
+                        Text = title,
+                        Size = AdaptiveTextSize.Medium,
+                        Weight = AdaptiveTextWeight.Bolder,
+                        Color = color
+                    }
+                }
+            });
+            container.Add(colSet);
+        }
+        else
+        {
+            container.Add(new AdaptiveTextBlock
+            {
+                Text = title,
+                Size = AdaptiveTextSize.Medium,
+                Weight = AdaptiveTextWeight.Bolder,
+                Color = color
+            });
+        }
     }
 
     protected void AddSectionHeader(IList<AdaptiveElement> container, string title)
@@ -156,8 +193,8 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
     }
 
     /// <summary>
-    /// 统一的风险警告容器：Attention 样式 + ⚠️ 标题 + 正文 + 可选列表。
-    /// 财务/基本面的容器实现与新闻/情绪的行内 ⚠️ 文本均改走此构件。
+    /// 统一的风险警告容器：Attention 样式 + 风险标题 + 正文 + 可选列表。
+    /// 财务/基本面的容器实现与新闻/情绪的行内风险文本均改走此构件。
     /// </summary>
     protected void AddRiskBox(
         IList<AdaptiveElement> container,
@@ -171,12 +208,36 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
             Spacing = AdaptiveSpacing.Medium
         };
 
-        box.Items.Add(new AdaptiveTextBlock
+        var titleCols = new AdaptiveColumnSet { Spacing = AdaptiveSpacing.Small };
+        titleCols.Columns.Add(new AdaptiveColumn
         {
-            Text = "⚠️ " + title,
-            Weight = AdaptiveTextWeight.Bolder,
-            Color = AdaptiveTextColor.Attention
+            Width = "auto",
+            VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+            Items =
+            {
+                new AdaptiveImage
+                {
+                    Url = new Uri("avares://MarketAssistant/Assets/Images/icon_danger.svg", UriKind.RelativeOrAbsolute),
+                    PixelWidth = 16,
+                    PixelHeight = 16
+                }
+            }
         });
+        titleCols.Columns.Add(new AdaptiveColumn
+        {
+            Width = "stretch",
+            VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+            Items =
+            {
+                new AdaptiveTextBlock
+                {
+                    Text = title,
+                    Weight = AdaptiveTextWeight.Bolder,
+                    Color = AdaptiveTextColor.Attention
+                }
+            }
+        });
+        box.Items.Add(titleCols);
 
         if (!string.IsNullOrEmpty(content))
         {

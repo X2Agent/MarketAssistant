@@ -22,7 +22,7 @@ public class SentimentCardParser : BaseAdaptiveCardParser<MarketSentimentAnalysi
             FallbackText = $"市场情绪分析：主导情绪{summaryEmotion} (强度 {summaryScore})，请查看完整报告。",
             Speak = "市场情绪分析已生成。"
         };
-        AddHeader(card.Body, "🌡️ 市场情绪分析", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "市场情绪分析", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_bulb.svg");
 
         // 1. Sentiment & Capital Flow in 2 columns
         var topCols = new AdaptiveColumnSet();

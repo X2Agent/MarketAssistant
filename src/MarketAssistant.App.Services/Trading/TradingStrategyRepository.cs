@@ -27,12 +27,12 @@ internal sealed class TradingStrategyRepository : TradingRepositoryBase
                 (id, environment, symbol, type, status, side, order_type, slippage_tolerance,
                  trigger_price, stop_loss_price, take_profit_price,
                  quantity, max_position_percent, custom_params, created_at, last_triggered_at,
-                 execution_count, max_executions, trailing_peak_price)
+                 execution_count, max_executions, trailing_peak_price, condition_order_fingerprint)
             VALUES
                 (@id, @environment, @symbol, @type, @status, @side, @orderType, @slippage,
                  @triggerPrice, @slPrice, @tpPrice,
                  @qty, @maxPos, @customParams, @createdAt, @lastTriggered,
-                 @execCount, @maxExec, @trailingPeak)
+                 @execCount, @maxExec, @trailingPeak, @conditionFingerprint)
             """;
         cmd.Parameters.AddWithValue("@id", strategy.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -53,6 +53,7 @@ internal sealed class TradingStrategyRepository : TradingRepositoryBase
         cmd.Parameters.AddWithValue("@execCount", strategy.ExecutionCount);
         cmd.Parameters.AddWithValue("@maxExec", strategy.MaxExecutions.HasValue ? (object)strategy.MaxExecutions.Value : DBNull.Value);
         cmd.Parameters.AddWithValue("@trailingPeak", ToDbNullable(strategy.TrailingPeakPrice));
+        cmd.Parameters.AddWithValue("@conditionFingerprint", (object?)strategy.ConditionOrderFingerprint ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -227,6 +228,22 @@ internal sealed class TradingStrategyRepository : TradingRepositoryBase
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 更新交易所侧保护性条件单的参数指纹（挂单成功后回写，供对账检测参数漂移）
+    /// </summary>
+    public async Task UpdateStrategyConditionOrderFingerprintAsync(
+        string id, string? fingerprint, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync();
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE strategies SET condition_order_fingerprint = @fp WHERE id = @id AND environment = @environment";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@fp", (object?)fingerprint ?? DBNull.Value);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     private static TradingStrategy ReadStrategy(SqliteDataReader reader)
     {
         var strategy = new TradingStrategy
@@ -269,6 +286,9 @@ internal sealed class TradingStrategyRepository : TradingRepositoryBase
 
         var trailingOrd = reader.GetOrdinal("trailing_peak_price");
         if (!reader.IsDBNull(trailingOrd)) strategy.TrailingPeakPrice = ReadDecimal(reader, trailingOrd);
+
+        var fpOrd = reader.GetOrdinal("condition_order_fingerprint");
+        if (!reader.IsDBNull(fpOrd)) strategy.ConditionOrderFingerprint = reader.GetString(fpOrd);
 
         return strategy;
     }

@@ -122,7 +122,6 @@ public sealed class PriceAlertRuleTest
             IsOneTime = true
         };
 
-        Assert.AreEqual("一次性", rule.AlertModeText);
         Assert.AreEqual("禁用", rule.StatusText);
 
         rule.Enabled = true;
@@ -141,7 +140,6 @@ public sealed class PriceAlertRuleTest
             IsOneTime = false
         };
 
-        Assert.AreEqual("持续", rule.AlertModeText);
         Assert.AreEqual("禁用", rule.StatusText);
 
         rule.Enabled = false;

@@ -24,7 +24,7 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
             FallbackText = $"新闻事件分析：[{summaryNature}] {summaryEvent}，请查看完整报告。",
             Speak = "新闻事件分析已生成。"
         };
-        AddHeader(card.Body, "📰 新闻事件分析", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "新闻事件分析", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_document.svg");
 
         // 1. Event & Impact in 2 columns
         var topCols = new AdaptiveColumnSet();

@@ -34,6 +34,42 @@
         <Style Selector="Border.alert-rule-card:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         </Style>
+        <!-- 文本式页签（替代默认胶囊样式）：未选中次级文本色，选中主色 + 底部主色下划线指示器 -->
+        <Style Selector="TabControl.page-tabs">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="TabControl.page-tabs TabItem">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="Transparent"
+                            Padding="0,6,24,8"
+                            Cursor="Hand">
+                        <Panel>
+                            <TextBlock x:Name="PART_TabText"
+                                       Text="{TemplateBinding Header}"
+                                       FontSize="{StaticResource MediumFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <Border x:Name="PART_Indicator"
+                                    Height="2"
+                                    CornerRadius="1"
+                                    Background="{StaticResource PrimaryBrush}"
+                                    VerticalAlignment="Bottom"
+                                    IsVisible="False"/>
+                        </Panel>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TabControl.page-tabs TabItem:pointerover /template/ TextBlock#PART_TabText">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="TabControl.page-tabs TabItem:selected /template/ TextBlock#PART_TabText">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+        </Style>
+        <Style Selector="TabControl.page-tabs TabItem:selected /template/ Border#PART_Indicator">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
     </UserControl.Styles>
 
     <ScrollViewer Background="{DynamicResource CardBackgroundBrush}">
@@ -68,6 +104,7 @@
 
             <Grid RowDefinitions="Auto,*">
                 <TabControl Grid.Row="0"
+                            Classes="page-tabs"
                             SelectedIndex="{Binding SelectedTabIndex}">
                     <TabItem Header="告警规则"/>
                     <TabItem Header="告警历史"/>

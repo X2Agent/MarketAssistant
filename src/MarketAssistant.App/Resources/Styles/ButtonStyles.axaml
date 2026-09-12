@@ -30,7 +30,7 @@
     <!-- ===== Primary 按钮 — 主要操作 ===== -->
     <Style Selector="Button.btn-primary">
         <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
@@ -79,7 +79,7 @@
     </Style>
     <Style Selector="Button.btn-danger:pressed /template/ ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource DangerPanelBorderBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
     </Style>
 
     <!-- ===== 按钮尺寸变体 ===== -->
@@ -151,7 +151,7 @@
     </Style>
     <Style Selector="Button.period-button.selected">
         <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
     </Style>
 
     <!-- 操作按钮 -->
@@ -171,7 +171,7 @@
     <!-- 成功按钮 -->
     <Style Selector="Button.success">
         <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
@@ -185,7 +185,7 @@
     <!-- 警告按钮 -->
     <Style Selector="Button.warning">
         <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
@@ -237,7 +237,7 @@
     <!-- Info 按钮 — 信息/链接操作 -->
     <Style Selector="Button.btn-info">
         <Setter Property="Background" Value="{StaticResource InfoBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Button.btn-info:pointerover /template/ ContentPresenter">

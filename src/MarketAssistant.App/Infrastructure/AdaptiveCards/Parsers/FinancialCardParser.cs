@@ -24,7 +24,7 @@ public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResul
             FallbackText = $"财务分析报告：偿债评分 {summaryScore}，观点：{summaryInsight}，请查看完整报告。",
             Speak = "财务分析报告已生成。"
         };
-        AddHeader(card.Body, "💰 财务分析报告", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "财务分析报告", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_money.svg");
 
         // 使用两列布局展示核心指标
         var metricsCols = new AdaptiveColumnSet();

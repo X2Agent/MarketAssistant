@@ -37,7 +37,8 @@ internal sealed class TradingSchemaInitializer : SqliteServiceBase
                 last_triggered_at TEXT,
                 execution_count INTEGER DEFAULT 0,
                 max_executions INTEGER,
-                trailing_peak_price TEXT
+                trailing_peak_price TEXT,
+                condition_order_fingerprint TEXT
             )
             """,
         ["trade_records"] = """
@@ -283,6 +284,8 @@ internal sealed class TradingSchemaInitializer : SqliteServiceBase
         // 历史库补充列时给出默认值，保证旧行读回为 Market / 0.003 的既有行为
         await EnsureColumnAsync(conn, transaction, "strategies", "order_type", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
         await EnsureColumnAsync(conn, transaction, "strategies", "slippage_tolerance", "TEXT DEFAULT '0.003'").ConfigureAwait(false);
+        // 交易所侧保护性条件单的参数指纹（策略编辑后撤旧挂新的比对依据）
+        await EnsureColumnAsync(conn, transaction, "strategies", "condition_order_fingerprint", "TEXT").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateAccountSnapshotsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateRiskConfigAsync(conn, transaction).ConfigureAwait(false);

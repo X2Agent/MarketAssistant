@@ -22,7 +22,7 @@ public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisR
             FallbackText = $"基本面分析：{summaryName} - 评级：{summaryRating}，请查看完整报告。",
             Speak = "基本面分析已生成。"
         };
-        AddHeader(card.Body, "📊 基本面分析", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "基本面分析", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_scale.svg");
 
         if (model.BasicInfo != null)
         {

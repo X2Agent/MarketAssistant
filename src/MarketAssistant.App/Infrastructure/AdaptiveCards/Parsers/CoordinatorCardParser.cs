@@ -22,7 +22,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
             FallbackText = $"综合分析报告：{summaryRating} (评分 {summaryScore})，请查看完整报告。",
             Speak = "综合分析报告已生成。"
         };
-        AddHeader(card.Body, "📑 综合分析报告", AdaptiveTextColor.Accent);
+        AddHeader(card.Body, "综合分析报告", AdaptiveTextColor.Accent, "avares://MarketAssistant/Assets/Images/icon_clipboard.svg");
 
         // Investment Rating & Score
         var rating = GetEnumDescription(model.InvestmentRating);
@@ -77,6 +77,11 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
             scoreFacts.Facts.Add(new AdaptiveFact("财务面", model.DimensionScores.Financial.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("市场情绪", model.DimensionScores.Sentiment.ToString("F1")));
             scoreFacts.Facts.Add(new AdaptiveFact("新闻事件", model.DimensionScores.News.ToString("F1")));
+            // 虚拟币专属维度：仅 Crypto 分析有值（A 股为 null），无值时不渲染该条目
+            if (model.DimensionScores.CryptoMetrics.HasValue)
+            {
+                scoreFacts.Facts.Add(new AdaptiveFact("虚拟币指标", model.DimensionScores.CryptoMetrics.Value.ToString("F1")));
+            }
             AddFactSection(card.Body, "维度评分", scoreFacts);
         }
 

@@ -69,16 +69,13 @@ public sealed class HomeAssetService : IHomeAssetService
 
         if (await _favoriteService.IsFavoriteAsync(code, market))
         {
-            var alreadyMsg = _marketType == MarketType.Crypto
-                ? "该虚拟币已在收藏列表中"
-                : "该资产已在收藏列表中";
-            await _dialogService.ShowMessageAsync("提示", alreadyMsg);
+            await _dialogService.ShowMessageAsync("提示", "该资产已在自选列表中");
             return false;
         }
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
-            "添加收藏",
-            $"确定要将 {assetName} 添加到收藏列表吗？",
+            "加入自选",
+            $"确定要将 {assetName} 加入自选列表吗？",
             "确认",
             "取消");
 
@@ -86,7 +83,7 @@ public sealed class HomeAssetService : IHomeAssetService
             return false;
 
         await _favoriteService.AddFavoriteAsync(code, market);
-        await _dialogService.ShowMessageAsync("收藏成功", $"已将 {assetName} 添加到收藏列表");
+        await _dialogService.ShowMessageAsync("加入自选成功", $"已将 {assetName} 加入自选列表");
         return true;
     }
 
@@ -105,26 +102,29 @@ public sealed class HomeAssetService : IHomeAssetService
         if (assetParameter is HotAsset hotAsset)
         {
             assetName = hotAsset.Name;
-            code = hotAsset.Code;
             market = _marketType == MarketType.AShare ? hotAsset.Market : string.Empty;
+            code = FavoriteCodeNormalizer.Normalize(hotAsset.Code, _marketType);
             return true;
         }
 
         if (assetParameter is AssetItem assetItem)
         {
             assetName = assetItem.Name;
-            code = assetItem.Code;
 
+            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记
+            market = string.Empty;
             if (_marketType == MarketType.AShare)
             {
-                if (code.StartsWith("sh", StringComparison.OrdinalIgnoreCase)
-                    || code.StartsWith("sz", StringComparison.OrdinalIgnoreCase))
+                var rawCode = assetItem.Code.Trim().ToUpperInvariant();
+                if (rawCode.Length > 2
+                    && (rawCode.StartsWith("SH", StringComparison.Ordinal)
+                        || rawCode.StartsWith("SZ", StringComparison.Ordinal)))
                 {
-                    market = code[..2].ToUpperInvariant();
-                    code = code[2..];
+                    market = rawCode[..2];
                 }
             }
 
+            code = FavoriteCodeNormalizer.Normalize(assetItem.Code, _marketType);
             return true;
         }
 

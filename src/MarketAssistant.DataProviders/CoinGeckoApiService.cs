@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Threading.RateLimiting;
 using System.Text.Json;
@@ -124,6 +125,40 @@ public sealed class CoinGeckoApiService
                 CoinGeckoJsonOptions,
                 cancellationToken),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// 获取全网宏观指标（<c>GET /global</c>）：总市值(USD)、24h 市值涨跌幅、BTC 主导率。
+    /// 一次请求即得顶栏行情条所需的 Crypto 市场级指标。失败/无数据返回 null（上层降级）。
+    /// </summary>
+    public async Task<(decimal TotalMarketCapUsd, decimal MarketCapChangePct24h, decimal BtcDominancePct)?>
+        GetGlobalStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var json = await ThrottledExecuteAsync(async httpClient =>
+            await httpClient.GetStringAsync("global", cancellationToken),
+            cancellationToken);
+
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("data", out var data))
+            return null;
+
+        decimal totalCap = 0, capChange = 0, btcDominance = 0;
+
+        if (data.TryGetProperty("total_market_cap", out var tmc)
+            && tmc.TryGetProperty("usd", out var tmcUsd))
+            decimal.TryParse(tmcUsd.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out totalCap);
+
+        if (data.TryGetProperty("market_cap_change_percentage_24h_usd", out var mcc))
+            decimal.TryParse(mcc.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out capChange);
+
+        if (data.TryGetProperty("market_cap_percentage", out var mcp)
+            && mcp.TryGetProperty("btc", out var btc))
+            decimal.TryParse(btc.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out btcDominance);
+
+        if (totalCap == 0 && btcDominance == 0)
+            return null;
+
+        return (totalCap, capChange, btcDominance);
     }
 
     public async Task<CoinGeckoSearchResponse?> SearchCoinsAsync(

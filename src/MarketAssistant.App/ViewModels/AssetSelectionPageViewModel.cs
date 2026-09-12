@@ -20,7 +20,7 @@ public partial class SelectionModeItem : ObservableObject
     private string _name = string.Empty;
 
     [ObservableProperty]
-    private string _icon = string.Empty;
+    private string _iconPath = string.Empty;
 
     [ObservableProperty]
     private string _description = string.Empty;
@@ -207,8 +207,8 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     /// 推荐列表标题
     /// </summary>
     public string RecommendationTitle => _marketContext.CurrentMarket == MarketType.Crypto
-        ? "📈 推荐虚拟币"
-        : "📈 推荐股票";
+        ? "推荐虚拟币"
+        : "推荐股票";
 
     public AssetSelectionPageViewModel(
         ILogger<AssetSelectionPageViewModel> logger,
@@ -281,14 +281,14 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     {
         if (stock == null) return;
 
-        // 解析 Symbol，例如 SH600000 -> Market: SH, Code: 600000
-        string market = "CN";
-        string code = stock.Symbol;
+        // 归一化：统一大写，A股剥离 SH/SZ 前缀（如 SH600000 → Market: SH, Code: 600000）
+        string market = string.Empty;
+        var rawSymbol = stock.Symbol.Trim().ToUpperInvariant();
+        var code = FavoriteCodeNormalizer.Normalize(rawSymbol, _marketContext.CurrentMarket);
 
-        if (stock.Symbol.Length > 2 && (stock.Symbol.StartsWith("SH") || stock.Symbol.StartsWith("SZ")))
+        if (_marketContext.CurrentMarket == MarketType.AShare && rawSymbol.Length > code.Length)
         {
-            market = stock.Symbol.Substring(0, 2);
-            code = stock.Symbol.Substring(2);
+            market = rawSymbol[..2];
         }
 
         var favoriteService = _marketContext.GetService<IFavoriteService>();
@@ -465,9 +465,9 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         {
             var modes = new ObservableCollection<SelectionModeItem>
             {
-                new SelectionModeItem { Name = "用户需求", Icon = "👤", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
-                new SelectionModeItem { Name = "新闻分析", Icon = "📰", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
-                new SelectionModeItem { Name = "快速策略", Icon = "⚡", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
+                new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
+                new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
+                new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
             };
 
             Dispatcher.UIThread.InvokeAsync(() =>

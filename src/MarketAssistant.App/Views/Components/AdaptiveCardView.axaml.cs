@@ -1,3 +1,4 @@
+using System;
 using AdaptiveCards;
 using Avalonia;
 using Avalonia.Controls;
@@ -260,6 +261,20 @@ public partial class AdaptiveCardView : UserControl
 
     private Control RenderImage(AdaptiveImage image)
     {
+        var urlStr = image.Url?.ToString() ?? string.Empty;
+        if (urlStr.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+        {
+            // Svg 控件无无参构造，须显式传入 baseUri；avares:// 绝对 URI 不依赖 baseUri 解析
+            return new Avalonia.Svg.Skia.Svg((Uri?)null)
+            {
+                Path = urlStr,
+                Width = image.PixelWidth > 0 ? image.PixelWidth : 20,
+                Height = image.PixelHeight > 0 ? image.PixelHeight : 20,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+        }
+
         var textBlock = new TextBlock
         {
             Text = "Image: " + image.Url,
