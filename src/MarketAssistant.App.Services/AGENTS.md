@@ -65,6 +65,21 @@ MarketAssistant.App.Services/
 
 ---
 
+## 分析成本估算（Services/Cost）
+
+报告页 Token 面板旁的"约 ¥x.xx"金额来自用户维护的模型价格表（`UserSetting.ModelPrices`，设置页「模型价格表」分区编辑，单位：元 / 1M tokens）。
+
+| 类型 | 职责 |
+|------|------|
+| `ModelCostCalculator` | 纯逻辑：按用量条目 × 单价累加；解析不出模型或无价格行标记 `HasUnpriced` |
+| `IAnalysisCostService` / `AnalysisCostService` | 模型解析口径与 `MarketAnalysisWorkflow.ResolveRuntimeForRole` 一致：Agent ASCII 名 → 分析师类型（经 `AnalystPromptLoader` 反查）→ 角色级模型优先、回落服务商默认模型；解析失败不猜价格 |
+
+- **不猜价格**：无法确定模型（如 Unknown）、或价格表未覆盖时该条目只计入"部分未定价"下界标记，绝不按默认模型估算——错价比没价格更糟。
+- 价格匹配优先 `(provider, model)` 精确键；仅传模型 ID 时按模型 ID 兜底（不同 provider 同名模型取第一个，接受歧义）。
+- 展示文本统一走 `ModelCostCalculator.FormatCost`：`约 ¥0.42` / `≥ ¥0.42（部分未定价）` / 空串（UI 据此隐藏金额）。
+
+---
+
 ## 模型分级调度（Infrastructure/Factories/ChatClientFactory）
 
 一次深度研判会并行启动多个分析师，全部使用同一个强模型既慢又贵。因此支持**按分析师角色**指定模型。

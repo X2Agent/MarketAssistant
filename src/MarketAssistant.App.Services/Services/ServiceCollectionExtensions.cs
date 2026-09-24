@@ -20,6 +20,7 @@ using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Charts;
+using MarketAssistant.Services.Cost;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Crypto;
@@ -410,6 +411,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
+        services.AddSingleton<IAnalysisCostService, AnalysisCostService>();
 
         // 每日 AI 简报：按市场 Keyed 注册（各自的市场自选/要闻数据源）
         services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.AShare);

@@ -68,6 +68,8 @@
 	<PackageReference Include="CommunityToolkit.Mvvm" />
 	<PackageReference Include="Svg.Controls.Skia.Avalonia" />
 	<PackageReference Include="Svg.Skia" />
+	<!-- SkiaSharp：分享卡 PDF 封装（SKDocument）。Svg.Skia 已传递依赖，显式引用避免隐式依赖漂移 -->
+	<PackageReference Include="SkiaSharp" />
 	<!-- Avalonia 官方 WebView（MIT 开源,无需许可证） -->
 	<PackageReference Include="Avalonia.Controls.WebView" />
 	<PackageReference Include="Avalonia.Controls.DataGrid" />

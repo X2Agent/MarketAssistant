@@ -105,6 +105,14 @@ MarketAssistant.App/
 - 进入首页先读当天缓存（命中即呈现），未命中才后台生成一次；`ShowCard` 聚合 `HasBriefing/IsGenerating/State` 控制卡片显隐，未开始加载时不展示空卡。
 - 生成中与失败/空态用骨架与 `StateOverlayView` 表达，不要把"生成中"做成阻塞按钮。
 
+### 报告导出（Markdown / 分享图 / PDF）
+
+- Markdown 导出走 App.Services 的 `MarkdownReportExporter`（纯文本，无渲染依赖）。
+- 分享图/PDF 走本项目的 `ReportShareCardRenderer`：固定 1080×1350 画布离屏渲染 `ReportShareCardView`（Avalonia 视觉树，中文与应用字体由宿主保证），PDF 由渲染位图经 SkiaSharp `SKDocument` 封装单页——**不引入第二套排版**，分享图与 PDF 永远视觉一致。
+- `RenderTargetBitmap` 要求 UI 线程：导出命令只在 VM（UI 线程）同步调用渲染，不要 `Task.Run`。
+- PDF 写入前先释放 `SaveFilePickerAsync` 返回的流，再以本地路径交给 SkiaSharp，避免文件占用；本地路径取 `IStorageFile.TryGetLocalPath()`。
+- 分享卡数据模型是 `ReportShareCardData`（不可变快照）：只带展示必需字段，不要把 `MarketAnalysisReport` 直接绑到离屏视图上。
+
 ---
 
 ## 边界约定

@@ -4,8 +4,9 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
               xmlns:providers="using:MarketAssistant.Infrastructure.Providers"
+              xmlns:settings="using:MarketAssistant.Applications.Settings"
 
-             xmlns:controls="using:MarketAssistant.Views.Controls"
+              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="MarketAssistant.Views.Pages.SettingsPageView"
@@ -622,6 +623,62 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 模型价格表区域 -->
+                <Expander Classes="section-card" IsExpanded="False" HorizontalContentAlignment="Stretch">
+                <Expander.Header>
+                    <TextBlock Text="模型价格表（成本估算）" Classes="section-title"/>
+                </Expander.Header>
+                    <StackPanel Spacing="{StaticResource LargeSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="按「服务商 + 模型ID」配置单价（元 / 1M tokens），分析报告页据此估算本次 Token 成本"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="各服务商定价经常调整，请以官方价格为准；未配置的模型成本显示为「部分未定价」。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+
+                        <ItemsControl ItemsSource="{Binding ModelPrices}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="settings:ModelPrice">
+                                    <Grid ColumnDefinitions="*,*,*,*,Auto" Margin="{StaticResource GridItemMargin}">
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding ProviderId, Mode=TwoWay}"
+                                                 Watermark="服务商ID"
+                                                 Margin="{StaticResource TinyRightMargin}"/>
+                                        <TextBox Grid.Column="1"
+                                                 Text="{Binding ModelId, Mode=TwoWay}"
+                                                 Watermark="模型ID"
+                                                 Margin="{StaticResource TinyRightMargin}"/>
+                                        <NumericUpDown Grid.Column="2"
+                                                       Value="{Binding InputPricePerMillionTokens, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Increment="0.1"
+                                                       FormatString="0.####"
+                                                       Margin="{StaticResource TinyRightMargin}"/>
+                                        <NumericUpDown Grid.Column="3"
+                                                       Value="{Binding OutputPricePerMillionTokens, Mode=TwoWay}"
+                                                       Minimum="0"
+                                                       Increment="0.1"
+                                                       FormatString="0.####"
+                                                       Margin="{StaticResource TinyRightMargin}"/>
+                                        <Button Grid.Column="4"
+                                                Content="删除"
+                                                Classes="btn-secondary"
+                                                Command="{Binding $parent[ItemsControl].((vm:SettingsPageViewModel)DataContext).RemoveModelPriceCommand}"
+                                                CommandParameter="{Binding}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Button Content="添加价格行"
+                                Classes="btn-secondary"
+                                HorizontalAlignment="Left"
+                                Command="{Binding AddModelPriceCommand}"/>
                     </StackPanel>
                 </Expander>
 

@@ -113,6 +113,40 @@
                                             </StackPanel>
                                         </Button>
 
+                                        <!-- 导出分享图 / PDF -->
+                                        <Button HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                Padding="{StaticResource CompactCardPadding}"
+                                                Margin="{StaticResource TinyBottomMargin}"
+                                                Command="{Binding ExportShareImageCommand}"
+                                                IsEnabled="{Binding CanExportReport}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_chart.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Text="导出分享图（PNG）" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                Padding="{StaticResource CompactCardPadding}"
+                                                Margin="{StaticResource TinyBottomMargin}"
+                                                Command="{Binding ExportPdfCommand}"
+                                                IsEnabled="{Binding CanExportReport}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Text="导出 PDF" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
                                         <!-- 分隔线 -->
                                         <Border Height="{StaticResource DividerHeight}"
                                                 Background="{DynamicResource DividerBrush}"

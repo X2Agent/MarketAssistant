@@ -12,6 +12,7 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
@@ -84,6 +85,48 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     }
 
     public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
+
+    /// <summary>
+    /// 模型价格表草稿（元 / 1M tokens）。保存时写回 UserSetting.ModelPrices；
+    /// 成本展示按 (provider, model) 匹配，未命中按"未定价"处理。
+    /// </summary>
+    public ObservableCollection<ModelPrice> ModelPrices { get; } = new();
+
+    /// <summary>新增一行价格（服务商预填当前服务商，减少重复输入）。</summary>
+    [RelayCommand]
+    private void AddModelPrice()
+    {
+        ModelPrices.Add(new ModelPrice { ProviderId = UserSetting.ProviderId });
+    }
+
+    /// <summary>删除一行价格。</summary>
+    [RelayCommand]
+    private void RemoveModelPrice(ModelPrice? price)
+    {
+        if (price is not null)
+        {
+            ModelPrices.Remove(price);
+        }
+    }
+
+    /// <summary>从草稿设置同步价格表集合（初始化与重置后调用）。</summary>
+    private void LoadModelPrices()
+    {
+        ModelPrices.Clear();
+        foreach (var price in UserSetting.ModelPrices)
+        {
+            ModelPrices.Add(price);
+        }
+    }
+
+    /// <summary>草稿价格表写回设置：完全空行丢弃，其余（含半成品）保留但不参与成本匹配。</summary>
+    private void CommitModelPrices()
+    {
+        UserSetting.ModelPrices = ModelPrices
+            .Where(price => !string.IsNullOrWhiteSpace(price.ProviderId) ||
+                            !string.IsNullOrWhiteSpace(price.ModelId))
+            .ToList();
+    }
 
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
 
@@ -290,6 +333,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         LoadAnalystRoles();
+        LoadModelPrices();
         ApplyTheme(UserSetting.ThemeMode);
     }
 
@@ -307,6 +351,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     role.Id,
                     role.ModelIdOverride);
             }
+
+            CommitModelPrices();
 
             // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。
             var targetMode = UserSetting.CryptoTradingMode;
@@ -364,6 +410,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             ApplyTheme(UserSetting.ThemeMode);
             await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             LoadAnalystRoles();
+            LoadModelPrices();
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");
         }, "重置设置");

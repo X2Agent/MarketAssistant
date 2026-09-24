@@ -203,6 +203,12 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = new();
 
+    /// <summary>
+    /// 模型价格表（元 / 1M tokens）。用户手工维护，用于分析成本的估算展示；
+    /// 未配置某模型时该模型的消耗在成本展示中标记为"未定价"。
+    /// </summary>
+    public List<ModelPrice> ModelPrices { get; set; } = new();
+
     private InvestmentPreference _investmentPreference = new();
     public InvestmentPreference InvestmentPreference
     {
@@ -252,6 +258,13 @@ public class UserSetting : INotifyPropertyChanged
             WebSearchApiKey = WebSearchApiKey,
             WebSearchProvider = WebSearchProvider,
             EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
+            ModelPrices = ModelPrices.Select(price => new ModelPrice
+            {
+                ProviderId = price.ProviderId,
+                ModelId = price.ModelId,
+                InputPricePerMillionTokens = price.InputPricePerMillionTokens,
+                OutputPricePerMillionTokens = price.OutputPricePerMillionTokens
+            }).ToList(),
             InvestmentPreference = InvestmentPreference.Clone()
         };
         return clone;

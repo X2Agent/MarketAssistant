@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Infrastructure.Extensions;
+using MarketAssistant.Services.Cost;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
@@ -14,6 +15,7 @@ namespace MarketAssistant.ViewModels;
 /// </summary>
 public partial class AnalysisReportViewModel : ViewModelBase
 {
+    private readonly IAnalysisCostService _analysisCostService;
     [ObservableProperty]
     private bool _isReportVisible;
 
@@ -102,6 +104,14 @@ public partial class AnalysisReportViewModel : ViewModelBase
     [ObservableProperty]
     private string _tokenUsageDetail = string.Empty;
 
+    /// <summary>成本估算文本（如"约 ¥0.42"）；价格表未覆盖时为 "≥ ¥…（部分未定价）" 或空串</summary>
+    [ObservableProperty]
+    private string _tokenUsageCost = string.Empty;
+
+    /// <summary>是否有可展示的成本估算（价格表覆盖了本次使用的模型）</summary>
+    [ObservableProperty]
+    private bool _hasTokenUsageCost;
+
     /// <summary>用量中是否包含本地估算值</summary>
     [ObservableProperty]
     private bool _tokenUsageIsEstimated;
@@ -113,9 +123,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
     public ObservableCollection<ChatMessage> AnalystMessages { get; } = new();
 
     public AnalysisReportViewModel(
+        IAnalysisCostService analysisCostService,
         ILogger<AnalysisReportViewModel> logger)
         : base(logger)
     {
+        _analysisCostService = analysisCostService;
     }
 
     partial void OnOverallScoreChanged(float value)
@@ -141,6 +153,8 @@ public partial class AnalysisReportViewModel : ViewModelBase
             HasTokenUsage = report.Usage is { HasValue: true };
             TokenUsageSummary = TokenUsageFormatter.FormatSummary(report.Usage);
             TokenUsageDetail = TokenUsageFormatter.FormatDetail(report.Usage);
+            TokenUsageCost = _analysisCostService.FormatCost(report.Usage);
+            HasTokenUsageCost = TokenUsageCost.Length > 0;
             TokenUsageIsEstimated = report.Usage?.IsEstimated == true;
 
             var coordinatorResult = report.CoordinatorResult;
@@ -250,6 +264,8 @@ public partial class AnalysisReportViewModel : ViewModelBase
         HasTokenUsage = false;
         TokenUsageSummary = string.Empty;
         TokenUsageDetail = string.Empty;
+        TokenUsageCost = string.Empty;
+        HasTokenUsageCost = false;
         TokenUsageIsEstimated = false;
     }
 }

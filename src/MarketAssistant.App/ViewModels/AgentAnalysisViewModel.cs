@@ -6,7 +6,9 @@ using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
+using MarketAssistant.Services.Cost;
 using MarketAssistant.Services.Export;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
@@ -29,6 +31,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     };
 
     private readonly AnalysisOrchestrationService _orchestrationService;
+    private readonly IAnalysisCostService _analysisCostService;
 
     [ObservableProperty]
     private string _stockCode = "";
@@ -89,6 +92,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// </summary>
     [ObservableProperty]
     private string _usageDetailText = string.Empty;
+
+    /// <summary>
+    /// 本次分析的成本估算文本（如"约 ¥0.42"）；价格表未覆盖时为 "≥ ¥…（部分未定价）" 或空串
+    /// </summary>
+    [ObservableProperty]
+    private string _usageCostText = string.Empty;
 
     /// <summary>
     /// 是否统计到 Token 用量
@@ -211,10 +220,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisReportViewModel analysisReportViewModel,
         ChatSidebarViewModel chatSidebarViewModel,
         MarketContext marketContext,
+        IAnalysisCostService analysisCostService,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
+        _analysisCostService = analysisCostService;
 
         _progressSmoothTimer = new DispatcherTimer(SmoothTickInterval, DispatcherPriority.Background, OnProgressSmoothTimerTick);
         _progressSmoothTimer.Stop();
@@ -424,6 +435,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         HasUsage = usage is { HasValue: true };
         UsageSummaryText = TokenUsageFormatter.FormatSummary(usage);
         UsageDetailText = TokenUsageFormatter.FormatDetail(usage);
+        UsageCostText = _analysisCostService.FormatCost(usage);
         UsageIsEstimated = usage?.IsEstimated == true;
     }
 
@@ -550,6 +562,93 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         await writer.WriteAsync(markdown);
 
         Logger?.LogInformation("分析报告已导出: {Path}", file.Name);
+    }
+
+    /// <summary>
+    /// 导出分享卡图片（PNG）。分享卡为固定画布离屏渲染，与 PDF 视觉一致。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportShareImageAsync()
+    {
+        if (_lastReport == null || _storageProvider == null)
+            return;
+
+        var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出分享图",
+            SuggestedFileName = BuildShareCardFileName(),
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PNG 图片") { Patterns = ["*.png"] },
+            ],
+            DefaultExtension = "png"
+        });
+
+        if (file == null) return;
+
+        await using var stream = await file.OpenWriteAsync();
+        var bytes = ReportShareCardRenderer.RenderToPngBytes(BuildShareCardData(_lastReport));
+        await stream.WriteAsync(bytes);
+
+        Logger?.LogInformation("分享图已导出: {Path}", file.Name);
+    }
+
+    /// <summary>
+    /// 导出分享卡 PDF（单页，内容与分享图一致）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportPdfAsync()
+    {
+        if (_lastReport == null || _storageProvider == null)
+            return;
+
+        var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出 PDF",
+            SuggestedFileName = BuildShareCardFileName(),
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PDF 文档") { Patterns = ["*.pdf"] },
+            ],
+            DefaultExtension = "pdf"
+        });
+
+        if (file == null) return;
+
+        // SaveFilePicker 返回的流需先释放再交由 SkiaSharp 以文件路径写入，避免文件占用
+        await using (var warmup = await file.OpenWriteAsync())
+        {
+            await warmup.FlushAsync();
+        }
+
+        var localPath = file.TryGetLocalPath() ?? file.Name;
+        ReportShareCardRenderer.SavePdf(BuildShareCardData(_lastReport), localPath);
+
+        Logger?.LogInformation("PDF 已导出: {Path}", localPath);
+    }
+
+    private string BuildShareCardFileName()
+        => $"{_lastReport!.AssetSymbol}_分析卡片_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
+
+    /// <summary>
+    /// 从报告构建分享卡数据：亮点取前 3 条，Token 摘要直接复用展示层格式化。
+    /// </summary>
+    private static ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
+    {
+        var coordinator = report.CoordinatorResult;
+        return new ReportShareCardData
+        {
+            AssetName = report.AssetSymbol,
+            AssetSymbol = report.AssetSymbol,
+            OverallScore = coordinator.OverallScore,
+            InvestmentRating = coordinator.InvestmentRating.GetDescription(),
+            TargetPrice = coordinator.TargetPrice,
+            PriceChangeExpectation = coordinator.PriceChangeExpectation,
+            ConfidencePercentage = coordinator.ConfidencePercentage,
+            Highlights = coordinator.InvestmentHighlights.Take(3).ToList(),
+            UsageSummary = TokenUsageFormatter.FormatSummary(report.Usage),
+            GeneratedAt = report.CreatedAt
+        };
     }
 
     public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
