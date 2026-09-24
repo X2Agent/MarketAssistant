@@ -237,7 +237,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
         _dialogService = dialogService;
         _userSettingService = userSettingService;
         _alertCenterService = alertCenterService;
-        AlertHistory = new AlertHistoryViewModel(alertCenterService, logger);
+        AlertHistory = new AlertHistoryViewModel(alertCenterService, marketContext, logger);
 
         EmptyMessage = "在上方添加价格告警规则：持续告警进入目标区间提醒一次、离开后自动复位；一次性告警触发后自动停用";
         SetRetryCommand(() => LoadRulesAsync());

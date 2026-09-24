@@ -225,6 +225,16 @@ public abstract class ViewModelBase : ObservableObject
     }
 
     /// <summary>
+    /// 显式标记就绪态（如筛选条件变化后重新产生可见数据）。
+    /// </summary>
+    protected void SetReady()
+    {
+        ErrorMessage = string.Empty;
+        IsInitialLoading = false;
+        State = LoadState.Ready;
+    }
+
+    /// <summary>
     /// 复位到未加载状态。
     /// </summary>
     protected void ResetLoadState()

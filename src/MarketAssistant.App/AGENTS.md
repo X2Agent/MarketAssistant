@@ -91,6 +91,13 @@ MarketAssistant.App/
 - 异常处理：使用 `SafeExecuteAsync` 或 `ErrorMessageMapper`，**不要吞并异常**。
 - 通过 DI 容器获取依赖，不使用 `ServiceLocator`。
 - ViewModel 可以消费 `MarketAssistant.App.Services` 暴露的业务服务，但不要在 UI 层新增 Agent、Tool、Workflow 实现。
+- 列表页筛选逻辑（纯函数、无 IO）抽为独立静态类（如 `AlertHistoryFilter`），ViewModel 只做装配与状态映射，便于脱离 Avalonia 单测。
+
+### 告警历史页（PriceAlertPage → 告警历史）
+
+- `AlertHistoryViewModel` 持有 `_allAlerts` 全量副本，可见集 `Alerts` 由 `AlertHistoryFilter.Matches` 按级别/标的关键词重建；筛选后为空与"无告警记录"是两种空态，文案必须区分（`SetEmpty` 传不同消息，不要复用同一句）。
+- 历史告警的"AI 归因"按钮经 `NavigationMessage("Analysis", ...)` 跳转多分析师研判页；告警归属市场与当前市场不一致时先 `MarketContext.SwitchMarket`，否则分析链路会解析错市场的 Keyed 数据服务。系统级告警（无标的）不展示该按钮（`AlertEvent.HasSymbol` 门控）。
+- `DataTemplate` 内的按钮命令经 `$parent[ItemsControl].((vm:XxxViewModel)DataContext).Command` 绑定到宿主 VM（`x:DataType` 不可跨 DataTemplate 冒泡）。
 
 ---
 

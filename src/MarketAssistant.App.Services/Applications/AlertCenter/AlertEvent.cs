@@ -98,6 +98,12 @@ public sealed class AlertEvent
     /// <summary>标的展示文本（系统级告警无标的）。</summary>
     public string SymbolText => string.IsNullOrWhiteSpace(Symbol) ? "系统" : Symbol;
 
+    /// <summary>是否携带标的（系统级告警为 false，不提供 AI 归因入口）。</summary>
+    public bool HasSymbol => !string.IsNullOrWhiteSpace(Symbol);
+
+    /// <summary>所属市场展示文本。</summary>
+    public string MarketTypeText => MarketType == MarketType.Crypto ? "虚拟币" : "A股";
+
     public bool IsLevelInfo => Level == AlertLevel.Info;
 
     public bool IsLevelWarning => Level == AlertLevel.Warning;
