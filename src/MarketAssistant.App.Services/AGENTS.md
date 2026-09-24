@@ -86,6 +86,10 @@ MarketAssistant.App.Services/
 - 工作流实现放在 `Agents/*Workflow*/`，执行器放在 `Executors/`。
 - 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 `FileAgentSkillsProvider` 加载，不在这里重复存放一份。
 
+### 分析师结构化信号落库
+
+`CoordinatorExecutor` 生成报告时调用 `AnalystSignalParser.ExtractSignals(reportAnalystMessages)`，把各分析师的结构化 JSON 提取为 `MarketAnalysisReport.AnalystSignals`（解析约定见 `src/MarketAssistant.Agents/AGENTS.md`）。信号随报告由 `ReportArchiveService` 全量序列化持久化，是 M3 回测与分析师绩效统计的数据基础；提取失败仅缺失单项，不阻断报告。
+
 ---
 
 ## 统一告警中心（Applications/AlertCenter）

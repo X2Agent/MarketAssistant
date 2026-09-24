@@ -250,11 +250,19 @@ public sealed partial class CoordinatorExecutor : Executor
             // 系统说明（SystemNotice）与落盘失败的条目在回填时分别被跳过或保留原文。
             var reportAnalystMessages = await RehydrateAnalystArtifactsAsync(filteredMessages, cancellationToken);
 
+            // 提取各分析师的机器可读信号（M3 回测/绩效统计的数据基础）：
+            // 单项解析失败仅缺失该分析师信号，不阻断报告生成
+            var analystSignals = AnalystSignalParser.ExtractSignals(reportAnalystMessages);
+            _logger.LogInformation(
+                "分析师信号提取完成，有效信号: {SignalCount}/{MessageCount}",
+                analystSignals.Count, reportAnalystMessages.Count);
+
             var finalReport = new MarketAnalysisReport
             {
                 AssetSymbol = assetSymbol,
                 AnalystMessages = [.. reportAnalystMessages, coordinatorMessage!],
                 CoordinatorResult = coordinatorResult,
+                AnalystSignals = analystSignals,
                 CreatedAt = DateTime.UtcNow
             };
 

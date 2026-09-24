@@ -23,6 +23,13 @@ public sealed class MarketAnalysisReport
     public CoordinatorResult CoordinatorResult { get; init; } = new();
 
     /// <summary>
+    /// 各分析师的机器可读信号快照（评级/操作方向/目标价位）。
+    /// 由工作流在生成报告时从分析师结构化输出提取，是回测与分析师绩效统计的数据基础；
+    /// 历史报告或提取失败的分析师不出现在列表中。
+    /// </summary>
+    public List<AnalystSignalSnapshot> AnalystSignals { get; init; } = new();
+
+    /// <summary>
     /// 本次分析运行的 Token 用量汇总（总计 + 按分析师明细）。
     /// 由工作流在运行结束后回填；历史报告或未统计时为 <c>null</c>。
     /// </summary>

@@ -17,6 +17,13 @@ public sealed class FinancialAnalysisResult
 
     [Description("财务风险识别和预警，包括主要风险指标、造假风险和关注点")]
     public FinancialRiskWarning RiskWarning { get; set; } = new();
+
+    /// <summary>
+    /// 财务面对投资的综合评级；财务数据不足以支持明确评级时为 null。
+    /// 供分析师绩效统计使用的机器可读字段。
+    /// </summary>
+    [Description("财务面对投资的综合评级；财务数据不足以支持明确评级时为 null")]
+    public InvestmentRating? FinancialRating { get; set; }
 }
 
 [Description("财务健康状况评估")]

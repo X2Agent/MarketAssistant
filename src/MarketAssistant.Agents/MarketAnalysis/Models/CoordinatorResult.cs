@@ -18,6 +18,23 @@ public sealed class CoordinatorResult
     [Description("综合目标价格区间，例如：'45-50 元'，综合考虑基本面估值、技术目标位、资金推动、事件影响")]
     public string TargetPrice { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 目标价数值（交易货币单位），取区间代表性数值（中值或单值），无明确目标价时为 null。
+    /// 供回测与绩效统计使用的机器可读字段，与 <see cref="TargetPrice"/> 文本并存；
+    /// 历史报告由旧模型生成时为 null，读取方需按缺失处理。
+    /// </summary>
+    [Range(0, 100000000)]
+    [Description("目标价数值（单位与标的计价货币一致），取目标区间的中值或单一目标值；无明确目标价时为 null")]
+    public decimal? TargetPriceValue { get; set; }
+
+    /// <summary>
+    /// 预期涨跌幅百分比数值（负数表示看跌），无明确预期时为 null。
+    /// 与 <see cref="PriceChangeExpectation"/> 文本对应的机器可读字段。
+    /// </summary>
+    [Range(-100, 10000)]
+    [Description("预期涨跌幅百分比数值，如 12.5 表示预计上涨12.5%，-8 表示预计下跌8%；无明确预期时为 null")]
+    public decimal? ExpectedChangePercent { get; set; }
+
     [MinLength(10)]
     [MaxLength(100)]
     [Description("综合价格变化预期，例如：'综合判断预计上涨 8-12%'，基于证据，避免过度乐观或悲观")]

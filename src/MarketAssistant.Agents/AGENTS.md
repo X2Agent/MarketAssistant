@@ -10,13 +10,16 @@ AI Agent 契约层，定义分析师基类、工具接口、分析模型、Token
 MarketAssistant.Agents/
 ├── Analysts/
 │   ├── AnalystAgentBase.cs            ← 分析师抽象基类（继承 DelegatingAIAgent）
+│   ├── AnalystNames.cs                ← 分析师 ASCII 名称常量（与 YAML name 一一对应）
 │   └── Attributes/
 │       ├── RequiredAnalystAttribute.cs   ← 标记必需分析师
 │       └── RequiresToolsAttribute.cs     ← 声明分析师所需工具接口
 ├── MarketAnalysis/
+│   ├── AnalystSignalParser.cs         ← 从分析师 JSON 输出提取机器可读信号快照（回测/绩效数据基础）
 │   └── Models/                        ← 分析结果模型（各维度分析结果 + 综合报告）
-│       ├── MarketAnalysisReport.cs    ← 最终报告：符号、分析师消息、CoordinatorResult、Usage
-│       ├── CoordinatorResult.cs       ← 聚合结果：评分、评级、目标价、风险
+│       ├── MarketAnalysisReport.cs    ← 最终报告：符号、分析师消息、AnalystSignals、CoordinatorResult、Usage
+│       ├── AnalystSignalSnapshot.cs   ← 单位分析师结构化信号（评级/操作/目标价位，缺省为 null）
+│       ├── CoordinatorResult.cs       ← 聚合结果：评分、评级、目标价（文本+数值）、风险
 │       ├── TechnicalAnalysisResult.cs
 │       ├── FundamentalAnalysisResult.cs
 │       ├── FinancialAnalysisResult.cs
@@ -74,6 +77,17 @@ MarketAssistant.Agents/
 - 新增分析维度时，在 `MarketAnalysis/Models/` 添加结果类。
 - 结果类应包含结构化字段（非自由文本），便于聚合评分。
 - 评分遵循 `ScoringStandards` 定义的 1–10 标准。
+
+### 结构化信号（回测与绩效的数据基础）
+
+`AnalystSignalParser` 把各分析师消息中的 JSON 提取为 `AnalystSignalSnapshot`，由 `CoordinatorExecutor` 在生成报告时写入 `MarketAnalysisReport.AnalystSignals`，供 M3 策略回测与分析师绩效统计使用。
+
+- **只提取、不推断**：某位分析师未提供评级/目标价位时对应字段保持 `null`；缺失维度禁止用默认值填充（会污染绩效统计）。
+- **事件性质映射**：新闻事件分析师的 `EventNature` 按 `MajorPositive→StrongBuy / Positive→Buy / Negative→Reduce / MajorNegative→StrongSell` 等价映射为评级，统一各分析师的方向口径。
+- **解析失败必须静默降级**：`LlmJsonExtractor.Deserialize` 对无法解析的文本抛 `JsonException`，`Parse` 捕获后返回 `null`——信号提取绝不能阻断报告生成。
+- **失败标记与未知作者不产出信号**：`AnalystFailureMessages` 标记的消息、`CoordinatorAnalyst`（其结论以 `CoordinatorResult` 为准）与不产出方向性字段的分析师（`CryptoMetricsAnalyst`）均返回 `null`。
+- 嵌套子对象（如 `Strategy`、`GrowthValue`、`ShortTermStrategy`）可能被模型输出为 `null` 或整体缺失，读取一律用 `?.`。
+- 新增分析师时：在 YAML `name` 与 `AnalystNames` 注册常量，并在 `AnalystSignalParser.Parse` 的分支中补映射。
 
 ### Token 管理
 
