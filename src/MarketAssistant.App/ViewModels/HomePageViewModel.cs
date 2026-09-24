@@ -15,17 +15,21 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
 
     public TelegraphNewsViewModel News { get; }
 
+    public DailyBriefingViewModel Briefing { get; }
+
     public HomePageViewModel(
         HomeSearchViewModel searchViewModel,
         HotAssetsViewModel hotAssetsViewModel,
         RecentAssetsViewModel recentAssetsViewModel,
         TelegraphNewsViewModel newsViewModel,
+        DailyBriefingViewModel briefingViewModel,
         ILogger<HomePageViewModel> logger) : base(logger)
     {
         Search = searchViewModel;
         HotAssets = hotAssetsViewModel;
         RecentAssets = recentAssetsViewModel;
         News = newsViewModel;
+        Briefing = briefingViewModel;
 
         Search.AssetSelected += OnAssetSelected;
         HotAssets.HotAssetSelected += OnHotAssetSelected;
@@ -90,6 +94,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         HotAssets.Dispose();
         RecentAssets.Dispose();
         News.Dispose();
+        Briefing.Dispose();
 
         GC.SuppressFinalize(this);
     }

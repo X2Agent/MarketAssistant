@@ -75,6 +75,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<HotAssetsViewModel>();
         services.AddTransient<RecentAssetsViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
+        services.AddTransient<DailyBriefingViewModel>();
 
         services.AddTransient<AgentAnalysisViewModel>();
         services.AddTransient<AnalysisReportViewModel>();

@@ -99,6 +99,12 @@ MarketAssistant.App/
 - 历史告警的"AI 归因"按钮经 `NavigationMessage("Analysis", ...)` 跳转多分析师研判页；告警归属市场与当前市场不一致时先 `MarketContext.SwitchMarket`，否则分析链路会解析错市场的 Keyed 数据服务。系统级告警（无标的）不展示该按钮（`AlertEvent.HasSymbol` 门控）。
 - `DataTemplate` 内的按钮命令经 `$parent[ItemsControl].((vm:XxxViewModel)DataContext).Command` 绑定到宿主 VM（`x:DataType` 不可跨 DataTemplate 冒泡）。
 
+### 每日简报（HomePage → DailyBriefingViewModel）
+
+- 首页子 VM 一律由 `HomePageViewModel` 组合创建/Dispose（`Search`/`HotAssets`/`RecentAssets`/`News`/`Briefing`），`AddViewModels()` 注册。
+- 进入首页先读当天缓存（命中即呈现），未命中才后台生成一次；`ShowCard` 聚合 `HasBriefing/IsGenerating/State` 控制卡片显隐，未开始加载时不展示空卡。
+- 生成中与失败/空态用骨架与 `StateOverlayView` 表达，不要把"生成中"做成阻塞按钮。
+
 ---
 
 ## 边界约定

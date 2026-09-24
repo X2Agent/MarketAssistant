@@ -332,8 +332,62 @@
                 </Panel>
             </controls:CardView>
             
-            <!-- 左列：热门资产（撑满列高，与右侧快讯对齐） -->
-            <controls:CardView Grid.Column="0"
+        <!-- 左列：每日简报 + 热门资产 -->
+        <Grid Grid.Column="0"
+              RowDefinitions="Auto,*">
+            <!-- 每日简报：缓存命中即呈现；未命中后台生成（骨架占位） -->
+            <controls:CardView Grid.Row="0"
+                               Margin="{StaticResource BottomMargin}"
+                               IsVisible="{Binding Briefing.ShowCard}">
+                <controls:CardView.Header>
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Grid.Column="0"
+                                   Text="每日简报"
+                                   FontSize="{StaticResource SectionTitleFontSize}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding Briefing.BriefingMetaText}"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="{StaticResource SmallLeftMargin}"/>
+                        <Button Grid.Column="2"
+                                Content="刷新"
+                                Classes="btn-secondary"
+                                Command="{Binding Briefing.RefreshCommand}"
+                                IsVisible="{Binding !Briefing.IsGenerating}"
+                                Margin="{StaticResource SmallLeftMargin}"/>
+                    </Grid>
+                </controls:CardView.Header>
+
+                <Panel>
+                    <!-- 生成中骨架 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                IsVisible="{Binding Briefing.IsGenerating}">
+                        <Border Classes="skeleton skeleton-row" Height="16"/>
+                        <Border Classes="skeleton skeleton-row" Height="16"/>
+                        <Border Classes="skeleton skeleton-row" Height="16"/>
+                    </StackPanel>
+
+                    <!-- 简报正文（限定高度，避免挤压下方热门资产） -->
+                    <ScrollViewer MaxHeight="200"
+                                  IsVisible="{Binding !Briefing.IsGenerating}">
+                        <TextBlock Text="{Binding Briefing.BriefingContent}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </ScrollViewer>
+
+                    <!-- 空态（无自选无要闻） / 失败态（含重试入口） -->
+                    <controls:StateOverlayView State="{Binding Briefing.OverlayState}"
+                                               Message="{Binding Briefing.OverlayMessage}"
+                                               RetryCommand="{Binding Briefing.RetryCommand}"
+                                               RetryText="重新生成"
+                                               ShowLoading="False"/>
+                </Panel>
+            </controls:CardView>
+
+            <!-- 下排：热门资产（撑满剩余列高，与右侧快讯对齐） -->
+            <controls:CardView Grid.Row="1"
                                Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
@@ -451,7 +505,7 @@
                                                ShowLoading="False"/>
                 </Panel>
             </controls:CardView>
-            
+        </Grid>
 
 
 

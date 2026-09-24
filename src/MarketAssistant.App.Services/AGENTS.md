@@ -53,6 +53,18 @@ MarketAssistant.App.Services/
 
 ---
 
+## 每日 AI 简报（Applications/Briefing）
+
+自选股的"隔夜要闻 + 异动归因"摘要，按市场 Keyed 注册（`IDailyBriefingService`），SQLite 表 `briefings` 按 `(market_type, date_key)` 唯一，当天生成后各端复用。
+
+- **Token 预算硬边界**：`DailyBriefingService` 的 `MaxFavorites/MaxNewsItems/MaxNewsContentLength/MaxBriefingLength/MaxOutputTokens` 常量钳制输入输出；自选按异动幅度优先纳入。调大任何边界前先评估成本。
+- **单次调用、无重试链**：经 `IChatClientFactory.CreateRuntime()` 默认模型一次 `GetResponseAsync` 完成；失败直接抛给调用方（UI 展示重试），不自动重试烧 Token，失败结果不落盘。
+- **空输入不是错误**：自选与要闻均空时返回 `null`，页面展示引导空态（"添加自选后……"），不要生成无意义内容。
+- **缓存语义**：`GenerateAsync(force: false)` 命中当天缓存直接返回；日期键用**本地时间** `yyyy-MM-dd`（跨时区/零点行为与用户感知一致）。
+- 提示词只允许给定事实，明确禁止编造与买卖建议——简报定位是事实归因，不是投资顾问。
+
+---
+
 ## 模型分级调度（Infrastructure/Factories/ChatClientFactory）
 
 一次深度研判会并行启动多个分析师，全部使用同一个强模型既慢又贵。因此支持**按分析师角色**指定模型。

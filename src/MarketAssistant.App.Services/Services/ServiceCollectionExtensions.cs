@@ -6,6 +6,7 @@ using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Applications.Briefing;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Agents.MarketAnalysis;
@@ -409,6 +410,10 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
+
+        // 每日 AI 简报：按市场 Keyed 注册（各自的市场自选/要闻数据源）
+        services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.AShare);
+        services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.Crypto);
 
         return services;
     }
