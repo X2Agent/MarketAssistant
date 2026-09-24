@@ -14,6 +14,10 @@ public interface IMarketCapability
     bool SupportsRealtime { get; }
     bool SupportsNews { get; }
     bool SupportsTrading { get; }
+    /// <summary>是否提供盘口深度（买卖档位）数据。</summary>
+    bool SupportsOrderBook { get; }
+    /// <summary>是否提供逐笔成交明细数据。</summary>
+    bool SupportsTickTrades { get; }
 }
 
 public class AShareMarketCapability : IMarketCapability
@@ -25,6 +29,9 @@ public class AShareMarketCapability : IMarketCapability
     public bool SupportsRealtime => false;
     public bool SupportsNews => true;
     public bool SupportsTrading => false;
+    // A 股暂无公开的实时五档/逐笔数据源，资产页不展示盘口面板
+    public bool SupportsOrderBook => false;
+    public bool SupportsTickTrades => false;
 }
 
 public class CryptoMarketCapability : IMarketCapability
@@ -36,4 +43,6 @@ public class CryptoMarketCapability : IMarketCapability
     public bool SupportsRealtime => true;
     public bool SupportsNews => true;
     public bool SupportsTrading => true;
+    public bool SupportsOrderBook => true;
+    public bool SupportsTickTrades => true;
 }

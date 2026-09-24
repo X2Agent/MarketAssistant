@@ -15,7 +15,7 @@ MarketAssistant.Agents/
 │       └── RequiresToolsAttribute.cs     ← 声明分析师所需工具接口
 ├── MarketAnalysis/
 │   └── Models/                        ← 分析结果模型（各维度分析结果 + 综合报告）
-│       ├── MarketAnalysisReport.cs    ← 最终报告：符号、分析师消息、CoordinatorResult
+│       ├── MarketAnalysisReport.cs    ← 最终报告：符号、分析师消息、CoordinatorResult、Usage
 │       ├── CoordinatorResult.cs       ← 聚合结果：评分、评级、目标价、风险
 │       ├── TechnicalAnalysisResult.cs
 │       ├── FundamentalAnalysisResult.cs
@@ -29,7 +29,12 @@ MarketAssistant.Agents/
 │   ├── AnalystPromptConfig.cs         ← 分析师提示词配置模型
 │   └── AnalystPromptLoader.cs         ← 从 YAML 加载提示词（支持热重载）
 ├── TokenManagement/
-│   └── TokenEstimator.cs              ← Token 估算（中文 ~1.5 字/token）
+│   ├── TokenEstimator.cs              ← Token 估算（中文 ~1.5 字/token）
+│   ├── AnalysisTokenUsage.cs          ← 单次分析的 Token 聚合（总量 + 按分析师明细）
+│   ├── TokenUsageEntry.cs             ← 单条 Token 记录
+│   ├── ITokenUsageRecorder.cs         ← 记录器与作用域接口
+│   ├── TokenUsageRecorder.cs          ← 基于 AsyncLocal 的作用域实现（并发 run 隔离）
+│   └── TokenUsageFormatter.cs         ← UI 展示格式化
 └── Tools/
     ├── Abstractions/                  ← 工具接口定义（纯标记，DI 分发 key）
     │   ├── IBasicDataTools.cs         ← 基础数据
@@ -74,6 +79,17 @@ MarketAssistant.Agents/
 
 - `TokenEstimator` 用于估算消息 Token 数。
 - 会话压缩由 `MarketAssistant.App.Services` 中的 `ConversationCompressionMiddleware`（MAF 中间件）负责。
+
+#### Token 消耗记录（`ITokenUsageRecorder`）
+
+`TokenManagement/` 下的 `ITokenUsageRecorder` / `ITokenUsageScope` / `TokenUsageRecorder` 负责把每次分析实际消耗的 Token 归集到报告上，供 UI 展示。
+
+- **作用域是唯一入口**：记录必须发生在 `using var scope = recorder.BeginScope(runId)` 打开的 `ITokenUsageScope` 内。作用域通过 `AsyncLocal` 传递，因此并发运行的分析（多个 `AgentAnalysis` 同时跑）天然互不串扰。
+- **必须在 `session == null` 早返回之前记录**：`TokenTrackingMiddleware` 的既有逻辑在 `session` 为空时提前返回，而分析链路始终传 `session: null`。新增记录点务必放在该守卫**之前**，否则数据会静默丢失。
+- **按角色归属**：中间件用 `innerAgent.Name` 作为归属键，该值等于分析师 YAML 配置里的 ASCII `config.Name`（例如 `FundamentalAnalyst`）。新增分析师时必须保证 YAML 的 `Name` 与工作流侧的归属字典键一致，否则消耗会被归到"未知"。
+- **作用域退出后不再记录**：`Dispose` 之后的记录请求被忽略，不要在报告构建完成后再写入。
+- `AnalysisTokenUsage` 是最终落到 `MarketAnalysisReport.Usage` 的聚合模型（总量 + 按角色明细）。**它是持久化模型**——新增的计算属性必须标 `[JsonIgnore]`，因为 `ReportArchiveService` 用 `JsonSerializer.Serialize(report)` 直接序列化，历史报告反序列化时 `Usage` 可能为 `null`，读取方必须容忍。
+- 展示层格式化统一走 `TokenUsageFormatter`，不要在 ViewModel 里手写单位换算。
 
 ---
 

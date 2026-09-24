@@ -142,7 +142,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:AnalystRunItemViewModel">
                         <Border Classes="analystRow">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                                 <Grid Grid.Column="0" Width="12" Height="12" VerticalAlignment="Center">
                                     <!-- 运行中：呼吸点 -->
                                     <Ellipse Width="9" Height="9"
@@ -170,12 +170,21 @@
                                            FontSize="{StaticResource SmallFontSize}"
                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <TextBlock Grid.Column="2"
+                                           Text="{Binding TokensText}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"
+                                           FontSize="{StaticResource MiniFontSize}"
+                                           FontFamily="{StaticResource DataFontFamily}"
+                                           ToolTip.Tip="该分析师累计 Token 用量"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           IsVisible="{Binding HasTokenUsage}"/>
+                                <TextBlock Grid.Column="3"
                                            Text="{Binding ElapsedText}"
                                            VerticalAlignment="Center"
                                            FontSize="{StaticResource MiniFontSize}"
                                            FontFamily="{StaticResource DataFontFamily}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <TextBlock Grid.Column="3"
+                                <TextBlock Grid.Column="4"
                                            Text="{Binding StatusMark}"
                                            Width="16"
                                            TextAlignment="Center"
@@ -189,6 +198,23 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- 运行级 Token 用量摘要 -->
+            <StackPanel Spacing="{StaticResource TinySpacing}"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding #Root.UsageSummaryText,
+                            Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding #Root.UsageSummaryText}"
+                           FontSize="{StaticResource SmallFontSize}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <TextBlock Text="{Binding #Root.UsageDetailText}"
+                           FontSize="{StaticResource MiniFontSize}"
+                           FontFamily="{StaticResource DataFontFamily}"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
 
             <!-- 失败分析师提示 -->
             <Border Background="{DynamicResource DangerPanelBackgroundBrush}"

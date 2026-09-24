@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
-using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Applications.AlertCenter;
 using Microsoft.Extensions.Logging;
@@ -18,22 +17,16 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<AlertEvent> Alerts { get; } = new();
 
-    /// <summary>是否正在加载。</summary>
-    [ObservableProperty]
-    private bool _isLoading;
-
-    /// <summary>空列表提示。</summary>
-    [ObservableProperty]
-    private string _emptyHintText = "暂无告警记录";
-
     public AlertHistoryViewModel(
         IAlertCenterService alertCenterService,
         ILogger? logger = null)
         : base(logger)
     {
         _alertCenterService = alertCenterService;
+        EmptyMessage = "暂无告警记录";
+        SetRetryCommand(() => LoadAlertsAsync());
         _alertCenterService.AlertsChanged += OnAlertsChanged;
-        _ = LoadAsync();
+        _ = LoadAlertsAsync();
     }
 
     /// <summary>告警集合变化回调（新告警/合并/已读），切回 UI 线程刷新。</summary>
@@ -42,12 +35,12 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
         if (_disposed)
             return;
 
-        Dispatcher.UIThread.Post(() => _ = LoadAsync());
+        Dispatcher.UIThread.Post(() => _ = LoadAlertsAsync());
     }
 
     /// <summary>手动刷新。</summary>
     [RelayCommand]
-    private async Task RefreshAsync() => await LoadAsync();
+    private async Task RefreshAsync() => await LoadAlertsAsync();
 
     /// <summary>全部标记已读（同时清除导航未读徽标）。</summary>
     [RelayCommand]
@@ -64,19 +57,18 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>加载最近告警（新→旧）。</summary>
-    private async Task LoadAsync()
+    private async Task LoadAlertsAsync()
     {
         if (_disposed)
             return;
 
-        IsLoading = true;
-        try
+        await LoadAsync(async _ =>
         {
             var alerts = await _alertCenterService.GetRecentAlertsAsync(200);
             if (_disposed)
-                return;
+                return Alerts.Count > 0;
 
-            Dispatcher.UIThread.Post(() =>
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_disposed)
                     return;
@@ -84,17 +76,10 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
                 Alerts.Clear();
                 foreach (var alert in alerts)
                     Alerts.Add(alert);
-                EmptyHintText = Alerts.Count == 0 ? "暂无告警记录" : string.Empty;
             });
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "加载告警历史失败");
-        }
-        finally
-        {
-            IsLoading = false;
-        }
+
+            return Alerts.Count > 0;
+        }, "加载告警历史");
     }
 
     public void Dispose()

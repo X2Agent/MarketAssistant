@@ -5,6 +5,7 @@ using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Settings;
+using MarketAssistant.Applications.Technical;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
 using MarketAssistant.DataProviders;
@@ -63,6 +64,10 @@ public class TechnicalDataToolsTest
         // 注册 KLine 服务（TechnicalTools 依赖）
         services.AddKeyedSingleton<IKLineService, AShareKLineService>(MarketType.AShare);
         services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
+
+        // 指标计算服务（TechnicalTools 复用）
+        services.AddTechnicalIndicatorService(MarketType.AShare);
+        services.AddTechnicalIndicatorService(MarketType.Crypto);
 
         // 注册被测试的服务
         services.AddKeyedSingleton<ITechnicalDataTools, AShareTechnicalTools>(MarketType.AShare);

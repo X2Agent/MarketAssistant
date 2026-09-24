@@ -46,6 +46,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
         RegisterRoute<BalanceDetailPageViewModel>("BalanceDetail");
         RegisterRoute<TradingPageViewModel>("Trading");
+        RegisterRoute<PriceAlertPageViewModel>("PriceAlert");
 
         WeakReferenceMessenger.Default.Register(this);
     }

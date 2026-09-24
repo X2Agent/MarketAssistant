@@ -15,7 +15,9 @@ MarketAssistant.Core/
 │   │   ├── ErrorMessageMapper.cs      ← 技术异常 → 用户友好消息映射
 │   │   ├── StockSymbolConverter.cs    ← A 股代码格式转换
 │   │   ├── CryptoSymbolConverter.cs   ← 加密货币符号转换
-│   │   └── LlmJsonExtractor.cs        ← LLM 返回文本 JSON 稳健提取/反序列化
+│   │   ├── LlmJsonExtractor.cs        ← LLM 返回文本 JSON 稳健提取/反序列化
+│   │   ├── MarketAssistantDiagnostics.cs ← 诊断辅助
+│   │   └── StructuredOutputMode.cs    ← 结构化输出模式
 │   ├── Extensions/
 │   │   └── EnumExtensions.cs          ← GetDescription() 扩展
 ```

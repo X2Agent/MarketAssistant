@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Applications.Charts;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
@@ -38,6 +39,9 @@ public class CryptoMetricsToolsTest
         services.AddSingleton<CoinGeckoApiService>();
         // CryptoMetricsTools 依赖 IKLineService（虚拟币 K线服务，基于币安行情）
         services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
+        // 盘口深度与逐笔成交已抽取为独立服务，工具通过委托调用
+        services.AddKeyedSingleton<IOrderBookService, CryptoOrderBookService>(MarketType.Crypto);
+        services.AddKeyedSingleton<ITickTradeService, CryptoTickTradeService>(MarketType.Crypto);
 
         // 通过 Mock 注入 UserSetting（CoinGeckoApiKey 可为空，使用免费 API）
         var userSetting = new UserSetting();

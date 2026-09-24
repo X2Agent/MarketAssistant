@@ -20,6 +20,14 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public Dictionary<string, string> ProviderModelIds { get; set; } = new();
 
+    /// <summary>
+    /// 按服务商保存"分析师角色 → 模型 ID"的分配，用于按角色分级模型
+    /// （如协调器用强模型、常规分析师用快模型）。
+    /// 结构为 providerId → 分析师类型名（如 FundamentalAnalystAgent）→ modelId；
+    /// 未配置或留空的角色回落到 <see cref="ProviderModelIds"/> 中的默认模型。
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>> ProviderAnalystModelIds { get; set; } = new();
+
     public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
     public string EmbeddingEndpoint { get; set; } = "https://api.jina.ai";
@@ -218,6 +226,10 @@ public class UserSetting : INotifyPropertyChanged
             EmbeddingApiKey = EmbeddingApiKey,
             ProviderApiKeys = new Dictionary<string, string>(ProviderApiKeys, StringComparer.Ordinal),
             ProviderModelIds = new Dictionary<string, string>(ProviderModelIds, StringComparer.Ordinal),
+            ProviderAnalystModelIds = ProviderAnalystModelIds.ToDictionary(
+                entry => entry.Key,
+                entry => new Dictionary<string, string>(entry.Value, StringComparer.Ordinal),
+                StringComparer.Ordinal),
             ProviderEndpoints = new Dictionary<string, string>(ProviderEndpoints, StringComparer.Ordinal),
             LoadKnowledge = LoadKnowledge,
             KnowledgeFileDirectory = KnowledgeFileDirectory,

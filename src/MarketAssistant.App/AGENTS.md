@@ -15,7 +15,9 @@ MarketAssistant.App/
 │       ├── TechnicalAnalyst.yaml
 │       ├── MarketSentimentAnalyst.yaml
 │       ├── NewsEventAnalyst.yaml
-│       └── CoordinatorAnalyst.yaml
+│       ├── CryptoMetricsAnalyst.yaml   ← Crypto 专属指标分析师
+│       ├── CoordinatorAnalyst.yaml
+│       └── Crypto/                     ← Crypto 市场差异化提示词
 ├── Converts/                      ← AXAML 值转换器
 ├── Infrastructure/                ← ViewLocator 等 UI 宿主基础设施
 ├── Resources/Styles/              ← Avalonia 样式资源字典
@@ -47,6 +49,36 @@ MarketAssistant.App/
   - 主题感知资源 → `{DynamicResource}`；固定资源 → `{StaticResource}`。
 - **控件**：优先使用 Avalonia 内置控件。
 - **资产**：非必要不改动图片与资产文件。
+
+### 加载态与状态浮层（强制约定）
+
+页面/区块的加载、空、失败三态必须走统一机制，禁止每页自行手写提示面板。
+
+- **状态源**：`ViewModelBase` 提供 `State`（`LoadState`）、`IsInitialLoading`、`OverlayState`、`OverlayMessage`、`ErrorMessage`、`EmptyMessage`、`RetryCommand`。
+  - 加载方法一律通过 `protected Task LoadAsync(Func<CancellationToken, Task<bool>> loader, string operationName, ...)` 编写：loader 返回 `true` → `Ready`，`false` → `Empty`，抛 `OperationCanceledException` → `Idle`，其他异常 → `Failed`（经 `ErrorMessageMapper` 转可读文案）。
+  - 构造函数末尾用 `SetRetryCommand(() => LoadXxxAsync())` 注册重试入口，再 `_ = LoadXxxAsync();` 触发首屏加载。
+- **状态浮层**：统一使用 `Views/Controls/StateOverlayView`，绑定 `OverlayState` / `OverlayMessage` / `RetryCommand`。该控件**自管理 `IsVisible`**（加载/空/失败时可见），页面无法从 XAML 外部关闭它——只能通过改变绑定的 `State` 来控制。
+  - `OverlayState` 而非 `State`：已有内容时刷新不显示浮层，避免内容闪烁。
+  - 重试按钮仅在 `Failed` 且 `RetryCommand` 非空时出现（`CanRetry`），空态不会误显示"重试"。
+- **骨架屏优先于转圈**：首屏加载展示骨架屏（绑定 `IsInitialLoading`），同时把内容区反相门控为 `{Binding !IsInitialLoading}`。骨架屏存在时必须给 `StateOverlayView` 加 `ShowLoading="False"`，否则浮层的加载点阵会叠在骨架上。
+- **不要把长耗时 AI 操作接入该机制**：分析进度蒙层（如 `AssetSelectionPageView` 的 `ZIndex=1000` 分析中蒙层、`AgentAnalysisPageView` 的 `ProgressDisplayView`）表达的是"任务进行中"而非"数据加载中"，继续使用 `IsBusy` + `SafeExecuteAsync`。
+
+### 骨架样式
+
+骨架屏统一使用 `Resources/Styles/SkeletonStyles.axaml` 的类：
+
+| 类 | 语义 |
+|---|---|
+| `Border.skeleton` | 基础类，带呼吸动画，必须搭配下方修饰类 |
+| `skeleton-text` | 文本行（H12） |
+| `skeleton-title` | 标题行（H18） |
+| `skeleton-row` | 列表行（H44） |
+| `skeleton-card` | 卡片（MinHeight 96） |
+| `skeleton-panel` | 面板（MinHeight 240） |
+| `skeleton-circle` | 头像/图标（32×32） |
+
+- 骨架尺寸按真实内容形态用显式 `Height`/`Margin` 覆盖，行数与真实列表首屏可见条数一致，避免加载完成时的布局跳动。
+- 骨架只服务**首屏**（`IsInitialLoading`）；刷新（`IsLoading` 且已有内容）不显示骨架。
 
 ---
 

@@ -237,7 +237,19 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _marketMonitorProvider = marketMonitorProvider;
         _dialogService = dialogService;
         _documentVectorizationService = documentVectorizationService;
-        _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
+
+        SetRetryCommand(() => LoadSettingsAsync());
+        _ = LoadSettingsAsync();
+    }
+
+    /// <summary>首屏加载：读取用户设置草稿、同步服务商与模型列表。</summary>
+    private async Task LoadSettingsAsync()
+    {
+        await LoadAsync(async _ =>
+        {
+            await InitializeAsync();
+            return true;
+        }, "初始化设置页");
     }
 
     /// <summary>
@@ -289,6 +301,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             foreach (var role in AnalystRoles)
             {
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
+                AnalystModelAssignment.SetAssignedModelId(
+                    UserSetting,
+                    UserSetting.ProviderId,
+                    role.Id,
+                    role.ModelIdOverride);
             }
 
             // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。

@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
 using Microsoft.Extensions.AI;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json.Nodes;
+using CryptoOrderBookLevel = MarketAssistant.Agents.Tools.Models.Crypto.OrderBookLevel;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
@@ -26,17 +28,23 @@ public sealed class CryptoMetricsTools : IFinancialTools
     private readonly BinanceMarketDataService _binanceService;
     private readonly CoinGeckoApiService _coinGeckoService;
     private readonly IKLineService _klineService;
+    private readonly IOrderBookService _orderBookService;
+    private readonly ITickTradeService _tickTradeService;
     private readonly ILogger<CryptoMetricsTools> _logger;
 
     public CryptoMetricsTools(
         BinanceMarketDataService binanceService,
         CoinGeckoApiService coinGeckoService,
         [FromKeyedServices(MarketType.Crypto)] IKLineService klineService,
+        [FromKeyedServices(MarketType.Crypto)] IOrderBookService orderBookService,
+        [FromKeyedServices(MarketType.Crypto)] ITickTradeService tickTradeService,
         ILogger<CryptoMetricsTools> logger)
     {
         _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
         _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
         _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
+        _orderBookService = orderBookService ?? throw new ArgumentNullException(nameof(orderBookService));
+        _tickTradeService = tickTradeService ?? throw new ArgumentNullException(nameof(tickTradeService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -185,51 +193,22 @@ public sealed class CryptoMetricsTools : IFinancialTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            var response = await _binanceService.GetDepthAsync(binanceSymbol, limit, cancellationToken);
-            if (response == null)
+            var snapshot = await _orderBookService.GetOrderBookAsync(binanceSymbol, limit, cancellationToken);
+            if (snapshot == null)
             {
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的深度数据，请确认代码是否正确。");
-            }
-
-            var bids = new List<OrderBookLevel>();
-            var asks = new List<OrderBookLevel>();
-
-            if (response["bids"] is JsonArray bidsArray)
-            {
-                foreach (var bid in bidsArray)
-                {
-                    if (bid is JsonArray bidArr && bidArr.Count >= 2)
-                    {
-                        bids.Add(new OrderBookLevel
-                        {
-                            Price = decimal.Parse(bidArr[0]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                            Quantity = decimal.Parse(bidArr[1]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture)
-                        });
-                    }
-                }
-            }
-
-            if (response["asks"] is JsonArray asksArray)
-            {
-                foreach (var ask in asksArray)
-                {
-                    if (ask is JsonArray askArr && askArr.Count >= 2)
-                    {
-                        asks.Add(new OrderBookLevel
-                        {
-                            Price = decimal.Parse(askArr[0]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                            Quantity = decimal.Parse(askArr[1]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture)
-                        });
-                    }
-                }
             }
 
             return new CryptoOrderBookDepth
             {
                 Symbol = binanceSymbol,
-                LastUpdateId = response["lastUpdateId"]?.GetValue<long>() ?? 0,
-                Bids = bids,
-                Asks = asks
+                LastUpdateId = snapshot.LastUpdateId,
+                Bids = snapshot.Bids
+                    .Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })
+                    .ToList(),
+                Asks = snapshot.Asks
+                    .Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })
+                    .ToList()
             };
         }
         catch (OperationCanceledException)
@@ -251,40 +230,28 @@ public sealed class CryptoMetricsTools : IFinancialTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            var response = await _binanceService.GetRecentTradesAsync(binanceSymbol, limit, cancellationToken);
-            if (response == null || response.Count == 0)
+            var recentTrades = await _tickTradeService.GetRecentTradesAsync(binanceSymbol, limit, cancellationToken);
+            if (recentTrades.Count == 0)
             {
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的成交数据，请确认代码是否正确。");
             }
 
-            var trades = new List<CryptoTrade>();
-            decimal buyVolume = 0;
-            decimal sellVolume = 0;
-
-            foreach (var item in response)
-            {
-                if (item is not JsonObject obj) continue;
-
-                var price = decimal.Parse(obj["price"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
-                var qty = decimal.Parse(obj["qty"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
-                var isBuyerMaker = obj["isBuyerMaker"]?.GetValue<bool>() ?? false;
-
-                trades.Add(new CryptoTrade
+            // ITickTradeService 按最新在前返回；工具契约保持数据源的升序顺序，避免改变既有输出
+            var trades = recentTrades
+                .Reverse()
+                .Select(trade => new CryptoTrade
                 {
-                    TradeId = obj["id"]?.GetValue<long>() ?? 0,
-                    Price = price,
-                    Quantity = qty,
-                    QuoteQuantity = decimal.Parse(obj["quoteQty"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                    Timestamp = obj["time"]?.GetValue<long>() ?? 0,
-                    IsBuyerMaker = isBuyerMaker
-                });
+                    TradeId = trade.TradeId,
+                    Price = trade.Price,
+                    Quantity = trade.Quantity,
+                    QuoteQuantity = trade.Amount,
+                    Timestamp = new DateTimeOffset(trade.Timestamp).ToUnixTimeMilliseconds(),
+                    IsBuyerMaker = trade.IsBuyerMaker
+                })
+                .ToList();
 
-                if (isBuyerMaker)
-                    sellVolume += qty;  // Buyer是maker表示主动卖出
-                else
-                    buyVolume += qty;   // Buyer是taker表示主动买入
-            }
-
+            var buyVolume = trades.Where(trade => !trade.IsBuyerMaker).Sum(trade => trade.Quantity);
+            var sellVolume = trades.Where(trade => trade.IsBuyerMaker).Sum(trade => trade.Quantity);
             var totalVolume = buyVolume + sellVolume;
 
             return new CryptoRecentTrades

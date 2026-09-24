@@ -165,6 +165,40 @@
                     </Grid>
                 </controls:CardView>
 
+                <!-- 本次分析的模型调用量（Token 用量） -->
+                <Border IsVisible="{Binding HasTokenUsage}"
+                        Background="{DynamicResource SurfaceVariantBrush}"
+                        CornerRadius="{StaticResource DefaultCornerRadius}"
+                        Padding="{StaticResource ReportNoticePadding}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
+                        <svg:Svg Grid.Column="0"
+                                 Path="/Assets/Images/icon_bolt.svg"
+                                 Width="{StaticResource SmallIconSize}"
+                                 Height="{StaticResource SmallIconSize}"
+                                 VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding TokenUsageSummary}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="{Binding TokenUsageDetail}"
+                                       FontSize="{StaticResource MiniFontSize}"
+                                       FontFamily="{StaticResource DataFontFamily}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </StackPanel>
+                        <Border Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource HoverBackgroundBrush}"
+                                CornerRadius="{StaticResource TinyCornerRadius}"
+                                Padding="{StaticResource ReportBadgePadding}"
+                                IsVisible="{Binding TokenUsageIsEstimated}">
+                            <TextBlock Text="估算值"
+                                       FontSize="{StaticResource MiniFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
                 <!-- 2. 维度评分与操作建议 -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="{StaticResource LargeSpacing}">
                     <!-- 维度评分 (Skill Bars) -->

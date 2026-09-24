@@ -27,10 +27,14 @@ public sealed class TokenTrackingMiddleware
     public const int MaxCumulativeTokens = 200_000;
 
     private readonly ILogger _logger;
+    private readonly ITokenUsageRecorder? _tokenUsageRecorder;
 
-    public TokenTrackingMiddleware(ILogger<TokenTrackingMiddleware> logger)
+    public TokenTrackingMiddleware(
+        ILogger<TokenTrackingMiddleware> logger,
+        ITokenUsageRecorder? tokenUsageRecorder = null)
     {
         _logger = logger;
+        _tokenUsageRecorder = tokenUsageRecorder;
     }
 
     /// <summary>
@@ -111,6 +115,10 @@ public sealed class TokenTrackingMiddleware
             activity.SetTag("gen_ai.usage.output_tokens", outputTokens);
             activity.SetTag("marketassistant.token_usage.precise", isPrecise);
         }
+
+        // 运行级用量记录：分析工作流的 Agent 以 session: null 无状态调用，
+        // 会话级累计不生效，因此必须先向环境作用域上报，再走会话累计与熔断逻辑。
+        _tokenUsageRecorder?.CurrentScope?.Report(agentName, inputTokens, outputTokens, isPrecise);
 
         if (session == null) return;
 

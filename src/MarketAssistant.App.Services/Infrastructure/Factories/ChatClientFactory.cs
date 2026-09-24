@@ -27,7 +27,10 @@ public interface IChatClientFactory : IDisposable
     /// <summary>
     /// 创建绑定不可变模型配置快照的 ChatClient Runtime。
     /// </summary>
-    ChatClientRuntime CreateRuntime();
+    /// <param name="modelIdOverride">
+    /// 角色级模型分配传入的模型 ID；为 null 或空白时使用服务商默认模型。
+    /// </param>
+    ChatClientRuntime CreateRuntime(string? modelIdOverride = null);
 }
 
 /// <summary>
@@ -47,7 +50,9 @@ public sealed record ChatClientRuntime(
 /// </summary>
 public class ChatClientFactory : IChatClientFactory
 {
-    private const int MaxCachedRuntimes = 16;
+    // 按角色分配模型后，同一次分析可能同时持有默认 Runtime + 若干角色 Runtime，
+    // 故上限需覆盖"默认 + 全部可分配角色"（当前分析师角色约 8 个），16 已不够用。
+    protected const int MaxCachedRuntimes = 32;
 
     private readonly IUserSettingService _userSettingService;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -69,7 +74,7 @@ public class ChatClientFactory : IChatClientFactory
 
     public IChatClient CreateClient() => CreateRuntime().Client;
 
-    public ChatClientRuntime CreateRuntime()
+    public ChatClientRuntime CreateRuntime(string? modelIdOverride = null)
     {
         lock (_lock)
         {
@@ -77,7 +82,9 @@ public class ChatClientFactory : IChatClientFactory
 
             var userSetting = _userSettingService.CurrentSetting;
             var providerId = userSetting.ProviderId;
-            var modelId = userSetting.ProviderModelIds.GetValueOrDefault(providerId, string.Empty);
+            var defaultModelId = userSetting.ProviderModelIds.GetValueOrDefault(providerId, string.Empty);
+            // 角色级模型分配（设置页"分析模型分配"）经 override 传入，空白视为未分配
+            var modelId = string.IsNullOrWhiteSpace(modelIdOverride) ? defaultModelId : modelIdOverride.Trim();
             var provider = ModelProviderCatalog.GetProvider(providerId)
                 ?? throw new FriendlyException($"未知的服务商: {providerId}");
             var configuredApiKey = userSetting.ProviderApiKeys.TryGetValue(providerId, out var key) ? key : string.Empty;

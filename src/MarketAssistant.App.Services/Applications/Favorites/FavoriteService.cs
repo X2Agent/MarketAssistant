@@ -104,7 +104,8 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 
     public async Task RemoveFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
-        code = code.Trim();
+        // 与写入端共用归一化入口：调用方传入 sh600519 等未归一化代码时也能命中
+        code = FavoriteCodeNormalizer.Normalize(code, _marketType);
         market = market.Trim();
 
         try
@@ -133,7 +134,8 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 
     public async Task<bool> IsFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
-        code = code.Trim();
+        // 与写入端共用归一化入口：调用方传入 sh600519 等未归一化代码时也能正确判定
+        code = FavoriteCodeNormalizer.Normalize(code, _marketType);
         market = market.Trim();
 
         try

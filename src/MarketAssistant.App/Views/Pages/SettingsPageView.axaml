@@ -55,8 +55,21 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="*,Auto">
+        <!-- 首屏骨架：表单区块占位（仅首屏补骨架） -->
+        <ScrollViewer Grid.Row="0"
+                      Background="{DynamicResource CardBackgroundBrush}"
+                      IsVisible="{Binding IsInitialLoading}">
+            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
+                <Border Classes="skeleton skeleton-panel" Height="200"/>
+                <Border Classes="skeleton skeleton-panel" Height="280"/>
+                <Border Classes="skeleton skeleton-panel" Height="240"/>
+            </StackPanel>
+        </ScrollViewer>
+
         <!-- 主内容区域 -->
-        <ScrollViewer Grid.Row="0" Background="{DynamicResource CardBackgroundBrush}">
+        <ScrollViewer Grid.Row="0"
+                      Background="{DynamicResource CardBackgroundBrush}"
+                      IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
 
                 <!-- 通用设置（主题 + 通知 + 日志） -->
@@ -561,6 +574,10 @@
                             <TextBlock Text="注意：启用的角色越多，消耗的Token越多"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{StaticResource ErrorBrush}"/>
+                            <TextBlock Text="分析模型分配：每个角色可单独指定模型（按服务商分别保存），留空表示跟随上方配置的默认模型；仅对勾选启用的角色生效。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
                         <ItemsControl ItemsSource="{Binding AnalystRoles}">
@@ -572,9 +589,9 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="Auto,*" 
-                                          RowDefinitions="Auto,Auto" 
+                                          RowDefinitions="Auto,Auto,Auto" 
                                           Margin="{StaticResource GridItemMargin}">
-                                        <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                        <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="3"
                                                   IsChecked="{Binding IsEnabled}"
                                                   IsEnabled="{Binding !IsRequired}"
                                                   VerticalAlignment="Top"
@@ -590,6 +607,17 @@
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    Margin="{StaticResource TinyTopMargin}"
                                                    TextWrapping="Wrap"/>
+                                        <AutoCompleteBox Grid.Row="2" Grid.Column="1"
+                                                         ItemsSource="{Binding ModelOptions}"
+                                                         Text="{Binding ModelIdOverride, Mode=TwoWay}"
+                                                         FilterMode="Contains"
+                                                         MinimumPrefixLength="0"
+                                                         PlaceholderText="跟随默认模型"
+                                                         MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                                         HorizontalAlignment="Stretch"
+                                                         IsEnabled="{Binding IsEnabled}"
+                                                         Margin="{StaticResource TinyTopMargin}"
+                                                         ToolTip.Tip="为该角色单独指定模型；留空则使用默认模型"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -599,6 +627,15 @@
 
             </StackPanel>
         </ScrollViewer>
+
+        <!-- 失败态（含重试入口） -->
+        <controls:StateOverlayView Grid.Row="0"
+                                   State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"
+                                   ZIndex="999"/>
 
         <!-- 底部操作栏 -->
         <Border Grid.Row="1" 

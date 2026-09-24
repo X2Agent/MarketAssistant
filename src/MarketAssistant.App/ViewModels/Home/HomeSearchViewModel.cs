@@ -28,6 +28,16 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     private bool _isSearching;
 
     /// <summary>
+    /// 搜索失败提示。与"没有匹配结果"区分：失败时结果区展示该提示而非静默空白。
+    /// </summary>
+    [ObservableProperty]
+    private string _searchErrorMessage = string.Empty;
+
+    public bool HasSearchError => !string.IsNullOrEmpty(SearchErrorMessage);
+
+    partial void OnSearchErrorMessageChanged(string value) => OnPropertyChanged(nameof(HasSearchError));
+
+    /// <summary>
     /// 当前键盘/鼠标高亮的结果项（Up/Down 仅移动高亮，导航由 Enter 或点击显式触发）
     /// </summary>
     [ObservableProperty]
@@ -62,7 +72,10 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         {
             IsSearching = false;
             IsSearchResultVisible = false;
+            SearchErrorMessage = string.Empty;
             SearchResults.Clear();
+            // 结果已清空，高亮项不能继续指向已被移除的条目
+            SelectedResult = null;
             Logger?.LogDebug("搜索查询为空，清空结果");
             return;
         }
@@ -95,6 +108,7 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         {
             IsSearching = false;
             IsSearchResultVisible = false;
+            SearchErrorMessage = string.Empty;
             SearchResults.Clear();
             SelectedResult = null;
             Logger?.LogDebug("搜索查询为空，清空结果");
@@ -103,8 +117,9 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
 
         Logger?.LogInformation("开始搜索资产，查询：{Query}", query);
         IsSearching = true;
+        SearchErrorMessage = string.Empty;
 
-        await SafeExecuteAsync(async () =>
+        try
         {
             var results = await HomeAssetService.SearchAssetAsync(query, cancellationToken);
 
@@ -124,6 +139,7 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
                     Logger?.LogDebug("添加搜索结果：{Name} ({Code})", asset.Name, asset.Code);
                 }
 
+                SearchErrorMessage = string.Empty;
                 IsSearchResultVisible = SearchResults.Count > 0;
             });
 
@@ -131,9 +147,27 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
             {
                 Logger?.LogWarning("未找到匹配的资产，查询：{Query}", query);
             }
-        }, "搜索资产");
-
-        IsSearching = false;
+        }
+        catch (OperationCanceledException)
+        {
+            Logger?.LogDebug("搜索被取消，查询：{Query}", query);
+        }
+        catch (Exception ex)
+        {
+            // 失败与"无匹配结果"必须可区分：弹出层展示可读错误而不是静默关闭
+            Logger?.LogError(ex, "搜索资产失败，查询：{Query}", query);
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                SelectedResult = null;
+                SearchResults.Clear();
+                SearchErrorMessage = ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "搜索资产");
+                IsSearchResultVisible = true;
+            });
+        }
+        finally
+        {
+            IsSearching = false;
+        }
     }
 
     [RelayCommand]
@@ -179,6 +213,7 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
         SearchQuery = string.Empty;
         SearchResults.Clear();
         SelectedResult = null;
+        SearchErrorMessage = string.Empty;
         IsSearchResultVisible = false;
         IsSearching = false;
     }

@@ -35,6 +35,9 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     {
         _marketContext = marketContext;
 
+        EmptyMessage = "暂无最近查看记录";
+        SetRetryCommand(() => LoadRecentAssetsAsync());
+
         SubscribeToMarketChanges(_marketContext);
 
         _ = LoadRecentAssetsAsync();
@@ -51,7 +54,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task LoadRecentAssetsAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             var recentAssets = await HistoryService.GetHistoryAsync();
 
@@ -63,6 +66,8 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
             {
                 RecentAssets.Add(asset);
             }
+
+            return RecentAssets.Count > 0;
         }, "加载最近查看资产");
     }
 

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -87,6 +88,24 @@ public partial class AnalysisReportViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasQualityMetrics;
 
+    // === 本次分析的 Token 用量 ===
+
+    /// <summary>是否统计到 Token 用量</summary>
+    [ObservableProperty]
+    private bool _hasTokenUsage;
+
+    /// <summary>用量摘要文本（如"本次共调用 9 次模型 / 128.4k tokens"）</summary>
+    [ObservableProperty]
+    private string _tokenUsageSummary = string.Empty;
+
+    /// <summary>用量明细文本（输入/输出分别展示）</summary>
+    [ObservableProperty]
+    private string _tokenUsageDetail = string.Empty;
+
+    /// <summary>用量中是否包含本地估算值</summary>
+    [ObservableProperty]
+    private bool _tokenUsageIsEstimated;
+
     public ObservableCollection<string> MissingDataDimensions { get; } = new();
 
     // === 各分析师的消息 ===
@@ -118,6 +137,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
         try
         {
             StockSymbol = report.AssetSymbol;
+
+            HasTokenUsage = report.Usage is { HasValue: true };
+            TokenUsageSummary = TokenUsageFormatter.FormatSummary(report.Usage);
+            TokenUsageDetail = TokenUsageFormatter.FormatDetail(report.Usage);
+            TokenUsageIsEstimated = report.Usage?.IsEstimated == true;
 
             var coordinatorResult = report.CoordinatorResult;
 
@@ -223,6 +247,10 @@ public partial class AnalysisReportViewModel : ViewModelBase
         LimitationsNote = string.Empty;
         QualityLevelText = string.Empty;
         HasQualityMetrics = false;
+        HasTokenUsage = false;
+        TokenUsageSummary = string.Empty;
+        TokenUsageDetail = string.Empty;
+        TokenUsageIsEstimated = false;
     }
 }
 

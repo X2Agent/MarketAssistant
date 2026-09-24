@@ -83,6 +83,8 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     {
         _marketContext = marketContext;
         _dialogService = dialogService;
+        EmptyMessage = "在资产详情页点击「加入自选」添加";
+        SetRetryCommand(() => LoadFavoriteAssetsAsync());
         BindRealtimeQuoteService();
         SubscribeToMarketChanges(_marketContext);
         _ = LoadFavoriteAssetsAsync();
@@ -132,14 +134,14 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
         _loadCts = new CancellationTokenSource();
         var ct = _loadCts.Token;
 
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async token =>
         {
             var favoritesCodes = await FavoriteService.GetFavoritesCodesAsync();
 
             // 集合修改须在 UI 线程执行（加载可能由后台事件触发进入），避免跨线程操作 ObservableCollection
             await Dispatcher.UIThread.InvokeAsync(Assets.Clear);
 
-            await UpdateAssetDataAsync(favoritesCodes, ct);
+            await UpdateAssetDataAsync(favoritesCodes, token);
 
             RebuildAssetIndex();
 
@@ -149,7 +151,9 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 ? Assets.Select(a => a.Code).ToList()
                 : [];
             _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.Favorites, codes);
-        }, "加载收藏列表");
+
+            return Assets.Count > 0;
+        }, "加载收藏列表", ct);
     }
 
     /// <summary>
@@ -248,6 +252,10 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
                 }
 
                 await FavoriteService.RemoveFavoriteAsync(asset.Code, asset.Market);
+
+                // 列表清空后回到统一空态，避免只剩空白网格
+                if (Assets.Count == 0)
+                    SetEmpty();
 
                 Logger?.LogInformation($"已将资产移出自选: {asset.Name}({asset.Code})");
                 await Task.CompletedTask;

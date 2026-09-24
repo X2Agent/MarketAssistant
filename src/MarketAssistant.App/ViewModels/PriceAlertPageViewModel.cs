@@ -8,6 +8,7 @@ using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.PriceAlert;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
+using MarketAssistant.Services.Navigation;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -31,7 +32,7 @@ public sealed class AssetOption
 /// 价格告警页面 ViewModel，提供告警规则的增删改查和启停管理。
 /// 规则列表与添加表单均跟随全局当前市场类型，不提供独立的市场筛选。
 /// </summary>
-public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
+public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
     private static readonly TimeSpan SearchDebounceDelay = TimeSpan.FromMilliseconds(300);
 
@@ -187,11 +188,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     private string _validationError = string.Empty;
 
     /// <summary>
-    /// 空列表提示文本
-    /// </summary>
-    public string EmptyHintText => "在上方添加价格告警规则：持续告警进入目标区间提醒一次、离开后自动复位；一次性告警触发后自动停用";
-
-    /// <summary>
     /// 桌面通知是否已开启。关闭时告警仍会触发并保留状态，但不会显示弹窗。
     /// </summary>
     public bool IsNotificationEnabled => _userSettingService.CurrentSetting.Notification;
@@ -242,6 +238,9 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
         _userSettingService = userSettingService;
         _alertCenterService = alertCenterService;
         AlertHistory = new AlertHistoryViewModel(alertCenterService, logger);
+
+        EmptyMessage = "在上方添加价格告警规则：持续告警进入目标区间提醒一次、离开后自动复位；一次性告警触发后自动停用";
+        SetRetryCommand(() => LoadRulesAsync());
 
         _alertService.RulesChanged += OnRulesChanged;
         _alertService.RuleQuoteUpdated += OnRuleQuoteUpdated;
@@ -337,7 +336,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task LoadRulesAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             Rules.Clear();
             foreach (var rule in _alertService.Rules)
@@ -345,8 +344,9 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
                 if (rule.MarketType == _marketContext.CurrentMarket)
                     Rules.Add(CreateDisplayRule(rule));
             }
-            OnPropertyChanged(nameof(EmptyHintText));
+
             OnPropertyChanged(nameof(IsNotificationEnabled));
+            return Rules.Count > 0;
         }, "加载告警规则");
     }
 
@@ -531,6 +531,35 @@ public partial class PriceAlertPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     [RelayCommand]
     private Task RefreshAsync() => LoadRulesAsync();
+
+    /// <summary>
+    /// 从资产详情页深链进入时，预填新规则的资产，避免用户重新搜索。
+    /// GoBack 重新激活不重复预填，否则会覆盖用户已编辑的表单。
+    /// </summary>
+    public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
+    {
+        // 作为根导航项打开时不会携带参数，此处需容忍 null
+        if (isReactivation || parameter is null || string.IsNullOrEmpty(parameter.Code))
+            return;
+
+        var option = new AssetOption
+        {
+            Name = string.IsNullOrEmpty(parameter.Name) ? parameter.Code : parameter.Name,
+            Code = parameter.Code
+        };
+
+        // 必须先落选中项再回填文本：OnNewRuleAssetTextChanged 的防抖搜索
+        // 命中「选中项文本与关键字一致」时直接返回，不会清空下面的候选
+        NewRuleSelectedAsset = option;
+        AssetOptions.Clear();
+        AssetOptions.Add(option);
+        NewRuleAssetText = option.Display;
+    }
+
+    public void OnNavigatedFrom()
+    {
+        _assetLoadCts?.Cancel();
+    }
 
     public void Dispose()
     {

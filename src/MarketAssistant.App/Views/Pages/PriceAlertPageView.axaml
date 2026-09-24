@@ -336,37 +336,17 @@
                 </Grid>
 
                 <StackPanel Grid.Row="2"
-                            IsVisible="{Binding IsBusy}"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="{StaticResource DefaultSpacing}"
+                            IsVisible="{Binding IsInitialLoading}"
+                            Spacing="{StaticResource SmallSpacing}"
                             Margin="{StaticResource BottomMargin}">
-                    <controls:LoadingDots DotSize="{StaticResource IndicatorSize}"/>
-                    <TextBlock Text="正在加载..."
-                               FontSize="{StaticResource SmallFontSize}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Border Classes="skeleton skeleton-row" Height="96"/>
+                    <Border Classes="skeleton skeleton-row" Height="96"/>
+                    <Border Classes="skeleton skeleton-row" Height="96"/>
+                    <Border Classes="skeleton skeleton-row" Height="96"/>
+                    <Border Classes="skeleton skeleton-row" Height="96"/>
                 </StackPanel>
 
-                <Grid Grid.Row="3" IsVisible="{Binding !IsBusy}">
-                    <StackPanel IsVisible="{Binding !Rules.Count}"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="{StaticResource DefaultSpacing}">
-                        <svg:Svg Path="/Assets/Images/empty_data.svg"
-                                 Width="{StaticResource LargeIconSize}"
-                                 Height="{StaticResource LargeIconSize}"
-                                 HorizontalAlignment="Center"
-                                 Opacity="0.6"/>
-                        <TextBlock Text="暂无告警规则"
-                                   FontSize="{StaticResource SubTitleFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding EmptyHintText}"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center"/>
-                    </StackPanel>
-
+                <Grid Grid.Row="3" IsVisible="{Binding !IsInitialLoading}">
                     <ItemsControl ItemsSource="{Binding Rules}"
                                   IsVisible="{Binding Rules.Count}">
                         <ItemsControl.ItemsPanel>
@@ -522,6 +502,13 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- 空态 / 失败态（含重试入口） -->
+                    <controls:StateOverlayView State="{Binding OverlayState}"
+                                               Message="{Binding OverlayMessage}"
+                                               RetryCommand="{Binding RetryCommand}"
+                                               RetryText="重新加载"
+                                               ShowLoading="False"/>
                 </Grid>
                 </Grid>
 

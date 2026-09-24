@@ -66,12 +66,15 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
         _isMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
+
+        // 本页为分区仪表盘：空态由各分区自行提示，浮层只承担首屏骨架与失败重试
+        SetRetryCommand(() => RefreshAsync());
     }
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             await _orderStateSyncService.SyncPendingOrdersAsync(force: true);
 
@@ -154,6 +157,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
             {
                 ActiveStrategies.Add(s);
             }
+
+            return true;
         }, "刷新交易监控");
     }
 

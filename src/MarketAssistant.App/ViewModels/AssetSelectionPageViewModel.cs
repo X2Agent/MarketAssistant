@@ -220,8 +220,21 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
         SubscribeToMarketChanges(_marketContext);
         _dialogService = dialogService;
-        _ = LoadQuickStrategiesAsync();
-        _ = LoadSelectionModesAsync();
+
+        EmptyMessage = "暂无可用选股模式，请稍后重试";
+        SetRetryCommand(() => LoadPageAsync());
+        _ = LoadPageAsync();
+    }
+
+    /// <summary>首屏加载：选股模式卡与快速策略列表。</summary>
+    private async Task LoadPageAsync()
+    {
+        await LoadAsync(async _ =>
+        {
+            await LoadSelectionModesAsync();
+            await LoadQuickStrategiesAsync();
+            return SelectionModes.Count > 0;
+        }, "加载选股页面");
     }
 
     partial void OnSelectedModeChanged(SelectionModeItem? value)
@@ -444,43 +457,38 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     private async Task LoadQuickStrategiesAsync()
     {
-        await SafeExecuteAsync(() =>
+        var strategies = _investmentSelectionService.GetQuickSelectionStrategies(_marketContext.CurrentMarket);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var strategies = _investmentSelectionService.GetQuickSelectionStrategies(_marketContext.CurrentMarket);
-            Dispatcher.UIThread.InvokeAsync(() =>
+            QuickStrategies.Clear();
+            foreach (var strategy in strategies)
             {
-                QuickStrategies.Clear();
-                foreach (var strategy in strategies)
-                {
-                    QuickStrategies.Add(strategy);
-                }
-            });
-            return Task.CompletedTask;
-        }, "加载快速选股策略");
+                QuickStrategies.Add(strategy);
+            }
+        });
     }
 
     private async Task LoadSelectionModesAsync()
     {
-        await SafeExecuteAsync(() =>
+        var modes = new ObservableCollection<SelectionModeItem>
         {
-            var modes = new ObservableCollection<SelectionModeItem>
-            {
-                new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
-                new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
-                new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
-            };
+            new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
+            new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
+            new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
+        };
 
-            Dispatcher.UIThread.InvokeAsync(() =>
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            SelectionModes.Clear();
+            foreach (var mode in modes)
             {
-                SelectionModes.Clear();
-                foreach (var mode in modes)
-                {
-                    SelectionModes.Add(mode);
-                }
+                SelectionModes.Add(mode);
+            }
+
+            if (SelectedMode is null)
                 SelectedMode = SelectionModes.FirstOrDefault();
-            });
-            return Task.CompletedTask;
-        }, "加载选股模式");
+        });
     }
 
     public void Dispose()

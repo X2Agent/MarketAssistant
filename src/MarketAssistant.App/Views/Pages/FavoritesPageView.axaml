@@ -43,20 +43,27 @@
     <!-- 根用 Panel 叠放各状态，使空态/加载占位可撑满整页垂直居中 -->
     <Panel Background="{DynamicResource CardBackgroundBrush}">
 
-        <!-- 加载指示器 -->
-        <StackPanel IsVisible="{Binding IsBusy}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Spacing="{StaticResource LargeSpacing}">
-            <controls:LoadingDots DotSize="{StaticResource IndicatorSize}" />
-            <TextBlock Text="正在加载自选列表..."
-                       FontSize="{StaticResource LabelFontSize}"
-                       HorizontalAlignment="Center"
-                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-        </StackPanel>
+        <!-- 首屏骨架：卡片视图占位 -->
+        <Grid IsVisible="{Binding IsInitialLoading}"
+              RowDefinitions="Auto,*">
+            <Border Grid.Row="0"
+                    Classes="skeleton skeleton-text"
+                    Width="180"
+                    Height="28"
+                    HorizontalAlignment="Right"
+                    Margin="{StaticResource PagePadding}"/>
+            <WrapPanel Grid.Row="1" Margin="{StaticResource PagePadding}">
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+                <Border Classes="skeleton skeleton-card" Width="290" Height="120" Margin="{StaticResource CardGridMargin}"/>
+            </WrapPanel>
+        </Grid>
 
-        <!-- 内容区域（非加载状态） -->
-        <Grid IsVisible="{Binding !IsBusy}" RowDefinitions="Auto,*">
+        <!-- 内容区域（非首次加载） -->
+        <Grid IsVisible="{Binding !IsInitialLoading}" RowDefinitions="Auto,*">
             <!-- 视图切换分段器（有数据时显示）：当前视图按钮禁用，另一视图可点 -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right"
                         Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource PagePadding}"
@@ -67,23 +74,6 @@
                         Command="{Binding ShowTableViewCommand}" IsEnabled="{Binding IsCardView}"/>
             </StackPanel>
             <Panel Grid.Row="1">
-            <!-- 空视图：垂直居中 -->
-            <StackPanel IsVisible="{Binding !Assets.Count}"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Spacing="{StaticResource DefaultSpacing}">
-                <svg:Svg Path="/Assets/Images/tab_favorites.svg"
-                         Width="{StaticResource LargeIconSize}"
-                         Height="{StaticResource LargeIconSize}"
-                         HorizontalAlignment="Center"/>
-                <TextBlock Text="暂无自选资产"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}" />
-                <TextBlock Text="在资产详情页点击「加入自选」添加"
-                           HorizontalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="{StaticResource SmallFontSize}" />
-            </StackPanel>
             <!-- 收藏网格（对齐原型 fav-grid：auto-fill 自适应换行） -->
             <ScrollViewer IsVisible="{Binding IsCardView}">
                 <ItemsControl ItemsSource="{Binding Assets}"
@@ -225,6 +215,14 @@
                     </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
+
+            <!-- 空态 / 失败态（含重试入口） -->
+            <controls:StateOverlayView State="{Binding OverlayState}"
+                                       Message="{Binding OverlayMessage}"
+                                       RetryCommand="{Binding RetryCommand}"
+                                       RetryText="重新加载"
+                                       ShowLoading="False"
+                                       IconSize="{StaticResource LargeIconSize}"/>
             </Panel>
         </Grid>
     </Panel>

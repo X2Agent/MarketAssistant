@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Applications.Cache;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
@@ -122,8 +123,8 @@ public class AnalysisCacheService : IAnalysisCacheService
     }
 
     /// <summary>
-    /// 生成配置指纹：ModelId + 启用的分析师角色排序后的 JSON。
-    /// 任一配置变更后指纹不同，缓存自动失效。
+    /// 生成配置指纹：默认 ModelId + 角色级模型分配 + 启用的分析师角色排序后的字符串。
+    /// 任一配置变更后指纹不同，缓存自动失效（角色级模型变更同样会使旧报告失效）。
     /// </summary>
     private string GetConfigFingerprint()
     {
@@ -133,7 +134,8 @@ public class AnalysisCacheService : IAnalysisCacheService
             .Select(kv => kv.Key)
             .OrderBy(s => s);
         var activeModelId = setting.ProviderModelIds.GetValueOrDefault(setting.ProviderId, string.Empty);
-        return $"{activeModelId}|{string.Join(",", enabledRoles)}";
+        var roleAssignments = AnalystModelAssignment.GetAssignmentFingerprint(setting, setting.ProviderId);
+        return $"{activeModelId}|{roleAssignments}|{string.Join(",", enabledRoles)}";
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
+using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Applications.AlertCenter;
@@ -343,6 +344,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AnalystPromptLoader>();
 
         // MAF 中间件与会话级 Context Provider 工厂
+        services.AddSingleton<ITokenUsageRecorder, TokenUsageRecorder>();
         services.AddSingleton<TokenTrackingMiddleware>();
         services.AddSingleton<ConversationCompactionProviderFactory>();
 

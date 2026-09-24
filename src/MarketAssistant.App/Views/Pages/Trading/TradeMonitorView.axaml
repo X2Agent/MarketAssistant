@@ -19,8 +19,27 @@
     </UserControl.Resources>
 
     <Grid>
+        <!-- ===== 首屏骨架 ===== -->
+        <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                    IsVisible="{Binding IsInitialLoading}">
+            <UniformGrid Columns="4">
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96"/>
+            </UniformGrid>
+            <Grid ColumnDefinitions="*,12,*">
+                <Border Grid.Column="0" Classes="skeleton skeleton-panel" Height="240"/>
+                <Border Grid.Column="2" Classes="skeleton skeleton-panel" Height="240"/>
+            </Grid>
+            <Grid ColumnDefinitions="*,12,*">
+                <Border Grid.Column="0" Classes="skeleton skeleton-panel" Height="240"/>
+                <Border Grid.Column="2" Classes="skeleton skeleton-panel" Height="240"/>
+            </Grid>
+        </StackPanel>
+
         <!-- ===== 主内容层 ===== -->
-        <ScrollViewer>
+        <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
                 <!-- ===== 指标卡（四等分）+ 操作区 ===== -->
@@ -342,6 +361,13 @@
                 </Grid>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- 失败态（含重试入口）；空态由各分区自行提示，不遮挡风控指标 -->
+        <controls:StateOverlayView State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"/>
 
         <!-- 交易确认（Human-in-the-Loop）已上移至应用级 TradeConfirmationService：全局对话框弹出，
              不再依赖本页存活，此处不再渲染页内模态确认层 -->

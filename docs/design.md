@@ -1,10 +1,10 @@
 # MarketAssistant 界面设计与交互架构规范 (Design.md)
 
-> **文档版本**: 1.1  
-> **更新日期**: 2026-09-12  
+> **文档版本**: 1.2  
+> **更新日期**: 2026-09-18  
 > **定位**: 本文档是 MarketAssistant (跨平台金融数据与 AI 交易终端) 的完整页面设计、交互架构与重构蓝图，**当前为唯一生效的设计规范**。  
 > **审视基准**: 本文档基于当前真实代码实现、金融终端业务痛点与 AI 原生交互范式建立。  
-> **历史说明**: 原设计系统文档（v2.4，`docs/design-system.md`）因存在若干与代码脱节的陈旧声明与理想化偏差，已被本文档取代并**于 2026-09-12 删除**；其完整颜色 Token 对照表以 `src/MarketAssistant.App/Resources/Styles/Colors.axaml` 与 `Spacing.axaml` 为唯一事实源，可视化预览见 [`配色预览.html`](配色预览.html)，原文可通过 git 历史追溯。下文第二章审计表保留作为该取代关系的背景记录。
+> **历史说明**: 原设计系统文档（v2.4，`docs/design-system.md`）因存在若干与代码脱节的陈旧声明与理想化偏差，已被本文档取代并**于 2026-09-12 删除**；其完整颜色 Token 对照表以 `src/MarketAssistant.App/Resources/Styles/Colors.axaml` 与 `Spacing.axaml` 为唯一事实源，可视化预览见 [`配色预览.html`](配色预览.html)，原文可通过 git 历史追溯。**v1.2（2026-09-18）**：第二章审计表所列问题已于 v1.0.0-beta1/beta2 期间全部收敛，经代码复核后更新为当前真实状态；第六章路线图同步标注完成情况。产品中长期规划见 [`roadmap.md`](roadmap.md)。
 
 ---
 
@@ -29,17 +29,22 @@ MarketAssistant 是一款面向高阶投资者与量化交易者的 **AI 原生�
 
 ## 二、当前页面实现与设计系统差异审计 (Reality Check)
 
-经过对当前代码库 `src/MarketAssistant.App` 的全面审查，`docs/design-system.md` 存在若干“文档声称已完成，但实际代码未落地或存在严重冲突”的问题：
+### 2026-09-18 复核结论
 
-| 检查项 | `design-system.md` 声称状态 | 实际代码真实状态 | 影响与隐患 |
+v1.1 审计表所列的 7 项差异**已全部在 v1.0.0-beta1/beta2 期间收敛落地**。本表更新为当前真实状态，作为收敛确认记录保留：
+
+| 检查项 | v1.1 审计发现 | 当前代码状态（2026-09-18 核实） | 结论 |
 |---|---|---|---|
-| **White 硬编码文字色** | 声称 v2.4 已将约 22 处 `Foreground="White"` 全部收敛至 `TextOnEmphasisBrush` | `ButtonStyles.axaml` (6处) 与 `MainWindow.axaml` (1处) 仍存在 `<Setter Property="Foreground" Value="White"/>` | 浅色模式下若按钮变体继承异常会出现白底白字，破坏 Token 一致性 |
-| **Emoji 清理** | 声称 v2.3 已全量替换为 SVG 线性图标 | `AssetSelectionPageViewModel.cs` 中仍硬编码 `👤`, `📰`, `⚡`, `📈`；`AdaptiveCard` 解析器仍包含 `📈`, `📰`, `💰` | 跨平台 (Windows/macOS/Linux) 下不同系统的 Emoji 渲染字形与风格严重分裂 |
-| **数据字体 Token 化** | 声称统一使用 `StaticResource DataFontFamily` | `AnalystResultCardView.axaml` (第89行) 仍硬编码 `FontFamily="Consolas, 'Cascadia Mono', monospace"` 与硬编码字号 | 破坏字体层级，Mac/Linux 下若缺对应字体会导致等宽对齐失效 |
-| **K 线图表控件封装** | 声称图表主题化已彻底落地 | `KLineChartView.cs` 在代码后置中通过 C# 动态拼装 UI，Loading/Error 视图为硬编码样式，未绑定应用主题画刷 | 深浅主题切换时，异常面板和加载状态闪烁且与宿主背景色突兀 |
-| **顶栏行情条 (TopBar Ticker)** | 原型与文档设计了完整的大盘行情滚动条 | `MainWindowViewModel.cs` 中 `IndexTickers` 完全为空，`RebuildIndexTickers()` 仅清空集合，长期处于隐藏状态 | 顶部横向空间严重浪费，用户无法对大盘指数一瞥便知 |
-| **AI 伴侣交互形态** | 当前实现为模态遮罩抽屉 (`AgentAnalysisPageView.axaml` ZIndex 2000) | 打开抽屉时将整个主报告区域全部置灰变暗 (`DarkOverlayBrush`) | 用户向 AI 提问报告细节时，报告本身被暗色遮罩遮挡，无法一边看图表一边对话 |
-| **自选股展示模式** | 仅提供固定 290px 卡片的 `WrapPanel` | 缺乏高密度数据表格视图 (Table View) | 当自选标的高达数十只时，翻页与滚动手感极差，无法快速多字段对比排序 |
+| **White 硬编码文字色** | `ButtonStyles.axaml` (6处) 与 `MainWindow.axaml` (1处) 残留 `Foreground="White"` | 两文件已 **0 处**，全部收敛至 `TextOnEmphasisBrush` | ✅ 已收敛 |
+| **Emoji 清理** | `AssetSelectionPageViewModel` 与 AdaptiveCard 解析器残留 Emoji | 已全部替换为 SVG 矢量资源，源码无残留 | ✅ 已收敛 |
+| **数据字体 Token 化** | `AnalystResultCardView.axaml` 硬编码 Consolas 与字号 | 已统一为 `DataFontFamily` 与 `Spacing.axaml` 字号阶梯 | ✅ 已收敛 |
+| **K 线图表控件封装** | Loading/Error 视图硬编码样式，未绑定主题画刷 | `KLineChartView` 已实现 `ApplyThemeToChartAsync`，随 `ActualThemeVariantChanged` 联动切换深浅主题 | ✅ 已收敛 |
+| **顶栏行情条 (TopBar Ticker)** | `IndexTickers` 空置，长期隐藏 | `MainWindowViewModel.RefreshIndexTickersAsync()` 已对接市场级聚合指标，无数据时随 `HasIndexTickers` 自动折叠 | ✅ 已落地 |
+| **AI 伴侣交互形态** | `DarkOverlayBrush` 遮罩置灰主报告区 | 遮罩已移除，升级为分屏常驻伴侣面板，报告始终可见 | ✅ 已落地 |
+| **自选股展示模式** | 仅固定 290px 卡片的 `WrapPanel` | 已实现卡片 / 高密度表格双视图（`ShowCardView` / `ShowTableView` + `DataGrid` 列排序） | ✅ 已落地 |
+
+> **信息密度缺口已清零（v1.3）**：`AssetPageView` 已补齐行情速览指标面板、技术指标数值面板（MA/MACD/BOLL/KDJ）、盘口深度与逐笔成交四区块，见第六章 Phase 2.4。
+> A 股数据源不提供盘口与逐笔，故这两区块为 Crypto 专属；A 股以"行情速览 + 技术指标"组合替代，并在页面内显式说明数据源限制（而非呈现为加载失败）。
 
 ---
 
@@ -101,7 +106,7 @@ flowchart LR
 #### 4.1.1 现状与痛点
 - 窗口原生标题栏与应用内部 TopBar 形成“双层顶栏”，浪费垂直空间 30-40px。
 - 市场切换分段器 (`A股` / `虚拟币`) 放在顶栏右侧，但在二级页面时会被直接隐藏（`IsVisible="{Binding !CanGoBack}"`），导致在二级页面无法感知当前市场上下文。
-- 顶部行情条长期空置。
+- ~~顶部行情条长期空置~~ → ✅ 已于 v1.0.0-beta2 真实化：对接市场级聚合指标（A 股三大指数 / Crypto 市场级指标），无数据时自动折叠，不留空白。
 
 #### 4.1.2 重构方案
 - **高度整合的紧凑顶栏 (Unified TopBar 44px)**:
@@ -145,36 +150,42 @@ flowchart LR
 
 ### 4.3 标的详情与行情分析 (AssetPageView)
 
-#### 4.3.1 现状与痛点
-- 页面仅有基本价格 + 大卡片 K 线图，信息密度显著低于专业金融终端。
-- 缺少五档买卖盘（盘口）、分时成交明细（Tick 流）、技术指标数值面板。
-- 用户在当前页无法直接进行快捷交易配置或加入自选操作。
+#### 4.3.1 现状与痛点（v1.3 已收敛）
+- ~~页面仅有基本价格 + 大卡片 K 线图，信息密度显著低于专业金融终端。~~ → ✅ 已补齐行情速览指标面板（今开/最高/最低/昨收/成交量/成交额/换手率/振幅/量比/市盈率/市净率）与技术指标数值面板。
+- ~~缺少五档买卖盘（盘口）、分时成交明细（Tick 流）、技术指标数值面板。~~ → ✅ 已实现盘口深度与逐笔成交（Crypto 专属，见下方数据源取舍）；技术指标面板已落地。
+- ~~用户在当前页无法直接进行快捷交易配置或加入自选操作。~~ → ✅ 操作区已有加入自选、AI 深度研判、刷新，并新增价格告警直达入口。
 
-#### 4.3.2 重构设计蓝图
+#### 4.3.2 重构设计蓝图（落地情况）
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │ 标的信息栏: 名称 [代码]  现价 1,820.00  +32.50 (+1.82%)  最高/最低/成交量 │
-│ 操作区: [⭐ 加入自选] [🤖 AI深度研判] [⚡ 快捷下单/网格策略] [🔄 刷新]     │
+│ 操作区: [⭐ 加入自选] [🤖 AI深度研判] [🔔 价格告警] [🔄 刷新] [◧ 折叠右栏] │
 ├────────────────────────────────────────┬───────────────────────────────┤
-│ K 线图表工作区 (主栏 75%)               │ 深度盘口与指标面板 (右侧 25%)   │
-│ - 周期切换: 分时 / 1m / 15m / 1h / 日K │ - 买五卖五 / 订单簿深度堆叠     │
-│ - 指标开关: MA / EMA / MACD / BOLL / KDJ│ - 逐笔交易最新流 (Time & Sales)│
-│ - WebView (klinecharts) 交互           │ - 核心基本面/技术面速览指标    │
+│ K 线图表工作区 (主栏)                   │ 深度盘口与指标面板 (右侧，可折叠)│
+│ - 周期切换: 分时 / 日K / 周K / 月K      │ - 技术指标数值 (MA/MACD/BOLL/KDJ)│
+│ - WebView (klinecharts) 交互           │ - 买五卖五 / 订单簿深度堆叠     │
+│                                        │ - 逐笔交易最新流 (Time & Sales) │
 ├────────────────────────────────────────┴───────────────────────────────┤
-│ 底部选项卡: [新闻公告] [AI 异动速评] [财务摘要]                          │
+│ 行情速览指标行（今开/最高/最低/昨收/量额/换手/振幅/量比/PE/PB，缺项自动隐藏）│
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+**与蓝图的两处偏差（有意为之）**：
+1. **A 股无盘口/逐笔**：A 股数据源不提供买卖盘与逐笔成交，故盘口与逐笔区块为 Crypto 专属。A 股在右栏位置显示"当前市场暂无盘口与逐笔成交数据源，已展示行情速览与技术指标"的明确说明——数据源缺失不等于加载失败，不能呈现为错误态。
+2. **底部选项卡未做**：新闻公告 / AI 异动速评 / 财务摘要移入 AgentAnalysis 报告区，详情页保持单屏可扫，避免纵向堆叠稀释主图。
+
+**降级策略**：四个数据区块并行加载且互不阻塞，单区块失败只降级自身（骨架 → 提示行 + 单区块重试按钮），K 线决定整页加载状态。
+
 #### 4.3.3 K 线图表宿主技术重构
-- 彻底移除 `KLineChartView.cs` 代码后置中的硬编码字体和字号。
-- 将 Loading/Error 面板声明在 XAML 或使用统一的 `SkeletonStyles` / `ErrorPanel` 样式，确保与设计系统画刷（`DynamicResource CardBackgroundBrush` 等）绝对同步。
+- ✅ 已完成：`KLineChartView.cs` 代码后置中的硬编码字体和字号已移除。
+- ✅ 已完成：Loading/Error 面板已随应用主题画刷收敛，并通过 `ApplyThemeToChartAsync` 在深浅主题切换时同步刷新图表，不再出现闪烁与底色断层。
 
 ---
 
 ### 4.4 AI 选标的 (AssetSelectionPageView)
 
 #### 4.4.1 现状与痛点
-- 界面上的三个模式卡片使用 Emoji 图标（`👤`, `📰`, `⚡`）。
+- ~~界面上的三个模式卡片使用 Emoji 图标（`👤`, `📰`, `⚡`）~~ → ✅ 已替换为 SVG 矢量图标。
 - 生成结果列表后，缺少多选操作、批量自选或结果横向对比功能。
 - 分析执行时使用全屏阻塞蒙层，无法进行其他页面浏览。
 
@@ -193,8 +204,8 @@ flowchart LR
 ### 4.5 多智能体协同分析 (AgentAnalysisPageView)
 
 #### 4.5.1 现状与交互致命伤
-- **遮罩抽屉冲突**: 点击 FAB 打开聊天侧边栏时，主界面被 `DarkOverlayBrush` 覆盖且半透明置灰。用户无法在看清技术分析图表或财报数字的同时与助手交互。
-- **分析等待期黑盒**: 分析中弹出一个全局 Progress 弹窗，用户只能干等 20-30 秒，不能实时查看已经跑完的分析师（如基本面分析师已输出，技术分析师还在跑）。
+- ~~**遮罩抽屉冲突**~~ → ✅ 已解决：`DarkOverlayBrush` 遮罩已移除，AI 伴侣升级为分屏常驻面板，用户可边看技术分析图表/财报数字边与助手交互。
+- **分析等待期黑盒**：分析中的进度展示仍偏粗粒度，未能直观呈现"哪些分析师已输出、哪些仍在运行"。
 
 #### 4.5.2 重构设计蓝图 (分屏并列架构)
 ```
@@ -246,7 +257,7 @@ flowchart LR
 ### 4.7 自选看板 (FavoritesPageView)
 
 #### 4.7.1 现状与痛点
-- 仅提供单一卡片流（宽 290px），无法满足关注数十只标的时的快速对比与排序诉求。
+- ~~仅提供单一卡片流（宽 290px）~~ → ✅ 已解决：已实现卡片 / 表格双视图切换（对齐 4.7.2 设计，`DataGrid` 支持列排序），数十只标的可快速多字段对比。
 
 #### 4.7.2 重构设计
 - **双模态切换 (Cards / Table View)**:
@@ -302,20 +313,20 @@ flowchart LR
 
 ## 六、实施与重构路线图 (Implementation Roadmap)
 
-### Phase 1: 规范与硬编码收敛 (阻断级修正)
-1. **清理 `Foreground="White"` 遗留**：收敛 `ButtonStyles.axaml` (6处) 及 `MainWindow.axaml` (1处) 为 `TextOnEmphasisBrush`。
-2. **根除残留 Emoji**：重构 `AssetSelectionPageViewModel.cs` 与 AdaptiveCard 解析器，全面切换为 SVG 矢量资源。
-3. **消除 `AnalystResultCardView` 本地字体声明**：替换硬编码 Consolas 为 `DataFontFamily`，收敛字号至 `Spacing.axaml` 阶梯。
-4. **重构 `KLineChartView.cs` 的 Loading/Error 视图**：使用应用主题画刷重构，彻底解决切主题时的闪烁与底色断层。
+### Phase 1: 规范与硬编码收敛 (阻断级修正) —— ✅ 已全部完成（2026-09-18 复核确认）
+1. **清理 `Foreground="White"` 遗留**：✅ `ButtonStyles.axaml` 与 `MainWindow.axaml` 已全部收敛为 `TextOnEmphasisBrush`（复核两文件 0 处残留）。
+2. **根除残留 Emoji**：✅ `AssetSelectionPageViewModel` 与 AdaptiveCard 解析器已全面切换为 SVG 矢量资源。
+3. **消除 `AnalystResultCardView` 本地字体声明**：✅ 已替换为 `DataFontFamily`，字号收敛至 `Spacing.axaml` 阶梯。
+4. **重构 `KLineChartView.cs` 的 Loading/Error 视图**：✅ 已随主题画刷重构，并支持运行时主题切换。
 
-### Phase 2: 交互体验深度优化 (核心交互破局)
-1. **AgentAnalysis 侧边栏交互改造**：由遮罩式遮挡抽屉升级为**平铺分屏 / 可折叠伴侣面板 (Docked Assistant)**，实现边看深度报告边对话。
-2. **FavoritesPageView 双视图改造**：在保留卡片网格的同时，新增专业级金融数据表格视图（带列排序）。
-3. **TopBar 行情条真实化**：对接**市场级聚合指标**数据源，消除空置占位。A 股取三大指数（上证 / 深证成指 / 创业板指，新浪 hq 指数端点）；Crypto 取对等的三项市场级指标（全网总市值+24h涨跌幅、BTC 主导率，CoinGecko `/global`；恐惧贪婪指数，alternative.me `/fng`）。**禁止展示具体标的价格**（如 BTC/ETH/SOL 单价），其语义与"市场指数"不对等。
-4. **AssetPageView 信息密度提升**：增补买卖盘五档/深度概览卡片，并增加一键直达交易与告警入口。
-5. **导航尺寸收敛**：导航项点击区域 56/48 → 44×44，导航图标 24 → 22px（原 design-system.md 第七章遗留待办，收敛至 `Spacing.axaml` Token）。
+### Phase 2: 交互体验深度优化 (核心交互破局) —— ✅ 5/5 已完成
+1. **AgentAnalysis 侧边栏交互改造**：✅ 遮罩式抽屉已移除，升级为平铺分屏 / 可折叠伴侣面板，实现边看深度报告边对话。
+2. **FavoritesPageView 双视图改造**：✅ 已新增专业级金融数据表格视图（`DataGrid` 带列排序）。
+3. **TopBar 行情条真实化**：✅ 已对接市场级聚合指标数据源，无数据时随 `HasIndexTickers` 折叠。A 股取三大指数（上证 / 深证成指 / 创业板指）；Crypto 取对等市场级指标（全网总市值+24h涨跌幅、BTC 主导率、恐惧贪婪指数）。**禁止展示具体标的价格**（如 BTC/ETH/SOL 单价），其语义与"市场指数"不对等。
+4. **AssetPageView 信息密度提升**：✅ 已完成——已增补行情速览指标面板、技术指标数值面板（MA/MACD/BOLL/KDJ）、盘口深度与逐笔成交，并新增价格告警直达入口与右栏折叠开关。盘口/逐笔为 Crypto 专属（A 股数据源不提供），A 股以明确的数据源说明替代错误态。四区块并行加载、单区块失败只降级自身。
+5. **导航尺寸收敛**：✅ 已收敛至 `Spacing.axaml` Token（`NavItemSize=44` / `NavIconSize=22`）。
 
-### Phase 3: 交易与智能化高级演进
+### Phase 3: 交易与智能化高级演进 —— ⬜ 未开始
 1. **TradingPageView 策略可视化**：为网格/定投策略增加价格区间与止损线的图形化预览。
 2. **紧急避险控制中心**：在交易状态栏增加经过二次校验的一键全平/一键撤单快捷通道。
 3. **多窗口/面板拆分支持**：探索 Avalonia 跨屏幕/可拖拽浮动窗口，支持专业交易员多显示器同时盯盘与对话。

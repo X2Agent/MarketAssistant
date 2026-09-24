@@ -8,12 +8,15 @@ namespace MarketAssistant.Applications.Assets;
 public interface IAssetInfoService
 {
     /// <summary>
-    /// 搜索资产
+    /// 搜索资产。
+    /// 返回空列表表示"数据源正常但没有匹配结果"；数据源不可用等异常应向外抛出（不要吞成空列表），
+    /// 以便调用方区分"无结果"与"加载失败"。
     /// </summary>
     Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 获取资产详情
+    /// 获取资产详情。返回对象中名称保持默认值（如"未知股票"）表示数据源正常但查无此资产；
+    /// 数据源不可用等异常应向外抛出，由调用方按失败处理。
     /// </summary>
     Task<AssetInfo> GetAssetInfoAsync(string code, string market = "", CancellationToken cancellationToken = default);
 

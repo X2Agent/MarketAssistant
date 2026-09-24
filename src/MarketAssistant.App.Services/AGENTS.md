@@ -26,6 +26,50 @@ MarketAssistant.App.Services/
 - Tool 接口定义保留在 `MarketAssistant.Agents/Tools/Abstractions/`，本项目只放实现。
 - 对外部 HTTP/API 的直接调用优先收敛到 `MarketAssistant.DataProviders` 或已存在的统一服务中，不在多个 Tool/Service 内重复实现。
 
+### 「空」与「失败」必须可区分（强制约定）
+
+数据服务禁止把异常吞成空集合或占位对象——那会让"数据源不可用"在 UI 上伪装成"没有数据"。
+
+- 返回空集合 / `null` / 默认占位对象，语义限定为**数据源正常但查无数据**。
+- 数据源故障、解析失败、超时等一律向外抛出。需要保留取消语义时先 `catch (OperationCanceledException) { throw; }` 再包装其余异常为 `FriendlyException`（携带原始异常）。
+- 批量接口（如 `IAssetInfoService.GetAssetInfosAsync`）按项隔离：单项失败占位为 `null`，不得让整批失败。
+- 编排层（`Applications/`）负责把异常翻译成 UI 状态，UI 层不再二次判断。
+
+---
+
+## 市场行情区块服务（Applications/Assets）
+
+详情页信息密度的数据来源，均为 **Keyed Services**（按 `MarketType` 注册，A 股与 Crypto 各一套实现）。
+
+| 接口 | 职责 | 注册 |
+|------|------|------|
+| `IMarketSnapshotService` | 行情速览（今开/最高/最低/昨收/量额/换手/振幅/量比/PE/PB） | `AShareMarketSnapshotService` / `CryptoMarketSnapshotService` |
+| `ITechnicalIndicatorService` | 技术指标快照（MA/MACD/BOLL/KDJ） | 市场无关实现（`TechnicalIndicatorService`，复用 `Skender.Stock.Indicators`），数据不足时返回 `null` 而非抛异常 |
+| `IOrderBookService` | 盘口深度 | Crypto：`CryptoOrderBookService`；A 股：`NoopOrderBookService`（能力位 `SupportsOrderBook=false`） |
+| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`NoopTickTradeService`（能力位 `SupportsTickTrades=false`） |
+
+- 新增市场区块服务时，必须在 `MarketContext` 对应的 MarketModule 中注册，并同步更新 `IMarketCapability` 的能力位。每个市场都必须注册全部 keyed 接口——不支持的市场注册 `Noop*` 实现（返回空集合），**不要**抛异常伪装成加载失败，也不要在业务层用 `if/else` 绕开解析。
+- 不支持某能力的市场由页面显式说明数据源限制；区块之间必须可独立加载与独立失败，禁止把多个区块串成一个必须全部成功的事务。
+
+---
+
+## 模型分级调度（Infrastructure/Factories/ChatClientFactory）
+
+一次深度研判会并行启动多个分析师，全部使用同一个强模型既慢又贵。因此支持**按分析师角色**指定模型。
+
+- 角色 key 约定为**分析师类型类名**（如 `FundamentalAnalystAgent`、`CoordinatorAnalystAgent`），与 `UserSetting.EnabledAnalystRoles`、设置页 `AnalystRoleViewModel.Id` 保持一致。
+- 映射持久化在 `UserSetting.ProviderAnalystModelIds`（`AnalystModelAssignment`：角色 → 模型 ID），按 provider 分组。
+- 解析入口 `ChatClientFactory.CreateRuntime(string? modelIdOverride = null)`：传 `null` 走 provider 默认模型。`MarketAnalysisWorkflow.ResolveRuntimeForRole` 负责查表并**吞掉解析失败降级为默认 runtime**——角色配置错误绝不能导致整次分析失败。
+- 新增角色映射时必须同步更新 `AnalysisCacheService.GetConfigFingerprint()`：指纹由 `activeModelId | roleAssignments | enabledRoles` 组成。漏改会导致"换了模型却命中旧模型缓存"。
+- runtime 缓存按指纹区分，`MaxCachedRuntimes` 为上限；新增角色模型组合会占用缓存槽位，调整上限时注意内存占用。
+
+---
+
+## Token 消耗透出
+
+- 分析链路在 `MarketAnalysisWorkflow` 中通过 `ITokenUsageRecorder.BeginScope(runId)` 打开作用域，把各分析师的 Token 消耗归集到 `MarketAnalysisReport.Usage`。
+- 作用域与归属约定见 `src/MarketAssistant.Agents/AGENTS.md`；本项目只负责开启作用域、传递与写入报告，不重复实现计量逻辑。
+
 ---
 
 ## DI 注册

@@ -2,6 +2,8 @@ using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.MarketAnalysis.Executors;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Agents.TokenManagement;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Agents.Analysts;
@@ -33,6 +35,7 @@ public class MarketAnalysisWorkflow
     private readonly AnalysisReportCache _reportCache;
     private readonly MarketContext _marketContext;
     private readonly IAnalystArtifactStore _artifactStore;
+    private readonly ITokenUsageRecorder _tokenUsageRecorder;
 
     /// <summary>
     /// MAF Agent <c>Name</c>（ASCII 标识符，如 "FundamentalAnalyst"）→ 中文显示名（如"基本面分析师"）映射。
@@ -60,7 +63,8 @@ public class MarketAnalysisWorkflow
         AnalysisReportCache reportCache,
         MarketContext marketContext,
         IAnalystArtifactStore artifactStore,
-        ILogger<MarketAnalysisWorkflow> logger)
+        ILogger<MarketAnalysisWorkflow> logger,
+        ITokenUsageRecorder? tokenUsageRecorder = null)
     {
         _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
         _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
@@ -70,6 +74,9 @@ public class MarketAnalysisWorkflow
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        // 未注入记录器时（如测试手工构造）回退到实例级记录器：
+        // 作用域基于 AsyncLocal，同实例上的并发运行互不干扰
+        _tokenUsageRecorder = tokenUsageRecorder ?? new TokenUsageRecorder();
     }
 
     /// <summary>
@@ -97,6 +104,10 @@ public class MarketAnalysisWorkflow
         activity?.SetTag("marketassistant.run.id", runId.ToString("N"));
         activity?.SetTag("marketassistant.asset.symbol", assetSymbol);
 
+        // 运行级 Token 用量作用域：分析工作流的 Agent 以 session: null 调用，
+        // 会话级累计不生效，故由作用域承接中间件的用量上报（含并发分析师与协调器重试）
+        using var tokenUsageScope = _tokenUsageRecorder.BeginScope(runId);
+
         // 分析师运行状态跟踪（键为 MAF Agent ASCII Name，插入顺序即创建顺序），
         // 随每次进度事件生成快照，供 UI 逐位展示各分析师状态与耗时；
         // 声明在 try 外，使取消/失败的 catch 也能构建终态快照
@@ -111,7 +122,7 @@ public class MarketAnalysisWorkflow
                 StageDescription = "正在准备分析环境",
                 IsInProgress = true,
                 Phase = AnalysisPhase.Preparing,
-                Analysts = BuildAnalystSnapshots(analystRunStates)
+                Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope)
             });
 
             // 获取启用的分析师列表
@@ -162,7 +173,7 @@ public class MarketAnalysisWorkflow
                         TotalAnalysts = totalForProgress,
                         FailedAnalysts = failedSnapshot,
                         Phase = AnalysisPhase.Analyzing,
-                        Analysts = BuildAnalystSnapshots(analystRunStates)
+                        Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope)
                     });
                 });
             var failedAnalystNames = analystAgents.FailedTypes
@@ -197,7 +208,7 @@ public class MarketAnalysisWorkflow
 
             var coordinatorAgent = _analystAgentFactory.CreateAnalyst(
                 typeof(CoordinatorAnalystAgent),
-                runtime,
+                ResolveRuntimeForRole(typeof(CoordinatorAnalystAgent), runtime),
                 extraTools: [getArtifactTool]);
             var coordinatorExecutor = new CoordinatorExecutor(
                 coordinatorAgent,
@@ -225,7 +236,7 @@ public class MarketAnalysisWorkflow
                 TotalAnalysts = createdAgents.Count,
                 FailedAnalysts = failedAnalystNames,
                 Phase = AnalysisPhase.Analyzing,
-                Analysts = BuildAnalystSnapshots(analystRunStates)
+                Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope)
             });
 
             // 执行工作流（流式处理）
@@ -237,11 +248,17 @@ public class MarketAnalysisWorkflow
                 agentNameToDisplayName,
                 degradedAnalysts,
                 analystRunStates,
+                tokenUsageScope,
                 cancellationToken);
+
+            // 回填本次运行的 Token 用量（含并发分析师与协调器重试），随报告一并持久化
+            finalReport.Usage = tokenUsageScope.Snapshot();
 
             // 缓存分析结果，供交易决策模块使用
             _reportCache.Set(assetSymbol, finalReport);
             activity?.SetTag("marketassistant.analyst.completed_count", createdAgents.Count);
+            activity?.SetTag("gen_ai.usage.input_tokens", finalReport.Usage.InputTokens);
+            activity?.SetTag("gen_ai.usage.output_tokens", finalReport.Usage.OutputTokens);
             activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
 
             OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
@@ -271,7 +288,7 @@ public class MarketAnalysisWorkflow
                 StageDescription = "分析已取消",
                 IsInProgress = false,
                 Phase = AnalysisPhase.Completed,
-                Analysts = BuildAnalystSnapshots(analystRunStates)
+                Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope)
             });
 
             throw;
@@ -287,7 +304,7 @@ public class MarketAnalysisWorkflow
                 StageDescription = $"分析失败: {ex.Message}",
                 IsInProgress = false,
                 Phase = AnalysisPhase.Completed,
-                Analysts = BuildAnalystSnapshots(analystRunStates)
+                Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope)
             });
             throw;
         }
@@ -305,6 +322,7 @@ public class MarketAnalysisWorkflow
         IReadOnlyDictionary<string, string> agentNameToDisplayName,
         List<string> degradedAnalysts,
         Dictionary<string, AnalystRunState> analystRunStates,
+        ITokenUsageScope tokenUsageScope,
         CancellationToken cancellationToken)
     {
         MarketAnalysisReport? finalReport = null;
@@ -332,7 +350,7 @@ public class MarketAnalysisWorkflow
             TotalAnalysts = totalAnalysts,
             CompletedAnalysts = completedAnalysts,
             Phase = currentPhase,
-            Analysts = BuildAnalystSnapshots(analystRunStates),
+            Analysts = BuildAnalystSnapshots(analystRunStates, tokenUsageScope),
             FailedAnalysts = [.. failedSteps.Select(f => f.DisplayName)]
         };
 
@@ -534,7 +552,7 @@ public class MarketAnalysisWorkflow
 
         if (finalReport != null)
         {
-            return (finalReport, BuildAnalystSnapshots(analystRunStates));
+            return (finalReport, BuildAnalystSnapshots(analystRunStates, tokenUsageScope));
         }
 
         // 全部分析师被失败隔离包装器降级：聚合器不会派发 Coordinator，事件流自然结束。
@@ -666,7 +684,10 @@ public class MarketAnalysisWorkflow
         {
             try
             {
-                var agent = _analystAgentFactory.CreateAnalyst(type, runtime, sharedProviders)
+                // 角色级模型分配：该角色单独配置了模型时使用独立 Runtime，
+                // 未配置则复用默认 Runtime（避免无谓占用 MaxCachedRuntimes 配额）
+                var agentRuntime = ResolveRuntimeForRole(type, runtime);
+                var agent = _analystAgentFactory.CreateAnalyst(type, agentRuntime, sharedProviders)
                     .WithFailureIsolation(exception => onAnalystDegraded?.Invoke(type, exception));
                 createdAgents.Add(agent);
 
@@ -689,6 +710,47 @@ public class MarketAnalysisWorkflow
 
         _logger.LogInformation("成功创建分析师代理，实际数量: {Count}", createdAgents.Count);
         return (createdAgents, failedTypes, nameToDisplayName);
+    }
+
+    /// <summary>
+    /// 解析单个分析师角色应使用的 Runtime：设置页为该角色单独分配了模型时创建独立 Runtime，
+    /// 否则复用默认 Runtime。
+    /// 分配不可用时（模型下线、协议未接入、缺少对应 API Key）降级回默认模型并记录告警，
+    /// 不让单个角色的配置错误中断整轮分析。
+    /// </summary>
+    private ChatClientRuntime ResolveRuntimeForRole(Type analystType, ChatClientRuntime defaultRuntime)
+    {
+        var setting = _userSettingService.CurrentSetting;
+        var assignedModelId = AnalystModelAssignment.GetAssignedModelId(
+            setting,
+            defaultRuntime.ProviderId,
+            analystType.Name);
+
+        if (assignedModelId.Length == 0 ||
+            string.Equals(assignedModelId, defaultRuntime.ModelId, StringComparison.Ordinal))
+        {
+            return defaultRuntime;
+        }
+
+        try
+        {
+            var runtime = _chatClientFactory.CreateRuntime(assignedModelId);
+            _logger.LogInformation(
+                "分析师 {Analyst} 使用角色专属模型: {ModelId}",
+                analystType.Name,
+                runtime.ModelId);
+            return runtime;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "分析师 {Analyst} 的角色专属模型 {ModelId} 不可用，回退到默认模型 {DefaultModelId}",
+                analystType.Name,
+                assignedModelId,
+                defaultRuntime.ModelId);
+            return defaultRuntime;
+        }
     }
 
     /// <summary>
@@ -765,13 +827,17 @@ public class MarketAnalysisWorkflow
     /// <summary>
     /// 生成各分析师的运行状态快照。运行中的条目携带实时耗时，已完成/失败的条目携带终态耗时。
     /// </summary>
+    /// <param name="analystRunStates">键为 MAF Agent ASCII Name 的运行状态表。</param>
+    /// <param name="tokenUsageScope">运行级 Token 用量作用域，用于回填各分析师的 Token 数；可为 null。</param>
     private static List<AnalystRunSnapshot> BuildAnalystSnapshots(
-        Dictionary<string, AnalystRunState> analystRunStates)
+        Dictionary<string, AnalystRunState> analystRunStates,
+        ITokenUsageScope? tokenUsageScope = null)
     {
         var snapshots = new List<AnalystRunSnapshot>(analystRunStates.Count);
-        foreach (var state in analystRunStates.Values)
+        foreach (var (agentName, state) in analystRunStates)
         {
-            snapshots.Add(state.CreateSnapshot());
+            var (inputTokens, outputTokens) = tokenUsageScope?.TokensFor(agentName) ?? (0, 0);
+            snapshots.Add(state.CreateSnapshot(inputTokens, outputTokens));
         }
         return snapshots;
     }
@@ -827,12 +893,12 @@ public class MarketAnalysisWorkflow
             StartedAtTimestamp = null;
         }
 
-        public AnalystRunSnapshot CreateSnapshot()
+        public AnalystRunSnapshot CreateSnapshot(long inputTokens = 0, long outputTokens = 0)
         {
             var elapsed = Status == AnalystRunStatus.Running && StartedAtTimestamp.HasValue
                 ? Stopwatch.GetElapsedTime(StartedAtTimestamp.Value)
                 : LastElapsed;
-            return new AnalystRunSnapshot(DisplayName, Status, elapsed);
+            return new AnalystRunSnapshot(DisplayName, Status, elapsed, inputTokens, outputTokens);
         }
     }
 
@@ -941,10 +1007,21 @@ public enum AnalystRunStatus
 /// <param name="DisplayName">中文显示名（如"基本面分析师"）</param>
 /// <param name="Status">运行状态</param>
 /// <param name="Elapsed">运行中为实时耗时，终态为定格耗时</param>
+/// <param name="InputTokens">该分析师累计输入 Token（未统计为 0）</param>
+/// <param name="OutputTokens">该分析师累计输出 Token（未统计为 0）</param>
 public sealed record AnalystRunSnapshot(
     string DisplayName,
     AnalystRunStatus Status,
-    TimeSpan Elapsed);
+    TimeSpan Elapsed,
+    long InputTokens = 0,
+    long OutputTokens = 0)
+{
+    /// <summary>该分析师的 Token 总量。</summary>
+    public long TotalTokens => InputTokens + OutputTokens;
+
+    /// <summary>是否统计到 Token 用量。</summary>
+    public bool HasTokenUsage => InputTokens > 0 || OutputTokens > 0;
+}
 
 /// <summary>
 /// 分析进度变化事件参数

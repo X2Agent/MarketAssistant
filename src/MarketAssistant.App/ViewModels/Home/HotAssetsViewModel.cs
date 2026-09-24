@@ -27,6 +27,9 @@ public partial class HotAssetsViewModel : ViewModelBase, IDisposable
     {
         _marketContext = marketContext;
 
+        EmptyMessage = "暂无热门资产数据";
+        SetRetryCommand(() => LoadHotAssetsAsync());
+
         SubscribeToMarketChanges(_marketContext);
 
         _ = LoadHotAssetsAsync();
@@ -43,7 +46,7 @@ public partial class HotAssetsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task LoadHotAssetsAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             var hotAssets = await HomeAssetService.GetHotAssetsAsync();
 
@@ -52,6 +55,8 @@ public partial class HotAssetsViewModel : ViewModelBase, IDisposable
             {
                 HotAssets.Add(asset);
             }
+
+            return HotAssets.Count > 0;
         }, "加载热门资产");
     }
 

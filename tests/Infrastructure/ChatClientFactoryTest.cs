@@ -145,24 +145,65 @@ public class ChatClientFactoryTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void CreateRuntime_MoreThanSixteenConfigurations_ShouldRejectWithoutEvictingLiveClients()
+    public void CreateRuntime_MoreThanMaxCachedConfigurations_ShouldRejectWithoutEvictingLiveClients()
     {
         var fixture = CreateFixture();
         using var factory = fixture.Factory;
 
-        for (var index = 0; index < 16; index++)
+        for (var index = 0; index < TestableChatClientFactory.MaxCachedRuntimeCount; index++)
         {
             fixture.Setting.ProviderModelIds["DeepSeek"] = $"model-{index}";
             factory.CreateRuntime();
         }
 
-        fixture.Setting.ProviderModelIds["DeepSeek"] = "model-16";
+        fixture.Setting.ProviderModelIds["DeepSeek"] = "model-overflow";
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
-        StringAssert.Contains(exception.Message, "16");
-        Assert.HasCount(16, fixture.Factory.CreatedClients);
+        StringAssert.Contains(
+            exception.Message,
+            TestableChatClientFactory.MaxCachedRuntimeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.HasCount(TestableChatClientFactory.MaxCachedRuntimeCount, fixture.Factory.CreatedClients);
         foreach (var client in fixture.Factory.CreatedClients)
             client.Verify(x => x.Dispose(), Times.Never);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_WithModelIdOverride_ShouldUseOverrideInsteadOfActiveModel()
+    {
+        var fixture = CreateFixture();
+        using var factory = fixture.Factory;
+
+        var runtime = factory.CreateRuntime("cheap-model");
+
+        Assert.AreEqual("cheap-model", runtime.ModelId);
+        Assert.AreEqual("cheap-model", fixture.Factory.CreatedRequests.Single().ModelId);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_WithNullModelIdOverride_ShouldFallBackToActiveModel()
+    {
+        var fixture = CreateFixture();
+        using var factory = fixture.Factory;
+
+        var runtime = factory.CreateRuntime(null);
+
+        Assert.AreEqual("model-a", runtime.ModelId);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void CreateRuntime_DifferentModelOverrides_ShouldProduceDistinctFingerprints()
+    {
+        var fixture = CreateFixture();
+        using var factory = fixture.Factory;
+
+        var strong = factory.CreateRuntime("strong-model");
+        var cheap = factory.CreateRuntime("cheap-model");
+
+        Assert.AreNotEqual(strong.ConfigurationFingerprint, cheap.ConfigurationFingerprint);
+        Assert.AreNotSame(strong.Client, cheap.Client);
     }
 
     [TestMethod]
@@ -292,6 +333,8 @@ public class ChatClientFactoryTest
         IHttpClientFactory httpClientFactory)
         : ChatClientFactory(userSettingService, httpClientFactory)
     {
+        public static int MaxCachedRuntimeCount => MaxCachedRuntimes;
+
         public List<ClientCreationRequest> CreatedRequests { get; } = [];
         public List<Mock<IChatClient>> CreatedClients { get; } = [];
 

@@ -39,6 +39,7 @@ public sealed class HomeAssetService : IHomeAssetService
 
     public async Task<List<AssetItem>> SearchAssetAsync(string query, CancellationToken cancellationToken = default)
     {
+        // 空查询属于"无结果"，直接返回空列表；数据源故障由 SearchAsync 抛出，交由上层展示失败态
         if (string.IsNullOrWhiteSpace(query))
             return [];
 

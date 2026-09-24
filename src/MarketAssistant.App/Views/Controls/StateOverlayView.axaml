@@ -1,0 +1,78 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="320" d:DesignHeight="220"
+             x:Class="MarketAssistant.Views.Controls.StateOverlayView"
+             x:Name="Root"
+             IsVisible="False">
+
+    <StackPanel HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="{StaticResource DefaultSpacing}"
+                Margin="{StaticResource LargeMargin}">
+
+        <!-- 加载中 -->
+        <controls:LoadingDots HorizontalAlignment="Center"
+                              IsVisible="{Binding #Root.IsLoadingState}"/>
+
+        <!-- 无数据 -->
+        <svg:Svg Path="/Assets/Images/empty_data.svg"
+                 Width="{Binding #Root.IconSize}"
+                 Height="{Binding #Root.IconSize}"
+                 HorizontalAlignment="Center"
+                 IsVisible="{Binding #Root.IsEmptyState}"/>
+
+        <!-- 失败 -->
+        <svg:Svg Path="/Assets/Images/icon_danger.svg"
+                 Width="{Binding #Root.IconSize}"
+                 Height="{Binding #Root.IconSize}"
+                 HorizontalAlignment="Center"
+                 IsVisible="{Binding #Root.IsFailedState}"/>
+
+        <!-- 失败标题 -->
+        <TextBlock Text="{Binding #Root.TitleText}"
+                   FontSize="{StaticResource SectionTitleFontSize}"
+                   FontWeight="Bold"
+                   Foreground="{StaticResource ErrorBrush}"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding #Root.IsFailedState}"/>
+
+        <!-- 空态标题 -->
+        <TextBlock Text="{Binding #Root.TitleText}"
+                   FontSize="{StaticResource SectionTitleFontSize}"
+                   FontWeight="Bold"
+                   Foreground="{DynamicResource TextPrimaryBrush}"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding #Root.IsEmptyState}"/>
+
+        <!-- 加载提示 -->
+        <TextBlock Text="{Binding #Root.TitleText}"
+                   FontSize="{StaticResource LabelFontSize}"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding #Root.IsLoadingState}"/>
+
+        <TextBlock Text="{Binding #Root.Message}"
+                   FontSize="{StaticResource LabelFontSize}"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   MaxWidth="{StaticResource MaxDialogWidth}"
+                   IsVisible="{Binding #Root.HasMessage}"/>
+
+        <Button Classes="action-button"
+                HorizontalAlignment="Center"
+                Margin="{StaticResource SmallTopMargin}"
+                Command="{Binding #Root.RetryCommand}"
+                IsVisible="{Binding #Root.CanRetry}">
+            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding #Root.RetryText}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+    </StackPanel>
+</UserControl>

@@ -35,10 +35,16 @@ public class AShareAssetInfoService : IAssetInfoService
             var items = await _clsClient.SearchStocksAsync(keyword, cancellationToken);
             return items.Select(i => (i.Name, i.StockId)).ToList();
         }
+        catch (OperationCanceledException)
+        {
+            // 用户继续输入或切换市场导致的取消，交由调用方按取消处理
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "搜索股票失败，返回空结果");
-            return [];
+            // 不吞异常：返回空列表会让"数据源不可用"伪装成"没有匹配结果"
+            _logger.LogError(ex, "搜索股票失败: {Keyword}", keyword);
+            throw new FriendlyException($"搜索股票失败: {ex.Message}", ex);
         }
     }
 
@@ -93,9 +99,15 @@ public class AShareAssetInfoService : IAssetInfoService
             var changeRatio = data.Change;
             assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "获取股票详细数据异常: {Code}", code);
+            // 不吞异常：返回"未知股票"会让"数据源不可用"伪装成"资产不存在"
+            _logger.LogError(ex, "获取股票详细数据失败: {Code}", code);
+            throw new FriendlyException($"获取股票信息失败: {ex.Message}", ex);
         }
 
         return assetInfo;
