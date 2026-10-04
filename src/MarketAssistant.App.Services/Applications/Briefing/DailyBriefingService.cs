@@ -354,6 +354,21 @@ public sealed class DailyBriefingService(
     protected override async Task InitializeDatabaseAsync()
     {
         await using var conn = await OpenConnectionAsync();
+        await MigrateSchemaAsync(conn);
+    }
+
+    /// <summary>
+    /// 建表并执行旧库迁移（补齐 v1.0 之后新增的列）。
+    /// </summary>
+    /// <remarks>
+    /// 独立成静态方法且接收 <see cref="SqliteConnection"/>，是为了让迁移逻辑
+    /// 可用内存数据库单测覆盖——迁移一旦回归，升级用户的简报会永久不可用，
+    /// 而这类问题在运行时才暴露，代价很高。
+    /// 参照 <c>TradingDataService.MigrateDatabaseSchemaAsync</c> 的既有做法。
+    /// </remarks>
+    /// <param name="conn">已打开的连接。</param>
+    internal static async Task MigrateSchemaAsync(SqliteConnection conn)
+    {
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """
             CREATE TABLE IF NOT EXISTS briefings (
@@ -404,7 +419,6 @@ public sealed class DailyBriefingService(
             // 列名来自上方常量表，非外部输入，不存在注入风险
             alterCmd.CommandText = $"ALTER TABLE briefings ADD COLUMN {column} {definition};";
             await alterCmd.ExecuteNonQueryAsync();
-            Logger.LogInformation("每日简报表迁移：已新增列 {Column}", column);
         }
     }
 }

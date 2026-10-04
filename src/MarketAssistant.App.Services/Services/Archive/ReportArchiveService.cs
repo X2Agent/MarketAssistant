@@ -183,7 +183,13 @@ public class ReportArchiveService(ILogger<ReportArchiveService> logger) : Sqlite
     /// 为既有 reports 表补齐后加列（旧库升级路径）。
     /// 历史行的 market_type/rating 保持 NULL，表示市场与评级未知，不做推断回填。
     /// </summary>
-    private static async Task EnsureMarketColumnsAsync(SqliteConnection conn)
+    /// <remarks>
+    /// <b>此处不做任何回填是刻意的：</b>roadmap 明确要求「旧行为 NULL，读取方必须按
+    /// 未知处理，<b>禁止从 asset_code 反推市场</b>」。反推会把 A 股代码误判为币圈，
+    /// 使 M3 按市场分基准的胜率统计整体失真——且不报错，属最难察觉的一类错误。
+    /// </remarks>
+    /// <param name="conn">已打开的连接，且 <c>reports</c> 表已存在。</param>
+    internal static async Task EnsureMarketColumnsAsync(SqliteConnection conn)
     {
         var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using (var pragmaCmd = conn.CreateCommand())
