@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "BasicInfo", "Fundamentals", "Competition" };
+    protected override string[] RequiredKeys => ["BasicInfo", "Fundamentals", "Competition"];
 
     protected override bool IsValid(FundamentalAnalysisResult model)
     {

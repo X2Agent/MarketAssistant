@@ -49,7 +49,21 @@ public interface IBinanceAuthService
 /// 支持现货实盘/Testnet/Demo、合约实盘/Testnet 共用同一实现。
 /// 签名时自动与币安服务器时间同步，避免本地系统时间偏差导致 -1021 错误。
 /// </summary>
-public sealed class BinanceAuthService : IBinanceAuthService
+/// <param name="credentialStore">交易凭证加密存储</param>
+/// <param name="mode">交易模式，决定从存储中读取哪套密钥</param>
+/// <param name="keyName">密钥名称，用于错误提示（如 "Binance"、"Binance Spot Testnet"）</param>
+/// <param name="httpClientFactory">用于服务器时间同步的 HttpClient 工厂（可选）</param>
+/// <param name="httpClientName">时间同步使用的 HttpClient 名称（可选，与账户服务一致）</param>
+/// <param name="timeEndpoint">时间同步端点：现货 "/api/v3/time"，合约 "/fapi/v1/time"（可选）</param>
+/// <param name="logger">日志器（可选）</param>
+public sealed class BinanceAuthService(
+    ITradingCredentialStore credentialStore,
+    CryptoTradingMode mode,
+    string keyName,
+    IHttpClientFactory? httpClientFactory = null,
+    string? httpClientName = null,
+    string? timeEndpoint = null,
+    ILogger? logger = null) : IBinanceAuthService
 {
     private const long RecvWindow = 5000;
 
@@ -58,52 +72,27 @@ public sealed class BinanceAuthService : IBinanceAuthService
     /// </summary>
     private static readonly TimeSpan ServerTimeSyncInterval = TimeSpan.FromMinutes(30);
 
-    private readonly ITradingCredentialStore _credentialStore;
-    private readonly CryptoTradingMode _mode;
-    private readonly string _keyName;
+    private readonly ITradingCredentialStore _credentialStore = credentialStore;
+    private readonly CryptoTradingMode _mode = mode;
+    private readonly string _keyName = keyName;
 
     /// <summary>
     /// 用于调用 /api/v3/time 或 /fapi/v1/time 同步服务器时间的 HttpClient 工厂。
     /// 为 null 时降级到本地时间（仅适合测试或受控环境）。
     /// </summary>
-    private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly IHttpClientFactory? _httpClientFactory = httpClientFactory;
 
     /// <summary>时间同步使用的 HttpClient 名称（如 "Binance" / "BinanceSpotDemo" / "BinanceFutures"）</summary>
-    private readonly string? _httpClientName;
+    private readonly string? _httpClientName = httpClientName;
 
     /// <summary>时间同步端点（现货 "/api/v3/time"，合约 "/fapi/v1/time"）</summary>
-    private readonly string? _timeEndpoint;
+    private readonly string? _timeEndpoint = timeEndpoint;
 
     /// <summary>服务器时间相对本地时间的偏移量（毫秒），正值表示本地慢于服务器</summary>
     private long _serverTimeOffsetMs;
     private DateTime _lastSyncTime = DateTime.MinValue;
     private readonly SemaphoreSlim _syncLock = new(1, 1);
-    private readonly ILogger? _logger;
-
-    /// <param name="credentialStore">交易凭证加密存储</param>
-    /// <param name="mode">交易模式，决定从存储中读取哪套密钥</param>
-    /// <param name="keyName">密钥名称，用于错误提示（如 "Binance"、"Binance Spot Testnet"）</param>
-    /// <param name="httpClientFactory">用于服务器时间同步的 HttpClient 工厂（可选）</param>
-    /// <param name="httpClientName">时间同步使用的 HttpClient 名称（可选，与账户服务一致）</param>
-    /// <param name="timeEndpoint">时间同步端点：现货 "/api/v3/time"，合约 "/fapi/v1/time"（可选）</param>
-    /// <param name="logger">日志器（可选）</param>
-    public BinanceAuthService(
-        ITradingCredentialStore credentialStore,
-        CryptoTradingMode mode,
-        string keyName,
-        IHttpClientFactory? httpClientFactory = null,
-        string? httpClientName = null,
-        string? timeEndpoint = null,
-        ILogger? logger = null)
-    {
-        _credentialStore = credentialStore;
-        _mode = mode;
-        _keyName = keyName;
-        _httpClientFactory = httpClientFactory;
-        _httpClientName = httpClientName;
-        _timeEndpoint = timeEndpoint;
-        _logger = logger;
-    }
+    private readonly ILogger? _logger = logger;
 
     private BinanceAuthConfig CurrentConfig
     {

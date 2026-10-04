@@ -26,7 +26,7 @@ public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
         _embeddingGenerator = _serviceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         if (_embeddingGenerator is null)
         {
-            Assert.Fail("JINA_API_KEY 环境变量未配置，无法创建嵌入生成器进行真实场景验证");
+            Assert.Inconclusive("JINA_API_KEY 环境变量未配置，跳过嵌入生成器真实场景验证");
         }
         _vectorStore = _serviceProvider.GetRequiredService<VectorStore>();
         _retrievalOrchestrator = _serviceProvider.GetRequiredService<IRetrievalOrchestrator>();
@@ -122,8 +122,8 @@ public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
 
         // 验证结果
         Assert.IsNotNull(results, "检索结果不应为null");
-        Assert.IsTrue(results.Count > 0, "应该返回至少一个结果");
-        Assert.IsTrue(results.Count <= 5, "结果数量不应超过请求的top数");
+        Assert.IsNotEmpty(results, "应该返回至少一个结果");
+        Assert.IsLessThanOrEqualTo(5, results.Count, "结果数量不应超过请求的top数");
 
         Console.WriteLine($"检索完成，返回 {results.Count} 个结果");
 
@@ -131,7 +131,7 @@ public class RetrievalOrchestratorIntegrationTest : BaseAgentTest
         foreach (var result in results)
         {
             Assert.IsNotNull(result.Value, "结果内容不应为null");
-            Assert.IsTrue(result.Value.Length > 0, "结果内容不应为空");
+            Assert.IsGreaterThan(0, result.Value.Length, "结果内容不应为空");
             Assert.IsNotNull(result.Name, "结果名称不应为null");
 
             var preview = result.Value.Length > 100 ? result.Value[..100] + "..." : result.Value;

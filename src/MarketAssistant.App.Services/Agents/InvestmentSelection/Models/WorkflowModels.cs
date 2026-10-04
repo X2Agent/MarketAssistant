@@ -23,8 +23,8 @@ public record InvestmentSelectionWorkflowRequest
     public string? RiskPreference { get; init; }
     public decimal? InvestmentAmount { get; init; }
     public int? InvestmentHorizon { get; init; }
-    public List<string> PreferredSectors { get; init; } = new();
-    public List<string> ExcludedSectors { get; init; } = new();
+    public List<string> PreferredSectors { get; init; } = [];
+    public List<string> ExcludedSectors { get; init; } = [];
     public int MaxRecommendations { get; init; } = 10;
 }
 
@@ -52,7 +52,7 @@ public record AssetScreeningResult
     /// <summary>
     /// 筛选得到的资产列表
     /// </summary>
-    public List<ScreenerAssetInfo> ScreenedAssets { get; init; } = new();
+    public List<ScreenerAssetInfo> ScreenedAssets { get; init; } = [];
 
     /// <summary>
     /// 使用的筛选条件

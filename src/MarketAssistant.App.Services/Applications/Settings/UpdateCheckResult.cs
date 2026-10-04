@@ -68,7 +68,7 @@ public class ReleaseInfo
     public DateTime PublishedAt { get; set; }
 
     [JsonPropertyName("assets")]
-    public List<ReleaseAsset> Assets { get; set; } = new List<ReleaseAsset>();
+    public List<ReleaseAsset> Assets { get; set; } = [];
 
     [JsonPropertyName("tarball_url")]
     public string TarballUrl { get; set; } = string.Empty;

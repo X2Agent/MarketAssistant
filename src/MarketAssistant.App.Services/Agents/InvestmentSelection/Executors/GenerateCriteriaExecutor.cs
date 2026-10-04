@@ -13,24 +13,16 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 泛型筛选条件生成器
 /// 将用户需求或新闻内容转换为结构化的筛选条件
 /// </summary>
-public sealed class GenerateCriteriaExecutor<TCriteria>
-    : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>
+public sealed class GenerateCriteriaExecutor<TCriteria>(
+    IChatClientFactory chatClientFactory,
+    ICriteriaGenerationStrategy<TCriteria> strategy,
+    ILogger<GenerateCriteriaExecutor<TCriteria>> logger)
+    : Executor<InvestmentSelectionWorkflowRequest, CriteriaGenerationResult>($"GenerateCriteria_{strategy.SupportedMarketType}")
     where TCriteria : IScreeningCriteria
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ICriteriaGenerationStrategy<TCriteria> _strategy;
-    private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger;
-
-    public GenerateCriteriaExecutor(
-        IChatClientFactory chatClientFactory,
-        ICriteriaGenerationStrategy<TCriteria> strategy,
-        ILogger<GenerateCriteriaExecutor<TCriteria>> logger)
-        : base($"GenerateCriteria_{strategy.SupportedMarketType}")
-    {
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+    private readonly ICriteriaGenerationStrategy<TCriteria> _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+    private readonly ILogger<GenerateCriteriaExecutor<TCriteria>> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public override async ValueTask<CriteriaGenerationResult> HandleAsync(
         InvestmentSelectionWorkflowRequest input,

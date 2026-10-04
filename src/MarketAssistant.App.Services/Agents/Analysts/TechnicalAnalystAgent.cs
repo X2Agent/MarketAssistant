@@ -16,21 +16,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [DisplayName("技术分析师")]
 [Description("专注于图表模式和技术指标分析")]
 [RequiresTools(typeof(ITechnicalDataTools))]
-public class TechnicalAnalystAgent : AnalystAgentBase
+public class TechnicalAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(TechnicalAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public TechnicalAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(TechnicalAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

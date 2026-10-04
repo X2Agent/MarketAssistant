@@ -9,22 +9,15 @@ namespace MarketAssistant.Services.Trading;
 /// 交易仓储基类（internal）：封装环境 key 解析、decimal 存取辅助、连接获取与延迟初始化。
 /// 各仓储继承本类，仅关注自身的 CRUD SQL；schema 初始化统一由 <see cref="TradingSchemaInitializer"/> 负责。
 /// </summary>
-internal abstract class TradingRepositoryBase
+internal abstract class TradingRepositoryBase(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    ILogger logger)
 {
-    private readonly TradingSchemaInitializer _schema;
-    private readonly TradingEnvironmentService _environment;
+    private readonly TradingSchemaInitializer _schema = schema;
+    private readonly TradingEnvironmentService _environment = environment;
 
-    protected ILogger Logger { get; }
-
-    protected TradingRepositoryBase(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        ILogger logger)
-    {
-        _schema = schema;
-        _environment = environment;
-        Logger = logger;
-    }
+    protected ILogger Logger { get; } = logger;
 
     /// <summary>
     /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Demo、合约实盘、合约 Testnet

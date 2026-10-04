@@ -77,7 +77,7 @@ public class ModelProviderCatalogTest
             .OrderBy(id => id)
             .ToArray();
 
-        CollectionAssert.AreEqual(new[] { "Custom", "LMStudio", "Ollama" }, overrideProviderIds);
+        Assert.AreSequenceEqual(["Custom", "LMStudio", "Ollama"], overrideProviderIds);
         Assert.AreEqual("http://localhost:11434", GetProvider("Ollama").DefaultEndpoint);
         Assert.AreEqual("http://localhost:1234/v1", GetProvider("LMStudio").DefaultEndpoint);
         Assert.AreEqual(string.Empty, GetProvider("Custom").DefaultEndpoint);

@@ -11,16 +11,10 @@ namespace MarketAssistant.Agents.Tools;
 /// 知识图谱工具，允许 Agent 记录和查询实体间关系。
 /// 适用于记录：用户持有/关注的标的、分析过的股票/币种、行业关联、重大事件影响。
 /// </summary>
-public class KnowledgeGraphTools : IToolsProvider
+public class KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<KnowledgeGraphTools> logger) : IToolsProvider
 {
-    private readonly UserKnowledgeGraphService _kgService;
-    private readonly ILogger<KnowledgeGraphTools> _logger;
-
-    public KnowledgeGraphTools(UserKnowledgeGraphService kgService, ILogger<KnowledgeGraphTools> logger)
-    {
-        _kgService = kgService;
-        _logger = logger;
-    }
+    private readonly UserKnowledgeGraphService _kgService = kgService;
+    private readonly ILogger<KnowledgeGraphTools> _logger = logger;
 
     [Description("记录一条实体关系。适用场景：用户持有/关注某标的、某事件影响某行业、分析过某标的等。" +
                  "predicate 常用值: 关注/持有/分析过/属于行业/影响/相关联。")]

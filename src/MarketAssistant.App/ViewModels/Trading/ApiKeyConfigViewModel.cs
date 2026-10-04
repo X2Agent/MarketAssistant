@@ -23,7 +23,7 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
 
     public override string Title => "API 密钥";
 
-    public List<CryptoTradingMode> TradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
+    public List<CryptoTradingMode> TradingModes { get; } = [.. Enum.GetValues<CryptoTradingMode>()];
 
     [ObservableProperty]
     private CryptoTradingMode _selectedMode;
@@ -40,7 +40,7 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
     /// <summary>
     /// 各交易模式的密钥配置状态（用于显示已配置/未配置标记）
     /// </summary>
-    public ObservableCollection<CredentialStatus> CredentialStatuses { get; } = new();
+    public ObservableCollection<CredentialStatus> CredentialStatuses { get; } = [];
 
     /// <summary>
     /// 当前选中模式是否为合约模式

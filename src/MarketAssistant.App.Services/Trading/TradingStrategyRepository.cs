@@ -7,16 +7,11 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 策略 CRUD 仓储（internal）：策略表的持久化与查询。
 /// </summary>
-internal sealed class TradingStrategyRepository : TradingRepositoryBase
+internal sealed class TradingStrategyRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public TradingStrategyRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
-
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();

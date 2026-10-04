@@ -128,10 +128,10 @@ public class AnalysisCacheServiceTest
         return new MarketAnalysisReport
         {
             AssetSymbol = assetSymbol,
-            AnalystMessages = new List<ChatMessage>
-            {
+            AnalystMessages =
+            [
                 new(ChatRole.Assistant, "Test content") { AuthorName = "TestAnalyst" }
-            },
+            ],
             CoordinatorResult = new CoordinatorResult
             {
                 InvestmentRating = InvestmentRating.Buy,

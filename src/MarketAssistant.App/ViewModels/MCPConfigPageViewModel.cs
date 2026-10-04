@@ -25,7 +25,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private readonly McpToolContextProvider _mcpToolProvider;
 
     [ObservableProperty]
-    private ObservableCollection<MCPServerConfig> _serverConfigs = new();
+    private ObservableCollection<MCPServerConfig> _serverConfigs = [];
 
     [ObservableProperty]
     private MCPServerConfig? _selectedConfig;
@@ -87,7 +87,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private bool _allowAllTools;
 
     [ObservableProperty]
-    private ObservableCollection<McpToolSelectionItem> _toolItems = new();
+    private ObservableCollection<McpToolSelectionItem> _toolItems = [];
 
     // 表单校验错误信息（保存/测试时触发，修正后即时清除）
     [ObservableProperty]
@@ -510,7 +510,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         config.ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion;
         config.AllowedTools = AllowAllTools
             ? []
-            : ToolItems.Where(item => item.IsSelected).Select(item => item.Name).ToList();
+            : [.. ToolItems.Where(item => item.IsSelected).Select(item => item.Name)];
         config.EnvironmentVariables = ParseEnvironmentVariables();
     }
 

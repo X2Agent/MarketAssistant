@@ -11,7 +11,7 @@ namespace MarketAssistant.Agents.PromptConfiguration;
 /// 查找顺序：config/prompts/{market}/{analystName}.yaml（市场覆写）→ config/prompts/{analystName}.yaml（各市场共用）。
 /// 支持热加载：每次访问时检查文件修改时间，文件变更后自动重新加载。
 /// </summary>
-public class AnalystPromptLoader
+public class AnalystPromptLoader(ILogger<AnalystPromptLoader> logger)
 {
     private static readonly string PromptsDir = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "config", "prompts");
@@ -22,13 +22,8 @@ public class AnalystPromptLoader
         .IgnoreUnmatchedProperties()
         .Build();
 
-    private readonly ILogger<AnalystPromptLoader> _logger;
+    private readonly ILogger<AnalystPromptLoader> _logger = logger;
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
-
-    public AnalystPromptLoader(ILogger<AnalystPromptLoader> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 获取指定分析师的共用提示词配置。

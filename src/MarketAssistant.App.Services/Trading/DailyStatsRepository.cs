@@ -5,16 +5,11 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 日统计仓储（internal）：今日交易统计的查询与累计更新。
 /// </summary>
-internal sealed class DailyStatsRepository : TradingRepositoryBase
+internal sealed class DailyStatsRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public DailyStatsRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
-
     public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync();

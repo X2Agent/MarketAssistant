@@ -94,7 +94,7 @@ public class VectorStoreIntegrationTest : BaseAgentTest
         var vectorSearchResultsList = await vectorSearchResults.ToListAsync();
 
         Assert.IsNotNull(vectorSearchResultsList);
-        Assert.AreEqual(1, vectorSearchResultsList.Count);
+        Assert.HasCount(1, vectorSearchResultsList);
 
         // 直接验证基本的存储和检索功能
         var secondParagraph = await collection.GetAsync("2");
@@ -102,10 +102,10 @@ public class VectorStoreIntegrationTest : BaseAgentTest
         // Assert - Verify search results (验证基本的存储功能)
         Assert.IsNotNull(secondParagraph);
         Assert.AreEqual("2", secondParagraph.Key);
-        Assert.IsTrue(secondParagraph.Text.Contains("stock market"));
+        Assert.Contains("stock market", secondParagraph.Text);
 
         // 验证向量嵌入已正确存储
         Assert.IsNotNull(secondParagraph.TextEmbedding);
-        Assert.AreEqual(1024, secondParagraph.TextEmbedding.Vector.Length);
+        Assert.HasCount(1024, secondParagraph.TextEmbedding.Vector);
     }
 }

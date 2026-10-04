@@ -14,17 +14,11 @@ namespace MarketAssistant.Rag.Services;
 /// 支持文本、标题、列表、表格、代码块、引用等类型
 /// 集成统一的图片路径处理逻辑
 /// </summary>
-public class MarkdownDocumentBlockReader : IDocumentBlockReader
+public class MarkdownDocumentBlockReader(MarkdownConverterFactory converterFactory, IImageStorageService imageStorageService) : IDocumentBlockReader
 {
-    private readonly MarkdownConverterFactory _converterFactory;
-    private readonly IImageStorageService _imageStorageService;
+    private readonly MarkdownConverterFactory _converterFactory = converterFactory ?? throw new ArgumentNullException(nameof(converterFactory));
+    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
     private static readonly Regex ImagePattern = new(@"!\[([^\]]*)\]\(([^)]+)\)", RegexOptions.Compiled);
-
-    public MarkdownDocumentBlockReader(MarkdownConverterFactory converterFactory, IImageStorageService imageStorageService)
-    {
-        _converterFactory = converterFactory ?? throw new ArgumentNullException(nameof(converterFactory));
-        _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
-    }
 
     public bool CanRead(string filePath)
     {
@@ -51,7 +45,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
             var converter = _converterFactory.GetConverter(filePath);
             if (converter == null)
             {
-                return Enumerable.Empty<DocumentBlock>();
+                return [];
             }
 
             markdown = await converter.ConvertToMarkdownAsync(filePath);
@@ -59,7 +53,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
 
         if (string.IsNullOrWhiteSpace(markdown))
         {
-            return Enumerable.Empty<DocumentBlock>();
+            return [];
         }
 
         // 解析Markdown为DocumentBlock
@@ -271,7 +265,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
                     var imagePath = link.Url ?? string.Empty;
 
                     // 使用统一的图片路径解析逻辑
-                    byte[] imageBytes = Array.Empty<byte>();
+                    byte[] imageBytes = [];
                     try
                     {
                         string resolvedImagePath = _imageStorageService.ResolveImagePath(imagePath, filePath);
@@ -382,7 +376,7 @@ public class MarkdownDocumentBlockReader : IDocumentBlockReader
         return new TableBlock
         {
             Order = order,
-            Rows = rows.Select(r => (IReadOnlyList<string>)r.AsReadOnly()).ToList(),
+            Rows = [.. rows.Select(r => (IReadOnlyList<string>)r.AsReadOnly())],
             Markdown = markdown,
             Hash = hash,
             TableCaption = caption

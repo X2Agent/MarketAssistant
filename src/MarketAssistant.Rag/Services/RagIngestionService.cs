@@ -29,30 +29,19 @@ namespace MarketAssistant.Rag.Services;
 /// - 使用LRU缓存管理感知哈希，避免内存泄漏。
 /// - 图片路径解析由文档读取器负责，避免重复处理。
 /// </remarks>
-public class RagIngestionService : IRagIngestionService
+public class RagIngestionService(
+    ITextCleaningService cleaning,
+    ITextChunkingService chunking,
+    IRagDocumentCatalog documentCatalog,
+    ILogger<RagIngestionService> logger,
+    DocumentBlockReaderFactory readerFactory,
+    IImageEmbeddingService imageEmbeddingService) : IRagIngestionService
 {
-    private readonly ILogger<RagIngestionService> _logger;
-    private readonly DocumentBlockReaderFactory _readerFactory;
-    private readonly IImageEmbeddingService _imageEmbeddingService;
-    private readonly DocumentBlockMapper _blockMapper;
-    private readonly IRagDocumentCatalog _documentCatalog;
-
-    // 保留：如未来扩展跨文档级别的去重，可在此处引入相关缓存
-
-    public RagIngestionService(
-        ITextCleaningService cleaning,
-        ITextChunkingService chunking,
-        IRagDocumentCatalog documentCatalog,
-        ILogger<RagIngestionService> logger,
-        DocumentBlockReaderFactory readerFactory,
-        IImageEmbeddingService imageEmbeddingService)
-    {
-        _logger = logger;
-        _readerFactory = readerFactory;
-        _imageEmbeddingService = imageEmbeddingService;
-        _documentCatalog = documentCatalog ?? throw new ArgumentNullException(nameof(documentCatalog));
-        _blockMapper = new DocumentBlockMapper(cleaning, chunking);
-    }
+    private readonly ILogger<RagIngestionService> _logger = logger;
+    private readonly DocumentBlockReaderFactory _readerFactory = readerFactory;
+    private readonly IImageEmbeddingService _imageEmbeddingService = imageEmbeddingService;
+    private readonly DocumentBlockMapper _blockMapper = new DocumentBlockMapper(cleaning, chunking);
+    private readonly IRagDocumentCatalog _documentCatalog = documentCatalog ?? throw new ArgumentNullException(nameof(documentCatalog));
 
     /// <summary>
     /// 处理并写入指定文件内容到向量集合，返回结构化摄取结果。
@@ -75,7 +64,7 @@ public class RagIngestionService : IRagIngestionService
         {
             _logger.LogError("No block reader found for file: {File}", filePath);
             return new RagIngestionResult(0, 0,
-                new List<RagIngestionFailure> { new(0, "NoBlockReader", $"不支持的文档格式，无法读取：{Path.GetFileName(filePath)}") });
+                [new(0, "NoBlockReader", $"不支持的文档格式，无法读取：{Path.GetFileName(filePath)}")]);
         }
 
         return await IngestWithBlocksAsync(collection, collectionName, filePath, embeddingGenerator, blockReader, cancellationToken);
@@ -98,7 +87,7 @@ public class RagIngestionService : IRagIngestionService
         {
             _logger.LogWarning("Document contains no blocks: {File}", filePath);
             return new RagIngestionResult(0, 0,
-                new List<RagIngestionFailure> { new(0, "EmptyDocument", $"文档中没有可摄取的内容：{Path.GetFileName(filePath)}") });
+                [new(0, "EmptyDocument", $"文档中没有可摄取的内容：{Path.GetFileName(filePath)}")]);
         }
 
         int currentOrder = 0;

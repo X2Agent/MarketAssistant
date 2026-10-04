@@ -16,7 +16,7 @@ public partial class HotAssetsViewModel : ViewModelBase, IDisposable
     private IHomeAssetService HomeAssetService =>
         _marketContext.GetService<IHomeAssetService>();
 
-    public ObservableCollection<HotAsset> HotAssets { get; } = new();
+    public ObservableCollection<HotAsset> HotAssets { get; } = [];
 
     public event EventHandler<HotAsset>? HotAssetSelected;
 

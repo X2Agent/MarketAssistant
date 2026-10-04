@@ -32,7 +32,7 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
+        Assert.IsEmpty(result);
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(1, result.Count);
+        Assert.HasCount(1, result);
         Assert.AreEqual("result1", result[0].Record.ParagraphId);
     }
 
@@ -73,7 +73,7 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(3, result.Count);
+        Assert.HasCount(3, result);
 
         // 向量距离最小的 result2 应排第一
         Assert.AreEqual("result2", result[0].Record.ParagraphId);
@@ -104,14 +104,14 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(4, result.Count);
+        Assert.HasCount(4, result);
 
         // 相关内容（result2）应排在无关内容（result4）之前
         var resultList = result.ToList();
         var relevantIndex = resultList.FindIndex(r => r.Record.ParagraphId == "result2");
         var irrelevantIndex = resultList.FindIndex(r => r.Record.ParagraphId == "result4");
         Assert.IsTrue(relevantIndex >= 0 && irrelevantIndex >= 0, "结果应包含所有输入项");
-        Assert.IsTrue(relevantIndex < irrelevantIndex,
+        Assert.IsLessThan(irrelevantIndex, relevantIndex,
             $"相关内容 result2 应排在无关内容 result4 之前，实际顺序: {string.Join(", ", result.Select(r => r.Record.ParagraphId))}");
 
         Console.WriteLine($"Reranked results for '{query}':");
@@ -144,12 +144,12 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(15, result.Count);
+        Assert.HasCount(15, result);
 
         // 所有输入项应保留
         var originalNames = items.Select(i => i.Record.ParagraphId).OrderBy(n => n).ToArray();
         var resultNames = result.Select(r => r.Record.ParagraphId).OrderBy(n => n).ToArray();
-        CollectionAssert.AreEquivalent(originalNames, resultNames);
+        Assert.AreSequenceEqual(originalNames, resultNames, Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
 
         // 相关项（result3/6/9/12/15）整体排名应优于无关项的中位排名
         var relevantRanks = result
@@ -162,7 +162,7 @@ public class RerankerServiceTest : BaseAgentTest
             .Where(t => t.ParagraphId is "result1" or "result2" or "result4" or "result5" or "result7")
             .Select(t => t.Rank)
             .ToList();
-        Assert.IsTrue(relevantRanks.Average() < irrelevantRanks.Average(),
+        Assert.IsLessThan(irrelevantRanks.Average(), relevantRanks.Average(),
             $"相关项平均排名应优于无关项，相关项平均: {relevantRanks.Average():F2}，无关项平均: {irrelevantRanks.Average():F2}");
 
         Console.WriteLine($"Reranked large dataset for '{query}':");
@@ -186,7 +186,7 @@ public class RerankerServiceTest : BaseAgentTest
         var result = _rerankerService.Rerank(null!, items);
 
         Assert.IsNotNull(result);
-        Assert.AreEqual(1, result.Count);
+        Assert.HasCount(1, result);
     }
 
     [TestMethod]
@@ -205,7 +205,7 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(2, result.Count);
+        Assert.HasCount(2, result);
         // 向量距离最小的应排前面
         Assert.AreEqual("result2", result[0].Record.ParagraphId);
     }
@@ -227,9 +227,8 @@ public class RerankerServiceTest : BaseAgentTest
         var result = _rerankerService.Rerank(query, items);
 
         // Assert - 距离全部相同时不应颠倒原始顺序
-        CollectionAssert.AreEqual(
-            new[] { "first", "second", "third" },
-            result.Select(r => r.Record.ParagraphId).ToArray());
+        Assert.AreSequenceEqual(
+            ["first", "second", "third"], [.. result.Select(r => r.Record.ParagraphId)]);
     }
 
     [TestMethod]
@@ -251,12 +250,12 @@ public class RerankerServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(originalCount, result.Count);
+        Assert.HasCount(originalCount, result);
 
         var originalNames = items.Select(i => i.Record.ParagraphId).OrderBy(n => n).ToArray();
         var resultNames = result.Select(r => r.Record.ParagraphId).OrderBy(n => n).ToArray();
 
-        CollectionAssert.AreEquivalent(originalNames, resultNames);
+        Assert.AreSequenceEqual(originalNames, resultNames, Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     #endregion

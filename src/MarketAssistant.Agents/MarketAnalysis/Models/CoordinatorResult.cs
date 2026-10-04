@@ -61,17 +61,17 @@ public sealed class CoordinatorResult
     [MinLength(1)]
     [MaxLength(3)]
     [Description("核心的投资驱动因素，结合最新信息，避免空洞描述")]
-    public List<string> InvestmentHighlights { get; set; } = new();
+    public List<string> InvestmentHighlights { get; set; } = [];
 
     [MinLength(1)]
     [MaxLength(3)]
     [Description("主要的潜在风险，包含新识别的风险")]
-    public List<string> RiskFactors { get; set; } = new();
+    public List<string> RiskFactors { get; set; } = [];
 
     [MinLength(3)]
     [MaxLength(5)]
     [Description("可执行的操作建议，整合各分析师建议，提供具体方案（入场点、止损位、仓位管理）。例如：'建议在 45-48 元区间分批建仓（技术支撑+估值合理）'")]
-    public List<string> OperationSuggestions { get; set; } = new();
+    public List<string> OperationSuggestions { get; set; } = [];
 
     [MinLength(50)]
     [MaxLength(200)]
@@ -91,7 +91,7 @@ public sealed class CoordinatorResult
     [MinLength(6)]
     [MaxLength(10)]
     [Description("各专业分析师的自然语言分析中提取的最关键指标和数据点，数据具体、判断清晰、建议可行")]
-    public List<KeyIndicator> KeyIndicators { get; set; } = new();
+    public List<KeyIndicator> KeyIndicators { get; set; } = [];
 
     [Description("分析质量自评估，包含数据完整度、分析师一致性和局限性说明")]
     public AnalysisQualityMetrics QualityMetrics { get; set; } = new();

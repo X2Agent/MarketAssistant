@@ -13,24 +13,16 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币基础数据工具实现（使用服务层获取数据）
 /// </summary>
-public sealed class CryptoBasicTools : IBasicDataTools
+public sealed class CryptoBasicTools(
+    ILogger<CryptoBasicTools> logger,
+    BinanceMarketDataService binanceService,
+    CoinGeckoApiService coinGeckoService,
+    IUserSettingService userSettingService) : IBasicDataTools
 {
-    private readonly ILogger<CryptoBasicTools> _logger;
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly IUserSettingService _userSettingService;
-
-    public CryptoBasicTools(
-        ILogger<CryptoBasicTools> logger,
-        BinanceMarketDataService binanceService,
-        CoinGeckoApiService coinGeckoService,
-        IUserSettingService userSettingService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-    }
+    private readonly ILogger<CryptoBasicTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
 
     /// <summary>
     /// 根据资产代码获取基本数据（使用币安 API 获取 24 小时行情统计）
@@ -155,7 +147,7 @@ public sealed class CryptoBasicTools : IBasicDataTools
                 Change7dPercent = coinDetail.MarketData?.PriceChangePercentage7dInCurrency?.GetValueOrDefault("usd"),
                 Change30dPercent = coinDetail.MarketData?.PriceChangePercentage30dInCurrency?.GetValueOrDefault("usd"),
                 Rankings = ExtractRankings(coinDetail),
-                Industries = coinDetail.Categories ?? new List<string>(),
+                Industries = coinDetail.Categories ?? [],
                 ContractAddresses = ExtractContractAddresses(coinDetail)
             };
 

@@ -12,7 +12,9 @@ namespace MarketAssistant.Agents.Middleware;
 /// Token 追踪中间件，拦截 Agent 运行以估算并记录输入/输出 Token 用量。
 /// 通过 agent.AsBuilder().Use(runFunc:, runStreamingFunc:).Build() 附加到任意 AIAgent。
 /// </summary>
-public sealed class TokenTrackingMiddleware
+public sealed class TokenTrackingMiddleware(
+    ILogger<TokenTrackingMiddleware> logger,
+    ITokenUsageRecorder? tokenUsageRecorder = null)
 {
     /// <summary>
     /// AgentSession.StateBag 中累计 Token 数的键
@@ -26,16 +28,8 @@ public sealed class TokenTrackingMiddleware
     /// </summary>
     public const int MaxCumulativeTokens = 200_000;
 
-    private readonly ILogger _logger;
-    private readonly ITokenUsageRecorder? _tokenUsageRecorder;
-
-    public TokenTrackingMiddleware(
-        ILogger<TokenTrackingMiddleware> logger,
-        ITokenUsageRecorder? tokenUsageRecorder = null)
-    {
-        _logger = logger;
-        _tokenUsageRecorder = tokenUsageRecorder;
-    }
+    private readonly ILogger _logger = logger;
+    private readonly ITokenUsageRecorder? _tokenUsageRecorder = tokenUsageRecorder;
 
     /// <summary>
     /// 非流式 Agent Run 中间件

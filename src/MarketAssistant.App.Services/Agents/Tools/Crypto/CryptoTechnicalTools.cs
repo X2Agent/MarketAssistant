@@ -14,24 +14,17 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币技术分析工具实现（基于币安 K 线数据，指标计算复用 <see cref="ITechnicalIndicatorService"/>）
 /// </summary>
-public sealed class CryptoTechnicalTools : ITechnicalDataTools
+public sealed class CryptoTechnicalTools(
+    ILogger<CryptoTechnicalTools> logger,
+    [FromKeyedServices(MarketType.Crypto)] IKLineService kLineService,
+    [FromKeyedServices(MarketType.Crypto)] ITechnicalIndicatorService indicatorService) : ITechnicalDataTools
 {
     /// <summary>指标计算所需的最大 K 线根数（MA250 需要 250 根）。</summary>
     private const int IndicatorBarCount = 250;
 
-    private readonly ILogger<CryptoTechnicalTools> _logger;
-    private readonly IKLineService _kLineService;
-    private readonly ITechnicalIndicatorService _indicatorService;
-
-    public CryptoTechnicalTools(
-        ILogger<CryptoTechnicalTools> logger,
-        [FromKeyedServices(MarketType.Crypto)] IKLineService kLineService,
-        [FromKeyedServices(MarketType.Crypto)] ITechnicalIndicatorService indicatorService)
-    {
-        _logger = logger;
-        _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
-        _indicatorService = indicatorService ?? throw new ArgumentNullException(nameof(indicatorService));
-    }
+    private readonly ILogger<CryptoTechnicalTools> _logger = logger;
+    private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
+    private readonly ITechnicalIndicatorService _indicatorService = indicatorService ?? throw new ArgumentNullException(nameof(indicatorService));
 
     [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
     public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
@@ -192,7 +185,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
             var timeFormat = klineType is KLineType.Minute5 or KLineType.Minute15
                 ? "yyyy-MM-dd HH:mm" : "yyyy-MM-dd";
 
-            return klineData
+            return [.. klineData
                 .OrderBy(k => k.Timestamp)
                 .Select(k => new OhlcvBar
                 {
@@ -202,8 +195,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
                     L = k.Low,
                     C = k.Close,
                     V = k.Volume
-                })
-                .ToList();
+                })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

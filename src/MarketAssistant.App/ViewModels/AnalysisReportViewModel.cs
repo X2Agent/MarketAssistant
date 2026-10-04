@@ -13,9 +13,11 @@ namespace MarketAssistant.ViewModels;
 /// 分析报告视图模型
 /// 负责展示 MarketAnalysisReport 中的 CoordinatorResult 结构化数据
 /// </summary>
-public partial class AnalysisReportViewModel : ViewModelBase
+public partial class AnalysisReportViewModel(
+    IAnalysisCostService analysisCostService,
+    ILogger<AnalysisReportViewModel> logger) : ViewModelBase(logger)
 {
-    private readonly IAnalysisCostService _analysisCostService;
+    private readonly IAnalysisCostService _analysisCostService = analysisCostService;
     [ObservableProperty]
     private bool _isReportVisible;
 
@@ -53,11 +55,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
 
     // === 聚合的列表数据 ===
 
-    public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
+    public ObservableCollection<ScoreItem> DimensionScores { get; } = [];
 
-    public ObservableCollection<string> InvestmentHighlights { get; } = new();
-    public ObservableCollection<string> RiskFactors { get; } = new();
-    public ObservableCollection<string> OperationSuggestions { get; } = new();
+    public ObservableCollection<string> InvestmentHighlights { get; } = [];
+    public ObservableCollection<string> RiskFactors { get; } = [];
+    public ObservableCollection<string> OperationSuggestions { get; } = [];
 
     // === Coordinator 专用（意见汇总） ===
 
@@ -116,19 +118,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
     [ObservableProperty]
     private bool _tokenUsageIsEstimated;
 
-    public ObservableCollection<string> MissingDataDimensions { get; } = new();
+    public ObservableCollection<string> MissingDataDimensions { get; } = [];
 
     // === 各分析师的消息 ===
 
-    public ObservableCollection<ChatMessage> AnalystMessages { get; } = new();
-
-    public AnalysisReportViewModel(
-        IAnalysisCostService analysisCostService,
-        ILogger<AnalysisReportViewModel> logger)
-        : base(logger)
-    {
-        _analysisCostService = analysisCostService;
-    }
+    public ObservableCollection<ChatMessage> AnalystMessages { get; } = [];
 
     partial void OnOverallScoreChanged(float value)
     {

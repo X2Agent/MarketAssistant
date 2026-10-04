@@ -66,7 +66,7 @@ public class QueryRewriteService : IQueryRewriteService
     {
         if (string.IsNullOrWhiteSpace(query) || maxCandidates <= 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         try
@@ -107,7 +107,7 @@ public class QueryRewriteService : IQueryRewriteService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to rewrite query: '{Query}'", query);
-            return new[] { query };
+            return [query];
         }
     }
 
@@ -204,10 +204,9 @@ public class QueryRewriteService : IQueryRewriteService
         }
 
         // 按长度排序，长词优先
-        return keywords.Distinct(StringComparer.OrdinalIgnoreCase)
+        return [.. keywords.Distinct(StringComparer.OrdinalIgnoreCase)
                       .OrderByDescending(k => k.Length)
-                      .Take(5)
-                      .ToList();
+                      .Take(5)];
     }
 
     private static string RemoveStopWords(string query)

@@ -18,21 +18,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [RequiredAnalyst]
 [RequiresTools(typeof(IBasicDataTools))]
 [RequiresTools(typeof(IOnChainTools))]
-public class FundamentalAnalystAgent : AnalystAgentBase
+public class FundamentalAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(FundamentalAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public FundamentalAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(FundamentalAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

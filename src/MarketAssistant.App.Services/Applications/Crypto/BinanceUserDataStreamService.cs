@@ -365,14 +365,11 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
                 return;
 
             var eventType = eventTypeProp.GetString();
-            switch (eventType)
+            if (eventType == "executionReport")
             {
-                case "executionReport":
-                    var report = JsonSerializer.Deserialize<ExecutionReport>(json);
-                    if (report != null)
-                        OrderUpdate?.Invoke(report);
-                    break;
-
+                var report = JsonSerializer.Deserialize<ExecutionReport>(json);
+                if (report is not null)
+                    OrderUpdate?.Invoke(report);
             }
         }
         catch (Exception ex)

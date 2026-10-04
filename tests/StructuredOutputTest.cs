@@ -43,8 +43,8 @@ public sealed class StructuredOutputTest
             StructuredOutputMode.Text);
 
         Assert.IsNull(format);
-        StringAssert.Contains(instructions, "JSON Schema");
-        StringAssert.Contains(instructions, "criteria");
+        Assert.Contains("JSON Schema", instructions);
+        Assert.Contains("criteria", instructions);
     }
 
     [TestMethod]
@@ -60,7 +60,7 @@ public sealed class StructuredOutputTest
             StructuredOutputMode.JsonObject);
 
         Assert.AreSame(ChatResponseFormat.Json, format);
-        StringAssert.Contains(instructions, "JSON Schema");
+        Assert.Contains("JSON Schema", instructions);
     }
 
     [TestMethod]
@@ -76,9 +76,9 @@ public sealed class StructuredOutputTest
             StructuredOutputMode.JsonObject);
 
         Assert.AreSame(ChatResponseFormat.Json, format);
-        StringAssert.Contains(instructions, "JSON Schema");
-        StringAssert.Contains(instructions, "criteria");
-        StringAssert.Contains(instructions, "quoteCurrency");
+        Assert.Contains("JSON Schema", instructions);
+        Assert.Contains("criteria", instructions);
+        Assert.Contains("quoteCurrency", instructions);
     }
 
     [TestMethod]
@@ -111,8 +111,8 @@ public sealed class StructuredOutputTest
 
         var errors = StructuredOutputValidator.Validate(model);
 
-        Assert.IsTrue(errors.Any(error => error.Contains("Child.Score", StringComparison.Ordinal)));
-        Assert.IsTrue(errors.Any(error => error.Contains("Child.Direction", StringComparison.Ordinal)));
+        Assert.Contains(error => error.Contains("Child.Score", StringComparison.Ordinal), errors);
+        Assert.Contains(error => error.Contains("Child.Direction", StringComparison.Ordinal), errors);
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public sealed class StructuredOutputTest
         var exception = Assert.Throws<InvalidOperationException>(
             () => strategy.DeserializeCriteria(json, request));
 
-        StringAssert.Contains(exception.Message, "不支持的指标");
+        Assert.Contains("不支持的指标", exception.Message);
     }
 
     [TestMethod]
@@ -175,7 +175,7 @@ public sealed class StructuredOutputTest
         var exception = Assert.Throws<InvalidOperationException>(
             () => strategy.DeserializeCriteria(json, request));
 
-        StringAssert.Contains(exception.Message, "不能大于最大值");
+        Assert.Contains("不能大于最大值", exception.Message);
     }
 
     [TestMethod]
@@ -201,15 +201,15 @@ public sealed class StructuredOutputTest
             .ToHashSet();
 
         Assert.HasCount(6, parserRegistrations);
-        Assert.IsTrue(parserRegistrations.Contains(typeof(CoordinatorCardParser)));
-        Assert.IsTrue(parserRegistrations.Contains(typeof(FinancialCardParser)));
-        Assert.IsTrue(parserRegistrations.Contains(typeof(FundamentalCardParser)));
-        Assert.IsTrue(parserRegistrations.Contains(typeof(SentimentCardParser)));
-        Assert.IsTrue(parserRegistrations.Contains(typeof(NewsCardParser)));
-        Assert.IsTrue(parserRegistrations.Contains(typeof(TechnicalCardParser)));
+        Assert.Contains(typeof(CoordinatorCardParser), parserRegistrations);
+        Assert.Contains(typeof(FinancialCardParser), parserRegistrations);
+        Assert.Contains(typeof(FundamentalCardParser), parserRegistrations);
+        Assert.Contains(typeof(SentimentCardParser), parserRegistrations);
+        Assert.Contains(typeof(NewsCardParser), parserRegistrations);
+        Assert.Contains(typeof(TechnicalCardParser), parserRegistrations);
 
         // 转换器消费整条解析器责任链，必须与解析器同容器注册
-        Assert.IsTrue(services.Any(descriptor => descriptor.ServiceType == typeof(AdaptiveCardConverter)));
+        Assert.Contains(descriptor => descriptor.ServiceType == typeof(AdaptiveCardConverter), services);
     }
 
     [TestMethod]

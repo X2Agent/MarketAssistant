@@ -9,9 +9,11 @@ using System.Collections.ObjectModel;
 
 namespace MarketAssistant.ViewModels.Home;
 
-public partial class HomeSearchViewModel : ViewModelBase, IDisposable
+public partial class HomeSearchViewModel(
+    MarketContext marketContext,
+    ILogger<HomeSearchViewModel> logger) : ViewModelBase(logger), IDisposable
 {
-    private readonly MarketContext _marketContext;
+    private readonly MarketContext _marketContext = marketContext;
     private CancellationTokenSource? _debounceCts;
     private const int DebounceDelayMs = 200;
 
@@ -43,17 +45,9 @@ public partial class HomeSearchViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private AssetItem? _selectedResult;
 
-    public ObservableCollection<AssetItem> SearchResults { get; } = new();
+    public ObservableCollection<AssetItem> SearchResults { get; } = [];
 
     public event EventHandler<AssetItem>? AssetSelected;
-
-    public HomeSearchViewModel(
-        MarketContext marketContext,
-        ILogger<HomeSearchViewModel> logger)
-        : base(logger)
-    {
-        _marketContext = marketContext;
-    }
 
     /// <summary>
     /// 当 SearchQuery 变化时自动触发搜索（带200毫秒防抖）

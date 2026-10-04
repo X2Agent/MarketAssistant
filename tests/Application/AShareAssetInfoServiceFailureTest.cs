@@ -44,7 +44,7 @@ public class AShareAssetInfoServiceFailureTest
 
         var exception = await Assert.ThrowsExactlyAsync<FriendlyException>(() => service.SearchAsync("茅台"));
 
-        StringAssert.Contains(exception.Message, "搜索股票失败");
+        Assert.Contains("搜索股票失败", exception.Message);
     }
 
     [TestMethod]
@@ -99,7 +99,7 @@ public class AShareAssetInfoServiceFailureTest
         var exception = await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetAssetInfoAsync("600519", "SH"));
 
-        StringAssert.Contains(exception.Message, "获取股票信息失败");
+        Assert.Contains("获取股票信息失败", exception.Message);
     }
 
     [TestMethod]

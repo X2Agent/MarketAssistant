@@ -54,13 +54,13 @@ public class HomeSearchErrorStateTest
         vm.SearchErrorMessage = "搜索资产失败：网络连接超时";
 
         Assert.IsTrue(vm.HasSearchError);
-        CollectionAssert.Contains(changed, nameof(HomeSearchViewModel.HasSearchError));
+        Assert.Contains(nameof(HomeSearchViewModel.HasSearchError), changed);
 
         changed.Clear();
         vm.SearchErrorMessage = string.Empty;
 
         Assert.IsFalse(vm.HasSearchError);
-        CollectionAssert.Contains(changed, nameof(HomeSearchViewModel.HasSearchError));
+        Assert.Contains(nameof(HomeSearchViewModel.HasSearchError), changed);
     }
 
     [TestMethod]
@@ -74,7 +74,7 @@ public class HomeSearchErrorStateTest
 
         Assert.AreEqual(string.Empty, vm.SearchErrorMessage);
         Assert.IsFalse(vm.HasSearchError);
-        Assert.AreEqual(0, vm.SearchResults.Count);
+        Assert.IsEmpty(vm.SearchResults);
         Assert.IsNull(vm.SelectedResult);
         Assert.IsFalse(vm.IsSearchResultVisible);
         Assert.IsFalse(vm.IsSearching);
@@ -107,7 +107,7 @@ public class HomeSearchErrorStateTest
         Assert.IsFalse(vm.HasSearchError);
         Assert.AreEqual(string.Empty, vm.SearchErrorMessage);
         Assert.AreEqual(string.Empty, vm.SearchQuery);
-        Assert.AreEqual(0, vm.SearchResults.Count);
+        Assert.IsEmpty(vm.SearchResults);
         Assert.IsNull(vm.SelectedResult);
         Assert.IsFalse(vm.IsSearchResultVisible);
         Assert.IsFalse(vm.IsSearching);

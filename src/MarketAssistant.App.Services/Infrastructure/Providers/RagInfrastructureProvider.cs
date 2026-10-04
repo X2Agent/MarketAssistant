@@ -8,14 +8,9 @@ namespace MarketAssistant.Infrastructure.Providers;
 /// <summary>
 /// 基于 DI 容器的 RAG 基础设施提供者实现，首次调用时才触发对应单例链的构造。
 /// </summary>
-public sealed class RagInfrastructureProvider : IRagInfrastructureProvider
+public sealed class RagInfrastructureProvider(IServiceProvider serviceProvider) : IRagInfrastructureProvider
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public RagInfrastructureProvider(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     public IEmbeddingFactory GetEmbeddingFactory()
         => _serviceProvider.GetRequiredService<IEmbeddingFactory>();

@@ -41,8 +41,8 @@ public class LocalImageStorageServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(File.Exists(result));
-        Assert.IsTrue(result.Contains("test-image"));
-        Assert.IsTrue(result.EndsWith(".png"));
+        Assert.Contains("test-image", result);
+        Assert.EndsWith(".png", result);
     }
 
     [TestMethod]
@@ -58,7 +58,7 @@ public class LocalImageStorageServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(File.Exists(result));
-        Assert.IsTrue(result.EndsWith(".png"));
+        Assert.EndsWith(".png", result);
     }
 
     [TestMethod]
@@ -74,7 +74,7 @@ public class LocalImageStorageServiceTest
         // Assert
         Assert.IsNotNull(result);
         Assert.IsTrue(File.Exists(result));
-        Assert.IsTrue(result.EndsWith(".png"));
+        Assert.EndsWith(".png", result);
     }
 
     [TestMethod]
@@ -99,7 +99,7 @@ public class LocalImageStorageServiceTest
 
         // Verify the file content matches the second save (overwritten)
         var savedBytes = await File.ReadAllBytesAsync(result2);
-        CollectionAssert.AreEqual(imageBytes2, savedBytes);
+        Assert.AreSequenceEqual(imageBytes2, savedBytes);
     }
 
     [TestMethod]
@@ -138,7 +138,7 @@ public class LocalImageStorageServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.EndsWith(".png"));
+        Assert.EndsWith(".png", result);
         Assert.IsTrue(File.Exists(result));
     }
 
@@ -156,7 +156,7 @@ public class LocalImageStorageServiceTest
         // Assert
         Assert.IsNotNull(result);
         var fileName = Path.GetFileName(result);
-        Assert.IsTrue(fileName.Length <= 255);
+        Assert.IsLessThanOrEqualTo(255, fileName.Length);
         Assert.IsTrue(File.Exists(result));
     }
 
@@ -175,7 +175,7 @@ public class LocalImageStorageServiceTest
     {
         // Act & Assert
         await Assert.ThrowsExactlyAsync<ArgumentException>(
-            () => _service.SaveImageAsync(Array.Empty<byte>(), "test.png", _testDocumentPath));
+            () => _service.SaveImageAsync([], "test.png", _testDocumentPath));
     }
 
     [TestMethod]

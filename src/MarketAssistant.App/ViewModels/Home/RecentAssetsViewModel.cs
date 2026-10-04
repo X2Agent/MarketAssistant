@@ -24,7 +24,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     private IAssetInfoService AssetInfoService =>
         _marketContext.GetService<IAssetInfoService>();
 
-    public ObservableCollection<AssetItem> RecentAssets { get; } = new();
+    public ObservableCollection<AssetItem> RecentAssets { get; } = [];
 
     public event EventHandler<AssetItem>? RecentAssetSelected;
 

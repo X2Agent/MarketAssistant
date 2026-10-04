@@ -48,14 +48,16 @@ public sealed record ChatClientRuntime(
 /// ChatClient 工厂实现
 /// 根据用户配置创建并缓存官方 SDK 提供的 IChatClient。
 /// </summary>
-public class ChatClientFactory : IChatClientFactory
+public class ChatClientFactory(
+    IUserSettingService userSettingService,
+    IHttpClientFactory httpClientFactory) : IChatClientFactory
 {
     // 按角色分配模型后，同一次分析可能同时持有默认 Runtime + 若干角色 Runtime，
     // 故上限需覆盖"默认 + 全部可分配角色"（当前分析师角色约 8 个），16 已不够用。
     protected const int MaxCachedRuntimes = 32;
 
-    private readonly IUserSettingService _userSettingService;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
 
@@ -63,14 +65,6 @@ public class ChatClientFactory : IChatClientFactory
     // 必须记入此列表统一释放，否则每个缓存 runtime 悬挂一个连接池
     private readonly List<HttpClient> _httpClients = [];
     private bool _disposed;
-
-    public ChatClientFactory(
-        IUserSettingService userSettingService,
-        IHttpClientFactory httpClientFactory)
-    {
-        _userSettingService = userSettingService;
-        _httpClientFactory = httpClientFactory;
-    }
 
     public IChatClient CreateClient() => CreateRuntime().Client;
 

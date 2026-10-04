@@ -41,9 +41,7 @@ public class HomeSearchViewModelTest
     }
 
     private static List<AssetItem> CreateResults(int count)
-        => Enumerable.Range(1, count)
-            .Select(i => new AssetItem { Name = $"资产{i}", Code = $"CODE{i:000}" })
-            .ToList();
+        => [.. Enumerable.Range(1, count).Select(i => new AssetItem { Name = $"资产{i}", Code = $"CODE{i:000}" })];
 
     [TestMethod]
     public void MoveSelection_WithNoResults_ShouldReturnFalse()
@@ -129,7 +127,7 @@ public class HomeSearchViewModelTest
         vm.ClearSearch();
 
         Assert.AreEqual(string.Empty, vm.SearchQuery);
-        Assert.AreEqual(0, vm.SearchResults.Count);
+        Assert.IsEmpty(vm.SearchResults);
         Assert.IsNull(vm.SelectedResult);
         Assert.IsFalse(vm.IsSearchResultVisible);
         Assert.IsFalse(vm.IsSearching);

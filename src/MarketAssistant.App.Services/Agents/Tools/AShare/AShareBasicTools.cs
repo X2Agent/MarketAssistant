@@ -12,7 +12,11 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股基础数据工具实现
 /// </summary>
-public sealed class AShareBasicTools : IBasicDataTools
+public sealed class AShareBasicTools(
+    ClsQuoteClient clsClient,
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareBasicTools> logger) : IBasicDataTools
 {
     /// <summary>CLS 行情接口请求字段列表。</summary>
     private const string QuoteFields =
@@ -20,22 +24,10 @@ public sealed class AShareBasicTools : IBasicDataTools
         "TotalShares,mc,NetAssetPS,NonRestrictedShares,cmc,business_amount,business_balance,pe,ttm_pe,pb," +
         "secu_name,secu_code,trade_status,secu_type,preclose_px,up_price,last_px";
 
-    private readonly ClsQuoteClient _clsClient;
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareBasicTools> _logger;
-
-    public AShareBasicTools(
-        ClsQuoteClient clsClient,
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareBasicTools> logger)
-    {
-        _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareBasicTools> _logger = logger;
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
     public async Task<StockQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
@@ -95,7 +87,7 @@ public sealed class AShareBasicTools : IBasicDataTools
     {
         try
         {
-            assetSymbol = new string(assetSymbol.Where(char.IsDigit).ToArray());
+            assetSymbol = new string([.. assetSymbol.Where(char.IsDigit)]);
 
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var info = await _zhiTuClient.GetCompanyInfoAsync<CompanyInfo>(assetSymbol, token, cancellationToken);

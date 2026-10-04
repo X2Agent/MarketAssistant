@@ -7,18 +7,12 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// 根据当前交易模式在实盘/模拟盘/Demo/合约客户端之间路由。
 /// 通过字典查找活跃客户端，新增模式只需在字典中注册，无需修改路由逻辑。
 /// </summary>
-public sealed class RoutingExchangeClient : IExchangeClient
+public sealed class RoutingExchangeClient(
+    TradingEnvironmentService environmentService,
+    IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> clients) : IExchangeClient
 {
-    private readonly TradingEnvironmentService _environmentService;
-    private readonly IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> _clients;
-
-    public RoutingExchangeClient(
-        TradingEnvironmentService environmentService,
-        IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> clients)
-    {
-        _environmentService = environmentService;
-        _clients = clients;
-    }
+    private readonly TradingEnvironmentService _environmentService = environmentService;
+    private readonly IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> _clients = clients;
 
     public string ExchangeName => GetActiveClient().ExchangeName;
 

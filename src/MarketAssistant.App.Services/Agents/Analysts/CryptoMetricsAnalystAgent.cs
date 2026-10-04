@@ -18,21 +18,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [Description("专注于加密资产的市场指标分析：市值、供应量、流动性分布与波动性")]
 [RequiresTools(typeof(IFinancialTools))]
 [SupportedMarkets(MarketType.Crypto)]
-public class CryptoMetricsAnalystAgent : AnalystAgentBase
+public class CryptoMetricsAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(CryptoMetricsAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public CryptoMetricsAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(CryptoMetricsAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

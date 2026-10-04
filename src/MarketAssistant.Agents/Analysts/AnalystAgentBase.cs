@@ -9,7 +9,19 @@ namespace MarketAssistant.Agents.Analysts;
 /// 分析师代理抽象基类
 /// 继承 DelegatingAIAgent，提供统一的 Agent 创建和配置管理
 /// </summary>
-public abstract class AnalystAgentBase : DelegatingAIAgent
+public abstract class AnalystAgentBase(
+    IChatClient chatClient,
+    string instructions,
+    string name,
+    string description,
+    float temperature,
+    float topP,
+    int? topK,
+    Type resultType,
+    StructuredOutputMode structuredOutputMode,
+    IList<AITool>? tools,
+    AIContextProvider[]? aiContextProviders = null) : DelegatingAIAgent(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
+            temperature, topP, topK, resultType, structuredOutputMode, tools, aiContextProviders))
 {
     /// <summary>
     /// 通用数据真实性约束指令
@@ -20,23 +32,6 @@ public abstract class AnalystAgentBase : DelegatingAIAgent
 2. **严禁编造数据**：绝对禁止编造数值、捏造事实或臆造不存在的市场情况。如果不知道，就说不知道。
 3. **缺失数据处理**：如果工具未能提供所需数据，或者数据不完整，必须在分析结果中明确说明""缺少数据支持""或""数据不可用""，不得进行无依据的猜测或试图掩盖。
 4. **拒绝幻觉**：对于未通过工具验证的信息，保持怀疑态度，不要将其作为分析依据。";
-
-    protected AnalystAgentBase(
-        IChatClient chatClient,
-        string instructions,
-        string name,
-        string description,
-        float temperature,
-        float topP,
-        int? topK,
-        Type resultType,
-        StructuredOutputMode structuredOutputMode,
-        IList<AITool>? tools,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(CreateInnerAgent(chatClient, instructions + DataIntegrityInstructions, name, description,
-            temperature, topP, topK, resultType, structuredOutputMode, tools, aiContextProviders))
-    {
-    }
 
     /// <summary>
     /// 初始化分析师代理基类（从 YAML 配置读取 name、description、temperature、topP、topK、instructions）

@@ -40,7 +40,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
         {
             lock (_syncRoot)
             {
-                return _rules.ToList();
+                return [.. _rules];
             }
         }
     }
@@ -281,9 +281,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
         List<PriceAlertRule> rules;
         lock (_syncRoot)
         {
-            rules = _rules
-                .Where(r => r.MarketType == MarketType.Crypto && r.Enabled)
-                .ToList();
+            rules = [.. _rules.Where(r => r.MarketType == MarketType.Crypto && r.Enabled)];
         }
 
         foreach (var rule in rules)
@@ -306,17 +304,13 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
                 List<PriceAlertRule> rules;
                 lock (_syncRoot)
                 {
-                    rules = _rules
-                        .Where(r => r.MarketType == MarketType.AShare && r.Enabled)
-                        .ToList();
+                    rules = [.. _rules.Where(r => r.MarketType == MarketType.AShare && r.Enabled)];
                 }
 
                 // 非交易时段仅评估确认级规则：休市行情无变化，普通规则反复触发无行动价值且浪费轮询请求；
                 // 确认级规则映射为 Critical 告警，需保证交易联动门及时登记（弹窗静默由告警中心统一处理）
                 if (!AShareTradingHours.IsTradingSession())
-                    rules = rules
-                        .Where(r => r.TradingImpact == AlertTradingImpact.RequireConfirmation)
-                        .ToList();
+                    rules = [.. rules.Where(r => r.TradingImpact == AlertTradingImpact.RequireConfirmation)];
 
                 if (rules.Count == 0)
                     continue;
@@ -500,11 +494,10 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
             List<string> symbols;
             lock (_syncRoot)
             {
-                symbols = _rules
+                symbols = [.. _rules
                     .Where(r => r.MarketType == MarketType.Crypto && r.Enabled)
                     .Select(r => ToBinanceFormat(r.AssetCode))
-                    .Distinct()
-                    .ToList();
+                    .Distinct()];
             }
 
             await _wsService.SubscribeAsync(WebSocketSubscriberKeys.PriceAlerts, symbols);

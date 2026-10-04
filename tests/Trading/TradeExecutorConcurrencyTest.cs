@@ -75,9 +75,9 @@ public sealed class TradeExecutorConcurrencyTest
 
         Assert.AreEqual(1, succeeded, "同一持仓的两笔并发卖出只允许一笔成交");
         Assert.AreEqual(1, rejected, "第二笔必须被锁内复检拒绝");
-        Assert.IsTrue(
-            results.Where(result => !result.Success).Any(result =>
-                result.ErrorMessage?.Contains("并发校验失败", StringComparison.Ordinal) == true),
+        Assert.Contains(
+            result =>
+                result.ErrorMessage?.Contains("并发校验失败", StringComparison.Ordinal) == true, results.Where(result => !result.Success),
             "拒绝原因应明确指向并发校验");
         exchangeClient.Verify(
             client => client.PlaceOrderAsync(
@@ -126,7 +126,7 @@ public sealed class TradeExecutorConcurrencyTest
             "UNKNOWNQUOTE", OrderSide.Sell, 0.1m, 100m, OrderType.Market);
 
         Assert.IsFalse(result.Passed, "无法解析基础资产时卖出校验必须 fail-closed");
-        StringAssert.Contains(result.Reason ?? string.Empty, "fail-closed");
+        Assert.Contains("fail-closed", result.Reason ?? string.Empty);
     }
 
     private static Position CreatePosition(decimal remainingQuantity)

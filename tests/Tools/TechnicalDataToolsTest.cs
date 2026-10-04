@@ -104,7 +104,7 @@ public class TechnicalDataToolsTest
         Assert.IsTrue(indicator.J.HasValue, "J 值不应为空");
         // KDJ 公式：J = 3K - 2D
         var expectedJ = 3m * indicator.K!.Value - 2m * indicator.D!.Value;
-        Assert.IsTrue(Math.Abs(expectedJ - indicator.J!.Value) < 0.1m,
+        Assert.IsLessThan(0.1m, Math.Abs(expectedJ - indicator.J!.Value),
             $"J({indicator.J}) 应满足 J=3K-2D={expectedJ}，K={indicator.K}, D={indicator.D}");
         TestContext?.WriteLine($"SH600519 KDJ: K={indicator.K}, D={indicator.D}, J={indicator.J}, 日期={indicator.T}");
     }
@@ -124,10 +124,10 @@ public class TechnicalDataToolsTest
         Assert.AreNotEqual(0m, indicator.Ema12, $"Ema12 不应为 0，实际: {indicator.Ema12}");
         Assert.AreNotEqual(0m, indicator.Ema26, $"Ema26 不应为 0，实际: {indicator.Ema26}");
         // MACD 公式：Diff = Ema12 - Ema26
-        Assert.IsTrue(Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff) < 0.01m,
+        Assert.IsLessThan(0.01m, Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff),
             $"Diff({indicator.Diff}) 应等于 Ema12({indicator.Ema12}) - Ema26({indicator.Ema26})");
         // MACD 公式：Macd = 2 * (Diff - Dea)
-        Assert.IsTrue(Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd) < 0.01m,
+        Assert.IsLessThan(0.01m, Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd),
             $"Macd({indicator.Macd}) 应等于 2*(Diff({indicator.Diff}) - Dea({indicator.Dea}))");
         TestContext?.WriteLine($"SH600519 MACD: Diff={indicator.Diff}, Dea={indicator.Dea}, Macd={indicator.Macd}, Ema12={indicator.Ema12}, Ema26={indicator.Ema26}, 日期={indicator.T}");
     }
@@ -166,8 +166,8 @@ public class TechnicalDataToolsTest
         Assert.IsNotNull(indicator, "MA 指标不应为空");
         Assert.IsTrue(indicator.MA5.HasValue, "MA5 不应为空");
         Assert.IsTrue(indicator.MA20.HasValue, "MA20 不应为空");
-        Assert.IsTrue(indicator.MA5!.Value > 0, $"MA5 应为正数，实际: {indicator.MA5}");
-        Assert.IsTrue(indicator.MA20!.Value > 0, $"MA20 应为正数，实际: {indicator.MA20}");
+        Assert.IsGreaterThan(0, indicator.MA5!.Value, $"MA5 应为正数，实际: {indicator.MA5}");
+        Assert.IsGreaterThan(0, indicator.MA20!.Value, $"MA20 应为正数，实际: {indicator.MA20}");
         TestContext?.WriteLine($"SH600519 MA: MA5={indicator.MA5}, MA10={indicator.MA10}, MA20={indicator.MA20}, MA30={indicator.MA30}, 日期={indicator.T}");
     }
 
@@ -192,7 +192,7 @@ public class TechnicalDataToolsTest
         Assert.IsTrue(indicator.J.HasValue, "J 值不应为空");
         // KDJ 公式：J = 3K - 2D
         var expectedJ = 3m * indicator.K!.Value - 2m * indicator.D!.Value;
-        Assert.IsTrue(Math.Abs(expectedJ - indicator.J!.Value) < 0.1m,
+        Assert.IsLessThan(0.1m, Math.Abs(expectedJ - indicator.J!.Value),
             $"J({indicator.J}) 应满足 J=3K-2D={expectedJ}，K={indicator.K}, D={indicator.D}");
         TestContext?.WriteLine($"BTCUSDT KDJ: K={indicator.K}, D={indicator.D}, J={indicator.J}, 日期={indicator.T}");
     }
@@ -212,10 +212,10 @@ public class TechnicalDataToolsTest
         Assert.AreNotEqual(0m, indicator.Ema12, $"Ema12 不应为 0，实际: {indicator.Ema12}");
         Assert.AreNotEqual(0m, indicator.Ema26, $"Ema26 不应为 0，实际: {indicator.Ema26}");
         // MACD 公式：Diff = Ema12 - Ema26
-        Assert.IsTrue(Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff) < 0.01m,
+        Assert.IsLessThan(0.01m, Math.Abs((indicator.Ema12 - indicator.Ema26) - indicator.Diff),
             $"Diff({indicator.Diff}) 应等于 Ema12({indicator.Ema12}) - Ema26({indicator.Ema26})");
         // MACD 公式：Macd = 2 * (Diff - Dea)
-        Assert.IsTrue(Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd) < 0.01m,
+        Assert.IsLessThan(0.01m, Math.Abs(2m * (indicator.Diff - indicator.Dea) - indicator.Macd),
             $"Macd({indicator.Macd}) 应等于 2*(Diff({indicator.Diff}) - Dea({indicator.Dea}))");
         TestContext?.WriteLine($"BTCUSDT MACD: Diff={indicator.Diff}, Dea={indicator.Dea}, Macd={indicator.Macd}, Ema12={indicator.Ema12}, Ema26={indicator.Ema26}, 日期={indicator.T}");
     }
@@ -254,8 +254,8 @@ public class TechnicalDataToolsTest
         Assert.IsNotNull(indicator, "MA 指标不应为空");
         Assert.IsTrue(indicator.MA5.HasValue, "MA5 不应为空");
         Assert.IsTrue(indicator.MA20.HasValue, "MA20 不应为空");
-        Assert.IsTrue(indicator.MA5!.Value > 0, $"MA5 应为正数，实际: {indicator.MA5}");
-        Assert.IsTrue(indicator.MA20!.Value > 0, $"MA20 应为正数，实际: {indicator.MA20}");
+        Assert.IsGreaterThan(0, indicator.MA5!.Value, $"MA5 应为正数，实际: {indicator.MA5}");
+        Assert.IsGreaterThan(0, indicator.MA20!.Value, $"MA20 应为正数，实际: {indicator.MA20}");
         TestContext?.WriteLine($"BTCUSDT MA: MA5={indicator.MA5}, MA10={indicator.MA10}, MA20={indicator.MA20}, MA30={indicator.MA30}, 日期={indicator.T}");
     }
 

@@ -25,7 +25,7 @@ public sealed class DailyBriefingServiceTest
     private const string StubReplyContent = "TESTBRIEF 隔夜要闻：测试。";
     private const string StubModelId = "stub-model";
 
-    private static List<ChatMessage> _capturedRequests = new();
+    private static List<ChatMessage> _capturedRequests = [];
     private static int _requestCount;
 
     private sealed class StubChatClient : IChatClient
@@ -118,7 +118,7 @@ public sealed class DailyBriefingServiceTest
 
     private static void ResetCounters()
     {
-        _capturedRequests = new List<ChatMessage>();
+        _capturedRequests = [];
         _requestCount = 0;
     }
 
@@ -229,8 +229,8 @@ public sealed class DailyBriefingServiceTest
             "自选条数应钳制在预算内");
         Assert.AreEqual(DailyBriefingService.MaxNewsItems, CountBulletLines(newsSection),
             "要闻条数应钳制在预算内");
-        Assert.IsTrue(prompt.Contains("x…"), "超长要闻正文应被截断");
-        StringAssert.Contains(prompt, "禁止编造", "提示词应包含防幻觉约束");
+        Assert.Contains("x…", prompt, "超长要闻正文应被截断");
+        Assert.Contains("禁止编造", prompt, "提示词应包含防幻觉约束");
     }
 
     private static int CountBulletLines(string section)

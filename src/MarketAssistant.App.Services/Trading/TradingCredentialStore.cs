@@ -197,7 +197,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
         var json = Encoding.UTF8.GetString(plaintextBytes);
         var entries = JsonSerializer.Deserialize<Dictionary<CryptoTradingMode, CredentialEntry>>(json)
-               ?? new Dictionary<CryptoTradingMode, CredentialEntry>();
+               ?? [];
         return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>(entries);
     }
 

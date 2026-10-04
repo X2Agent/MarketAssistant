@@ -16,27 +16,19 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 统一的资产分析 Executor
 /// 对筛选出的资产进行深度分析并生成推荐报告
 /// </summary>
-public sealed partial class AnalyzeAssetsExecutor : Executor
+public sealed partial class AnalyzeAssetsExecutor(
+    IChatClientFactory chatClientFactory,
+    IServiceProvider serviceProvider,
+    ILogger<AnalyzeAssetsExecutor> logger) : Executor("AnalyzeAssets")
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<AnalyzeAssetsExecutor> _logger;
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<AnalyzeAssetsExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
     {
         PropertyNameCaseInsensitive = true
     };
-
-    public AnalyzeAssetsExecutor(
-        IChatClientFactory chatClientFactory,
-        IServiceProvider serviceProvider,
-        ILogger<AnalyzeAssetsExecutor> logger)
-        : base("AnalyzeAssets")
-    {
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     [MessageHandler]
     private async ValueTask<InvestmentSelectionResult> HandleAsync(
@@ -250,12 +242,12 @@ public sealed partial class AnalyzeAssetsExecutor : Executor
         return new InvestmentSelectionResult
         {
             SelectionType = SelectionType.UserRequest,
-            Recommendations = new List<InvestmentRecommendation>(),
+            Recommendations = [],
             ConfidenceScore = 0,
             AnalysisSummary = message,
             MarketEnvironmentAnalysis = "无可用分析",
             InvestmentAdvice = "建议重新尝试分析",
-            RiskWarnings = new List<string> { "分析失败，请联系技术支持" }
+            RiskWarnings = ["分析失败，请联系技术支持"]
         };
     }
 }

@@ -17,7 +17,7 @@ public class DialogService : IDialogService
     /// </summary>
     public async Task ShowMessageAsync(string title, string message, string button = "确定")
     {
-        await ShowCustomDialogAsync(title, message, new[] { button });
+        await ShowCustomDialogAsync(title, message, [button]);
     }
 
     /// <summary>
@@ -27,7 +27,7 @@ public class DialogService : IDialogService
     /// <returns>如果用户点击确认返回 true，点击取消返回 false</returns>
     public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default, bool topmost = false)
     {
-        var result = await ShowCustomDialogAsync(title, message, new[] { accept, cancel }, ct, topmost);
+        var result = await ShowCustomDialogAsync(title, message, [accept, cancel], ct, topmost);
         return result == accept;
     }
 

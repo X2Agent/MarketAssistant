@@ -6,14 +6,9 @@ namespace MarketAssistant.Services;
 /// <summary>
 /// 工作流可视化服务，将 MAF Workflow 导出为 Mermaid 图表
 /// </summary>
-public class WorkflowVisualizationService
+public class WorkflowVisualizationService(ILogger<WorkflowVisualizationService> logger)
 {
-    private readonly ILogger<WorkflowVisualizationService> _logger;
-
-    public WorkflowVisualizationService(ILogger<WorkflowVisualizationService> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<WorkflowVisualizationService> _logger = logger;
 
     /// <summary>
     /// 将工作流导出为 Mermaid 格式图表

@@ -10,22 +10,16 @@ namespace MarketAssistant.Services.Mcp;
 /// 无需调用方手动管理工具加载和传递。
 /// 支持缓存、按需刷新和连接状态监控。
 /// </summary>
-public sealed class McpToolContextProvider : AIContextProvider
+public sealed class McpToolContextProvider(
+    McpService mcpService,
+    ILogger<McpToolContextProvider> logger) : AIContextProvider
 {
-    private readonly McpService _mcpService;
-    private readonly ILogger<McpToolContextProvider> _logger;
+    private readonly McpService _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
+    private readonly ILogger<McpToolContextProvider> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     private List<AITool>? _cachedTools;
     private bool _invalidated;
-
-    public McpToolContextProvider(
-        McpService mcpService,
-        ILogger<McpToolContextProvider> logger)
-    {
-        _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 已加载的 MCP 工具数量

@@ -57,6 +57,47 @@ public sealed class AnalystSignalParserTest
         }
         """;
 
+    private const string TechnicalJsonWithConfidenceAndHorizon = """
+        {
+          "strategy": {
+            "technicalRating": "Buy",
+            "operationDirection": "Buy",
+            "holdingPeriod": "MediumTerm",
+            "confidencePercentage": 72.5
+          }
+        }
+        """;
+
+    private const string NewsJsonWithConfidenceAndHorizon = """
+        {
+          "eventAnalysis": {
+            "eventNature": "Positive",
+            "confidencePercentage": 88
+          },
+          "impactEvaluation": {
+            "impactDuration": "LongTerm"
+          }
+        }
+        """;
+
+    private const string TechnicalJsonWithOutOfRangeConfidence = """
+        {
+          "strategy": {
+            "technicalRating": "Buy",
+            "confidencePercentage": 150
+          }
+        }
+        """;
+
+    private const string TechnicalJsonWithNegativeConfidence = """
+        {
+          "strategy": {
+            "technicalRating": "Buy",
+            "confidencePercentage": -5
+          }
+        }
+        """;
+
     [TestMethod]
     [TestCategory("Unit")]
     public void Parse_TechnicalAnalystJson_ShouldMapRatingPricesAndStop()
@@ -127,6 +168,55 @@ public sealed class AnalystSignalParserTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public void Parse_ConfidenceAndHorizon_ShouldMapFromStructuredOutput()
+    {
+        var technical = AnalystSignalParser.Parse(AnalystNames.Technical, TechnicalJsonWithConfidenceAndHorizon);
+
+        Assert.IsNotNull(technical);
+        Assert.AreEqual(72.5f, technical.Confidence, "技术分析师置信度取自策略结论");
+        Assert.AreEqual(Duration.MediumTerm, technical.Horizon, "持仓周期直接映射为回测持有窗口");
+
+        var news = AnalystSignalParser.Parse(AnalystNames.News, NewsJsonWithConfidenceAndHorizon);
+
+        Assert.IsNotNull(news);
+        Assert.AreEqual(88f, news.Confidence);
+        Assert.AreEqual(Duration.LongTerm, news.Horizon, "新闻影响持续时长映射为回测持有窗口");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void Parse_MissingConfidenceAndHorizon_ShouldKeepNullWithoutInferring()
+    {
+        var technical = AnalystSignalParser.Parse(AnalystNames.Technical, TechnicalJson);
+        Assert.IsNotNull(technical);
+        Assert.IsNull(technical.Confidence, "未给出置信度必须保持 null");
+        Assert.IsNull(technical.Horizon, "未给出持仓周期必须保持 null，不得默认为短期");
+
+        var news = AnalystSignalParser.Parse(AnalystNames.News, NewsJson);
+        Assert.IsNotNull(news);
+        Assert.IsNull(news.Confidence);
+        Assert.IsNull(news.Horizon, "未给出影响持续时长必须保持 null");
+
+        Assert.IsNull(AnalystSignalParser.Parse(AnalystNames.Fundamental, FundamentalJson)?.Confidence);
+        Assert.IsNull(AnalystSignalParser.Parse(AnalystNames.Sentiment, SentimentJson)?.Confidence);
+        Assert.IsNull(AnalystSignalParser.Parse(AnalystNames.Financial, FinancialJsonWithoutRating)?.Confidence);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void Parse_ConfidenceOutOfRange_ShouldClampToBucketRange()
+    {
+        var tooHigh = AnalystSignalParser.Parse(AnalystNames.Technical, TechnicalJsonWithOutOfRangeConfidence);
+        Assert.IsNotNull(tooHigh);
+        Assert.AreEqual(100f, tooHigh.Confidence, "越界置信度应钳制到 100 而非污染分桶");
+
+        var negative = AnalystSignalParser.Parse(AnalystNames.Technical, TechnicalJsonWithNegativeConfidence);
+        Assert.IsNotNull(negative);
+        Assert.AreEqual(0f, negative.Confidence, "负置信度应钳制到 0");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public void ExtractSignals_ShouldSkipSystemAndFailedMessagesInOrder()
     {
         var messages = new List<ChatMessage>
@@ -140,7 +230,7 @@ public sealed class AnalystSignalParserTest
 
         var signals = AnalystSignalParser.ExtractSignals(messages);
 
-        Assert.AreEqual(2, signals.Count);
+        Assert.HasCount(2, signals);
         Assert.AreEqual(AnalystNames.Technical, signals[0].AnalystName);
         Assert.AreEqual(AnalystNames.Sentiment, signals[1].AnalystName);
         Assert.AreEqual(OperationRecommendation.Sell, signals[1].Operation);

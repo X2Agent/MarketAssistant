@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class SentimentCardParser : BaseAdaptiveCardParser<MarketSentimentAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "SentimentAssessment", "CapitalFlowAnalysis", "BehaviorAnalysis" };
+    protected override string[] RequiredKeys => ["SentimentAssessment", "CapitalFlowAnalysis", "BehaviorAnalysis"];
 
     protected override bool IsValid(MarketSentimentAnalysisResult model)
     {

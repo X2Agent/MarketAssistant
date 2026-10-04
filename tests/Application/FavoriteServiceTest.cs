@@ -106,7 +106,7 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favorites);
-        Assert.AreEqual(2, favorites.Count);
+        Assert.HasCount(2, favorites);
     }
 
     [TestMethod]
@@ -122,9 +122,9 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favoritesWithData);
-        Assert.IsTrue(favoritesWithData.Count > 0);
+        Assert.IsNotEmpty(favoritesWithData);
         // 存储与返回均为归一化后的代码（A股剥离 SH/SZ 前缀）
-        Assert.IsTrue(favoritesWithData.Any(f => f.Code == "600519"));
+        Assert.Contains(f => f.Code == "600519", favoritesWithData);
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favorites);
-        Assert.AreEqual(0, favorites.Count);
+        Assert.IsEmpty(favorites);
     }
 
     [TestMethod]
@@ -161,8 +161,8 @@ public class FavoriteServiceTest
         var cryptoFavorites = await cryptoService.GetFavoritesCodesAsync();
 
         // Assert
-        Assert.AreEqual(1, aShareFavorites.Count);
-        Assert.AreEqual(1, cryptoFavorites.Count);
+        Assert.HasCount(1, aShareFavorites);
+        Assert.HasCount(1, cryptoFavorites);
         Assert.AreEqual("600519", aShareFavorites[0].Code);
         Assert.AreEqual("BTCUSDT", cryptoFavorites[0].Code);
     }
@@ -176,7 +176,7 @@ public class FavoriteServiceTest
         // 写入端：大小写与交易所前缀均被归一化
         await service.AddFavoriteAsync("sh600519", "SH");
         var favorites = await service.GetFavoritesCodesAsync();
-        Assert.AreEqual(1, favorites.Count);
+        Assert.HasCount(1, favorites);
         Assert.AreEqual("600519", favorites[0].Code);
 
         // 查询端：无论传入原始代码还是归一化代码，都必须判定为已收藏
@@ -186,7 +186,7 @@ public class FavoriteServiceTest
 
         // 重复写入归一化后的同一资产不应产生第二条记录
         await service.AddFavoriteAsync("SH600519", "SH");
-        Assert.AreEqual(1, (await service.GetFavoritesCodesAsync()).Count);
+        Assert.HasCount(1, await service.GetFavoritesCodesAsync());
 
         // 移除端同样归一化，且原始代码调用也能命中
         await service.RemoveFavoriteAsync("sh600519", "SH");

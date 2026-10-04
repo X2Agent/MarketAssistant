@@ -17,24 +17,19 @@ public sealed record SinaIndexQuote(
 /// 新浪指数行情客户端：一次请求拉取 A 股三大指数（上证/深证成指/创业板指）。
 /// 仅负责 HTTP 访问与 <c>var hq_str_*</c> 文本解析（GBK 解码），不承载业务映射逻辑。
 /// </summary>
-public sealed class SinaIndexQuoteClient
+public sealed class SinaIndexQuoteClient(IHttpClientFactory httpClientFactory)
 {
     /// <summary>三大指数代码：上证指数、深证成指、创业板指。</summary>
     private const string IndexList = "s_sh000001,s_sz399001,s_sz399006";
 
     private const string QueryPath = "/list=" + IndexList;
 
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     static SinaIndexQuoteClient()
     {
         // 新浪 hq 接口返回 GBK 编码，.NET 默认不支持，需注册 CodePagesEncodingProvider（幂等）。
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-    }
-
-    public SinaIndexQuoteClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     }
 
     /// <summary>

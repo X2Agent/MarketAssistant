@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class TechnicalCardParser : BaseAdaptiveCardParser<TechnicalAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "PatternTrend", "PriceLevels", "Indicators" };
+    protected override string[] RequiredKeys => ["PatternTrend", "PriceLevels", "Indicators"];
 
     protected override bool IsValid(TechnicalAnalysisResult model)
     {

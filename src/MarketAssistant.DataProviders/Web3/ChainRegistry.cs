@@ -22,14 +22,36 @@ public static class ChainRegistry
     /// <summary>别名 → 规范链名（含规范名自身、CoinGecko 平台 ID、EIP-155 数字链 ID、常用缩写）。</summary>
     private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["ethereum"] = "ethereum", ["eth"] = "ethereum", ["eth-mainnet"] = "ethereum", ["1"] = "ethereum",
-        ["bsc"] = "bsc", ["binance-smart-chain"] = "bsc", ["binance_smart_chain"] = "bsc", ["bnb"] = "bsc", ["56"] = "bsc",
-        ["polygon"] = "polygon", ["polygon-pos"] = "polygon", ["matic"] = "polygon", ["matic-network"] = "polygon", ["137"] = "polygon",
-        ["arbitrum"] = "arbitrum", ["arbitrum-one"] = "arbitrum", ["arb"] = "arbitrum", ["42161"] = "arbitrum",
-        ["optimism"] = "optimism", ["optimistic-ethereum"] = "optimism", ["10"] = "optimism",
-        ["avalanche"] = "avalanche", ["avax"] = "avalanche", ["avalanche-2"] = "avalanche", ["43114"] = "avalanche",
-        ["base"] = "base", ["8453"] = "base",
-        ["solana"] = "solana", ["sol"] = "solana", ["mainnet"] = "solana"
+        ["ethereum"] = "ethereum",
+        ["eth"] = "ethereum",
+        ["eth-mainnet"] = "ethereum",
+        ["1"] = "ethereum",
+        ["bsc"] = "bsc",
+        ["binance-smart-chain"] = "bsc",
+        ["binance_smart_chain"] = "bsc",
+        ["bnb"] = "bsc",
+        ["56"] = "bsc",
+        ["polygon"] = "polygon",
+        ["polygon-pos"] = "polygon",
+        ["matic"] = "polygon",
+        ["matic-network"] = "polygon",
+        ["137"] = "polygon",
+        ["arbitrum"] = "arbitrum",
+        ["arbitrum-one"] = "arbitrum",
+        ["arb"] = "arbitrum",
+        ["42161"] = "arbitrum",
+        ["optimism"] = "optimism",
+        ["optimistic-ethereum"] = "optimism",
+        ["10"] = "optimism",
+        ["avalanche"] = "avalanche",
+        ["avax"] = "avalanche",
+        ["avalanche-2"] = "avalanche",
+        ["43114"] = "avalanche",
+        ["base"] = "base",
+        ["8453"] = "base",
+        ["solana"] = "solana",
+        ["sol"] = "solana",
+        ["mainnet"] = "solana"
     };
 
     /// <summary>

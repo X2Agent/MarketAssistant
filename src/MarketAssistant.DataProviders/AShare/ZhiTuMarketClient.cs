@@ -8,14 +8,9 @@ namespace MarketAssistant.DataProviders.AShare;
 /// 泛型反序列化由本层统一执行（容错字符串数值/null/-- 占位），
 /// 业务 DTO 类型仍归属上层契约模块。
 /// </summary>
-public sealed class ZhiTuMarketClient
+public sealed class ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     /// <summary>
     /// 获取财务报表类列表数据（<c>/hs/fin/{endpoint}/{code}</c>）。

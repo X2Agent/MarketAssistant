@@ -9,12 +9,8 @@ namespace MarketAssistant.Services;
 /// 存储实体-关系三元组（subject, predicate, object），每个三元组有有效时间窗口。
 /// 参考 MemPalace 的时序知识图谱设计，适配金融投资领域。
 /// </summary>
-public class UserKnowledgeGraphService : SqliteServiceBase
+public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger) : SqliteServiceBase(logger)
 {
-    public UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger)
-        : base(logger)
-    {
-    }
 
     /// <summary>
     /// 添加一条三元组（实体-关系-实体），带有效起始时间

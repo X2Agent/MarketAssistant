@@ -9,17 +9,12 @@ namespace MarketAssistant.Rag.Services;
 /// 方案：先按行切分，再按段落（带 token 限制与重叠）。
 /// 代码逻辑源自 Microsoft.SemanticKernel.Text.TextChunker (MIT License)，已做适配以移除 SK 依赖。
 /// </summary>
-public class TextChunkingService : ITextChunkingService
+/// <remarks>
+/// <paramref name="tokenCounter"/> 为可选参数：DI 注册单例 ITokenCounter；测试/手工构造可缺省。
+/// </remarks>
+public class TextChunkingService(ITokenCounter? tokenCounter = null) : ITextChunkingService
 {
-    private readonly ITokenCounter _tokenCounter;
-
-    /// <summary>
-    /// <paramref name="tokenCounter"/> 为可选参数：DI 注册单例 ITokenCounter；测试/手工构造可缺省。
-    /// </summary>
-    public TextChunkingService(ITokenCounter? tokenCounter = null)
-    {
-        _tokenCounter = tokenCounter ?? new TiktokenTokenCounter();
-    }
+    private readonly ITokenCounter _tokenCounter = tokenCounter ?? new TiktokenTokenCounter();
 
     /// <summary>
     /// 将清洗后的全文分块为段落，优先使用语义边界（行/段落），并用 token 限制控制长度与重叠。
@@ -80,15 +75,9 @@ public class TextChunkingService : ITextChunkingService
     /// 内部辅助类，移植自 Microsoft.SemanticKernel.Text.TextChunker。
     /// Token 计数统一委托给注入的 <see cref="ITokenCounter"/>，不再自建 Tiktoken 编码器与启发式回退。
     /// </summary>
-    private class TextChunkerHelper
+    private class TextChunkerHelper(ITokenCounter tokenCounter)
     {
-        private readonly ITokenCounter _tokenCounter;
-
-        public TextChunkerHelper(ITokenCounter tokenCounter)
-        {
-            _tokenCounter = tokenCounter;
-        }
-
+        private readonly ITokenCounter _tokenCounter = tokenCounter;
         private static readonly string?[] s_plaintextSplitOptions = ["\n", ".。．", "?!", ";", ":", ",，、", ")]}", " ", "-", null];
 
         public List<string> SplitPlainTextLines(string text, int maxTokensPerLine)
@@ -146,7 +135,7 @@ public class TextChunkingService : ITextChunkingService
             int inputTokenCount = GetTokenCount(input);
             if (inputTokenCount <= maxTokens)
             {
-                return (new List<string> { trim ? input.Trim() : input }, false);
+                return ([trim ? input.Trim() : input], false);
             }
 
             bool inputWasSplit = true;
@@ -198,7 +187,7 @@ public class TextChunkingService : ITextChunkingService
             }
 
             // Fallback if no split point found but still too long (should rarely happen with empty separators)
-            return (new List<string> { trim ? input.Trim() : input }, false);
+            return ([trim ? input.Trim() : input], false);
         }
 
         private List<string> InternalSplitTextParagraphs(
@@ -211,13 +200,13 @@ public class TextChunkingService : ITextChunkingService
             if (maxTokensPerParagraph <= overlapTokens) throw new ArgumentException("overlapTokens cannot be larger than maxTokensPerParagraph");
 
             var linesList = lines.ToList();
-            if (linesList.Count == 0) return new List<string>();
+            if (linesList.Count == 0) return [];
 
             // Split long lines first
             var truncatedLines = linesList.SelectMany(line =>
                 GetTokenCount(line) > maxTokensPerParagraph
                 ? longLinesSplitter(line, maxTokensPerParagraph)
-                : new List<string> { line });
+                : [line]);
 
             var paragraphs = BuildParagraph(truncatedLines, maxTokensPerParagraph);
             var processedParagraphs = ProcessParagraphs(paragraphs, maxTokensPerParagraph, overlapTokens, longLinesSplitter);
@@ -228,7 +217,7 @@ public class TextChunkingService : ITextChunkingService
         private List<string> BuildParagraph(IEnumerable<string> truncatedLines, int maxTokensPerParagraph)
         {
             StringBuilder paragraphBuilder = new();
-            List<string> paragraphs = new();
+            List<string> paragraphs = [];
 
             foreach (string line in truncatedLines)
             {

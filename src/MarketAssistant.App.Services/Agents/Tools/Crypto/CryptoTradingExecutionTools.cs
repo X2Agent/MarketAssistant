@@ -14,27 +14,18 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币交易执行工具实现，供 TradingAgent 使用。下单委托给 TradeExecutor 统一入口。
 /// </summary>
-public class CryptoTradingExecutionTools : ITradingExecutionTools
+public class CryptoTradingExecutionTools(
+    CryptoPortfolioService portfolioService,
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    BinanceMarketDataService marketDataService,
+    TradeExecutor tradeExecutor,
+    ILogger<CryptoTradingExecutionTools> logger) : ITradingExecutionTools
 {
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly IExchangeClient _exchangeClient;
-    private readonly BinanceMarketDataService _marketDataService;
-    private readonly TradeExecutor _tradeExecutor;
-    private readonly ILogger<CryptoTradingExecutionTools> _logger;
-
-    public CryptoTradingExecutionTools(
-        CryptoPortfolioService portfolioService,
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        BinanceMarketDataService marketDataService,
-        TradeExecutor tradeExecutor,
-        ILogger<CryptoTradingExecutionTools> logger)
-    {
-        _portfolioService = portfolioService;
-        _exchangeClient = exchangeClient;
-        _marketDataService = marketDataService;
-        _tradeExecutor = tradeExecutor;
-        _logger = logger;
-    }
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly BinanceMarketDataService _marketDataService = marketDataService;
+    private readonly TradeExecutor _tradeExecutor = tradeExecutor;
+    private readonly ILogger<CryptoTradingExecutionTools> _logger = logger;
 
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
     public async Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)

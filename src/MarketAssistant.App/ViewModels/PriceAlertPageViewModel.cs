@@ -56,17 +56,17 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     /// <summary>
     /// 当前页面的规则列表（仅展示当前市场的规则）
     /// </summary>
-    public ObservableCollection<PriceAlertRule> Rules { get; } = new();
+    public ObservableCollection<PriceAlertRule> Rules { get; } = [];
 
     /// <summary>
     /// 交易对搜索候选列表（随输入防抖搜索）
     /// </summary>
-    public ObservableCollection<AssetOption> AssetOptions { get; } = new();
+    public ObservableCollection<AssetOption> AssetOptions { get; } = [];
 
     /// <summary>
     /// 触发条件选项（涨破/跌破/涨幅超/跌幅超）
     /// </summary>
-    public List<AlertCondition> ConditionOptions { get; } = Enum.GetValues<AlertCondition>().ToList();
+    public List<AlertCondition> ConditionOptions { get; } = [.. Enum.GetValues<AlertCondition>()];
 
     /// <summary>
     /// 新规则 - 资产搜索输入（下拉文本框）

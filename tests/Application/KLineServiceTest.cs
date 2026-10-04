@@ -65,7 +65,7 @@ public class KLineServiceTest
     private static void AssertKLineDataValid(List<KLineData> kLineData, int expectedMinCount)
     {
         Assert.IsNotNull(kLineData, "K线数据不应为 null");
-        Assert.IsTrue(kLineData.Count >= expectedMinCount, $"K线数据数量应至少为 {expectedMinCount}，实际 {kLineData.Count}");
+        Assert.IsGreaterThanOrEqualTo(expectedMinCount, kLineData.Count, $"K线数据数量应至少为 {expectedMinCount}，实际 {kLineData.Count}");
         Assert.IsTrue(kLineData.All(k => k.Close > 0), "所有K线的收盘价应大于 0");
         Assert.IsTrue(kLineData.All(k => k.High >= k.Close), "所有K线的最高价应不低于收盘价");
         Assert.IsTrue(kLineData.All(k => k.Low <= k.Close), "所有K线的最低价应不高于收盘价");

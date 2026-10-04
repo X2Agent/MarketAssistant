@@ -11,21 +11,15 @@ namespace MarketAssistant.Applications.Technical;
 /// 基于 Skender.Stock.Indicators 的指标实现，输入为市场无关的 <see cref="KLineData"/>，
 /// 因此 A 股与虚拟币共用同一份计算逻辑。
 /// </summary>
-public sealed class TechnicalIndicatorService : ITechnicalIndicatorService
+public sealed class TechnicalIndicatorService(
+    IKLineService kLineService,
+    ILogger<TechnicalIndicatorService> logger) : ITechnicalIndicatorService
 {
     /// <summary>MACD 慢线周期，也是所有指标中最长的预热窗口。</summary>
     private const int MinimumBarCount = 26;
 
-    private readonly IKLineService _kLineService;
-    private readonly ILogger<TechnicalIndicatorService> _logger;
-
-    public TechnicalIndicatorService(
-        IKLineService kLineService,
-        ILogger<TechnicalIndicatorService> logger)
-    {
-        _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
+    private readonly ILogger<TechnicalIndicatorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<TechnicalIndicatorSnapshot> GetSnapshotAsync(
         string code,
@@ -84,7 +78,7 @@ public sealed class TechnicalIndicatorService : ITechnicalIndicatorService
     }
 
     private static List<IndicatorQuote> ToIndicatorQuotes(IEnumerable<KLineData> kLineData) =>
-        kLineData
+        [.. kLineData
             .OrderBy(item => item.Timestamp)
             .Select(item => new IndicatorQuote
             {
@@ -94,8 +88,7 @@ public sealed class TechnicalIndicatorService : ITechnicalIndicatorService
                 Low = item.Low,
                 Close = item.Close,
                 Volume = item.Volume
-            })
-            .ToList();
+            })];
 
     private static decimal? GetLatestSma(List<IndicatorQuote> quotes, int period) =>
         Round(quotes.GetSma(period).LastOrDefault(item => item.Sma is not null)?.Sma);

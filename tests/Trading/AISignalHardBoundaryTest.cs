@@ -31,9 +31,8 @@ public sealed class AISignalHardBoundaryTest
 
         Assert.IsTrue(result.TradeExecuted, "平仓成功时应返回成交记录");
         Assert.AreEqual(AISignalOutcome.Executed, result.Outcome, "平仓成功的结局应为 Executed");
-        CollectionAssert.AreEqual(new[] { OrderSide.Sell }, capturedSides,
-            "止损平仓方向应为持仓方向的反向");
-        Assert.IsTrue(capturedRequireClose.Contains(true), "硬性边界必须以 requireClose 语义平仓");
+        Assert.AreSequenceEqual([OrderSide.Sell], capturedSides, "止损平仓方向应为持仓方向的反向");
+        Assert.Contains(true, capturedRequireClose, "硬性边界必须以 requireClose 语义平仓");
         Assert.AreEqual(OrderSide.Buy, strategy.Side, "执行结束后策略方向必须恢复为原始持仓方向");
         strategyService.Verify(
             service => service.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, It.IsAny<CancellationToken>()),

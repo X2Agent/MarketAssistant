@@ -6,16 +6,11 @@ namespace MarketAssistant.Services.Mcp;
 /// MCP 工具调用审计日志
 /// 记录所有通过 MCP 加载和调用的工具，用于安全审计和排查
 /// </summary>
-public class McpToolAuditLogger
+public class McpToolAuditLogger(ILogger<McpToolAuditLogger> logger)
 {
-    private readonly ILogger<McpToolAuditLogger> _logger;
+    private readonly ILogger<McpToolAuditLogger> _logger = logger;
     private readonly List<McpToolAuditEntry> _entries = [];
     private readonly object _lock = new();
-
-    public McpToolAuditLogger(ILogger<McpToolAuditLogger> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 记录工具加载事件

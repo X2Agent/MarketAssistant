@@ -117,6 +117,8 @@ MarketAssistant.App.Services/
 
 `CoordinatorExecutor` 生成报告时调用 `AnalystSignalParser.ExtractSignals(reportAnalystMessages)`，把各分析师的结构化 JSON 提取为 `MarketAnalysisReport.AnalystSignals`（解析约定见 `src/MarketAssistant.Agents/AGENTS.md`）。信号随报告由 `ReportArchiveService` 全量序列化持久化，是 M3 回测与分析师绩效统计的数据基础；提取失败仅缺失单项，不阻断报告。
 
+`reports` 表除 `report_json` 外另存 `market_type` 与 `rating` 两个可索引列（`ReportSummary.MarketType`/`Rating` 供 UI 与统计直接筛选，避免全表反序列化）。旧库通过 `EnsureMarketColumnsAsync`（`PRAGMA table_info` + `ALTER TABLE ADD COLUMN`）迁移，**旧行为 NULL 属"未知"**，读取方不得从 `asset_code` 推断市场。
+
 ---
 
 ## 统一告警中心（Applications/AlertCenter）

@@ -13,11 +13,15 @@ namespace MarketAssistant.Applications.AlertCenter;
 /// 每小时配额、免打扰静默等抑制逻辑，按级别经 INotificationService 处理触达，
 /// 并维护确认级交易联动门（AlertGate）的登记与解除。
 /// </summary>
-public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
+public sealed class AlertCenterService(
+    INotificationService notificationService,
+    IUserSettingService userSettingService,
+    AlertGate alertGate,
+    ILogger<AlertCenterService> logger) : SqliteServiceBase(logger), IAlertCenterService
 {
-    private readonly INotificationService _notificationService;
-    private readonly IUserSettingService _userSettingService;
-    private readonly AlertGate _alertGate;
+    private readonly INotificationService _notificationService = notificationService;
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly AlertGate _alertGate = alertGate;
     private readonly AlertSuppressionPolicy _policy = new();
 
     /// <summary>历史告警保留期：超期记录在启动初始化时裁剪，避免 alert_events 无界增长。</summary>
@@ -32,25 +36,13 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
     /// 键含标题：同一标的多条不同条件的确认级规则各自独立登记，解除时精确匹配，
     /// 避免后触发覆盖先触发导致门计数无法归零。</summary>
     private readonly Dictionary<(AlertSource Source, MarketType MarketType, string Symbol, string Title), string>
-        _activeGatedAlerts = new();
+        _activeGatedAlerts = [];
 
     /// <inheritdoc />
     public event Action<AlertEvent>? AlertRaised;
 
     /// <inheritdoc />
     public event Action? AlertsChanged;
-
-    public AlertCenterService(
-        INotificationService notificationService,
-        IUserSettingService userSettingService,
-        AlertGate alertGate,
-        ILogger<AlertCenterService> logger)
-        : base(logger)
-    {
-        _notificationService = notificationService;
-        _userSettingService = userSettingService;
-        _alertGate = alertGate;
-    }
 
     /// <inheritdoc />
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>

@@ -7,18 +7,12 @@ namespace MarketAssistant.Infrastructure.Core;
 /// 全局异常处理器，提供应用级异常捕获和处理。
 /// 通过 DI 注册为 Singleton，由 <see cref="Initialize"/> 激活事件钩子。
 /// </summary>
-public sealed class GlobalExceptionHandler
+public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
 {
-    private readonly ILogger<GlobalExceptionHandler> _logger;
-    private readonly IDialogService _dialogService;
+    private readonly ILogger<GlobalExceptionHandler> _logger = logger;
+    private readonly IDialogService _dialogService = dialogService;
     private static GlobalExceptionHandler? _instance;
     private static readonly object _lock = new();
-
-    public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IDialogService dialogService)
-    {
-        _logger = logger;
-        _dialogService = dialogService;
-    }
 
     /// <summary>
     /// 注册全局异常处理钩子。应在 DI 容器构建完毕后调用一次，

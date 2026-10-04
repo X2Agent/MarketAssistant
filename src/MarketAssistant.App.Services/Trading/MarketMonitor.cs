@@ -210,7 +210,7 @@ public class MarketMonitor : IDisposable
             // 等待所有正在执行的策略任务完成，避免订单已发送但本地状态未更新
             Task[] pendingTasks;
             lock (_pendingTasksLock)
-                pendingTasks = _pendingStrategyTasks.ToArray();
+                pendingTasks = [.. _pendingStrategyTasks];
 
             if (pendingTasks.Length > 0)
             {
@@ -694,7 +694,7 @@ public class MarketMonitor : IDisposable
 
         Task[] pendingTasks;
         lock (_pendingTasksLock)
-            pendingTasks = _pendingStrategyTasks.ToArray();
+            pendingTasks = [.. _pendingStrategyTasks];
 
         // 锁资源改为在后台等待在途任务收尾后释放：Dispose 常从 UI 线程触发（页面卸载/退出），
         // 在途任务可能正等待 HITL 确认框（最长 60s），同步等待会冻结 UI；

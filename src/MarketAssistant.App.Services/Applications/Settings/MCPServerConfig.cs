@@ -41,7 +41,7 @@ public class MCPServerConfig
     /// 环境变量，用于stdio类型
     /// </summary>
     [JsonIgnore]
-    public Dictionary<string, string?> EnvironmentVariables { get; set; } = new();
+    public Dictionary<string, string?> EnvironmentVariables { get; set; } = [];
 
     /// <summary>
     /// 是否启用

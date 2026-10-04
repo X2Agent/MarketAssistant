@@ -5,14 +5,9 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 策略编排服务：统一封装策略增删改，并广播策略集合变化。
 /// </summary>
-public class TradingStrategyService
+public class TradingStrategyService(TradingDataService dataService)
 {
-    private readonly TradingDataService _dataService;
-
-    public TradingStrategyService(TradingDataService dataService)
-    {
-        _dataService = dataService;
-    }
+    private readonly TradingDataService _dataService = dataService;
 
     public event EventHandler? StrategiesChanged;
 

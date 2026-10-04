@@ -15,12 +15,11 @@ public static class AnalystTypeRegistry
 
     private static IReadOnlyList<Type> DiscoverConcreteAnalystTypes()
     {
-        return AppDomain.CurrentDomain.GetAssemblies()
+        return [.. AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(GetLoadableTypes)
             .Where(IsConcreteAnalystType)
             .DistinctBy(type => type.FullName)
-            .OrderBy(type => type.Name, StringComparer.Ordinal)
-            .ToList();
+            .OrderBy(type => type.Name, StringComparer.Ordinal)];
     }
 
     private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)

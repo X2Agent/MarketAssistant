@@ -19,19 +19,13 @@ public interface ITradingAgentFactory
 /// 交易 Agent 工厂实现。<see cref="MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
 /// 自主交易与工具解析<strong>始终</strong>使用 <see cref="MarketType.Crypto"/> 的 Keyed 注册（现货 Binance），与当前所选市场无关。
 /// </summary>
-public class TradingAgentFactory : AgentFactoryBase, ITradingAgentFactory
+public class TradingAgentFactory(
+    IServiceProvider serviceProvider,
+    IChatClientFactory chatClientFactory,
+    TokenTrackingMiddleware tokenTracking,
+    ILogger<TradingAgentFactory> logger) : AgentFactoryBase(serviceProvider, tokenTracking, logger), ITradingAgentFactory
 {
-    private readonly IChatClientFactory _chatClientFactory;
-
-    public TradingAgentFactory(
-        IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
-        TokenTrackingMiddleware tokenTracking,
-        ILogger<TradingAgentFactory> logger)
-        : base(serviceProvider, tokenTracking, logger)
-    {
-        _chatClientFactory = chatClientFactory;
-    }
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
 
     /// <summary>
     /// 创建自动交易使用的 <see cref="TradingAgent"/>；工具一律从 <see cref="MarketType.Crypto"/> 解析。

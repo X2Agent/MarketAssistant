@@ -23,30 +23,20 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// 职责：提供市场深度数据、综合市场指标和衍生计算指标
 /// 数据源：币安（市场深度）、CoinGecko（市场指标、交易量分布）
 /// </remarks>
-public sealed class CryptoMetricsTools : IFinancialTools
+public sealed class CryptoMetricsTools(
+    BinanceMarketDataService binanceService,
+    CoinGeckoApiService coinGeckoService,
+    [FromKeyedServices(MarketType.Crypto)] IKLineService klineService,
+    [FromKeyedServices(MarketType.Crypto)] IOrderBookService orderBookService,
+    [FromKeyedServices(MarketType.Crypto)] ITickTradeService tickTradeService,
+    ILogger<CryptoMetricsTools> logger) : IFinancialTools
 {
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly IKLineService _klineService;
-    private readonly IOrderBookService _orderBookService;
-    private readonly ITickTradeService _tickTradeService;
-    private readonly ILogger<CryptoMetricsTools> _logger;
-
-    public CryptoMetricsTools(
-        BinanceMarketDataService binanceService,
-        CoinGeckoApiService coinGeckoService,
-        [FromKeyedServices(MarketType.Crypto)] IKLineService klineService,
-        [FromKeyedServices(MarketType.Crypto)] IOrderBookService orderBookService,
-        [FromKeyedServices(MarketType.Crypto)] ITickTradeService tickTradeService,
-        ILogger<CryptoMetricsTools> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
-        _orderBookService = orderBookService ?? throw new ArgumentNullException(nameof(orderBookService));
-        _tickTradeService = tickTradeService ?? throw new ArgumentNullException(nameof(tickTradeService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly IKLineService _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
+    private readonly IOrderBookService _orderBookService = orderBookService ?? throw new ArgumentNullException(nameof(orderBookService));
+    private readonly ITickTradeService _tickTradeService = tickTradeService ?? throw new ArgumentNullException(nameof(tickTradeService));
+    private readonly ILogger<CryptoMetricsTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // ==================== 市场深度数据（币安） ====================
 
@@ -72,7 +62,7 @@ public sealed class CryptoMetricsTools : IFinancialTools
                 {
                     Symbol = binanceSymbol,
                     Interval = intervalStr,
-                    Candles = klineData.Select(k => new OHLCVCandle
+                    Candles = [.. klineData.Select(k => new OHLCVCandle
                     {
                         OpenTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds(),
                         CloseTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds() + intervalMs - 1,
@@ -82,7 +72,7 @@ public sealed class CryptoMetricsTools : IFinancialTools
                         Close = k.Close,
                         Volume = k.Volume,
                         QuoteVolume = k.Amount
-                    }).ToList()
+                    })]
                 };
             }
 
@@ -203,12 +193,8 @@ public sealed class CryptoMetricsTools : IFinancialTools
             {
                 Symbol = binanceSymbol,
                 LastUpdateId = snapshot.LastUpdateId,
-                Bids = snapshot.Bids
-                    .Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })
-                    .ToList(),
-                Asks = snapshot.Asks
-                    .Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })
-                    .ToList()
+                Bids = [.. snapshot.Bids.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })],
+                Asks = [.. snapshot.Asks.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })]
             };
         }
         catch (OperationCanceledException)
@@ -356,15 +342,14 @@ public sealed class CryptoMetricsTools : IFinancialTools
             var totalVolume = exchangeVolumes.Sum(x => x.Volume);
             if (totalVolume == 0) return [];
 
-            return exchangeVolumes
+            return [.. exchangeVolumes
                 .Select(x => new VolumeDistribution
                 {
                     Exchange = x.Exchange,
                     Volume = (decimal)x.Volume,
                     Percentage = (decimal)(x.Volume / totalVolume * 100),
                     PairCount = x.PairCount
-                })
-                .ToList();
+                })];
         }
         catch (OperationCanceledException)
         {

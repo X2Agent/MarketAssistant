@@ -66,7 +66,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private string _assetName = string.Empty;
 
     [ObservableProperty]
-    private ObservableCollection<KLineData> _kLineData = new();
+    private ObservableCollection<KLineData> _kLineData = [];
 
     [ObservableProperty]
     private decimal _currentPrice;
@@ -83,11 +83,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     /// <summary>行情速览指标（今开 / 最高 / 最低 / 昨收 / 成交量 / 成交额 / 换手 / 振幅 / 量比 / 市盈率 / 市净率）。</summary>
     [ObservableProperty]
-    private ObservableCollection<MarketMetricItem> _marketMetrics = new();
+    private ObservableCollection<MarketMetricItem> _marketMetrics = [];
 
     /// <summary>技术指标分组（均线 / MACD / BOLL / KDJ），统一按日线口径计算。</summary>
     [ObservableProperty]
-    private ObservableCollection<IndicatorGroupItem> _indicatorGroups = new();
+    private ObservableCollection<IndicatorGroupItem> _indicatorGroups = [];
 
     /// <summary>技术指标对应的 K 线日期。</summary>
     [ObservableProperty]
@@ -95,11 +95,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     /// <summary>卖盘五档，按「卖五 → 卖一」展示，使卖一紧邻中间价。</summary>
     [ObservableProperty]
-    private ObservableCollection<OrderBookLevelItem> _asks = new();
+    private ObservableCollection<OrderBookLevelItem> _asks = [];
 
     /// <summary>买盘五档，按「买一 → 买五」展示。</summary>
     [ObservableProperty]
-    private ObservableCollection<OrderBookLevelItem> _bids = new();
+    private ObservableCollection<OrderBookLevelItem> _bids = [];
 
     [ObservableProperty]
     private string _orderBookSummaryText = string.Empty;
@@ -112,7 +112,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private string _bidQuantityPercentText = string.Empty;
 
     [ObservableProperty]
-    private ObservableCollection<TickTradeItem> _tickTrades = new();
+    private ObservableCollection<TickTradeItem> _tickTrades = [];
 
     [ObservableProperty]
     private SectionState _snapshotState = new();
@@ -523,7 +523,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             if (attempt != _indicatorAttempt)
                 return;
 
-            IndicatorGroups = new ObservableCollection<IndicatorGroupItem>();
+            IndicatorGroups = [];
             IndicatorDateText = string.Empty;
             IndicatorState = IndicatorState with
             {
@@ -636,7 +636,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             if (attempt != _tickTradeAttempt)
                 return;
 
-            TickTrades = new ObservableCollection<TickTradeItem>();
+            TickTrades = [];
             TickTradeState = TickTradeState with
             {
                 State = LoadState.Failed,
@@ -703,8 +703,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     private void ClearOrderBook()
     {
-        Asks = new ObservableCollection<OrderBookLevelItem>();
-        Bids = new ObservableCollection<OrderBookLevelItem>();
+        Asks = [];
+        Bids = [];
         BidQuantityPercent = 0;
         BidQuantityPercentText = string.Empty;
         OrderBookSummaryText = string.Empty;
@@ -760,9 +760,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         AddIndicatorGroup(
             groups,
             "均线",
-            DisplayMovingAveragePeriods
-                .Select(period => ($"MA{period}", snapshot.GetMovingAverage(period), true))
-                .ToArray());
+            [.. DisplayMovingAveragePeriods.Select(period => ($"MA{period}", snapshot.GetMovingAverage(period), true))]);
 
         AddIndicatorGroup(
             groups,
@@ -897,10 +895,10 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         TickTradeState = new SectionState();
 
         MarketMetrics = BuildMarketMetrics(null);
-        IndicatorGroups = new ObservableCollection<IndicatorGroupItem>();
+        IndicatorGroups = [];
         IndicatorDateText = string.Empty;
         ClearOrderBook();
-        TickTrades = new ObservableCollection<TickTradeItem>();
+        TickTrades = [];
 
         _lastOrderBookRefreshAt = DateTime.MinValue;
         _isOrderBookRefreshing = false;

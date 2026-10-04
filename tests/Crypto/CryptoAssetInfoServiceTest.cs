@@ -59,7 +59,7 @@ public class CryptoAssetInfoServiceTest
         var results = await service.GetAssetInfosAsync(favorites);
 
         // Assert：与请求等长同序，价格与涨跌幅已填充；批量路径不拉取市值（收藏列表不展示）
-        Assert.AreEqual(favorites.Count, results.Count);
+        Assert.HasCount(favorites.Count, results);
         Assert.IsNotNull(results[0]);
         Assert.AreEqual("BTCUSDT", results[0]!.Code);
         Assert.IsFalse(string.IsNullOrWhiteSpace(results[0]!.CurrentPrice));

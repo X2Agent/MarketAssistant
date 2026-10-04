@@ -11,21 +11,14 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 策略管理工具实现，供 TradingAgent 查询和更新策略
 /// </summary>
-public class CryptoStrategyTools : IStrategyTools
+public class CryptoStrategyTools(
+    TradingStrategyService strategyService,
+    TradingDataService dataService,
+    ILogger<CryptoStrategyTools> logger) : IStrategyTools
 {
-    private readonly TradingStrategyService _strategyService;
-    private readonly TradingDataService _dataService;
-    private readonly ILogger<CryptoStrategyTools> _logger;
-
-    public CryptoStrategyTools(
-        TradingStrategyService strategyService,
-        TradingDataService dataService,
-        ILogger<CryptoStrategyTools> logger)
-    {
-        _strategyService = strategyService;
-        _dataService = dataService;
-        _logger = logger;
-    }
+    private readonly TradingStrategyService _strategyService = strategyService;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly ILogger<CryptoStrategyTools> _logger = logger;
 
     [Description("获取所有活跃状态的交易策略列表")]
     public async Task<List<TradingStrategy>> GetActiveStrategiesAsync(CancellationToken cancellationToken = default)

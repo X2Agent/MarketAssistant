@@ -11,38 +11,29 @@ namespace MarketAssistant.Applications.Crypto;
 /// 子类只需提供端点前缀与响应映射逻辑。
 /// positionSide 参数仅在合约下单时使用，现货下单忽略。
 /// </summary>
-public abstract class BinanceAccountServiceBase
+/// <param name="httpClientFactory">HttpClient 工厂</param>
+/// <param name="logger">日志器</param>
+/// <param name="authService">鉴权服务（决定实盘/Testnet 密钥来源）</param>
+/// <param name="httpClientName">HttpClient 名称（"Binance" / "BinanceSpotDemo" / "BinanceFutures" / "BinanceFuturesTestnet"）</param>
+/// <param name="label">错误提示前缀（"" / "Demo " / "Testnet "）</param>
+public abstract class BinanceAccountServiceBase(
+    IHttpClientFactory httpClientFactory,
+    ILogger logger,
+    IBinanceAuthService authService,
+    string httpClientName,
+    string label)
 {
-    protected readonly IHttpClientFactory HttpClientFactory;
-    protected readonly ILogger Logger;
-    protected readonly IBinanceAuthService AuthService;
-    protected readonly string HttpClientName;
-    protected readonly string Label;
+    protected readonly IHttpClientFactory HttpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    protected readonly ILogger Logger = logger;
+    protected readonly IBinanceAuthService AuthService = authService;
+    protected readonly string HttpClientName = httpClientName;
+    protected readonly string Label = label;
 
     /// <summary>
     /// 交易对精度过滤器缓存（进程内共享，按 HttpClient 名称维度隔离）。
     /// 下单时用于对数量/价格取整，避免精度违规被交易所拒单。
     /// </summary>
     private ExchangeSymbolFilterCache? _filterCache;
-
-    /// <param name="httpClientFactory">HttpClient 工厂</param>
-    /// <param name="logger">日志器</param>
-    /// <param name="authService">鉴权服务（决定实盘/Testnet 密钥来源）</param>
-    /// <param name="httpClientName">HttpClient 名称（"Binance" / "BinanceSpotDemo" / "BinanceFutures" / "BinanceFuturesTestnet"）</param>
-    /// <param name="label">错误提示前缀（"" / "Demo " / "Testnet "）</param>
-    protected BinanceAccountServiceBase(
-        IHttpClientFactory httpClientFactory,
-        ILogger logger,
-        IBinanceAuthService authService,
-        string httpClientName,
-        string label)
-    {
-        HttpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        Logger = logger;
-        AuthService = authService;
-        HttpClientName = httpClientName;
-        Label = label;
-    }
 
     /// <summary>
     /// 账户信息端点（如 /api/v3/account、/fapi/v2/account）
@@ -387,18 +378,13 @@ public abstract class BinanceAccountServiceBase
 /// 端点：/api/v3/account、/api/v3/order、/api/v3/openOrders
 /// API文档：https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/rest-api/account-endpoints
 /// </summary>
-public sealed class BinanceSpotAccountService : BinanceAccountServiceBase
+public sealed class BinanceSpotAccountService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<BinanceSpotAccountService> logger,
+    IBinanceAuthService authService,
+    string httpClientName,
+    string label) : BinanceAccountServiceBase(httpClientFactory, logger, authService, httpClientName, label)
 {
-    public BinanceSpotAccountService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<BinanceSpotAccountService> logger,
-        IBinanceAuthService authService,
-        string httpClientName,
-        string label)
-        : base(httpClientFactory, logger, authService, httpClientName, label)
-    {
-    }
-
     protected override string AccountEndpoint => "/api/v3/account";
     protected override string OrderEndpoint => "/api/v3/order";
     protected override string OpenOrdersEndpoint => "/api/v3/openOrders";
@@ -436,7 +422,7 @@ public class BinanceAccountInfo
     public bool CanDeposit { get; set; }
     public long UpdateTime { get; set; }
     public string AccountType { get; set; } = string.Empty;
-    public List<BinanceBalance> Balances { get; set; } = new();
+    public List<BinanceBalance> Balances { get; set; } = [];
 }
 
 /// <summary>

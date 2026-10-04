@@ -25,7 +25,7 @@ public class Telegram
     /// <summary>
     /// 相关标的符号（股票代码或加密货币符号）
     /// </summary>
-    public List<string> Symbols { get; set; } = new();
+    public List<string> Symbols { get; set; } = [];
 
     /// <summary>
     /// 是否为重要快讯

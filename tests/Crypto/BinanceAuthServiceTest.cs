@@ -37,11 +37,10 @@ public class BinanceAuthServiceTest
 
         var signature = generateSignatureMethod?.Invoke(
             null,
-            new object[]
-            {
+            [
                 testPayload,
                 "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"
-            }) as string;
+            ]) as string;
 
         // Assert - 验证签名是否与文档示例一致
         var expectedSignature = "c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71";
@@ -74,9 +73,9 @@ public class BinanceAuthServiceTest
         Console.WriteLine($"原始查询: {queryString}");
         Console.WriteLine($"签名后查询: {signedQuery}");
 
-        Assert.IsTrue(signedQuery.Contains("timestamp="));
-        Assert.IsTrue(signedQuery.Contains("signature="));
-        Assert.IsTrue(signedQuery.Contains(queryString));
+        Assert.Contains("timestamp=", signedQuery);
+        Assert.Contains("signature=", signedQuery);
+        Assert.Contains(queryString, signedQuery);
     }
 
     /// <summary>
@@ -125,7 +124,7 @@ public class BinanceAuthServiceTest
 
     private sealed class FakeTradingCredentialStore : ITradingCredentialStore
     {
-        private readonly Dictionary<CryptoTradingMode, (string ApiKey, string SecretKey)> _cache = new();
+        private readonly Dictionary<CryptoTradingMode, (string ApiKey, string SecretKey)> _cache = [];
 
         public (string ApiKey, string SecretKey) GetCredentials(CryptoTradingMode mode)
         {

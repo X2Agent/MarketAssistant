@@ -7,23 +7,18 @@ namespace MarketAssistant.DataProviders.AShare;
 /// 新浪财经个股资金流排行客户端（<c>MoneyFlow.ssl_bkzj_ssggzj</c>）。
 /// 仅负责 HTTP 访问与响应解析（GBK 编码流式解码），不承载业务映射逻辑。
 /// </summary>
-public sealed class SinaFundFlowClient
+public sealed class SinaFundFlowClient(IHttpClientFactory httpClientFactory)
 {
     private const string TopNetInflowPath =
         "/quotes_service/api/json_v2.php/MoneyFlow.ssl_bkzj_ssggzj?page=1&num={0}&sort=netamount&asc=0";
 
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     static SinaFundFlowClient()
     {
         // 新浪接口返回 Content-Type: application/json; charset=gbk，
         // .NET 默认不支持 GBK 编码，需注册 CodePagesEncodingProvider（幂等）。
         System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-    }
-
-    public SinaFundFlowClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
     }
 
     /// <summary>

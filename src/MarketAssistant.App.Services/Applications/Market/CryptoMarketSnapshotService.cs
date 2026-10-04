@@ -8,18 +8,12 @@ namespace MarketAssistant.Applications.Market;
 /// <summary>
 /// 虚拟币行情速览：复用币安 24 小时统计接口。
 /// </summary>
-public sealed class CryptoMarketSnapshotService : IMarketSnapshotService
+public sealed class CryptoMarketSnapshotService(
+    BinanceMarketDataService binanceService,
+    ILogger<CryptoMarketSnapshotService> logger) : IMarketSnapshotService
 {
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly ILogger<CryptoMarketSnapshotService> _logger;
-
-    public CryptoMarketSnapshotService(
-        BinanceMarketDataService binanceService,
-        ILogger<CryptoMarketSnapshotService> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly ILogger<CryptoMarketSnapshotService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<MarketSnapshot?> GetSnapshotAsync(string code, CancellationToken cancellationToken = default)
     {

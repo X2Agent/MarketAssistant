@@ -32,7 +32,7 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isNewsEmpty;
 
-    public ObservableCollection<Telegram> Telegraphs { get; } = new();
+    public ObservableCollection<Telegram> Telegraphs { get; } = [];
 
     public IAsyncRelayCommand<Telegram> OpenNewsCommand { get; }
 

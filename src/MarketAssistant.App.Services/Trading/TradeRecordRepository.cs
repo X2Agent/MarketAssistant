@@ -9,22 +9,15 @@ namespace MarketAssistant.Services.Trading;
 /// 交易记录仓储（internal）：交易记录的持久化、查询与对账。
 /// 对账需联动持仓（FIFO）与日统计，故依赖 <see cref="PositionRepository"/> 与 <see cref="DailyStatsRepository"/>。
 /// </summary>
-internal sealed class TradeRecordRepository : TradingRepositoryBase
+internal sealed class TradeRecordRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger,
+    PositionRepository positions,
+    DailyStatsRepository dailyStats) : TradingRepositoryBase(schema, environment, logger)
 {
-    private readonly PositionRepository _positions;
-    private readonly DailyStatsRepository _dailyStats;
-
-    public TradeRecordRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger,
-        PositionRepository positions,
-        DailyStatsRepository dailyStats)
-        : base(schema, environment, logger)
-    {
-        _positions = positions;
-        _dailyStats = dailyStats;
-    }
+    private readonly PositionRepository _positions = positions;
+    private readonly DailyStatsRepository _dailyStats = dailyStats;
 
     public async Task SaveTradeRecordAsync(TradeRecord record, CancellationToken ct = default)
     {
@@ -69,8 +62,10 @@ internal sealed class TradeRecordRepository : TradingRepositoryBase
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
 
-        var conditions = new List<string>();
-        conditions.Add("environment = @environment");
+        var conditions = new List<string>
+        {
+            "environment = @environment"
+        };
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
 
         if (!string.IsNullOrEmpty(symbol))

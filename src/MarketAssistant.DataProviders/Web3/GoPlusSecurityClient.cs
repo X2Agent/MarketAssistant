@@ -8,19 +8,13 @@ namespace MarketAssistant.DataProviders.Web3;
 /// GoPlus Security 客户端：代币安全审计与蜜罐检测（EVM 多链 + Solana 专用端点）。
 /// API 域名为 api.gopluslabs.io；链 ID 词汇统一经 ChainRegistry 归一化。
 /// </summary>
-public sealed class GoPlusSecurityClient
+public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, ILogger<GoPlusSecurityClient> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<GoPlusSecurityClient> _logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly ILogger<GoPlusSecurityClient> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>可选 API Key，由上层（如用户设置服务）在运行时注入。</summary>
     public string? ApiKey { get; set; }
-
-    public GoPlusSecurityClient(IHttpClientFactory httpClientFactory, ILogger<GoPlusSecurityClient> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 查询代币安全审计结果（含蜜罐检测、税率、增发/黑名单/暂停交易等风险项）。

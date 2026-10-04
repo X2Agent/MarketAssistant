@@ -80,9 +80,9 @@ public class ChatClientFactoryTest
 
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
-        StringAssert.Contains(exception.Message, "DeepSeek");
-        StringAssert.Contains(exception.Message, "model-a");
-        StringAssert.Contains(exception.Message, "API Key");
+        Assert.Contains("DeepSeek", exception.Message);
+        Assert.Contains("model-a", exception.Message);
+        Assert.Contains("API Key", exception.Message);
         Assert.HasCount(0, fixture.Factory.CreatedRequests);
     }
 
@@ -129,7 +129,7 @@ public class ChatClientFactoryTest
 
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
-        StringAssert.Contains(exception.Message, "API 协议尚未接入");
+        Assert.Contains("API 协议尚未接入", exception.Message);
         Assert.HasCount(0, fixture.Factory.CreatedRequests);
     }
 
@@ -159,9 +159,9 @@ public class ChatClientFactoryTest
         fixture.Setting.ProviderModelIds["DeepSeek"] = "model-overflow";
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
-        StringAssert.Contains(
-            exception.Message,
-            TestableChatClientFactory.MaxCachedRuntimeCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Contains(
+            TestableChatClientFactory.MaxCachedRuntimeCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            exception.Message);
         Assert.HasCount(TestableChatClientFactory.MaxCachedRuntimeCount, fixture.Factory.CreatedClients);
         foreach (var client in fixture.Factory.CreatedClients)
             client.Verify(x => x.Dispose(), Times.Never);
@@ -250,7 +250,7 @@ public class ChatClientFactoryTest
 
         var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
 
-        StringAssert.Contains(exception.Message, "API Base URL");
+        Assert.Contains("API Base URL", exception.Message);
         Assert.HasCount(0, fixture.Factory.CreatedRequests);
     }
 

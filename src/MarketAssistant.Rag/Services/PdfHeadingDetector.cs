@@ -121,7 +121,7 @@ internal static class PdfHeadingDetector
                 Level1Threshold = ratio,
                 Level2Threshold = Math.Max(ratio - 0.2, PdfTextUtility.SmallHeadingThreshold),
                 Level3Threshold = PdfTextUtility.SmallHeadingThreshold,
-                FontSizeBreakpoints = new List<double> { ratio }
+                FontSizeBreakpoints = [ratio]
             };
         }
         else if (fontRatios.Count == 2)
@@ -143,7 +143,7 @@ internal static class PdfHeadingDetector
                 Level1Threshold = fontRatios[0],
                 Level2Threshold = fontRatios[1],
                 Level3Threshold = fontRatios[2],
-                FontSizeBreakpoints = fontRatios.Take(4).ToList()
+                FontSizeBreakpoints = [.. fontRatios.Take(4)]
             };
         }
 

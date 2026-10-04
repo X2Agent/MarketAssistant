@@ -13,29 +13,20 @@ namespace MarketAssistant.Applications.Favorites;
 /// 收藏服务：封装 SQLite 持久化与最新行情查询的共同行为。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
+public sealed class FavoriteService(
+    [ServiceKey] MarketType marketType,
+    IServiceProvider serviceProvider,
+    ILogger<FavoriteService> logger) : SqliteServiceBase(logger), IFavoriteService
 {
-    private readonly IAssetInfoService _assetInfoService;
-    private readonly ILogger<FavoriteService> _logger;
-    private readonly MarketType _marketType;
-    private readonly string _marketLabel;
-
-    public FavoriteService(
-        [ServiceKey] MarketType marketType,
-        IServiceProvider serviceProvider,
-        ILogger<FavoriteService> logger)
-        : base(logger)
+    private readonly IAssetInfoService _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
+    private readonly ILogger<FavoriteService> _logger = logger;
+    private readonly MarketType _marketType = marketType;
+    private readonly string _marketLabel = marketType switch
     {
-        _marketType = marketType;
-        _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
-        _logger = logger;
-        _marketLabel = marketType switch
-        {
-            MarketType.AShare => "A股",
-            MarketType.Crypto => "虚拟币",
-            _ => marketType.ToString()
-        };
-    }
+        MarketType.AShare => "A股",
+        MarketType.Crypto => "虚拟币",
+        _ => marketType.ToString()
+    };
 
     protected override async Task InitializeDatabaseAsync()
     {
@@ -209,7 +200,7 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
         });
 
         var results = await Task.WhenAll(tasks);
-        return results.Where(result => result != null).ToList();
+        return [.. results.Where(result => result != null)];
     }
 
     public async Task ClearFavoritesAsync(CancellationToken cancellationToken = default)

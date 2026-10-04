@@ -12,16 +12,10 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// 统一 AI 客户端由 ChatClientFactory 创建（M.E.AI IChatClient），此处适配为 SK IChatCompletionService；
 /// AI 未配置（FriendlyException）时返回 null，Caption 降级为占位符。
 /// </summary>
-public sealed class ImageCaptionClientFactory : IImageCaptionClientFactory
+public sealed class ImageCaptionClientFactory(IChatClientFactory chatClientFactory, ILogger<ImageCaptionClientFactory> logger) : IImageCaptionClientFactory
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILogger<ImageCaptionClientFactory> _logger;
-
-    public ImageCaptionClientFactory(IChatClientFactory chatClientFactory, ILogger<ImageCaptionClientFactory> logger)
-    {
-        _chatClientFactory = chatClientFactory;
-        _logger = logger;
-    }
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly ILogger<ImageCaptionClientFactory> _logger = logger;
 
     public IChatCompletionService? Create()
     {

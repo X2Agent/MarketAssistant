@@ -16,7 +16,11 @@ namespace MarketAssistant.Applications.Briefing;
 /// 内容截断、输出上限），按本地日期缓存。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public sealed class DailyBriefingService : SqliteServiceBase, IDailyBriefingService
+public sealed class DailyBriefingService(
+    [ServiceKey] MarketType marketType,
+    IServiceProvider serviceProvider,
+    IChatClientFactory chatClientFactory,
+    ILogger<DailyBriefingService> logger) : SqliteServiceBase(logger), IDailyBriefingService
 {
     /// <summary>纳入简报的自选数量上限（按异动幅度优先，控制输入 Token）。</summary>
     public const int MaxFavorites = 8;
@@ -32,25 +36,11 @@ public sealed class DailyBriefingService : SqliteServiceBase, IDailyBriefingServ
 
     private const int MaxOutputTokens = 800;
 
-    private readonly MarketType _marketType;
-    private readonly IFavoriteService _favoriteService;
-    private readonly ITelegramService _telegramService;
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILogger<DailyBriefingService> _logger;
-
-    public DailyBriefingService(
-        [ServiceKey] MarketType marketType,
-        IServiceProvider serviceProvider,
-        IChatClientFactory chatClientFactory,
-        ILogger<DailyBriefingService> logger)
-        : base(logger)
-    {
-        _marketType = marketType;
-        _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
-        _telegramService = serviceProvider.GetRequiredKeyedService<ITelegramService>(marketType);
-        _chatClientFactory = chatClientFactory;
-        _logger = logger;
-    }
+    private readonly MarketType _marketType = marketType;
+    private readonly IFavoriteService _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
+    private readonly ITelegramService _telegramService = serviceProvider.GetRequiredKeyedService<ITelegramService>(marketType);
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly ILogger<DailyBriefingService> _logger = logger;
 
     public async Task<DailyBriefing?> GetTodayAsync(CancellationToken cancellationToken = default)
     {
@@ -128,16 +118,15 @@ public sealed class DailyBriefingService : SqliteServiceBase, IDailyBriefingServ
     private async Task<List<AssetInfo>> LoadFavoritesAsync(CancellationToken cancellationToken)
     {
         var favorites = await _favoriteService.GetFavoritesWithLatestDataAsync(cancellationToken);
-        return favorites
+        return [.. favorites
             .OrderByDescending(f => Math.Abs(ParsePercent(f.ChangePercentage)))
-            .Take(MaxFavorites)
-            .ToList();
+            .Take(MaxFavorites)];
     }
 
     private async Task<List<Telegram>> LoadNewsAsync(CancellationToken cancellationToken)
     {
         var news = await _telegramService.GetTelegraphsAsync(cancellationToken);
-        return news.Take(MaxNewsItems).ToList();
+        return [.. news.Take(MaxNewsItems)];
     }
 
     private static decimal ParsePercent(string? percent)

@@ -28,7 +28,7 @@ public class TextChunkingServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(1, result.Length, "短文本应聚合为单个分块");
+        Assert.HasCount(1, result, "短文本应聚合为单个分块");
 
         var chunk = result[0];
         Assert.AreEqual(documentUri, chunk.DocumentUri, "应保留原始 DocumentUri");
@@ -55,7 +55,7 @@ public class TextChunkingServiceTest : BaseAgentTest
         var result = _service.Chunk(documentUri, input).ToArray();
 
         // Assert
-        Assert.IsTrue(result.Length > 1, "超过 token 限制的长文本应被切分为多个分块");
+        Assert.IsGreaterThan(1, result.Length, "超过 token 限制的长文本应被切分为多个分块");
 
         // 验证 Order 字段严格递增，证明分块顺序正确
         for (int i = 0; i < result.Length; i++)
@@ -80,7 +80,7 @@ public class TextChunkingServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Length);
+        Assert.IsEmpty(result);
     }
 
     [TestMethod]
@@ -96,7 +96,7 @@ public class TextChunkingServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Length);
+        Assert.IsEmpty(result);
     }
 
     [TestMethod]
@@ -114,9 +114,9 @@ public class TextChunkingServiceTest : BaseAgentTest
         var result = _service.Chunk(documentUri, input).ToArray();
 
         // Assert
-        Assert.IsTrue(result.Length > 1, "应产生多个分块以验证 Key 唯一性");
+        Assert.IsGreaterThan(1, result.Length, "应产生多个分块以验证 Key 唯一性");
         var keys = result.Select(r => r.Key).ToArray();
-        Assert.AreEqual(keys.Length, keys.Distinct().Count(), "所有分块的 Key 应唯一");
+        Assert.HasCount(keys.Length, keys.Distinct(), "所有分块的 Key 应唯一");
 
         // 验证 Key 格式：{documentUriHash}:{order}:{contentHash[..8]}
         var expectedDocHashPrefix = result[0].Key.Split(':')[0];
@@ -144,7 +144,7 @@ public class TextChunkingServiceTest : BaseAgentTest
             var result = _service.Chunk(uri, "测试内容用于验证 SourceType 识别").ToArray();
 
             // Assert
-            Assert.IsTrue(result.Length > 0, $"URI '{uri}' 应至少产生一个分块");
+            Assert.IsNotEmpty(result, $"URI '{uri}' 应至少产生一个分块");
             Assert.AreEqual(expectedSourceType, result[0].SourceType,
                 $"URI '{uri}' 应识别为 '{expectedSourceType}' 类型");
         }

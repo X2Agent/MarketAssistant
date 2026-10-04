@@ -93,7 +93,7 @@ public class ViewModelBaseLoadStateTest
         Assert.IsTrue(vm.HasError);
         Assert.IsFalse(vm.IsEmpty, "失败不得被当成空态");
         Assert.IsFalse(vm.HasLoadedContent);
-        StringAssert.Contains(vm.ErrorMessage, OperationName);
+        Assert.Contains(OperationName, vm.ErrorMessage);
         Assert.AreEqual(vm.ErrorMessage, vm.OverlayMessage, "失败态浮层应展示错误信息而非空态文案");
     }
 

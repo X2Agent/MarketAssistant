@@ -8,12 +8,8 @@ namespace MarketAssistant.Services;
 /// <summary>
 /// 聊天会话持久化服务，支持将对话历史保存到 SQLite 并在应用重启后恢复。
 /// </summary>
-public class ChatSessionPersistenceService : SqliteServiceBase
+public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger) : SqliteServiceBase(logger)
 {
-    public ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService> logger)
-        : base(logger)
-    {
-    }
 
     /// <summary>
     /// 保存聊天会话

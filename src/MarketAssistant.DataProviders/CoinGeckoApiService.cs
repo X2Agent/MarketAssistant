@@ -12,10 +12,12 @@ namespace MarketAssistant.DataProviders;
 /// <summary>
 /// CoinGecko API服务（含客户端限流，免费版 30 次/分钟）
 /// </summary>
-public sealed class CoinGeckoApiService
+public sealed class CoinGeckoApiService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<CoinGeckoApiService> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<CoinGeckoApiService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly ILogger<CoinGeckoApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔。
     // QueueLimit 有限：突发排队超过 8 个直接失败并抛错（无界排队会让调用方长时间悬挂）
@@ -35,14 +37,6 @@ public sealed class CoinGeckoApiService
         PropertyNameCaseInsensitive = true,
         Converters = { new StringToDecimalConverter() }
     };
-
-    public CoinGeckoApiService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<CoinGeckoApiService> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 限流执行：确保请求间隔不低于 MinRequestIntervalMs（约 24 次/分钟）
@@ -94,7 +88,7 @@ public sealed class CoinGeckoApiService
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinGecko市场数据，币种数量: {Count}", markets?.Count ?? 0);
-            return markets ?? new List<CoinGeckoMarket>();
+            return markets ?? [];
         }, cancellationToken);
     }
 

@@ -60,9 +60,9 @@ public class AssetInfoServiceTest
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.IsTrue(results.Count > 0, "搜索'贵州茅台'应返回至少一条结果");
+        Assert.IsNotEmpty(results, "搜索'贵州茅台'应返回至少一条结果");
         Assert.IsTrue(results.All(r => !string.IsNullOrWhiteSpace(r.Code)), "所有结果应包含有效代码");
-        Assert.IsTrue(results.Any(r => r.Name.Contains("茅台")), "结果中应包含茅台相关股票");
+        Assert.Contains(r => r.Name.Contains("茅台"), results, "结果中应包含茅台相关股票");
     }
 
     [TestMethod]
@@ -96,7 +96,7 @@ public class AssetInfoServiceTest
 
         // Assert
         Assert.IsNotNull(hotAssets);
-        Assert.IsTrue(hotAssets.Count > 0, "A股热门资产列表不应为空");
+        Assert.IsNotEmpty(hotAssets, "A股热门资产列表不应为空");
         Assert.IsTrue(hotAssets.All(h => !string.IsNullOrEmpty(h.Code)), "所有热门资产应包含有效代码");
     }
 }

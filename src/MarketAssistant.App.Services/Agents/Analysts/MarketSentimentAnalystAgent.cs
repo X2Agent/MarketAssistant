@@ -17,21 +17,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [Description("整合了行为金融分析师和市场分析师的功能")]
 [RequiresTools(typeof(IFinancialTools))]
 [RequiresTools(typeof(ISentimentTools))]
-public class MarketSentimentAnalystAgent : AnalystAgentBase
+public class MarketSentimentAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(MarketSentimentAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public MarketSentimentAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(MarketSentimentAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

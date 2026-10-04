@@ -12,33 +12,22 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// AI 信号策略执行器：封装硬性边界处理、Prompt 构建、Agent 调用与成交回写识别。
 /// </summary>
-public sealed class AISignalStrategyExecutor
+public sealed class AISignalStrategyExecutor(
+    ITradingAgentFactory agentFactory,
+    TradingDataService dataService,
+    TradingStrategyService strategyService,
+    CryptoPortfolioService portfolioService,
+    AnalysisReportCache reportCache,
+    TradeExecutor tradeExecutor,
+    ILogger<AISignalStrategyExecutor> logger)
 {
-    private readonly ITradingAgentFactory _agentFactory;
-    private readonly TradingDataService _dataService;
-    private readonly TradingStrategyService _strategyService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly AnalysisReportCache _reportCache;
-    private readonly TradeExecutor _tradeExecutor;
-    private readonly ILogger<AISignalStrategyExecutor> _logger;
-
-    public AISignalStrategyExecutor(
-        ITradingAgentFactory agentFactory,
-        TradingDataService dataService,
-        TradingStrategyService strategyService,
-        CryptoPortfolioService portfolioService,
-        AnalysisReportCache reportCache,
-        TradeExecutor tradeExecutor,
-        ILogger<AISignalStrategyExecutor> logger)
-    {
-        _agentFactory = agentFactory;
-        _dataService = dataService;
-        _strategyService = strategyService;
-        _portfolioService = portfolioService;
-        _reportCache = reportCache;
-        _tradeExecutor = tradeExecutor;
-        _logger = logger;
-    }
+    private readonly ITradingAgentFactory _agentFactory = agentFactory;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly TradingStrategyService _strategyService = strategyService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly AnalysisReportCache _reportCache = reportCache;
+    private readonly TradeExecutor _tradeExecutor = tradeExecutor;
+    private readonly ILogger<AISignalStrategyExecutor> _logger = logger;
 
     public async Task<AISignalExecutionResult> ExecuteAsync(
         TradingStrategy strategy,

@@ -20,7 +20,7 @@ public class TechnicalIndicatorServiceTest
     private static List<KLineData> CreateSeries(int count)
     {
         var start = new DateTime(2024, 1, 1);
-        return Enumerable.Range(0, count)
+        return [.. Enumerable.Range(0, count)
             .Select(index => new KLineData
             {
                 Timestamp = start.AddDays(index),
@@ -29,8 +29,7 @@ public class TechnicalIndicatorServiceTest
                 Low = 100m + index - 1m,
                 Close = 100m + index,
                 Volume = 1_000 + index
-            })
-            .ToList();
+            })];
     }
 
     /// <summary>递增序列最后一个周期为 p 的 SMA：收盘价为 100+i，故均值 = (699 - p) / 2。</summary>
@@ -166,7 +165,7 @@ public class TechnicalIndicatorServiceTest
         var exception = await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetSnapshotAsync("600519"));
 
-        StringAssert.Contains(exception.Message, "600519");
+        Assert.Contains("600519", exception.Message);
     }
 
     [TestMethod]

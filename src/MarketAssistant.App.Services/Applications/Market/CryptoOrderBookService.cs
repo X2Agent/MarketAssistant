@@ -11,21 +11,15 @@ namespace MarketAssistant.Applications.Market;
 /// 虚拟币盘口深度：复用币安 <c>/api/v3/depth</c>。
 /// 解析逻辑集中在此，Agent 工具与 UI 共用同一份实现。
 /// </summary>
-public sealed class CryptoOrderBookService : IOrderBookService
+public sealed class CryptoOrderBookService(
+    BinanceMarketDataService binanceService,
+    ILogger<CryptoOrderBookService> logger) : IOrderBookService
 {
     /// <summary>币安 depth 接口允许的档位值；其它值会被服务端拒绝。</summary>
     private static readonly int[] AllowedLimits = [5, 10, 20, 50, 100, 500, 1000, 5000];
 
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly ILogger<CryptoOrderBookService> _logger;
-
-    public CryptoOrderBookService(
-        BinanceMarketDataService binanceService,
-        ILogger<CryptoOrderBookService> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly ILogger<CryptoOrderBookService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<OrderBookSnapshot?> GetOrderBookAsync(
         string code,

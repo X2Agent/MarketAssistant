@@ -8,9 +8,9 @@ namespace MarketAssistant.Rag.Services;
 /// Document-centric local file system image storage service.
 /// Organizes images in document-specific directories for better isolation and management.
 /// </summary>
-public sealed class LocalImageStorageService : IImageStorageService
+public sealed class LocalImageStorageService(ILogger<LocalImageStorageService>? logger = null) : IImageStorageService
 {
-    private readonly ILogger<LocalImageStorageService> _logger;
+    private readonly ILogger<LocalImageStorageService> _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalImageStorageService>.Instance;
 
     // Configuration constants
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10MB
@@ -22,11 +22,6 @@ public sealed class LocalImageStorageService : IImageStorageService
     {
         ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"
     };
-
-    public LocalImageStorageService(ILogger<LocalImageStorageService>? logger = null)
-    {
-        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<LocalImageStorageService>.Instance;
-    }
 
     public async Task<string> SaveImageAsync(byte[] imageBytes, string? fileName, string documentPath, CancellationToken cancellationToken = default)
     {

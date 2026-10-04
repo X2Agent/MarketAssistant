@@ -8,7 +8,9 @@ namespace MarketAssistant.Applications.Market;
 /// <summary>
 /// A 股行情速览：复用财联社 <c>/quote/stock/basic</c>（与资产信息同一数据源，仅扩字段）。
 /// </summary>
-public sealed class AShareMarketSnapshotService : IMarketSnapshotService
+public sealed class AShareMarketSnapshotService(
+    ClsQuoteClient clsClient,
+    ILogger<AShareMarketSnapshotService> logger) : IMarketSnapshotService
 {
     /// <summary>
     /// 请求字段列表。财联社按此列表裁剪返回，字段越少响应越小。
@@ -17,16 +19,8 @@ public sealed class AShareMarketSnapshotService : IMarketSnapshotService
         "secu_name,secu_code,last_px,change,open_px,high_px,low_px,preclose_px," +
         "business_amount,business_balance,tr,amp,qrr,pe,pb";
 
-    private readonly ClsQuoteClient _clsClient;
-    private readonly ILogger<AShareMarketSnapshotService> _logger;
-
-    public AShareMarketSnapshotService(
-        ClsQuoteClient clsClient,
-        ILogger<AShareMarketSnapshotService> logger)
-    {
-        _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
+    private readonly ILogger<AShareMarketSnapshotService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<MarketSnapshot?> GetSnapshotAsync(string code, CancellationToken cancellationToken = default)
     {

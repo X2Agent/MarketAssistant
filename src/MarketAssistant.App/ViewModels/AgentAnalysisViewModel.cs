@@ -196,7 +196,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }
     }
 
-    private readonly ObservableCollection<ChatMessageAdapter> _emptyChatMessages = new();
+    private readonly ObservableCollection<ChatMessageAdapter> _emptyChatMessages = [];
     public ObservableCollection<ChatMessageAdapter> ChatMessages => ChatSidebarViewModel?.ChatMessages ?? _emptyChatMessages;
 
     public string UserInput
@@ -645,7 +645,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             TargetPrice = coordinator.TargetPrice,
             PriceChangeExpectation = coordinator.PriceChangeExpectation,
             ConfidencePercentage = coordinator.ConfidencePercentage,
-            Highlights = coordinator.InvestmentHighlights.Take(3).ToList(),
+            Highlights = [.. coordinator.InvestmentHighlights.Take(3)],
             UsageSummary = TokenUsageFormatter.FormatSummary(report.Usage),
             GeneratedAt = report.CreatedAt
         };

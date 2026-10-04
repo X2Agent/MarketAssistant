@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "EventAnalysis", "ImpactEvaluation", "InvestmentGuidance" };
+    protected override string[] RequiredKeys => ["EventAnalysis", "ImpactEvaluation", "InvestmentGuidance"];
 
     protected override bool IsValid(NewsEventAnalysisResult model)
     {
@@ -120,7 +120,7 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
                 color,
                 content: contentParts.Count > 0 ? string.Join("\n", contentParts) : null,
                 bulletPoints: model.InvestmentGuidance.FocusPoints?.Count > 0
-                    ? new List<string> { "关注重点:" }.Concat(model.InvestmentGuidance.FocusPoints).ToList()
+                    ? ["关注重点:", .. model.InvestmentGuidance.FocusPoints]
                     : null);
 
             // 风险告警独立为统一风险看板

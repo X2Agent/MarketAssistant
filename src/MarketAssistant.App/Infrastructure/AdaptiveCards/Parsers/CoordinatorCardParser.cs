@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
 {
-    protected override string[] RequiredKeys => new[] { "OverallScore", "InvestmentRating", "OperationSuggestions" };
+    protected override string[] RequiredKeys => ["OverallScore", "InvestmentRating", "OperationSuggestions"];
 
     protected override bool IsValid(CoordinatorResult model)
     {

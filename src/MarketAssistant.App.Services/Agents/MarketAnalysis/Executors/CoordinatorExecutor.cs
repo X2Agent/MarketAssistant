@@ -18,12 +18,21 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 负责汇总各分析师的分析并生成最终报告
 /// 使用 AIAgent 支持工具调用 + 结构化输出
 /// </summary>
-public sealed partial class CoordinatorExecutor : Executor
+/// <param name="marketType">
+/// 本次运行所属市场。由工作流在 Run 开始时捕获后传入，避免分析过程中切换市场导致报告归属错乱。
+/// </param>
+public sealed partial class CoordinatorExecutor(
+    AIAgent coordinatorAgent,
+    Guid runId,
+    MarketType marketType,
+    IAnalystArtifactStore artifactStore,
+    ILogger<CoordinatorExecutor> logger) : Executor("Coordinator")
 {
-    private readonly AIAgent _coordinatorAgent;
-    private readonly ILogger<CoordinatorExecutor> _logger;
-    private readonly Guid _runId;
-    private readonly IAnalystArtifactStore _artifactStore;
+    private readonly AIAgent _coordinatorAgent = coordinatorAgent ?? throw new ArgumentNullException(nameof(coordinatorAgent));
+    private readonly ILogger<CoordinatorExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly Guid _runId = runId;
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly MarketType _marketType = marketType;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerOptions.Web)
     {
@@ -40,19 +49,6 @@ public sealed partial class CoordinatorExecutor : Executor
 
     /// <summary>校验错误中 null 违规的标记片段，用于区分硬伤与可降级的值违规</summary>
     private const string NullViolationMarker = "值不能为空";
-
-    public CoordinatorExecutor(
-        AIAgent coordinatorAgent,
-        Guid runId,
-        IAnalystArtifactStore artifactStore,
-        ILogger<CoordinatorExecutor> logger)
-        : base("Coordinator")
-    {
-        _coordinatorAgent = coordinatorAgent ?? throw new ArgumentNullException(nameof(coordinatorAgent));
-        _runId = runId;
-        _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     [MessageHandler]
     private async ValueTask<MarketAnalysisReport> HandleAsync(
@@ -260,6 +256,7 @@ public sealed partial class CoordinatorExecutor : Executor
             var finalReport = new MarketAnalysisReport
             {
                 AssetSymbol = assetSymbol,
+                MarketType = _marketType,
                 AnalystMessages = [.. reportAnalystMessages, coordinatorMessage!],
                 CoordinatorResult = coordinatorResult,
                 AnalystSignals = analystSignals,
@@ -415,7 +412,7 @@ public sealed partial class CoordinatorExecutor : Executor
 
     private void LogMessageDiagnostics(string stage, IEnumerable<ChatMessage> messages)
     {
-        var messageList = messages as IList<ChatMessage> ?? messages.ToList();
+        var messageList = messages as IList<ChatMessage> ?? [.. messages];
         for (var index = 0; index < messageList.Count; index++)
         {
             var message = messageList[index];

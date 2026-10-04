@@ -33,25 +33,18 @@ public interface ICryptoAliasRegistry
     Task<List<string>> GetAliasesAsync(string symbol, CancellationToken cancellationToken = default);
 }
 
-public sealed class CryptoAliasRegistry : ICryptoAliasRegistry
+public sealed class CryptoAliasRegistry(
+    CoinGeckoApiService coinGeckoService,
+    IMemoryCache memoryCache,
+    ILogger<CryptoAliasRegistry> logger) : ICryptoAliasRegistry
 {
     private const string CacheKey = "CryptoAliasRegistry_Data";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(6);
 
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly IMemoryCache _memoryCache;
-    private readonly ILogger<CryptoAliasRegistry> _logger;
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService;
+    private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly ILogger<CryptoAliasRegistry> _logger = logger;
     private readonly SemaphoreSlim _initLock = new(1, 1);
-
-    public CryptoAliasRegistry(
-        CoinGeckoApiService coinGeckoService,
-        IMemoryCache memoryCache,
-        ILogger<CryptoAliasRegistry> logger)
-    {
-        _coinGeckoService = coinGeckoService;
-        _memoryCache = memoryCache;
-        _logger = logger;
-    }
 
     public async Task<IReadOnlyDictionary<string, Regex>> GetMatchPatternsAsync(CancellationToken cancellationToken = default)
         => (await GetDataAsync(cancellationToken)).Patterns;

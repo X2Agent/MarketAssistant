@@ -59,7 +59,7 @@ public interface IAssetInfoService
         });
 
         await Task.WhenAll(tasks);
-        return results.ToList();
+        return [.. results];
     }
 }
 

@@ -18,7 +18,7 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 按服务商保存模型 ID，切换服务商时恢复各自选择。
     /// </summary>
-    public Dictionary<string, string> ProviderModelIds { get; set; } = new();
+    public Dictionary<string, string> ProviderModelIds { get; set; } = [];
 
     /// <summary>
     /// 按服务商保存"分析师角色 → 模型 ID"的分配，用于按角色分级模型
@@ -26,7 +26,7 @@ public class UserSetting : INotifyPropertyChanged
     /// 结构为 providerId → 分析师类型名（如 FundamentalAnalystAgent）→ modelId；
     /// 未配置或留空的角色回落到 <see cref="ProviderModelIds"/> 中的默认模型。
     /// </summary>
-    public Dictionary<string, Dictionary<string, string>> ProviderAnalystModelIds { get; set; } = new();
+    public Dictionary<string, Dictionary<string, string>> ProviderAnalystModelIds { get; set; } = [];
 
     public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
@@ -38,13 +38,13 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 按服务商保存自定义 Endpoint，空值表示使用目录默认地址。
     /// </summary>
-    public Dictionary<string, string> ProviderEndpoints { get; set; } = new();
+    public Dictionary<string, string> ProviderEndpoints { get; set; } = [];
 
     /// <summary>
     /// 按服务商 ID 存储各自的 API Key
     /// </summary>
     [JsonIgnore]
-    public Dictionary<string, string> ProviderApiKeys { get; set; } = new();
+    public Dictionary<string, string> ProviderApiKeys { get; set; } = [];
 
     private bool _loadKnowledge;
     public bool LoadKnowledge
@@ -201,13 +201,13 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 启用的分析师角色字典 Key: AgentName, Value: IsEnabled
     /// </summary>
-    public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = new();
+    public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = [];
 
     /// <summary>
     /// 模型价格表（元 / 1M tokens）。用户手工维护，用于分析成本的估算展示；
     /// 未配置某模型时该模型的消耗在成本展示中标记为"未定价"。
     /// </summary>
-    public List<ModelPrice> ModelPrices { get; set; } = new();
+    public List<ModelPrice> ModelPrices { get; set; } = [];
 
     private InvestmentPreference _investmentPreference = new();
     public InvestmentPreference InvestmentPreference
@@ -258,13 +258,13 @@ public class UserSetting : INotifyPropertyChanged
             WebSearchApiKey = WebSearchApiKey,
             WebSearchProvider = WebSearchProvider,
             EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
-            ModelPrices = ModelPrices.Select(price => new ModelPrice
+            ModelPrices = [.. ModelPrices.Select(price => new ModelPrice
             {
                 ProviderId = price.ProviderId,
                 ModelId = price.ModelId,
                 InputPricePerMillionTokens = price.InputPricePerMillionTokens,
                 OutputPricePerMillionTokens = price.OutputPricePerMillionTokens
-            }).ToList(),
+            })],
             InvestmentPreference = InvestmentPreference.Clone()
         };
         return clone;

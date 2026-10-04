@@ -10,7 +10,12 @@ namespace MarketAssistant.Applications.Assets;
 /// <summary>
 /// 虚拟币资产信息服务实现（基于币安API + CoinGecko市值数据）
 /// </summary>
-public class CryptoAssetInfoService : IAssetInfoService
+public class CryptoAssetInfoService(
+    BinanceMarketDataService binanceService,
+    CoinGeckoApiService coinGeckoService,
+    ICryptoAliasRegistry aliasRegistry,
+    ILogger<CryptoAssetInfoService> logger,
+    IMemoryCache memoryCache) : IAssetInfoService
 {
     /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
     private const int HotAssetCount = 10;
@@ -18,31 +23,17 @@ public class CryptoAssetInfoService : IAssetInfoService
     /// <summary>币安批量 24hr ticker 单次请求的最大交易对数（API 上限 100）</summary>
     private const int BinanceTickerBatchSize = 100;
 
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly ICryptoAliasRegistry _aliasRegistry;
-    private readonly ILogger<CryptoAssetInfoService> _logger;
-    private readonly IMemoryCache _memoryCache;
-
-    public CryptoAssetInfoService(
-        BinanceMarketDataService binanceService,
-        CoinGeckoApiService coinGeckoService,
-        ICryptoAliasRegistry aliasRegistry,
-        ILogger<CryptoAssetInfoService> logger,
-        IMemoryCache memoryCache)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _aliasRegistry = aliasRegistry;
-        _logger = logger;
-        _memoryCache = memoryCache;
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
+    private readonly ILogger<CryptoAssetInfoService> _logger = logger;
+    private readonly IMemoryCache _memoryCache = memoryCache;
 
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(keyword))
         {
-            return new List<(string Name, string Code)>();
+            return [];
         }
 
         keyword = keyword.Trim().ToUpperInvariant();
@@ -107,13 +98,13 @@ public class CryptoAssetInfoService : IAssetInfoService
         var tickers = new Dictionary<string, Binance24hrTicker>(StringComparer.OrdinalIgnoreCase);
         foreach (var chunk in symbols.Chunk(BinanceTickerBatchSize))
         {
-            foreach (var ticker in await _binanceService.Get24hrTickersAsync(chunk.ToList(), cancellationToken))
+            foreach (var ticker in await _binanceService.Get24hrTickersAsync([.. chunk], cancellationToken))
             {
                 tickers[ticker.Symbol] = ticker;
             }
         }
 
-        return favorites.Select(favorite =>
+        return [.. favorites.Select(favorite =>
         {
             var symbol = ToBinanceFormat(favorite.Code);
             if (!tickers.TryGetValue(symbol, out var ticker))
@@ -132,7 +123,7 @@ public class CryptoAssetInfoService : IAssetInfoService
                 ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
                 Volume24h = FormatVolume(ticker.Volume)
             };
-        }).ToList();
+        })];
     }
 
     public async Task<List<HotAsset>> GetHotAssetsAsync()
@@ -142,7 +133,7 @@ public class CryptoAssetInfoService : IAssetInfoService
         if (tickers == null || tickers.Count == 0)
         {
             _logger.LogWarning("币安API返回数据为空");
-            return new List<HotAsset>();
+            return [];
         }
 
         // 稳定币列表（用于过滤稳定币互换交易对）
@@ -231,7 +222,7 @@ public class CryptoAssetInfoService : IAssetInfoService
 
         var exchangeInfo = await _binanceService.GetExchangeInfoAsync(cancellationToken);
 
-        var tradingSymbols = exchangeInfo?.Symbols ?? new List<BinanceSymbolInfo>();
+        var tradingSymbols = exchangeInfo?.Symbols ?? [];
 
         var cacheOptions = new MemoryCacheEntryOptions
         {

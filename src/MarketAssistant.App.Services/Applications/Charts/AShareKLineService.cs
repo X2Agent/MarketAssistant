@@ -14,21 +14,14 @@ namespace MarketAssistant.Applications.Charts;
 /// <summary>
 /// A股K线数据服务实现
 /// </summary>
-public class AShareKLineService : IKLineService
+public class AShareKLineService(
+    ZhiTuMarketClient zhiTuClient,
+    ILogger<AShareKLineService> logger,
+    IUserSettingService userSettingService) : IKLineService
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareKLineService> _logger;
-
-    public AShareKLineService(
-        ZhiTuMarketClient zhiTuClient,
-        ILogger<AShareKLineService> logger,
-        IUserSettingService userSettingService)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService;
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly ILogger<AShareKLineService> _logger = logger;
 
     /// <summary>
     /// 获取K线数据（统一入口，根据类型调用对应的实现）
@@ -47,7 +40,7 @@ public class AShareKLineService : IKLineService
         };
 
         var dataset = await GetKLineDataInternalAsync(code, interval, dataTypeName, count: count);
-        return dataset?.Data ?? new List<KLineData>();
+        return dataset?.Data ?? [];
     }
 
     #region 内部实现方法
@@ -83,7 +76,7 @@ public class AShareKLineService : IKLineService
             {
                 Symbol = symbol,
                 Interval = interval,
-                Data = new List<KLineData>()
+                Data = []
             };
 
             // 解析数据
@@ -92,9 +85,7 @@ public class AShareKLineService : IKLineService
             // 按调用方请求的 count 截取最近的 N 条（已按时间升序排序，取最后 count 条）
             if (count.HasValue && count.Value > 0 && klineDataSet.Data.Count > count.Value)
             {
-                klineDataSet.Data = klineDataSet.Data
-                    .Skip(klineDataSet.Data.Count - count.Value)
-                    .ToList();
+                klineDataSet.Data = [.. klineDataSet.Data.Skip(klineDataSet.Data.Count - count.Value)];
             }
 
             return klineDataSet;
@@ -117,32 +108,20 @@ public class AShareKLineService : IKLineService
 
         if (!startDate.HasValue && !endDate.HasValue)
         {
-            switch (interval.ToLower())
+            defaultStartDate = interval.ToLower() switch
             {
-                case "d": // 日K线，默认查询最近1年
-                    defaultStartDate = DateTime.Now.AddYears(-1);
-                    break;
-                case "w": // 周K线，默认查询最近3年
-                    defaultStartDate = DateTime.Now.AddYears(-3);
-                    break;
-                case "m": // 月K线，默认查询最近10年
-                    defaultStartDate = DateTime.Now.AddYears(-10);
-                    break;
-                case "y": // 年K线，默认查询最近10年
-                    defaultStartDate = DateTime.Now.AddYears(-10);
-                    break;
-                case "1":
-                case "5":
-                case "15":
-                case "30":
-                case "60": // 分钟级别数据，默认查询最近60天
-                    defaultStartDate = DateTime.Now.AddDays(-60);
-                    break;
-                default: // 其他情况，默认查询最近1年
-                    defaultStartDate = DateTime.Now.AddYears(-1);
-                    break;
-            }
-
+                // 日K线，默认查询最近1年
+                "d" => DateTime.Now.AddYears(-1),
+                // 周K线，默认查询最近3年
+                "w" => DateTime.Now.AddYears(-3),
+                // 月K线，默认查询最近10年
+                "m" => DateTime.Now.AddYears(-10),
+                // 年K线，默认查询最近10年
+                "y" => DateTime.Now.AddYears(-10),
+                "1" or "5" or "15" or "30" or "60" => DateTime.Now.AddDays(-60),
+                // 其他情况，默认查询最近1年
+                _ => DateTime.Now.AddYears(-1),
+            };
             startDate = defaultStartDate;
             endDate = defaultEndDate;
         }
@@ -226,7 +205,7 @@ public class AShareKLineService : IKLineService
         }
 
         // 按日期时间排序（从旧到新）
-        klineDataSet.Data = klineDataSet.Data.OrderBy(x => x.Timestamp).ToList();
+        klineDataSet.Data = [.. klineDataSet.Data.OrderBy(x => x.Timestamp)];
     }
 
     #endregion

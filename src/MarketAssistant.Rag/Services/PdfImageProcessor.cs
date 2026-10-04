@@ -7,14 +7,9 @@ namespace MarketAssistant.Rag.Services;
 /// <summary>
 /// PDF 页内图片提取与 Markdown 图片引用生成（依赖 <see cref="IImageStorageService"/> 持久化）。
 /// </summary>
-internal sealed class PdfImageProcessor
+internal sealed class PdfImageProcessor(IImageStorageService imageStorageService)
 {
-    private readonly IImageStorageService _imageStorageService;
-
-    public PdfImageProcessor(IImageStorageService imageStorageService)
-    {
-        _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
-    }
+    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
 
     public async Task ProcessPageImages(PdfPage page, StringBuilder markdown, int pageNumber, string filePath)
     {

@@ -7,25 +7,18 @@ namespace MarketAssistant.Applications.AssetScreener;
 /// <summary>
 /// 虚拟币筛选服务实现（基于CoinGecko免费API + 币安API补充）
 /// </summary>
-public sealed class CryptoScreenerService : IAssetScreenerService
+public sealed class CryptoScreenerService(
+    ILogger<CryptoScreenerService> logger,
+    CoinGeckoApiService coinGeckoService,
+    BinanceMarketDataService binanceService) : IAssetScreenerService
 {
-    private readonly ILogger<CryptoScreenerService> _logger;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly BinanceMarketDataService _binanceService;
+    private readonly ILogger<CryptoScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
 
     // CoinGecko API 限制
     private const int COINGECKO_MAX_PER_PAGE = 250;
     private const int COINGECKO_DEFAULT_PAGE_SIZE = 100;
-
-    public CryptoScreenerService(
-        ILogger<CryptoScreenerService> logger,
-        CoinGeckoApiService coinGeckoService,
-        BinanceMarketDataService binanceService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    }
 
     /// <summary>
     /// 根据筛选条件筛选虚拟币
@@ -151,12 +144,12 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             };
         }
 
-        return filtered.ToList();
+        return [.. filtered];
     }
 
     private List<ScreenerAssetInfo> ConvertToScreenerInfo(List<CoinGeckoMarket> markets)
     {
-        return markets.Select(m => (ScreenerAssetInfo)new ScreenerCryptoInfo
+        return [.. markets.Select(m => (ScreenerAssetInfo)new ScreenerCryptoInfo
         {
             Name = m.Name,
             Symbol = m.Symbol.ToUpperInvariant(),
@@ -172,7 +165,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             CirculatingSupply = m.CirculatingSupply ?? 0,
             TotalSupply = m.TotalSupply ?? 0,
             MaxSupply = m.MaxSupply
-        }).ToList();
+        })];
     }
 
     /// <summary>
@@ -229,7 +222,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             };
         }
 
-        return filtered.ToList();
+        return [.. filtered];
     }
 
     /// <summary>
@@ -246,7 +239,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// </summary>
     private List<ScreenerAssetInfo> ConvertBinanceToScreenerInfo(List<Binance24hrTicker> tickers)
     {
-        return tickers.Select(t =>
+        return [.. tickers.Select(t =>
         {
             // BTCUSDT → BTC
             var baseAsset = t.Symbol.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)
@@ -269,7 +262,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
                 CirculatingSupply = 0,
                 TotalSupply = 0
             };
-        }).ToList();
+        })];
     }
 
     #region 辅助方法

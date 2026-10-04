@@ -9,9 +9,9 @@ namespace MarketAssistant.Rag.Services;
 /// <summary>
 /// 文本清洗服务
 /// </summary>
-public class TextCleaningService : ITextCleaningService
+public class TextCleaningService(ILogger<TextCleaningService> logger) : ITextCleaningService
 {
-    private readonly ILogger<TextCleaningService> _logger;
+    private readonly ILogger<TextCleaningService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // 预编译的正则表达式 - 固定清洗规则
     private static readonly Regex MultiSpace = new(@"[\t\x0B\f ]{2,}", RegexOptions.Compiled);
@@ -32,11 +32,6 @@ public class TextCleaningService : ITextCleaningService
     // 严禁使用通用 N 位数字模式：金融文档中任意长数字串（成交额、证券代码、订单号）会被整段删除。
     private static readonly Regex PhonePattern = new(@"(?<![\d,.])(?:\+?86[- ]?)?1[3-9]\d{9}(?![\d])", RegexOptions.Compiled);
     private static readonly Regex HeaderFooterPattern = new(@"(?:^|\n)(?:Header|Footer|页眉|页脚):.*?(?:\n|$)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    public TextCleaningService(ILogger<TextCleaningService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 用于测试的无参构造函数

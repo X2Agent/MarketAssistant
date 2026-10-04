@@ -12,7 +12,7 @@ public class MCPServerConfigService
     private static readonly ConcurrentDictionary<string, object> FileLocks = new(
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
-    private List<MCPServerConfig> _serverConfigs = new();
+    private List<MCPServerConfig> _serverConfigs = [];
     private readonly object _lock;
     private readonly ISecureSettingsStore _secretStore;
     private readonly string _configFilePath;
@@ -26,7 +26,7 @@ public class MCPServerConfigService
         {
             lock (_lock)
             {
-                return _serverConfigs.ToList();
+                return [.. _serverConfigs];
             }
         }
     }

@@ -8,11 +8,8 @@ namespace MarketAssistant.Services.Trading;
 /// 交易数据库 schema 初始化与迁移（internal，单一职责：建表 + 历史结构迁移 + 索引创建）。
 /// 由 <see cref="TradingDataService"/> 组合，各仓储通过 <see cref="TradingRepositoryBase"/> 复用其连接与初始化能力。
 /// </summary>
-internal sealed class TradingSchemaInitializer : SqliteServiceBase
+internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBase(logger)
 {
-    public TradingSchemaInitializer(ILogger logger) : base(logger)
-    {
-    }
 
     /// <summary>各表建表 DDL（金额/数量列为 TEXT），供新建库与迁移重建共用。</summary>
     private static readonly IReadOnlyDictionary<string, string> TableDefinitions = new Dictionary<string, string>

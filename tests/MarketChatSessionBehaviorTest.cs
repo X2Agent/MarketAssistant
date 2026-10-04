@@ -21,10 +21,9 @@ public sealed class MarketChatSessionBehaviorTest
         await DrainAsync(session.SendMessageStreamAsync("第二问"));
 
         Assert.HasCount(2, client.Requests);
-        CollectionAssert.AreEqual(new[] { "第一问" }, GetNonSystemTexts(client.Requests[0]));
-        CollectionAssert.AreEqual(
-            new[] { "第一问", "完整回复", "第二问" },
-            GetNonSystemTexts(client.Requests[1]));
+        Assert.AreSequenceEqual(["第一问"], GetNonSystemTexts(client.Requests[0]));
+        Assert.AreSequenceEqual(
+            ["第一问", "完整回复", "第二问"], GetNonSystemTexts(client.Requests[1]));
     }
 
     [TestMethod]
@@ -52,17 +51,15 @@ public sealed class MarketChatSessionBehaviorTest
         var completedText = await DrainAsync(session.SendMessageStreamAsync("下一问"));
         Assert.AreEqual("完整回复", completedText);
         Assert.HasCount(2, client.Requests);
-        CollectionAssert.AreEqual(
-            new[] { "会被取消", "部分回复\n\n[回复被中断]", "下一问" },
-            GetNonSystemTexts(client.Requests[1]));
+        Assert.AreSequenceEqual(
+            ["会被取消", "部分回复\n\n[回复被中断]", "下一问"], GetNonSystemTexts(client.Requests[1]));
     }
 
     private static string[] GetNonSystemTexts(IReadOnlyList<ChatMessage> messages)
     {
-        return messages
+        return [.. messages
             .Where(message => message.Role != ChatRole.System)
-            .Select(message => message.Text ?? string.Empty)
-            .ToArray();
+            .Select(message => message.Text ?? string.Empty)];
     }
 
     private static async Task<string> DrainAsync(IAsyncEnumerable<string> source)

@@ -68,7 +68,7 @@ public class TokenTrackingMiddlewareTest
         // 累计突破 200k 熔断上限时抛出异常终止执行，防止工具调用循环失控
         var exception = Assert.ThrowsExactly<InvalidOperationException>(() =>
             middleware.LogAndAccumulate(session, inputTokens: 100_000, outputTokens: 60_000, agentName: "TestAgent"));
-        StringAssert.Contains(exception.Message, "熔断");
+        Assert.Contains("熔断", exception.Message);
     }
 
     [TestMethod]

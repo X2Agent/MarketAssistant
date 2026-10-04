@@ -10,26 +10,18 @@ namespace MarketAssistant.Services.Trading;
 /// 切换模式前会先停止正在运行的 <see cref="MarketMonitor"/>，防止在途订单、价格订阅
 /// 与账户数据在切换瞬间被路由到新环境造成状态错乱。
 /// </summary>
-public sealed class TradingEnvironmentService
+public sealed class TradingEnvironmentService(
+    IUserSettingService userSettingService,
+    IMarketMonitorProvider marketMonitorProvider,
+    ILogger<TradingEnvironmentService> logger)
 {
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<TradingEnvironmentService> _logger;
-    private readonly IMarketMonitorProvider _marketMonitorProvider;
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly ILogger<TradingEnvironmentService> _logger = logger;
+    private readonly IMarketMonitorProvider _marketMonitorProvider = marketMonitorProvider;
 
     // 后台下单链路（MarketMonitor 消费者/TradeExecutor）与 UI 线程并发读写，
     // 必须 volatile 保证模式切换立即对后台线程可见，避免"切到实盘仍在 Demo 下单"的反向错误
-    private volatile CryptoTradingMode _currentMode;
-
-    public TradingEnvironmentService(
-        IUserSettingService userSettingService,
-        IMarketMonitorProvider marketMonitorProvider,
-        ILogger<TradingEnvironmentService> logger)
-    {
-        _userSettingService = userSettingService;
-        _marketMonitorProvider = marketMonitorProvider;
-        _logger = logger;
-        _currentMode = userSettingService.CurrentSetting.CryptoTradingMode;
-    }
+    private volatile CryptoTradingMode _currentMode = userSettingService.CurrentSetting.CryptoTradingMode;
 
     public event Action<CryptoTradingMode>? ModeChanged;
 

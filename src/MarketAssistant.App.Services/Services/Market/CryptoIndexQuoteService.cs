@@ -7,16 +7,10 @@ namespace MarketAssistant.Services.Market;
 /// 与恐惧贪婪指数（alternative.me）。三项均为市场级聚合指标，非具体标的价格。
 /// 任一数据源失败仅省略对应项，全失败返回空集合（顶栏整体隐藏）。
 /// </summary>
-public sealed class CryptoIndexQuoteService : IIndexQuoteService
+public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, AlternativeMeClient alternativeMe) : IIndexQuoteService
 {
-    private readonly CoinGeckoApiService _coinGecko;
-    private readonly AlternativeMeClient _alternativeMe;
-
-    public CryptoIndexQuoteService(CoinGeckoApiService coinGecko, AlternativeMeClient alternativeMe)
-    {
-        _coinGecko = coinGecko;
-        _alternativeMe = alternativeMe;
-    }
+    private readonly CoinGeckoApiService _coinGecko = coinGecko;
+    private readonly AlternativeMeClient _alternativeMe = alternativeMe;
 
     public async Task<IReadOnlyList<IndexQuoteItem>> GetLatestAsync(CancellationToken cancellationToken = default)
     {

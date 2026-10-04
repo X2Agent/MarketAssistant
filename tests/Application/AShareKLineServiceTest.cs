@@ -81,7 +81,7 @@ public class AShareKLineServiceTest
         var result = await service.GetKLineDataAsync("sz002475", KLineType.Daily, 100);
 
         // Assert
-        Assert.AreEqual(3, result.Count);
+        Assert.HasCount(3, result);
         Assert.AreEqual(new DateTime(2025, 6, 20), result[0].Timestamp);
         Assert.AreEqual(38.50m, result[0].Open);
         Assert.AreEqual(39.20m, result[0].High);
@@ -147,7 +147,7 @@ public class AShareKLineServiceTest
         var result = await service.GetKLineDataAsync("sz002475", KLineType.Daily, 2);
 
         // Assert
-        Assert.AreEqual(2, result.Count);
+        Assert.HasCount(2, result);
         Assert.AreEqual(new DateTime(2025, 6, 23), result[0].Timestamp);
         Assert.AreEqual(new DateTime(2025, 6, 24), result[1].Timestamp);
     }
@@ -169,10 +169,10 @@ public class AShareKLineServiceTest
         var uri = capturedRequest!.RequestUri!;
         Assert.IsTrue(uri.IsAbsoluteUri);
         Assert.AreEqual("api.zhituapi.com", uri.Host);
-        Assert.IsTrue(uri.AbsolutePath.StartsWith("/hs/history/002475.SZ/d/n"));
-        Assert.IsTrue(uri.Query.Contains("token=test-token-123"));
-        Assert.IsTrue(uri.Query.Contains("st="));
-        Assert.IsTrue(uri.Query.Contains("et="));
+        Assert.StartsWith("/hs/history/002475.SZ/d/n", uri.AbsolutePath);
+        Assert.Contains("token=test-token-123", uri.Query);
+        Assert.Contains("st=", uri.Query);
+        Assert.Contains("et=", uri.Query);
     }
 
     [TestMethod]
@@ -195,7 +195,7 @@ public class AShareKLineServiceTest
         // Assert
         Assert.IsNotNull(capturedRequest);
         var path = capturedRequest!.RequestUri!.AbsolutePath;
-        Assert.IsTrue(path.Contains(expectedInPath), $"URL路径 '{path}' 应包含 '{expectedInPath}'");
+        Assert.Contains(expectedInPath, path, $"URL路径 '{path}' 应包含 '{expectedInPath}'");
     }
 
     [TestMethod]
@@ -209,8 +209,8 @@ public class AShareKLineServiceTest
         // Act & Assert
         var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
-        Assert.IsTrue(ex.Message.Contains("400"), "异常消息应包含状态码");
-        Assert.IsTrue(ex.Message.Contains("invalid token"), "异常消息应包含API返回的错误内容");
+        Assert.Contains("400", ex.Message, "异常消息应包含状态码");
+        Assert.Contains("invalid token", ex.Message, "异常消息应包含API返回的错误内容");
     }
 
     [TestMethod]
@@ -224,8 +224,8 @@ public class AShareKLineServiceTest
         // Act & Assert
         var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
-        Assert.IsTrue(ex.Message.Contains("400"));
-        Assert.IsTrue(ex.Message.Contains("请稍后重试"));
+        Assert.Contains("400", ex.Message);
+        Assert.Contains("请稍后重试", ex.Message);
     }
 
     [TestMethod]
@@ -274,6 +274,6 @@ public class AShareKLineServiceTest
         // Assert
         Assert.IsNotNull(capturedRequest);
         var path = capturedRequest!.RequestUri!.AbsolutePath;
-        Assert.IsTrue(path.Contains(expectedInterval), $"URL路径 '{path}' 应包含 '{expectedInterval}'");
+        Assert.Contains(expectedInterval, path, $"URL路径 '{path}' 应包含 '{expectedInterval}'");
     }
 }

@@ -14,21 +14,14 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// <summary>
 /// Agent 工厂基类：封装基于 RequiresToolsAttribute 的工具解析和 Token 追踪中间件附加。
 /// </summary>
-public abstract class AgentFactoryBase
+public abstract class AgentFactoryBase(
+    IServiceProvider serviceProvider,
+    TokenTrackingMiddleware tokenTracking,
+    ILogger logger)
 {
-    protected readonly IServiceProvider ServiceProvider;
-    protected readonly TokenTrackingMiddleware TokenTracking;
-    protected readonly ILogger Logger;
-
-    protected AgentFactoryBase(
-        IServiceProvider serviceProvider,
-        TokenTrackingMiddleware tokenTracking,
-        ILogger logger)
-    {
-        ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        TokenTracking = tokenTracking ?? throw new ArgumentNullException(nameof(tokenTracking));
-        Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    protected readonly IServiceProvider ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    protected readonly TokenTrackingMiddleware TokenTracking = tokenTracking ?? throw new ArgumentNullException(nameof(tokenTracking));
+    protected readonly ILogger Logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 基于 agentType 上的 <see cref="RequiresToolsAttribute"/> 与指定市场类型解析工具列表。

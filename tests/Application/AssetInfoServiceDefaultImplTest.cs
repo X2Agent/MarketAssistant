@@ -14,17 +14,12 @@ public class AssetInfoServiceDefaultImplTest
     /// <summary>
     /// 记录并发峰值的最小 Fake 实现（GetAssetInfoAsync 可按需抛异常）
     /// </summary>
-    private sealed class FakeAssetInfoService : IAssetInfoService
+    private sealed class FakeAssetInfoService(IEnumerable<string>? failingCodes = null) : IAssetInfoService
     {
-        private readonly HashSet<string> _failingCodes;
+        private readonly HashSet<string> _failingCodes = failingCodes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
         private int _current;
 
         public int MaxConcurrent { get; private set; }
-
-        public FakeAssetInfoService(IEnumerable<string>? failingCodes = null)
-        {
-            _failingCodes = failingCodes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>();
-        }
 
         public Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
             => throw new NotSupportedException("本测试不涉及搜索");
@@ -64,10 +59,10 @@ public class AssetInfoServiceDefaultImplTest
     {
         var service = new FakeAssetInfoService();
 
-        var results = await ((IAssetInfoService)service).GetAssetInfosAsync(new List<FavoriteAsset>());
+        var results = await ((IAssetInfoService)service).GetAssetInfosAsync([]);
 
         Assert.IsNotNull(results);
-        Assert.AreEqual(0, results.Count);
+        Assert.IsEmpty(results);
     }
 
     [TestMethod]
@@ -75,7 +70,7 @@ public class AssetInfoServiceDefaultImplTest
     public async Task GetAssetInfosAsync_SingleItemFailure_ReturnsNullForThatItem()
     {
         // Arrange：第二项抛异常，其余成功
-        var service = new FakeAssetInfoService(new[] { "SH600002" });
+        var service = new FakeAssetInfoService(["SH600002"]);
         var favorites = new List<FavoriteAsset>
         {
             CreateFavorite("SH600001"),
@@ -87,7 +82,7 @@ public class AssetInfoServiceDefaultImplTest
         var results = await ((IAssetInfoService)service).GetAssetInfosAsync(favorites);
 
         // Assert：等长同序，仅失败项为 null
-        Assert.AreEqual(3, results.Count);
+        Assert.HasCount(3, results);
         Assert.IsNotNull(results[0]);
         Assert.IsNull(results[1]);
         Assert.IsNotNull(results[2]);
@@ -107,8 +102,8 @@ public class AssetInfoServiceDefaultImplTest
         var results = await ((IAssetInfoService)service).GetAssetInfosAsync(favorites);
 
         // Assert：全部返回且并发峰值不超过 3
-        Assert.AreEqual(10, results.Count);
+        Assert.HasCount(10, results);
         Assert.IsTrue(results.All(r => r != null));
-        Assert.IsTrue(service.MaxConcurrent <= 3, $"并发峰值应不超过3，实际为 {service.MaxConcurrent}");
+        Assert.IsLessThanOrEqualTo(3, service.MaxConcurrent, $"并发峰值应不超过3，实际为 {service.MaxConcurrent}");
     }
 }

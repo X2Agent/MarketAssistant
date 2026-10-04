@@ -23,7 +23,7 @@ public class McpServiceTest
             Arguments = "-y @modelcontextprotocol/server-everything",
             // 验证工具加载能力，显式允许全部；空白名单默认不暴露由 EmptyWhitelist 测试覆盖
             AllowAllTools = true,
-            EnvironmentVariables = new Dictionary<string, string?>()
+            EnvironmentVariables = []
         };
 
         var service = new McpService(
@@ -33,7 +33,7 @@ public class McpServiceTest
 
         var tools = await service.GetAIToolsAsync([config]);
 
-        Assert.IsTrue(tools.Count > 0, "应该返回至少一个 AI 工具");
+        Assert.IsNotEmpty(tools, "应该返回至少一个 AI 工具");
     }
 
     [TestMethod]
@@ -48,7 +48,7 @@ public class McpServiceTest
             Command = "npx",
             Arguments = "-y @modelcontextprotocol/server-everything",
             AllowedTools = [],
-            EnvironmentVariables = new Dictionary<string, string?>()
+            EnvironmentVariables = []
         };
 
         var service = new McpService(
@@ -113,6 +113,6 @@ public class McpServiceTest
 
         var tools = await service.GetAIToolsAsync([]);
 
-        Assert.AreEqual(0, tools.Count, "空配置列表应该返回空工具列表");
+        Assert.IsEmpty(tools, "空配置列表应该返回空工具列表");
     }
 }

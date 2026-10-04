@@ -52,7 +52,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     private string _newsContent = string.Empty;
 
     [ObservableProperty]
-    private ObservableCollection<SelectionModeItem> _selectionModes = new();
+    private ObservableCollection<SelectionModeItem> _selectionModes = [];
 
     [ObservableProperty]
     private SelectionModeItem? _selectedMode;
@@ -64,7 +64,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     private bool _hasResult;
 
     [ObservableProperty]
-    private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = new();
+    private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = [];
 
     [ObservableProperty]
     private string _validationMessage = string.Empty;
@@ -151,7 +151,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     /// 集合实例保持不变、结果变更时原地替换内容：
     /// 每次绑定求值新建集合会让整个 ItemsControl 重建（丢滚动位置）
     /// </summary>
-    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = new();
+    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = [];
 
     /// <summary>
     /// 格式化的风险提示文本（用于UI绑定）

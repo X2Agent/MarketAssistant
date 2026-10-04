@@ -49,7 +49,7 @@ public sealed class CryptoPortfolioServiceFuturesTest
 
         var result = await service.Object.GetCurrentPositionsAsync();
 
-        Assert.AreEqual(2, result.Count, "零数量与空符号持仓应被过滤");
+        Assert.HasCount(2, result, "零数量与空符号持仓应被过滤");
 
         var longPosition = result.Single(p => p.Symbol == "BTCUSDT");
         Assert.AreEqual(2m, longPosition.Quantity, "多头数量应归一为绝对值");
@@ -91,6 +91,6 @@ public sealed class CryptoPortfolioServiceFuturesTest
 
         var result = await service.Object.GetCurrentPositionsAsync();
 
-        Assert.AreEqual(0, result.Count, "合约持仓查询失败应返回空视图而非抛出");
+        Assert.IsEmpty(result, "合约持仓查询失败应返回空视图而非抛出");
     }
 }

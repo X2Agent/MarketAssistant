@@ -17,24 +17,16 @@ namespace MarketAssistant.Agents.Tools;
 /// - 混合搜索：当用户同时启用知识库和网络搜索时
 /// - 空结果：当用户都未启用时，返回空结果
 /// </summary>
-public class GroundingSearchTools : IToolsProvider
+public class GroundingSearchTools(
+    IRetrievalOrchestrator orchestrator,
+    IWebSearchService webSearchService,
+    IUserSettingService userSettingService,
+    ILogger<GroundingSearchTools> logger) : IToolsProvider
 {
-    private readonly IRetrievalOrchestrator _orchestrator;
-    private readonly IWebSearchService _webSearchService;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<GroundingSearchTools> _logger;
-
-    public GroundingSearchTools(
-        IRetrievalOrchestrator orchestrator,
-        IWebSearchService webSearchService,
-        IUserSettingService userSettingService,
-        ILogger<GroundingSearchTools> logger)
-    {
-        _orchestrator = orchestrator;
-        _webSearchService = webSearchService;
-        _userSettingService = userSettingService;
-        _logger = logger;
-    }
+    private readonly IRetrievalOrchestrator _orchestrator = orchestrator;
+    private readonly IWebSearchService _webSearchService = webSearchService;
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly ILogger<GroundingSearchTools> _logger = logger;
 
     [Description("综合信息检索工具。可同时检索互联网公开信息和内部知识库（如用户文档、历史研报）。")]
     public async Task<List<TextSearchResult>> SearchAsync(
@@ -58,7 +50,7 @@ public class GroundingSearchTools : IToolsProvider
         try
         {
             var searchResults = await ExecuteSearchStrategy(query, hasKnowledgeEnabled, hasWebSearchEnabled, top, cancellationToken);
-            return searchResults.Take(top).ToList();
+            return [.. searchResults.Take(top)];
         }
         catch (OperationCanceledException)
         {
@@ -123,7 +115,7 @@ public class GroundingSearchTools : IToolsProvider
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "知识库搜索失败: {Query}", query);
-            return new List<TextSearchResult>();
+            return [];
         }
     }
 
@@ -144,7 +136,7 @@ public class GroundingSearchTools : IToolsProvider
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "网络搜索失败，忽略网络结果: {Query}", query);
-            return new List<TextSearchResult>();
+            return [];
         }
     }
 

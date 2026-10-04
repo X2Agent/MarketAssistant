@@ -90,7 +90,7 @@ public static class StockSymbolConverter
     /// </summary>
     private static string ExtractDigits(string stockCode)
     {
-        return new string(stockCode.Where(char.IsDigit).ToArray());
+        return new string([.. stockCode.Where(char.IsDigit)]);
     }
 
     /// <summary>

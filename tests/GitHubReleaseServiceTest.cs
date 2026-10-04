@@ -46,15 +46,15 @@ public class GitHubReleaseServiceTest
                 PublishedAt = DateTime.UtcNow,
                 Prerelease = false,
                 Draft = false,
-                Assets = new List<ReleaseAsset>
-                {
+                Assets =
+                [
                     new ReleaseAsset
                     {
                         Name = "app-2.0.0.zip",
                         DownloadUrl = "https://github.com/test/repo/releases/download/v2.0.0/app-2.0.0.zip",
                         Size = 10485760
                     }
-                }
+                ]
             }
         };
 
@@ -262,8 +262,8 @@ public class GitHubReleaseServiceTest
             Assert.IsTrue(File.Exists(savePath));
 
             // 10MB 文件应触发进度报告，且最终进度应为 100%
-            Assert.IsTrue(progressReports.Count > 0, "下载 10MB 文件应触发进度回调");
-            Assert.IsTrue(progressReports[progressReports.Count - 1] >= 1.0,
+            Assert.IsNotEmpty(progressReports, "下载 10MB 文件应触发进度回调");
+            Assert.IsGreaterThanOrEqualTo(1.0, progressReports[progressReports.Count - 1],
                 $"最终进度应 >= 1.0，实际: {progressReports[progressReports.Count - 1]}");
         }
         finally
@@ -335,8 +335,8 @@ public class GitHubReleaseServiceTest
                 PublishedAt = DateTime.UtcNow,
                 Prerelease = false,
                 Draft = false,
-                Assets = new List<ReleaseAsset>
-                {
+                Assets =
+                [
                     new ReleaseAsset
                     {
                         Name = "MarketAssistant-Setup-1.0.0.exe",
@@ -349,7 +349,7 @@ public class GitHubReleaseServiceTest
                         DownloadUrl = "https://github.com/X2Agent/MarketAssistant/releases/download/v1.0.0/MarketAssistant-Windows-x64.zip",
                         Size = 45_000_000
                     }
-                }
+                ]
             }
         };
 

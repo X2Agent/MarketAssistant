@@ -10,24 +10,17 @@ namespace MarketAssistant.Applications.Telegrams;
 /// 虚拟币市场快讯服务，调用 PANews 快讯API（中文）
 /// 数据来源：https://www.panewslab.com/zh/newsflash
 /// </summary>
-public class CryptoTelegramService : ITelegramService
+public class CryptoTelegramService(
+    ILogger<CryptoTelegramService> logger,
+    IHttpClientFactory httpClientFactory,
+    ICryptoAliasRegistry aliasRegistry) : ITelegramService
 {
-    private readonly ILogger<CryptoTelegramService> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ICryptoAliasRegistry _aliasRegistry;
+    private readonly ILogger<CryptoTelegramService> _logger = logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
 
     private const string ApiUrl =
         "https://universal-api.panewslab.com/articles?type=NEWS&isShowInList=true&take=20&skip=0&isImportant=true";
-
-    public CryptoTelegramService(
-        ILogger<CryptoTelegramService> logger,
-        IHttpClientFactory httpClientFactory,
-        ICryptoAliasRegistry aliasRegistry)
-    {
-        _logger = logger;
-        _httpClientFactory = httpClientFactory;
-        _aliasRegistry = aliasRegistry;
-    }
 
     /// <summary>
     /// 通过 PANews API 获取虚拟币市场实时快讯（中文）
@@ -120,11 +113,10 @@ public class CryptoTelegramService : ITelegramService
     {
         var patterns = await _aliasRegistry.GetMatchPatternsAsync(cancellationToken);
         var text = $"{title} {content}";
-        return patterns
+        return [.. patterns
             .Where(kv => kv.Value.IsMatch(text))
             .Select(kv => kv.Key)
-            .OrderBy(s => s)
-            .ToList();
+            .OrderBy(s => s)];
     }
 
     // ─────────────────────────────────────────────────────────────

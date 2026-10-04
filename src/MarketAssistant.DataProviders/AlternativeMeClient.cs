@@ -36,16 +36,11 @@ public sealed class FearGreedEntry
 /// <summary>
 /// alternative.me 恐惧贪婪指数客户端。仅负责 HTTP 访问与解析，失败时返回 null 交由上层降级。
 /// </summary>
-public sealed class AlternativeMeClient
+public sealed class AlternativeMeClient(IHttpClientFactory httpClientFactory)
 {
     private const string LatestPath = "/fng/";
 
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public AlternativeMeClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     /// <summary>
     /// 获取最新恐惧贪婪指数。网络或解析失败返回 null（不抛异常，顶栏据此省略该项）。

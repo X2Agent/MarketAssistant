@@ -13,29 +13,21 @@ namespace MarketAssistant.Services;
 /// 自动保存到 UserMemoryService 和 UserKnowledgeGraphService。
 /// 借鉴 Hermes 的主动保存 + MemPalace 的 auto-save hook。
 /// </summary>
-public class MemoryExtractionService
+public class MemoryExtractionService(
+    IChatClientFactory chatClientFactory,
+    UserMemoryService memoryService,
+    UserKnowledgeGraphService kgService,
+    ILogger<MemoryExtractionService> logger)
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly UserMemoryService _memoryService;
-    private readonly UserKnowledgeGraphService _kgService;
-    private readonly ILogger<MemoryExtractionService> _logger;
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly UserMemoryService _memoryService = memoryService;
+    private readonly UserKnowledgeGraphService _kgService = kgService;
+    private readonly ILogger<MemoryExtractionService> _logger = logger;
 
     /// <summary>
     /// 触发自动提取的对话轮次间隔
     /// </summary>
     public int ExtractionInterval { get; set; } = 6;
-
-    public MemoryExtractionService(
-        IChatClientFactory chatClientFactory,
-        UserMemoryService memoryService,
-        UserKnowledgeGraphService kgService,
-        ILogger<MemoryExtractionService> logger)
-    {
-        _chatClientFactory = chatClientFactory;
-        _memoryService = memoryService;
-        _kgService = kgService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 从对话历史中提取记忆并持久化。

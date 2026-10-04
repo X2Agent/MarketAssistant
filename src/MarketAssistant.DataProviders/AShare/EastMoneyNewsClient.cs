@@ -22,14 +22,9 @@ public sealed class EastMoneyNewsArticle
 /// <summary>
 /// 东方财富搜索新闻客户端。公开免费、无需签名，返回 JSONP 需剥离外层包装。
 /// </summary>
-public sealed class EastMoneyNewsClient
+public sealed class EastMoneyNewsClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public EastMoneyNewsClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     /// <summary>
     /// 按纯数字股票代码搜索相关新闻。

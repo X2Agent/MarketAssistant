@@ -13,13 +13,11 @@ namespace TestMarketAssistant.DataProviders;
 [TestClass]
 public class GoPlusSecurityClientTest
 {
-    private sealed class StubHandler : HttpMessageHandler
+    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder;
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder = responder;
 
-        public List<string> RequestUrls { get; } = new();
-
-        public StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) => _responder = responder;
+        public List<string> RequestUrls { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -104,7 +102,7 @@ public class GoPlusSecurityClientTest
 
         await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => client.GetTokenSecurityAsync("zksync", "0xabc"));
-        Assert.AreEqual(0, handler.RequestUrls.Count);
+        Assert.IsEmpty(handler.RequestUrls);
     }
 
     [TestMethod]

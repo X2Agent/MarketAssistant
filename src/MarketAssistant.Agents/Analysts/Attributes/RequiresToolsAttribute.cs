@@ -5,12 +5,7 @@ namespace MarketAssistant.Agents.Analysts.Attributes;
 /// Factory 通过此 Attribute 自动解析并注入对应的市场特定工具实现
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = true)]
-public sealed class RequiresToolsAttribute : Attribute
+public sealed class RequiresToolsAttribute(Type toolInterfaceType) : Attribute
 {
-    public Type ToolInterfaceType { get; }
-
-    public RequiresToolsAttribute(Type toolInterfaceType)
-    {
-        ToolInterfaceType = toolInterfaceType ?? throw new ArgumentNullException(nameof(toolInterfaceType));
-    }
+    public Type ToolInterfaceType { get; } = toolInterfaceType ?? throw new ArgumentNullException(nameof(toolInterfaceType));
 }

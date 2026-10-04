@@ -13,24 +13,16 @@ namespace MarketAssistant.Services.Cost;
 /// <c>MarketAnalysisWorkflow.ResolveRuntimeForRole</c> 保持一致的降级行为：
 /// 角色级分配优先，缺失回落服务商默认模型；解析不出模型时不猜价格。
 /// </summary>
-public sealed class AnalysisCostService : IAnalysisCostService
+public sealed class AnalysisCostService(
+    IUserSettingService userSettingService,
+    AnalystPromptLoader promptLoader,
+    MarketContext marketContext,
+    ILogger<AnalysisCostService> logger) : IAnalysisCostService
 {
-    private readonly IUserSettingService _userSettingService;
-    private readonly AnalystPromptLoader _promptLoader;
-    private readonly MarketContext _marketContext;
-    private readonly ILogger<AnalysisCostService> _logger;
-
-    public AnalysisCostService(
-        IUserSettingService userSettingService,
-        AnalystPromptLoader promptLoader,
-        MarketContext marketContext,
-        ILogger<AnalysisCostService> logger)
-    {
-        _userSettingService = userSettingService;
-        _promptLoader = promptLoader;
-        _marketContext = marketContext;
-        _logger = logger;
-    }
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly AnalystPromptLoader _promptLoader = promptLoader;
+    private readonly MarketContext _marketContext = marketContext;
+    private readonly ILogger<AnalysisCostService> _logger = logger;
 
     public ModelCostEstimate Estimate(AnalysisTokenUsage? usage)
     {

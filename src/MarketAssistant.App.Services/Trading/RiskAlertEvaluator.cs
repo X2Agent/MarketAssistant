@@ -12,29 +12,21 @@ namespace MarketAssistant.Services.Trading;
 /// - 策略信号被风控拒绝 → Warning；
 /// - 行情连接中断 → Critical / 恢复 → Info。
 /// </summary>
-public sealed class RiskAlertEvaluator
+public sealed class RiskAlertEvaluator(
+    IAlertCenterService alertCenterService,
+    TradingDataService dataService,
+    CryptoPortfolioService portfolioService,
+    ILogger<RiskAlertEvaluator> logger)
 {
     private static readonly TimeSpan RiskCheckThrottle = TimeSpan.FromSeconds(60);
 
-    private readonly IAlertCenterService _alertCenterService;
-    private readonly TradingDataService _dataService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly ILogger<RiskAlertEvaluator> _logger;
+    private readonly IAlertCenterService _alertCenterService = alertCenterService;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly ILogger<RiskAlertEvaluator> _logger = logger;
 
     private DateTime _lastAccountRiskCheckUtc = DateTime.MinValue;
     private volatile bool _connectionAlertActive;
-
-    public RiskAlertEvaluator(
-        IAlertCenterService alertCenterService,
-        TradingDataService dataService,
-        CryptoPortfolioService portfolioService,
-        ILogger<RiskAlertEvaluator> logger)
-    {
-        _alertCenterService = alertCenterService;
-        _dataService = dataService;
-        _portfolioService = portfolioService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 评估账户回撤风险：回撤达熔断阈值 80% 时发 Warning。

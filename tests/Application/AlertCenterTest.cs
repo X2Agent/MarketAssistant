@@ -22,7 +22,7 @@ public sealed class AlertCenterTest
 
     private sealed class StubNotificationService : INotificationService
     {
-        public List<string> Messages { get; } = new();
+        public List<string> Messages { get; } = [];
 
         public void ShowSuccess(string message, int durationMs = 3000) => Messages.Add(message);
         public void ShowError(string message, int durationMs = 3000) => Messages.Add(message);
@@ -78,11 +78,11 @@ public sealed class AlertCenterTest
         Assert.AreEqual("涨破 100", raised.Title);
 
         var stored = await GetTestAlertsAsync();
-        Assert.AreEqual(1, stored.Count);
+        Assert.HasCount(1, stored);
         Assert.AreEqual(1, stored[0].OccurrenceCount);
         Assert.IsFalse(stored[0].IsRead);
         // 首条告警弹窗一次
-        Assert.AreEqual(1, _notification.Messages.Count);
+        Assert.HasCount(1, _notification.Messages);
     }
 
     [TestMethod]
@@ -94,10 +94,10 @@ public sealed class AlertCenterTest
 
         var stored = await GetTestAlertsAsync();
 
-        Assert.AreEqual(1, stored.Count);
+        Assert.HasCount(1, stored);
         Assert.AreEqual(3, stored[0].OccurrenceCount);
         // 合并触发不重复弹窗
-        Assert.AreEqual(1, _notification.Messages.Count);
+        Assert.HasCount(1, _notification.Messages);
     }
 
     [TestMethod]
@@ -112,8 +112,8 @@ public sealed class AlertCenterTest
         var stored = await GetTestAlertsAsync();
 
         // 两条都落库，但仅第一条弹窗
-        Assert.AreEqual(2, stored.Count);
-        Assert.AreEqual(1, _notification.Messages.Count);
+        Assert.HasCount(2, stored);
+        Assert.HasCount(1, _notification.Messages);
     }
 
     [TestMethod]
@@ -130,10 +130,10 @@ public sealed class AlertCenterTest
 
         var stored = await GetTestAlertsAsync();
 
-        Assert.AreEqual(2, stored.Count);
+        Assert.HasCount(2, stored);
         // 免打扰时段内仅 Critical 触达
-        Assert.AreEqual(1, _notification.Messages.Count);
-        Assert.IsTrue(_notification.Messages[0].Contains("静默期紧急"));
+        Assert.HasCount(1, _notification.Messages);
+        Assert.Contains("静默期紧急", _notification.Messages[0]);
     }
 
     [TestMethod]
@@ -198,7 +198,7 @@ public sealed class AlertCenterTest
 
         Assert.AreEqual(0, await CountAsync(
             "SELECT COUNT(*) FROM alert_events WHERE symbol = @symbol AND is_read = 0"));
-        Assert.AreEqual(1, (await GetTestAlertsAsync()).Count(a => a.IsRead));
+        Assert.ContainsSingle(a => a.IsRead, await GetTestAlertsAsync());
     }
 
     /// <summary>
@@ -210,7 +210,7 @@ public sealed class AlertCenterTest
     {
         await _service.RaiseAlertAsync(CreateAlert("保留期内告警"));
         await InsertRawAlertAsync("超期告警", DateTime.UtcNow.AddDays(-60));
-        Assert.AreEqual(2, (await GetTestAlertsAsync()).Count);
+        Assert.HasCount(2, await GetTestAlertsAsync());
 
         // 新建实例并初始化，模拟应用重启触发裁剪
         var restarted = new AlertCenterService(
@@ -221,7 +221,7 @@ public sealed class AlertCenterTest
         await restarted.InitializeAsync();
 
         var stored = await GetTestAlertsAsync();
-        Assert.AreEqual(1, stored.Count);
+        Assert.HasCount(1, stored);
         Assert.AreEqual("保留期内告警", stored[0].Title);
     }
 
@@ -242,7 +242,7 @@ public sealed class AlertCenterTest
     private async Task<List<AlertEvent>> GetTestAlertsAsync()
     {
         var recent = await _service.GetRecentAlertsAsync(500);
-        return recent.Where(a => a.Symbol == TestSymbol).ToList();
+        return [.. recent.Where(a => a.Symbol == TestSymbol)];
     }
 
     private static string DbPath => Path.Combine(

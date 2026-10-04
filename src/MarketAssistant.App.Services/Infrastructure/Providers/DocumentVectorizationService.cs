@@ -23,23 +23,17 @@ public sealed record VectorizationResult(
 /// 文档向量化服务：枚举知识库目录、逐文件向量化并汇总结果（纯业务逻辑，不依赖 UI 通知）。
 /// 进度通过 <see cref="IProgress{T}"/> 回调上报，结果以 <see cref="VectorizationResult"/> 返回，由调用方（ViewModel）负责 UI 反馈。
 /// </summary>
-public sealed class DocumentVectorizationService
+public sealed class DocumentVectorizationService(
+    IRagInfrastructureProvider ragInfrastructureProvider,
+    ILogger<DocumentVectorizationService> logger)
 {
     public static readonly string[] SupportedExtensions = [".pdf", ".docx", ".md"];
 
     // 向量化在途守卫必须跨服务实例生效（与 ViewModel 生命周期的并发向量化场景一致）
     private static int _activeVectorizations;
 
-    private readonly IRagInfrastructureProvider _ragInfrastructureProvider;
-    private readonly ILogger<DocumentVectorizationService> _logger;
-
-    public DocumentVectorizationService(
-        IRagInfrastructureProvider ragInfrastructureProvider,
-        ILogger<DocumentVectorizationService> logger)
-    {
-        _ragInfrastructureProvider = ragInfrastructureProvider;
-        _logger = logger;
-    }
+    private readonly IRagInfrastructureProvider _ragInfrastructureProvider = ragInfrastructureProvider;
+    private readonly ILogger<DocumentVectorizationService> _logger = logger;
 
     /// <summary>
     /// 尝试进入向量化（跨实例并发守卫），返回 false 表示已有任务在进行中。

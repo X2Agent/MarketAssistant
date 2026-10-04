@@ -8,24 +8,17 @@ namespace MarketAssistant.Applications.Assets;
 /// <summary>
 /// A股资产信息服务实现
 /// </summary>
-public class AShareAssetInfoService : IAssetInfoService
+public class AShareAssetInfoService(
+    ClsQuoteClient clsClient,
+    SinaFundFlowClient sinaFundFlowClient,
+    ILogger<AShareAssetInfoService> logger) : IAssetInfoService
 {
     /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
     private const int HotAssetCount = 10;
 
-    private readonly ClsQuoteClient _clsClient;
-    private readonly SinaFundFlowClient _sinaFundFlowClient;
-    private readonly ILogger<AShareAssetInfoService> _logger;
-
-    public AShareAssetInfoService(
-        ClsQuoteClient clsClient,
-        SinaFundFlowClient sinaFundFlowClient,
-        ILogger<AShareAssetInfoService> logger)
-    {
-        _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-        _sinaFundFlowClient = sinaFundFlowClient ?? throw new ArgumentNullException(nameof(sinaFundFlowClient));
-        _logger = logger;
-    }
+    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
+    private readonly SinaFundFlowClient _sinaFundFlowClient = sinaFundFlowClient ?? throw new ArgumentNullException(nameof(sinaFundFlowClient));
+    private readonly ILogger<AShareAssetInfoService> _logger = logger;
 
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
@@ -33,7 +26,7 @@ public class AShareAssetInfoService : IAssetInfoService
         {
             // HTTP 访问与解析由 ClsQuoteClient 负责
             var items = await _clsClient.SearchStocksAsync(keyword, cancellationToken);
-            return items.Select(i => (i.Name, i.StockId)).ToList();
+            return [.. items.Select(i => (i.Name, i.StockId))];
         }
         catch (OperationCanceledException)
         {
@@ -120,7 +113,7 @@ public class AShareAssetInfoService : IAssetInfoService
         {
             var items = await _sinaFundFlowClient.GetTopNetInflowAsync(HotAssetCount);
 
-            return items.Select(item =>
+            return [.. items.Select(item =>
             {
                 var market = item.Symbol.StartsWith("sh", StringComparison.OrdinalIgnoreCase) ? "SH" :
                              item.Symbol.StartsWith("sz", StringComparison.OrdinalIgnoreCase) ? "SZ" :
@@ -137,7 +130,7 @@ public class AShareAssetInfoService : IAssetInfoService
                     MetricValue = item.NetAmount.ToString("F0"),
                     MarketType = MarketType.AShare
                 };
-            }).ToList();
+            })];
         }
         catch (Exception ex)
         {

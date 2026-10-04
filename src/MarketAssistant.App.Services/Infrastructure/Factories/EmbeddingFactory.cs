@@ -14,16 +14,11 @@ namespace MarketAssistant.Infrastructure.Factories;
 /// 嵌入生成器工厂：按 (Endpoint, API Key 指纹, ModelId) 缓存底层客户端，
 /// 避免每次检索/向量化都新建 OpenAIClient 造成连接 churn。
 /// </summary>
-public class EmbeddingFactory : IEmbeddingFactory, IDisposable
+public class EmbeddingFactory(IUserSettingService userSettingService) : IEmbeddingFactory, IDisposable
 {
-    private readonly IUserSettingService _userSettingService;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly ConcurrentDictionary<string, IEmbeddingGenerator<string, Embedding<float>>> _generators = new();
     private bool _disposed;
-
-    public EmbeddingFactory(IUserSettingService userSettingService)
-    {
-        _userSettingService = userSettingService;
-    }
 
     public IEmbeddingGenerator<string, Embedding<float>> Create()
     {

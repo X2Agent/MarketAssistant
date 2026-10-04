@@ -17,7 +17,7 @@ public class StockCriteria : IScreeningCriteria
     /// 筛选条件列表
     /// </summary>
     [Description("股票筛选条件列表，每个条件包含指标代码、名称和范围")]
-    public List<StockScreeningCriteria> Criteria { get; set; } = new();
+    public List<StockScreeningCriteria> Criteria { get; set; } = [];
 
     /// <summary>
     /// A股市场细分类型

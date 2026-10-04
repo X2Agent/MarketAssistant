@@ -53,14 +53,14 @@ public class PdfFileTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result, "转换结果不应为null");
-        Assert.IsTrue(result.Length > 0, "转换结果不应为空");
+        Assert.IsGreaterThan(0, result.Length, "转换结果不应为空");
 
         // 打印结果以便调试
         Console.WriteLine("转换结果:");
         Console.WriteLine(result);
 
         // 基本验证：结果应该包含一些文本内容
-        Assert.IsTrue(result.Trim().Length > 10, "转换结果应该包含实际内容");
+        Assert.IsGreaterThan(10, result.Trim().Length, "转换结果应该包含实际内容");
     }
 
     [TestMethod]
@@ -75,10 +75,10 @@ public class PdfFileTest : BaseAgentTest
 
         // 验证文档不是完全空白
         var trimmedResult = result.Trim();
-        Assert.IsTrue(trimmedResult.Length > 0, "转换后的文档不应为空");
+        Assert.IsGreaterThan(0, trimmedResult.Length, "转换后的文档不应为空");
 
         // 验证不包含明显的错误标记
-        Assert.IsFalse(result.Contains("ERROR"), "转换结果不应包含错误信息");
+        Assert.DoesNotContain("ERROR", result, "转换结果不应包含错误信息");
     }
 
     [TestMethod]
@@ -93,7 +93,7 @@ public class PdfFileTest : BaseAgentTest
 
         // 验证基本的文本结构保留
         var lines = result.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Assert.IsTrue(lines.Length > 0, "应该包含至少一行文本");
+        Assert.IsNotEmpty(lines, "应该包含至少一行文本");
 
         // 验证文本内容不全是空白字符
         var hasNonWhitespaceContent = lines.Any(line => !string.IsNullOrWhiteSpace(line));
@@ -124,13 +124,13 @@ public class PdfFileTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(blockList, "文档块列表不应为null");
-        Assert.IsTrue(blockList.Count > 0, "应该至少读取到一个文档块");
+        Assert.IsNotEmpty(blockList, "应该至少读取到一个文档块");
 
         // 验证块的基本属性
         foreach (var block in blockList)
         {
             Assert.IsNotNull(block, "文档块不应为null");
-            Assert.IsTrue(block.Order >= 0, "文档块顺序应该是非负数");
+            Assert.IsGreaterThanOrEqualTo(0, block.Order, "文档块顺序应该是非负数");
         }
 
         // 打印结果以便调试
@@ -151,12 +151,12 @@ public class PdfFileTest : BaseAgentTest
         var blockList = blocks.ToList();
 
         // Assert
-        Assert.IsTrue(blockList.Count > 0, "应该至少读取到一个文档块");
+        Assert.IsNotEmpty(blockList, "应该至少读取到一个文档块");
 
         // 验证块的顺序是递增的
         for (int i = 1; i < blockList.Count; i++)
         {
-            Assert.IsTrue(blockList[i].Order >= blockList[i - 1].Order,
+            Assert.IsGreaterThanOrEqualTo(blockList[i - 1].Order, blockList[i].Order,
                 $"文档块顺序应该是递增的。块 {i - 1} 的顺序是 {blockList[i - 1].Order}，块 {i} 的顺序是 {blockList[i].Order}");
         }
     }
@@ -170,7 +170,7 @@ public class PdfFileTest : BaseAgentTest
         var blockList = blocks.ToList();
 
         // Assert
-        Assert.IsTrue(blockList.Count > 0, "应该至少读取到一个文档块");
+        Assert.IsNotEmpty(blockList, "应该至少读取到一个文档块");
 
         // 验证至少有一些块包含文本内容
         var hasTextContent = blockList.Any(block => block.HasTextContent());
@@ -199,11 +199,11 @@ public class PdfFileTest : BaseAgentTest
 
             // Act & Assert - 损坏的PDF应返回空块列表或抛出异常
             var threw = false;
-            List<DocumentBlock> blockList = new();
+            List<DocumentBlock> blockList = [];
             try
             {
                 var blocks = await _reader.ReadBlocksAsync(tempFile);
-                blockList = blocks.ToList();
+                blockList = [.. blocks];
             }
             catch (Exception)
             {

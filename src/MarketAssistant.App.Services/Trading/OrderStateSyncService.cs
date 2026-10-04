@@ -10,16 +10,20 @@ namespace MarketAssistant.Services.Trading;
 /// 待完成订单状态同步服务：查询交易所最新状态并回写本地订单、持仓与日统计。
 /// 顺带以固定周期刷新账户快照，保证回撤熔断的峰值数据在监控期间保持新鲜。
 /// </summary>
-public sealed class OrderStateSyncService
+public sealed class OrderStateSyncService(
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    TradingDataService dataService,
+    CryptoPortfolioService portfolioService,
+    ILogger<OrderStateSyncService> logger)
 {
     private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromSeconds(10);
     private const int MaxConcurrentSymbolQueries = 5;
     private static readonly TimeSpan SnapshotRefreshInterval = TimeSpan.FromMinutes(2);
 
-    private readonly IExchangeClient _exchangeClient;
-    private readonly TradingDataService _dataService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly ILogger<OrderStateSyncService> _logger;
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly ILogger<OrderStateSyncService> _logger = logger;
 
     /// <summary>
     /// 交易记录转为成交终态（Filled）时触发，携带最新记录。
@@ -33,18 +37,6 @@ public sealed class OrderStateSyncService
     private readonly SemaphoreSlim _symbolQueryGate = new(MaxConcurrentSymbolQueries, MaxConcurrentSymbolQueries);
     private readonly SemaphoreSlim _snapshotGate = new(1, 1);
     private DateTime _lastSnapshotAt = DateTime.MinValue;
-
-    public OrderStateSyncService(
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        TradingDataService dataService,
-        CryptoPortfolioService portfolioService,
-        ILogger<OrderStateSyncService> logger)
-    {
-        _exchangeClient = exchangeClient;
-        _dataService = dataService;
-        _portfolioService = portfolioService;
-        _logger = logger;
-    }
 
     public async Task<int> SyncPendingOrdersAsync(
         string? symbol = null,

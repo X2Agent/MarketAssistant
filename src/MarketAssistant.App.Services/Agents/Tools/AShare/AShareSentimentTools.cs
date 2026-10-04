@@ -13,28 +13,21 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股市场情绪工具实现
 /// </summary>
-public sealed class AShareSentimentTools : ISentimentTools
+public sealed class AShareSentimentTools(
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareSentimentTools> logger) : ISentimentTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareSentimentTools> _logger;
-
-    public AShareSentimentTools(
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareSentimentTools> logger)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareSentimentTools> _logger = logger;
 
     [Description("根据股票代码获取资金流向数据")]
     public async Task<FundFlow> GetFundFlowAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
-            var stockCode = new string(assetSymbol.Where(char.IsDigit).ToArray());
+            var stockCode = new string([.. assetSymbol.Where(char.IsDigit)]);
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
 
             var dailyFlows = await _zhiTuClient.GetTransactionHistoryAsync<ZhiTuFundFlowData>(stockCode, token, cancellationToken);

@@ -75,7 +75,7 @@ public class FinancialDataToolsTest
     {
         if (string.IsNullOrEmpty(_zhiTuApiToken))
         {
-            Assert.Fail("ZHITU_API_TOKEN 环境变量未配置，无法调用智兔 API 进行真实场景验证");
+            Assert.Inconclusive("ZHITU_API_TOKEN 环境变量未配置，跳过智兔 API 真实场景验证");
         }
     }
 
@@ -96,7 +96,7 @@ public class FinancialDataToolsTest
 
         // Assert - 验证真实资产负债表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(balanceSheets);
-        Assert.IsTrue(balanceSheets.Count > 0, "应返回至少一条资产负债表数据");
+        Assert.IsNotEmpty(balanceSheets, "应返回至少一条资产负债表数据");
 
         var latest = balanceSheets[0];
         Assert.IsFalse(string.IsNullOrEmpty(latest.EndDate), $"截止日期不应为空，实际: {latest.EndDate}");
@@ -132,7 +132,7 @@ public class FinancialDataToolsTest
 
         // Assert - 验证真实利润表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(incomeStatements);
-        Assert.IsTrue(incomeStatements.Count > 0, "应返回至少一条利润表数据");
+        Assert.IsNotEmpty(incomeStatements, "应返回至少一条利润表数据");
 
         var latest = incomeStatements[0];
         Assert.IsFalse(string.IsNullOrEmpty(latest.EndDate), $"截止日期不应为空，实际: {latest.EndDate}");
@@ -169,7 +169,7 @@ public class FinancialDataToolsTest
 
         // Assert - 验证真实现金流量表数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(cashFlowStatements);
-        Assert.IsTrue(cashFlowStatements.Count > 0, "应返回至少一条现金流量表数据");
+        Assert.IsNotEmpty(cashFlowStatements, "应返回至少一条现金流量表数据");
 
         // 季报可能未披露完整现金流量字段，取首个含经营活动净额的记录进行校验
         var latest = cashFlowStatements.FirstOrDefault(s => s.NetCashFlowFromOperating.HasValue)
@@ -208,7 +208,7 @@ public class FinancialDataToolsTest
 
         // Assert - 验证真实财务指标数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(ratios);
-        Assert.IsTrue(ratios.Count > 0, "应返回至少一条财务指标数据");
+        Assert.IsNotEmpty(ratios, "应返回至少一条财务指标数据");
 
         var latest = ratios[0];
         Assert.IsFalse(string.IsNullOrEmpty(latest.EndDate), $"截止日期不应为空，实际: {latest.EndDate}");
@@ -241,7 +241,7 @@ public class FinancialDataToolsTest
 
         // Assert - 验证真实股本结构数据（关键字段非空 + 数值合理性，证明 API 真实返回）
         Assert.IsNotNull(capitalStructure);
-        Assert.IsTrue(capitalStructure.Count > 0, "应返回至少一条股本结构数据");
+        Assert.IsNotEmpty(capitalStructure, "应返回至少一条股本结构数据");
 
         var latest = capitalStructure[0];
         Assert.IsFalse(string.IsNullOrEmpty(latest.ChangeDate), $"变动日期不应为空，实际: {latest.ChangeDate}");
@@ -256,7 +256,7 @@ public class FinancialDataToolsTest
         if (latest.RestrictedShares.HasValue)
         {
             var shareSum = latest.CirculatingAShares!.Value + latest.RestrictedShares!.Value;
-            Assert.IsTrue(Math.Abs(latest.TotalShares.Value - shareSum) <= 1m,
+            Assert.IsLessThanOrEqualTo(1m, Math.Abs(latest.TotalShares.Value - shareSum),
                 $"股本勾稽不成立: 流通A股({latest.CirculatingAShares}) + 限售流通股({latest.RestrictedShares}) ≠ 总股本({latest.TotalShares})");
         }
 

@@ -14,19 +14,12 @@ namespace MarketAssistant.Services.Trading;
 /// 过期语义沿用原实现（绝对 TTL 24 小时，写入后固定时长失效）；
 /// 容量上限（原 50 条）随 LRU 一并移除——报告按 symbol 存储、条目数天然有限，无需淘汰。
 /// </summary>
-public sealed class AnalysisReportCache
+public sealed class AnalysisReportCache(MarketContext marketContext, IMemoryCache? cache = null)
 {
     private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
 
-    private readonly IMemoryCache _cache;
-    private readonly MarketContext _marketContext;
-
-    public AnalysisReportCache(MarketContext marketContext, IMemoryCache? cache = null)
-    {
-        _marketContext = marketContext;
-        // 测试/手工构造可缺省；DI 注入应用级共享缓存实例
-        _cache = cache ?? new MemoryCache(new MemoryCacheOptions());
-    }
+    private readonly IMemoryCache _cache = cache ?? new MemoryCache(new MemoryCacheOptions());
+    private readonly MarketContext _marketContext = marketContext;
 
     /// <summary>
     /// 写入缓存（显式市场类型）。后台交易链路应显式传入市场，

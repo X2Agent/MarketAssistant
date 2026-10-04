@@ -25,17 +25,26 @@ namespace MarketAssistant.Agents.MarketAnalysis;
 /// 市场分析并发工作流（基于 Agent Framework 最佳实践）
 /// 参考: https://learn.microsoft.com/zh-cn/agent-framework/tutorials/workflows/agents-in-workflows
 /// </summary>
-public class MarketAnalysisWorkflow
+public class MarketAnalysisWorkflow(
+    IUserSettingService userSettingService,
+    IAnalystAgentFactory analystAgentFactory,
+    IChatClientFactory chatClientFactory,
+    ILoggerFactory loggerFactory,
+    AnalysisReportCache reportCache,
+    MarketContext marketContext,
+    IAnalystArtifactStore artifactStore,
+    ILogger<MarketAnalysisWorkflow> logger,
+    ITokenUsageRecorder? tokenUsageRecorder = null)
 {
-    private readonly IUserSettingService _userSettingService;
-    private readonly IAnalystAgentFactory _analystAgentFactory;
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly ILogger<MarketAnalysisWorkflow> _logger;
-    private readonly AnalysisReportCache _reportCache;
-    private readonly MarketContext _marketContext;
-    private readonly IAnalystArtifactStore _artifactStore;
-    private readonly ITokenUsageRecorder _tokenUsageRecorder;
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly IAnalystAgentFactory _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+    private readonly ILoggerFactory _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+    private readonly ILogger<MarketAnalysisWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly AnalysisReportCache _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
+    private readonly MarketContext _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly ITokenUsageRecorder _tokenUsageRecorder = tokenUsageRecorder ?? new TokenUsageRecorder();
 
     /// <summary>
     /// MAF Agent <c>Name</c>（ASCII 标识符，如 "FundamentalAnalyst"）→ 中文显示名（如"基本面分析师"）映射。
@@ -54,30 +63,6 @@ public class MarketAnalysisWorkflow
     /// 分析进度事件
     /// </summary>
     public event EventHandler<AnalysisProgressEventArgs>? ProgressChanged;
-
-    public MarketAnalysisWorkflow(
-        IUserSettingService userSettingService,
-        IAnalystAgentFactory analystAgentFactory,
-        IChatClientFactory chatClientFactory,
-        ILoggerFactory loggerFactory,
-        AnalysisReportCache reportCache,
-        MarketContext marketContext,
-        IAnalystArtifactStore artifactStore,
-        ILogger<MarketAnalysisWorkflow> logger,
-        ITokenUsageRecorder? tokenUsageRecorder = null)
-    {
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
-        _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
-        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-        _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        // 未注入记录器时（如测试手工构造）回退到实例级记录器：
-        // 作用域基于 AsyncLocal，同实例上的并发运行互不干扰
-        _tokenUsageRecorder = tokenUsageRecorder ?? new TokenUsageRecorder();
-    }
 
     /// <summary>
     /// 执行市场分析工作流
@@ -107,6 +92,9 @@ public class MarketAnalysisWorkflow
         // 运行级 Token 用量作用域：分析工作流的 Agent 以 session: null 调用，
         // 会话级累计不生效，故由作用域承接中间件的用量上报（含并发分析师与协调器重试）
         using var tokenUsageScope = _tokenUsageRecorder.BeginScope(runId);
+
+        // 本次 Run 的市场归属在开始时捕获一次：分析期间用户切换市场不应改变本报告的归属
+        var marketType = _marketContext.CurrentMarket;
 
         // 分析师运行状态跟踪（键为 MAF Agent ASCII Name，插入顺序即创建顺序），
         // 随每次进度事件生成快照，供 UI 逐位展示各分析师状态与耗时；
@@ -213,6 +201,7 @@ public class MarketAnalysisWorkflow
             var coordinatorExecutor = new CoordinatorExecutor(
                 coordinatorAgent,
                 runId,
+                marketType,
                 _artifactStore,
                 _loggerFactory.CreateLogger<CoordinatorExecutor>());
             var aggregatorExecutor = new AnalysisAggregatorExecutor(

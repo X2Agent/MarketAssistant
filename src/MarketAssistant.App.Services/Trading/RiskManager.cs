@@ -9,24 +9,16 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 风控网关，所有交易指令必须经过风控检查
 /// </summary>
-public class RiskManager
+public class RiskManager(
+    TradingDataService dataService,
+    CryptoPortfolioService portfolioService,
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    ILogger<RiskManager> logger)
 {
-    private readonly TradingDataService _dataService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly IExchangeClient _exchangeClient;
-    private readonly ILogger<RiskManager> _logger;
-
-    public RiskManager(
-        TradingDataService dataService,
-        CryptoPortfolioService portfolioService,
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        ILogger<RiskManager> logger)
-    {
-        _dataService = dataService;
-        _portfolioService = portfolioService;
-        _exchangeClient = exchangeClient;
-        _logger = logger;
-    }
+    private readonly TradingDataService _dataService = dataService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly ILogger<RiskManager> _logger = logger;
 
     /// <summary>
     /// 校验交易是否通过风控检查

@@ -27,7 +27,7 @@ public sealed class CryptoRealtimeQuoteService : IRealtimeQuoteService
 
     public Task SubscribeAsync(string subscriberKey, IEnumerable<string> codes)
     {
-        var codeList = codes as IList<string> ?? codes.ToList();
+        var codeList = codes as IList<string> ?? [.. codes];
         foreach (var code in codeList)
         {
             _codeBySymbol[ToBinanceFormat(code)] = code;

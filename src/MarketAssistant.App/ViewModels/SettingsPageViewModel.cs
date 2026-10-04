@@ -84,13 +84,13 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
+    public List<string> WebSearchProviders { get; } = ["Bing", "Brave", "Tavily"];
 
     /// <summary>
     /// 模型价格表草稿（元 / 1M tokens）。保存时写回 UserSetting.ModelPrices；
     /// 成本展示按 (provider, model) 匹配，未命中按"未定价"处理。
     /// </summary>
-    public ObservableCollection<ModelPrice> ModelPrices { get; } = new();
+    public ObservableCollection<ModelPrice> ModelPrices { get; } = [];
 
     /// <summary>新增一行价格（服务商预填当前服务商，减少重复输入）。</summary>
     [RelayCommand]
@@ -122,17 +122,16 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// <summary>草稿价格表写回设置：完全空行丢弃，其余（含半成品）保留但不参与成本匹配。</summary>
     private void CommitModelPrices()
     {
-        UserSetting.ModelPrices = ModelPrices
+        UserSetting.ModelPrices = [.. ModelPrices
             .Where(price => !string.IsNullOrWhiteSpace(price.ProviderId) ||
-                            !string.IsNullOrWhiteSpace(price.ModelId))
-            .ToList();
+                            !string.IsNullOrWhiteSpace(price.ModelId))];
     }
 
-    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
+    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];
 
-    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
+    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = [.. Enum.GetValues<InvestmentHorizonType>()];
 
-    public List<CryptoTradingMode> CryptoTradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
+    public List<CryptoTradingMode> CryptoTradingModes { get; } = [.. Enum.GetValues<CryptoTradingMode>()];
 
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";

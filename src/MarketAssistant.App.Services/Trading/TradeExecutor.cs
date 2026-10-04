@@ -14,17 +14,23 @@ namespace MarketAssistant.Services.Trading;
 /// 交易执行器，统一的下单入口：风控 → 确认 → 下单 → 记录 → PnL 计算。
 /// 同一交易对在任意时刻仅允许一条下单路径进入交易所调用，避免并发重复下单。
 /// </summary>
-public class TradeExecutor : IDisposable
+public class TradeExecutor(
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    RiskManager riskManager,
+    TradingDataService dataService,
+    ILogger<TradeExecutor> logger,
+    TradingEnvironmentService? environmentService = null,
+    IAlertGate? alertGate = null) : IDisposable
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _symbolExecutionLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private readonly IExchangeClient _exchangeClient;
-    private readonly TradingEnvironmentService? _environmentService;
-    private readonly RiskManager _riskManager;
-    private readonly TradingDataService _dataService;
-    private readonly IAlertGate? _alertGate;
-    private readonly ILogger<TradeExecutor> _logger;
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly TradingEnvironmentService? _environmentService = environmentService;
+    private readonly RiskManager _riskManager = riskManager;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly IAlertGate? _alertGate = alertGate;
+    private readonly ILogger<TradeExecutor> _logger = logger;
 
     /// <summary>
     /// Human-in-the-Loop 确认事件。
@@ -33,22 +39,6 @@ public class TradeExecutor : IDisposable
     /// 未订阅时保持现有行为（直接拒绝）。
     /// </summary>
     public event Func<string, OrderSide, decimal, decimal, string, Task<bool>>? ConfirmationRequested;
-
-    public TradeExecutor(
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        RiskManager riskManager,
-        TradingDataService dataService,
-        ILogger<TradeExecutor> logger,
-        TradingEnvironmentService? environmentService = null,
-        IAlertGate? alertGate = null)
-    {
-        _exchangeClient = exchangeClient;
-        _riskManager = riskManager;
-        _dataService = dataService;
-        _logger = logger;
-        _environmentService = environmentService;
-        _alertGate = alertGate;
-    }
 
     /// <summary>
     /// 执行策略触发的交易（兼容包装，委托给 <see cref="ExecuteTriggeredTradeAsync"/>）。

@@ -6,14 +6,9 @@ namespace MarketAssistant.Rag.Services;
 /// DOCX 文档块读取器：支持结构化块读取
 /// 使用适配器模式，内部委托给 MarkdownDocumentBlockReader 处理
 /// </summary>
-public class DocxBlockReader : IDocumentBlockReader
+public class DocxBlockReader(MarkdownDocumentBlockReader markdownReader) : IDocumentBlockReader
 {
-    private readonly MarkdownDocumentBlockReader _markdownReader;
-
-    public DocxBlockReader(MarkdownDocumentBlockReader markdownReader)
-    {
-        _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
-    }
+    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
 
     public bool CanRead(string filePath) => filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 

@@ -81,7 +81,9 @@ public static class AnalystSignalParser
             Operation = result.Strategy?.OperationDirection,
             TargetPriceLow = result.Strategy?.TargetPriceLow,
             TargetPriceHigh = result.Strategy?.TargetPriceHigh,
-            StopLossPrice = result.Strategy?.StopLossPrice
+            StopLossPrice = result.Strategy?.StopLossPrice,
+            Confidence = NormalizeConfidence(result.Strategy?.ConfidencePercentage),
+            Horizon = result.Strategy?.HoldingPeriod
         };
     }
 
@@ -96,7 +98,8 @@ public static class AnalystSignalParser
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = result.GrowthValue?.InvestmentRating
+            Rating = result.GrowthValue?.InvestmentRating,
+            Confidence = NormalizeConfidence(result.GrowthValue?.ConfidencePercentage)
         };
     }
 
@@ -111,7 +114,8 @@ public static class AnalystSignalParser
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = result.FinancialRating
+            Rating = result.FinancialRating,
+            Confidence = NormalizeConfidence(result.ConfidencePercentage)
         };
     }
 
@@ -126,7 +130,8 @@ public static class AnalystSignalParser
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Operation = result.ShortTermStrategy?.OperationRecommendation
+            Operation = result.ShortTermStrategy?.OperationRecommendation,
+            Confidence = NormalizeConfidence(result.ShortTermStrategy?.ConfidencePercentage)
         };
     }
 
@@ -141,9 +146,18 @@ public static class AnalystSignalParser
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = MapEventNatureToRating(result.EventAnalysis?.EventNature ?? EventNature.Neutral)
+            Rating = MapEventNatureToRating(result.EventAnalysis?.EventNature ?? EventNature.Neutral),
+            Confidence = NormalizeConfidence(result.EventAnalysis?.ConfidencePercentage),
+            Horizon = result.ImpactEvaluation?.ImpactDuration
         };
     }
+
+    /// <summary>
+    /// 置信度归一化到 0-100；模型越界输出（如 150 / -5）钳制而非丢弃，缺失保持 null。
+    /// 回测按置信度分桶（0-59/60-79/80-100）校准分析师绩效，越界值会污染分桶。
+    /// </summary>
+    private static float? NormalizeConfidence(float? confidence)
+        => confidence.HasValue ? Math.Clamp(confidence.Value, 0, 100) : null;
 
     /// <summary>
     /// 反序列化分析师 JSON 输出；任何解析失败均返回 null（信号提取绝不阻断报告生成）。

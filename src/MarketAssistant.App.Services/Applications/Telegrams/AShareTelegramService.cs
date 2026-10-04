@@ -6,16 +6,10 @@ namespace MarketAssistant.Applications.Telegrams;
 /// <summary>
 /// A股市场快讯服务，调用同花顺快讯API
 /// </summary>
-public class AShareTelegramService : ITelegramService
+public class AShareTelegramService(ILogger<AShareTelegramService> logger, IHttpClientFactory httpClientFactory) : ITelegramService
 {
-    private readonly ILogger<AShareTelegramService> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public AShareTelegramService(ILogger<AShareTelegramService> logger, IHttpClientFactory httpClientFactory)
-    {
-        _logger = logger;
-        _httpClientFactory = httpClientFactory;
-    }
+    private readonly ILogger<AShareTelegramService> _logger = logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 通过同花顺快讯API获取实时新闻数据
@@ -73,7 +67,7 @@ public class AShareTelegramService : ITelegramService
                 var content = !string.IsNullOrWhiteSpace(item.Short) ? item.Short! : (item.Digest ?? string.Empty);
                 var itemUrl = item.Url ?? item.AppUrl ?? item.ShareUrl ?? string.Empty;
                 var isImportant = ParseImportance(item.Import) || ParseColorImportant(item.Color);
-                var stocks = (item.Stock ?? new List<ThsNewsStock>())
+                var stocks = (item.Stock ?? [])
                     .Select(s => s.Name?.Trim())
                     .Where(s => !string.IsNullOrWhiteSpace(s))
                     .Select(s => s!)

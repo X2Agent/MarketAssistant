@@ -7,7 +7,7 @@ using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
-public abstract class ViewModelBase : ObservableObject
+public abstract class ViewModelBase(ILogger? logger = null) : ObservableObject
 {
     private bool _isBusy;
     private LoadState _state = LoadState.Idle;
@@ -16,7 +16,7 @@ public abstract class ViewModelBase : ObservableObject
     private string _errorMessage = string.Empty;
     private string _emptyMessage = "暂无数据";
     private int _loadGeneration;
-    protected readonly ILogger? Logger;
+    protected readonly ILogger? Logger = logger;
 
     /// <summary>
     /// 当前市场上下文（由 SubscribeToMarketChanges 设置）
@@ -128,11 +128,6 @@ public abstract class ViewModelBase : ObservableObject
     public IAsyncRelayCommand? RetryCommand { get; protected set; }
 
     public virtual string Title => string.Empty;
-
-    protected ViewModelBase(ILogger? logger = null)
-    {
-        Logger = logger;
-    }
 
     /// <summary>
     /// 注册重试入口，供失败态浮层绑定。

@@ -13,25 +13,17 @@ namespace MarketAssistant.Services.Cache;
 /// 分析结果缓存服务（彻底重构版）
 /// 缓存完整的 MarketAnalysisReport，更符合业务逻辑
 /// </summary>
-public class AnalysisCacheService : IAnalysisCacheService
+public class AnalysisCacheService(
+    ILogger<AnalysisCacheService> logger,
+    IMemoryCache memoryCache,
+    MarketContext marketContext,
+    IUserSettingService userSettingService) : IAnalysisCacheService
 {
-    private readonly ILogger<AnalysisCacheService> _logger;
-    private readonly IMemoryCache _memoryCache;
-    private readonly MarketContext _marketContext;
-    private readonly IUserSettingService _userSettingService;
+    private readonly ILogger<AnalysisCacheService> _logger = logger;
+    private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly MarketContext _marketContext = marketContext;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(2);
-
-    public AnalysisCacheService(
-        ILogger<AnalysisCacheService> logger,
-        IMemoryCache memoryCache,
-        MarketContext marketContext,
-        IUserSettingService userSettingService)
-    {
-        _logger = logger;
-        _memoryCache = memoryCache;
-        _marketContext = marketContext;
-        _userSettingService = userSettingService;
-    }
 
     /// <summary>
     /// 获取缓存的市场分析报告。

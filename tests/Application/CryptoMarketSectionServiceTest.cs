@@ -82,7 +82,7 @@ public class CryptoMarketSectionServiceTest
         Assert.AreEqual(0.90m, snapshot.Spread);
         Assert.AreEqual(3.5m, snapshot.TotalBidQuantity);
         Assert.AreEqual(3.75m, snapshot.TotalAskQuantity);
-        StringAssert.Contains(handler.RequestUrls.Single(), "symbol=BTCUSDT");
+        Assert.Contains("symbol=BTCUSDT", handler.RequestUrls.Single());
     }
 
     [TestMethod]
@@ -95,7 +95,7 @@ public class CryptoMarketSectionServiceTest
         await service.GetOrderBookAsync("BTCUSDT", depth: 7);
 
         // 币安只接受 5/10/20/...，7 档向上吸附到 10
-        StringAssert.Contains(handler.RequestUrls.Single(), "limit=10");
+        Assert.Contains("limit=10", handler.RequestUrls.Single());
     }
 
     [TestMethod]
@@ -239,7 +239,7 @@ public class CryptoMarketSectionServiceTest
 
         await service.GetRecentTradesAsync("BTCUSDT", limit: 5000);
 
-        StringAssert.Contains(handler.RequestUrls.Single(), "limit=1000");
+        Assert.Contains("limit=1000", handler.RequestUrls.Single());
     }
 
     #endregion

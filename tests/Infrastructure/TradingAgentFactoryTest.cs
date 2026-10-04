@@ -38,8 +38,8 @@ public sealed class TradingAgentFactoryTest
         var exception = Assert.ThrowsExactly<InvalidOperationException>(
             factory.CreateAutomationAgent);
 
-        StringAssert.Contains(exception.Message, nameof(ITradingExecutionTools));
-        StringAssert.Contains(exception.Message, nameof(MarketType.Crypto));
+        Assert.Contains(nameof(ITradingExecutionTools), exception.Message);
+        Assert.Contains(nameof(MarketType.Crypto), exception.Message);
     }
 
     private static ServiceProvider CreateServices(bool includeTradingTools)

@@ -10,18 +10,12 @@ namespace MarketAssistant.Applications.Market;
 /// <summary>
 /// 虚拟币逐笔成交：复用币安 <c>/api/v3/trades</c>（返回最近成交，按时间升序）。
 /// </summary>
-public sealed class CryptoTickTradeService : ITickTradeService
+public sealed class CryptoTickTradeService(
+    BinanceMarketDataService binanceService,
+    ILogger<CryptoTickTradeService> logger) : ITickTradeService
 {
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly ILogger<CryptoTickTradeService> _logger;
-
-    public CryptoTickTradeService(
-        BinanceMarketDataService binanceService,
-        ILogger<CryptoTickTradeService> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly ILogger<CryptoTickTradeService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     public async Task<IReadOnlyList<TickTrade>> GetRecentTradesAsync(
         string code,

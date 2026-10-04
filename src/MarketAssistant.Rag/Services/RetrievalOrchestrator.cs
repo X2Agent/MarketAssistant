@@ -14,30 +14,20 @@ namespace MarketAssistant.Rag.Services;
 /// 2) 向量检索——对每个候选在内部向量集合中检索，保留向量距离（越小越相关）。
 /// 3) 去重与重排：去重相似条目，融合向量分数与启发式评分重排。
 /// </summary>
-public class RetrievalOrchestrator : IRetrievalOrchestrator
+public class RetrievalOrchestrator(
+    IQueryRewriteService queryRewrite,
+    IRerankerService reranker,
+    IContextExpansionService contextExpansion,
+    VectorStore vectorStore,
+    IEmbeddingFactory embeddingFactory,
+    ILogger<RetrievalOrchestrator> logger) : IRetrievalOrchestrator
 {
-    private readonly IQueryRewriteService _queryRewrite;
-    private readonly IRerankerService _reranker;
-    private readonly IContextExpansionService _contextExpansion;
-    private readonly VectorStore _vectorStore;
-    private readonly IEmbeddingFactory _embeddingFactory;
-    private readonly ILogger<RetrievalOrchestrator> _logger;
-
-    public RetrievalOrchestrator(
-        IQueryRewriteService queryRewrite,
-        IRerankerService reranker,
-        IContextExpansionService contextExpansion,
-        VectorStore vectorStore,
-        IEmbeddingFactory embeddingFactory,
-        ILogger<RetrievalOrchestrator> logger)
-    {
-        _queryRewrite = queryRewrite;
-        _reranker = reranker;
-        _contextExpansion = contextExpansion ?? throw new ArgumentNullException(nameof(contextExpansion));
-        _vectorStore = vectorStore;
-        _embeddingFactory = embeddingFactory;
-        _logger = logger;
-    }
+    private readonly IQueryRewriteService _queryRewrite = queryRewrite;
+    private readonly IRerankerService _reranker = reranker;
+    private readonly IContextExpansionService _contextExpansion = contextExpansion ?? throw new ArgumentNullException(nameof(contextExpansion));
+    private readonly VectorStore _vectorStore = vectorStore;
+    private readonly IEmbeddingFactory _embeddingFactory = embeddingFactory;
+    private readonly ILogger<RetrievalOrchestrator> _logger = logger;
 
     /// <summary>
     /// 从内部向量集合中检索查询相关的段落。
@@ -75,7 +65,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         catch (Exception ex)
         {
             _logger.LogError(ex, "批量生成查询向量失败");
-            return Array.Empty<TextSearchResult>();
+            return [];
         }
 
         // 指定使用TextEmbedding字段进行向量搜索（避免向量字段推断问题）
@@ -129,7 +119,7 @@ public class RetrievalOrchestrator : IRetrievalOrchestrator
         // 4) 如果检索为空的兜底提示。
         if (merged.Count == 0)
         {
-            return Array.Empty<TextSearchResult>();
+            return [];
         }
 
         // 5) 标准去重：优先按 Record.Key，其次 ContentHash，最后文本内容；保留距离最小（最相关）的

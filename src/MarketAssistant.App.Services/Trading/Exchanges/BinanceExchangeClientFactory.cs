@@ -10,21 +10,14 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// Binance 交易所客户端工厂：按交易模式构建独立的鉴权/账户/客户端实例（P1-5）。
 /// 实盘合约复用现货实盘 API Key（同一账户，需在 binance.com 开启合约权限）。
 /// </summary>
-public sealed class BinanceExchangeClientFactory : IExchangeClientFactory
+public sealed class BinanceExchangeClientFactory(
+    ITradingCredentialStore credentialStore,
+    IHttpClientFactory httpClientFactory,
+    ILoggerFactory loggerFactory) : IExchangeClientFactory
 {
-    private readonly ITradingCredentialStore _credentialStore;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILoggerFactory _loggerFactory;
-
-    public BinanceExchangeClientFactory(
-        ITradingCredentialStore credentialStore,
-        IHttpClientFactory httpClientFactory,
-        ILoggerFactory loggerFactory)
-    {
-        _credentialStore = credentialStore;
-        _httpClientFactory = httpClientFactory;
-        _loggerFactory = loggerFactory;
-    }
+    private readonly ITradingCredentialStore _credentialStore = credentialStore;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
 
     /// <summary>构建指定交易模式的 Binance 客户端。</summary>
     public IExchangeClient Create(CryptoTradingMode tradingMode) => tradingMode switch

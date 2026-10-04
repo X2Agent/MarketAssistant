@@ -33,4 +33,18 @@ public sealed class AnalystSignalSnapshot
     /// <summary>建议止损价；未给出时为 null。</summary>
     [Description("建议止损价；未给出时为 null")]
     public decimal? StopLossPrice { get; set; }
+
+    /// <summary>
+    /// 分析师对本次结论的置信度百分比（0-100）；未给出时为 null。
+    /// 回测按置信度分桶（0-59 / 60-79 / 80-100）校准分析师绩效。
+    /// </summary>
+    [Description("分析师对本次结论的置信度百分比（0-100）；未给出时为 null")]
+    public float? Confidence { get; set; }
+
+    /// <summary>
+    /// 结论适用的持仓/影响周期；未给出时为 null。
+    /// 回测据此映射持仓窗口（短期 5 / 中期 20 / 长期 60 个交易日）。
+    /// </summary>
+    [Description("结论适用的持仓/影响周期；未给出时为 null")]
+    public Duration? Horizon { get; set; }
 }

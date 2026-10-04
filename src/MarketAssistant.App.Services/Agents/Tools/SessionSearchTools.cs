@@ -11,16 +11,10 @@ namespace MarketAssistant.Agents.Tools;
 /// 历史会话搜索工具，允许 Agent 跨会话搜索过去讨论过的内容。
 /// 基于 SQLite FTS5 全文索引实现。
 /// </summary>
-public class SessionSearchTools : IToolsProvider
+public class SessionSearchTools(ChatSessionPersistenceService persistenceService, ILogger<SessionSearchTools> logger) : IToolsProvider
 {
-    private readonly ChatSessionPersistenceService _persistenceService;
-    private readonly ILogger<SessionSearchTools> _logger;
-
-    public SessionSearchTools(ChatSessionPersistenceService persistenceService, ILogger<SessionSearchTools> logger)
-    {
-        _persistenceService = persistenceService;
-        _logger = logger;
-    }
+    private readonly ChatSessionPersistenceService _persistenceService = persistenceService;
+    private readonly ILogger<SessionSearchTools> _logger = logger;
 
     [Description("搜索历史对话记录。当用户提到过去讨论过的内容、之前的分析、或需要回忆跨会话信息时调用。" +
                  "返回匹配的对话片段、时间和标的代码。")]

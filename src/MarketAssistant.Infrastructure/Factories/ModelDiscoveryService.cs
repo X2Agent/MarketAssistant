@@ -56,11 +56,10 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
 
         await using var stream = await response.Content.ReadAsStreamAsync(cts.Token);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cts.Token);
-        return ExtractModelIds(doc.RootElement)
+        return [.. ExtractModelIds(doc.RootElement)
             .Where(modelId => !string.IsNullOrWhiteSpace(modelId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(modelId => modelId, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .OrderBy(modelId => modelId, StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>

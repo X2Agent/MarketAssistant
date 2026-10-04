@@ -134,6 +134,10 @@ public sealed class GrowthAndValue
     [Description("投资评级建议")]
     public InvestmentRating InvestmentRating { get; set; }
 
+    [Range(0, 100)]
+    [Description("对投资评级结论的置信度百分比，0-100；依据不足或结论不确定时设为null。评分标准：" + ScoringStandards.Confidence)]
+    public float? ConfidencePercentage { get; set; }
+
     [MinLength(10)]
     [MaxLength(200)]
     [Description("合理估值空间或目标价的简述")]
@@ -142,7 +146,7 @@ public sealed class GrowthAndValue
     [MinLength(1)]
     [MaxLength(2)]
     [Description("核心投资优势")]
-    public List<string> InvestmentHighlights { get; set; } = new();
+    public List<string> InvestmentHighlights { get; set; } = [];
 
     [MinLength(10)]
     [MaxLength(200)]

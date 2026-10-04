@@ -9,11 +9,11 @@ namespace MarketAssistant.DataProviders;
 /// <summary>
 /// Binance WebSocket 实时行情服务，通过 mini-ticker 推送价格更新
 /// </summary>
-public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
+public sealed class BinanceWebSocketService(ILogger<BinanceWebSocketService> logger) : IAsyncDisposable, IDisposable
 {
     private const string WsBaseUrl = "wss://stream.binance.com:9443/stream?streams=";
     private const int ReconnectDelayMs = 5000;
-    private readonly ILogger<BinanceWebSocketService> _logger;
+    private readonly ILogger<BinanceWebSocketService> _logger = logger;
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
     private volatile bool _disposed;
@@ -52,11 +52,6 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
     public event Action? ConnectionRestored;
 
     private int _connectionInterrupted;
-
-    public BinanceWebSocketService(ILogger<BinanceWebSocketService> logger)
-    {
-        _logger = logger;
-    }
 
     /// <summary>
     /// 以指定订阅方身份订阅实时行情。同一订阅方重复调用会整体替换其交易对集合，

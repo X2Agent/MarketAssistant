@@ -26,7 +26,7 @@ public sealed class SinaFundFlowClientTest
 
         var items = await client.GetTopNetInflowAsync(8);
 
-        Assert.AreEqual(2, items.Count, "symbol 非法的条目应被跳过");
+        Assert.HasCount(2, items, "symbol 非法的条目应被跳过");
         Assert.AreEqual("sh600519", items[0].Symbol);
         Assert.AreEqual("贵州茅台", items[0].Name, "GBK 中文应正确解码");
         Assert.AreEqual("1500.00", items[0].Price);
@@ -47,7 +47,7 @@ public sealed class SinaFundFlowClientTest
         var items = await client.GetTopNetInflowAsync(8);
 
         Assert.IsNotNull(items);
-        Assert.AreEqual(0, items.Count);
+        Assert.IsEmpty(items);
     }
 
     /// <summary>触发 SinaFundFlowClient 静态构造，注册 CodePagesEncodingProvider。</summary>

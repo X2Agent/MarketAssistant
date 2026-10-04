@@ -9,7 +9,7 @@ namespace MarketAssistant.DataProviders.Web3;
 public class DexScreenerSearchResponse
 {
     [JsonPropertyName("pairs")]
-    public List<DexScreenerPair> Pairs { get; set; } = new();
+    public List<DexScreenerPair> Pairs { get; set; } = [];
 }
 
 public class DexScreenerPair

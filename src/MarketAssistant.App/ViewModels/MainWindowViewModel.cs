@@ -98,9 +98,9 @@ public partial class MainWindowViewModel : ViewModelBase
         _notificationService = notificationService;
         _alertCenterService = alertCenterService;
 
-        MainNavigationItems = new ObservableCollection<NavigationItemViewModel>();
-        BottomNavigationItems = new ObservableCollection<NavigationItemViewModel>();
-        IndexTickers = new ObservableCollection<IndexTickerItemViewModel>();
+        MainNavigationItems = [];
+        BottomNavigationItems = [];
+        IndexTickers = [];
         RebuildNavigationItems();
         _ = RefreshIndexTickersAsync();
         StartTickerTimer();
@@ -353,12 +353,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 }
 
-public class NavigationItemViewModel : ViewModelBase
+public class NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel) : ViewModelBase
 {
-    public override string Title { get; }
-    public string IconPath { get; }
-    public string SelectedIconPath { get; }
-    public Func<ViewModelBase> CreateViewModel { get; }
+    public override string Title { get; } = title;
+    public string IconPath { get; } = iconPath;
+    public string SelectedIconPath { get; } = selectedIconPath;
+    public Func<ViewModelBase> CreateViewModel { get; } = createViewModel;
 
     /// <summary>是否显示未读徽标（仅告警导航项在存在未读告警时为 true）。</summary>
     private bool _hasUnreadBadge;
@@ -366,13 +366,5 @@ public class NavigationItemViewModel : ViewModelBase
     {
         get => _hasUnreadBadge;
         set => SetProperty(ref _hasUnreadBadge, value);
-    }
-
-    public NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel)
-    {
-        Title = title;
-        IconPath = iconPath;
-        SelectedIconPath = selectedIconPath;
-        CreateViewModel = createViewModel;
     }
 }

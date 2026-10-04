@@ -61,7 +61,7 @@ public class TokenSecurityReport
     public string RiskLevel { get; set; } = string.Empty;
 
     [Description("风险原因说明列表")]
-    public List<string> RiskReasons { get; set; } = new();
+    public List<string> RiskReasons { get; set; } = [];
 
     [Description("是否蜜罐代币（买入后无法卖出）")]
     public bool IsHoneypot { get; set; }

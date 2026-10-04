@@ -18,7 +18,7 @@ MarketAssistant.Agents/
 │   ├── AnalystSignalParser.cs         ← 从分析师 JSON 输出提取机器可读信号快照（回测/绩效数据基础）
 │   └── Models/                        ← 分析结果模型（各维度分析结果 + 综合报告）
 │       ├── MarketAnalysisReport.cs    ← 最终报告：符号、分析师消息、AnalystSignals、CoordinatorResult、Usage
-│       ├── AnalystSignalSnapshot.cs   ← 单位分析师结构化信号（评级/操作/目标价位，缺省为 null）
+│       ├── AnalystSignalSnapshot.cs   ← 单位分析师结构化信号（评级/操作/目标价位/置信度/结论周期，缺省为 null）
 │       ├── CoordinatorResult.cs       ← 聚合结果：评分、评级、目标价（文本+数值）、风险
 │       ├── TechnicalAnalysisResult.cs
 │       ├── FundamentalAnalysisResult.cs
@@ -82,7 +82,9 @@ MarketAssistant.Agents/
 
 `AnalystSignalParser` 把各分析师消息中的 JSON 提取为 `AnalystSignalSnapshot`，由 `CoordinatorExecutor` 在生成报告时写入 `MarketAnalysisReport.AnalystSignals`，供 M3 策略回测与分析师绩效统计使用。
 
-- **只提取、不推断**：某位分析师未提供评级/目标价位时对应字段保持 `null`；缺失维度禁止用默认值填充（会污染绩效统计）。
+- **只提取、不推断**：某位分析师未提供评级/目标价位/置信度/结论周期时对应字段保持 `null`；缺失维度禁止用默认值填充（会污染绩效统计）。
+- **置信度与周期字段**：`AnalystSignalSnapshot.Confidence`（0-100，越界值由 `NormalizeConfidence` 夹取到 0-100，缺失保持 `null`）与 `Horizon`（`Duration?`）。`Duration` 的枚举 0 值即 `ShortTerm`，因此**必须保持可空**——否则模型省略字段会被误读为"短期"。
+- **报告级市场维度**：`MarketAnalysisReport.MarketType` 由工作流从 `MarketContext.CurrentMarket` 注入（`CoordinatorExecutor` 构造参数），历史报告为 `null`，读取方按"未知"处理，禁止从 `asset_code` 反推市场。
 - **事件性质映射**：新闻事件分析师的 `EventNature` 按 `MajorPositive→StrongBuy / Positive→Buy / Negative→Reduce / MajorNegative→StrongSell` 等价映射为评级，统一各分析师的方向口径。
 - **解析失败必须静默降级**：`LlmJsonExtractor.Deserialize` 对无法解析的文本抛 `JsonException`，`Parse` 捕获后返回 `null`——信号提取绝不能阻断报告生成。
 - **失败标记与未知作者不产出信号**：`AnalystFailureMessages` 标记的消息、`CoordinatorAnalyst`（其结论以 `CoordinatorResult` 为准）与不产出方向性字段的分析师（`CryptoMetricsAnalyst`）均返回 `null`。

@@ -100,7 +100,7 @@ public sealed class ModelCostCalculatorTest
         Assert.IsTrue(estimate.HasUnpriced);
         Assert.IsTrue(ModelCostCalculator.FormatCost(estimate).StartsWith("≥ ¥", StringComparison.Ordinal),
             "存在未定价条目时金额应标记为下界");
-        Assert.IsTrue(ModelCostCalculator.FormatCost(estimate).Contains("部分未定价"));
+        Assert.Contains("部分未定价", ModelCostCalculator.FormatCost(estimate));
     }
 
     [TestMethod]

@@ -6,14 +6,9 @@ namespace MarketAssistant.DataProviders.AShare;
 /// 财联社（cls.cn）行情与搜索客户端。
 /// 仅负责 HTTP 访问与响应解析，不承载业务映射逻辑。
 /// </summary>
-public sealed class ClsQuoteClient
+public sealed class ClsQuoteClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public ClsQuoteClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     /// <summary>
     /// 获取股票基础行情（<c>/quote/stock/basic</c>）。

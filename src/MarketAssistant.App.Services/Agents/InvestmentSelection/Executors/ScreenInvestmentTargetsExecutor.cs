@@ -11,19 +11,12 @@ namespace MarketAssistant.Agents.InvestmentSelection.Executors;
 /// 步骤2: 执行投资标的筛选（共用，支持多市场）
 /// 通过 IAssetScreenerService 接口抽象，根据市场类型动态选择筛选服务
 /// </summary>
-public sealed partial class ScreenInvestmentTargetsExecutor : Executor
+public sealed partial class ScreenInvestmentTargetsExecutor(
+    IServiceProvider serviceProvider,
+    ILogger<ScreenInvestmentTargetsExecutor> logger) : Executor("ScreenInvestmentTargets")
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<ScreenInvestmentTargetsExecutor> _logger;
-
-    public ScreenInvestmentTargetsExecutor(
-        IServiceProvider serviceProvider,
-        ILogger<ScreenInvestmentTargetsExecutor> logger)
-        : base("ScreenInvestmentTargets")
-    {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+    private readonly ILogger<ScreenInvestmentTargetsExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     [MessageHandler]
     private async ValueTask<AssetScreeningResult> HandleAsync(

@@ -77,26 +77,25 @@ public partial class AdaptiveCardView : UserControl
         {
             Text = textBlock.Text,
             TextWrapping = textBlock.Wrap ? TextWrapping.Wrap : TextWrapping.NoWrap,
-        };
+            // Size
+            FontSize = textBlock.Size switch
+            {
+                AdaptiveTextSize.Small => SmallFontSize,
+                AdaptiveTextSize.Default => DefaultFontSize,
+                AdaptiveTextSize.Medium => MediumFontSize,
+                AdaptiveTextSize.Large => LargeFontSize,
+                AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
+                _ => DefaultFontSize
+            },
 
-        // Size
-        tb.FontSize = textBlock.Size switch
-        {
-            AdaptiveTextSize.Small => SmallFontSize,
-            AdaptiveTextSize.Default => DefaultFontSize,
-            AdaptiveTextSize.Medium => MediumFontSize,
-            AdaptiveTextSize.Large => LargeFontSize,
-            AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
-            _ => DefaultFontSize
-        };
-
-        // Weight
-        tb.FontWeight = textBlock.Weight switch
-        {
-            AdaptiveTextWeight.Lighter => FontWeight.Light,
-            AdaptiveTextWeight.Default => FontWeight.Normal,
-            AdaptiveTextWeight.Bolder => FontWeight.Bold,
-            _ => FontWeight.Normal
+            // Weight
+            FontWeight = textBlock.Weight switch
+            {
+                AdaptiveTextWeight.Lighter => FontWeight.Light,
+                AdaptiveTextWeight.Default => FontWeight.Normal,
+                AdaptiveTextWeight.Bolder => FontWeight.Bold,
+                _ => FontWeight.Normal
+            }
         };
 
         // Color — 对齐到项目真实主题资源（不再依赖幽灵 SystemControl* 画刷）

@@ -18,21 +18,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [Description("专注于财务报表和财务健康分析")]
 [RequiresTools(typeof(IFinancialTools))]
 [SupportedMarkets(MarketType.AShare)]
-public class FinancialAnalystAgent : AnalystAgentBase
+public class FinancialAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(FinancialAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public FinancialAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(FinancialAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

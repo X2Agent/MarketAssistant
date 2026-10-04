@@ -158,17 +158,10 @@ public static class LlmJsonExtractor
             var depth = 0;
             do
             {
-                switch (reader.TokenType)
-                {
-                    case JsonTokenType.StartObject:
-                    case JsonTokenType.StartArray:
-                        depth++;
-                        break;
-                    case JsonTokenType.EndObject:
-                    case JsonTokenType.EndArray:
-                        depth--;
-                        break;
-                }
+                if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+                    depth++;
+                else if (reader.TokenType is JsonTokenType.EndObject or JsonTokenType.EndArray)
+                    depth--;
 
                 if (depth == 0)
                     break;

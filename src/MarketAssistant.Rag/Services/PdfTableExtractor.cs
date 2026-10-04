@@ -15,7 +15,7 @@ internal static class PdfTableExtractor
     private sealed class LineCells
     {
         public StructuredLine Line { get; init; } = null!;
-        public List<CellFragment> Cells { get; init; } = new();
+        public List<CellFragment> Cells { get; init; } = [];
     }
 
     internal static List<TableInfo> DetectTables(List<StructuredLine> lines)
@@ -116,7 +116,7 @@ internal static class PdfTableExtractor
             // 回退：用单空格分但只取>2列的情况
             if (words.Length >= 3)
             {
-                split = words.ToList();
+                split = [.. words];
             }
         }
         double currentLeft = line.LeftMargin;
@@ -170,7 +170,7 @@ internal static class PdfTableExtractor
         // 通用：用 SplitLineIntoCells 重新对齐列，选择出现频率最高的列数
         var lineCells = rows.Select(SplitLineIntoCells).ToList();
         var columnCounts = lineCells.Where(lc => lc.Cells.Count >= MinTableColumns).Select(lc => lc.Cells.Count).ToList();
-        if (!columnCounts.Any()) return new List<List<string>>();
+        if (!columnCounts.Any()) return [];
         int targetColumns = columnCounts
             .GroupBy(c => c)
             .OrderByDescending(g => g.Count())
@@ -184,7 +184,7 @@ internal static class PdfTableExtractor
             if (lc.Cells.Count < 1) continue;
             if (lc.Cells.Count == targetColumns)
             {
-                table.Add(lc.Cells.Select(c => c.Text).ToList());
+                table.Add([.. lc.Cells.Select(c => c.Text)]);
             }
             else if (lc.Cells.Count > targetColumns)
             {

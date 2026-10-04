@@ -37,6 +37,10 @@ public sealed class EventInterpretation
     [Description("事件性质")]
     public EventNature EventNature { get; set; }
 
+    [Range(0, 100)]
+    [Description("对事件性质判断的置信度百分比，0-100；信息不足或性质不明确时设为null。评分标准：" + ScoringStandards.Confidence)]
+    public float? ConfidencePercentage { get; set; }
+
     [Range(1, 10)]
     [Description("事件重要性评分，基于影响范围和影响程度综合判断。评分标准：" + ScoringStandards.Reliability)]
     public float ImportanceScore { get; set; }
@@ -72,8 +76,8 @@ public sealed class ImpactAssessment
     [Description("影响范围")]
     public ImpactScope ImpactScope { get; set; }
 
-    [Description("影响持续时长")]
-    public Duration ImpactDuration { get; set; }
+    [Description("影响持续时长；无法判断时设为null")]
+    public Duration? ImpactDuration { get; set; }
 
     [MinLength(5)]
     [MaxLength(100)]
@@ -117,7 +121,7 @@ public sealed class InvestmentInsight
     [MinLength(1)]
     [MaxLength(2)]
     [Description("需要持续关注的后续发展或潜在催化剂")]
-    public List<string> FocusPoints { get; set; } = new();
+    public List<string> FocusPoints { get; set; } = [];
 
     [MinLength(10)]
     [MaxLength(200)]

@@ -17,21 +17,17 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [DisplayName("新闻事件分析师")]
 [Description("专注于新闻事件对股票的影响分析")]
 [RequiresTools(typeof(INewsDataTools))]
-public class NewsEventAnalystAgent : AnalystAgentBase
+public class NewsEventAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(NewsEventAnalysisResult),
+        structuredOutputMode,
+        tools,
+        aiContextProviders)
 {
-    public NewsEventAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(NewsEventAnalysisResult),
-            structuredOutputMode,
-            tools,
-            aiContextProviders)
-    {
-    }
 }

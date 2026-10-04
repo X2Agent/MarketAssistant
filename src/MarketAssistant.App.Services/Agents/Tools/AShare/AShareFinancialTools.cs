@@ -12,21 +12,14 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股财务数据工具实现
 /// </summary>
-public sealed class AShareFinancialTools : IFinancialTools
+public sealed class AShareFinancialTools(
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareFinancialTools> logger) : IFinancialTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareFinancialTools> _logger;
-
-    public AShareFinancialTools(
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareFinancialTools> logger)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareFinancialTools> _logger = logger;
 
     /// <summary>
     /// 通用财务数据获取方法（HTTP 与容错反序列化由 ZhiTuMarketClient 负责）

@@ -58,7 +58,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
     private IAssetCacheService CacheService =>
         _marketContext.GetService<IAssetCacheService>();
 
-    public ObservableCollection<AssetInfo> Assets { get; set; } = new ObservableCollection<AssetInfo>();
+    public ObservableCollection<AssetInfo> Assets { get; set; } = [];
 
     /// <summary>是否处于表格视图（false 为卡片视图）。对齐 design.md 4.7 双模态。</summary>
     [ObservableProperty]

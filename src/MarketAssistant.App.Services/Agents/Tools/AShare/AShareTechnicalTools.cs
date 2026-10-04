@@ -13,21 +13,14 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股技术分析工具实现
 /// </summary>
-public sealed class AShareTechnicalTools : ITechnicalDataTools
+public sealed class AShareTechnicalTools(
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareTechnicalTools> logger) : ITechnicalDataTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareTechnicalTools> _logger;
-
-    public AShareTechnicalTools(
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareTechnicalTools> logger)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareTechnicalTools> _logger = logger;
 
     private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, CancellationToken cancellationToken = default)
     {
@@ -100,11 +93,10 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
             if (items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");
 
-            return items
+            return [.. items
                 .OrderBy(x => x.T)
                 .TakeLast(clampedCount)
-                .Select(x => new OhlcvBar { T = x.T, O = x.O, H = x.H, L = x.L, C = x.C, V = x.V })
-                .ToList();
+                .Select(x => new OhlcvBar { T = x.T, O = x.O, H = x.H, L = x.L, C = x.C, V = x.V })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

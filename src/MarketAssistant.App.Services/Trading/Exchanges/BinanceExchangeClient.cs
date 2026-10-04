@@ -9,21 +9,14 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// Binance 交易所适配器，将 BinanceAccountServiceBase 包装为统一的 IExchangeClient 接口。
 /// 通过构造参数注入不同的账户服务（现货实盘/Testnet/合约实盘/Testnet）与名称，消除重复实现。
 /// </summary>
-public class BinanceExchangeClient : IExchangeClient
+/// <param name="accountService">账户服务（现货或合约）</param>
+/// <param name="exchangeName">交易所显示名（"Binance" / "Binance Spot Testnet" / "Binance Futures" / "Binance Futures Testnet"）</param>
+/// <param name="positionSide">合约单向模式下默认持仓方向（"BOTH"），现货传 null</param>
+public class BinanceExchangeClient(BinanceAccountServiceBase accountService, string exchangeName, string? positionSide = null) : IExchangeClient
 {
-    private readonly BinanceAccountServiceBase _accountService;
-    private readonly string _exchangeName;
-    private readonly string? _positionSide;
-
-    /// <param name="accountService">账户服务（现货或合约）</param>
-    /// <param name="exchangeName">交易所显示名（"Binance" / "Binance Spot Testnet" / "Binance Futures" / "Binance Futures Testnet"）</param>
-    /// <param name="positionSide">合约单向模式下默认持仓方向（"BOTH"），现货传 null</param>
-    public BinanceExchangeClient(BinanceAccountServiceBase accountService, string exchangeName, string? positionSide = null)
-    {
-        _accountService = accountService;
-        _exchangeName = exchangeName;
-        _positionSide = positionSide;
-    }
+    private readonly BinanceAccountServiceBase _accountService = accountService;
+    private readonly string _exchangeName = exchangeName;
+    private readonly string? _positionSide = positionSide;
 
     public string ExchangeName => _exchangeName;
 
@@ -38,12 +31,12 @@ public class BinanceExchangeClient : IExchangeClient
         return new ExchangeAccountInfo
         {
             CanTrade = info.CanTrade,
-            Balances = info.Balances.Select(b => new ExchangeBalance
+            Balances = [.. info.Balances.Select(b => new ExchangeBalance
             {
                 Asset = b.Asset,
                 Free = decimal.TryParse(b.Free, NumberStyles.Number, CultureInfo.InvariantCulture, out var f) ? f : 0,
                 Locked = decimal.TryParse(b.Locked, NumberStyles.Number, CultureInfo.InvariantCulture, out var l) ? l : 0
-            }).ToList()
+            })]
         };
     }
 
@@ -83,7 +76,7 @@ public class BinanceExchangeClient : IExchangeClient
         string? symbol = null, CancellationToken ct = default)
     {
         var orders = await _accountService.GetOpenOrdersAsync(symbol, ct);
-        return orders.Select(MapOrderResponse).ToList();
+        return [.. orders.Select(MapOrderResponse)];
     }
 
     /// <summary>

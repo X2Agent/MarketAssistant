@@ -9,14 +9,9 @@ namespace MarketAssistant.Infrastructure.Http;
 /// - 其他：添加 x-cg-demo-api-key（免费 Demo 版）
 /// - 为空：不添加（兼容旧版公共端点，但 /coins/markets 可能返回 401）
 /// </summary>
-public sealed class CoinGeckoApiKeyHandler : DelegatingHandler
+public sealed class CoinGeckoApiKeyHandler(IUserSettingService userSettingService) : DelegatingHandler
 {
-    private readonly IUserSettingService _userSettingService;
-
-    public CoinGeckoApiKeyHandler(IUserSettingService userSettingService)
-    {
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-    }
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {

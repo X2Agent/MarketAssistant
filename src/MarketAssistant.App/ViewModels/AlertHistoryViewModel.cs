@@ -19,19 +19,19 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
 {
     private readonly IAlertCenterService _alertCenterService;
     private readonly MarketContext? _marketContext;
-    private readonly List<AlertEvent> _allAlerts = new();
+    private readonly List<AlertEvent> _allAlerts = [];
     private bool _disposed;
 
-    public ObservableCollection<AlertEvent> Alerts { get; } = new();
+    public ObservableCollection<AlertEvent> Alerts { get; } = [];
 
     /// <summary>级别筛选项（Level 为 null 表示全部级别）。</summary>
-    public ObservableCollection<AlertLevelFilterOption> LevelFilters { get; } = new()
-    {
+    public ObservableCollection<AlertLevelFilterOption> LevelFilters { get; } =
+    [
         new("全部级别", null),
         new("提示", AlertLevel.Info),
         new("警告", AlertLevel.Warning),
         new("紧急", AlertLevel.Critical)
-    };
+    ];
 
     [ObservableProperty]
     private AlertLevelFilterOption? _selectedLevelFilter;

@@ -12,7 +12,7 @@ namespace MarketAssistant.Applications.Crypto;
 /// 过滤器信息极少变化，缓存 24 小时，避免每个下单请求都拉取 exchangeInfo。
 /// 拿不到过滤器信息时调用方应保持原始值下单（宁可信服交易所报错也不阻断交易）。
 /// </summary>
-public sealed class ExchangeSymbolFilterCache
+public sealed class ExchangeSymbolFilterCache(IHttpClientFactory httpClientFactory, ILogger logger)
 {
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromHours(24);
 
@@ -22,14 +22,8 @@ public sealed class ExchangeSymbolFilterCache
     /// </summary>
     private static readonly ConcurrentDictionary<string, (DateTimeOffset FetchedAt, SymbolFilters Filters)> Cache = new();
 
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger _logger;
-
-    public ExchangeSymbolFilterCache(IHttpClientFactory httpClientFactory, ILogger logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger _logger = logger;
 
     /// <summary>
     /// 获取指定交易对的精度过滤器；网络失败或解析失败返回 null（调用方保持原值并继续）。

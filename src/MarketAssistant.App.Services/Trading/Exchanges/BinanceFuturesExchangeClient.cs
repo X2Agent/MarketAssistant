@@ -9,17 +9,11 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// Binance 合约交易所适配器，继承自 BinanceExchangeClient 并覆写 GetPositionsAsync 和 SetLeverageAsync。
 /// 单向模式下所有订单 positionSide 默认为 BOTH。
 /// </summary>
-public sealed class BinanceFuturesExchangeClient : BinanceExchangeClient
+public sealed class BinanceFuturesExchangeClient(
+    BinanceFuturesAccountService accountService,
+    string exchangeName) : BinanceExchangeClient(accountService, exchangeName, "BOTH")
 {
-    private readonly BinanceFuturesAccountService _futuresAccountService;
-
-    public BinanceFuturesExchangeClient(
-        BinanceFuturesAccountService accountService,
-        string exchangeName)
-        : base(accountService, exchangeName, "BOTH")
-    {
-        _futuresAccountService = accountService;
-    }
+    private readonly BinanceFuturesAccountService _futuresAccountService = accountService;
 
     /// <inheritdoc />
     public override async Task<List<ExchangePosition>> GetPositionsAsync(
@@ -27,7 +21,7 @@ public sealed class BinanceFuturesExchangeClient : BinanceExchangeClient
     {
         var positions = await _futuresAccountService.GetPositionInfoAsync(instrumentSymbol, ct);
 
-        return positions
+        return [.. positions
             .Where(p => decimal.TryParse(p.PositionAmt, NumberStyles.Number, CultureInfo.InvariantCulture, out var amt) && amt != 0)
             .Select(p => new ExchangePosition
             {
@@ -40,7 +34,7 @@ public sealed class BinanceFuturesExchangeClient : BinanceExchangeClient
                 Leverage = decimal.TryParse(p.Leverage, NumberStyles.Number, CultureInfo.InvariantCulture, out var lev) ? lev : 0,
                 MarginType = p.MarginType == "isolated" ? "isolated" : "cross",
                 MaxQty = decimal.TryParse(p.PositionAmt, NumberStyles.Number, CultureInfo.InvariantCulture, out var pa) ? Math.Abs(pa) : 0
-            }).ToList();
+            })];
     }
 
     /// <summary>
