@@ -409,6 +409,11 @@ FodyWeavers.xsd
 # 仓库根目录下所有以 . 开头的文件夹（各工具的本地缓存/配置目录）
 /.[!.]*/
 
+# 例外：.github 存放版本化的 CI 配置，必须可追踪。
+# 缺少此白名单时，上面的 /.[!.]*/ 会把新增的 workflow 文件静默忽略，
+# 导致 `git add .github/workflows/xxx.yml` 表现为"成功"但文件未入库。
+!/.github/
+
 # Secrets and credentials
 # 注意：历史提交中曾误追踪 .secrets（内容形如 GITHUB_TOKEN=...），
 # 已通过 git rm --cached 解除追踪。若这些 token 曾在远端公开，需在 GitHub
