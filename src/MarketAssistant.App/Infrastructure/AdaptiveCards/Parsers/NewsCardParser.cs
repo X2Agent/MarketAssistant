@@ -1,4 +1,4 @@
-﻿using AdaptiveCards;
+using AdaptiveCards;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 
 namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
@@ -37,7 +37,7 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
             hasLeft = true;
             var type = GetEnumDescription(model.EventAnalysis.EventType);
             var nature = GetEnumDescription(model.EventAnalysis.EventNature);
-            var color = nature.Contains("利好") ? AdaptiveTextColor.Good : (nature.Contains("利空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
+            var color = nature.Contains("利好", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (nature.Contains("利空", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
 
             // 1. 标题加粗
             leftCol.Items.Add(new AdaptiveTextBlock
@@ -100,7 +100,7 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
         if (model.InvestmentGuidance != null)
         {
             var strategy = GetEnumDescription(model.InvestmentGuidance.ResponseStrategy);
-            var color = strategy.Contains("买入") || strategy.Contains("做多") ? AdaptiveTextColor.Good : (strategy.Contains("卖出") || strategy.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
+            var color = strategy.Contains("买入", StringComparison.Ordinal) || strategy.Contains("做多", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (strategy.Contains("卖出", StringComparison.Ordinal) || strategy.Contains("做空", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
 
             // 核心逻辑 + 具体建议合并为策略看板正文
             var contentParts = new List<string>();

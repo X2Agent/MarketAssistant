@@ -51,7 +51,7 @@ public class BinanceExchangeClient(BinanceAccountServiceBase accountService, str
         CancellationToken ct = default)
     {
         var response = await _accountService.PlaceOrderAsync(
-            symbol, side.ToString().ToUpper(), type.ToString().ToUpper(),
+            symbol, side.ToString().ToUpperInvariant(), type.ToString().ToUpperInvariant(),
             quantity, price, clientOrderId, _positionSide ?? positionSide, reduceOnly,
             stopPrice, trailingDelta, ct);
 

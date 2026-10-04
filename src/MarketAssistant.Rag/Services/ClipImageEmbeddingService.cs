@@ -31,6 +31,7 @@ public class ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger
     private static readonly float[] ImageNetStd = [0.229f, 0.224f, 0.225f];
 
     private readonly ILogger<ClipImageEmbeddingService> _logger = logger;
+    private bool _disposed;
     private readonly IChatCompletionService? _chat = captionClientFactory.Create();
     private readonly string? _modelPath = Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")
                      ?? Path.Combine(AppContext.BaseDirectory, "models", "clip-image.onnx");
@@ -149,7 +150,7 @@ public class ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger
             if (inputMeta.Key == imageInputName) continue; // 跳过图像输入
 
             // 处理文本输入（input_ids, text等）
-            if (inputMeta.Key.Contains("input_ids") || inputMeta.Key.Contains("text"))
+            if (inputMeta.Key.Contains("input_ids", StringComparison.Ordinal) || inputMeta.Key.Contains("text", StringComparison.Ordinal))
             {
                 // 创建空文本输入（表示只处理图像）
                 var textShape = inputMeta.Value.Dimensions.ToArray();
@@ -161,7 +162,7 @@ public class ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger
                     inputMeta.Key, string.Join(", ", textShape));
             }
             // 处理attention_mask输入
-            else if (inputMeta.Key.Contains("attention_mask"))
+            else if (inputMeta.Key.Contains("attention_mask", StringComparison.Ordinal))
             {
                 var maskShape = inputMeta.Value.Dimensions.ToArray();
                 if (maskShape.Any(d => d <= 0)) maskShape = [1, 1];
@@ -388,8 +389,18 @@ public class ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger
     /// </summary>
     public void Dispose()
     {
+        // 幂等保护：Dispose 可能被多次调用（DI 容器与显式调用并存），
+        // ONNX InferenceSession 重复释放不保证安全。
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         // 资源释放：释放ONNX会话的非托管资源
         _session?.Dispose();
         // 注意：托管字段（_logger, _chatCompletion等）由DI容器自动管理
+        GC.SuppressFinalize(this);
     }
 }

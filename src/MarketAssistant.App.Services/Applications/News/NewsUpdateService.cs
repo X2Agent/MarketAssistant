@@ -26,9 +26,7 @@ public class NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpd
     /// </summary>
     public void StartUpdates()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(NewsUpdateService));
-
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_updateLoopTask != null && !_updateLoopTask.IsCompleted)
         {
             // 旧循环尚未退出（刚调用过 StopUpdates）：串行排队，待其退出后再启动，
@@ -122,6 +120,7 @@ public class NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpd
         {
             StopUpdates();
             _disposed = true;
+            GC.SuppressFinalize(this);
         }
     }
 }

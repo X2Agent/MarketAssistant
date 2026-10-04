@@ -36,6 +36,17 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private AlertLevelFilterOption? _selectedLevelFilter;
 
+    /// <summary>市场筛选项（MarketType 为 null 表示全部市场）。</summary>
+    public ObservableCollection<MarketFilterOption> MarketFilters { get; } =
+    [
+        new("全部市场", null),
+        new("A股", MarketType.AShare),
+        new("虚拟币", MarketType.Crypto)
+    ];
+
+    [ObservableProperty]
+    private MarketFilterOption? _selectedMarketFilter;
+
     /// <summary>标的关键词（匹配标的代码或告警标题，忽略大小写）。</summary>
     [ObservableProperty]
     private string _symbolFilterText = string.Empty;
@@ -53,6 +64,7 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
         _alertCenterService = alertCenterService;
         _marketContext = marketContext;
         SelectedLevelFilter = LevelFilters[0];
+        SelectedMarketFilter = MarketFilters[0];
         EmptyMessage = "暂无告警记录";
         SetRetryCommand(() => LoadAlertsAsync());
         _alertCenterService.AlertsChanged += OnAlertsChanged;
@@ -109,6 +121,8 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
     }
 
     partial void OnSelectedLevelFilterChanged(AlertLevelFilterOption? value) => ApplyFilter();
+
+    partial void OnSelectedMarketFilterChanged(MarketFilterOption? value) => ApplyFilter();
 
     partial void OnSymbolFilterTextChanged(string value) => ApplyFilter();
 
@@ -167,7 +181,11 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
     }
 
     private bool MatchesFilter(AlertEvent alert)
-        => AlertHistoryFilter.Matches(alert, SelectedLevelFilter?.Level, SymbolFilterText);
+        => AlertHistoryFilter.Matches(
+            alert,
+            SelectedLevelFilter?.Level,
+            SymbolFilterText,
+            SelectedMarketFilter?.MarketType);
 
     public void Dispose()
     {
@@ -176,6 +194,7 @@ public partial class AlertHistoryViewModel : ViewModelBase, IDisposable
 
         _disposed = true;
         _alertCenterService.AlertsChanged -= OnAlertsChanged;
+        GC.SuppressFinalize(this);
     }
 }
 

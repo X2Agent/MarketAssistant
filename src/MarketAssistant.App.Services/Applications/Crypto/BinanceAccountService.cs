@@ -158,9 +158,9 @@ public abstract class BinanceAccountServiceBase(
 
             var parameters = new Dictionary<string, string>
             {
-                ["symbol"] = symbol.ToUpper(),
-                ["side"] = side.ToUpper(),
-                ["type"] = type.ToUpper(),
+                ["symbol"] = symbol.ToUpperInvariant(),
+                ["side"] = side.ToUpperInvariant(),
+                ["type"] = type.ToUpperInvariant(),
                 ["quantity"] = roundedQuantity.ToString("F8", CultureInfo.InvariantCulture)
             };
 
@@ -173,7 +173,7 @@ public abstract class BinanceAccountServiceBase(
             if (reduceOnly)
                 parameters["reduceOnly"] = "true";
 
-            if (type.ToUpper() == "LIMIT")
+            if (string.Equals(type, "LIMIT", StringComparison.OrdinalIgnoreCase))
             {
                 if (!price.HasValue)
                 {
@@ -190,7 +190,7 @@ public abstract class BinanceAccountServiceBase(
             }
 
             // 条件单参数
-            var typeUpper = type.ToUpper();
+            var typeUpper = type.ToUpperInvariant();
             if (stopPrice.HasValue && (typeUpper == "STOP_MARKET" || typeUpper == "TAKE_PROFIT_MARKET"))
             {
                 // 触发价同样受 tickSize 约束，否则条件单会被交易所以精度错误拒绝
@@ -243,7 +243,7 @@ public abstract class BinanceAccountServiceBase(
     {
         try
         {
-            var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
+            var queryString = $"symbol={symbol.ToUpperInvariant()}&orderId={orderId}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"{OrderEndpoint}?{signedQuery}";
 
@@ -275,7 +275,7 @@ public abstract class BinanceAccountServiceBase(
     {
         try
         {
-            var queryString = $"symbol={symbol.ToUpper()}&orderId={orderId}";
+            var queryString = $"symbol={symbol.ToUpperInvariant()}&orderId={orderId}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"{OrderEndpoint}?{signedQuery}";
 
@@ -312,7 +312,7 @@ public abstract class BinanceAccountServiceBase(
     {
         try
         {
-            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpper()}";
+            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpperInvariant()}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"{OpenOrdersEndpoint}?{signedQuery}";
 

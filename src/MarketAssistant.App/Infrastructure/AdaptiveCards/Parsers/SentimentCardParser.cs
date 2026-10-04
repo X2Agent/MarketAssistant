@@ -1,4 +1,4 @@
-﻿using AdaptiveCards;
+using AdaptiveCards;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 
 namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
@@ -110,7 +110,7 @@ public class SentimentCardParser : BaseAdaptiveCardParser<MarketSentimentAnalysi
         if (model.ShortTermStrategy != null)
         {
             var recommendation = GetEnumDescription(model.ShortTermStrategy.OperationRecommendation);
-            var color = recommendation.Contains("买入") || recommendation.Contains("做多") ? AdaptiveTextColor.Good : (recommendation.Contains("卖出") || recommendation.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
+            var color = recommendation.Contains("买入", StringComparison.Ordinal) || recommendation.Contains("做多", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (recommendation.Contains("卖出", StringComparison.Ordinal) || recommendation.Contains("做空", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
 
             var facts = new AdaptiveFactSet();
             if (!string.IsNullOrEmpty(model.ShortTermStrategy.TargetPriceRange))

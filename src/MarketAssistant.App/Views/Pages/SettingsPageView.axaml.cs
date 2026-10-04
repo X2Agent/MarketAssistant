@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.ViewModels;
 
@@ -59,6 +60,18 @@ public partial class SettingsPageView : UserControl
             && !box.IsDropDownOpen)
         {
             box.IsDropDownOpen = true;
+        }
+    }
+
+    /// <summary>
+    /// 恢复内置参考价：只改 ViewModel 草稿，需用户点击保存才落盘，
+    /// 与设置页其他编辑项的草稿语义保持一致。
+    /// </summary>
+    private void OnRestoreDefaultPricesClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is SettingsPageViewModel viewModel)
+        {
+            viewModel.RestoreDefaultPrices();
         }
     }
 }

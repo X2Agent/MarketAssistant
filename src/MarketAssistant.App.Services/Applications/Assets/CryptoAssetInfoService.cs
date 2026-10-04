@@ -140,7 +140,7 @@ public class CryptoAssetInfoService(
         var stablecoins = new[] { "USDT", "USDC", "BUSD", "FDUSD", "DAI", "TUSD", "USDP" };
 
         var hotAssets = tickers
-            .Where(t => t.Symbol.EndsWith("USDT") && t.Symbol != "USDT")
+            .Where(t => t.Symbol.EndsWith("USDT", StringComparison.Ordinal) && t.Symbol != "USDT")
             .Where(t =>
             {
                 var baseCurrency = ExtractBaseCurrency(t.Symbol);

@@ -23,6 +23,18 @@ public sealed class DailyBriefing
     /// <summary>生成所用模型 ID，便于成本追溯。</summary>
     public string ModelId { get; init; } = string.Empty;
 
+    /// <summary>本次生成的输入 Token 数；<see cref="Estimated"/> 为 true 时为本地估算值。</summary>
+    public long InputTokens { get; init; }
+
+    /// <summary>本次生成的输出 Token 数。</summary>
+    public long OutputTokens { get; init; }
+
+    /// <summary>Token 计数是否为本地估算值（提供商未返回精确用量）。</summary>
+    public bool Estimated { get; init; }
+
+    /// <summary>是否记录到任何 Token 用量（区分"未统计"与"统计为零"）。</summary>
+    public bool HasTokenUsage => InputTokens > 0 || OutputTokens > 0;
+
     /// <summary>生成时间展示文本。</summary>
     public string GeneratedAtText => GeneratedAt.ToLocalTime().ToString("HH:mm");
 }

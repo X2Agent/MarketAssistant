@@ -21,11 +21,12 @@ public class RagIngestionServiceIntegrationTest : BaseAgentTest
         base.BaseInitialize();
 
         // 获取服务（嵌入生成器仅在 JINA_API_KEY 已配置时注册，缺失时给出明确失败原因）
-        _embeddingGenerator = _serviceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-        if (_embeddingGenerator is null)
+        var embeddingGenerator = _serviceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
+        if (embeddingGenerator is null)
         {
             Assert.Inconclusive("JINA_API_KEY 环境变量未配置，跳过嵌入生成器真实场景验证");
         }
+        _embeddingGenerator = embeddingGenerator;
         _vectorStore = _serviceProvider.GetRequiredService<VectorStore>();
 
         // 从 DI 容器获取 RagIngestionService

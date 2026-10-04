@@ -284,7 +284,7 @@ public class TextChunkingService(ITokenCounter? tokenCounter = null) : ITextChun
                     sb.Append(paragraph);
                     if (split.Count > 0)
                     {
-                        sb.Append("\n").Append(split[0]);
+                        sb.Append('\n').Append(split[0]);
                     }
                 }
                 else

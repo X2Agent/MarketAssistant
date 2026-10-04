@@ -1,4 +1,4 @@
-﻿using AdaptiveCards;
+using AdaptiveCards;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 
 namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
@@ -107,7 +107,7 @@ public class TechnicalCardParser : BaseAdaptiveCardParser<TechnicalAnalysisResul
         if (model.Strategy != null)
         {
             var direction = GetEnumDescription(model.Strategy.OperationDirection);
-            var color = direction.Contains("买入") || direction.Contains("做多") ? AdaptiveTextColor.Good : (direction.Contains("卖出") || direction.Contains("做空") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
+            var color = direction.Contains("买入", StringComparison.Ordinal) || direction.Contains("做多", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (direction.Contains("卖出", StringComparison.Ordinal) || direction.Contains("做空", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Default);
 
             var facts = new AdaptiveFactSet();
             if (model.Strategy.TargetPriceLow.HasValue && model.Strategy.TargetPriceHigh.HasValue)

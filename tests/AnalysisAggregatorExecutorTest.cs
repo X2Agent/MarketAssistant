@@ -46,6 +46,7 @@ public sealed class AnalysisAggregatorExecutorTest
 
         // 全文应已落盘，可按 runId+analyst 读回
         var artifact = await store.GetAsync(TestRunId, "NewsEventAnalyst");
+        Assert.IsNotNull(artifact, "分析师产物应已落盘");
         Assert.Contains("正常的新闻事件分析结论", artifact);
     }
 
@@ -113,6 +114,7 @@ public sealed class AnalysisAggregatorExecutorTest
         Assert.Contains("【NewsEventAnalyst】结论摘要", payload[2].Text);
 
         var artifact = await store.GetAsync(TestRunId, "NewsEventAnalyst");
+        Assert.IsNotNull(artifact, "降级派发时已有分析师的产物应已落盘");
         Assert.Contains("仅一位分析师完成的结论", artifact);
     }
 

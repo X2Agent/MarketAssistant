@@ -27,7 +27,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
         // Investment Rating & Score
         var rating = GetEnumDescription(model.InvestmentRating);
         var score = model.OverallScore.ToString("F1");
-        var color = rating.Contains("买入") ? AdaptiveTextColor.Good : (rating.Contains("卖出") ? AdaptiveTextColor.Attention : AdaptiveTextColor.Warning);
+        var color = rating.Contains("买入", StringComparison.Ordinal) ? AdaptiveTextColor.Good : (rating.Contains("卖出", StringComparison.Ordinal) ? AdaptiveTextColor.Attention : AdaptiveTextColor.Warning);
 
         // 1. 综合评分看板
         var scoreContainer = new AdaptiveContainer { Style = AdaptiveContainerStyle.Emphasis, Spacing = AdaptiveSpacing.Medium };

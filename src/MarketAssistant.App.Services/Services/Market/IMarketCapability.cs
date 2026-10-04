@@ -29,9 +29,10 @@ public class AShareMarketCapability : IMarketCapability
     public bool SupportsRealtime => false;
     public bool SupportsNews => true;
     public bool SupportsTrading => false;
-    // A 股暂无公开的实时五档/逐笔数据源，资产页不展示盘口面板
-    public bool SupportsOrderBook => false;
-    public bool SupportsTickTrades => false;
+    // 新浪个股行情接口提供五档盘口与逐笔成交（非简版指数接口）。
+    // 注意：逐笔不含主动买卖方向，UI 不应据此推断内外盘。
+    public bool SupportsOrderBook => true;
+    public bool SupportsTickTrades => true;
 }
 
 public class CryptoMarketCapability : IMarketCapability

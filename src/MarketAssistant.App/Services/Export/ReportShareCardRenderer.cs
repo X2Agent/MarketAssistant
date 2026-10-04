@@ -20,13 +20,19 @@ public static class ReportShareCardRenderer
 
     private static readonly PixelSize CardPixelSize = new(CardWidth, CardHeight);
 
+    /// <summary>
+    /// 显式指定 PNG 编码参数以走非过时重载：<c>Save(Stream, int?)</c> 缺少编码器类型，
+    /// 在无扩展名的 <see cref="MemoryStream"/> 上格式判定不够显式。
+    /// </summary>
+    private static readonly BitmapEncoderOptions PngEncoderOptions = new PngBitmapEncoderOptions();
+
     /// <summary>渲染分享卡为 PNG 字节。</summary>
     public static byte[] RenderToPngBytes(ReportShareCardData data)
     {
         var view = CreateCard(data);
         using var bitmap = Render(view);
         using var stream = new MemoryStream();
-        bitmap.Save(stream);
+        bitmap.Save(stream, PngEncoderOptions);
         return stream.ToArray();
     }
 
@@ -46,14 +52,19 @@ public static class ReportShareCardRenderer
         using var bitmap = Render(view);
 
         using var pngStream = new MemoryStream();
-        bitmap.Save(pngStream);
+        bitmap.Save(pngStream, PngEncoderOptions);
         pngStream.Position = 0;
 
         using var input = SKBitmap.Decode(pngStream);
         using var document = SKDocument.CreatePdf(filePath);
         using var canvas = document.BeginPage(CardWidth, CardHeight);
         canvas.Clear(SKColors.White);
-        canvas.DrawBitmap(input, new SKRect(0, 0, CardWidth, CardHeight));
+        // 卡片按 1:1 像素尺寸贴入整页，使用 Nearest 采样避免重采样插值模糊
+        canvas.DrawBitmap(
+            input,
+            new SKRect(0, 0, CardWidth, CardHeight),
+            new SKSamplingOptions(SKFilterMode.Nearest),
+            null);
         document.EndPage();
     }
 

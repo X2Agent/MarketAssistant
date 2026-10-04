@@ -20,6 +20,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<EastMoneyNewsClient>();
         services.AddSingleton<SinaFundFlowClient>();
         services.AddSingleton<SinaIndexQuoteClient>();
+        // 个股五档盘口/逐笔（资产页 A 股盘口面板）：与指数行情同源，复用 SinaHq 命名客户端
+        services.AddSingleton<SinaStockQuoteClient>();
         return services;
     }
 }

@@ -175,9 +175,9 @@ public class DocxMarkdownConverter(IImageStorageService imageStorageService) : I
 
         var styleLower = style.ToLowerInvariant();
 
-        if (styleLower.StartsWith("heading"))
+        if (styleLower.StartsWith("heading", StringComparison.Ordinal))
         {
-            var levelStr = styleLower.Replace("heading", "");
+            var levelStr = styleLower.Replace("heading", "", StringComparison.Ordinal);
             if (int.TryParse(levelStr, out var level) && level >= 1 && level <= 6)
                 return level;
         }
@@ -249,7 +249,7 @@ public class DocxMarkdownConverter(IImageStorageService imageStorageService) : I
             if (!string.IsNullOrWhiteSpace(formattedText))
             {
                 if (cellContent.Length > 0)
-                    cellContent.Append(" ");
+                    cellContent.Append(' ');
                 cellContent.Append(formattedText);
             }
         }

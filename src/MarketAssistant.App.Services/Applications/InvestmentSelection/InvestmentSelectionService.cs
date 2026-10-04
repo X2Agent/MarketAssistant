@@ -368,7 +368,7 @@ public class InvestmentSelectionService(
 
     private string NormalizeRiskPreference(string riskPreference)
     {
-        return riskPreference?.ToLower() switch
+        return riskPreference?.ToLowerInvariant() switch
         {
             "conservative" or "保守" or "低风险" => "conservative",
             "aggressive" or "激进" or "高风险" => "aggressive",

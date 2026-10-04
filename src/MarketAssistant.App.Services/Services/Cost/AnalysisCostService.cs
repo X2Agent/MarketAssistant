@@ -37,6 +37,46 @@ public sealed class AnalysisCostService(
     public string FormatCost(AnalysisTokenUsage? usage)
         => ModelCostCalculator.FormatCost(Estimate(usage));
 
+    public string FormatCostForModel(string? providerId, string? modelId, long inputTokens, long outputTokens)
+    {
+        if (string.IsNullOrWhiteSpace(providerId) || string.IsNullOrWhiteSpace(modelId))
+        {
+            return string.Empty;
+        }
+
+        if (inputTokens <= 0 && outputTokens <= 0)
+        {
+            return string.Empty;
+        }
+
+        // 复用同一条价格匹配与格式化逻辑，避免简报与分析报告出现两套算法。
+        var usage = new AnalysisTokenUsage
+        {
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            CallCount = 1,
+            Entries =
+            [
+                new TokenUsageEntry
+                {
+                    // 模型已知时用模型名作归集键；模型解析在下方由 resolver 直接给出
+                    AgentName = modelId,
+                    InputTokens = inputTokens,
+                    OutputTokens = outputTokens,
+                    CallCount = 1
+                }
+            ]
+        };
+
+        var estimate = ModelCostCalculator.Estimate(
+            usage,
+            _userSettingService.CurrentSetting.ModelPrices,
+            _ => $"{providerId}|{modelId}");
+
+        // 仅一个明细行时该行对应用户实际调用的模型，无需按分析师名反查
+        return ModelCostCalculator.FormatCost(estimate);
+    }
+
     /// <summary>
     /// Agent ASCII 名 → "provider|model" 键。未识别的 Agent 名解析为 null（未定价），
     /// 避免把成本记到错误模型上。

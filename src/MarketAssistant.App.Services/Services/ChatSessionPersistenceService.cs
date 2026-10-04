@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Data.Sqlite;
@@ -93,8 +94,8 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
                 Id = reader.GetString(0),
                 StockCode = reader.GetString(1),
                 Title = reader.GetString(2),
-                CreatedAt = DateTime.Parse(reader.GetString(3)),
-                UpdatedAt = DateTime.Parse(reader.GetString(4))
+                CreatedAt = ParseRoundTrip(reader.GetString(3)),
+                UpdatedAt = ParseRoundTrip(reader.GetString(4))
             });
         }
         return summaries;
@@ -146,8 +147,8 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
             Endpoint = reader.GetString(reader.GetOrdinal("endpoint")),
             RuntimeConfigurationFingerprint = reader.GetString(
                 reader.GetOrdinal("runtime_configuration_fingerprint")),
-            CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at"))),
-            UpdatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("updated_at")))
+            CreatedAt = ParseRoundTrip(reader.GetString(reader.GetOrdinal("created_at"))),
+            UpdatedAt = ParseRoundTrip(reader.GetString(reader.GetOrdinal("updated_at")))
         };
     }
 
@@ -188,7 +189,7 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
                     AuthorName = reader.IsDBNull(3) ? null : reader.GetString(3),
                     StockCode = reader.GetString(5),
                     SessionTitle = reader.GetString(6),
-                    UpdatedAt = DateTime.Parse(reader.GetString(7))
+                    UpdatedAt = ParseRoundTrip(reader.GetString(7))
                 });
             }
         }
@@ -263,6 +264,19 @@ public class ChatSessionPersistenceService(ILogger<ChatSessionPersistenceService
             await alterCommand.ExecuteNonQueryAsync();
         }
     }
+
+    /// <summary>
+    /// 解析以 <c>ToString("O")</c> 写入的时间戳。
+    /// </summary>
+    /// <remarks>
+    /// 必须显式指定 <see cref="CultureInfo.InvariantCulture"/> 并保留 <c>RoundtripKind</c>：
+    /// 写入侧用的是往返格式（ISO 8601 且带时区/Kind 标记），若读取侧退化为
+    /// 当前区域解析，在非 en-US 区域下可能被误判或丢失 Kind，
+    /// 进而导致会话时间在 UI 上偏移数小时。此约定与其它持久化服务一致
+    /// （如 <c>DailyBriefingService</c>）。
+    /// </remarks>
+    private static DateTime ParseRoundTrip(string value) =>
+        DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
     protected override async Task InitializeDatabaseAsync()
     {

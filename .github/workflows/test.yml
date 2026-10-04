@@ -1,10 +1,13 @@
 name: Run Tests
 
 on:
-  workflow_dispatch:  # 允许手动触发
-  # 取消注释下面的行以在特定分支自动运行测试
-  # push:
-  #   branches: [ main ]
+  push:
+    branches: [main, develop, 'feat/**', 'fix/**', 'refactor/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:  # 保留手动触发，便于按需重跑
+  # 注意：此前 push 触发器被注释、仅剩 workflow_dispatch，导致 533 个单元测试
+  # 在 CI 上从不执行，PR 缺乏质量门禁。此处已恢复自动触发。
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -34,7 +37,7 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         ZHITU_API_TOKEN: ${{ secrets.ZHITU_API_TOKEN }}
         WEB_SEARCH_API_KEY: ${{ secrets.WEB_SEARCH_API_KEY }}
-      run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build -s tests/unit.runsettings --filter "TestCategory=Unit" --logger "trx;LogFileName=test-results.trx"
+      run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build -s tests/unit.runsettings --logger "trx;LogFileName=test-results.trx"
     
     - name: Upload test results
       uses: actions/upload-artifact@v4

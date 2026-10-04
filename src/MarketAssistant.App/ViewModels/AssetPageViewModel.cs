@@ -360,7 +360,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         if (string.IsNullOrEmpty(type))
             return;
 
-        var newKLineType = type.ToLower() switch
+        var newKLineType = type.ToLowerInvariant() switch
         {
             "minute" => KLineType.Minute15,
             "daily" => KLineType.Daily,

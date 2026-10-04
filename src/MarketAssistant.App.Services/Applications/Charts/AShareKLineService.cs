@@ -108,7 +108,7 @@ public class AShareKLineService(
 
         if (!startDate.HasValue && !endDate.HasValue)
         {
-            defaultStartDate = interval.ToLower() switch
+            defaultStartDate = interval.ToLowerInvariant() switch
             {
                 // 日K线，默认查询最近1年
                 "d" => DateTime.Now.AddYears(-1),

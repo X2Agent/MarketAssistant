@@ -29,7 +29,7 @@ public sealed class BinanceFuturesAccountService(
     protected override void AppendPlaceOrderParameters(Dictionary<string, string> parameters, string? positionSide)
     {
         if (!string.IsNullOrEmpty(positionSide))
-            parameters["positionSide"] = positionSide.ToUpper();
+            parameters["positionSide"] = positionSide.ToUpperInvariant();
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ public sealed class BinanceFuturesAccountService(
     {
         try
         {
-            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpper()}";
+            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpperInvariant()}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"/fapi/v2/positionRisk?{signedQuery}";
 
@@ -116,7 +116,7 @@ public sealed class BinanceFuturesAccountService(
     {
         try
         {
-            var queryString = $"symbol={symbol.ToUpper()}&leverage={leverage}";
+            var queryString = $"symbol={symbol.ToUpperInvariant()}&leverage={leverage}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"/fapi/v1/leverage?{signedQuery}";
 

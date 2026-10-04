@@ -92,6 +92,22 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     /// </summary>
     public ObservableCollection<ModelPrice> ModelPrices { get; } = [];
 
+    /// <summary>
+    /// 是否展示"内置参考价"提示。表内仍有与内置快照完全一致的行时为 true，
+    /// 提醒用户这些单价是快照而非实时报价。
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasBuiltinPriceHint;
+
+    /// <summary>内置参考价提示文案（含快照日期）。</summary>
+    public string BuiltinPriceHintText =>
+        $"已为你填入常用模型的参考单价（快照日期 {DefaultModelPriceCatalog.SnapshotDate}）。" +
+        "这些是内置参考价而非实时报价，请按你所选服务商的官方定价核对后自行修改；" +
+        "未覆盖的模型会显示为「部分未定价」。";
+
+    /// <summary>恢复内置参考价的按钮文案。</summary>
+    public string RestoreDefaultPricesText => "重置为内置参考价";
+
     /// <summary>新增一行价格（服务商预填当前服务商，减少重复输入）。</summary>
     [RelayCommand]
     private void AddModelPrice()
@@ -117,6 +133,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         {
             ModelPrices.Add(price);
         }
+
+        RefreshPriceHint();
     }
 
     /// <summary>草稿价格表写回设置：完全空行丢弃，其余（含半成品）保留但不参与成本匹配。</summary>
@@ -125,6 +143,39 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         UserSetting.ModelPrices = [.. ModelPrices
             .Where(price => !string.IsNullOrWhiteSpace(price.ProviderId) ||
                             !string.IsNullOrWhiteSpace(price.ModelId))];
+        RefreshPriceHint();
+    }
+
+    /// <summary>
+    /// 价格表提示：只要表内存在与内置参考价完全一致的行（典型情况是用户从未改过），
+    /// 就提示这些数字是内置快照而非实时报价，避免用户误以为是精确账单。
+    /// 用户自行改过任意一行即不再打扰。
+    /// </summary>
+    private void RefreshPriceHint()
+    {
+        var usesBuiltin = ModelPrices.Any(price =>
+            price.IsMatchable &&
+            DefaultModelPriceCatalog.Defaults.Any(builtin =>
+                string.Equals(builtin.ProviderId, price.ProviderId, StringComparison.Ordinal) &&
+                string.Equals(builtin.ModelId, price.ModelId, StringComparison.Ordinal) &&
+                builtin.InputPricePerMillionTokens == price.InputPricePerMillionTokens &&
+                builtin.OutputPricePerMillionTokens == price.OutputPricePerMillionTokens));
+
+        HasBuiltinPriceHint = usesBuiltin;
+    }
+
+    /// <summary>重置为内置参考价（仅改草稿，需点击保存才落盘）。</summary>
+    public void RestoreDefaultPrices()
+    {
+        ModelPrices.Clear();
+        foreach (var price in DefaultModelPriceCatalog.CreateDefaults())
+        {
+            ModelPrices.Add(price);
+        }
+
+        RefreshPriceHint();
+        Logger?.LogInformation("用户将模型价格表重置为内置参考价（快照日期 {SnapshotDate}）",
+            DefaultModelPriceCatalog.SnapshotDate);
     }
 
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];

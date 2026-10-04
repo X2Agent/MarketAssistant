@@ -221,7 +221,7 @@ internal static class PdfTableExtractor
         if (table.Count > 1)
         {
             bool firstRowHeader = table[0].Count(c => c.Any(char.IsLetter)) >= Math.Max(2, targetColumns - 1) &&
-                                  table[0].Any(c => c.Contains("名称") || c.Contains("地区") || c.Contains("时间") || c.Contains("类") || c.Contains("种"));
+                                  table[0].Any(c => c.Contains("名称", StringComparison.Ordinal) || c.Contains("地区", StringComparison.Ordinal) || c.Contains("时间", StringComparison.Ordinal) || c.Contains('类') || c.Contains('种'));
             if (!firstRowHeader)
             {
                 // 生成一个通用表头

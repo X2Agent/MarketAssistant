@@ -110,7 +110,7 @@ public static class LlmJsonExtractor
     private static string StripMarkdownCodeFence(string text)
     {
         var span = text.AsSpan().Trim();
-        if (!span.StartsWith("```"))
+        if (!span.StartsWith("```", StringComparison.Ordinal))
             return text;
 
         var firstNewline = span.IndexOf('\n');

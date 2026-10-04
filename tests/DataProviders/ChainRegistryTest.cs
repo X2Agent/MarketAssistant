@@ -9,7 +9,7 @@ namespace TestMarketAssistant.DataProviders;
 [TestClass]
 public class ChainRegistryTest
 {
-    [DataTestMethod]
+    [TestMethod]
     [DataRow("ethereum", "ethereum")]
     [DataRow("eth", "ethereum")]
     [DataRow("ETH", "ethereum")]
@@ -51,7 +51,7 @@ public class ChainRegistryTest
         Assert.ThrowsExactly<FriendlyException>(() => ChainRegistry.Normalize(null));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow("ethereum", "1")]
     [DataRow("bsc", "56")]
     [DataRow("polygon", "137")]

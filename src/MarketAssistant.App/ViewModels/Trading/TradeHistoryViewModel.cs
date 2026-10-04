@@ -31,7 +31,7 @@ public partial class TradeHistoryViewModel : ViewModelBase
     {
         await LoadAsync(async _ =>
         {
-            var symbol = string.IsNullOrWhiteSpace(FilterSymbol) ? null : FilterSymbol.Trim().ToUpper();
+            var symbol = string.IsNullOrWhiteSpace(FilterSymbol) ? null : FilterSymbol.Trim().ToUpperInvariant();
             var records = await _dataService.GetTradeRecordsAsync(symbol: symbol, limit: 100);
 
             Records.Clear();

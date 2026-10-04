@@ -31,7 +31,7 @@ public sealed class AShareTechnicalTools(
             var items = await _zhiTuClient.GetIndicatorListAsync<T>(indicator, formattedSymbol, token, cancellationToken);
 
             if (items.Count == 0)
-                throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
+                throw new FriendlyException($"获取 {indicator.ToUpperInvariant()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
 
             return items.Last();
         }

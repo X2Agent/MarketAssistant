@@ -30,8 +30,8 @@
                 Classes="btn-secondary"/>
     </Grid>
 
-    <!-- 筛选行：级别下拉 + 标的关键词 -->
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,*" Margin="{StaticResource BottomMargin}">
+    <!-- 筛选行：级别下拉 + 市场下拉 + 标的关键词 -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto" Margin="{StaticResource BottomMargin}">
         <ComboBox Grid.Column="0"
                   ItemsSource="{Binding LevelFilters}"
                   SelectedItem="{Binding SelectedLevelFilter}"
@@ -43,11 +43,22 @@
                 </DataTemplate>
             </ComboBox.ItemTemplate>
         </ComboBox>
-        <TextBox Grid.Column="1"
+        <ComboBox Grid.Column="1"
+                  ItemsSource="{Binding MarketFilters}"
+                  SelectedItem="{Binding SelectedMarketFilter}"
+                  MinWidth="110"
+                  Margin="{StaticResource SmallRightMargin}">
+            <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:MarketFilterOption">
+                    <TextBlock Text="{Binding Text}"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBox Grid.Column="2"
                  Text="{Binding SymbolFilterText, Mode=TwoWay}"
-                 Watermark="按标的代码或告警标题筛选"
+                 PlaceholderText="按标的代码或告警标题筛选"
                  Margin="{StaticResource SmallRightMargin}"/>
-        <TextBlock Grid.Column="2"
+        <TextBlock Grid.Column="3"
                    Text="{Binding VisibleCountText}"
                    VerticalAlignment="Center"
                    HorizontalAlignment="Right"

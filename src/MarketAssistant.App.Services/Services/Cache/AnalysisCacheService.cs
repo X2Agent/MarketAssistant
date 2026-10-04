@@ -138,5 +138,6 @@ public class AnalysisCacheService(
     public void Dispose()
     {
         // IMemoryCache 由 DI 容器管理，无需手动释放
+        GC.SuppressFinalize(this);
     }
 }

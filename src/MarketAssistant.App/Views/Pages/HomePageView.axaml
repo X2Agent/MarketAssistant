@@ -360,30 +360,41 @@
                     </Grid>
                 </controls:CardView.Header>
 
-                <Panel>
-                    <!-- 生成中骨架 -->
-                    <StackPanel Spacing="{StaticResource SmallSpacing}"
-                                IsVisible="{Binding Briefing.IsGenerating}">
-                        <Border Classes="skeleton skeleton-row" Height="16"/>
-                        <Border Classes="skeleton skeleton-row" Height="16"/>
-                        <Border Classes="skeleton skeleton-row" Height="16"/>
-                    </StackPanel>
+                <StackPanel>
+                    <Panel>
+                        <!-- 生成中骨架 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                    IsVisible="{Binding Briefing.IsGenerating}">
+                            <Border Classes="skeleton skeleton-row" Height="16"/>
+                            <Border Classes="skeleton skeleton-row" Height="16"/>
+                            <Border Classes="skeleton skeleton-row" Height="16"/>
+                        </StackPanel>
 
-                    <!-- 简报正文（限定高度，避免挤压下方热门资产） -->
-                    <ScrollViewer MaxHeight="200"
-                                  IsVisible="{Binding !Briefing.IsGenerating}">
-                        <TextBlock Text="{Binding Briefing.BriefingContent}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                    </ScrollViewer>
+                        <!-- 简报正文（限定高度，避免挤压下方热门资产） -->
+                        <ScrollViewer MaxHeight="200"
+                                      IsVisible="{Binding !Briefing.IsGenerating}">
+                            <TextBlock Text="{Binding Briefing.BriefingContent}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </ScrollViewer>
 
-                    <!-- 空态（无自选无要闻） / 失败态（含重试入口） -->
-                    <controls:StateOverlayView State="{Binding Briefing.OverlayState}"
-                                               Message="{Binding Briefing.OverlayMessage}"
-                                               RetryCommand="{Binding Briefing.RetryCommand}"
-                                               RetryText="重新生成"
-                                               ShowLoading="False"/>
-                </Panel>
+                        <!-- 空态（无自选无要闻） / 失败态（含重试入口） -->
+                        <controls:StateOverlayView State="{Binding Briefing.OverlayState}"
+                                                   Message="{Binding Briefing.OverlayMessage}"
+                                                   RetryCommand="{Binding Briefing.RetryCommand}"
+                                                   RetryText="重新生成"
+                                                   ShowLoading="False"/>
+                    </Panel>
+
+                    <!-- 近 30 天简报累计用量：置于卡片内容末尾（页脚），与"本次消耗"分开表述；
+                         无历史记录时自动隐藏。CardView 是 ContentControl，只能有单个子元素，
+                         故必须与正文一起包在 StackPanel 内 -->
+                    <TextBlock Text="{Binding Briefing.UsageSummaryText}"
+                               IsVisible="{Binding Briefing.ShowUsageSummary}"
+                               FontSize="{StaticResource SmallFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Margin="{StaticResource SmallTopMargin}"/>
+                </StackPanel>
             </controls:CardView>
 
             <!-- 下排：热门资产（撑满剩余列高，与右侧快讯对齐） -->

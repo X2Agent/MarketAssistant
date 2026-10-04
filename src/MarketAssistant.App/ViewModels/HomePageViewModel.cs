@@ -44,8 +44,8 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     private void OnHotAssetSelected(object? sender, HotAsset asset)
     {
         var assetCode = asset.MarketType == Infrastructure.Core.MarketType.Crypto
-            ? asset.Code.ToLower()
-            : $"{asset.Market}{asset.Code}".ToLower();
+            ? asset.Code.ToLowerInvariant()
+            : $"{asset.Market}{asset.Code}".ToLowerInvariant();
 
         decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
         decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;

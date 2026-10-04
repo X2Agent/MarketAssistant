@@ -50,8 +50,8 @@ public sealed class CryptoBasicTools(
             // 映射到 CryptoQuoteInfo 模型
             var quoteInfo = new CryptoQuoteInfo
             {
-                SecurityCode = assetSymbol.ToUpper(),
-                SecurityName = assetSymbol.ToUpper(),
+                SecurityCode = assetSymbol.ToUpperInvariant(),
+                SecurityName = assetSymbol.ToUpperInvariant(),
                 SecurityType = "虚拟币",
                 TradeStatus = "交易中",
 
@@ -115,7 +115,7 @@ public sealed class CryptoBasicTools(
         {
             // 提取基础币种 (如 BTCUSDT -> BTC)
             var baseSymbol = CryptoSymbolConverter.ExtractBaseCurrency(assetSymbol);
-            var symbol = string.IsNullOrWhiteSpace(baseSymbol) ? assetSymbol.ToUpper() : baseSymbol;
+            var symbol = string.IsNullOrWhiteSpace(baseSymbol) ? assetSymbol.ToUpperInvariant() : baseSymbol;
 
             _logger.LogInformation("正在获取虚拟币项目信息: {Symbol}", symbol);
 
@@ -130,7 +130,7 @@ public sealed class CryptoBasicTools(
             // 映射到 CryptoProjectInfo 模型
             var projectInfo = new CryptoProjectInfo
             {
-                Symbol = coinDetail.Symbol?.ToUpper() ?? symbol,
+                Symbol = coinDetail.Symbol?.ToUpperInvariant() ?? symbol,
                 Name = coinDetail.Name ?? symbol,
                 Uri = coinDetail.Links?.Homepage?.FirstOrDefault(h => !string.IsNullOrEmpty(h)) ?? "",
                 AssetType = "BLOCKCHAIN",

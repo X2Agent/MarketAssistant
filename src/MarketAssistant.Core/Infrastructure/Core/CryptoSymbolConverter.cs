@@ -45,7 +45,7 @@ public static class CryptoSymbolConverter
         var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "BTC", "ETH", "BNB", "DAI" };
         foreach (var quote in quoteCurrencies)
         {
-            if (symbol.EndsWith(quote) && symbol.Length > quote.Length)
+            if (symbol.EndsWith(quote, StringComparison.Ordinal) && symbol.Length > quote.Length)
             {
                 return symbol;
             }
@@ -79,7 +79,7 @@ public static class CryptoSymbolConverter
         var quoteCurrencies = new[] { "USDT", "BUSD", "USDC", "FDUSD", "TUSD", "DAI", "BTC", "ETH", "BNB", "EUR", "TRY", "BRL" };
         foreach (var quote in quoteCurrencies)
         {
-            if (tradingPair.EndsWith(quote) && tradingPair.Length > quote.Length)
+            if (tradingPair.EndsWith(quote, StringComparison.Ordinal) && tradingPair.Length > quote.Length)
             {
                 return tradingPair.Substring(0, tradingPair.Length - quote.Length);
             }
