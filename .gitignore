@@ -410,7 +410,19 @@ FodyWeavers.xsd
 /.[!.]*/
 
 # Secrets and credentials
+# 注意：历史提交中曾误追踪 .secrets（内容形如 GITHUB_TOKEN=...），
+# 已通过 git rm --cached 解除追踪。若这些 token 曾在远端公开，需在 GitHub
+# Settings → Developer settings 中轮换，旧值即使已删除仍然有效。
 .secrets
 .env
 *.pem
 *.key.zcode/
+
+# 本地临时产物（本轮质量治理期间的构建日志）
+verify*.txt
+analyzer*.txt
+a3.txt
+final.txt
+build_log.txt
+*.trx
+TestResults/
