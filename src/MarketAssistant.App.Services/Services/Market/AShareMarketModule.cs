@@ -57,10 +57,10 @@ public sealed class AShareMarketModule : IMarketModule
         services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.AShare);
         services.AddKeyedSingleton<IAssetScreenerService, StockScreenerService>(MarketType.AShare);
 
-        // 资产页行情数据（盘口/逐笔：新浪个股行情接口，与顶栏指数同源）
+        // 资产页行情数据（盘口：新浪个股行情接口，与顶栏指数同源；逐笔：数据源不提供，注册空实现）
         services.AddKeyedSingleton<IMarketSnapshotService, AShareMarketSnapshotService>(MarketType.AShare);
         services.AddKeyedSingleton<IOrderBookService, AShareOrderBookService>(MarketType.AShare);
-        services.AddKeyedSingleton<ITickTradeService, AShareTickTradeService>(MarketType.AShare);
+        services.AddKeyedSingleton<ITickTradeService, NoopTickTradeService>(MarketType.AShare);
         services.AddTechnicalIndicatorService(MarketType.AShare);
 
         // 顶栏行情条：A 股三大指数（新浪 hq 指数端点）

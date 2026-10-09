@@ -45,8 +45,11 @@ MarketAssistant.App.Services/
 |------|------|------|
 | `IMarketSnapshotService` | 行情速览（今开/最高/最低/昨收/量额/换手/振幅/量比/PE/PB） | `AShareMarketSnapshotService` / `CryptoMarketSnapshotService` |
 | `ITechnicalIndicatorService` | 技术指标快照（MA/MACD/BOLL/KDJ） | 市场无关实现（`TechnicalIndicatorService`，复用 `Skender.Stock.Indicators`），数据不足时返回 `null` 而非抛异常 |
-| `IOrderBookService` | 盘口深度 | Crypto：`CryptoOrderBookService`；A 股：`NoopOrderBookService`（能力位 `SupportsOrderBook=false`） |
-| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`NoopTickTradeService`（能力位 `SupportsTickTrades=false`） |
+| `IOrderBookService` | 盘口深度 | Crypto：`CryptoOrderBookService`（币安深度）；A 股：`AShareOrderBookService`（新浪个股行情五档）。A 股解析器带交叉校验，任一条不满足即返回 `null` |
+| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`AShareTickTradeService`。**逐笔不含主动买卖方向**，UI 不得据 `IsBuyerMaker` 推断内外盘 |
+
+> 两个市场的 `SupportsOrderBook` / `SupportsTickTrades` 能力位目前**均为 `true`**，
+> `NoopOrderBookService` / `NoopTickTradeService` 仅作为新增市场缺少数据源时的兜底契约位保留。
 
 - 新增市场区块服务时，必须在 `MarketContext` 对应的 MarketModule 中注册，并同步更新 `IMarketCapability` 的能力位。每个市场都必须注册全部 keyed 接口——不支持的市场注册 `Noop*` 实现（返回空集合），**不要**抛异常伪装成加载失败，也不要在业务层用 `if/else` 绕开解析。
 - 不支持某能力的市场由页面显式说明数据源限制；区块之间必须可独立加载与独立失败，禁止把多个区块串成一个必须全部成功的事务。
@@ -55,28 +58,26 @@ MarketAssistant.App.Services/
 
 ## 每日 AI 简报（Applications/Briefing）
 
-自选股的"隔夜要闻 + 异动归因"摘要，按市场 Keyed 注册（`IDailyBriefingService`），SQLite 表 `briefings` 按 `(market_type, date_key)` 唯一，当天生成后各端复用。
+自选股的"要闻速览 + 异动归因"摘要，按市场 Keyed 注册（`IDailyBriefingService`），SQLite 表 `briefings` 按 `(market_type, date_key)` 唯一，当天生成后各端复用。**纯手动生成**：构造函数只读当天缓存，绝不自动触发模型调用。
 
-- **Token 预算硬边界**：`DailyBriefingService` 的 `MaxFavorites/MaxNewsItems/MaxNewsContentLength/MaxBriefingLength/MaxOutputTokens` 常量钳制输入输出；自选按异动幅度优先纳入。调大任何边界前先评估成本。
+- **重要性与相关性判断交给模型**：代码只做条数截断，**不做本地重要性/相关性过滤**。实测 A 股同花顺 `import` 字段 97% 为 0（无区分度）、88% 的快讯无关联股票（`stock` 为空或外盘），基于这些信号硬过滤等于用噪声决策。`Telegram.Symbols` 在 A 股因字段大小写不匹配恒为空，不可用。
+- **要闻覆盖约 28~29 小时**：数据源 `pagesize=100`（A股）/`take=100`（币圈）实测跨度 28.9h / 28.3h；原先 `20` 条仅覆盖 2.1h / 9.2h，缺失隔夜与开盘前消息。
+- **Token 预算硬边界**：`DailyBriefingService` 的 `MaxFavorites/MaxNewsItems/MaxNewsTitleLength/MaxNewsContentLength/MaxBriefingLength/MaxOutputTokens` 常量钳制输入输出；自选按异动幅度优先纳入，要闻按数据源时间倒序取前 N 条。调大任何边界前先评估成本（要闻部分当前约 2100 token/次，为早期 8 条方案的约 5.5 倍）。
 - **单次调用、无重试链**：经 `IChatClientFactory.CreateRuntime()` 默认模型一次 `GetResponseAsync` 完成；失败直接抛给调用方（UI 展示重试），不自动重试烧 Token，失败结果不落盘。
 - **空输入不是错误**：自选与要闻均空时返回 `null`，页面展示引导空态（"添加自选后……"），不要生成无意义内容。
 - **缓存语义**：`GenerateAsync(force: false)` 命中当天缓存直接返回；日期键用**本地时间** `yyyy-MM-dd`（跨时区/零点行为与用户感知一致）。
-- 提示词只允许给定事实，明确禁止编造与买卖建议——简报定位是事实归因，不是投资顾问。
+- 提示词只允许给定事实，明确禁止编造与买卖建议——简报定位是事实归因，不是投资顾问。措辞上不使用"隔夜"：数据源虽覆盖跨日，但并不保证每条都落在隔夜时段。
 
 ---
 
-## 分析成本估算（Services/Cost）
+## 成本估算（已移除）
 
-报告页 Token 面板旁的"约 ¥x.xx"金额来自用户维护的模型价格表（`UserSetting.ModelPrices`，设置页「模型价格表」分区编辑，单位：元 / 1M tokens）。
+2026-10 决策：**移除货币成本估算，只保留 Token 用量展示**。原 `Services/Cost`（`ModelCostCalculator` / `AnalysisCostService`）、`UserSetting.ModelPrices` 与 `DefaultModelPriceCatalog` 内置参考价均已删除，设置页「模型价格表」分区一并移除。
 
-| 类型 | 职责 |
-|------|------|
-| `ModelCostCalculator` | 纯逻辑：按用量条目 × 单价累加；解析不出模型或无价格行标记 `HasUnpriced` |
-| `IAnalysisCostService` / `AnalysisCostService` | 模型解析口径与 `MarketAnalysisWorkflow.ResolveRuntimeForRole` 一致：Agent ASCII 名 → 分析师类型（经 `AnalystPromptLoader` 反查）→ 角色级模型优先、回落服务商默认模型；解析失败不猜价格 |
-
-- **不猜价格**：无法确定模型（如 Unknown）、或价格表未覆盖时该条目只计入"部分未定价"下界标记，绝不按默认模型估算——错价比没价格更糟。
-- 价格匹配优先 `(provider, model)` 精确键；仅传模型 ID 时按模型 ID 兜底（不同 provider 同名模型取第一个，接受歧义）。
-- 展示文本统一走 `ModelCostCalculator.FormatCost`：`约 ¥0.42` / `≥ ¥0.42（部分未定价）` / 空串（UI 据此隐藏金额）。
+- 原因：价格表维护负担重、内置参考价快照会过期、未覆盖模型只能显示"部分未定价"，用户感知价值低于维护成本；Token 用量本身已足够支撑"这次分析花了多少算力"的判断。
+- 旧设置文件 JSON 中的 `ModelPrices` 字段由反序列化默认忽略，下次保存自然消失，无需迁移。
+- Token 用量的采集与展示（`ITokenUsageRecorder` / `TokenUsageFormatter` / 报告页与简报卡片）不受影响，仍在服役。
+- **不要重新引入"按默认模型猜价格"的逻辑**：宁可只展示 Token 数，也不给错误的金额预期。
 
 ---
 

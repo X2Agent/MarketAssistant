@@ -77,9 +77,9 @@ cp -r $PUBLISH_DIR/* %{buildroot}/opt/MarketAssistant/
 # 复制桌面文件
 cp $SCRIPT_DIR/marketassistant.desktop %{buildroot}/usr/share/applications/
 
-# 复制图标
-if [ -f "$APP_ASSETS_DIR/logo.png" ]; then
-    cp "$APP_ASSETS_DIR/logo.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/marketassistant.png
+# 复制图标（使用预生成的 256x256 图，避免把 3000x3000 母版塞进 hicolor 主题目录）
+if [ -f "$APP_ASSETS_DIR/logo_256.png" ]; then
+    cp "$APP_ASSETS_DIR/logo_256.png" %{buildroot}/usr/share/icons/hicolor/256x256/apps/marketassistant.png
 fi
 
 # 创建符号链接

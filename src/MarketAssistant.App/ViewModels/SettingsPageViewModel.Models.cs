@@ -182,13 +182,30 @@ public partial class SettingsPageViewModel
             var currentKey = UserSetting.ProviderApiKeys.TryGetValue(newValue.Id, out var key) ? key : "";
             if (newValue.CanListModels(currentKey))
             {
-                _ = FetchModels();
+                _ = FetchModelsCore(forceRefresh: false);
             }
         }
     }
 
     [ObservableProperty]
     private ObservableCollection<AnalystRoleViewModel> _analystRoles = [];
+
+    /// <summary>
+    /// 是否为每个分析师单独指定模型（设置页总开关，视图态、不持久化）。
+    /// 默认关闭：角色卡片不铺开模型下拉，避免过多输入框造成视觉过载；开启后才逐角色编辑。
+    /// 角色级分配本身不受开关影响，保存时始终按角色写回，关闭只是隐藏编辑入口。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPerAnalystModelEnabled;
+
+    partial void OnIsPerAnalystModelEnabledChanged(bool value)
+    {
+        // 开关切换时同步各角色卡片的编辑器可见性（分配值与生效逻辑不受影响）
+        foreach (var role in AnalystRoles)
+        {
+            role.ShowModelEditor = value;
+        }
+    }
 
     private void LoadAnalystRoles()
     {
@@ -221,6 +238,7 @@ public partial class SettingsPageViewModel
                 Description = description,
                 IsRequired = isRequired,
                 IsEnabled = isEnabled,
+                ShowModelEditor = IsPerAnalystModelEnabled,
                 ModelOptions = Models,
                 ModelIdOverride = AnalystModelAssignment.GetAssignedModelId(UserSetting, UserSetting.ProviderId, id)
             });
@@ -269,12 +287,19 @@ public partial class SettingsPageViewModel
     private Task OpenEmbeddingApiWebsite() => OpenUrlAsync(JinaApiUrl);
 
     /// <summary>
-    /// 从服务商 API 获取模型列表（用户填好 API Key 后手动触发）
+    /// 从服务商 API 获取模型列表（用户填好 API Key 后手动触发）。
+    /// 用户显式点击「刷新模型」时绕过会话级目录缓存，强制拉取最新目录。
     /// </summary>
     private bool CanFetchModelsCommand() => CanFetchModels;
 
     [RelayCommand(CanExecute = nameof(CanFetchModelsCommand))]
-    private async Task FetchModels()
+    private Task FetchModels() => FetchModelsCore(forceRefresh: true);
+
+    /// <summary>
+    /// 模型目录拉取主体。<paramref name="forceRefresh"/> 为 false 时命中
+    /// <see cref="IModelDiscoveryService"/> 的会话级缓存即刻返回（初始化/切换服务商走此路径）。
+    /// </summary>
+    private async Task FetchModelsCore(bool forceRefresh)
     {
         var provider = SelectedProvider;
         if (provider is null || !provider.SupportsModelListing)
@@ -298,7 +323,8 @@ public partial class SettingsPageViewModel
                 provider,
                 apiKey,
                 endpoint,
-                cts.Token);
+                cts.Token,
+                forceRefresh);
 
             // 取消不能保证远端立即停止；响应落 UI 前再次校验 Provider 身份。
             if (cts.IsCancellationRequested || SelectedProvider?.Id != requestedProviderId)

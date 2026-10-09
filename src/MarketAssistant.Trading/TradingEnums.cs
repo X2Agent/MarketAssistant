@@ -56,19 +56,37 @@ public enum OrderType
     TrailingStopMarket
 }
 
-public enum CryptoTradingMode
+/// <summary>
+/// 交易环境模式。表达"在哪种环境、以何种市场形态交易"的语义，
+/// 与具体交易所无关——交易所品牌由展示层（如 <c>TradingEnvironmentService</c>）负责拼接。
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>取值不可变更：</b>本枚举以数值形式持久化到 <c>UserSetting.json</c>
+/// 与交易凭证加密文件，改名不影响数值，但<b>不得调整已有数值</b>
+/// （1 为历史遗留空洞，保留不复用）。
+/// </para>
+/// <para>
+/// 新增市场时按同一语义轴扩展成员（如 A 股的模拟盘），不要引入交易所品牌到成员名中。
+/// </para>
+/// </remarks>
+public enum TradingMode
 {
-    [Description("Binance 实盘现货")]
+    /// <summary>实盘现货（真实资金，真实成交）</summary>
+    [Description("实盘现货")]
     LiveSpot = 0,
 
-    [Description("Binance 实盘合约")]
+    /// <summary>实盘合约（真实资金，支持杠杆与双向持仓）</summary>
+    [Description("实盘合约")]
     LiveFutures = 2,
 
-    [Description("Binance Futures Testnet")]
-    BinanceFuturesTestnet = 3,
+    /// <summary>合约测试网（虚拟资金，用于合约策略验证）</summary>
+    [Description("合约测试网")]
+    FuturesTestnet = 3,
 
-    [Description("Binance 现货 Demo")]
-    BinanceSpotDemo = 4
+    /// <summary>现货 Demo（虚拟余额，用于现货策略验证）</summary>
+    [Description("现货 Demo")]
+    SpotDemo = 4
 }
 
 public enum TradeRecordStatus

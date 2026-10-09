@@ -93,10 +93,20 @@ public sealed class AShareTechnicalTools(
             if (items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");
 
+            // OHLC 为 null 的 bar 是上游缺失的无效数据，跳过；缺失成交量按 0 计
             return [.. items
+                .Where(x => x.O.HasValue && x.H.HasValue && x.L.HasValue && x.C.HasValue)
                 .OrderBy(x => x.T)
                 .TakeLast(clampedCount)
-                .Select(x => new OhlcvBar { T = x.T, O = x.O, H = x.H, L = x.L, C = x.C, V = x.V })];
+                .Select(x => new OhlcvBar
+                {
+                    T = x.T,
+                    O = x.O!.Value,
+                    H = x.H!.Value,
+                    L = x.L!.Value,
+                    C = x.C!.Value,
+                    V = x.V ?? 0m
+                })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -114,13 +124,16 @@ public sealed class AShareTechnicalTools(
         yield return AIFunctionFactory.Create(GetKLinesAsync);
     }
 
+    /// <summary>
+    /// 智兔 K 线条目。OHLC 缺失（null）的 bar 为无效数据，映射时跳过；成交量缺失按 0 计。
+    /// </summary>
     private sealed class ZhiTuKLineBar
     {
         [JsonPropertyName("t")] public string T { get; init; } = "";
-        [JsonPropertyName("o")] public decimal O { get; init; }
-        [JsonPropertyName("h")] public decimal H { get; init; }
-        [JsonPropertyName("l")] public decimal L { get; init; }
-        [JsonPropertyName("c")] public decimal C { get; init; }
-        [JsonPropertyName("v")] public decimal V { get; init; }
+        [JsonPropertyName("o")] public decimal? O { get; init; }
+        [JsonPropertyName("h")] public decimal? H { get; init; }
+        [JsonPropertyName("l")] public decimal? L { get; init; }
+        [JsonPropertyName("c")] public decimal? C { get; init; }
+        [JsonPropertyName("v")] public decimal? V { get; init; }
     }
 }

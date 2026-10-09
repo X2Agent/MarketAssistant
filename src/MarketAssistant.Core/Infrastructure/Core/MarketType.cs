@@ -19,9 +19,3 @@ public enum MarketType
     [Description("虚拟币")]
     Crypto
 }
-
-
-
-
-
-

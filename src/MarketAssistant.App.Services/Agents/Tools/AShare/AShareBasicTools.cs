@@ -41,15 +41,18 @@ public sealed class AShareBasicTools(
             // HTTP 访问与容错反序列化由 ClsQuoteClient 负责
             var raw = await _clsClient.GetStockQuoteAsync(formattedSymbol, QuoteFields, cancellationToken)
                 ?? throw new FriendlyException($"未找到股票 {assetSymbol} ({formattedSymbol}) 的数据，请检查代码是否正确。");
+            // last_px 为 null 表示停牌/暂无成交，没有有效行情可返回
+            if (raw.LastPrice is not { } lastPrice)
+                throw new FriendlyException($"股票 {assetSymbol} 当前无有效行情（可能停牌或暂无成交）。");
             return new StockQuoteInfo
             {
-                CurrentPrice = raw.LastPrice,
-                PriceChange = raw.ChangePx,
-                PercentageChange = raw.Change,
-                HighPrice = raw.HighPx,
-                LowPrice = raw.LowPx,
-                Volume = raw.BusinessAmount / 10000m,
-                Amount = raw.BusinessBalance / 100000000m,
+                CurrentPrice = lastPrice,
+                PriceChange = raw.ChangePx ?? 0m,
+                PercentageChange = raw.Change ?? 0m,
+                HighPrice = raw.HighPx ?? 0m,
+                LowPrice = raw.LowPx ?? 0m,
+                Volume = (raw.BusinessAmount ?? 0m) / 10000m,
+                Amount = (raw.BusinessBalance ?? 0m) / 100000000m,
                 TurnoverRate = raw.TurnoverRate,
                 PercentageChange3Day = raw.Change3,
                 PercentageChange5Day = raw.Change5,
@@ -59,8 +62,8 @@ public sealed class AShareBasicTools(
                 SecurityCode = raw.SecurityCode ?? string.Empty,
                 TradeStatus = raw.TradeStatus ?? string.Empty,
                 SecurityType = raw.SecurityType ?? string.Empty,
-                OpenPrice = raw.OpenPx,
-                PreviousClosePrice = raw.PreClosePx,
+                OpenPrice = raw.OpenPx ?? 0m,
+                PreviousClosePrice = raw.PreClosePx ?? 0m,
                 UpLimitPrice = raw.UpPrice,
                 DownLimitPrice = raw.DownPrice,
                 Amplitude = raw.Amplitude,

@@ -19,8 +19,11 @@ public class CryptoTelegramService(
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
 
+    // take=100 覆盖约 28 小时（实测 take=20 仅 9.2h），使每日简报能跨越隔夜时段。
+    // isImportant=true 由服务端预筛：实测返回的 100 条全部为重要，密度高于全量拉取
+    // （不限时仅 46% 重要）。此处不再依赖该字段做本地排序，重要性判断交给模型。
     private const string ApiUrl =
-        "https://universal-api.panewslab.com/articles?type=NEWS&isShowInList=true&take=20&skip=0&isImportant=true";
+        "https://universal-api.panewslab.com/articles?type=NEWS&isShowInList=true&take=100&skip=0&isImportant=true";
 
     /// <summary>
     /// 通过 PANews API 获取虚拟币市场实时快讯（中文）

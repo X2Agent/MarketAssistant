@@ -126,11 +126,11 @@ public class BasicDataToolsTest
         Assert.Contains("茅台", quoteInfo.SecurityName, $"股票名称应包含'茅台'，实际: {quoteInfo.SecurityName}");
         Assert.IsFalse(string.IsNullOrEmpty(quoteInfo.SecurityCode), "股票代码不应为空");
         Assert.IsGreaterThan(0, quoteInfo.CurrentPrice, $"当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-        Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization, $"总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
+        Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization ?? 0m, $"总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
         Assert.IsGreaterThanOrEqualTo(quoteInfo.LowPrice, quoteInfo.HighPrice, $"最高价({quoteInfo.HighPrice})应大于等于最低价({quoteInfo.LowPrice})");
-        Assert.IsGreaterThanOrEqualTo(quoteInfo.CurrentPrice, quoteInfo.UpLimitPrice, $"涨停价({quoteInfo.UpLimitPrice})应大于等于当前价({quoteInfo.CurrentPrice})");
-        Assert.IsLessThanOrEqualTo(quoteInfo.CurrentPrice, quoteInfo.DownLimitPrice, $"跌停价({quoteInfo.DownLimitPrice})应小于等于当前价({quoteInfo.CurrentPrice})");
-        Assert.IsGreaterThan(0, quoteInfo.TotalShares, $"总股本应大于0，实际: {quoteInfo.TotalShares}");
+        Assert.IsGreaterThanOrEqualTo(quoteInfo.CurrentPrice, quoteInfo.UpLimitPrice ?? 0m, $"涨停价({quoteInfo.UpLimitPrice})应大于等于当前价({quoteInfo.CurrentPrice})");
+        Assert.IsLessThanOrEqualTo(quoteInfo.CurrentPrice, quoteInfo.DownLimitPrice ?? 0m, $"跌停价({quoteInfo.DownLimitPrice})应小于等于当前价({quoteInfo.CurrentPrice})");
+        Assert.IsGreaterThan(0, quoteInfo.TotalShares ?? 0m, $"总股本应大于0，实际: {quoteInfo.TotalShares}");
         TestContext?.WriteLine($"SH600519 名称: {quoteInfo.SecurityName}, 当前价: {quoteInfo.CurrentPrice}, 总市值: {quoteInfo.MarketCapitalization}亿, 涨跌幅: {quoteInfo.PercentageChange}%");
     }
 
@@ -181,7 +181,7 @@ public class BasicDataToolsTest
             Assert.Contains(expectedName, quoteInfo.SecurityName, $"{symbol} 股票名称应包含'{expectedName}'，实际: {quoteInfo.SecurityName}");
             Assert.IsFalse(string.IsNullOrEmpty(quoteInfo.SecurityCode), $"{symbol} 股票代码不应为空");
             Assert.IsGreaterThan(0, quoteInfo.CurrentPrice, $"{symbol} 当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-            Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization, $"{symbol} 总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
+            Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization ?? 0m, $"{symbol} 总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
             TestContext?.WriteLine($"{symbol} 名称: {quoteInfo.SecurityName}, 当前价: {quoteInfo.CurrentPrice}, 总市值: {quoteInfo.MarketCapitalization}亿");
         }
     }
@@ -237,7 +237,7 @@ public class BasicDataToolsTest
         Assert.IsFalse(string.IsNullOrEmpty(quoteInfo.SecurityName), "股票名称不应为空");
         Assert.Contains("茅台", quoteInfo.SecurityName, $"股票名称应包含'茅台'，实际: {quoteInfo.SecurityName}");
         Assert.IsGreaterThan(0, quoteInfo.CurrentPrice, $"当前价格应大于0，实际: {quoteInfo.CurrentPrice}");
-        Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization, $"总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
+        Assert.IsGreaterThan(0, quoteInfo.MarketCapitalization ?? 0m, $"总市值应大于0，实际: {quoteInfo.MarketCapitalization}");
         TestContext?.WriteLine($"AIFunction 返回 {quoteInfo.SecurityName}({quoteInfo.SecurityCode}), 当前价: {quoteInfo.CurrentPrice}, 总市值: {quoteInfo.MarketCapitalization}亿");
     }
 

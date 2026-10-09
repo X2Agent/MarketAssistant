@@ -132,21 +132,21 @@ sed -e "s|__APP_VERSION__|$VERSION|g" \
 if [ -f "$APP_ASSETS_DIR/MarketAssistant.icns" ]; then
     echo -e "${YELLOW}🎨 Copying icon...${NC}"
     cp "$APP_ASSETS_DIR/MarketAssistant.icns" "$APP_BUNDLE/Contents/Resources/"
-elif [ -f "$APP_ASSETS_DIR/logo.png" ]; then
+elif [ -f "$APP_ASSETS_DIR/logo_1024.png" ]; then
     echo -e "${YELLOW}🎨 Converting PNG to ICNS...${NC}"
-    # 如果只有 PNG，尝试转换（需要 imagemagick 或 sips）
+    # 使用预先裁边、抠好透明底并降采样好的 1024px 图（由 scripts/icons/generate_icons.py 生成）
     if command -v sips &> /dev/null; then
         mkdir -p /tmp/iconset.iconset
-        sips -z 16 16 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16.png
-        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
-        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32.png
-        sips -z 64 64 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
-        sips -z 128 128 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128.png
-        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
-        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256.png
-        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
-        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512.png
-        sips -z 1024 1024 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
+        sips -z 16 16 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_16x16.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_32x32.png
+        sips -z 64 64 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
+        sips -z 128 128 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_128x128.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_256x256.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_512x512.png
+        sips -z 1024 1024 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
         iconutil -c icns /tmp/iconset.iconset -o "$APP_BUNDLE/Contents/Resources/MarketAssistant.icns"
         rm -rf /tmp/iconset.iconset
     fi

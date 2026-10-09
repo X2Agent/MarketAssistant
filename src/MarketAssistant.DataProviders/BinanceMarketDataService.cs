@@ -1,6 +1,7 @@
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using System.Net;
 using System.Text.Json.Nodes;
 using System.Web;
 
@@ -35,23 +36,37 @@ public sealed class BinanceMarketDataService(
     };
 
     /// <summary>
-    /// 检查响应内容是否包含地区限制错误，并返回内容字符串
+    /// 地区限制的对外提示文案（REST 与 WebSocket 共用，避免两处措辞漂移）。
     /// </summary>
+    internal const string RegionUnavailableMessage =
+        "币安服务在当前地区不可用\n\n" +
+        "根据币安服务条款，您所在的地区无法访问此服务。\n\n" +
+        "建议解决方案：\n" +
+        "• 使用 VPN 或代理服务器\n" +
+        "• 在系统网络设置中配置代理\n" +
+        "• 联系币安客服确认您的地区是否被支持\n\n" +
+        "如果您认为这是错误提示，请联系客服处理。";
+
+    /// <summary>
+    /// 检查响应是否属于地区限制，并返回内容字符串。
+    /// </summary>
+    /// <remarks>
+    /// 判定同时依据<b>状态码 451</b>与<b>响应体文本</b>：WebSocket 握手失败时只会拿到 451，
+    /// 拿不到响应体；而 REST 端点有时返回 200 却带受限文案。只判其一都会漏。
+    /// </remarks>
     private async Task<string> CheckAndReadResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken = default)
     {
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
 
-        if (!response.IsSuccessStatusCode && content.Contains("restricted location", StringComparison.OrdinalIgnoreCase))
+        var isRegionBlocked =
+            response.StatusCode == HttpStatusCode.UnavailableForLegalReasons
+            || content.Contains("restricted location", StringComparison.OrdinalIgnoreCase);
+
+        if (isRegionBlocked)
         {
-            _logger.LogError("币安服务在当前地区受限: {Content}", content);
-            throw new FriendlyException(
-                "币安服务在当前地区不可用\n\n" +
-                "根据币安服务条款，您所在的地区无法访问此服务。\n\n" +
-                "建议解决方案：\n" +
-                "• 使用 VPN 或代理服务器\n" +
-                "• 在系统网络设置中配置代理\n" +
-                "• 联系币安客服确认您的地区是否被支持\n\n" +
-                "如果您认为这是错误提示，请联系客服处理。");
+            _logger.LogError("币安服务在当前地区受限（状态码 {StatusCode}）: {Content}",
+                (int)response.StatusCode, content);
+            throw new BinanceRegionUnavailableException(RegionUnavailableMessage);
         }
 
         response.EnsureSuccessStatusCode();

@@ -15,10 +15,11 @@ using Moq.Protected;
 namespace TestMarketAssistant.Application;
 
 /// <summary>
-/// AShareKLineService 单元测试（使用 Mock HttpMessageHandler，不依赖真实网络）
+/// AShareKLineService 单元测试（使用 Mock HttpMessageHandler，不依赖真实网络）。
+/// 覆盖智兔优先、新浪兜底（智兔不覆盖基金/ETF）与双源失败的友好报错。
 /// </summary>
 [TestClass]
-public class AShareKLineServiceTest
+public sealed class AShareKLineServiceTest
 {
     private const string SampleKLineJson = """
     [
@@ -28,13 +29,26 @@ public class AShareKLineServiceTest
     ]
     """;
 
-    private static IServiceProvider BuildServiceProvider(
-        HttpStatusCode statusCode,
-        string responseContent,
-        Action<HttpRequestMessage>? requestInspector = null)
+    private const string SinaKLineJson = """
+    [
+        {"day":"2025-06-20","open":"38.50","high":"39.20","low":"38.10","close":"39.00","volume":"1234567"},
+        {"day":"2025-06-23","open":"39.10","high":"39.80","low":"38.90","close":"39.50","volume":"987654"},
+        {"day":"2025-06-24","open":"39.60","high":"40.10","low":"39.30","close":"39.80","volume":"1100000"}
+    ]
+    """;
+
+    private static (IServiceProvider, List<HttpRequestMessage>) BuildServiceProvider(
+        HttpStatusCode zhiTuStatusCode,
+        string zhiTuResponseContent,
+        HttpStatusCode sinaStatusCode = HttpStatusCode.OK,
+        string sinaResponseContent = "null",
+        Action<HttpRequestMessage>? zhiTuRequestInspector = null)
     {
-        var handlerMock = new Mock<HttpMessageHandler>();
-        handlerMock
+        var zhiTuRequests = new List<HttpRequestMessage>();
+        var sinaRequests = new List<HttpRequestMessage>();
+
+        var zhiTuHandlerMock = new Mock<HttpMessageHandler>();
+        zhiTuHandlerMock
             .Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
@@ -42,10 +56,27 @@ public class AShareKLineServiceTest
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync((HttpRequestMessage request, CancellationToken _) =>
             {
-                requestInspector?.Invoke(request);
-                return new HttpResponseMessage(statusCode)
+                zhiTuRequests.Add(request);
+                zhiTuRequestInspector?.Invoke(request);
+                return new HttpResponseMessage(zhiTuStatusCode)
                 {
-                    Content = new StringContent(responseContent)
+                    Content = new StringContent(zhiTuResponseContent)
+                };
+            });
+
+        var sinaHandlerMock = new Mock<HttpMessageHandler>();
+        sinaHandlerMock
+            .Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync((HttpRequestMessage request, CancellationToken _) =>
+            {
+                sinaRequests.Add(request);
+                return new HttpResponseMessage(sinaStatusCode)
+                {
+                    Content = new StringContent(sinaResponseContent)
                 };
             });
 
@@ -62,11 +93,17 @@ public class AShareKLineServiceTest
         {
             client.BaseAddress = new Uri("https://api.zhituapi.com");
         })
-        .ConfigurePrimaryHttpMessageHandler(() => handlerMock.Object);
+        .ConfigurePrimaryHttpMessageHandler(() => zhiTuHandlerMock.Object);
+
+        services.AddHttpClient("SinaKLine", client =>
+        {
+            client.BaseAddress = new Uri("https://quotes.sina.cn");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => sinaHandlerMock.Object);
 
         services.AddSingleton<IKLineService, AShareKLineService>();
 
-        return services.BuildServiceProvider();
+        return (services.BuildServiceProvider(), sinaRequests);
     }
 
     [TestMethod]
@@ -74,7 +111,7 @@ public class AShareKLineServiceTest
     public async Task GetKLineDataAsync_Daily_ShouldParseCorrectly()
     {
         // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
+        var (sp, _) = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
@@ -97,7 +134,7 @@ public class AShareKLineServiceTest
     public async Task GetKLineDataAsync_Daily_ShouldCalculateChangeCorrectly()
     {
         // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
+        var (sp, _) = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
@@ -123,7 +160,7 @@ public class AShareKLineServiceTest
             {"t":"2025-06-23","o":"39.10","h":"39.80","l":"38.90","c":"39.50","v":"987654","a":"39000000","pc":"39.00"}
         ]
         """;
-        var sp = BuildServiceProvider(HttpStatusCode.OK, json);
+        var (sp, _) = BuildServiceProvider(HttpStatusCode.OK, json);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
@@ -140,7 +177,7 @@ public class AShareKLineServiceTest
     public async Task GetKLineDataAsync_ShouldTruncateToCount()
     {
         // Arrange - 返回 3 条，请求 count=2，应取最后 2 条
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
+        var (sp, _) = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
@@ -158,13 +195,16 @@ public class AShareKLineServiceTest
     {
         // Arrange
         HttpRequestMessage? capturedRequest = null;
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson, req => capturedRequest = req);
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            zhiTuRequestInspector: request => capturedRequest = request);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
         await service.GetKLineDataAsync("sz002475", KLineType.Daily, 100);
 
-        // Assert - 验证请求 URL 格式正确
+        // Assert - 验证请求 URL 格式正确（智兔优先，未触发新浪兜底）
         Assert.IsNotNull(capturedRequest);
         var uri = capturedRequest!.RequestUri!;
         Assert.IsTrue(uri.IsAbsoluteUri);
@@ -186,7 +226,10 @@ public class AShareKLineServiceTest
     {
         // Arrange
         HttpRequestMessage? capturedRequest = null;
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson, req => capturedRequest = req);
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            zhiTuRequestInspector: request => capturedRequest = request);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act
@@ -200,56 +243,139 @@ public class AShareKLineServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GetKLineDataAsync_ApiError400_ShouldThrowFriendlyExceptionWithBody()
+    public async Task GetKLineDataAsync_ZhiTuSuccess_ShouldNotCallSinaFallback()
     {
         // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.BadRequest, "{\"error\":\"invalid token\"}");
+        var (sp, sinaRequests) = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        // Act & Assert
-        var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
-            () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
-        Assert.Contains("400", ex.Message, "异常消息应包含状态码");
-        Assert.Contains("invalid token", ex.Message, "异常消息应包含API返回的错误内容");
+        // Act
+        var result = await service.GetKLineDataAsync("sz002475", KLineType.Daily, 100);
+
+        // Assert - 智兔有数据时不应触发新浪兜底
+        Assert.HasCount(3, result);
+        Assert.IsEmpty(sinaRequests, "智兔成功时不得请求新浪");
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GetKLineDataAsync_ApiError400_EmptyBody_ShouldThrowFriendlyException()
+    public async Task GetKLineDataAsync_ZhiTuNotFound_ShouldFallBackToSina()
     {
-        // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.BadRequest, "");
+        // 复现线上问题：智兔对基金/ETF 返回 404 {"error":"not found"}，需回退新浪 K 线
+        var (sp, sinaRequests) = BuildServiceProvider(
+            HttpStatusCode.NotFound,
+            "{\"error\":\"not found\"}",
+            sinaResponseContent: SinaKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        // Act & Assert
-        var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
-            () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
-        Assert.Contains("400", ex.Message);
-        Assert.Contains("请稍后重试", ex.Message);
+        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+
+        Assert.HasCount(3, result);
+        Assert.AreEqual(new DateTime(2025, 6, 24), result[2].Timestamp);
+        Assert.AreEqual(39.80m, result[2].Close);
+        Assert.HasCount(1, sinaRequests, "应触发一次新浪兜底请求");
+        Assert.Contains("symbol=sh511010", sinaRequests[0].RequestUri!.Query);
+        Assert.Contains("scale=240", sinaRequests[0].RequestUri!.Query);
+        Assert.Contains("datalen=100", sinaRequests[0].RequestUri!.Query);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task GetKLineDataAsync_EmptyResponse_ShouldThrowFriendlyException()
+    public async Task GetKLineDataAsync_SinaFallback_ShouldDerivePreCloseFromPreviousBar()
     {
-        // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.OK, "[]");
+        // 新浪不提供昨收：用前一根收盘价派生，保证涨跌额/涨跌幅与主图口径一致
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.NotFound,
+            "{\"error\":\"not found\"}",
+            sinaResponseContent: SinaKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        // Act & Assert
-        await Assert.ThrowsExactlyAsync<FriendlyException>(
+        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+
+        Assert.AreEqual(0m, result[0].PreClose, "首根无前值，昨收记 0");
+        Assert.AreEqual(0m, result[0].Change);
+        Assert.AreEqual(39.00m, result[1].PreClose);
+        Assert.AreEqual(0.50m, result[1].Change);
+        Assert.AreEqual(39.50m, result[2].PreClose);
+        Assert.AreEqual(0.30m, result[2].Change);
+        Assert.AreEqual(0m, result[0].Amount, "日线兜底无成交额，记 0 而非伪造");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow(KLineType.Weekly, "scale=1200")]
+    [DataRow(KLineType.Monthly, "scale=7200")]
+    [DataRow(KLineType.Minute5, "scale=5")]
+    [DataRow(KLineType.Minute15, "scale=15")]
+    public async Task GetKLineDataAsync_ShouldMapSinaScalePerKLineType(KLineType kLineType, string expectedScaleQuery)
+    {
+        var (sp, sinaRequests) = BuildServiceProvider(
+            HttpStatusCode.NotFound,
+            "{\"error\":\"not found\"}",
+            sinaResponseContent: SinaKLineJson);
+        var service = sp.GetRequiredService<IKLineService>();
+
+        await service.GetKLineDataAsync("sh511010", kLineType, 100);
+
+        Assert.HasCount(1, sinaRequests);
+        Assert.Contains(expectedScaleQuery, sinaRequests[0].RequestUri!.Query);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetKLineDataAsync_ZhiTuApiError_BothSourcesEmpty_ShouldThrowFriendlyException()
+    {
+        // 智兔报错且新浪也无数据时，抛面向用户的友好异常（原文进日志）
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.BadRequest,
+            "{\"error\":\"invalid token\"}",
+            sinaResponseContent: "null");
+        var service = sp.GetRequiredService<IKLineService>();
+
+        var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
+        Assert.Contains("数据源暂不可用", ex.Message);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetKLineDataAsync_ZhiTuApiError_EmptySinaBody_ShouldThrowFriendlyException()
+    {
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.BadRequest,
+            "",
+            sinaResponseContent: "null");
+        var service = sp.GetRequiredService<IKLineService>();
+
+        var ex = await Assert.ThrowsExactlyAsync<FriendlyException>(
+            () => service.GetKLineDataAsync("sz002475", KLineType.Daily, 100));
+        Assert.Contains("数据源暂不可用", ex.Message);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetKLineDataAsync_ZhiTuEmptyArray_ShouldFallBackToSina()
+    {
+        // 智兔返回空数组同样触发兜底
+        var (sp, sinaRequests) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            "[]",
+            sinaResponseContent: SinaKLineJson);
+        var service = sp.GetRequiredService<IKLineService>();
+
+        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+
+        Assert.HasCount(3, result);
+        Assert.HasCount(1, sinaRequests);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
     public async Task GetKLineDataAsync_EmptyCode_ShouldThrowFriendlyException()
     {
-        // Arrange
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
+        var (sp, _) = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        // Act & Assert
         await Assert.ThrowsExactlyAsync<FriendlyException>(
             () => service.GetKLineDataAsync("", KLineType.Daily, 100));
     }
@@ -261,11 +387,14 @@ public class AShareKLineServiceTest
     [DataRow(KLineType.Monthly, "/m/")]
     [DataRow(KLineType.Minute5, "/5/")]
     [DataRow(KLineType.Minute15, "/15/")]
-    public async Task GetKLineDataAsync_ShouldMapIntervalCorrectly(KLineType kLineType, string expectedInterval)
+    public async Task GetKLineDataAsync_ShouldMapZhiTuIntervalCorrectly(KLineType kLineType, string expectedInterval)
     {
-        // Arrange
+        // Arrange - 智兔优先路径的周期映射
         HttpRequestMessage? capturedRequest = null;
-        var sp = BuildServiceProvider(HttpStatusCode.OK, SampleKLineJson, req => capturedRequest = req);
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            zhiTuRequestInspector: request => capturedRequest = request);
         var service = sp.GetRequiredService<IKLineService>();
 
         // Act

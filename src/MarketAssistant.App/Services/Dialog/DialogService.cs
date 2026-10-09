@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using MarketAssistant.Trading.Models;
+using MarketAssistant.ViewModels.Home;
 using MarketAssistant.Views.Windows;
 
 namespace MarketAssistant.Services.Dialog;
@@ -10,8 +11,11 @@ namespace MarketAssistant.Services.Dialog;
 /// Avalonia 平台的对话框服务，UI 模板定义在 <see cref="MessageDialogWindow"/> 与
 /// <see cref="InputDialogWindow"/>，本类仅负责窗口创建、UI 线程切换与结果回传。
 /// </summary>
-public class DialogService : IDialogService
+public class DialogService : IDialogService, IWindowService
 {
+    /// <summary>已打开的每日简报窗口；关闭时清空，用于重复打开防护。</summary>
+    private DailyBriefingWindow? _briefingWindow;
+
     /// <summary>
     /// 显示简单的信息对话框（只有一个按钮）
     /// </summary>
@@ -92,6 +96,40 @@ public class DialogService : IDialogService
         dialog.SetContent(title, message, defaultValue);
         await dialog.ShowDialog(owner);
         return dialog.Result;
+    }
+
+    /// <summary>
+    /// 以非模态方式显示每日简报窗口。已打开时聚焦既有窗口，避免重复开窗。
+    /// </summary>
+    /// <remarks>
+    /// 与模态对话框不同，非模态窗口在无可见 owner 时仍可展示（仅失去居中锚点），
+    /// 故 <see cref="GetActiveWindow"/> 取不到 owner 时直接 <c>Show()</c> 而非放弃。
+    /// </remarks>
+    public void ShowDailyBriefingWindow(DailyBriefingViewModel viewModel)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ShowDailyBriefingWindow(viewModel));
+            return;
+        }
+
+        if (_briefingWindow is { IsVisible: true })
+        {
+            _briefingWindow.Activate();
+            return;
+        }
+
+        var owner = GetActiveWindow();
+        _briefingWindow = new DailyBriefingWindow { DataContext = viewModel };
+        _briefingWindow.Closed += (_, _) => _briefingWindow = null;
+        if (owner is not null)
+        {
+            _briefingWindow.Show(owner);
+        }
+        else
+        {
+            _briefingWindow.Show();
+        }
     }
 
     /// <summary>

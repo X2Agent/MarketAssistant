@@ -346,14 +346,14 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
 
             // HTTP 访问与容错解析由 ClsQuoteClient 负责
             var data = await _clsClient.GetStockQuoteAsync(clsCode, "last_px,change", cancellationToken);
-            // 非正价格（停牌/无成交/数据缺失）一律拒绝参与预警评估，
+            // 非正价格（停牌/无成交/数据缺失，CLS 以 null 或 0 表达）一律拒绝参与预警评估，
             // 否则 0 恒小于正目标价会对停牌股持续误报"跌破"
-            if (data is null || data.LastPrice <= 0)
+            if (data is null || data.LastPrice is not { } lastPrice || lastPrice <= 0)
                 return null;
 
-            decimal? changePercent = data.Change != 0 ? data.Change * 100 : null;
+            decimal? changePercent = data.Change is { } change && change != 0 ? change * 100 : null;
 
-            return (data.LastPrice, changePercent);
+            return (lastPrice, changePercent);
         }
         catch (OperationCanceledException)
         {

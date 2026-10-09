@@ -8,7 +8,6 @@ using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
-using MarketAssistant.Services.Cost;
 using MarketAssistant.Services.Export;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
@@ -31,7 +30,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     };
 
     private readonly AnalysisOrchestrationService _orchestrationService;
-    private readonly IAnalysisCostService _analysisCostService;
 
     [ObservableProperty]
     private string _stockCode = "";
@@ -92,12 +90,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// </summary>
     [ObservableProperty]
     private string _usageDetailText = string.Empty;
-
-    /// <summary>
-    /// 本次分析的成本估算文本（如"约 ¥0.42"）；价格表未覆盖时为 "≥ ¥…（部分未定价）" 或空串
-    /// </summary>
-    [ObservableProperty]
-    private string _usageCostText = string.Empty;
 
     /// <summary>
     /// 是否统计到 Token 用量
@@ -220,12 +212,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisReportViewModel analysisReportViewModel,
         ChatSidebarViewModel chatSidebarViewModel,
         MarketContext marketContext,
-        IAnalysisCostService analysisCostService,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
-        _analysisCostService = analysisCostService;
 
         _progressSmoothTimer = new DispatcherTimer(SmoothTickInterval, DispatcherPriority.Background, OnProgressSmoothTimerTick);
         _progressSmoothTimer.Stop();
@@ -435,7 +425,6 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         HasUsage = usage is { HasValue: true };
         UsageSummaryText = TokenUsageFormatter.FormatSummary(usage);
         UsageDetailText = TokenUsageFormatter.FormatDetail(usage);
-        UsageCostText = _analysisCostService.FormatCost(usage);
         UsageIsEstimated = usage?.IsEstimated == true;
     }
 

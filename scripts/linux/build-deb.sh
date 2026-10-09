@@ -82,10 +82,10 @@ cd "$SCRIPT_DIR"
 echo -e "${YELLOW}📝 Installing desktop entry...${NC}"
 cp "$SCRIPT_DIR/marketassistant.desktop" "$DEB_DIR/$PACKAGE_NAME/usr/share/applications/"
 
-# 6. 复制图标
-if [ -f "$APP_ASSETS_DIR/logo.png" ]; then
+# 6. 复制图标（使用预生成的 256x256 图，避免把 3000x3000 母版塞进 hicolor 主题目录）
+if [ -f "$APP_ASSETS_DIR/logo_256.png" ]; then
     echo -e "${YELLOW}🎨 Installing icon...${NC}"
-    cp "$APP_ASSETS_DIR/logo.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
+    cp "$APP_ASSETS_DIR/logo_256.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
 fi
 
 # 7. 创建 control 文件

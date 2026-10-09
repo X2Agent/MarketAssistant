@@ -33,7 +33,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
     // UI 线程写入（保存密钥）与后台签名线程读取（每次交易所请求）并发访问，
     // 必须使用并发容器，普通 Dictionary 扩容期间被并发读会抛异常甚至死循环
-    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> _cache;
+    private ConcurrentDictionary<TradingMode, CredentialEntry> _cache;
 
     public TradingCredentialStore(
         IUserSettingService userSettingService,
@@ -46,27 +46,27 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         MigrateFromUserSettingIfNeeded(userSettingService.CurrentSetting);
     }
 
-    public (string ApiKey, string SecretKey) GetCredentials(CryptoTradingMode mode)
+    public (string ApiKey, string SecretKey) GetCredentials(TradingMode mode)
     {
         if (_cache.TryGetValue(mode, out var entry))
             return (entry.ApiKey, entry.SecretKey);
         return (string.Empty, string.Empty);
     }
 
-    public void SetCredentials(CryptoTradingMode mode, string apiKey, string secretKey)
+    public void SetCredentials(TradingMode mode, string apiKey, string secretKey)
     {
         _cache.AddOrUpdate(mode, new CredentialEntry(apiKey, secretKey), (_, _) => new CredentialEntry(apiKey, secretKey));
         Save();
     }
 
-    public bool IsConfigured(CryptoTradingMode mode)
+    public bool IsConfigured(TradingMode mode)
     {
         if (!_cache.TryGetValue(mode, out var entry))
             return false;
         return !string.IsNullOrEmpty(entry.ApiKey) && !string.IsNullOrEmpty(entry.SecretKey);
     }
 
-    public void ClearCredentials(CryptoTradingMode mode)
+    public void ClearCredentials(TradingMode mode)
     {
         if (_cache.TryRemove(mode, out _))
             Save();
@@ -88,15 +88,16 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
             // 实盘现货/合约共用同一套密钥
             if (!string.IsNullOrEmpty(setting.BinanceApiKey) && !string.IsNullOrEmpty(setting.BinanceSecretKey))
             {
-                _cache[CryptoTradingMode.LiveSpot] = new CredentialEntry(setting.BinanceApiKey, setting.BinanceSecretKey);
-                _cache[CryptoTradingMode.LiveFutures] = new CredentialEntry(setting.BinanceApiKey, setting.BinanceSecretKey);
+                _cache[TradingMode.LiveSpot] = new CredentialEntry(setting.BinanceApiKey, setting.BinanceSecretKey);
+                _cache[TradingMode.LiveFutures] = new CredentialEntry(setting.BinanceApiKey, setting.BinanceSecretKey);
                 migrated = true;
             }
 
             // Futures Testnet
             if (!string.IsNullOrEmpty(setting.BinanceFuturesTestnetApiKey) && !string.IsNullOrEmpty(setting.BinanceFuturesTestnetSecretKey))
             {
-                _cache[CryptoTradingMode.BinanceFuturesTestnet] = new CredentialEntry(setting.BinanceFuturesTestnetApiKey, setting.BinanceFuturesTestnetSecretKey);
+                _cache[TradingMode.FuturesTestnet] = new CredentialEntry(
+                    setting.BinanceFuturesTestnetApiKey, setting.BinanceFuturesTestnetSecretKey);
                 migrated = true;
             }
 
@@ -115,14 +116,14 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         }
     }
 
-    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> Load()
+    private ConcurrentDictionary<TradingMode, CredentialEntry> Load()
     {
         lock (_fileLock)
         {
             try
             {
                 if (!File.Exists(FilePath))
-                    return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
+                    return new ConcurrentDictionary<TradingMode, CredentialEntry>();
 
                 var bytes = File.ReadAllBytes(FilePath);
                 return Decrypt(bytes);
@@ -130,7 +131,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "加载交易凭证失败，使用空配置");
-                return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
+                return new ConcurrentDictionary<TradingMode, CredentialEntry>();
             }
         }
     }
@@ -174,10 +175,10 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         return result;
     }
 
-    private ConcurrentDictionary<CryptoTradingMode, CredentialEntry> Decrypt(byte[] data)
+    private ConcurrentDictionary<TradingMode, CredentialEntry> Decrypt(byte[] data)
     {
         if (data.Length < SaltSize + NonceSize + TagSize)
-            return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>();
+            return new ConcurrentDictionary<TradingMode, CredentialEntry>();
 
         var salt = new byte[SaltSize];
         var nonce = new byte[NonceSize];
@@ -196,9 +197,9 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         aes.Decrypt(nonce, ciphertext, tag, plaintextBytes);
 
         var json = Encoding.UTF8.GetString(plaintextBytes);
-        var entries = JsonSerializer.Deserialize<Dictionary<CryptoTradingMode, CredentialEntry>>(json)
+        var entries = JsonSerializer.Deserialize<Dictionary<TradingMode, CredentialEntry>>(json)
                ?? [];
-        return new ConcurrentDictionary<CryptoTradingMode, CredentialEntry>(entries);
+        return new ConcurrentDictionary<TradingMode, CredentialEntry>(entries);
     }
 
     /// <summary>

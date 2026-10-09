@@ -45,7 +45,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**" />
+    <!-- logo_1024.png 仅供 macOS 打包脚本生成 icns 使用，运行期无需随包分发 -->
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\logo_1024.png" />
   </ItemGroup>
 
   <ItemGroup>

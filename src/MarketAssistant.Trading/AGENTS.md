@@ -8,7 +8,7 @@
 
 ```
 MarketAssistant.Trading/
-├── TradingEnums.cs           ← 跨层共享枚举（StrategyType / OrderSide / CryptoTradingMode 等）
+├── TradingEnums.cs           ← 跨层共享枚举（StrategyType / OrderSide / TradingMode 等）
 ├── TradingStrategy.cs        ← 交易策略配置（持久化模型）
 ├── TradeRecord.cs            ← 交易执行记录（持久化模型）
 ├── RiskModels.cs             ← RiskConfig / RiskCheckResult / DailyStats

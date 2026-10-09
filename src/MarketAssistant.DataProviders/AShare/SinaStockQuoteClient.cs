@@ -5,26 +5,37 @@ namespace MarketAssistant.DataProviders.AShare;
 /// <summary>新浪盘口单档（数量单位：股）。</summary>
 public sealed record SinaOrderBookLevel(decimal Price, decimal Quantity);
 
-/// <summary>新浪逐笔成交（数量单位：股）。</summary>
-public sealed record SinaTick(decimal Price, decimal Quantity);
-
 /// <summary>
 /// 新浪个股行情单条解析结果（<c>hq.sinajs.cn/list=sh600519</c>，非 <c>s_</c> 简版）。
 /// </summary>
 /// <param name="Name">证券名称。</param>
+/// <param name="Open">今开；字段缺失时为 null（领域层约定的「未提供」）。</param>
+/// <param name="PreClose">昨收；字段缺失时为 null。</param>
 /// <param name="CurrentPrice">最新价。</param>
+/// <param name="High">最高；字段缺失时为 null。</param>
+/// <param name="Low">最低；字段缺失时为 null。</param>
+/// <param name="Volume">成交量（股）；字段缺失时为 null。</param>
+/// <param name="Amount">成交额（元）；字段缺失时为 null。</param>
 /// <param name="Bids">买一至买五（价格降序）。</param>
 /// <param name="Asks">卖一至卖五（价格升序）。</param>
-/// <param name="Ticks">逐笔成交（成交量单位：股；源不提供主动买卖方向）。</param>
+/// <remarks>
+/// 该接口<b>不提供逐笔成交明细</b>：字段 26..29 实为卖四/卖五档位，30 起为日期与时间，
+/// 早期版本据错误假设解析出的"逐笔"只是卖盘档位，已移除。需要逐笔的市场不应依赖本客户端。
+/// </remarks>
 public sealed record SinaStockQuote(
     string Name,
     decimal CurrentPrice,
+    decimal? Open,
+    decimal? PreClose,
+    decimal? High,
+    decimal? Low,
+    decimal? Volume,
+    decimal? Amount,
     IReadOnlyList<SinaOrderBookLevel> Bids,
-    IReadOnlyList<SinaOrderBookLevel> Asks,
-    IReadOnlyList<SinaTick> Ticks);
+    IReadOnlyList<SinaOrderBookLevel> Asks);
 
 /// <summary>
-/// 新浪个股行情客户端：拉取单只 A 股的五档盘口与逐笔成交。
+/// 新浪个股行情客户端：拉取单只 A 股的五档盘口与开高低收等快照字段。
 /// </summary>
 /// <remarks>
 /// <para>
@@ -38,6 +49,11 @@ public sealed record SinaStockQuote(
 /// 价格贴近最新价），任一条不满足即整体返回 <c>null</c>，由上层展示"数据不可用"。
 /// 这保证"接口变了而我不知情"降级为"没有数据"，而不是"错误数据"。
 /// </para>
+/// <para>
+/// <b>字段布局（2026-10 实测抓包校准）</b>：0 名称 / 1 今开 / 2 昨收 / 3 最新 /
+/// 4 最高 / 5 最低 / 6 竞买价 / 7 竞卖价 / 8 成交量(股) / 9 成交额(元) /
+/// 10..19 买一~买五「量,价」对 / 20..29 卖一~卖五「量,价」对 / 30 日期 / 31 时间。
+/// </para>
 /// </remarks>
 public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
 {
@@ -48,12 +64,24 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
     private const decimal MaxRelativeDeviation = 0.25m;
 
     private const int NameIndex = 0;
+    private const int OpenIndex = 1;
+    private const int PreCloseIndex = 2;
     private const int CurrentPriceIndex = 3;
-    private const int BidStartIndex = 6;
-    private const int AskStartIndex = 16;
-    private const int TicksIndex = 26;
+    private const int HighIndex = 4;
+    private const int LowIndex = 5;
+    private const int VolumeIndex = 8;
+    private const int AmountIndex = 9;
 
-    /// <summary>五档：买一~买五 / 卖一~卖五 各为「价格,数量」成对字段。</summary>
+    /// <summary>买盘「量,价」对的起始下标（买一量）。</summary>
+    private const int BidStartIndex = 10;
+
+    /// <summary>卖盘「量,价」对的起始下标（卖一量）。</summary>
+    private const int AskStartIndex = 20;
+
+    /// <summary>卖五价下标，决定响应至少需要的字段段数。</summary>
+    private const int LastAskPriceIndex = AskStartIndex + (Depth - 1) * 2 + 1;
+
+    /// <summary>五档：买一~买五 / 卖一~卖五 各为「量,价」成对字段。</summary>
     private const int Depth = 5;
 
     private readonly IHttpClientFactory _httpClientFactory =
@@ -106,7 +134,7 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
            sinaCode.AsSpan(2).IndexOfAny("_.") < 0;
 
     /// <summary>
-    /// 解析 <c>var hq_str_sh600519="名称,开盘,昨收,最新,最高,最低,买一,买一量,...,逐笔,日期,时间,...";</c>。
+    /// 解析 <c>var hq_str_sh600519="名称,今开,昨收,最新,最高,最低,竞买价,竞卖价,成交量,成交额,买一量,买一价,...,卖五量,卖五价,日期,时间";</c>。
     /// </summary>
     internal static SinaStockQuote? ParseResponse(string text)
     {
@@ -126,8 +154,8 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
 
         var fields = line[(open + 1)..close].Split(',');
 
-        // 逐笔字段下标为 26，故至少需要 27 段；少于此说明响应形态已变，直接拒绝
-        if (fields.Length <= TicksIndex)
+        // 卖五价位于下标 29，少于此说明响应形态已变，直接拒绝
+        if (fields.Length <= LastAskPriceIndex)
         {
             return null;
         }
@@ -145,7 +173,6 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
 
         var bids = ParseLevels(fields, BidStartIndex, descending: true);
         var asks = ParseLevels(fields, AskStartIndex, descending: false);
-        var ticks = ParseTicks(JoinTailFields(fields));
 
         // 核心防线：五档必须自洽且贴近最新价，否则视为字段错位并放弃整条数据
         if (!IsPlausible(bids, asks, currentPrice))
@@ -153,18 +180,28 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
             return null;
         }
 
-        return new SinaStockQuote(name, currentPrice, bids, asks, ticks);
+        return new SinaStockQuote(
+            name,
+            currentPrice,
+            TryParseNullableDecimal(fields[OpenIndex]),
+            TryParseNullableDecimal(fields[PreCloseIndex]),
+            TryParseNullableDecimal(fields[HighIndex]),
+            TryParseNullableDecimal(fields[LowIndex]),
+            TryParseNullableDecimal(fields[VolumeIndex]),
+            TryParseNullableDecimal(fields[AmountIndex]),
+            bids,
+            asks);
     }
 
-    /// <summary>解析从 <paramref name="startIndex"/> 起的 depth 组「价格,数量」成对字段。</summary>
-    private static List<SinaOrderBookLevel> ParseLevels(string[] fields, int startIndex, bool descending)
+    /// <summary>解析从 <paramref name="quantityStartIndex"/> 起的 depth 组「量,价」成对字段。</summary>
+    private static List<SinaOrderBookLevel> ParseLevels(string[] fields, int quantityStartIndex, bool descending)
     {
         var levels = new List<SinaOrderBookLevel>(Depth);
         for (var i = 0; i < Depth; i++)
         {
-            var priceIndex = startIndex + i * 2;
-            var quantityIndex = priceIndex + 1;
-            if (quantityIndex >= fields.Length)
+            var quantityIndex = quantityStartIndex + i * 2;
+            var priceIndex = quantityIndex + 1;
+            if (priceIndex >= fields.Length)
             {
                 break;
             }
@@ -224,52 +261,10 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
         return true;
     }
 
-    /// <summary>
-    /// 还原下标 26 之后的尾部文本。
-    /// </summary>
-    /// <remarks>
-    /// <b>关键：</b>新浪的逐笔字段本身含逗号（如 <c>1800.00,100,1799.99,200</c>），
-    /// 因此整段载荷按逗号切分后，下标 26 之后的每个元素并非"独立字段"，
-    /// 而是被逐笔内容打散的片段。若直接读取 <c>fields[26]</c>，
-    /// 只会拿到第一笔成交的价格，而丢失数量与其后所有成交。
-    /// 这里必须把尾部重新拼接，逐笔解析交由 <see cref="ParseTicks"/> 按成对规则处理。
-    /// </remarks>
-    private static string JoinTailFields(string[] fields) =>
-        string.Join(',', fields.Skip(TicksIndex));
-
-    /// <summary>
-    /// 解析逐笔成交段落。格式为连续的 <c>价格,数量</c> 对，其后紧跟日期与时间。
-    /// </summary>
-    /// <remarks>
-    /// 该字段<b>不提供主动买卖方向</b>，故方向信息不可得，调用方不应据此推断内外盘。
-    /// 遇到无法解析为数值的 token（如 <c>2026-10-04</c>）即判定为逐笔段落结束。
-    /// </remarks>
-    private static List<SinaTick> ParseTicks(string tail)
-    {
-        var ticks = new List<SinaTick>();
-        if (string.IsNullOrWhiteSpace(tail))
-        {
-            return ticks;
-        }
-
-        var parts = tail.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        for (var i = 0; i + 1 < parts.Length; i += 2)
-        {
-            // 奇数段为落单尾巴；非数值 token 表明已进入日期/时间区域，二者都应终止解析
-            if (!TryParseDecimal(parts[i], out var price) || !TryParseDecimal(parts[i + 1], out var quantity))
-            {
-                break;
-            }
-
-            if (price > 0m && quantity > 0m)
-            {
-                ticks.Add(new SinaTick(price, quantity));
-            }
-        }
-
-        return ticks;
-    }
-
     private static bool TryParseDecimal(string? value, out decimal result) =>
         decimal.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out result);
+
+    /// <summary>快照字段缺失或不可解析时返回 null（「未提供」），绝不静默归零。</summary>
+    private static decimal? TryParseNullableDecimal(string? value) =>
+        TryParseDecimal(value, out var result) && result > 0m ? result : null;
 }

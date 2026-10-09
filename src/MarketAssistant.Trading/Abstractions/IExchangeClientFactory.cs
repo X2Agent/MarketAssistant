@@ -9,5 +9,5 @@ namespace MarketAssistant.Trading.Abstractions;
 public interface IExchangeClientFactory
 {
     /// <summary>构建指定交易模式的交易所客户端。返回的实例由调用方持有生命周期。</summary>
-    IExchangeClient Create(CryptoTradingMode tradingMode);
+    IExchangeClient Create(TradingMode tradingMode);
 }

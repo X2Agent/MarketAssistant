@@ -34,7 +34,7 @@
     <!-- 系统托盘图标 -->
     <TrayIcon.Icons>
         <TrayIcons>
-            <TrayIcon Icon="/Assets/trans_bg.ico" 
+            <TrayIcon Icon="/Assets/tray_logo.ico" 
                       ToolTipText="MarketAssistant - 智能股票分析助手"
                       Clicked="TrayIcon_Clicked">
                 <TrayIcon.Menu>

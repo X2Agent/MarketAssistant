@@ -222,15 +222,38 @@
         <Grid Grid.Row="1"
               ColumnDefinitions="3*,2*">
             
-            <!-- 上排右列：7*24小时新闻快讯 -->
+            <!-- 上排右列：7*24小时新闻快讯（每日简报为其 AI 解读入口，同属资讯域） -->
             <controls:CardView Grid.Column="1" Grid.Row="0">
                 <controls:CardView.Header>
-                    <Grid ColumnDefinitions="*,Auto">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                         <TextBlock Grid.Column="0"
                                    Text="7*24小时快讯"
                                    FontSize="{StaticResource SectionTitleFontSize}" 
                                    FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="1"
+
+                        <!-- 每日简报入口：与快讯同属资讯域（简报是快讯+自选的 AI 解读），
+                             置于同一卡片标题栏语义自洽，也不占用首页黄金位置。
+                             此处不承载加载态——简报的生成状态只在弹窗内呈现：
+                             标题栏是导航区，塞入指示器会与快讯自身的刷新状态混淆。 -->
+                        <Button Grid.Column="1"
+                                Content="简报"
+                                Classes="btn-secondary"
+                                Command="{Binding Briefing.OpenBriefingWindowCommand}"
+                                ToolTip.Tip="今日 AI 简报：要闻速览 + 自选异动归因"
+                                Margin="{StaticResource SmallLeftMargin}"
+                                VerticalAlignment="Center"/>
+
+                        <!-- 快讯列表自身的加载态：首次推送到达前显示圆形 loading，
+                             归属明确（它加载的就是这个列表本身） -->
+                        <ProgressBar Grid.Column="2"
+                                     IsIndeterminate="True"
+                                     Width="{StaticResource LargeSpacing}"
+                                     Height="{StaticResource LargeSpacing}"
+                                     Margin="{StaticResource SmallLeftMargin}"
+                                     VerticalAlignment="Center"
+                                     IsVisible="{Binding News.IsAwaitingFirstNews}"/>
+
+                        <TextBlock Grid.Column="3"
                                    Text="{Binding News.TelegraphRefreshCountdown}"
                                    FontSize="{StaticResource SmallFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -332,74 +355,10 @@
                 </Panel>
             </controls:CardView>
             
-        <!-- 左列：每日简报 + 热门资产 -->
-        <Grid Grid.Column="0"
-              RowDefinitions="Auto,*">
-            <!-- 每日简报：缓存命中即呈现；未命中后台生成（骨架占位） -->
-            <controls:CardView Grid.Row="0"
-                               Margin="{StaticResource BottomMargin}"
-                               IsVisible="{Binding Briefing.ShowCard}">
-                <controls:CardView.Header>
-                    <Grid ColumnDefinitions="*,Auto,Auto">
-                        <TextBlock Grid.Column="0"
-                                   Text="每日简报"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="1"
-                                   Text="{Binding Briefing.BriefingMetaText}"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   VerticalAlignment="Center"
-                                   Margin="{StaticResource SmallLeftMargin}"/>
-                        <Button Grid.Column="2"
-                                Content="刷新"
-                                Classes="btn-secondary"
-                                Command="{Binding Briefing.RefreshCommand}"
-                                IsVisible="{Binding !Briefing.IsGenerating}"
-                                Margin="{StaticResource SmallLeftMargin}"/>
-                    </Grid>
-                </controls:CardView.Header>
-
-                <StackPanel>
-                    <Panel>
-                        <!-- 生成中骨架 -->
-                        <StackPanel Spacing="{StaticResource SmallSpacing}"
-                                    IsVisible="{Binding Briefing.IsGenerating}">
-                            <Border Classes="skeleton skeleton-row" Height="16"/>
-                            <Border Classes="skeleton skeleton-row" Height="16"/>
-                            <Border Classes="skeleton skeleton-row" Height="16"/>
-                        </StackPanel>
-
-                        <!-- 简报正文（限定高度，避免挤压下方热门资产） -->
-                        <ScrollViewer MaxHeight="200"
-                                      IsVisible="{Binding !Briefing.IsGenerating}">
-                            <TextBlock Text="{Binding Briefing.BriefingContent}"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        </ScrollViewer>
-
-                        <!-- 空态（无自选无要闻） / 失败态（含重试入口） -->
-                        <controls:StateOverlayView State="{Binding Briefing.OverlayState}"
-                                                   Message="{Binding Briefing.OverlayMessage}"
-                                                   RetryCommand="{Binding Briefing.RetryCommand}"
-                                                   RetryText="重新生成"
-                                                   ShowLoading="False"/>
-                    </Panel>
-
-                    <!-- 近 30 天简报累计用量：置于卡片内容末尾（页脚），与"本次消耗"分开表述；
-                         无历史记录时自动隐藏。CardView 是 ContentControl，只能有单个子元素，
-                         故必须与正文一起包在 StackPanel 内 -->
-                    <TextBlock Text="{Binding Briefing.UsageSummaryText}"
-                               IsVisible="{Binding Briefing.ShowUsageSummary}"
-                               FontSize="{StaticResource SmallFontSize}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Margin="{StaticResource SmallTopMargin}"/>
-                </StackPanel>
-            </controls:CardView>
-
-            <!-- 下排：热门资产（撑满剩余列高，与右侧快讯对齐） -->
-            <controls:CardView Grid.Row="1"
-                               Margin="{StaticResource SmallRightMargin}">
+        <!-- 左列：热门资产 -->
+        <controls:CardView Grid.Column="0"
+                           Grid.Row="0"
+                           Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
@@ -516,10 +475,7 @@
                                                ShowLoading="False"/>
                 </Panel>
             </controls:CardView>
-        </Grid>
-
-
 
         </Grid>
-            </Grid>
+    </Grid>
 </UserControl>

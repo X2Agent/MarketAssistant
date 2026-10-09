@@ -173,7 +173,7 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
         }
     }
 
-    private void OnModeChanged(CryptoTradingMode newMode)
+    private void OnModeChanged(TradingMode newMode)
     {
         // 模式切换在 UI 线程触发，异步重启避免阻塞；fire-and-forget 需自带异常观察
         if (_running)
@@ -204,8 +204,8 @@ public sealed class BinanceUserDataStreamService : IAsyncDisposable, IDisposable
         apiKey = string.Empty;
         httpClientName = _environmentService.CurrentMode switch
         {
-            CryptoTradingMode.LiveSpot => "Binance",
-            CryptoTradingMode.BinanceSpotDemo => "BinanceSpotDemo",
+            TradingMode.LiveSpot => "Binance",
+            TradingMode.SpotDemo => "BinanceSpotDemo",
             _ => string.Empty
         };
 

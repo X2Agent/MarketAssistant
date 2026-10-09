@@ -86,103 +86,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
 
     public List<string> WebSearchProviders { get; } = ["Bing", "Brave", "Tavily"];
 
-    /// <summary>
-    /// 模型价格表草稿（元 / 1M tokens）。保存时写回 UserSetting.ModelPrices；
-    /// 成本展示按 (provider, model) 匹配，未命中按"未定价"处理。
-    /// </summary>
-    public ObservableCollection<ModelPrice> ModelPrices { get; } = [];
-
-    /// <summary>
-    /// 是否展示"内置参考价"提示。表内仍有与内置快照完全一致的行时为 true，
-    /// 提醒用户这些单价是快照而非实时报价。
-    /// </summary>
-    [ObservableProperty]
-    private bool _hasBuiltinPriceHint;
-
-    /// <summary>内置参考价提示文案（含快照日期）。</summary>
-    public string BuiltinPriceHintText =>
-        $"已为你填入常用模型的参考单价（快照日期 {DefaultModelPriceCatalog.SnapshotDate}）。" +
-        "这些是内置参考价而非实时报价，请按你所选服务商的官方定价核对后自行修改；" +
-        "未覆盖的模型会显示为「部分未定价」。";
-
-    /// <summary>恢复内置参考价的按钮文案。</summary>
-    public string RestoreDefaultPricesText => "重置为内置参考价";
-
-    /// <summary>新增一行价格（服务商预填当前服务商，减少重复输入）。</summary>
-    [RelayCommand]
-    private void AddModelPrice()
-    {
-        ModelPrices.Add(new ModelPrice { ProviderId = UserSetting.ProviderId });
-    }
-
-    /// <summary>删除一行价格。</summary>
-    [RelayCommand]
-    private void RemoveModelPrice(ModelPrice? price)
-    {
-        if (price is not null)
-        {
-            ModelPrices.Remove(price);
-        }
-    }
-
-    /// <summary>从草稿设置同步价格表集合（初始化与重置后调用）。</summary>
-    private void LoadModelPrices()
-    {
-        ModelPrices.Clear();
-        foreach (var price in UserSetting.ModelPrices)
-        {
-            ModelPrices.Add(price);
-        }
-
-        RefreshPriceHint();
-    }
-
-    /// <summary>草稿价格表写回设置：完全空行丢弃，其余（含半成品）保留但不参与成本匹配。</summary>
-    private void CommitModelPrices()
-    {
-        UserSetting.ModelPrices = [.. ModelPrices
-            .Where(price => !string.IsNullOrWhiteSpace(price.ProviderId) ||
-                            !string.IsNullOrWhiteSpace(price.ModelId))];
-        RefreshPriceHint();
-    }
-
-    /// <summary>
-    /// 价格表提示：只要表内存在与内置参考价完全一致的行（典型情况是用户从未改过），
-    /// 就提示这些数字是内置快照而非实时报价，避免用户误以为是精确账单。
-    /// 用户自行改过任意一行即不再打扰。
-    /// </summary>
-    private void RefreshPriceHint()
-    {
-        var usesBuiltin = ModelPrices.Any(price =>
-            price.IsMatchable &&
-            DefaultModelPriceCatalog.Defaults.Any(builtin =>
-                string.Equals(builtin.ProviderId, price.ProviderId, StringComparison.Ordinal) &&
-                string.Equals(builtin.ModelId, price.ModelId, StringComparison.Ordinal) &&
-                builtin.InputPricePerMillionTokens == price.InputPricePerMillionTokens &&
-                builtin.OutputPricePerMillionTokens == price.OutputPricePerMillionTokens));
-
-        HasBuiltinPriceHint = usesBuiltin;
-    }
-
-    /// <summary>重置为内置参考价（仅改草稿，需点击保存才落盘）。</summary>
-    public void RestoreDefaultPrices()
-    {
-        ModelPrices.Clear();
-        foreach (var price in DefaultModelPriceCatalog.CreateDefaults())
-        {
-            ModelPrices.Add(price);
-        }
-
-        RefreshPriceHint();
-        Logger?.LogInformation("用户将模型价格表重置为内置参考价（快照日期 {SnapshotDate}）",
-            DefaultModelPriceCatalog.SnapshotDate);
-    }
-
     public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];
 
     public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = [.. Enum.GetValues<InvestmentHorizonType>()];
 
-    public List<CryptoTradingMode> CryptoTradingModes { get; } = [.. Enum.GetValues<CryptoTradingMode>()];
+    public List<TradingMode> CryptoTradingModes { get; } = [.. Enum.GetValues<TradingMode>()];
 
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
@@ -268,16 +176,16 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveSpot;
+    public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == TradingMode.LiveSpot;
 
     /// <summary>
     /// 是否为实盘模式（现货或合约，共用同一套 API Key）
     /// </summary>
     public bool IsLiveTradingMode => IsLiveSpotTradingMode || IsLiveFuturesTradingMode;
 
-    public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveFutures;
+    public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == TradingMode.LiveFutures;
 
-    public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.BinanceFuturesTestnet;
+    public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == TradingMode.FuturesTestnet;
 
     public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
 
@@ -335,7 +243,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _ = LoadSettingsAsync();
     }
 
-    /// <summary>首屏加载：读取用户设置草稿、同步服务商与模型列表。</summary>
+    /// <summary>首屏加载：读取用户设置草稿并同步本地状态；模型目录在后台拉取，不阻塞首屏。</summary>
     private async Task LoadSettingsAsync()
     {
         await LoadAsync(async _ =>
@@ -353,7 +261,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _storageProvider = storageProvider;
     }
 
-    private async Task InitializeAsync()
+    private Task InitializeAsync()
     {
         // 加载用户设置为独立草稿副本（OnUserSettingChanged 会自动订阅 PropertyChanged）。
         // 不能直接绑定 CurrentSetting 本体：页面上的每次编辑都会立刻生效于全进程，
@@ -373,18 +281,21 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             _isInitializingProvider = false;
         }
 
-        // 模型列表鉴权与具体模型调用鉴权彼此独立。
-        var currentKey = UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
-        if (SelectedProvider?.CanListModels(currentKey) == true)
-        {
-            await FetchModels();
-        }
-
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         LoadAnalystRoles();
-        LoadModelPrices();
         ApplyTheme(UserSetting.ThemeMode);
+
+        // 模型目录是网络慢依赖：首屏只等本地同步，目录在后台拉取。
+        // 角色卡片与「模型 ID」框共用 Models 集合，目录到达后自动填充，无需额外刷新；
+        // 命中 ModelDiscoveryService 会话级缓存时近乎瞬时。
+        var currentKey = UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
+        if (SelectedProvider?.CanListModels(currentKey) == true)
+        {
+            _ = FetchModelsCore(forceRefresh: false);
+        }
+
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -401,8 +312,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     role.Id,
                     role.ModelIdOverride);
             }
-
-            CommitModelPrices();
 
             // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。
             var targetMode = UserSetting.CryptoTradingMode;
@@ -460,7 +369,6 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             ApplyTheme(UserSetting.ThemeMode);
             await _tradingEnvironmentService.ApplyModeAsync(UserSetting.CryptoTradingMode);
             LoadAnalystRoles();
-            LoadModelPrices();
             _notificationService.ShowSuccess("设置已重置为默认值");
             Logger?.LogInformation("重置设置为默认值");
         }, "重置设置");

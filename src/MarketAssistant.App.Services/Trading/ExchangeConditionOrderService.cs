@@ -282,7 +282,7 @@ public sealed class ExchangeConditionOrderService
         }
     }
 
-    private void OnModeChanged(CryptoTradingMode mode)
+    private void OnModeChanged(TradingMode mode)
     {
         _liveOrderIds.Clear();
         _ = ReconcileSafeAsync();

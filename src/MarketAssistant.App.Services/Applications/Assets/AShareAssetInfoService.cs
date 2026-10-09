@@ -84,13 +84,22 @@ public class AShareAssetInfoService(
                 assetInfo.Code = rawCode;
             }
 
-            // 当前价格
-            assetInfo.CurrentPrice = PriceFormatter.Format(data.LastPrice);
+            // 当前价格（CLS 对停牌/无成交返回 null，保留默认空串表示「未提供」，不伪造 0）
+            if (data.LastPrice is { } lastPrice)
+            {
+                assetInfo.CurrentPrice = PriceFormatter.Format(lastPrice);
+            }
+            else
+            {
+                _logger.LogDebug("财联社未返回 {Code} 的最新价（可能停牌或暂无成交）", code);
+            }
 
             // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）。
             // InvariantCulture：下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
-            var changeRatio = data.Change;
-            assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
+            if (data.Change is { } changeRatio)
+            {
+                assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
+            }
         }
         catch (OperationCanceledException)
         {

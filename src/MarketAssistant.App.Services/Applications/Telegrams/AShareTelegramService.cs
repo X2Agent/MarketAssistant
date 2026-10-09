@@ -21,8 +21,11 @@ public class AShareTelegramService(ILogger<AShareTelegramService> logger, IHttpC
         var client = _httpClientFactory.CreateClient("AShareTelegram");
         client.Timeout = TimeSpan.FromSeconds(10);
 
-        // 获取最新20条快讯（不使用 ctime 参数，避免增量更新导致数据为空）
-        var url = "https://news.10jqka.com.cn/tapp/news/push/stock/?page=1&tag=&track=website&pagesize=20";
+        // 拉取最新 100 条快讯，覆盖约 29 小时（实测 pagesize 与时间跨度的对应关系：
+        // 20 条≈2.1h、50 条≈6.6h、100 条≈28.9h）。每日简报需要跨越隔夜与开盘，
+        // pagesize=20 只能覆盖盘前两小时，缺失当日开盘前及前一日的消息。
+        // 不使用 ctime 参数做增量更新——实测会导致返回为空。
+        var url = "https://news.10jqka.com.cn/tapp/news/push/stock/?page=1&tag=&track=website&pagesize=100";
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
 

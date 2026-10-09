@@ -58,7 +58,7 @@ public interface IBinanceAuthService
 /// <param name="logger">日志器（可选）</param>
 public sealed class BinanceAuthService(
     ITradingCredentialStore credentialStore,
-    CryptoTradingMode mode,
+    TradingMode mode,
     string keyName,
     IHttpClientFactory? httpClientFactory = null,
     string? httpClientName = null,
@@ -73,7 +73,7 @@ public sealed class BinanceAuthService(
     private static readonly TimeSpan ServerTimeSyncInterval = TimeSpan.FromMinutes(30);
 
     private readonly ITradingCredentialStore _credentialStore = credentialStore;
-    private readonly CryptoTradingMode _mode = mode;
+    private readonly TradingMode _mode = mode;
     private readonly string _keyName = keyName;
 
     /// <summary>

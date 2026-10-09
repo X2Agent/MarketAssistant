@@ -11,12 +11,26 @@ MarketAssistant.DataProviders/
 ├── BinanceMarketDataService.cs    ← Binance REST API（现货 + 合约）
 ├── BinanceMarketDataModels.cs     ← Binance 本地模型（24hrTicker、ExchangeInfo）
 ├── BinanceWebSocketService.cs     ← Binance WebSocket 实时价格推送
+├── BinanceFundingRateResponse.cs  ← 资金费率响应模型
+├── BinanceLongShortRatioResponse.cs ← 多空比响应模型
+├── BinanceOpenInterestResponse.cs ← 持仓量响应模型
+├── BinancePremiumIndexResponse.cs ← 溢价指数响应模型
+├── BinanceRegionUnavailableException.cs ← 地区限制异常（binance.com 返回451 等）
 ├── CoinGeckoApiService.cs         ← CoinGecko REST API（市值、排名、涨跌幅）
+├── CoinGeckoSearchResponse.cs     ← CoinGecko 搜索响应模型
+├── CoinGeckoTickersResponse.cs    ← CoinGecko 行情响应模型
+├── AlternativeMeClient.cs        ← 恐惧贪婪指数（alternative.me）
 ├── AShare/                        ← A 股数据客户端（P1-05 下沉）
 │   ├── ClsQuoteClient.cs          ← 财联社行情 /quote/stock/basic 与搜索 /api/sw
 │   ├── ZhiTuMarketClient.cs       ← 智兔财务/技术指标/K线/资金流/公司资料
 │   ├── EastMoneyNewsClient.cs     ← 东方财富搜索新闻（JSONP）
+│   ├── SinaIndexQuoteClient.cs    ← 新浪指数行情（顶栏行情条）
+│   ├── SinaStockQuoteClient.cs    ← 新浪个股行情（五档盘口 + 开高低收快照字段；不含逐笔）
+│   ├── SinaKLineClient.cs         ← 新浪 K 线历史（智兔不覆盖基金/ETF 时的兜底数据源）
+│   ├── SinaFundFlowClient.cs      ← 新浪个股资金流排行
+│   ├── SinaFundFlowItem.cs        ← 新浪资金流条目模型
 │   ├── ClsStockQuoteData.cs       ← CLS 行情字段模型
+│   ├── AShareJsonOptions.cs       ← A 股容错反序列化选项（字符串数值/null/-- 占位）
 │   └── ServiceCollectionExtensions.cs ← AddAShareDataProviders()
 ├── Web3/                           ← 链上数据客户端（DexScreener + GoPlus）
 │   ├── DexScreenerClient.cs        ← 多链 DEX 行情：热门对搜索 /token-pairs（免费无 Key）
@@ -37,7 +51,8 @@ MarketAssistant.DataProviders/
 | **Binance** | `api.binance.com` / `fapi.binance.com` | 部分地区受限，需 VPN/代理 |
 | **CoinGecko** | `api.coingecko.com` | 免费版有频率限制（~24 req/min），`CoinGeckoApiService` 内置限流 |
 | **财联社 (Cls)** | `x-quote.cls.cn` / `www.cls.cn` | 命名 HttpClient `Cls`；行情无需签名 |
-| **智兔 (ZhiTu)** | `api.zhituapi.com` | 命名 HttpClient `ZhiTu`；Token 由调用方传入，禁止硬编码 |
+| **智兔 (ZhiTu)** | `api.zhituapi.com` | 命名 HttpClient `ZhiTu`；Token 由调用方传入，禁止硬编码；`/hs/history` K 线不覆盖基金/ETF（返回 404），由 `SinaKLineClient` 兜底 |
+| **新浪行情 (Sina)** | `hq.sinajs.cn` / `quotes.sina.cn` | 命名 HttpClient `SinaHq`（个股五档，强制 Referer、GBK 响应）与 `SinaKLine`（K 线历史，实测无需 Referer、无限流）；`quotes.sina.cn` datalen 上限 1900、传 0 返回全历史，无效代码/周期返回 JSON `null` |
 | **东方财富** | `search-api-web.eastmoney.com` | 命名 HttpClient `EastMoneySearch`；返回 JSONP 需剥离 |
 | **DexScreener** | `api.dexscreener.com` | 命名 HttpClient `DexScreener`；免费公开接口无需 Key，限速 300 req/min；`token-pairs` 端点要求链全名（ethereum/bsc...），错误写法会**静默返回空数组** |
 | **GoPlus Security** | `api.gopluslabs.io` | 命名 HttpClient `GoPlus`；免费接口有 QPS 限制，API Key 可选（经 `GoPlusSecurityClient.ApiKey` 属性由上层注入，本层不感知设置服务）；主端点要求**数字链 ID**（1/56/137...），Solana 走独立端点 `/api/v1/solana/token_security`（旧域名 api.gopluslabs.com 已退役，禁止使用） |

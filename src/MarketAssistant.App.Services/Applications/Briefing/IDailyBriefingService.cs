@@ -1,8 +1,8 @@
 namespace MarketAssistant.Applications.Briefing;
 
 /// <summary>
-/// 每日 AI 简报服务（按市场 Keyed 注册）：基于自选行情与最新要闻生成
-/// "隔夜要闻 + 异动归因"摘要，按本地日期缓存复用。
+/// 每日 AI 简报服务（按市场 Keyed 注册）：基于自选行情与最近约一天的市场要闻，
+/// 生成"要闻速览 + 自选异动归因"摘要，按本地日期缓存复用。
 /// </summary>
 public interface IDailyBriefingService
 {
@@ -14,21 +14,10 @@ public interface IDailyBriefingService
     /// 自选与要闻均为空时返回 null（无可摘要内容）；LLM 调用失败抛出异常，不落盘失败结果。
     /// </summary>
     /// <param name="force">跳过当天缓存强制重新生成（会再次产生模型调用与费用）。</param>
-    /// <param name="manual">
-    /// 是否为用户手动触发。自动路径（首页进入时）会受"自动生成"开关约束，
-    /// 手动路径则只受"启用简报"总开关约束——用户显式点击时不应被二次拦截。
-    /// </param>
     /// <param name="cancellationToken">取消令牌。</param>
     Task<DailyBriefing?> GenerateAsync(
         bool force = false,
-        bool manual = false,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 是否允许当前进行自动（用户未主动触发）生成。读取当天开关状态，
-    /// 供 UI 决定是否展示"自动生成已关闭"提示。
-    /// </summary>
-    bool IsAutoGenerateEnabled { get; }
 
     /// <summary>简报功能总开关（关闭后手动生成亦不可用）。</summary>
     bool IsEnabled { get; }

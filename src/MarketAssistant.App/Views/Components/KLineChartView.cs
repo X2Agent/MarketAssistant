@@ -35,6 +35,73 @@ public class KLineChartView : UserControl
         set => SetValue(DataProperty, value);
     }
 
+    /// <summary>均线（MA(5/10/20/30/60)）主图叠加是否显示。</summary>
+    public static readonly StyledProperty<bool> IsMaVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsMaVisible), true);
+
+    public bool IsMaVisible
+    {
+        get => GetValue(IsMaVisibleProperty);
+        set => SetValue(IsMaVisibleProperty, value);
+    }
+
+    /// <summary>BOLL 主图叠加是否显示。</summary>
+    public static readonly StyledProperty<bool> IsBollVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsBollVisible), true);
+
+    public bool IsBollVisible
+    {
+        get => GetValue(IsBollVisibleProperty);
+        set => SetValue(IsBollVisibleProperty, value);
+    }
+
+    /// <summary>成交量（VOL）副图是否显示。</summary>
+    public static readonly StyledProperty<bool> IsVolVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsVolVisible), true);
+
+    public bool IsVolVisible
+    {
+        get => GetValue(IsVolVisibleProperty);
+        set => SetValue(IsVolVisibleProperty, value);
+    }
+
+    /// <summary>MACD 副图是否显示。</summary>
+    public static readonly StyledProperty<bool> IsMacdVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsMacdVisible), true);
+
+    public bool IsMacdVisible
+    {
+        get => GetValue(IsMacdVisibleProperty);
+        set => SetValue(IsMacdVisibleProperty, value);
+    }
+
+    /// <summary>KDJ 副图是否显示。</summary>
+    public static readonly StyledProperty<bool> IsKdjVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsKdjVisible), true);
+
+    public bool IsKdjVisible
+    {
+        get => GetValue(IsKdjVisibleProperty);
+        set => SetValue(IsKdjVisibleProperty, value);
+    }
+
+    /// <summary>左上角行情图例（K 线信息条与各指标图例）是否显示。</summary>
+    public static readonly StyledProperty<bool> IsLegendVisibleProperty =
+        AvaloniaProperty.Register<KLineChartView, bool>(nameof(IsLegendVisible), true);
+
+    public bool IsLegendVisible
+    {
+        get => GetValue(IsLegendVisibleProperty);
+        set => SetValue(IsLegendVisibleProperty, value);
+    }
+
+    // 指标/图例可见性属性集合：变更时统一下发图表脚本（声明须晚于各 Property，避免静态初始化拿到 null）
+    private static readonly AvaloniaProperty[] IndicatorVisibilityProperties =
+    [
+        IsMaVisibleProperty, IsBollVisibleProperty, IsVolVisibleProperty,
+        IsMacdVisibleProperty, IsKdjVisibleProperty, IsLegendVisibleProperty,
+    ];
+
     public KLineChartView()
     {
         InitializeComponent();
@@ -75,6 +142,45 @@ public class KLineChartView : UserControl
             {
                 _ = UpdateChartAsync(data);
             }
+        }
+        else if (Array.IndexOf(IndicatorVisibilityProperties, change.Property) >= 0)
+        {
+            // 指标/图例开关变更：已初始化时立即下发，未初始化时由导航完成回调补推
+            _ = ApplyIndicatorVisibilityAsync();
+        }
+    }
+
+    /// <summary>
+    /// 把指标/图例可见性一次性推送到图表脚本（JSON 键与脚本内 setIndicatorVisibility 约定一致）。
+    /// </summary>
+    private async Task ApplyIndicatorVisibilityAsync()
+    {
+        if (_webView == null || !_isInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var state = new
+                {
+                    ma = IsMaVisible,
+                    boll = IsBollVisible,
+                    vol = IsVolVisible,
+                    macd = IsMacdVisible,
+                    kdj = IsKdjVisible,
+                    legend = IsLegendVisible,
+                };
+                string json = JsonSerializer.Serialize(state);
+                await _webView.InvokeScript($"window.stockChartInterface.setIndicatorVisibility({json});");
+            });
+        }
+        catch (Exception ex)
+        {
+            // 图表脚本尚未就绪时忽略，导航完成回调会再次同步
+            System.Diagnostics.Debug.WriteLine($"同步K线图指标可见性失败: {ex.Message}");
         }
     }
 
@@ -182,6 +288,8 @@ public class KLineChartView : UserControl
         {
             _isInitialized = true;
             ApplyThemeToChart();
+            // 初始化 layout 会创建全部指标，此处按宿主当前状态纠正显隐
+            Dispatcher.UIThread.Post(() => _ = ApplyIndicatorVisibilityAsync());
             HideLoading();
         });
     }

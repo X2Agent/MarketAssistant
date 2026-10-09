@@ -2,7 +2,10 @@ namespace MarketAssistant.DataProviders;
 
 /// <summary>
 /// 币安24小时价格变动统计数据模型（用于 BinanceMarketDataService）
-/// 注意：这是专门为 /api/v3/ticker/24hr 接口定义的模型，字段为 decimal 类型
+/// 注意：这是专门为 /api/v3/ticker/24hr 接口定义的模型，字段为 decimal 类型。
+/// 币安对价格/成交量类字段恒返回字符串（无数据时为 "0.00000000" 而非 null），
+/// 非空 decimal 依赖该上游契约；<see cref="StringToDecimalConverter"/> 对 null 抛错，
+/// 兼任上游 schema 违约的哨兵。
 /// </summary>
 public class Binance24hrTicker
 {

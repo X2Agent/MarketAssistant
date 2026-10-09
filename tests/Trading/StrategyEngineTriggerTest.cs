@@ -42,7 +42,7 @@ public sealed class StrategyEngineTriggerTest
         var strategies = new Mock<TradingStrategyService>(data.Object);
         // RoutingExchangeClient 为 sealed，使用真实实例：触发评估路径不会调用交易所客户端
         var exchange = new RoutingExchangeClient(
-            environment, new Dictionary<CryptoTradingMode, IExchangeClient>());
+            environment, new Dictionary<TradingMode, IExchangeClient>());
 
         var engine = new StrategyEngine(
             data.Object, strategies.Object, exchange, environment,

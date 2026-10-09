@@ -33,7 +33,7 @@ public sealed class ExchangeConditionOrderServiceTest
         Mock<TradingStrategyService> Strategies,
         Mock<TradingDataService> Data) CreateContext(bool futures)
     {
-        var mode = futures ? CryptoTradingMode.BinanceFuturesTestnet : CryptoTradingMode.BinanceSpotDemo;
+        var mode = futures ? TradingMode.FuturesTestnet : TradingMode.SpotDemo;
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(s => s.CurrentSetting).Returns(new UserSetting { CryptoTradingMode = mode });
 
@@ -47,7 +47,7 @@ public sealed class ExchangeConditionOrderServiceTest
 
         var router = new RoutingExchangeClient(
             environment,
-            new Dictionary<CryptoTradingMode, IExchangeClient> { [mode] = client.Object });
+            new Dictionary<TradingMode, IExchangeClient> { [mode] = client.Object });
 
         var data = new Mock<TradingDataService>(environment, NullLogger<TradingDataService>.Instance);
         var strategies = new Mock<TradingStrategyService>(data.Object);

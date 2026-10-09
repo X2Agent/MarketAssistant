@@ -22,10 +22,10 @@ public class BinanceAuthServiceTest
     {
         // Arrange - 使用币安文档中的示例密钥（仅用于测试）
         var authService = new BinanceAuthService(
-            CreateCredentialStore(CryptoTradingMode.LiveSpot,
+            CreateCredentialStore(TradingMode.LiveSpot,
                 "vmPUZE6mv9SD5VNHk4HlWFsOr6aKE2zvsw0MuIgwCIPy6utIco14y7Ju91duEh8A",
                 "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"),
-            CryptoTradingMode.LiveSpot,
+            TradingMode.LiveSpot,
             "Binance");
 
         // Act - 构建币安文档中的示例payload（不包含timestamp，手动测试签名算法）
@@ -61,8 +61,8 @@ public class BinanceAuthServiceTest
     {
         // Arrange
         var authService = new BinanceAuthService(
-            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", "test-secret-key"),
-            CryptoTradingMode.LiveSpot,
+            CreateCredentialStore(TradingMode.LiveSpot, "test-api-key", "test-secret-key"),
+            TradingMode.LiveSpot,
             "Binance");
 
         // Act
@@ -87,8 +87,8 @@ public class BinanceAuthServiceTest
     {
         // Arrange
         var authService = new BinanceAuthService(
-            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", string.Empty),
-            CryptoTradingMode.LiveSpot,
+            CreateCredentialStore(TradingMode.LiveSpot, "test-api-key", string.Empty),
+            TradingMode.LiveSpot,
             "Binance");
 
         // Act & Assert
@@ -104,8 +104,8 @@ public class BinanceAuthServiceTest
     public void TestAddAuthHeaders_ShouldSetApiKeyHeader()
     {
         var authService = new BinanceAuthService(
-            CreateCredentialStore(CryptoTradingMode.LiveSpot, "test-api-key", "test-secret-key"),
-            CryptoTradingMode.LiveSpot,
+            CreateCredentialStore(TradingMode.LiveSpot, "test-api-key", "test-secret-key"),
+            TradingMode.LiveSpot,
             "Binance");
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.com");
 
@@ -115,7 +115,7 @@ public class BinanceAuthServiceTest
         Assert.AreEqual("test-api-key", values.Single());
     }
 
-    private static ITradingCredentialStore CreateCredentialStore(CryptoTradingMode mode, string apiKey, string secretKey)
+    private static ITradingCredentialStore CreateCredentialStore(TradingMode mode, string apiKey, string secretKey)
     {
         var store = new FakeTradingCredentialStore();
         store.SetCredentials(mode, apiKey, secretKey);
@@ -124,26 +124,26 @@ public class BinanceAuthServiceTest
 
     private sealed class FakeTradingCredentialStore : ITradingCredentialStore
     {
-        private readonly Dictionary<CryptoTradingMode, (string ApiKey, string SecretKey)> _cache = [];
+        private readonly Dictionary<TradingMode, (string ApiKey, string SecretKey)> _cache = [];
 
-        public (string ApiKey, string SecretKey) GetCredentials(CryptoTradingMode mode)
+        public (string ApiKey, string SecretKey) GetCredentials(TradingMode mode)
         {
             return _cache.TryGetValue(mode, out var creds) ? creds : (string.Empty, string.Empty);
         }
 
-        public void SetCredentials(CryptoTradingMode mode, string apiKey, string secretKey)
+        public void SetCredentials(TradingMode mode, string apiKey, string secretKey)
         {
             _cache[mode] = (apiKey, secretKey);
         }
 
-        public bool IsConfigured(CryptoTradingMode mode)
+        public bool IsConfigured(TradingMode mode)
         {
             if (!_cache.TryGetValue(mode, out var creds))
                 return false;
             return !string.IsNullOrEmpty(creds.ApiKey) && !string.IsNullOrEmpty(creds.SecretKey);
         }
 
-        public void ClearCredentials(CryptoTradingMode mode)
+        public void ClearCredentials(TradingMode mode)
         {
             _cache.Remove(mode);
         }

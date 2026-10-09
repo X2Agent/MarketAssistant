@@ -77,19 +77,6 @@ public class UserSettingService : IUserSettingService
                 {
                     _currentSetting.LogPath = Path.Combine(FileSystem.AppDataDirectory, AppInfo.LogsDirectoryName);
                 }
-
-                // 成本可见的开箱状态：价格表为空时填入内置参考价。
-                // 仅填空表，绝不覆盖用户已维护的价格；填完不立即落盘，
-                // 待用户下次保存设置时自然持久化，避免每次启动都写盘。
-                // 用 FillIfEmpty 而非 Count 判断：旧配置反序列化可能得到 null。
-                var seededPrices = DefaultModelPriceCatalog.FillIfEmpty(_currentSetting.ModelPrices);
-                if (!ReferenceEquals(seededPrices, _currentSetting.ModelPrices))
-                {
-                    _currentSetting.ModelPrices = seededPrices;
-                    _logger.LogInformation(
-                        "模型价格表为空，已填入内置参考价（快照日期 {SnapshotDate}），用户可在设置中自行维护",
-                        DefaultModelPriceCatalog.SnapshotDate);
-                }
             }
             catch (SecureSettingsException ex)
             {

@@ -22,6 +22,14 @@ public partial class AnalystRoleViewModel : ObservableObject
     private bool _isRequired;
 
     /// <summary>
+    /// 是否展示该角色的模型编辑器（由设置页"为每个分析师单独指定模型"总开关驱动）。
+    /// 关闭时隐藏下拉输入框，避免默认铺开过多输入框；已有分配通过
+    /// <see cref="ModelAssignmentHintText"/> 提示，分配本身始终生效。
+    /// </summary>
+    [ObservableProperty]
+    private bool _showModelEditor;
+
+    /// <summary>
     /// 角色专属模型 ID；留空表示跟随默认模型。
     /// </summary>
     [ObservableProperty]
@@ -30,6 +38,23 @@ public partial class AnalystRoleViewModel : ObservableObject
     /// <summary>是否配置了角色专属模型</summary>
     public bool HasModelOverride => !string.IsNullOrWhiteSpace(ModelIdOverride);
 
-    partial void OnModelIdOverrideChanged(string value) =>
+    /// <summary>编辑器隐藏且存在分配时展示提示（避免用户误以为分配丢失）。</summary>
+    public bool ShowModelAssignmentHint => !ShowModelEditor && HasModelOverride;
+
+    /// <summary>编辑器隐藏且有分配时的提示文本；否则为空串。</summary>
+    public string ModelAssignmentHintText =>
+        ShowModelAssignmentHint ? $"已指定模型：{ModelIdOverride}" : string.Empty;
+
+    partial void OnModelIdOverrideChanged(string value)
+    {
         OnPropertyChanged(nameof(HasModelOverride));
+        OnPropertyChanged(nameof(ShowModelAssignmentHint));
+        OnPropertyChanged(nameof(ModelAssignmentHintText));
+    }
+
+    partial void OnShowModelEditorChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowModelAssignmentHint));
+        OnPropertyChanged(nameof(ModelAssignmentHintText));
+    }
 }

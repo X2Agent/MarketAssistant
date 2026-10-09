@@ -133,4 +133,23 @@ public class AShareAssetInfoServiceFailureTest
         Assert.AreEqual("SH", assetInfo.Market);
         Assert.AreEqual("-0.82%", assetInfo.ChangePercentage);
     }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetAssetInfoAsync_WhenLastPriceAndChangeAreNull_ShouldNotThrowAndLeavePriceEmpty()
+    {
+        // 复现线上 JsonException 崩溃：CLS 对停牌/无成交股票返回 "last_px":null、"change":null。
+        // 合法"无数据"状态不得抛错，也不得把缺失伪造成 0 价格或 0.00%
+        const string payload = """
+            {"data":{"secu_name":"测试股票","secu_code":"SH600000","last_px":null,"change":null}}
+            """;
+        var service = CreateService(new StubHandler(_ => Json(payload)));
+
+        var assetInfo = await service.GetAssetInfoAsync("600000", "SH");
+
+        Assert.AreEqual("测试股票", assetInfo.Name);
+        Assert.AreEqual("600000", assetInfo.Code);
+        Assert.AreEqual(string.Empty, assetInfo.CurrentPrice, "无行情时应留空而非伪造价格");
+        Assert.AreEqual(string.Empty, assetInfo.ChangePercentage, "无涨跌幅时应留空而非显示 0.00%");
+    }
 }

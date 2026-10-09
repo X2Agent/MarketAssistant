@@ -8,8 +8,6 @@ using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.Market;
 using MarketAssistant.Applications.Market.Models;
-using MarketAssistant.Applications.Technical;
-using MarketAssistant.Applications.Technical.Models;
 using MarketAssistant.Infrastructure;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
@@ -21,17 +19,11 @@ namespace MarketAssistant.ViewModels;
 
 public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetNavigationParameter>, IDisposable
 {
-    /// <summary>盘口展示档位数（币安 depth 仅接受 5/10/20/50/100/500/1000/5000）。</summary>
-    private const int OrderBookDepth = 5;
+    /// <summary>盘口展示档位数（币安 depth 仅接受 5/10/20/50/100/500/1000/5000；A 股新浪源固定五档，由服务层收敛）。</summary>
+    private const int OrderBookDepth = 10;
 
-    /// <summary>逐笔成交展示条数。</summary>
-    private const int TickTradeLimit = 20;
-
-    /// <summary>技术指标计算所需 K 线根数，需覆盖最长均线周期 MA250。</summary>
-    private const int IndicatorBarCount = 250;
-
-    /// <summary>技术指标面板展示的均线周期（完整周期集合见 <see cref="TechnicalIndicatorSnapshot"/>）。</summary>
-    private static readonly int[] DisplayMovingAveragePeriods = [5, 10, 20, 30, 60];
+    /// <summary>盘口轮询间隔。A 股无实时推送，靠定时轮询保持盘口新鲜；币安由价格推送驱动，轮询触发被节流自然跳过。</summary>
+    private static readonly TimeSpan OrderBookPollInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>盘口自动刷新最小间隔。价格推送频率远高于盘口变化频率，必须节流。</summary>
     private static readonly TimeSpan OrderBookRefreshInterval = TimeSpan.FromSeconds(3);
@@ -43,15 +35,16 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private DateTime _lastOrderBookRefreshAt = DateTime.MinValue;
     private bool _isOrderBookRefreshing;
 
-    // 各加载路径可重入（切换资产/周期、右栏盘口补拉、单区块重试都会取消旧加载后重新进入），
+    /// <summary>盘口轮询计时器（惰性创建）：A 股无实时推送时按间隔补拉，页面离开时停止。</summary>
+    private Avalonia.Threading.DispatcherTimer? _orderBookPollTimer;
+
+    // 各加载路径可重入（切换资产/周期、单区块重试都会取消旧加载后重新进入），
     // 而 K 线等数据源的请求不支持取消、只能在其自然返回后丢弃结果。
     // 通过代次计数识别过期调用：仅最新一次尝试允许写入状态，避免延迟返回的旧结果覆写新加载的状态。
     private int _pageLoadGeneration;
     private int _kLineAttempt;
     private int _snapshotAttempt;
-    private int _indicatorAttempt;
     private int _orderBookAttempt;
-    private int _tickTradeAttempt;
 
     /// <summary>当前绑定事件的实时行情服务。导航参数携带的市场与当前绑定不一致时重新绑定。</summary>
     private IRealtimeQuoteService? _quoteService;
@@ -81,23 +74,19 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     [ObservableProperty]
     private bool _isFavorite;
 
-    /// <summary>行情速览指标（今开 / 最高 / 最低 / 昨收 / 成交量 / 成交额 / 换手 / 振幅 / 量比 / 市盈率 / 市净率）。</summary>
+    /// <summary>行情数据指标（换手率 / 量比 / 市盈率 / 市净率）。开高低收与成交量等逐 bar 数据由 K 线图图例展示，不在此重复。</summary>
     [ObservableProperty]
     private ObservableCollection<MarketMetricItem> _marketMetrics = [];
 
-    /// <summary>技术指标分组（均线 / MACD / BOLL / KDJ），统一按日线口径计算。</summary>
-    [ObservableProperty]
-    private ObservableCollection<IndicatorGroupItem> _indicatorGroups = [];
+    /// <summary>行情数据区块是否可见：有指标数据、首屏骨架或加载失败（可重试）时渲染；ETF/基金等快照无指标时整卡隐藏。</summary>
+    public bool SnapshotSectionVisible =>
+        SnapshotState.HasData || SnapshotState.ShowSkeleton || SnapshotState.IsFailed;
 
-    /// <summary>技术指标对应的 K 线日期。</summary>
-    [ObservableProperty]
-    private string _indicatorDateText = string.Empty;
-
-    /// <summary>卖盘五档，按「卖五 → 卖一」展示，使卖一紧邻中间价。</summary>
+    /// <summary>卖盘各档，按「卖 N → 卖一」展示，使卖一紧邻中间价。</summary>
     [ObservableProperty]
     private ObservableCollection<OrderBookLevelItem> _asks = [];
 
-    /// <summary>买盘五档，按「买一 → 买五」展示。</summary>
+    /// <summary>买盘各档，按「买一 → 买 N」展示。</summary>
     [ObservableProperty]
     private ObservableCollection<OrderBookLevelItem> _bids = [];
 
@@ -112,28 +101,34 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private string _bidQuantityPercentText = string.Empty;
 
     [ObservableProperty]
-    private ObservableCollection<TickTradeItem> _tickTrades = [];
-
-    [ObservableProperty]
     private SectionState _snapshotState = new();
-
-    [ObservableProperty]
-    private SectionState _indicatorState = new();
 
     [ObservableProperty]
     private SectionState _orderBookState = new();
 
+    /// <summary>均线（MA(5/10/20/30/60)）主图叠加开关。</summary>
     [ObservableProperty]
-    private SectionState _tickTradeState = new();
+    private bool _isMaVisible = true;
 
-    /// <summary>右栏（技术指标 + 盘口 + 逐笔）展开状态，折叠后主图独占宽度。</summary>
+    /// <summary>BOLL 主图叠加开关。</summary>
     [ObservableProperty]
-    private bool _isRightPanelVisible = true;
+    private bool _isBollVisible = true;
 
-    /// <summary>右栏折叠按钮文案。</summary>
-    public string RightPanelToggleText => IsRightPanelVisible ? "收起右栏" : "展开右栏";
+    /// <summary>成交量（VOL）副图开关。</summary>
+    [ObservableProperty]
+    private bool _isVolVisible = true;
 
-    partial void OnIsRightPanelVisibleChanged(bool value) => OnPropertyChanged(nameof(RightPanelToggleText));
+    /// <summary>MACD 副图开关。</summary>
+    [ObservableProperty]
+    private bool _isMacdVisible = true;
+
+    /// <summary>KDJ 副图开关。</summary>
+    [ObservableProperty]
+    private bool _isKdjVisible = true;
+
+    /// <summary>左上角行情图例（K 线信息条与各指标图例）开关。</summary>
+    [ObservableProperty]
+    private bool _isLegendVisible = true;
 
     /// <summary>收藏按钮文案：已自选显示“已自选”，否则“加入自选”。</summary>
     public string FavoriteLabel => IsFavorite ? "已自选" : "加入自选";
@@ -146,8 +141,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     /// <summary>当前市场是否提供盘口深度（A 股无公开五档数据源）。</summary>
     public bool SupportsOrderBook => _marketContext.CurrentCapability.SupportsOrderBook;
 
-    /// <summary>当前市场是否提供逐笔成交。</summary>
-    public bool SupportsTickTrades => _marketContext.CurrentCapability.SupportsTickTrades;
+    partial void OnSnapshotStateChanged(SectionState value) => OnPropertyChanged(nameof(SnapshotSectionVisible));
 
     /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
     public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
@@ -171,7 +165,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public IRelayCommand NavigateToAnalysisCommand { get; private set; }
     public IRelayCommand NavigateToTradingCommand { get; private set; }
     public IRelayCommand NavigateToAlertCommand { get; private set; }
-    public IRelayCommand ToggleRightPanelCommand { get; private set; }
     public IAsyncRelayCommand ToggleFavoriteCommand { get; private set; }
 
     public AssetPageViewModel(
@@ -184,7 +177,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         NavigateToAnalysisCommand = new RelayCommand(NavigateToAnalysisAsync);
         NavigateToTradingCommand = new RelayCommand(NavigateToTradingAsync);
         NavigateToAlertCommand = new RelayCommand(NavigateToAlertAsync);
-        ToggleRightPanelCommand = new RelayCommand(ToggleRightPanel);
         ToggleFavoriteCommand = new AsyncRelayCommand(ToggleFavoriteAsync);
 
         SetRetryCommand(() => LoadAssetDataAsync(AssetCode));
@@ -232,29 +224,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             case "Snapshot":
                 await LoadSnapshotSectionAsync(AssetCode, cancellationToken);
                 break;
-            case "Indicator":
-                await LoadIndicatorSectionAsync(AssetCode, cancellationToken);
-                break;
             case "OrderBook":
                 await LoadOrderBookSectionAsync(AssetCode, cancellationToken);
-                break;
-            case "TickTrade":
-                await LoadTickTradeSectionAsync(AssetCode, cancellationToken);
                 break;
             default:
                 Logger?.LogWarning("未知的区块重试请求: {Section}", section);
                 break;
-        }
-    }
-
-    private void ToggleRightPanel()
-    {
-        IsRightPanelVisible = !IsRightPanelVisible;
-
-        // 右栏折叠期间不请求盘口，展开时补一次，避免展示过期深度
-        if (IsRightPanelVisible)
-        {
-            _ = RefreshOrderBookAsync(force: true);
         }
     }
 
@@ -377,7 +352,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     /// <summary>
     /// 并行加载详情页全部区块。仅 K 线决定页面整体状态，
-    /// 行情速览 / 技术指标 / 盘口 / 逐笔各自失败时只降级自身。
+    /// 行情数据 / 盘口各自失败时只降级自身。
     /// </summary>
     private async Task LoadAssetDataAsync(string assetCode)
     {
@@ -397,14 +372,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         {
             var kLineTask = LoadKLineSectionAsync(assetCode, cancellationToken);
             var snapshotTask = LoadSnapshotSectionAsync(assetCode, cancellationToken);
-            var indicatorTask = LoadIndicatorSectionAsync(assetCode, cancellationToken);
             var orderBookTask = LoadOrderBookSectionAsync(assetCode, cancellationToken);
-            var tickTradeTask = LoadTickTradeSectionAsync(assetCode, cancellationToken);
 
             await LoadAsync(_ => kLineTask, "加载K线数据", cancellationToken);
 
             // 各区块自行捕获异常，此处仅兜底，防止某个区块的异常逃逸成未观察任务
-            await Task.WhenAll(snapshotTask, indicatorTask, orderBookTask, tickTradeTask);
+            await Task.WhenAll(snapshotTask, orderBookTask);
         }
         catch (Exception ex)
         {
@@ -457,10 +430,12 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                 return;
 
             MarketMetrics = metrics;
+            // 快照存在但指标全无值时（如币安不提供市盈率/市净率）按空态处理，避免渲染空卡片
+            var hasMetricValue = metrics.Any(metric => metric.HasValue);
             SnapshotState = SnapshotState with
             {
-                State = snapshot is null ? LoadState.Empty : LoadState.Ready,
-                HasData = snapshot is not null
+                State = snapshot is null || !hasMetricValue ? LoadState.Empty : LoadState.Ready,
+                HasData = snapshot is not null && hasMetricValue
             };
         }
         catch (OperationCanceledException)
@@ -480,58 +455,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             {
                 State = LoadState.Failed,
                 HasData = false,
-                FailedText = "行情速览加载失败"
+                FailedText = "行情数据加载失败"
             };
-            Logger?.LogWarning(ex, "加载资产 {AssetCode} 的行情速览失败", assetCode);
-        }
-    }
-
-    private async Task LoadIndicatorSectionAsync(string assetCode, CancellationToken cancellationToken)
-    {
-        var attempt = ++_indicatorAttempt;
-        IndicatorState = IndicatorState with { State = LoadState.Loading };
-
-        try
-        {
-            // 技术指标固定按日线口径计算：周期切换只影响主图，不重复拉取指标数据
-            var snapshot = await _marketContext.GetService<ITechnicalIndicatorService>()
-                .GetSnapshotAsync(assetCode, KLineType.Daily, IndicatorBarCount, cancellationToken);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var groups = BuildIndicatorGroups(snapshot);
-            if (attempt != _indicatorAttempt)
-                return;
-
-            IndicatorGroups = groups;
-            IndicatorDateText = groups.Count > 0 ? snapshot.Date : string.Empty;
-            IndicatorState = IndicatorState with
-            {
-                State = groups.Count > 0 ? LoadState.Ready : LoadState.Empty,
-                HasData = groups.Count > 0
-            };
-        }
-        catch (OperationCanceledException)
-        {
-            if (attempt != _indicatorAttempt)
-                return;
-
-            IndicatorState = IndicatorState with { State = LoadState.Idle };
-        }
-        catch (Exception ex)
-        {
-            if (attempt != _indicatorAttempt)
-                return;
-
-            IndicatorGroups = [];
-            IndicatorDateText = string.Empty;
-            IndicatorState = IndicatorState with
-            {
-                State = LoadState.Failed,
-                HasData = false,
-                FailedText = "技术指标加载失败"
-            };
-            Logger?.LogWarning(ex, "计算资产 {AssetCode} 的技术指标失败", assetCode);
+            Logger?.LogWarning(ex, "加载资产 {AssetCode} 的行情数据失败", assetCode);
         }
     }
 
@@ -595,59 +521,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         }
     }
 
-    private async Task LoadTickTradeSectionAsync(string assetCode, CancellationToken cancellationToken)
-    {
-        if (!SupportsTickTrades)
-        {
-            TickTradeState = new SectionState { State = LoadState.Idle };
-            return;
-        }
-
-        var attempt = ++_tickTradeAttempt;
-        TickTradeState = TickTradeState with { State = LoadState.Loading };
-
-        try
-        {
-            var trades = await _marketContext.GetService<ITickTradeService>()
-                .GetRecentTradesAsync(assetCode, TickTradeLimit, cancellationToken);
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var items = new ObservableCollection<TickTradeItem>(trades.Select(CreateTickTradeItem));
-            if (attempt != _tickTradeAttempt)
-                return;
-
-            TickTrades = items;
-            TickTradeState = TickTradeState with
-            {
-                State = items.Count > 0 ? LoadState.Ready : LoadState.Empty,
-                HasData = items.Count > 0
-            };
-        }
-        catch (OperationCanceledException)
-        {
-            if (attempt != _tickTradeAttempt)
-                return;
-
-            TickTradeState = TickTradeState with { State = LoadState.Idle };
-        }
-        catch (Exception ex)
-        {
-            if (attempt != _tickTradeAttempt)
-                return;
-
-            TickTrades = [];
-            TickTradeState = TickTradeState with
-            {
-                State = LoadState.Failed,
-                HasData = false,
-                FailedText = "逐笔成交加载失败"
-            };
-            Logger?.LogWarning(ex, "加载资产 {AssetCode} 的逐笔成交失败", assetCode);
-        }
-    }
-
-    /// <summary>右栏展开且距上次刷新超过节流间隔时才请求盘口；force 用于展开右栏后的补拉。</summary>
+    /// <summary>距上次刷新超过节流间隔时才请求盘口；价格推送与轮询计时器共用此入口。</summary>
     private async Task RefreshOrderBookAsync(bool force)
     {
         if (!force && (DateTime.UtcNow - _lastOrderBookRefreshAt) < OrderBookRefreshInterval)
@@ -666,7 +540,6 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         {
             var cancellationToken = _loadingCancellationTokenSource?.Token ?? CancellationToken.None;
             await LoadOrderBookSectionAsync(AssetCode, cancellationToken);
-            await LoadTickTradeSectionAsync(AssetCode, cancellationToken);
         }
         finally
         {
@@ -696,10 +569,36 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             ? $"买盘 {snapshot.BidQuantityPercent.Value:F1}%"
             : string.Empty;
 
-        OrderBookSummaryText = snapshot.Spread.HasValue
+        // 档位数按数据源实际返回的档位展示（币安十档 / A 股五档），避免用户误以为数据缺失
+        var levelCount = Math.Min(snapshot.Asks.Count, snapshot.Bids.Count);
+        if (levelCount == 0)
+        {
+            levelCount = Math.Max(snapshot.Asks.Count, snapshot.Bids.Count);
+        }
+
+        var levelText = levelCount > 0 ? $"{ChineseNumeral(levelCount)}档" : string.Empty;
+        var spreadText = snapshot.Spread.HasValue
             ? $"价差 {PriceFormatter.Format(snapshot.Spread.Value)}"
             : string.Empty;
+        OrderBookSummaryText = string.Join(" · ", new[] { spreadText, levelText }.Where(text => text.Length > 0));
     }
+
+    /// <summary>档位数中文表述（五/十/二十……），超出已表述范围时回退阿拉伯数字。</summary>
+    private static string ChineseNumeral(int value) => value switch
+    {
+        1 => "一",
+        2 => "二",
+        3 => "三",
+        4 => "四",
+        5 => "五",
+        6 => "六",
+        7 => "七",
+        8 => "八",
+        9 => "九",
+        10 => "十",
+        20 => "二十",
+        _ => value.ToString()
+    };
 
     private void ClearOrderBook()
     {
@@ -728,84 +627,16 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             ToneValue: isBid ? 1m : -1m);
     }
 
-    private static TickTradeItem CreateTickTradeItem(TickTrade trade) =>
-        new(
-            TimeText: trade.Timestamp.ToString("HH:mm:ss"),
-            PriceText: PriceFormatter.Format(trade.Price),
-            QuantityText: MarketValueFormatter.FormatQuantity(trade.Quantity),
-            AmountText: MarketValueFormatter.FormatAmount(trade.Amount),
-            ToneValue: trade.IsActiveBuy ? 1m : -1m);
-
-    /// <summary>构建行情速览指标。数据源未提供的项保留占位（Value 为空）由界面隐藏，保证顺序稳定。</summary>
+    /// <summary>构建行情数据指标。开高低收、成交量、成交额、振幅等逐 bar 数据由 K 线图图例展示，此处只保留快照级指标。
+    /// 数据源未提供的项保留占位（Value 为空）由界面隐藏，保证顺序稳定。</summary>
     private static ObservableCollection<MarketMetricItem> BuildMarketMetrics(MarketSnapshot? snapshot) =>
         new(
         [
-            new MarketMetricItem("今开", MarketValueFormatter.FormatPrice(snapshot?.Open)),
-            new MarketMetricItem("最高", MarketValueFormatter.FormatPrice(snapshot?.High)),
-            new MarketMetricItem("最低", MarketValueFormatter.FormatPrice(snapshot?.Low)),
-            new MarketMetricItem("昨收", MarketValueFormatter.FormatPrice(snapshot?.PreClose)),
-            new MarketMetricItem("成交量", MarketValueFormatter.FormatQuantity(snapshot?.Volume)),
-            new MarketMetricItem("成交额", MarketValueFormatter.FormatAmount(snapshot?.Amount)),
             new MarketMetricItem("换手率", MarketValueFormatter.FormatPercent(snapshot?.TurnoverRate)),
-            new MarketMetricItem("振幅", MarketValueFormatter.FormatPercent(snapshot?.Amplitude)),
             new MarketMetricItem("量比", MarketValueFormatter.FormatRatio(snapshot?.VolumeRatio)),
             new MarketMetricItem("市盈率", MarketValueFormatter.FormatRatio(snapshot?.Pe)),
             new MarketMetricItem("市净率", MarketValueFormatter.FormatRatio(snapshot?.Pb))
         ]);
-
-    private static ObservableCollection<IndicatorGroupItem> BuildIndicatorGroups(TechnicalIndicatorSnapshot snapshot)
-    {
-        var groups = new ObservableCollection<IndicatorGroupItem>();
-
-        AddIndicatorGroup(
-            groups,
-            "均线",
-            [.. DisplayMovingAveragePeriods.Select(period => ($"MA{period}", snapshot.GetMovingAverage(period), true))]);
-
-        AddIndicatorGroup(
-            groups,
-            "MACD",
-            ("DIF", snapshot.MacdDiff, false),
-            ("DEA", snapshot.MacdDea, false),
-            ("MACD", snapshot.MacdBar, false));
-
-        AddIndicatorGroup(
-            groups,
-            "BOLL",
-            ("上轨", snapshot.BollUpper, true),
-            ("中轨", snapshot.BollMiddle, true),
-            ("下轨", snapshot.BollLower, true));
-
-        AddIndicatorGroup(
-            groups,
-            "KDJ",
-            ("K", snapshot.KdjK, false),
-            ("D", snapshot.KdjD, false),
-            ("J", snapshot.KdjJ, false));
-
-        return groups;
-    }
-
-    /// <summary>追加一个指标分组；全部条目都无值时跳过，避免出现空分组标题。</summary>
-    private static void AddIndicatorGroup(
-        ObservableCollection<IndicatorGroupItem> groups,
-        string title,
-        params (string Label, decimal? Value, bool AsPrice)[] entries)
-    {
-        var items = entries
-            .Where(entry => entry.Value.HasValue)
-            .Select(entry => new IndicatorItem(
-                entry.Label,
-                entry.AsPrice
-                    ? MarketValueFormatter.FormatPrice(entry.Value)
-                    : MarketValueFormatter.FormatRatio(entry.Value)))
-            .ToList();
-
-        if (items.Count > 0)
-        {
-            groups.Add(new IndicatorGroupItem(title, new ObservableCollection<IndicatorItem>(items)));
-        }
-    }
 
     private void CalculatePriceInfo(List<KLineData> data)
     {
@@ -880,6 +711,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             {
                 DetachRealtimeQuoteService();
             }
+
+            // 无实时推送的市场（A 股）由轮询计时器保持盘口新鲜；有推送的市场轮询触发会被节流跳过
+            StartOrderBookPolling();
         }
 
         // 刷新收藏状态（首次进入与 GoBack 重新激活均需同步）
@@ -890,18 +724,35 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private void ResetSectionStates()
     {
         SnapshotState = new SectionState();
-        IndicatorState = new SectionState();
         OrderBookState = new SectionState();
-        TickTradeState = new SectionState();
 
         MarketMetrics = BuildMarketMetrics(null);
-        IndicatorGroups = [];
-        IndicatorDateText = string.Empty;
         ClearOrderBook();
-        TickTrades = [];
 
         _lastOrderBookRefreshAt = DateTime.MinValue;
         _isOrderBookRefreshing = false;
+    }
+
+    /// <summary>启动盘口轮询计时器（惰性创建于 UI 线程）：无实时推送的市场（如 A 股）靠它保持盘口新鲜。</summary>
+    private void StartOrderBookPolling()
+    {
+        _orderBookPollTimer ??= new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = OrderBookPollInterval,
+        };
+        _orderBookPollTimer.Tick -= OnOrderBookPollTick;
+        _orderBookPollTimer.Tick += OnOrderBookPollTick;
+        _orderBookPollTimer.Start();
+    }
+
+    private void StopOrderBookPolling() => _orderBookPollTimer?.Stop();
+
+    private void OnOrderBookPollTick(object? sender, EventArgs e)
+    {
+        if (SupportsOrderBook && !string.IsNullOrEmpty(AssetCode))
+        {
+            _ = RefreshOrderBookAsync(force: false);
+        }
     }
 
     /// <summary>
@@ -942,8 +793,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             PriceChangePercent = changePercent;
             PriceChange = CurrentPrice * PriceChangePercent / 100;
 
-            // 右栏折叠时不做无谓请求；展开时按节流间隔跟随刷新盘口与逐笔
-            if (IsRightPanelVisible && SupportsOrderBook)
+            // 按节流间隔跟随刷新盘口（币安推送驱动；A 股无推送，由轮询计时器驱动）
+            if (SupportsOrderBook)
             {
                 _ = RefreshOrderBookAsync(force: false);
             }
@@ -954,12 +805,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     {
         _loadingCancellationTokenSource?.Cancel();
         _quoteService?.PriceUpdated -= OnDetailPriceUpdated;
+        StopOrderBookPolling();
     }
 
     public void Dispose()
     {
         _loadingCancellationTokenSource?.Cancel();
         DetachRealtimeQuoteService();
+        StopOrderBookPolling();
         GC.SuppressFinalize(this);
     }
 }

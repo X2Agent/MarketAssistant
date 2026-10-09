@@ -25,9 +25,9 @@ internal abstract class TradingRepositoryBase(
     /// </summary>
     protected string CurrentEnvironmentKey => _environment.CurrentMode switch
     {
-        CryptoTradingMode.LiveFutures => TradingEnvironmentKeys.LiveFutures,
-        CryptoTradingMode.BinanceFuturesTestnet => TradingEnvironmentKeys.FuturesTestnet,
-        CryptoTradingMode.BinanceSpotDemo => TradingEnvironmentKeys.SpotDemo,
+        TradingMode.LiveFutures => TradingEnvironmentKeys.LiveFutures,
+        TradingMode.FuturesTestnet => TradingEnvironmentKeys.FuturesTestnet,
+        TradingMode.SpotDemo => TradingEnvironmentKeys.SpotDemo,
         _ => TradingEnvironmentKeys.LiveSpot
     };
 
@@ -35,7 +35,7 @@ internal abstract class TradingRepositoryBase(
     /// 当前是否为合约模式（合约买卖方向需结合持仓判断开平仓）
     /// </summary>
     protected bool IsFuturesMode => _environment.CurrentMode is
-        CryptoTradingMode.LiveFutures or CryptoTradingMode.BinanceFuturesTestnet;
+        TradingMode.LiveFutures or TradingMode.FuturesTestnet;
 
     protected Task EnsureInitializedAsync() => _schema.EnsureSchemaInitializedAsync();
 

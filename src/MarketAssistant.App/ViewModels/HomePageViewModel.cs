@@ -90,12 +90,15 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         HotAssets.HotAssetSelected -= OnHotAssetSelected;
         RecentAssets.RecentAssetSelected -= OnRecentAssetSelected;
 
+        // 以下子 ViewModel 与本页面同为 Transient，生命周期归页面所有。
         Search.Dispose();
         HotAssets.Dispose();
         RecentAssets.Dispose();
         News.Dispose();
-        Briefing.Dispose();
 
+        // Briefing 为单例（跨导航复用，避免重复计费生成），生命周期由容器拥有。
+        // 此处不得释放：否则离开首页会把它置为 _disposed，
+        // 再次进入首页时该单例将永久失效（加载与市场切换响应全部短路）。
         GC.SuppressFinalize(this);
     }
 }

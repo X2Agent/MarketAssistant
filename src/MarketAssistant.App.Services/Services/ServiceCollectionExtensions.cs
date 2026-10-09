@@ -20,7 +20,6 @@ using MarketAssistant.Applications.AssetScreener;
 using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.Cache;
 using MarketAssistant.Applications.Charts;
-using MarketAssistant.Services.Cost;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Crypto;
@@ -200,6 +199,15 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Referrer = new Uri("https://finance.sina.com.cn/");
+        }).AddStandardResilienceHandler();
+
+        // 新浪 K 线历史（智兔不覆盖基金/ETF 时的 A 股 K 线兜底数据源）
+        // quotes.sina.cn 实测无需 Referer、无限流；datalen 上限 1900 由 SinaKLineClient 钳制
+        services.AddHttpClient("SinaKLine", client =>
+        {
+            client.BaseAddress = new Uri("https://quotes.sina.cn");
+            client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.Referrer = new Uri("https://finance.sina.com.cn/");
         }).AddStandardResilienceHandler();
 
@@ -411,7 +419,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<PriceAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
-        services.AddSingleton<IAnalysisCostService, AnalysisCostService>();
 
         // 每日 AI 简报：按市场 Keyed 注册（各自的市场自选/要闻数据源）
         services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.AShare);
@@ -436,7 +443,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<RoutingExchangeClient>(sp =>
         {
             var factory = sp.GetRequiredService<IExchangeClientFactory>();
-            var clients = Enum.GetValues<CryptoTradingMode>()
+            var clients = Enum.GetValues<TradingMode>()
                 .ToDictionary(mode => mode, factory.Create);
             return new RoutingExchangeClient(
                 sp.GetRequiredService<TradingEnvironmentService>(),

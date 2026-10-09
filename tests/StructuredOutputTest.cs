@@ -214,14 +214,14 @@ public sealed class StructuredOutputTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    [DataRow(CryptoTradingMode.BinanceSpotDemo, CryptoTradingMode.LiveSpot, true, true)]
-    [DataRow(CryptoTradingMode.BinanceFuturesTestnet, CryptoTradingMode.LiveFutures, true, true)]
-    [DataRow(CryptoTradingMode.BinanceSpotDemo, CryptoTradingMode.LiveSpot, false, false)]
-    [DataRow(CryptoTradingMode.LiveSpot, CryptoTradingMode.LiveSpot, true, false)]
-    [DataRow(CryptoTradingMode.LiveSpot, CryptoTradingMode.BinanceSpotDemo, true, false)]
+    [DataRow(TradingMode.SpotDemo, TradingMode.LiveSpot, true, true)]
+    [DataRow(TradingMode.FuturesTestnet, TradingMode.LiveFutures, true, true)]
+    [DataRow(TradingMode.SpotDemo, TradingMode.LiveSpot, false, false)]
+    [DataRow(TradingMode.LiveSpot, TradingMode.LiveSpot, true, false)]
+    [DataRow(TradingMode.LiveSpot, TradingMode.SpotDemo, true, false)]
     public void TradingEnvironment_ShouldRequireConfirmationOnlyWhenRunningMonitorSwitchesToLive(
-        CryptoTradingMode currentMode,
-        CryptoTradingMode targetMode,
+        TradingMode currentMode,
+        TradingMode targetMode,
         bool isMonitorRunning,
         bool expected)
     {

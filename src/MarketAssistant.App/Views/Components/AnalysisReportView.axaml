@@ -185,10 +185,6 @@
                                        FontSize="{StaticResource MiniFontSize}"
                                        FontFamily="{StaticResource DataFontFamily}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding TokenUsageCost}"
-                                       IsVisible="{Binding HasTokenUsageCost}"
-                                       FontSize="{StaticResource MiniFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
                         <Border Grid.Column="2"
                                 VerticalAlignment="Center"

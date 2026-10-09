@@ -20,18 +20,18 @@ public sealed class BinanceExchangeClientFactory(
     private readonly ILoggerFactory _loggerFactory = loggerFactory;
 
     /// <summary>构建指定交易模式的 Binance 客户端。</summary>
-    public IExchangeClient Create(CryptoTradingMode tradingMode) => tradingMode switch
+    public IExchangeClient Create(TradingMode tradingMode) => tradingMode switch
     {
-        CryptoTradingMode.LiveSpot => CreateLiveSpot(),
-        CryptoTradingMode.BinanceSpotDemo => CreateSpotDemo(),
-        CryptoTradingMode.LiveFutures => CreateLiveFutures(),
-        CryptoTradingMode.BinanceFuturesTestnet => CreateFuturesTestnet(),
+        TradingMode.LiveSpot => CreateLiveSpot(),
+        TradingMode.SpotDemo => CreateSpotDemo(),
+        TradingMode.LiveFutures => CreateLiveFutures(),
+        TradingMode.FuturesTestnet => CreateFuturesTestnet(),
         _ => throw new ArgumentOutOfRangeException(nameof(tradingMode), tradingMode, "不支持的交易模式"),
     };
 
     private IExchangeClient CreateLiveSpot()
     {
-        var auth = CreateAuth(CryptoTradingMode.LiveSpot, "Binance", "Binance", "/api/v3/time");
+        var auth = CreateAuth(TradingMode.LiveSpot, "Binance", "Binance", "/api/v3/time");
         var account = new BinanceSpotAccountService(
             _httpClientFactory,
             _loggerFactory.CreateLogger<BinanceSpotAccountService>(),
@@ -43,7 +43,7 @@ public sealed class BinanceExchangeClientFactory(
 
     private IExchangeClient CreateSpotDemo()
     {
-        var auth = CreateAuth(CryptoTradingMode.BinanceSpotDemo, "Binance Spot Demo", "BinanceSpotDemo", "/api/v3/time");
+        var auth = CreateAuth(TradingMode.SpotDemo, "Binance Spot Demo", "BinanceSpotDemo", "/api/v3/time");
         var account = new BinanceSpotAccountService(
             _httpClientFactory,
             _loggerFactory.CreateLogger<BinanceSpotAccountService>(),
@@ -56,7 +56,7 @@ public sealed class BinanceExchangeClientFactory(
     private IExchangeClient CreateLiveFutures()
     {
         // 实盘合约复用现货实盘 API Key（同一账户，需在 binance.com 开启合约权限）
-        var auth = CreateAuth(CryptoTradingMode.LiveFutures, "Binance Futures", "BinanceFutures", "/fapi/v1/time");
+        var auth = CreateAuth(TradingMode.LiveFutures, "Binance Futures", "BinanceFutures", "/fapi/v1/time");
         var account = new BinanceFuturesAccountService(
             _httpClientFactory,
             _loggerFactory.CreateLogger<BinanceFuturesAccountService>(),
@@ -68,7 +68,7 @@ public sealed class BinanceExchangeClientFactory(
 
     private IExchangeClient CreateFuturesTestnet()
     {
-        var auth = CreateAuth(CryptoTradingMode.BinanceFuturesTestnet, "Binance Futures Testnet", "BinanceFuturesTestnet", "/fapi/v1/time");
+        var auth = CreateAuth(TradingMode.FuturesTestnet, "Binance Futures Testnet", "BinanceFuturesTestnet", "/fapi/v1/time");
         var account = new BinanceFuturesAccountService(
             _httpClientFactory,
             _loggerFactory.CreateLogger<BinanceFuturesAccountService>(),
@@ -79,7 +79,7 @@ public sealed class BinanceExchangeClientFactory(
     }
 
     private BinanceAuthService CreateAuth(
-        CryptoTradingMode tradingMode,
+        TradingMode tradingMode,
         string label,
         string httpClientName,
         string pingPath)

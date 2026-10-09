@@ -18,7 +18,7 @@ MarketAssistant.App/
 │       ├── CryptoMetricsAnalyst.yaml   ← Crypto 专属指标分析师
 │       ├── CoordinatorAnalyst.yaml
 │       └── Crypto/                     ← Crypto 市场差异化提示词
-├── Converts/                      ← AXAML 值转换器
+├── Converters/                    ← AXAML 值转换器
 ├── Infrastructure/                ← ViewLocator 等 UI 宿主基础设施
 ├── Resources/Styles/              ← Avalonia 样式资源字典
 ├── Services/                      ← UI 适配服务
@@ -99,10 +99,11 @@ MarketAssistant.App/
 - 历史告警的"AI 归因"按钮经 `NavigationMessage("Analysis", ...)` 跳转多分析师研判页；告警归属市场与当前市场不一致时先 `MarketContext.SwitchMarket`，否则分析链路会解析错市场的 Keyed 数据服务。系统级告警（无标的）不展示该按钮（`AlertEvent.HasSymbol` 门控）。
 - `DataTemplate` 内的按钮命令经 `$parent[ItemsControl].((vm:XxxViewModel)DataContext).Command` 绑定到宿主 VM（`x:DataType` 不可跨 DataTemplate 冒泡）。
 
-### 每日简报（HomePage → DailyBriefingViewModel）
+### 每日简报（HomePage → DailyBriefingViewModel → DailyBriefingWindow）
 
-- 首页子 VM 一律由 `HomePageViewModel` 组合创建/Dispose（`Search`/`HotAssets`/`RecentAssets`/`News`/`Briefing`），`AddViewModels()` 注册。
-- 进入首页先读当天缓存（命中即呈现），未命中才后台生成一次；`ShowCard` 聚合 `HasBriefing/IsGenerating/State` 控制卡片显隐，未开始加载时不展示空卡。
+- 简报 VM 是**例外**：纯手动生成策略下它 Singleton 注册（`AddViewModels()` 内），构造/市场切换只读当天缓存，绝不自动生成（生成会产生真实模型费用）；故 `HomePageViewModel.Dispose` 不释放它，归 DI 容器所有。
+- 首页仅保留简报**入口按钮**，正文在独立弹窗 `DailyBriefingWindow` 中展示：窗口经 `IWindowService.ShowDailyBriefingWindow` 打开（统一 owner 选择与重复打开防护），ViewModel 不直接 new 窗口。
+- 总开关关闭时生成按钮禁用、生成入口直接拦截并给出"已关闭"空态文案；近 30 天 Token 用量摘要展示在弹窗底部（只展示 Token 计数，货币成本估算已移除）。
 - 生成中与失败/空态用骨架与 `StateOverlayView` 表达，不要把"生成中"做成阻塞按钮。
 
 ### 报告导出（Markdown / 分享图 / PDF）

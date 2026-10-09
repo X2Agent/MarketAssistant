@@ -9,10 +9,10 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// </summary>
 public sealed class RoutingExchangeClient(
     TradingEnvironmentService environmentService,
-    IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> clients) : IExchangeClient
+    IReadOnlyDictionary<TradingMode, IExchangeClient> clients) : IExchangeClient
 {
     private readonly TradingEnvironmentService _environmentService = environmentService;
-    private readonly IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> _clients = clients;
+    private readonly IReadOnlyDictionary<TradingMode, IExchangeClient> _clients = clients;
 
     public string ExchangeName => GetActiveClient().ExchangeName;
 

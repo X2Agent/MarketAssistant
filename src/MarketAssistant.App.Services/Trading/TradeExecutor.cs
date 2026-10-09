@@ -439,7 +439,7 @@ public class TradeExecutor(
     private IExchangeClient ResolveClientSnapshot() => ResolveClientSnapshot(_exchangeClient);
 
     private async Task<TradeResult> ExecuteApprovedOrderAsync(
-        IExchangeClient exchangeClient, CryptoTradingMode? modeAtEntry,
+        IExchangeClient exchangeClient, TradingMode? modeAtEntry,
         string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice,
         string strategyId, string? aiReasoning, bool requireClose,

@@ -23,10 +23,10 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
 
     public override string Title => "API 密钥";
 
-    public List<CryptoTradingMode> TradingModes { get; } = [.. Enum.GetValues<CryptoTradingMode>()];
+    public List<TradingMode> TradingModes { get; } = [.. Enum.GetValues<TradingMode>()];
 
     [ObservableProperty]
-    private CryptoTradingMode _selectedMode;
+    private TradingMode _selectedMode;
 
     [ObservableProperty]
     private string _apiKey = string.Empty;
@@ -45,17 +45,17 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
     /// <summary>
     /// 当前选中模式是否为合约模式
     /// </summary>
-    public bool IsFuturesMode => SelectedMode is CryptoTradingMode.LiveFutures or CryptoTradingMode.BinanceFuturesTestnet;
+    public bool IsFuturesMode => SelectedMode is TradingMode.LiveFutures or TradingMode.FuturesTestnet;
 
     /// <summary>
     /// 当前选中模式是否为实盘模式（真实资金）
     /// </summary>
-    public bool IsLiveMode => SelectedMode is CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures;
+    public bool IsLiveMode => SelectedMode is TradingMode.LiveSpot or TradingMode.LiveFutures;
 
     /// <summary>
     /// 当前选中模式是否为 Demo 模式（虚拟资金）。现货 Demo 与 Futures Testnet 共用同一组 Demo API Key。
     /// </summary>
-    public bool IsDemoMode => SelectedMode is CryptoTradingMode.BinanceFuturesTestnet or CryptoTradingMode.BinanceSpotDemo;
+    public bool IsDemoMode => SelectedMode is TradingMode.FuturesTestnet or TradingMode.SpotDemo;
 
     public ApiKeyConfigViewModel(
         ITradingCredentialStore credentialStore,
@@ -76,7 +76,7 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
         LoadCredentialsForMode(_selectedMode);
     }
 
-    partial void OnSelectedModeChanged(CryptoTradingMode value)
+    partial void OnSelectedModeChanged(TradingMode value)
     {
         LoadCredentialsForMode(value);
         ModeDescription = TradingEnvironmentService.GetModeDescription(value);
@@ -101,18 +101,18 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
             // 实盘现货/合约共用同一套 binance.com 账户密钥，联动写入避免重复配置
             if (IsLiveMode)
             {
-                var pairedMode = SelectedMode == CryptoTradingMode.LiveSpot
-                    ? CryptoTradingMode.LiveFutures
-                    : CryptoTradingMode.LiveSpot;
+                var pairedMode = SelectedMode == TradingMode.LiveSpot
+                    ? TradingMode.LiveFutures
+                    : TradingMode.LiveSpot;
                 _credentialStore.SetCredentials(pairedMode, ApiKey.Trim(), SecretKey.Trim());
             }
 
             // Demo 现货/合约共用同一组 Demo API Key（实测 demo-api / demo-fapi 端点共享密钥）
             if (IsDemoMode)
             {
-                var pairedDemoMode = SelectedMode == CryptoTradingMode.BinanceSpotDemo
-                    ? CryptoTradingMode.BinanceFuturesTestnet
-                    : CryptoTradingMode.BinanceSpotDemo;
+                var pairedDemoMode = SelectedMode == TradingMode.SpotDemo
+                    ? TradingMode.FuturesTestnet
+                    : TradingMode.SpotDemo;
                 _credentialStore.SetCredentials(pairedDemoMode, ApiKey.Trim(), SecretKey.Trim());
             }
 
@@ -132,18 +132,18 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
             // 实盘现货/合约共享密钥，清除时联动清除配对模式
             if (IsLiveMode)
             {
-                var pairedMode = SelectedMode == CryptoTradingMode.LiveSpot
-                    ? CryptoTradingMode.LiveFutures
-                    : CryptoTradingMode.LiveSpot;
+                var pairedMode = SelectedMode == TradingMode.LiveSpot
+                    ? TradingMode.LiveFutures
+                    : TradingMode.LiveSpot;
                 _credentialStore.ClearCredentials(pairedMode);
             }
 
             // Demo 现货/合约共享密钥，清除时联动清除配对模式
             if (IsDemoMode)
             {
-                var pairedDemoMode = SelectedMode == CryptoTradingMode.BinanceSpotDemo
-                    ? CryptoTradingMode.BinanceFuturesTestnet
-                    : CryptoTradingMode.BinanceSpotDemo;
+                var pairedDemoMode = SelectedMode == TradingMode.SpotDemo
+                    ? TradingMode.FuturesTestnet
+                    : TradingMode.SpotDemo;
                 _credentialStore.ClearCredentials(pairedDemoMode);
             }
 
@@ -184,14 +184,14 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
         }, "切换交易模式");
     }
 
-    private void LoadCredentialsForMode(CryptoTradingMode mode)
+    private void LoadCredentialsForMode(TradingMode mode)
     {
         // 实盘现货/合约共享密钥，统一直接从 LiveSpot 加载，保证两侧显示一致
-        // Demo 现货/合约共享密钥，统一直接从 BinanceSpotDemo 加载
+        // Demo 现货/合约共享密钥，统一直接从 SpotDemo 加载
         var loadMode = mode switch
         {
-            CryptoTradingMode.LiveSpot or CryptoTradingMode.LiveFutures => CryptoTradingMode.LiveSpot,
-            CryptoTradingMode.BinanceSpotDemo or CryptoTradingMode.BinanceFuturesTestnet => CryptoTradingMode.BinanceSpotDemo,
+            TradingMode.LiveSpot or TradingMode.LiveFutures => TradingMode.LiveSpot,
+            TradingMode.SpotDemo or TradingMode.FuturesTestnet => TradingMode.SpotDemo,
             _ => mode
         };
         var (apiKey, secretKey) = _credentialStore.GetCredentials(loadMode);
@@ -205,21 +205,21 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
         CredentialStatuses.Clear();
 
         // 实盘现货/合约共享密钥，合并为一行显示
-        var liveConfigured = _credentialStore.IsConfigured(CryptoTradingMode.LiveSpot)
-                             && _credentialStore.IsConfigured(CryptoTradingMode.LiveFutures);
+        var liveConfigured = _credentialStore.IsConfigured(TradingMode.LiveSpot)
+                             && _credentialStore.IsConfigured(TradingMode.LiveFutures);
         CredentialStatuses.Add(new CredentialStatus
         {
-            Mode = CryptoTradingMode.LiveSpot,
+            Mode = TradingMode.LiveSpot,
             DisplayName = "实盘（现货 + 合约共享）",
             IsConfigured = liveConfigured
         });
 
         // Demo 现货/合约共享同一组 Demo API Key，合并为一行显示
-        var demoConfigured = _credentialStore.IsConfigured(CryptoTradingMode.BinanceSpotDemo)
-                             && _credentialStore.IsConfigured(CryptoTradingMode.BinanceFuturesTestnet);
+        var demoConfigured = _credentialStore.IsConfigured(TradingMode.SpotDemo)
+                             && _credentialStore.IsConfigured(TradingMode.FuturesTestnet);
         CredentialStatuses.Add(new CredentialStatus
         {
-            Mode = CryptoTradingMode.BinanceSpotDemo,
+            Mode = TradingMode.SpotDemo,
             DisplayName = "Demo（现货 Demo + Futures Testnet 共享）",
             IsConfigured = demoConfigured
         });
@@ -231,7 +231,7 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
 /// </summary>
 public class CredentialStatus
 {
-    public CryptoTradingMode Mode { get; set; }
+    public TradingMode Mode { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public bool IsConfigured { get; set; }
     public string StatusText => IsConfigured ? "已配置" : "未配置";

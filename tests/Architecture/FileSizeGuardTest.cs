@@ -48,7 +48,7 @@ public sealed class FileSizeGuardTest
     private static readonly Dictionary<string, string> AllowList = new(StringComparer.OrdinalIgnoreCase)
     {
         ["src/MarketAssistant.App/ViewModels/AssetPageViewModel.cs"] =
-            "资产页聚合五个数据区块（K线/快照/指标/盘口/逐笔）的加载与状态机。"
+            "资产页聚合四个数据区块（K线/快照/盘口/逐笔）的加载与状态机。"
             + "已完成一次职责梳理，确认区块间共享 _orderBookState 等状态字段，"
             + "直接切分会破坏状态机原子性；需先补单元测试再动。",
 

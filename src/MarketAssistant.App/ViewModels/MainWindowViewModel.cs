@@ -14,6 +14,9 @@ namespace MarketAssistant.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    /// <summary>首页导航项标题：行情条仅在该根页面常驻。</summary>
+    private const string HomeNavigationTitle = "首页";
+
     // 页面 ViewModel 由工厂在导航项点击时才实例化，避免构造主窗口时实例化全部页面
     private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly NavigationService _navigationService;
@@ -64,14 +67,37 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _tickerRequestId;
 
     /// <summary>
-    /// 行情条是否可见（无数据时整段隐藏，对齐设计系统裁决 #6）
+    /// 行情条是否有数据（无数据时整段隐藏，对齐设计系统裁决 #6）。
     /// </summary>
     public bool HasIndexTickers => IndexTickers.Count > 0;
+
+    /// <summary>
+    /// 行情条是否可见：仅在首页根页面常驻——行情条是首页盯盘的背景信息，
+    /// 自选/告警/设置等其余根页面与二级详情页一律隐藏，避免与页面无关的市场指数分散注意力；
+    /// 无数据时整段隐藏。
+    /// </summary>
+    public bool ShowIndexTickers => HasIndexTickers && IsOnHomeRootPage;
+
+    /// <summary>当前是否处于首页根页面（行情条的唯一常驻页面）。</summary>
+    private bool IsOnHomeRootPage =>
+        _navigationService.CurrentRootNavigationItemTitle == HomeNavigationTitle && !_navigationService.CanGoBack;
+
+    /// <summary>
+    /// 顶栏是否可见：只在有内容时出现——首页（行情条）或二级页面（返回 + 标题）。
+    /// 其余根页面顶栏仅剩市场切换器（已移入导航栏），整条隐藏避免空白带；
+    /// 行情条无数据时首页顶栏同样不渲染。
+    /// </summary>
+    public bool ShowTopBar => ShowIndexTickers || CanGoBack;
 
     /// <summary>
     /// 当前市场类型显示文本
     /// </summary>
     public string CurrentMarketText => _marketContext.CurrentMarket == MarketType.AShare ? "A股市场" : "虚拟币市场";
+
+    /// <summary>
+    /// 当前市场简短名称（导航栏切换芯片用，72px 轨道内完整显示）
+    /// </summary>
+    public string CurrentMarketShortText => _marketContext.CurrentMarket == MarketType.AShare ? "A股" : "虚拟币";
 
     /// <summary>
     /// 当前是否为 A 股市场（用于顶栏分段切换器视觉状态）
@@ -103,7 +129,6 @@ public partial class MainWindowViewModel : ViewModelBase
         IndexTickers = [];
         RebuildNavigationItems();
         _ = RefreshIndexTickersAsync();
-        StartTickerTimer();
 
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
@@ -114,6 +139,7 @@ public partial class MainWindowViewModel : ViewModelBase
         SubscribeToMarketChanges(_marketContext);
 
         // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
+        // 导航事件会经 OnNavigationServicePropertyChanged 启动行情条定时刷新（仅首页常驻）。
         SelectedMainNavigationItem = MainNavigationItems[0];
     }
 
@@ -144,6 +170,7 @@ public partial class MainWindowViewModel : ViewModelBase
     protected override void OnMarketChanged(MarketType newMarket)
     {
         OnPropertyChanged(nameof(CurrentMarketText));
+        OnPropertyChanged(nameof(CurrentMarketShortText));
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
@@ -206,6 +233,8 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             OnPropertyChanged(nameof(HasIndexTickers));
+            OnPropertyChanged(nameof(ShowIndexTickers));
+            OnPropertyChanged(nameof(ShowTopBar));
         }
     }
 
@@ -219,6 +248,25 @@ public partial class MainWindowViewModel : ViewModelBase
         _tickerTimer.Tick -= OnTickerTimerTick;
         _tickerTimer.Tick += OnTickerTimerTick;
         _tickerTimer.Start();
+    }
+
+    /// <summary>
+    /// 按当前页面维护行情条定时刷新：仅在首页根页面运行，
+    /// 离开即暂停（省去无谓的指数请求），回到首页立即补刷一次避免展示陈旧数据。
+    /// </summary>
+    private void UpdateTickerTimer()
+    {
+        if (!IsOnHomeRootPage)
+        {
+            _tickerTimer?.Stop();
+            return;
+        }
+
+        if (_tickerTimer?.IsEnabled != true)
+        {
+            StartTickerTimer();
+            _ = RefreshIndexTickersAsync();
+        }
     }
 
     private void OnTickerTimerTick(object? sender, EventArgs e) => _ = RefreshIndexTickersAsync();
@@ -235,10 +283,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(CurrentPageTitle));
+            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CanGoBack))
         {
             OnPropertyChanged(nameof(CanGoBack));
+            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CurrentRootNavigationItemTitle))
         {
@@ -260,7 +310,19 @@ public partial class MainWindowViewModel : ViewModelBase
                     _isSynchronizingNavigationSelection = false;
                 }
             }
+
+            OnTickerPageChanged();
         }
+    }
+
+    /// <summary>
+    /// 页面/导航栈变化后刷新行情条可见性，并按页面启停定时刷新。
+    /// </summary>
+    private void OnTickerPageChanged()
+    {
+        OnPropertyChanged(nameof(ShowIndexTickers));
+        OnPropertyChanged(nameof(ShowTopBar));
+        UpdateTickerTimer();
     }
 
     [RelayCommand]

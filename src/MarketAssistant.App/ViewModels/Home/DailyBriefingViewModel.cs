@@ -3,17 +3,16 @@ using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Briefing;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Cost;
+using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
-using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels.Home;
 
 /// <summary>
-/// 每日简报 ViewModel：进入首页先读当天缓存（命中即可呈现，满足"启动 10 秒内可读"），
-/// 未命中时后台生成一次；自选与要闻均为空时展示引导空态。
+/// 每日简报 ViewModel：进入首页与打开弹窗时只读当天缓存，纯手动策略下绝不自动生成；
+/// 自选与要闻均为空时展示引导空态。弹窗由 <see cref="IWindowService"/> 统一打开。
 /// </summary>
 public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
 {
@@ -21,8 +20,7 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     private const int UsageSummaryWindowDays = 30;
 
     private readonly MarketContext _marketContext;
-    private readonly IAnalysisCostService _costService;
-    private readonly IUserSettingService _userSettingService;
+    private readonly IWindowService _windowService;
     private bool _disposed;
 
     private IDailyBriefingService BriefingService =>
@@ -37,6 +35,10 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _isGenerating;
 
+    /// <summary>简报功能总开关的快照，用于禁用弹窗内的生成按钮。</summary>
+    [ObservableProperty]
+    private bool _isBriefingEnabled = true;
+
     /// <summary>简报元信息（生成时间 / 纳入自选数 / 本次 Token 与成本）。</summary>
     [ObservableProperty]
     private string _briefingMetaText = string.Empty;
@@ -48,28 +50,35 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _usageSummaryText = string.Empty;
 
-    /// <summary>
-    /// 是否展示简报卡片：有简报、生成中、失败或引导空态时均展示，
-    /// 尚未开始加载（Idle 且无生成动作）时隐藏，避免首页闪现空卡。
-    /// </summary>
-    public bool ShowCard => HasBriefing || IsGenerating || State != LoadState.Idle;
-
     /// <summary>累计摘要是否有内容可展示。</summary>
     public bool ShowUsageSummary => !string.IsNullOrEmpty(UsageSummaryText);
 
+    /// <summary>
+    /// 打开简报弹窗。窗口的创建、owner 选择与重复打开防护统一由窗口服务处理；
+    /// 打开前先刷新一次缓存与开关快照，保证弹窗展示的是最新状态。
+    /// </summary>
+    [RelayCommand]
+    private async Task OpenBriefingWindowAsync()
+    {
+        await LoadCachedAsync();
+        _windowService.ShowDailyBriefingWindow(this);
+    }
+
     public DailyBriefingViewModel(
         MarketContext marketContext,
-        IAnalysisCostService costService,
-        IUserSettingService userSettingService,
+        IWindowService windowService,
         ILogger<DailyBriefingViewModel> logger)
         : base(logger)
     {
         _marketContext = marketContext;
-        _costService = costService;
-        _userSettingService = userSettingService;
-        EmptyMessage = "添加自选资产后，每天打开将自动生成隔夜要闻与异动归因简报";
+        _windowService = windowService;
+        EmptyMessage = "今日简报尚未生成。生成会产生模型调用与费用，确认后点击「生成今日简报」。";
         SetRetryCommand(() => RetryAsync());
         SubscribeToMarketChanges(_marketContext);
+
+        // 纯手动策略：此处只读取当天缓存，绝不自动触发生成。
+        // 生成简报会产生真实费用，必须由用户在弹窗内显式确认，
+        // 否则用户会在毫不知情的情况下被持续计费（且察觉不到）。
         _ = LoadCachedAsync();
     }
 
@@ -80,32 +89,40 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
             if (_disposed)
                 return;
 
+            // 市场切换后缓存键随之改变，需重读；仍然只读缓存、不生成
             _ = LoadCachedAsync();
         });
     }
 
-    /// <summary>手动刷新：强制重新生成当天简报。</summary>
+    /// <summary>生成今日简报（强制，覆盖当天缓存，会产生模型调用与费用）。</summary>
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await GenerateAsync(force: true, manual: true);
+        await GenerateAsync(force: true);
     }
 
     /// <summary>失败态重试：重新生成当天简报。</summary>
     [RelayCommand]
     private async Task RetryAsync()
     {
-        await GenerateAsync(force: true, manual: true);
+        await GenerateAsync(force: true);
     }
 
     /// <summary>
-    /// 读取当天缓存；未命中时在自动生成开关允许的前提下后台生成一次
-    /// （当天首次进入首页的自动路径，之后各次均命中缓存，不重复消耗 Token）。
+    /// 读取当天缓存与累计用量摘要。<b>不触发生成</b>。
     /// </summary>
+    /// <remarks>
+    /// 纯手动策略下，本方法没有任何"未命中就自动生成"的分支——
+    /// 缓存未命中时保持空态，由用户在弹窗内点「生成今日简报」。
+    /// 累计摘要仍无条件刷新：即使用户从未生成过，也应能看到历史花费，
+    /// 这属于成本透明的一部分（展示在简报弹窗底部）。
+    /// </remarks>
     private async Task LoadCachedAsync()
     {
         await SafeExecuteAsync(async () =>
         {
+            IsBriefingEnabled = BriefingService.IsEnabled;
+
             var cached = await BriefingService.GetTodayAsync();
             if (_disposed)
                 return;
@@ -115,46 +132,49 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
                 ApplyBriefing(cached);
             }
 
-            // 无论是否命中缓存都刷新累计摘要：即使用户关掉了自动生成，
-            // 也应能看到"过去已经花了多少"，这是成本透明的一部分。
             await RefreshUsageSummaryAsync();
 
+            // 缓存未命中：进入空态，等用户显式点击「生成今日简报」。
+            // 功能总开关关闭时需给出不同文案——两种情况用户的下一步动作不同。
             if (cached != null)
             {
                 return;
             }
 
-            // 自动生成被关闭：不静默失败，明确告知用户原因与如何恢复。
-            // 注意仍要展示卡片——否则用户会以为功能坏掉了。
-            if (!BriefingService.IsAutoGenerateEnabled)
-            {
-                EmptyMessage = BriefingService.IsEnabled
-                    ? "每日简报自动生成已关闭，可在设置中开启，或点击右上角刷新手动生成"
-                    : "每日简报功能已关闭，可在设置中重新开启";
-                SetEmpty();
-                return;
-            }
-
-            await GenerateAsync(force: false, manual: false);
+            EmptyMessage = BriefingService.IsEnabled
+                ? "今日简报尚未生成。生成会产生模型调用与费用，确认后点击「生成今日简报」。"
+                : "每日简报功能已关闭，可在设置中重新开启";
+            SetEmpty();
         }, "加载每日简报");
     }
 
-    private async Task GenerateAsync(bool force, bool manual)
+    private async Task GenerateAsync(bool force)
     {
         if (_disposed || IsGenerating)
             return;
 
+        // 总开关关闭：不触发模型调用，也不清空已有简报，直接给出可操作的指引文案。
+        // 弹窗生成按钮已按 IsBriefingEnabled 禁用，此处兜底设置变更未同步到 UI 的竞态。
+        if (!BriefingService.IsEnabled)
+        {
+            IsBriefingEnabled = false;
+            EmptyMessage = "每日简报功能已关闭，可在设置中重新开启";
+            SetEmpty();
+            return;
+        }
+
         IsGenerating = true;
         try
         {
-            var briefing = await BriefingService.GenerateAsync(force, manual);
+            var briefing = await BriefingService.GenerateAsync(force);
             if (_disposed)
                 return;
 
             ApplyBriefing(briefing);
             if (briefing == null)
             {
-                // 无自选无要闻：引导态，不是错误
+                // 无自选无要闻：无可摘要内容，属空态而非错误
+                EmptyMessage = "没有可摘要的内容：需先添加自选资产，或等待要闻数据到达";
                 SetEmpty();
             }
 
@@ -222,8 +242,7 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// 元信息行：生成时间 + 纳入自选数 + Token 消耗。
-    /// Token 一律展示（这是简报唯一会产生的费用）；金额仅在价格表命中该模型时附加，
-    /// 未定价时不显示金额，避免给出错误的"免费"暗示。
+    /// Token 一律展示（这是简报唯一会产生的费用）。
     /// </summary>
     private string BuildMetaText(DailyBriefing briefing)
     {
@@ -239,13 +258,7 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
             var tokenText = $"消耗 {TokenUsageFormatter.FormatCount(briefing.InputTokens + briefing.OutputTokens)} tokens"
                             + (briefing.Estimated ? "（估算）" : string.Empty);
 
-            var costText = _costService.FormatCostForModel(
-                _userSettingService.CurrentSetting.ProviderId,
-                briefing.ModelId,
-                briefing.InputTokens,
-                briefing.OutputTokens);
-
-            parts.Add(string.IsNullOrEmpty(costText) ? tokenText : $"{tokenText} · {costText}");
+            parts.Add(tokenText);
         }
 
         return string.Join(" · ", parts);
@@ -264,12 +277,6 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-
-        // ShowCard 依赖加载状态与生成状态，随同变化通知，避免卡片显隐滞后
-        if (e.PropertyName is nameof(HasBriefing) or nameof(IsGenerating) or nameof(State))
-        {
-            OnPropertyChanged(nameof(ShowCard));
-        }
 
         if (e.PropertyName == nameof(UsageSummaryText))
         {

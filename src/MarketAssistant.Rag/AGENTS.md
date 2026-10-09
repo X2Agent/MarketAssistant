@@ -13,34 +13,52 @@ MarketAssistant.Rag/
 ├── Infrastructure/
 │   └── Factories/
 │       ├── IEmbeddingFactory.cs         ← 文本嵌入生成器工厂契约
+│       ├── IImageCaptionClientFactory.cs ← 图片描述（caption）客户端工厂契约
 │       └── IWebSearchService.cs         ← Web 搜索执行契约
 ├── Interfaces/
 │   ├── IRagIngestionService.cs          ← 文档摄取接口
 │   ├── IRetrievalOrchestrator.cs        ← 检索编排接口
 │   ├── IRerankerService.cs              ← 重排接口
 │   ├── IQueryRewriteService.cs          ← 查询改写接口
+│   ├── IContextExpansionService.cs      ← 上下文扩展接口
+│   ├── IRagDocumentCatalog.cs           ← 文档目录（索引条目）读写接口
 │   ├── ITextCleaningService.cs          ← 文本清洗接口
 │   ├── ITextChunkingService.cs          ← 文本分块接口
 │   ├── IDocumentBlockReader.cs          ← 文档块读取接口
+│   ├── DocumentBlocks.cs                ← DocumentBlock 体系（Text/Heading/List/Table/Image + 扩展方法）
 │   ├── IMarkdownConverter.cs            ← Markdown 转换接口
 │   ├── IImageEmbeddingService.cs        ← 图像嵌入接口
 │   └── IImageStorageService.cs          ← 图像存储接口
 ├── Services/
 │   ├── RagIngestionService.cs           ← 文档清洗/分块/向量化/写入
 │   ├── RetrievalOrchestrator.cs         ← 查询改写 + 检索 + 去重 + 重排
+│   ├── ContextExpansionService.cs       ← 上下文扩展
+│   ├── SqliteRagDocumentCatalog.cs      ← SQLite 文档目录实现
 │   ├── RerankerService.cs               ← 启发式重排
-│   ├── QueryRewriteService.cs           ← 查询重写
+│   ├── QueryRewriteService.cs           ← 查询改写
 │   ├── TextCleaningService.cs           ← 文本清洗
 │   ├── TextChunkingService.cs           ← 文本分块
 │   ├── DocxMarkdownConverter.cs         ← DOCX → Markdown
 │   ├── PdfMarkdownConverter.cs          ← PDF → Markdown
+│   ├── PdfMarkdownModels.cs             ← PDF 转换中间模型
+│   ├── PdfMarkdownPostProcessor.cs      ← PDF 转换后处理
+│   ├── PdfHeadingDetector.cs            ← PDF 标题层级识别
+│   ├── PdfListFormatter.cs              ← PDF 列表还原
+│   ├── PdfTableExtractor.cs             ← PDF 表格抽取
+│   ├── PdfImageProcessor.cs             ← PDF 内嵌图片处理
+│   ├── PdfTextUtility.cs                ← PDF 文本清洗辅助
 │   ├── DocxBlockReader.cs               ← DOCX 文档块读取
 │   ├── PdfBlockReader.cs                ← PDF 文档块读取
 │   ├── MarkdownDocumentBlockReader.cs   ← Markdown 文档块读取
 │   ├── DocumentBlockReaderFactory.cs    ← 文档读取器工厂
+│   ├── DocumentBlockMapper.cs           ← 文档块 → 分块映射
 │   ├── MarkdownConverterFactory.cs      ← 转换器工厂
 │   ├── ClipImageEmbeddingService.cs     ← CLIP 图像嵌入与 caption 降级策略
-│   └── LocalImageStorageService.cs      ← 本地图像存储
+│   ├── LocalImageStorageService.cs      ← 本地图像存储
+│   └── RagSourceType.cs                 ← 文档来源类型枚举
+├── RagConstants.cs                      ← RAG 常量（分块阈值等）
+├── RagDocumentId.cs                     ← 文档稳定 ID 生成
+├── RagSearchCandidate.cs                ← 检索候选模型
 ├── TextParagraph.cs                     ← 向量检索的段落实体
 └── GlobalUsing.cs
 ```

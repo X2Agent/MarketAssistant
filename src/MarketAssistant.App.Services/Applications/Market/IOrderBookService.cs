@@ -26,8 +26,13 @@ public interface ITickTradeService
 }
 
 /// <summary>
-/// 不支持盘口的市场（A 股无公开逐笔委托/五档数据源）使用空实现。
+/// 不支持盘口的市场使用空实现。
 /// </summary>
+/// <remarks>
+/// 当前 A 股（<c>AShareOrderBookService</c>，新浪个股行情接口）与虚拟币
+/// （<c>CryptoOrderBookService</c>，币安深度接口）均已注册真实实现，
+/// 本类仅作为新增市场缺少盘口数据源时的兜底契约位。
+/// </remarks>
 public sealed class NoopOrderBookService : IOrderBookService
 {
     public Task<OrderBookSnapshot?> GetOrderBookAsync(
@@ -38,6 +43,11 @@ public sealed class NoopOrderBookService : IOrderBookService
 /// <summary>
 /// 不支持逐笔成交的市场使用空实现。
 /// </summary>
+/// <remarks>
+/// 当前 A 股（新浪个股行情接口不返回逐笔明细）与虚拟币
+/// （<c>CryptoTickTradeService</c>，币安成交流）分别注册空实现与真实实现，
+/// 本类仅作为新增市场缺少逐笔数据源时的兜底契约位。
+/// </remarks>
 public sealed class NoopTickTradeService : ITickTradeService
 {
     public Task<IReadOnlyList<TickTrade>> GetRecentTradesAsync(

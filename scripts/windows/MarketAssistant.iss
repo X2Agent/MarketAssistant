@@ -28,6 +28,7 @@ LicenseFile=..\..\LICENSE
 InfoBeforeFile=..\..\README.md
 OutputDir=..\..\Release\Windows
 OutputBaseFilename=MarketAssistant-Setup-{#MyAppVersion}
+; 多分辨率图标（16~256 共 10 层），由 scripts/icons/generate_icons.py 从 assets/logo_source.png 生成
 SetupIconFile=..\..\src\MarketAssistant.App\Assets\logo.ico
 Compression=lzma2
 SolidCompression=yes

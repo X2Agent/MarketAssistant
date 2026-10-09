@@ -35,19 +35,19 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
 #### （一）自然风光图片
 
-![文档图片3](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image3.png)
+![文档图片3](images/doc_image3.png)
 
 这张图片展示了雄伟壮观的山脉景色。
 
 #### （二）城市建筑图片
 
-![文档图片2](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image2.png)
+![文档图片2](images/doc_image2.png)
 
 此图片聚焦于现代化的城市建筑。
 
 #### （三）动物生活图片
 
-![文档图片1](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image1.png)
+![文档图片1](images/doc_image1.png)
 
 图片中的动物十分可爱。
 
