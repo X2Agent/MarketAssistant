@@ -68,14 +68,6 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public bool Notification { get; set; } = true;
 
-    /// <summary>每小时告警弹窗配额上限（Critical 不受限）。</summary>
-    private int _alertHourlyQuota = 20;
-    public int AlertHourlyQuota
-    {
-        get => _alertHourlyQuota;
-        set => SetProperty(ref _alertHourlyQuota, Math.Clamp(value, 1, 200));
-    }
-
     /// <summary>是否启用告警免打扰时段（Critical 不受免打扰限制）。</summary>
     private bool _alertQuietHoursEnabled;
     public bool AlertQuietHoursEnabled
@@ -257,7 +249,6 @@ public class UserSetting : INotifyPropertyChanged
             LoadKnowledge = LoadKnowledge,
             KnowledgeFileDirectory = KnowledgeFileDirectory,
             Notification = Notification,
-            AlertHourlyQuota = AlertHourlyQuota,
             AlertQuietHoursEnabled = AlertQuietHoursEnabled,
             AlertQuietStartHour = AlertQuietStartHour,
             AlertQuietEndHour = AlertQuietEndHour,

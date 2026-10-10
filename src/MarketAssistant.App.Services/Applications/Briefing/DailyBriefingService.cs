@@ -76,9 +76,9 @@ public sealed class DailyBriefingService(
 
         await EnsureInitializedAsync(InitializeDatabaseAsync);
 
-        // 固定 InvariantCulture：date_key 是字典序即时序的比较键，不能跟随区域
+        // date_key 是字典序即时序的比较键，由 DateKeys 统一钉本地时间 + InvariantCulture
         //（th-TH 佛历等区域会产出 2569-xx-xx 之类的年份，破坏窗口过滤）
-        var fromDateKey = DateTime.Now.AddDays(-(window - 1)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var fromDateKey = DateKeys.From(DateTime.Now.AddDays(-(window - 1)));
 
         await using var conn = await OpenConnectionAsync(cancellationToken);
         await using var cmd = conn.CreateCommand();
@@ -110,7 +110,7 @@ public sealed class DailyBriefingService(
     public async Task<DailyBriefing?> GetTodayAsync(CancellationToken cancellationToken = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
-        return await QueryAsync(TodayKey(), cancellationToken);
+        return await QueryAsync(DateKeys.Today(), cancellationToken);
     }
 
     public async Task<DailyBriefing?> GenerateAsync(
@@ -128,7 +128,7 @@ public sealed class DailyBriefingService(
 
         if (!force)
         {
-            var cached = await QueryAsync(TodayKey(), cancellationToken);
+            var cached = await QueryAsync(DateKeys.Today(), cancellationToken);
             if (cached != null)
             {
                 _logger.LogInformation("每日简报命中当天缓存: {Market}, {DateKey}", _marketType, cached.DateKey);
@@ -174,7 +174,7 @@ public sealed class DailyBriefingService(
         var briefing = new DailyBriefing
         {
             MarketType = _marketType,
-            DateKey = TodayKey(),
+            DateKey = DateKeys.Today(),
             Content = content,
             GeneratedAt = DateTime.UtcNow,
             FavoriteCount = favorites.Count,
@@ -247,9 +247,8 @@ public sealed class DailyBriefingService(
     private static decimal ParsePercent(string? percent)
         => decimal.TryParse(percent?.TrimEnd('%'), out var value) ? value : 0m;
 
-    // 当天缓存键，与 briefings.date_key 的写入/查询共用同一口径；固定 InvariantCulture，
-    // 与 GetUsageSummaryAsync 的窗口过滤保持一致（不能跟随区域日历）
-    private static string TodayKey() => DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    // 当天缓存键与 briefings.date_key 的写入/查询共用同一口径，统一走 DateKeys：
+    // 本地时间 + InvariantCulture + 定长零填充（字典序即时序，不跟随区域日历）
 
     /// <summary>
     /// 构建受控提示词：只给模型脱敏后的结构化事实（无原始 HTML/JSON 噪声），

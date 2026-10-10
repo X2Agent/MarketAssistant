@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Mcp;
@@ -63,6 +64,11 @@ public class McpToolAuditEntry
 
 public enum McpAuditEventType
 {
+    /// <summary>工具被成功加载。</summary>
+    [Description("工具加载")]
     ToolLoaded,
+
+    /// <summary>工具因白名单限制被过滤。</summary>
+    [Description("白名单过滤")]
     ToolFiltered
 }

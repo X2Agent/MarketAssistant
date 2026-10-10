@@ -210,37 +210,18 @@ public class TradeExecutor(
             var clientOrderId = BuildConditionOrderClientOrderId(strategy.Id);
 
             // 网络异常重试：与普通下单一致的指数退避（1s/2s/4s）
-            ExchangeOrderResult? response = null;
-            Exception? lastNetworkException = null;
-            const int maxRetries = 3;
-            for (var attempt = 1; attempt <= maxRetries; attempt++)
-            {
-                try
-                {
-                    response = await exchangeClient.PlaceOrderAsync(
-                        strategy.Symbol, strategy.Side, orderType.Value, strategy.Quantity,
-                        price: null, clientOrderId,
-                        reduceOnly: true,
-                        stopPrice: stopPrice, trailingDelta: trailingDelta, ct: ct).ConfigureAwait(false);
-                    break;
-                }
-                catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
-                {
-                    lastNetworkException = ex;
-                    if (attempt >= maxRetries)
-                        break;
-
-                    var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
-                    _logger.LogWarning(ex,
-                        "挂条件单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {StrategyId}",
-                        attempt, maxRetries, delayMs, clientOrderId, strategy.Symbol, strategy.Id);
-                    await Task.Delay(delayMs, ct).ConfigureAwait(false);
-                }
-            }
-
-            if (response == null)
-                throw new InvalidOperationException(
-                    $"挂条件单响应为空（已重试 {maxRetries} 次）", lastNetworkException);
+            var response = await PlaceOrderWithRetryAsync(
+                token => exchangeClient.PlaceOrderAsync(
+                    strategy.Symbol, strategy.Side, orderType.Value, strategy.Quantity,
+                    price: null, clientOrderId,
+                    reduceOnly: true,
+                    stopPrice: stopPrice, trailingDelta: trailingDelta, ct: token),
+                "挂条件单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {StrategyId}",
+                $"挂条件单响应为空（已重试 {OrderRetryCount} 次）",
+                ct,
+                clientOrderId,
+                strategy.Symbol,
+                strategy.Id);
 
             // 挂单成功即落 Pending 交易记录：OrderStateSyncService 对既有对账管线
             // 自动感知成交（回写持仓 FIFO 与日统计），无需新增成交流
@@ -507,37 +488,18 @@ public class TradeExecutor(
 
             // 网络异常重试：最多 3 次，指数退避 1s/2s/4s。
             // 业务错误（如余额不足、风控拒绝）不重试，直接抛出。
-            ExchangeOrderResult? response = null;
-            Exception? lastNetworkException = null;
-            const int maxRetries = 3;
-            for (int attempt = 1; attempt <= maxRetries; attempt++)
-            {
-                try
-                {
-                    response = await exchangeClient.PlaceOrderAsync(
-                        instrumentSymbol, side, type, quantity,
-                        type == OrderType.Limit ? limitPrice : null,
-                        clientOrderId, reduceOnly,
-                        stopPrice: null, trailingDelta: null, ct: ct);
-                    break;
-                }
-                catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
-                {
-                    lastNetworkException = ex;
-                    if (attempt >= maxRetries)
-                        break;
-
-                    var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
-                    _logger.LogWarning(ex,
-                        "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {Side}",
-                        attempt, maxRetries, delayMs, clientOrderId, instrumentSymbol, side);
-                    await Task.Delay(delayMs, ct);
-                }
-            }
-
-            if (response == null)
-                throw new InvalidOperationException(
-                    $"交易所下单响应为空（已重试 {maxRetries} 次）", lastNetworkException);
+            var response = await PlaceOrderWithRetryAsync(
+                token => exchangeClient.PlaceOrderAsync(
+                    instrumentSymbol, side, type, quantity,
+                    type == OrderType.Limit ? limitPrice : null,
+                    clientOrderId, reduceOnly,
+                    stopPrice: null, trailingDelta: null, ct: token),
+                "下单网络异常，{Attempt}/{Max} 次重试，{Delay}ms 后重试（幂等ID={ClientOrderId}）: {Symbol} {Side}",
+                $"交易所下单响应为空（已重试 {OrderRetryCount} 次）",
+                ct,
+                clientOrderId,
+                instrumentSymbol,
+                side);
 
             var record = new TradeRecord
             {
@@ -617,6 +579,77 @@ public class TradeExecutor(
                 return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// 下单重试次数：指数退避 1s/2s/4s，合计 3 次尝试。
+    /// </summary>
+    private const int OrderRetryCount = 3;
+
+    /// <summary>
+    /// 带指数退避的下单重试，收敛条件单与普通下单两条路径的同一段重试逻辑。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 仅瞬态网络异常参与重试；业务错误（余额不足、风控拒绝）不重试直接抛出。
+    /// 重复提交安全由调用方传入的 clientOrderId 保证：交易所按幂等ID 去重，
+    /// 重试不会产生第二笔挂单。
+    /// </para>
+    /// <para>
+    /// 重试耗尽仍未拿到响应时抛出 <see cref="InvalidOperationException"/>
+    /// （携带最后一次网络异常），由调用方的 catch 归类为 Network 失败——
+    /// 该类失败短期可恢复，调用方按冷却策略处理而非直接停用策略。
+    /// </para>
+    /// </remarks>
+    /// <param name="place">下单委托。</param>
+    /// <param name="retryLogMessage">重试警告日志模板，须依次含 {Attempt}/{Max}/{Delay}/{ClientOrderId} 占位符。</param>
+    /// <param name="emptyResponseMessage">重试耗尽且响应为空时的异常文案。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <param name="clientOrderId">幂等下单 ID，随重试日志透出。</param>
+    /// <param name="logContext">日志模板中 {ClientOrderId} 之后的上下文参数。</param>
+    private async Task<ExchangeOrderResult> PlaceOrderWithRetryAsync(
+        Func<CancellationToken, Task<ExchangeOrderResult>> place,
+        string retryLogMessage,
+        string emptyResponseMessage,
+        CancellationToken ct,
+        string clientOrderId,
+        params object?[] logContext)
+    {
+        ExchangeOrderResult? response = null;
+        Exception? lastNetworkException = null;
+
+        for (var attempt = 1; attempt <= OrderRetryCount; attempt++)
+        {
+            try
+            {
+                response = await place(ct).ConfigureAwait(false);
+                break;
+            }
+            catch (Exception ex) when (IsTransient(ex) && !ct.IsCancellationRequested)
+            {
+                lastNetworkException = ex;
+                if (attempt >= OrderRetryCount)
+                    break;
+
+                var delayMs = (int)Math.Pow(2, attempt - 1) * 1000;
+
+                // 前缀四参（尝试序号/总次数/退避时长/幂等ID）拼接调用方上下文，与模板占位符对齐
+                var logArgs = new object?[4 + logContext.Length];
+                logArgs[0] = attempt;
+                logArgs[1] = OrderRetryCount;
+                logArgs[2] = delayMs;
+                logArgs[3] = clientOrderId;
+                logContext.CopyTo(logArgs, 4);
+                _logger.LogWarning(ex, retryLogMessage, logArgs);
+
+                await Task.Delay(delayMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        if (response == null)
+            throw new InvalidOperationException(emptyResponseMessage, lastNetworkException);
+
+        return response;
     }
 
     /// <summary>

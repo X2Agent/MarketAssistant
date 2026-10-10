@@ -87,12 +87,6 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
     private readonly IHttpClientFactory _httpClientFactory =
         httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
-    static SinaStockQuoteClient()
-    {
-        // 新浪 hq 接口返回 GBK 编码，.NET 默认不支持，需注册 CodePagesEncodingProvider（幂等）。
-        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-    }
-
     /// <summary>
     /// 拉取单只个股的五档盘口与逐笔成交。
     /// </summary>
@@ -108,10 +102,8 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
 
         try
         {
-            using var httpClient = _httpClientFactory.CreateClient("SinaHq");
-            using var stream = await httpClient.GetStreamAsync($"/list={sinaCode}", cancellationToken);
-            using var reader = new StreamReader(stream, System.Text.Encoding.GetEncoding("gbk"));
-            var text = await reader.ReadToEndAsync(cancellationToken);
+            var text = await SinaHqText.GetTextAsync(
+                _httpClientFactory, "SinaHq", $"/list={sinaCode}", cancellationToken);
 
             return ParseResponse(text);
         }
@@ -145,14 +137,11 @@ public sealed class SinaStockQuoteClient(IHttpClientFactory httpClientFactory)
             return null;
         }
 
-        var open = line.IndexOf('"');
-        var close = line.LastIndexOf('"');
-        if (open < 0 || close <= open)
+        var fields = SinaHqText.ExtractQuotedFields(line);
+        if (fields is null)
         {
             return null;
         }
-
-        var fields = line[(open + 1)..close].Split(',');
 
         // 卖五价位于下标 29，少于此说明响应形态已变，直接拒绝
         if (fields.Length <= LastAskPriceIndex)

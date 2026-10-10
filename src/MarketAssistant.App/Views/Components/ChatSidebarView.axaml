@@ -60,7 +60,7 @@
                 Background="{DynamicResource CardBackgroundBrush}" 
                 BorderBrush="{DynamicResource DividerBrush}" 
                 BorderThickness="{StaticResource BottomBorderThickness}">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{StaticResource HeaderPadding}">
                     <PathIcon Data="{StaticResource IconChat}" 
                               Foreground="{StaticResource PrimaryBrush}" 
@@ -72,7 +72,26 @@
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>
                 
+                <!-- 历史会话入口：展开覆盖层列出持久化的会话（恢复/删除/新建） -->
                 <Button Grid.Column="1" 
+                        Command="{Binding ToggleSessionHistoryCommand}"
+                        Background="Transparent"
+                        Width="{StaticResource CloseButtonSize}" Height="{StaticResource CloseButtonSize}"
+                        CornerRadius="{StaticResource CloseButtonCornerRadius}"
+                        Margin="{StaticResource CloseButtonMargin}"
+                        Padding="{StaticResource NoPadding}"
+                        ToolTip.Tip="历史会话">
+                    <PathIcon Data="{StaticResource IconChat}" 
+                              Width="{StaticResource CloseIconSize}" Height="{StaticResource CloseIconSize}" 
+                              Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+                
+                <Button Grid.Column="2" 
                         Command="{Binding #Root.CloseCommand}"
                         Background="Transparent"
                         Width="{StaticResource CloseButtonSize}" Height="{StaticResource CloseButtonSize}"
@@ -156,8 +175,9 @@
             </Grid>
         </Border>
 
-        <!-- 2. 消息列表 -->
-        <ListBox x:Name="ChatListBox"
+        <!-- 2. 消息列表 + 历史会话覆盖层 -->
+        <Grid>
+            <ListBox x:Name="ChatListBox"
                  ItemsSource="{Binding ChatMessages}" 
                  Background="Transparent" 
                  Margin="{StaticResource NoMargin}"
@@ -300,5 +320,110 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+
+        <!-- 历史会话面板：覆盖消息列表。数据来自持久化层（每次对话结束自动保存），
+             在此完成恢复 / 删除 / 新建，补齐「会话历史管理」入口 -->
+        <Border IsVisible="{Binding IsSessionHistoryOpen}"
+                Background="{DynamicResource PageBackgroundBrush}"
+                ZIndex="10">
+            <DockPanel>
+                <!-- 面板标题栏 -->
+                <Border DockPanel.Dock="Top"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource DividerBrush}"
+                        BorderThickness="{StaticResource BottomBorderThickness}"
+                        Padding="{StaticResource HeaderPadding}">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
+                        <TextBlock Grid.Column="0" Text="历史会话"
+                                   FontSize="{StaticResource SubTitleFontSize}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Command="{Binding RefreshSessionHistoryCommand}"
+                                Background="Transparent"
+                                Content="刷新"
+                                Foreground="{StaticResource PrimaryBrush}"
+                                Margin="{StaticResource CloseButtonMargin}"
+                                VerticalAlignment="Center"/>
+                        <Button Grid.Column="2"
+                                Command="{Binding ToggleSessionHistoryCommand}"
+                                Background="Transparent"
+                                Content="关闭"
+                                Foreground="{DynamicResource TextSecondaryBrush}"
+                                Margin="{StaticResource CloseButtonMargin}"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- 新建会话 -->
+                <Button DockPanel.Dock="Top"
+                        Command="{Binding NewSessionCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Margin="{StaticResource HeaderPadding}"
+                        Content="＋ 新建会话"/>
+
+                <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="{StaticResource TinySpacing}" Margin="{StaticResource ChatListPadding}">
+                        <TextBlock IsVisible="{Binding HasNoSessionHistory}"
+                                   Text="暂无历史会话。开始新对话后，会话会自动保存在这里。"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,24,0,0"/>
+                        <ItemsControl ItemsSource="{Binding SessionHistory}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ChatSessionSummaryItem">
+                                    <Grid Margin="{StaticResource MessageItemMargin}">
+                                        <!-- 常驻卡片 -->
+                                        <Border Background="{DynamicResource CardBackgroundBrush}"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="{StaticResource DefaultBorderThickness}"
+                                                CornerRadius="8"
+                                                Padding="{StaticResource CardPadding}">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                                    <TextBlock Text="{Binding Title}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               FontSize="{StaticResource LabelFontSize}"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBlock TextWrapping="NoWrap"
+                                                               FontSize="{StaticResource SmallFontSize}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}">
+                                                        <Run Text="{Binding StockCode}"/>
+                                                        <Run Text=" · "/>
+                                                        <Run Text="{Binding UpdatedAtText}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).RestoreSessionCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Content="打开"
+                                                            Background="Transparent"
+                                                            Foreground="{StaticResource PrimaryBrush}"/>
+                                                    <Button Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).DeleteSessionCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            Content="删除"
+                                                            Background="Transparent"
+                                                            Foreground="{StaticResource ErrorBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <!-- 当前会话高亮描边：不拦截命中，按钮与选中仍可操作 -->
+                                        <Border IsVisible="{Binding IsActive}"
+                                                IsHitTestVisible="False"
+                                                BorderBrush="{StaticResource PrimaryBrush}"
+                                                BorderThickness="1.5"
+                                                CornerRadius="8"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+        </Grid>
     </DockPanel>
 </UserControl>

@@ -148,4 +148,71 @@ public class StockSymbolConverterTest
         var result = StockSymbolConverter.ToZhiTuFormat(input);
         Assert.AreEqual(expected, result);
     }
+
+    /// <summary>
+    /// 交易所前缀拆分契约：带前缀符号 → （市场, 代码）的统一入口。
+    /// 关键约定：① 大小写不敏感、市场输出恒大写；② 未识别前缀时市场为空、代码原样返回，
+    /// 绝不「默认上海」——猜错交易所等于把标的路由到错误市场。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("SH600000", "SH", "600000")]
+    [DataRow("sh600000", "SH", "600000")]
+    [DataRow("SZ000001", "SZ", "000001")]
+    [DataRow("sz000001", "SZ", "000001")]
+    [DataRow("BJ430047", "BJ", "430047")]
+    [DataRow("bj430047", "BJ", "430047")]
+    [DataRow("600000", "", "600000")]
+    [DataRow("600000.SH", "", "600000.SH")]
+    [DataRow("XX600000", "", "XX600000")]
+    public void SplitExchangePrefix_ShouldFollowUnifiedContract(string input, string expectedMarket, string expectedCode)
+    {
+        var (market, code) = StockSymbolConverter.SplitExchangePrefix(input);
+
+        Assert.AreEqual(expectedMarket, market);
+        Assert.AreEqual(expectedCode, code);
+    }
+
+    /// <summary>
+    /// 边界形态：空白与过短输入不得抛异常，也不得凭空产出市场归属。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("")]
+    [DataRow("   ")]
+    [DataRow("SH")]
+    [DataRow("sh")]
+    public void SplitExchangePrefix_OnBlankOrTooShort_ShouldReturnEmptyMarketAndOriginalCode(string input)
+    {
+        var (market, code) = StockSymbolConverter.SplitExchangePrefix(input);
+
+        Assert.AreEqual(string.Empty, market);
+        Assert.AreEqual(input?.Trim() ?? string.Empty, code);
+    }
+
+    /// <summary>
+    /// 前缀识别与当前区域无关：tr-TR 等区域下大小写映射特殊，
+    /// 而交易所前缀是路由依据，任何区域敏感比较都可能把沪市符号判成未知前缀。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("tr-TR")]
+    [DataRow("en-US")]
+    [DataRow("zh-CN")]
+    public void SplitExchangePrefix_UnderAnyCulture_ShouldRecognizePrefixes(string culture)
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo(culture);
+
+            Assert.AreEqual("SH", StockSymbolConverter.SplitExchangePrefix("sh600000").Market, $"[{culture}]");
+            Assert.AreEqual("SZ", StockSymbolConverter.SplitExchangePrefix("SZ000001").Market, $"[{culture}]");
+            Assert.AreEqual("BJ", StockSymbolConverter.SplitExchangePrefix("bj430047").Market, $"[{culture}]");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
 }

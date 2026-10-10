@@ -156,8 +156,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         NavigateToInternal(viewModel, null, rootNavigationItemTitle);
     }
 
-    public int GetStackDepth() => _navigationStack.Count;
-
     public void Clear()
     {
         while (_navigationStack.Count > 0)

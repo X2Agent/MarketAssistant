@@ -50,9 +50,9 @@ public sealed class SinaFundFlowClientTest
         Assert.IsEmpty(items);
     }
 
-    /// <summary>触发 SinaFundFlowClient 静态构造，注册 CodePagesEncodingProvider。</summary>
+    /// <summary>触发 SinaHqText 静态构造，注册 CodePagesEncodingProvider。</summary>
     private static void EnsureEncodingProvider() =>
-        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(SinaFundFlowClient).TypeHandle);
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(SinaHqText).TypeHandle);
 
     private static SinaFundFlowClient CreateClient(byte[] responseBody) =>
         new(new FakeHttpClientFactory(responseBody));

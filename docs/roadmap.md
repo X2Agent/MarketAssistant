@@ -44,7 +44,7 @@
 
 | 批次 | 内容 | 交付证据 |
 |------|------|---------|
-| P0-1 | **AssetPage 四区块**：行情速览 / 技术指标数值面板（MA/MACD/BOLL/KDJ）/ 盘口深度 / 逐笔成交，四区块并行加载、单区块失败只降级自身，页面内直达加自选 / AI 研判 / 告警入口 | `b9aa710` / `AShareOrderBookService`（A 股与 Crypto 均接入） |
+| P0-1 | **AssetPage 多区块**：行情速览 / 技术指标数值面板（MA/MACD/BOLL/KDJ）/ 盘口深度 / 逐笔成交，四区块并行加载、单区块失败只降级自身，页面内直达加自选 / AI 研判 / 告警入口（**2026-10 修订**：A 股逐笔数据源经复核为字段误读，已随数据源修正一并移除，现为 K线/快照/盘口三区块，见 S6） | `b9aa710` / `AShareOrderBookService`（A 股与 Crypto 均接入） |
 | P0-2 | **Token 消耗透明**：报告与进度面板展示按分析师归属的 Token 消耗；设置页按分析师角色配置模型（分级调度）；`AnalysisCacheService` 指纹纳入角色映射防串缓存（同期交付的模型价格表已于 2026-10 移除，见 S4） | `b9aa710` / `453fe00` |
 | P0-3 | **稳定性降级**：10 个页面首屏骨架屏 + 统一 `StateOverlayView`（加载/空/失败+重试）；"无结果"与"数据源不可用"在 UI 可区分；AssetPage 单区块重试 | `b9aa710` |
 | P1-4 | **报告导出**：Markdown（既有）+ 分享图 PNG + PDF 三通道；1080×1350 固定画布离屏渲染，PDF 由同一位图经 SkiaSharp 封装，与分享图视觉一致 | `453fe00` / `ReportShareCardRenderer` |
@@ -54,7 +54,7 @@
 | S3 | **后台 LLM 用量归集**：简报按 `UsageContent` / `TokenEstimator` 双口径采集，落库 `briefings` 三列；首页卡片展示单次消耗 + 近 30 天累计；设置页总开关 | `DailyBriefingService` |
 | S4 | **默认价格表（已移除）**：`DefaultModelPriceCatalog` 曾内置 13 条参考价并在空表时自动填充、绝不覆盖用户数据；2026-10 随货币成本估算一并移除（`Services/Cost`、`UserSetting.ModelPrices`、设置页价格表分区全删），旧配置 JSON 的 `ModelPrices` 字段反序列化时忽略、无需迁移 | — |
 | S5 | **告警历史按市场筛选**：`AlertHistoryFilter.Matches` 增加可选 `MarketType` 参数（默认 null 向后兼容），筛选行新增市场下拉 | `456360d` / `AlertHistoryFilter` |
-| S6 | **A 股盘口/逐笔接入**：`SinaStockQuoteClient` + `AShareOrderBookService` / `AShareTickTradeService`，解析器交叉校验（买降序/卖升序/无倒挂/贴近最新价）保证"接口漂移即降级为无数据" | `SinaHq` 命名客户端 |
+| S6 | **A 股盘口接入**（逐笔部分已回退）：`SinaStockQuoteClient` + `AShareOrderBookService`，解析器交叉校验（买降序/卖升序/无倒挂/贴近最新价）保证"接口漂移即降级为无数据"；`AShareTickTradeService` 同期交付后经抓包复核——接口字段 26..29 实为卖四/卖五档位而非逐笔，误读版本已移除，A 股改注册 `NoopTickTradeService` 且 `SupportsTickTrades => false` | `SinaHq` 命名客户端 |
 
 **当前工作重心已全部转入第三章长期目标。**
 

@@ -1,3 +1,5 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Services.Trading;
 
 /// <summary>
@@ -15,7 +17,7 @@ internal sealed class AccountSnapshotRepository(
     public async Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """

@@ -30,7 +30,6 @@ public sealed class AlertCenterService(
     private readonly object _stateSync = new();
     private readonly Dictionary<string, AlertSuppressionPolicy.MergeState> _mergeStates =
         new(StringComparer.Ordinal);
-    private AlertSuppressionPolicy.QuotaState _quotaState = AlertSuppressionPolicy.QuotaState.Empty;
 
     /// <summary>触发中的确认级告警：(来源, 市场, 标的, 标题) → 告警 Id，供告警解除时释放联动门。
     /// 键含标题：同一标的多条不同条件的确认级规则各自独立登记，解除时精确匹配，
@@ -55,8 +54,8 @@ public sealed class AlertCenterService(
         await EnsureInitializedAsync(InitializeDatabaseAsync);
 
         var settings = _userSettingService.CurrentSetting;
-        // 触达抑制（休市静默 / 用户关闭通知 / 免打扰时段）在配额评估前算好传入 policy：
-        // 被抑制的告警只落库不弹窗，也不消耗每小时配额，避免静默期噪声挤占交易时段配额
+        // 触达抑制（休市静默 / 用户关闭通知 / 免打扰时段）在策略评估前算好传入 policy：
+        // 被抑制的告警只落库不弹窗
         var isSessionSilenced = AlertSuppressionPolicy.IsSilencedByTradingSession(
             alert, AShareTradingHours.IsTradingSession());
         var suppressNotification =
@@ -67,11 +66,8 @@ public sealed class AlertCenterService(
         {
             var mergeState = _mergeStates.GetValueOrDefault(alert.DedupeKey)
                              ?? AlertSuppressionPolicy.MergeState.Empty;
-            decision = _policy.Evaluate(
-                alert, mergeState, _quotaState, settings.AlertHourlyQuota, DateTime.UtcNow,
-                suppressNotification);
+            decision = _policy.Evaluate(alert, mergeState, DateTime.UtcNow, suppressNotification);
             _mergeStates[alert.DedupeKey] = decision.NewMergeState;
-            _quotaState = decision.NewQuotaState;
         }
 
         // 命中合并窗口：并入最近一条同类记录（累计次数），不新增行

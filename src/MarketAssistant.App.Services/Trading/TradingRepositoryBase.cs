@@ -67,10 +67,4 @@ internal abstract class TradingRepositoryBase(
             _ => 0
         };
     }
-
-    /// <summary>
-    /// 获取今日日期字符串，用于日统计与账户快照的日期分组键。
-    /// 刻意使用本地时间（DateTime.Now）而非 UTC：交易日的切分以用户所在时区为准。
-    /// </summary>
-    protected static string GetTodayDateString() => DateTime.Now.ToString("yyyy-MM-dd");
 }

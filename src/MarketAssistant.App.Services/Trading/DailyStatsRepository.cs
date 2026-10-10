@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Services.Trading;
@@ -13,7 +14,7 @@ internal sealed class DailyStatsRepository(
     public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM daily_stats WHERE environment = @environment AND date = @date";
@@ -43,7 +44,7 @@ internal sealed class DailyStatsRepository(
     public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, bool countTrade = true, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
 
         // 金额列以 TEXT 精确存储，SQL 数值加法会把 TEXT 退化为 double，

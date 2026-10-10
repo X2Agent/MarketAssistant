@@ -30,7 +30,7 @@ public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger
         cmd.Parameters.AddWithValue("@subject", subject);
         cmd.Parameters.AddWithValue("@predicate", predicate);
         cmd.Parameters.AddWithValue("@object", obj);
-        cmd.Parameters.AddWithValue("@validFrom", validFrom ?? DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        cmd.Parameters.AddWithValue("@validFrom", validFrom ?? DateKeys.Today());
         cmd.Parameters.AddWithValue("@metadata", (object?)metadata ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
@@ -45,7 +45,7 @@ public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger
         string entity, string? asOf = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
-        var dateFilter = asOf ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var dateFilter = asOf ?? DateKeys.Today();
 
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -81,7 +81,7 @@ public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger
         cmd.Parameters.AddWithValue("@subject", subject);
         cmd.Parameters.AddWithValue("@predicate", predicate);
         cmd.Parameters.AddWithValue("@object", obj);
-        cmd.Parameters.AddWithValue("@ended", ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        cmd.Parameters.AddWithValue("@ended", ended ?? DateKeys.Today());
         await cmd.ExecuteNonQueryAsync(ct);
 
         Logger.LogDebug("知识图谱三元组过期: {S} --[{P}]--> {O}", subject, predicate, obj);

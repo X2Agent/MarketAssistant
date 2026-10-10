@@ -64,28 +64,6 @@ public static class LlmJsonExtractor
             $"LLM 返回文本无法解析为 JSON。原始文本前 500 字符: {preview}", lastException);
     }
 
-    /// <summary>
-    /// 仅提取 JSON 文本片段（不反序列化）。供需要自行反序列化的调用方使用。
-    /// </summary>
-    /// <returns>提取到的 JSON 文本；若所有策略均失败则返回 null。</returns>
-    public static string? ExtractJsonString(string? rawText)
-    {
-        if (string.IsNullOrWhiteSpace(rawText))
-            return rawText;
-
-        if (IsValidJson(rawText))
-            return rawText;
-
-        var stripped = StripMarkdownCodeFence(rawText);
-        if (!ReferenceEquals(stripped, rawText) && IsValidJson(stripped))
-            return stripped;
-
-        if (TryExtractJsonWithReader(rawText, out var jsonText))
-            return jsonText;
-
-        return null;
-    }
-
     private static bool TryDeserialize<T>(
         string text, JsonSerializerOptions options,
         out T? result, out Exception? exception)
@@ -172,19 +150,6 @@ public static class LlmJsonExtractor
 
             // 直接从已转换的子串字节中截取 JSON 部分，无需再次编码完整文本
             json = Encoding.UTF8.GetString(jsonBytes, 0, (int)reader.BytesConsumed);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsValidJson(string text)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(text);
             return true;
         }
         catch (JsonException)

@@ -102,22 +102,6 @@ public sealed class AlertCenterTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task RaiseAlert_QuotaExceeded_ShouldPersistWithoutNotify()
-    {
-        _settings.CurrentSetting.AlertHourlyQuota = 1;
-
-        await _service.RaiseAlertAsync(CreateAlert("配额内告警"));
-        await _service.RaiseAlertAsync(CreateAlert("超配额告警"));
-
-        var stored = await GetTestAlertsAsync();
-
-        // 两条都落库，但仅第一条弹窗
-        Assert.HasCount(2, stored);
-        Assert.HasCount(1, _notification.Messages);
-    }
-
-    [TestMethod]
-    [TestCategory("Unit")]
     public async Task RaiseAlert_DuringQuietHours_ShouldSuppressWarningButNotCritical()
     {
         var nowHour = DateTime.Now.Hour;

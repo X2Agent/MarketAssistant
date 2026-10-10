@@ -36,13 +36,6 @@ public static class ReportShareCardRenderer
         return stream.ToArray();
     }
 
-    /// <summary>渲染分享卡并保存为 PNG 文件。</summary>
-    public static void SavePng(ReportShareCardData data, string filePath)
-    {
-        var bytes = RenderToPngBytes(data);
-        File.WriteAllBytes(filePath, bytes);
-    }
-
     /// <summary>
     /// 渲染分享卡并封装为 PDF 文件（单页，页面尺寸即卡片像素尺寸）。
     /// </summary>

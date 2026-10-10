@@ -67,22 +67,16 @@ public class AShareAssetInfoService(
             if (!string.IsNullOrWhiteSpace(data.SecurityName))
                 assetInfo.Name = data.SecurityName.Trim();
 
-            // 股票代码 & 市场
+            // 股票代码 & 市场：统一走交易所前缀拆分（SH/SZ/BJ，大小写不敏感）。
+            // 未识别前缀时保留既有市场归属、代码原样落入，不做默认猜测。
             var rawCode = data.SecurityCode?.Trim() ?? "";
-            if (rawCode.StartsWith("SH", StringComparison.OrdinalIgnoreCase))
+            var (prefixMarket, prefixCode) = StockSymbolConverter.SplitExchangePrefix(rawCode);
+            if (prefixMarket.Length > 0)
             {
-                assetInfo.Market = "SH";
-                assetInfo.Code = rawCode[2..];
+                assetInfo.Market = prefixMarket;
             }
-            else if (rawCode.StartsWith("SZ", StringComparison.OrdinalIgnoreCase))
-            {
-                assetInfo.Market = "SZ";
-                assetInfo.Code = rawCode[2..];
-            }
-            else
-            {
-                assetInfo.Code = rawCode;
-            }
+
+            assetInfo.Code = prefixCode;
 
             // 当前价格（CLS 对停牌/无成交返回 null，保留默认空串表示「未提供」，不伪造 0）
             if (data.LastPrice is { } lastPrice)
@@ -95,10 +89,10 @@ public class AShareAssetInfoService(
             }
 
             // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）。
-            // InvariantCulture：下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
+            // 下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
             if (data.Change is { } changeRatio)
             {
-                assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
+                assetInfo.ChangePercentage = PercentFormatter.Format(changeRatio * 100);
             }
         }
         catch (OperationCanceledException)
@@ -124,17 +118,17 @@ public class AShareAssetInfoService(
 
             return [.. items.Select(item =>
             {
-                var market = item.Symbol.StartsWith("sh", StringComparison.OrdinalIgnoreCase) ? "SH" :
-                             item.Symbol.StartsWith("sz", StringComparison.OrdinalIgnoreCase) ? "SZ" :
-                             item.Symbol.StartsWith("bj", StringComparison.OrdinalIgnoreCase) ? "BJ" : "";
+                // 交易所标识统一拆分（SH/SZ/BJ）：新浪符号恒带两字符前缀，
+                // 未识别时市场留空、代码原样落入（不再无条件截掉前两字符）
+                var (market, code) = StockSymbolConverter.SplitExchangePrefix(item.Symbol);
 
                 return new HotAsset
                 {
                     Name = item.Name,
-                    Code = item.Symbol[2..],
+                    Code = code,
                     Market = market,
                     CurrentPrice = item.Price,
-                    ChangePercentage = (item.ChangeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%",
+                    ChangePercentage = PercentFormatter.Format(item.ChangeRatio * 100),
                     MetricLabel = "净流入",
                     MetricValue = item.NetAmount.ToString("F0"),
                     MarketType = MarketType.AShare

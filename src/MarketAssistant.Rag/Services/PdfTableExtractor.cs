@@ -232,7 +232,4 @@ internal static class PdfTableExtractor
         }
         return table;
     }
-
-    // 旧的特定案例处理逻辑已移除，保留最小必要工具函数
-    internal static bool IsDataRow(string text) => text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Count(w => w.Any(char.IsDigit)) >= 2;
 }

@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.DataProviders;
 
 namespace MarketAssistant.Services.Market;
@@ -24,14 +25,11 @@ public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, Alter
         if (globalTask.Result is { } global)
         {
             // 全网总市值 + 24h 涨跌幅
-            var capTrend = global.MarketCapChangePct24h > 0 ? TickerTrend.Up
-                : global.MarketCapChangePct24h < 0 ? TickerTrend.Down
-                : TickerTrend.Flat;
             items.Add(new IndexQuoteItem(
                 "总市值",
                 FormatUsdCompact(global.TotalMarketCapUsd),
-                $"{global.MarketCapChangePct24h:+0.00;-0.00;0.00}%",
-                capTrend));
+                PercentFormatter.Format(global.MarketCapChangePct24h),
+                TickerTrendExtensions.FromChange(global.MarketCapChangePct24h)));
 
             // BTC 主导率（无涨跌语义，仅展示占比）
             items.Add(new IndexQuoteItem("BTC主导率", $"{global.BtcDominancePct:F1}%", null, TickerTrend.None));

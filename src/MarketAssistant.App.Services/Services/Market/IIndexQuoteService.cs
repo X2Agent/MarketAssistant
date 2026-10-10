@@ -19,6 +19,22 @@ public enum TickerTrend
 }
 
 /// <summary>
+/// <see cref="TickerTrend"/> 的判定扩展：从涨跌值推导趋势语义。
+/// </summary>
+public static class TickerTrendExtensions
+{
+    /// <summary>
+    /// 按涨跌值推导趋势：正数上涨、负数下跌、零平盘。
+    /// </summary>
+    public static TickerTrend FromChange(decimal change) => change switch
+    {
+        > 0 => TickerTrend.Up,
+        < 0 => TickerTrend.Down,
+        _ => TickerTrend.Flat
+    };
+}
+
+/// <summary>
 /// 顶栏行情条的单个市场级指标项。所有展示字符串均已在服务侧格式化完成，
 /// 视图层保持纯展示，不参与数值解析或本地化。
 /// </summary>

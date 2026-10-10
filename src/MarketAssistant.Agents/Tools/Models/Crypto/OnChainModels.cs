@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace MarketAssistant.Agents.Tools.Models.Crypto;
 
 /// <summary>
-/// 链上工具返回模型：DEX 热门交易对、代币安全审计、蜜罐检测与大额转账信号。
+/// 链上工具返回模型：DEX 热门交易对、代币安全审计与蜜罐检测。
 /// </summary>
 
 [Description("DEX 热门交易对信息")]
@@ -104,32 +104,4 @@ public class TokenSecurityReport
 
     [Description("安全建议说明")]
     public string SecurityAdvice { get; set; } = string.Empty;
-}
-
-[Description("链上大额转账信号")]
-public class LargeTransferSignal
-{
-    [Description("链 ID")]
-    public string ChainId { get; set; } = string.Empty;
-
-    [Description("代币符号")]
-    public string Symbol { get; set; } = string.Empty;
-
-    [Description("代币合约地址")]
-    public string TokenAddress { get; set; } = string.Empty;
-
-    [Description("转账笔数")]
-    public int TransferCount { get; set; }
-
-    [Description("转账总额（代币数量）")]
-    public decimal? TotalAmount { get; set; }
-
-    [Description("转账总价值（USD）")]
-    public decimal? TotalValueUsd { get; set; }
-
-    [Description("接盘地址数量")]
-    public int UniqueBuyerCount { get; set; }
-
-    [Description("信号说明")]
-    public string Signal { get; set; } = string.Empty;
 }

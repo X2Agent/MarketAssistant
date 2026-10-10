@@ -46,10 +46,10 @@ MarketAssistant.App.Services/
 | `IMarketSnapshotService` | 行情速览（今开/最高/最低/昨收/量额/换手/振幅/量比/PE/PB） | `AShareMarketSnapshotService` / `CryptoMarketSnapshotService` |
 | `ITechnicalIndicatorService` | 技术指标快照（MA/MACD/BOLL/KDJ） | 市场无关实现（`TechnicalIndicatorService`，复用 `Skender.Stock.Indicators`），数据不足时返回 `null` 而非抛异常 |
 | `IOrderBookService` | 盘口深度 | Crypto：`CryptoOrderBookService`（币安深度）；A 股：`AShareOrderBookService`（新浪个股行情五档）。A 股解析器带交叉校验，任一条不满足即返回 `null` |
-| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`AShareTickTradeService`。**逐笔不含主动买卖方向**，UI 不得据 `IsBuyerMaker` 推断内外盘 |
+| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`NoopTickTradeService`（新浪接口不提供逐笔明细，`SupportsTickTrades => false`，页面隐藏该区块）。**逐笔不含主动买卖方向**，UI 不得据 `IsBuyerMaker` 推断内外盘 |
 
-> 两个市场的 `SupportsOrderBook` / `SupportsTickTrades` 能力位目前**均为 `true`**，
-> `NoopOrderBookService` / `NoopTickTradeService` 仅作为新增市场缺少数据源时的兜底契约位保留。
+> A 股 `SupportsOrderBook` 为 `true`（新浪五档）、`SupportsTickTrades` 为 `false`（字段 26..29 实为卖四/卖五档位，早期据错误假设解析出的"逐笔"只是卖盘档位，已移除）；
+> Crypto 两项均为 `true`。`NoopOrderBookService` / `NoopTickTradeService` 仅作为新增市场缺少数据源时的兜底契约位保留。
 
 - 新增市场区块服务时，必须在 `MarketContext` 对应的 MarketModule 中注册，并同步更新 `IMarketCapability` 的能力位。每个市场都必须注册全部 keyed 接口——不支持的市场注册 `Noop*` 实现（返回空集合），**不要**抛异常伪装成加载失败，也不要在业务层用 `if/else` 绕开解析。
 - 不支持某能力的市场由页面显式说明数据源限制；区块之间必须可独立加载与独立失败，禁止把多个区块串成一个必须全部成功的事务。

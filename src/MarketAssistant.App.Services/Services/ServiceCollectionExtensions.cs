@@ -98,9 +98,6 @@ public static class BusinessServiceCollectionExtensions
     public static IServiceCollection AddNamedMarketHttpClients(this IServiceCollection services) =>
         AddHttpClientsCore(services);
 
-    internal static IServiceCollection AddHttpClients(this IServiceCollection services) =>
-        AddHttpClientsCore(services);
-
     private static IServiceCollection AddHttpClientsCore(IServiceCollection services)
     {
         services.AddHttpClient("Binance", client =>
@@ -379,7 +376,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<UserKnowledgeGraphService>();
         services.AddSingleton<MemoryExtractionService>();
         services.AddSingleton<ChatSessionPersistenceService>();
-        services.AddSingleton<WorkflowVisualizationService>();
         services.AddSingleton<IMarketChatSessionFactory, MarketChatSessionFactory>();
 
         var store = Path.Combine(

@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.DataProviders.AShare;
 
 namespace MarketAssistant.Services.Market;
@@ -16,12 +17,11 @@ public sealed class AShareIndexQuoteService(SinaIndexQuoteClient client) : IInde
         var items = new List<IndexQuoteItem>(quotes.Count);
         foreach (var q in quotes)
         {
-            var trend = q.ChangePercent > 0 ? TickerTrend.Up
-                : q.ChangePercent < 0 ? TickerTrend.Down
-                : TickerTrend.Flat;
-
-            var changeText = $"{q.ChangePercent:+0.00;-0.00;0.00}%";
-            items.Add(new IndexQuoteItem(q.Name, q.Point.ToString("N2"), changeText, trend));
+            items.Add(new IndexQuoteItem(
+                q.Name,
+                q.Point.ToString("N2"),
+                PercentFormatter.Format(q.ChangePercent),
+                TickerTrendExtensions.FromChange(q.ChangePercent)));
         }
 
         return items;

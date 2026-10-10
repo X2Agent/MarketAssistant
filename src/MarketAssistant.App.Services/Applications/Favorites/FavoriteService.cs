@@ -45,16 +45,17 @@ public sealed class FavoriteService(
             """;
         await cmd.ExecuteNonQueryAsync();
 
-        // 存量数据归一化迁移（幂等）：历史数据存在小写/带 SH/SZ 前缀的代码，
+        // 存量数据归一化迁移（幂等）：历史数据存在小写/带 SH/SZ/BJ 前缀的代码，
         // 与归一化后的查询（大写、无前缀）无法匹配，导致详情页收藏状态判定失败。
         // 顺序：先按归一化后的键去重（保留最早一条），再统一大写，最后剥离 A 股交易所前缀。
+        // BJ 与 SH/SZ 同规则：前缀剥离逻辑统一在 StockSymbolConverter，此处保持同步。
         await using var migrateCmd = conn.CreateCommand();
         migrateCmd.CommandText = """
             DELETE FROM favorite_assets
             WHERE id NOT IN (SELECT MIN(id) FROM favorite_assets GROUP BY UPPER(code), market_type);
             UPDATE favorite_assets SET code = UPPER(code);
             UPDATE favorite_assets SET code = SUBSTR(code, 3)
-            WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ');
+            WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ', 'BJ');
             """;
         await migrateCmd.ExecuteNonQueryAsync();
     }

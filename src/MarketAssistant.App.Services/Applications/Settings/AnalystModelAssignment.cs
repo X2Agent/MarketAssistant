@@ -54,18 +54,6 @@ public static class AnalystModelAssignment
     }
 
     /// <summary>
-    /// 角色最终生效的模型 ID：优先角色级分配，否则回落到服务商默认模型。
-    /// </summary>
-    public static string ResolveEffectiveModelId(UserSetting setting, string providerId, string analystRoleKey)
-    {
-        var assigned = GetAssignedModelId(setting, providerId, analystRoleKey);
-        if (assigned.Length > 0)
-            return assigned;
-
-        return setting?.ProviderModelIds.GetValueOrDefault(providerId, string.Empty) ?? string.Empty;
-    }
-
-    /// <summary>
     /// 生成指定服务商下角色分配的稳定指纹（键排序），供分析缓存判定失效。
     /// 无任何有效分配时返回空串。
     /// </summary>

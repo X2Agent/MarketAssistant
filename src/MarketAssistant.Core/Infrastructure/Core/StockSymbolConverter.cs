@@ -94,6 +94,44 @@ public static class StockSymbolConverter
     }
 
     /// <summary>
+    /// 已知交易所前缀（沪深京），统一的大写标识编码。大小写不敏感匹配，输出恒为大写。
+    /// </summary>
+    private static readonly string[] KnownExchangePrefixes = ["SH", "SZ", "BJ"];
+
+    /// <summary>
+    /// 拆分交易所前缀（如 <c>SH600519</c> / <c>sh600519</c>）为（交易所, 代码）：
+    /// 识别到已知前缀时交易所返回大写前缀、代码返回剥离前缀后的部分；
+    /// 未识别时交易所返回空串、代码返回原值——由调用方按各自约定处置，
+    /// <b>不做「未知默认上海」的猜测</b>（猜错等于把标的标到错误的交易所，
+    /// 进而路由到错误市场的数据源与下单通道）。
+    /// </summary>
+    /// <remarks>
+    /// 本方法是「带前缀符号 → 市场 + 代码」的统一入口；
+    /// 裸数字代码的交易所推断走 <see cref="ResolveExchange"/>（经各格式转换方法间接复用）。
+    /// 两者互补：前者解析显式标识，后者按代码段规则推断。
+    /// </remarks>
+    public static (string Market, string Code) SplitExchangePrefix(string? symbol)
+    {
+        if (string.IsNullOrWhiteSpace(symbol))
+            return (string.Empty, string.Empty);
+
+        var trimmed = symbol.Trim();
+        if (trimmed.Length <= 2)
+            return (string.Empty, trimmed);
+
+        var prefix = trimmed[..2];
+        foreach (var known in KnownExchangePrefixes)
+        {
+            if (string.Equals(prefix, known, StringComparison.OrdinalIgnoreCase))
+            {
+                return (known, trimmed[2..]);
+            }
+        }
+
+        return (string.Empty, trimmed);
+    }
+
+    /// <summary>
     /// 根据代码数字统一解析所属交易所（单一判定入口，供各类格式转换复用）。
     /// 上海证券交易所（SH）：6 开头（主板/科创板）、5 开头（基金 ETF/LOF）、11 开头（可转债）、9 开头（B股）
     /// 深圳证券交易所（SZ）：0/3 开头（主板/创业板）、12 开头（可转债）、15/16 开头（基金 ETF）

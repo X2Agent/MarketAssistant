@@ -1,9 +1,11 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Applications.Favorites;
 
 /// <summary>
 /// 收藏（自选）代码归一化工具：所有写入/查询路径共用唯一入口，
 /// 保证 SQLite 文本比较（区分大小写）下收藏状态判定一致。
-/// 规则：统一大写；A股剥离 SH/SZ 交易所前缀；虚拟币保持交易对原样（大写）。
+/// 规则：统一大写；A股剥离 SH/SZ/BJ 交易所前缀；虚拟币保持交易对原样（大写）。
 /// </summary>
 public static class FavoriteCodeNormalizer
 {
@@ -20,12 +22,11 @@ public static class FavoriteCodeNormalizer
 
         var normalized = code.Trim().ToUpperInvariant();
 
-        if (marketType == MarketType.AShare
-            && normalized.Length > 2
-            && (normalized.StartsWith("SH", StringComparison.Ordinal)
-                || normalized.StartsWith("SZ", StringComparison.Ordinal)))
+        // A 股剥离交易所前缀的逻辑统一收敛到 StockSymbolConverter（沪深京一套规则），
+        // 避免此处与资产服务、首页、选股页各写一份 StartsWith 简版
+        if (marketType == MarketType.AShare)
         {
-            normalized = normalized[2..];
+            return StockSymbolConverter.SplitExchangePrefix(normalized).Code;
         }
 
         return normalized;

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Applications.AlertCenter;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.PriceAlert;
@@ -122,16 +123,16 @@ public partial class PriceAlertRule : ObservableObject
     public string CurrentPriceText => CurrentPrice?.ToString("0.########") ?? "--";
 
     public string QuoteDisplayValue => CurrentChangePercent.HasValue
-        ? $"{CurrentChangePercent.Value:+0.00;-0.00;0.00}%"
+        ? PercentFormatter.Format(CurrentChangePercent.Value)
         : "--";
 
     public string FloatingValueText => FloatingValue switch
     {
         null => "--",
-        var value when IsPercentCondition => $"{value:+0.00;-0.00;0.00} 个百分点",
+        var value when IsPercentCondition => $"{PercentFormatter.FormatValue(value.Value)} 个百分点",
         var value when FloatingPercent.HasValue =>
-            $"{value:+0.########;-0.########;0}（{FloatingPercent.Value:+0.00;-0.00;0.00}%）",
-        var value => $"{value:+0.########;-0.########;0}"
+            $"{PercentFormatter.FormatCompact(value.Value)}（{PercentFormatter.Format(FloatingPercent.Value)}）",
+        var value => PercentFormatter.FormatCompact(value.Value)
     };
 
     public string QuoteStatusText => LastUpdatedAt.HasValue

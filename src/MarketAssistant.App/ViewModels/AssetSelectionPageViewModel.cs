@@ -294,14 +294,15 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     {
         if (stock == null) return;
 
-        // 归一化：统一大写，A股剥离 SH/SZ 前缀（如 SH600000 → Market: SH, Code: 600000）
+        // 归一化：统一大写，A股剥离交易所前缀（如 SH600000 → Market: SH, Code: 600000）。
+        // 市场归属从前缀统一识别（沪深京一套规则），不再用「长度是否变短」反推
         string market = string.Empty;
         var rawSymbol = stock.Symbol.Trim().ToUpperInvariant();
         var code = FavoriteCodeNormalizer.Normalize(rawSymbol, _marketContext.CurrentMarket);
 
-        if (_marketContext.CurrentMarket == MarketType.AShare && rawSymbol.Length > code.Length)
+        if (_marketContext.CurrentMarket == MarketType.AShare)
         {
-            market = rawSymbol[..2];
+            (market, _) = StockSymbolConverter.SplitExchangePrefix(rawSymbol);
         }
 
         var favoriteService = _marketContext.GetService<IFavoriteService>();

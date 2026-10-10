@@ -102,17 +102,12 @@ public sealed class HomeAssetService(
         {
             assetName = assetItem.Name;
 
-            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记
+            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记。
+            // 前缀识别统一走 StockSymbolConverter（沪深京一套规则）
             market = string.Empty;
             if (_marketType == MarketType.AShare)
             {
-                var rawCode = assetItem.Code.Trim().ToUpperInvariant();
-                if (rawCode.Length > 2
-                    && (rawCode.StartsWith("SH", StringComparison.Ordinal)
-                        || rawCode.StartsWith("SZ", StringComparison.Ordinal)))
-                {
-                    market = rawCode[..2];
-                }
+                (market, _) = StockSymbolConverter.SplitExchangePrefix(assetItem.Code);
             }
 
             code = FavoriteCodeNormalizer.Normalize(assetItem.Code, _marketType);

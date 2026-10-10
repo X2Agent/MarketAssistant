@@ -1,37 +1,6 @@
 using System.Globalization;
-using System.Text.Json.Serialization;
 
 namespace MarketAssistant.DataProviders;
-
-/// <summary>
-/// alternative.me 恐惧贪婪指数响应（<c>GET /fng</c>）。免费、无需 API Key。
-/// </summary>
-public sealed class FearGreedResponse
-{
-    [JsonPropertyName("data")]
-    public List<FearGreedEntry>? Data { get; set; }
-
-    [JsonPropertyName("status")]
-    public string? Status { get; set; }
-
-    [JsonPropertyName("error")]
-    public string? Error { get; set; }
-}
-
-/// <summary>
-/// 恐惧贪婪指数单日条目。<see cref="Value"/> 为 0-100，越大越贪婪。
-/// </summary>
-public sealed class FearGreedEntry
-{
-    [JsonPropertyName("value")]
-    public string? Value { get; set; }
-
-    [JsonPropertyName("value_classification")]
-    public string? Classification { get; set; }
-
-    [JsonPropertyName("timestamp")]
-    public long Timestamp { get; set; }
-}
 
 /// <summary>
 /// alternative.me 恐惧贪婪指数客户端。仅负责 HTTP 访问与解析，失败时返回 null 交由上层降级。
