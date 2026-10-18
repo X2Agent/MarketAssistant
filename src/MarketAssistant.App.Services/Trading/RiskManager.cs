@@ -34,7 +34,8 @@ public class RiskManager(
         string? strategyId = null,
         CancellationToken ct = default)
     {
-        // 紧急停止是最高优先级闸门：停机期间一律拒单（含保护性平仓之外的所有路径），
+        // 紧急停止是最高优先级闸门：停机期间经本方法的所有订单一律拒单
+        // （紧急全部平仓走 TradeExecutor.ExecuteEmergencyCloseAsync 专用通道，不经过本方法），
         // 必须先于其它校验，避免停机状态下仍做无意义的账户查询
         await _haltState.EnsureLoadedAsync(ct).ConfigureAwait(false);
         if (_haltState.IsHalted)

@@ -17,14 +17,26 @@ namespace TestMarketAssistant.Application;
 [TestClass]
 public sealed class AlertChannelDispatchTest
 {
-    /// <summary>测试专用标的：与其它测试隔离，避免共享库中的历史数据干扰断言。</summary>
     private const string TestSymbol = "CHANNELTEST";
+    private string _dbPath = string.Empty;
 
     [TestInitialize]
-    public async Task Setup() => await ExecuteAsync("DELETE FROM alert_events WHERE symbol = @symbol");
+    public void Setup()
+    {
+        _dbPath = Path.Combine(Path.GetTempPath(), $"alert_channel_test_{Guid.NewGuid():N}.db");
+    }
 
     [TestCleanup]
-    public async Task Cleanup() => await ExecuteAsync("DELETE FROM alert_events WHERE symbol = @symbol");
+    public void Cleanup()
+    {
+        if (string.IsNullOrEmpty(_dbPath))
+            return;
+
+        using var conn = new SqliteConnection($"Data Source={_dbPath}");
+        SqliteConnection.ClearPool(conn);
+        if (File.Exists(_dbPath))
+            File.Delete(_dbPath);
+    }
 
     private sealed class RecordingChannel : IAlertChannel
     {
@@ -102,9 +114,9 @@ public sealed class AlertChannelDispatchTest
         Assert.AreEqual(1, await CountTestAlertsAsync(), "告警仍应正常落库");
     }
 
-    private static async Task<int> CountTestAlertsAsync()
+    private async Task<int> CountTestAlertsAsync()
     {
-        await using var conn = new SqliteConnection($"Data Source={DbPath}");
+        await using var conn = new SqliteConnection($"Data Source={_dbPath}");
         await conn.OpenAsync();
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM alert_events WHERE symbol = @symbol";
@@ -112,23 +124,7 @@ public sealed class AlertChannelDispatchTest
         return Convert.ToInt32(await cmd.ExecuteScalarAsync());
     }
 
-    private static string DbPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        AppInfo.AppName,
-        // 与 SqliteServiceBase.UnifiedDbFileName 一致：所有持久化服务共享同一库文件
-        "market.db");
-
-    private static async Task ExecuteAsync(string sql)
-    {
-        await using var conn = new SqliteConnection($"Data Source={DbPath}");
-        await conn.OpenAsync();
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = sql;
-        cmd.Parameters.AddWithValue("@symbol", TestSymbol);
-        await cmd.ExecuteNonQueryAsync();
-    }
-
-    private static AlertCenterService CreateService(
+    private AlertCenterService CreateService(
         IAlertChannel channel,
         UserSetting? settings = null,
         IReadOnlyList<IAlertChannel>? channels = null)
@@ -141,7 +137,8 @@ public sealed class AlertChannelDispatchTest
             userSettings,
             new AlertGate(),
             channels ?? [channel],
-            NullLogger<AlertCenterService>.Instance);
+            NullLogger<AlertCenterService>.Instance,
+            _dbPath);
     }
 
     private sealed class StubNotificationService : INotificationService

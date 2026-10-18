@@ -19,7 +19,8 @@ public sealed class AlertCenterService(
     IUserSettingService userSettingService,
     AlertGate alertGate,
     IEnumerable<IAlertChannel> alertChannels,
-    ILogger<AlertCenterService> logger) : SqliteServiceBase(logger), IAlertCenterService
+    ILogger<AlertCenterService> logger,
+    string? dbPath = null) : SqliteServiceBase(logger, dbPath), IAlertCenterService
 {
     private readonly INotificationService _notificationService = notificationService;
     private readonly IUserSettingService _userSettingService = userSettingService;

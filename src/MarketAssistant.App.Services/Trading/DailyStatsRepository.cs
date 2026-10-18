@@ -54,8 +54,7 @@ internal sealed class DailyStatsRepository(
         var totalPnl = pnl;
         var totalCommission = commission;
         // 连续亏损：实现亏损 +1，实现盈利归零，无已实现盈亏（开仓成交）保持原值
-        var lossDelta = pnl < 0 ? 1 : (pnl > 0 ? 0 : -1);
-        var consecutiveLosses = 0;
+        var consecutiveLosses = pnl < 0 ? 1 : 0;
 
         await using (var selectCmd = conn.CreateCommand())
         {
@@ -70,7 +69,12 @@ internal sealed class DailyStatsRepository(
                 totalCommission += ReadDecimal(reader, 2);
 
                 var previousLosses = reader.GetInt32(3);
-                consecutiveLosses = lossDelta < 0 ? previousLosses : Math.Max(0, previousLosses + lossDelta);
+                consecutiveLosses = pnl switch
+                {
+                    < 0 => Math.Max(0, previousLosses) + 1,
+                    > 0 => 0,
+                    _ => Math.Max(0, previousLosses)
+                };
             }
         }
 

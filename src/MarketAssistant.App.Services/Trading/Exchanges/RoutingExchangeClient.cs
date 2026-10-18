@@ -28,7 +28,7 @@ public sealed class RoutingExchangeClient(
     public bool IsFutures => GetActiveClient().IsFutures;
 
     public Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
-        => TrackAsync(client => client.GetAccountInfoAsync(ct));
+        => TrackAsync(client => client.GetAccountInfoAsync(ct), ct);
 
     public Task<ExchangeOrderResult> PlaceOrderAsync(
         string instrumentSymbol,
@@ -44,32 +44,32 @@ public sealed class RoutingExchangeClient(
         CancellationToken ct = default)
         => TrackAsync(client => client.PlaceOrderAsync(
             instrumentSymbol, side, type, quantity, price, clientOrderId, reduceOnly,
-            positionSide, stopPrice, trailingDelta, ct));
+            positionSide, stopPrice, trailingDelta, ct), ct);
 
     public Task<ExchangeOrderResult> GetOrderAsync(
         string instrumentSymbol,
         string orderId,
         CancellationToken ct = default)
-        => TrackAsync(client => client.GetOrderAsync(instrumentSymbol, orderId, ct));
+        => TrackAsync(client => client.GetOrderAsync(instrumentSymbol, orderId, ct), ct);
 
     public Task<ExchangeOrderResult> CancelOrderAsync(
         string instrumentSymbol,
         string orderId,
         CancellationToken ct = default)
-        => TrackAsync(client => client.CancelOrderAsync(instrumentSymbol, orderId, ct));
+        => TrackAsync(client => client.CancelOrderAsync(instrumentSymbol, orderId, ct), ct);
 
     public Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
         string? instrumentSymbol = null,
         CancellationToken ct = default)
-        => TrackAsync(client => client.GetOpenOrdersAsync(instrumentSymbol, ct));
+        => TrackAsync(client => client.GetOpenOrdersAsync(instrumentSymbol, ct), ct);
 
     public Task<List<ExchangePosition>> GetPositionsAsync(
         string? instrumentSymbol = null,
         CancellationToken ct = default)
-        => TrackAsync(client => client.GetPositionsAsync(instrumentSymbol, ct));
+        => TrackAsync(client => client.GetPositionsAsync(instrumentSymbol, ct), ct);
 
     public Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default)
-        => TrackAsync(client => TrackVoidAsync(client.SetLeverageAsync(instrumentSymbol, leverage, ct)));
+        => TrackAsync(client => TrackVoidAsync(client.SetLeverageAsync(instrumentSymbol, leverage, ct)), ct);
 
     /// <summary>把无返回值的调用包装为可埋点的 Task&lt;T&gt;。</summary>
     private static async Task<byte> TrackVoidAsync(Task task)
@@ -85,11 +85,11 @@ public sealed class RoutingExchangeClient(
     public IExchangeClient GetActiveClientSnapshot() => GetActiveClient();
 
     /// <summary>
-    /// 记录一次交易所调用的成败。用户主动取消（OperationCanceledException）不算 API 故障；
+    /// 记录一次交易所调用的成败。用户主动取消（ct.IsCancellationRequested）不算 API 故障；
     /// 业务错误（余额不足、参数非法）同样是"API 正常工作"的证据，
-    /// 只有传输层故障（网络/超时/5xx）计入失败——把业务拒绝也算故障会让风控误熔断。
+    /// 只有传输层故障（网络/超时/5xx）计入失败——把业务拒绝或主动取消也算故障会让风控误熔断。
     /// </summary>
-    private async Task<T> TrackAsync<T>(Func<IExchangeClient, Task<T>> call)
+    private async Task<T> TrackAsync<T>(Func<IExchangeClient, Task<T>> call, CancellationToken ct = default)
     {
         try
         {
@@ -97,13 +97,17 @@ public sealed class RoutingExchangeClient(
             _apiHealthMonitor.RecordSuccess();
             return result;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex) when (IsTransportFailure(ex))
+        catch (Exception ex) when (IsTransportFailure(ex, ct))
         {
             _apiHealthMonitor.RecordFailure();
+            throw;
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
             throw;
         }
         catch (Exception)
@@ -115,10 +119,13 @@ public sealed class RoutingExchangeClient(
 
     /// <summary>
     /// 判定异常是否为传输层故障。交易所客户端会把 HttpRequestException 包装成
-    /// FriendlyException，必须沿 InnerException 链递归判定。
+    /// FriendlyException，必须沿 InnerException 链递归判定；调用方主动取消不计为传输故障。
     /// </summary>
-    private static bool IsTransportFailure(Exception ex)
+    private static bool IsTransportFailure(Exception ex, CancellationToken ct)
     {
+        if (ct.IsCancellationRequested)
+            return false;
+
         for (var current = ex; current != null; current = current.InnerException)
         {
             if (current is System.Net.Http.HttpRequestException or TimeoutException or TaskCanceledException)

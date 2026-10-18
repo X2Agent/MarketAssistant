@@ -18,6 +18,7 @@ public sealed class TradingHaltState(
 {
     private readonly object _loadSync = new();
     private Task? _loadTask;
+    private int _stateVersion;
     private volatile bool _loaded;
     private volatile bool _loadFailed;
     private volatile bool _halted;
@@ -49,28 +50,41 @@ public sealed class TradingHaltState(
             if (_loadTask is { IsCompleted: false })
                 return _loadTask;
 
-            _loadTask = LoadCoreAsync(ct);
+            var expectedVersion = _stateVersion;
+            _loadTask = LoadCoreAsync(expectedVersion, ct);
             return _loadTask;
         }
     }
 
-    private async Task LoadCoreAsync(CancellationToken ct)
+    private async Task LoadCoreAsync(int expectedVersion, CancellationToken ct)
     {
         try
         {
             var (halted, reason, _) = await dataService.LoadTradingHaltAsync(ct).ConfigureAwait(false);
-            _halted = halted;
-            _reason = halted ? (reason ?? string.Empty) : string.Empty;
-            _loadFailed = false;
-            _loaded = true;
+            lock (_loadSync)
+            {
+                if (_loaded || _stateVersion != expectedVersion)
+                    return;
+
+                _halted = halted;
+                _reason = halted ? (reason ?? string.Empty) : string.Empty;
+                _loadFailed = false;
+                _loaded = true;
+            }
         }
         catch (Exception ex)
         {
             // fail-closed：无法确认数据库中的紧急停止标记时必须阻止新交易与监控启动，
             // 同时保持 _loaded = false 以便后续调用继续重试读取
-            _halted = true;
-            _reason = "无法读取紧急停止状态（数据库异常），已进入安全保护";
-            _loadFailed = true;
+            lock (_loadSync)
+            {
+                if (_loaded || _stateVersion != expectedVersion)
+                    return;
+
+                _halted = true;
+                _reason = "无法读取紧急停止状态（数据库异常），已进入安全保护";
+                _loadFailed = true;
+            }
             logger.LogError(ex, "加载交易紧急停止状态失败，按 fail-closed 进入停机保护状态");
         }
     }
@@ -79,10 +93,14 @@ public sealed class TradingHaltState(
     public async Task HaltAsync(string reason, CancellationToken ct = default)
     {
         await dataService.SaveTradingHaltAsync(true, reason, ct).ConfigureAwait(false);
-        _halted = true;
-        _reason = reason;
-        _loadFailed = false;
-        _loaded = true;
+        lock (_loadSync)
+        {
+            _stateVersion++;
+            _halted = true;
+            _reason = reason;
+            _loadFailed = false;
+            _loaded = true;
+        }
         logger.LogWarning("交易已紧急停止: {Reason}", reason);
         HaltStateChanged?.Invoke(true);
     }
@@ -91,10 +109,14 @@ public sealed class TradingHaltState(
     public async Task ResumeAsync(CancellationToken ct = default)
     {
         await dataService.SaveTradingHaltAsync(false, string.Empty, ct).ConfigureAwait(false);
-        _halted = false;
-        _reason = string.Empty;
-        _loadFailed = false;
-        _loaded = true;
+        lock (_loadSync)
+        {
+            _stateVersion++;
+            _halted = false;
+            _reason = string.Empty;
+            _loadFailed = false;
+            _loaded = true;
+        }
         logger.LogInformation("交易紧急停止已解除");
         HaltStateChanged?.Invoke(false);
     }

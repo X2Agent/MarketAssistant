@@ -1,4 +1,5 @@
 using MarketAssistant.Services.Trading;
+using Moq;
 
 namespace TestMarketAssistant.Trading;
 
@@ -54,5 +55,58 @@ public sealed class ApiHealthMonitorTest
         Assert.AreEqual(0, monitor.FailureCount);
         Assert.AreEqual(0, monitor.ConsecutiveFailures);
         Assert.IsFalse(monitor.IsUnhealthy(1));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task RoutingExchangeClient_UserCancellation_ShouldNotRecordFailure()
+    {
+        var monitor = new ApiHealthMonitor();
+        var userSettingService = new Moq.Mock<MarketAssistant.Services.Settings.IUserSettingService>();
+        userSettingService
+            .Setup(service => service.CurrentSetting)
+            .Returns(new MarketAssistant.Applications.Settings.UserSetting
+            {
+                CryptoTradingMode = MarketAssistant.Trading.Models.TradingMode.SpotDemo
+            });
+        var monitorProvider = new Moq.Mock<IMarketMonitorProvider>();
+        var environment = new TradingEnvironmentService(
+            userSettingService.Object,
+            monitorProvider.Object,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TradingEnvironmentService>.Instance);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var innerClient = new Moq.Mock<MarketAssistant.Trading.Abstractions.IExchangeClient>();
+        innerClient
+            .Setup(client => client.GetAccountInfoAsync(Moq.It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new MarketAssistant.Infrastructure.Core.FriendlyException(
+                "已取消",
+                new TaskCanceledException("User canceled", null, cts.Token)));
+
+        var routingClient = new MarketAssistant.Services.Trading.Exchanges.RoutingExchangeClient(
+            environment,
+            new Dictionary<MarketAssistant.Trading.Models.TradingMode, MarketAssistant.Trading.Abstractions.IExchangeClient>
+            {
+                [MarketAssistant.Trading.Models.TradingMode.SpotDemo] = innerClient.Object
+            },
+            monitor);
+
+        await Assert.ThrowsExactlyAsync<MarketAssistant.Infrastructure.Core.FriendlyException>(
+            () => routingClient.GetAccountInfoAsync(cts.Token));
+
+        Assert.AreEqual(0, monitor.FailureCount, "调用方主动取消不得计入 API 故障");
+
+        // 未取消令牌下的 TaskCanceledException（如 HttpClient 超时）应计入故障
+        using var uncancelledCts = new CancellationTokenSource();
+        innerClient
+            .Setup(client => client.GetAccountInfoAsync(Moq.It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TaskCanceledException("HttpClient.Timeout elapsed"));
+
+        await Assert.ThrowsExactlyAsync<TaskCanceledException>(
+            () => routingClient.GetAccountInfoAsync(uncancelledCts.Token));
+
+        Assert.AreEqual(1, monitor.FailureCount, "非主动取消的超时应计入 API 故障");
     }
 }
