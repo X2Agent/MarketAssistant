@@ -138,10 +138,12 @@
                                        FontSize="{StaticResource LabelFontSize}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="控制告警免打扰时段（紧急告警不受限制）"
+                            <TextBlock Text="控制告警触发来源与免打扰时段（紧急告警不受免打扰时段限制）"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextWrapping="Wrap"/>
+                            <CheckBox IsChecked="{Binding UserSetting.EnableRatingChangeAlert, Mode=TwoWay}"
+                                      Content="启用 AI 评级变化告警（分析报告归档后与上次评级不同时发出提醒）"/>
                             <!-- 告警中心：免打扰时段标题与启用开关同行，时段行未启用时禁用置灰 -->
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
                                 <StackPanel Orientation="Horizontal"

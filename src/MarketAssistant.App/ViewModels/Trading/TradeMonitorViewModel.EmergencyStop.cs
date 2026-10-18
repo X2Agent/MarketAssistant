@@ -12,9 +12,6 @@ namespace MarketAssistant.ViewModels.Trading;
 /// </summary>
 public partial class TradeMonitorViewModel
 {
-    /// <summary>紧急停止确认对话框的超时时间（秒）。</summary>
-    private const int EmergencyConfirmTimeoutSeconds = 60;
-
     [ObservableProperty]
     private bool _isTradingHalted;
 
@@ -109,10 +106,23 @@ public partial class TradeMonitorViewModel
         }, "解除紧急停止");
     }
 
-    /// <summary>把停机状态同步到绑定属性（UI 线程调用）。</summary>
+    /// <summary>把停机状态同步到绑定属性（自动兼容后台线程与 UI 线程调用）。</summary>
     private void SyncHaltState()
     {
-        IsTradingHalted = _haltState.IsHalted;
-        HaltReason = _haltState.HaltReason;
+        var halted = _haltState.IsHalted;
+        var reason = _haltState.HaltReason;
+
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            IsTradingHalted = halted;
+            HaltReason = reason;
+            return;
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsTradingHalted = halted;
+            HaltReason = reason;
+        });
     }
 }

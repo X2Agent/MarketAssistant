@@ -248,14 +248,7 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>停机状态变化（可能来自其它页面或重启后的首次加载）时同步到绑定属性。</summary>
-    private void OnHaltStateChanged(bool halted)
-    {
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            IsTradingHalted = halted;
-            HaltReason = _haltState.HaltReason;
-        });
-    }
+    private void OnHaltStateChanged(bool halted) => SyncHaltState();
 
     public void Dispose()
     {
