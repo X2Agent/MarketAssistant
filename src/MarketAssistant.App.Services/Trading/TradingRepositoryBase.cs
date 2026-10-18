@@ -23,13 +23,7 @@ internal abstract class TradingRepositoryBase(
     /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Demo、合约实盘、合约 Testnet
     /// 的策略、交易记录、持仓、风控配置互不混淆。
     /// </summary>
-    protected string CurrentEnvironmentKey => _environment.CurrentMode switch
-    {
-        TradingMode.LiveFutures => TradingEnvironmentKeys.LiveFutures,
-        TradingMode.FuturesTestnet => TradingEnvironmentKeys.FuturesTestnet,
-        TradingMode.SpotDemo => TradingEnvironmentKeys.SpotDemo,
-        _ => TradingEnvironmentKeys.LiveSpot
-    };
+    protected string CurrentEnvironmentKey => TradingEnvironmentKeys.FromMode(_environment.CurrentMode);
 
     /// <summary>
     /// 当前是否为合约模式（合约买卖方向需结合持仓判断开平仓）

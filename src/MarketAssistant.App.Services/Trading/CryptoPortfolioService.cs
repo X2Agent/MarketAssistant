@@ -64,17 +64,8 @@ public class CryptoPortfolioService(
     private async Task<List<PositionInfo>> GetFuturesPositionsAsync(CancellationToken ct)
     {
         var positions = new List<PositionInfo>();
-
-        List<ExchangePosition> exchangePositions;
-        try
-        {
-            exchangePositions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "查询合约持仓失败，返回空持仓视图");
-            return positions;
-        }
+        // 禁止把异常吞为空列表：紧急全部平仓与 AI 硬性边界依赖异常区分"接口故障"与"真无持仓"
+        var exchangePositions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
 
         foreach (var exchangePosition in exchangePositions)
         {
@@ -88,6 +79,7 @@ public class CryptoPortfolioService(
                 Quantity = quantity,
                 EntryPrice = exchangePosition.EntryPrice,
                 CurrentPrice = exchangePosition.MarkPrice > 0 ? exchangePosition.MarkPrice : exchangePosition.EntryPrice,
+                IsShort = exchangePosition.PositionAmt < 0
             };
 
             if (position.EntryPrice > 0 && position.CurrentPrice > 0)

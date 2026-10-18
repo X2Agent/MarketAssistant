@@ -172,5 +172,11 @@ public class ExchangePosition
     /// 最大可平数量
     /// </summary>
     public decimal MaxQty { get; set; }
+
+    /// <summary>
+    /// 强平价（合约）。交易所未返回（全仓低风险等）或现货场景为 0，
+    /// 调用方不得把 0 当作真实强平价参与距离计算。
+    /// </summary>
+    public decimal LiquidationPrice { get; set; }
 }
 

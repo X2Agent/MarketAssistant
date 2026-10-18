@@ -163,7 +163,9 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
         string CoinGeckoApiKey,
         string BinanceApiKey,
         string BinanceSecretKey,
-        string WebSearchApiKey)
+        string WebSearchApiKey,
+        string FeishuWebhookUrl,
+        string FeishuWebhookSecret)
     {
         public static UserSecrets From(UserSetting setting) => new(
             new Dictionary<string, string>(setting.ProviderApiKeys, StringComparer.Ordinal),
@@ -172,7 +174,9 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
             setting.CoinGeckoApiKey,
             setting.BinanceApiKey,
             setting.BinanceSecretKey,
-            setting.WebSearchApiKey);
+            setting.WebSearchApiKey,
+            setting.FeishuWebhookUrl,
+            setting.FeishuWebhookSecret);
 
         public void ApplyTo(UserSetting setting)
         {
@@ -183,6 +187,8 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
             setting.BinanceApiKey = BinanceApiKey;
             setting.BinanceSecretKey = BinanceSecretKey;
             setting.WebSearchApiKey = WebSearchApiKey;
+            setting.FeishuWebhookUrl = FeishuWebhookUrl;
+            setting.FeishuWebhookSecret = FeishuWebhookSecret;
         }
     }
 

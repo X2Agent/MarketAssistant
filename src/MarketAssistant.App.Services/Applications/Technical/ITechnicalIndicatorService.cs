@@ -14,4 +14,10 @@ public interface ITechnicalIndicatorService
         KLineType kLineType = KLineType.Daily,
         int barCount = 250,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 基于调用方已获取的 K 线计算指标快照。指标告警等需要同时使用成交量（量比）
+    /// 与指标的路径用它避免重复取数；公式仍由本服务统一计算。
+    /// </summary>
+    TechnicalIndicatorSnapshot CalculateFrom(IReadOnlyList<KLineData> kLineData);
 }

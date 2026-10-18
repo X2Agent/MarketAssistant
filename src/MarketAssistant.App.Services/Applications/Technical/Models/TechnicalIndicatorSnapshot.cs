@@ -16,7 +16,8 @@ public sealed record TechnicalIndicatorSnapshot(
     decimal? BollLower,
     decimal? KdjK,
     decimal? KdjD,
-    decimal? KdjJ)
+    decimal? KdjJ,
+    decimal? Rsi = null)
 {
     /// <summary>快照对应的 K 线日期（日线口径）。</summary>
     public string Date => Timestamp.ToString("yyyy-MM-dd");

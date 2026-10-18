@@ -12,38 +12,38 @@
         TransparencyLevelHint="Transparent"
         Topmost="True"
         WindowStartupLocation="Manual">
-    
+
     <Border Name="NotificationBorder"
             Background="{StaticResource NotificationDarkBackgroundBrush}"
             BorderBrush="{StaticResource NotificationDarkBorderBrush}"
             BorderThickness="{StaticResource DefaultBorderThickness}"
             CornerRadius="{StaticResource CardCornerRadius}"
-            Padding="{StaticResource SmallCardPadding}"
+            Padding="{StaticResource DefaultCardPadding}"
             Margin="{StaticResource SmallMargin}"
             BoxShadow="{StaticResource NotificationBoxShadow}">
-        
+
         <Grid ColumnDefinitions="Auto,*,Auto">
-            
-            <!-- 图标区域 -->
+
+            <!-- 图标区域：圆形语义色底，尺寸与标题字号协调 -->
             <Border Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
-                    CornerRadius="{StaticResource DefaultCornerRadius}"
+                    CornerRadius="{StaticResource NotificationIconCornerRadius}"
                     Background="{StaticResource NotificationIconSuccessBrush}"
-                    VerticalAlignment="Center"
-                    Margin="{StaticResource DefaultMargin}">
+                    VerticalAlignment="Center">
                 <TextBlock Text="✓"
-                           FontSize="{StaticResource SubTitleFontSize}"
+                           FontSize="{StaticResource SectionTitleFontSize}"
                            FontWeight="Bold"
                            Foreground="{StaticResource TextOnEmphasisBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"/>
             </Border>
-            
+
             <!-- 消息内容 -->
             <StackPanel Grid.Column="1"
-                        VerticalAlignment="Center">
-                <ScrollViewer MaxHeight="88"
+                        VerticalAlignment="Center"
+                        Margin="{StaticResource SmallHorizontalMargin}">
+                <ScrollViewer MaxHeight="{StaticResource NotificationMessageMaxHeight}"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock Name="MessageText"
@@ -52,22 +52,21 @@
                                FontWeight="Medium"
                                Foreground="{StaticResource NotificationTextLightBrush}"
                                TextWrapping="Wrap"
-                               LineHeight="20"/>
+                               LineHeight="{StaticResource CompactLineHeight}"/>
                 </ScrollViewer>
             </StackPanel>
-            
+
             <!-- 关闭按钮 -->
             <Button Grid.Column="2"
                     Name="CloseButton"
                     Content="✕"
                     Width="{StaticResource DefaultIconSize}"
                     Height="{StaticResource DefaultIconSize}"
-                    FontSize="{StaticResource SectionTitleFontSize}"
+                    FontSize="{StaticResource MediumFontSize}"
                     Foreground="{StaticResource NotificationTextSecondaryBrush}"
                     Background="Transparent"
                     BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
-                    Margin="{StaticResource SmallHorizontalMargin}"
                     Padding="{StaticResource NoPadding}"
                     CornerRadius="{StaticResource DefaultCornerRadius}"
                     HorizontalContentAlignment="Center"
@@ -87,4 +86,3 @@
         </Grid>
     </Border>
 </Window>
-

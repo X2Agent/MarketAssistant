@@ -25,6 +25,7 @@ public class MarketMonitor : IDisposable
     private readonly TradingDataService _dataService;
     private readonly RiskAlertEvaluator _riskAlertEvaluator;
     private readonly SignalAlertEvaluator _signalAlertEvaluator;
+    private readonly TradingHaltState _haltState;
     private readonly ILogger<MarketMonitor> _logger;
 
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
@@ -109,6 +110,7 @@ public class MarketMonitor : IDisposable
         BinanceUserDataStreamService userDataStreamService,
         RiskAlertEvaluator riskAlertEvaluator,
         SignalAlertEvaluator signalAlertEvaluator,
+        TradingHaltState haltState,
         ILogger<MarketMonitor> logger)
     {
         _webSocketService = webSocketService;
@@ -122,6 +124,7 @@ public class MarketMonitor : IDisposable
         _userDataStreamService = userDataStreamService;
         _riskAlertEvaluator = riskAlertEvaluator;
         _signalAlertEvaluator = signalAlertEvaluator;
+        _haltState = haltState;
         _logger = logger;
         _priceUpdatedAdapter = (symbol, lastPrice, _) => OnPriceUpdated(symbol, lastPrice);
         _connectionInterruptedAdapter = () =>
@@ -144,6 +147,17 @@ public class MarketMonitor : IDisposable
         {
             if (_isRunning)
                 return;
+
+            // 紧急停止期间拒绝启动监控：停机是用户显式的资金安全意图，
+            // 不得因任何路径（重启、切换页面）被绕过
+            await _haltState.EnsureLoadedAsync();
+            if (_haltState.IsHalted)
+            {
+                var reason = string.IsNullOrWhiteSpace(_haltState.HaltReason) ? "未注明原因" : _haltState.HaltReason;
+                _logger.LogWarning("交易处于紧急停止状态，拒绝启动市场监控: {Reason}", reason);
+                await _riskAlertEvaluator.NotifyTradingHaltedSafeAsync(reason);
+                return;
+            }
 
             _cts = new CancellationTokenSource();
             _isRunning = true;
@@ -652,6 +666,12 @@ public class MarketMonitor : IDisposable
                 _conditionOrderService.ClearLiveOrder(strategy.Id);
                 return;
             }
+
+            // OCO：成交腿的兄弟腿必须撤掉，否则止损成交后止盈单仍挂着，
+            // 后续触发会以 reduceOnly 之外的方向开出新仓
+            await _conditionOrderService
+                .CancelSiblingLegsAsync(strategy.Id, record.Symbol, record.ExchangeOrderId, MonitorToken)
+                .ConfigureAwait(false);
 
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);

@@ -18,6 +18,9 @@ public sealed class TechnicalIndicatorService(
     /// <summary>MACD 慢线周期，也是所有指标中最长的预热窗口。</summary>
     private const int MinimumBarCount = 26;
 
+    /// <summary>RSI 回溯周期（Wilder 标准 14）。</summary>
+    private const int RsiPeriod = 14;
+
     private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
     private readonly ILogger<TechnicalIndicatorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -34,14 +37,24 @@ public sealed class TechnicalIndicatorService(
         if (kLineData is null || kLineData.Count == 0)
             throw new FriendlyException($"K线数据为空，无法计算技术指标: {code}");
 
-        var quotes = ToIndicatorQuotes(kLineData);
-        var snapshot = BuildSnapshot(quotes, kLineData.OrderBy(item => item.Timestamp).Last().Timestamp);
+        var snapshot = CalculateFrom(kLineData);
 
         _logger.LogInformation(
-            "计算技术指标完成: {Code} {Interval}, MA5={MA5}, DIFF={Diff}, K={K}",
-            code, kLineType, snapshot.GetMovingAverage(5), snapshot.MacdDiff, snapshot.KdjK);
+            "计算技术指标完成: {Code} {Interval}, MA5={MA5}, DIFF={Diff}, K={K}, RSI={Rsi}",
+            code, kLineType, snapshot.GetMovingAverage(5), snapshot.MacdDiff, snapshot.KdjK, snapshot.Rsi);
 
         return snapshot;
+    }
+
+    /// <inheritdoc />
+    public TechnicalIndicatorSnapshot CalculateFrom(IReadOnlyList<KLineData> kLineData)
+    {
+        ArgumentNullException.ThrowIfNull(kLineData);
+        if (kLineData.Count == 0)
+            throw new FriendlyException("K线数据为空，无法计算技术指标");
+
+        var quotes = ToIndicatorQuotes(kLineData);
+        return BuildSnapshot(quotes, kLineData.OrderBy(item => item.Timestamp).Last().Timestamp);
     }
 
     private static TechnicalIndicatorSnapshot BuildSnapshot(List<IndicatorQuote> quotes, DateTime timestamp)
@@ -74,8 +87,13 @@ public sealed class TechnicalIndicatorService(
             BollLower: Round(boll?.LowerBand),
             KdjK: Round(stoch?.K),
             KdjD: Round(stoch?.D),
-            KdjJ: Round(stoch?.J));
+            KdjJ: Round(stoch?.J),
+            Rsi: GetLatestRsi(quotes));
     }
+
+    /// <summary>最新 RSI 值（样本不足时返回 null）。</summary>
+    private static decimal? GetLatestRsi(List<IndicatorQuote> quotes) =>
+        Round(quotes.GetRsi(RsiPeriod).LastOrDefault(item => item.Rsi is not null)?.Rsi);
 
     private static List<IndicatorQuote> ToIndicatorQuotes(IEnumerable<KLineData> kLineData) =>
         [.. kLineData

@@ -15,8 +15,9 @@ public interface IAlertCenterService
     Task InitializeAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 上报一条告警。内部执行冷却合并、每小时配额、免打扰静默等抑制逻辑，
-    /// 持久化后按级别弹窗触达，并维护确认级交易联动门（IAlertGate）。
+    /// 上报一条告警。内部执行同类合并窗口（5 分钟）、触达抑制（休市静默 / 免打扰时段 /
+    /// 用户关闭通知，Critical 穿透免打扰）等抑制逻辑，
+    /// 持久化后按级别经各触达通道（桌面通知、飞书等）分发，并维护确认级交易联动门（IAlertGate）。
     /// </summary>
     Task RaiseAlertAsync(AlertEvent alert, CancellationToken cancellationToken = default);
 

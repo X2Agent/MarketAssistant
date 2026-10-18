@@ -33,7 +33,9 @@ public sealed class BinanceFuturesExchangeClient(
                 UnRealizedProfit = decimal.TryParse(p.UnRealizedProfit, NumberStyles.Number, CultureInfo.InvariantCulture, out var up) ? up : 0,
                 Leverage = decimal.TryParse(p.Leverage, NumberStyles.Number, CultureInfo.InvariantCulture, out var lev) ? lev : 0,
                 MarginType = p.MarginType == "isolated" ? "isolated" : "cross",
-                MaxQty = decimal.TryParse(p.PositionAmt, NumberStyles.Number, CultureInfo.InvariantCulture, out var pa) ? Math.Abs(pa) : 0
+                MaxQty = decimal.TryParse(p.PositionAmt, NumberStyles.Number, CultureInfo.InvariantCulture, out var pa) ? Math.Abs(pa) : 0,
+                // 强平价：全仓低风险或双向持仓下交易所可能不返回，缺失按 0 处理（调用方据此跳过距离计算）
+                LiquidationPrice = decimal.TryParse(p.LiquidationPrice, NumberStyles.Number, CultureInfo.InvariantCulture, out var lp) ? lp : 0
             })];
     }
 

@@ -41,6 +41,13 @@ public class PositionInfo
     public decimal UnrealizedPnl { get; set; }
     [Description("未实现盈亏百分比（%）")]
     public decimal UnrealizedPnlPercent { get; set; }
+
+    /// <summary>
+    /// 是否为空头持仓（合约）。现货持仓恒为 false。
+    /// 数量为绝对值，方向由本字段表达——紧急平仓等场景必须据此决定买卖方向。
+    /// </summary>
+    [Description("是否空头持仓")]
+    public bool IsShort { get; set; }
 }
 
 [Description("交易执行结果")]

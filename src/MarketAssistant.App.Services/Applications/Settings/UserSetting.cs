@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Applications.Settings;
@@ -90,6 +91,32 @@ public class UserSetting : INotifyPropertyChanged
     {
         get => _alertQuietEndHour;
         set => SetProperty(ref _alertQuietEndHour, Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>是否启用飞书告警通道（自定义机器人推送）。</summary>
+    private bool _feishuWebhookEnabled;
+    public bool FeishuWebhookEnabled
+    {
+        get => _feishuWebhookEnabled;
+        set => SetProperty(ref _feishuWebhookEnabled, value);
+    }
+
+    /// <summary>
+    /// 飞书自定义机器人 Webhook 地址（含 token，按密钥管理，不写入普通设置文件）。
+    /// </summary>
+    [JsonIgnore]
+    public string FeishuWebhookUrl { get; set; } = "";
+
+    /// <summary>飞书机器人签名校验密钥（可选，启用签名校验时必填）。</summary>
+    [JsonIgnore]
+    public string FeishuWebhookSecret { get; set; } = "";
+
+    /// <summary>飞书通道接收的最低告警级别（默认仅警告及以上）。</summary>
+    private AlertLevel _feishuMinAlertLevel = AlertLevel.Warning;
+    public AlertLevel FeishuMinAlertLevel
+    {
+        get => _feishuMinAlertLevel;
+        set => SetProperty(ref _feishuMinAlertLevel, value);
     }
 
     [JsonIgnore]
@@ -218,6 +245,16 @@ public class UserSetting : INotifyPropertyChanged
         set => SetProperty(ref _enableDailyBriefing, value);
     }
 
+    /// <summary>
+    /// 是否在自选股 AI 综合评级变化时发送告警（评级下调为警告、上调为提示）。
+    /// </summary>
+    private bool _enableRatingChangeAlert = true;
+    public bool EnableRatingChangeAlert
+    {
+        get => _enableRatingChangeAlert;
+        set => SetProperty(ref _enableRatingChangeAlert, value);
+    }
+
     private InvestmentPreference _investmentPreference = new();
     public InvestmentPreference InvestmentPreference
     {
@@ -252,6 +289,10 @@ public class UserSetting : INotifyPropertyChanged
             AlertQuietHoursEnabled = AlertQuietHoursEnabled,
             AlertQuietStartHour = AlertQuietStartHour,
             AlertQuietEndHour = AlertQuietEndHour,
+            FeishuWebhookEnabled = FeishuWebhookEnabled,
+            FeishuWebhookUrl = FeishuWebhookUrl,
+            FeishuWebhookSecret = FeishuWebhookSecret,
+            FeishuMinAlertLevel = FeishuMinAlertLevel,
             ZhiTuApiToken = ZhiTuApiToken,
             ThemeMode = ThemeMode,
             CurrentMarketType = CurrentMarketType,
@@ -267,6 +308,7 @@ public class UserSetting : INotifyPropertyChanged
             WebSearchProvider = WebSearchProvider,
             EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
             EnableDailyBriefing = EnableDailyBriefing,
+            EnableRatingChangeAlert = EnableRatingChangeAlert,
             InvestmentPreference = InvestmentPreference.Clone()
         };
         return clone;

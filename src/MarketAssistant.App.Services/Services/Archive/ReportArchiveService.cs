@@ -12,6 +12,11 @@ namespace MarketAssistant.Services.Archive;
 /// </summary>
 public class ReportArchiveService(ILogger<ReportArchiveService> logger) : SqliteServiceBase(logger)
 {
+    /// <summary>
+    /// 报告归档成功后触发（携带完整报告）。供评级变化告警等旁路消费，
+    /// 订阅方异常不得影响归档主链（由订阅方自行隔离）。
+    /// </summary>
+    public event Action<MarketAnalysisReport>? ReportSaved;
 
     /// <summary>
     /// 保存分析报告。失败时抛出异常，调用方可据此决定是否回滚缓存等后续操作。
@@ -36,6 +41,8 @@ public class ReportArchiveService(ILogger<ReportArchiveService> logger) : Sqlite
             cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
             cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
             await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            ReportSaved?.Invoke(report);
         }
         catch (Exception ex)
         {

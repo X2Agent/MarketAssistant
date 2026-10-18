@@ -9,19 +9,22 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Applications.AlertCenter;
 
 /// <summary>
-/// 统一告警中心服务：SQLite 持久化告警事件（alert_events 表），执行冷却合并、
-/// 每小时配额、免打扰静默等抑制逻辑，按级别经 INotificationService 处理触达，
+/// 统一告警中心服务：SQLite 持久化告警事件（alert_events 表），执行同类合并窗口（5 分钟）、
+/// 触达抑制（休市静默 / 免打扰时段 / 关闭通知）等抑制逻辑，按级别经各触达通道
+/// （桌面通知与 IAlertChannel 扩展通道，Critical 穿透免打扰）分发，
 /// 并维护确认级交易联动门（AlertGate）的登记与解除。
 /// </summary>
 public sealed class AlertCenterService(
     INotificationService notificationService,
     IUserSettingService userSettingService,
     AlertGate alertGate,
+    IEnumerable<IAlertChannel> alertChannels,
     ILogger<AlertCenterService> logger) : SqliteServiceBase(logger), IAlertCenterService
 {
     private readonly INotificationService _notificationService = notificationService;
     private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly AlertGate _alertGate = alertGate;
+    private readonly IReadOnlyList<IAlertChannel> _alertChannels = [.. alertChannels];
     private readonly AlertSuppressionPolicy _policy = new();
 
     /// <summary>历史告警保留期：超期记录在启动初始化时裁剪，避免 alert_events 无界增长。</summary>
@@ -89,13 +92,39 @@ public sealed class AlertCenterService(
             _alertGate.Activate(alert.MarketType, alert.Symbol);
         }
 
-        // policy 已统一判定触达抑制（配额 + 静默），被抑制的告警仍落库、
+        // policy 已统一判定触达抑制（合并窗口 + 静默），被抑制的告警仍落库、
         // 确认级交易联动门仍登记
         if (decision.ShouldNotify)
+        {
             Notify(alert);
+            _ = NotifyChannelsAsync(alert);
+        }
 
         AlertRaised?.Invoke(alert);
         AlertsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// 向扩展通道（飞书等）异步投递。与桌面弹窗共用同一 <see cref="AlertSuppressionPolicy.Decision.ShouldNotify"/>
+    /// 判定结果——通道不做二次抑制，只按各自的最低级别过滤。
+    /// 单通道失败仅记录，不影响其它通道与告警主链。
+    /// </summary>
+    private async Task NotifyChannelsAsync(AlertEvent alert)
+    {
+        foreach (var channel in _alertChannels)
+        {
+            if (alert.Level < channel.MinimumLevel)
+                continue;
+
+            try
+            {
+                await channel.SendAsync(alert, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "告警通道投递失败: {Channel} {AlertId}", channel.Name, alert.Id);
+            }
+        }
     }
 
     /// <inheritdoc />

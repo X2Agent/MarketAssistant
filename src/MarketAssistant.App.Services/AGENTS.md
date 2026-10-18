@@ -129,17 +129,46 @@ MarketAssistant.App.Services/
 | 文件 | 职责 |
 |------|------|
 | `AlertEvent.cs` | 告警模型：`AlertLevel`（Info/Warning/Critical）、`AlertSource`、`AlertTradingImpact`、去重键 `DedupeKey` |
-| `IAlertCenterService.cs` / `AlertCenterService.cs` | 落库（`alert_events` 表）、抑制、弹窗触达、联动门登记/释放、历史与未读查询 |
-| `AlertSuppressionPolicy.cs` | 纯逻辑：同类 5 分钟合并窗口 + 全局每小时配额（Critical 不受限），无 IO 便于单测 |
+| `IAlertCenterService.cs` / `AlertCenterService.cs` | 落库（`alert_events` 表）、抑制、桌面与扩展通道触达、联动门登记/释放、历史与未读查询 |
+| `AlertSuppressionPolicy.cs` | 纯逻辑：同类 5 分钟合并窗口 + 触达抑制（休市静默 / 免打扰时段 / 用户关闭通知），Critical 穿透免打扰；无 IO 便于单测 |
 | `AlertGate.cs` | `IAlertGate` 内存计数门：某标的是否存在触发中的确认级告警 |
 | `AShareTradingHours.cs` | A 股交易时段判定，非交易时段跳过价格告警评估 |
+| `IAlertChannel.cs` / `Channels/FeishuAlertChannel.cs` | 进程外触达通道（飞书自定义机器人）：只投递已通过抑制判定的告警，按各自 `MinimumLevel` 过滤 |
+| `Channels/FeishuWebhookClient.cs` / `FeishuWebhookMessage.cs` | 飞书 webhook 客户端与签名/报文纯计算（命名 HttpClient "Feishu"，5s 超时 + 1 次重试） |
 
 新增告警来源时的约定：
 
-- 一律通过 `IAlertCenterService.RaiseAlertAsync(AlertEvent)` 上报，**不要**在业务服务里直接调用 `INotificationService` 弹告警窗（弹窗由告警中心统一按级别、免打扰时段与配额分发）。
-- 需要"告警期间该标的 AI 交易强制人工确认"时，把 `AlertEvent.TradingImpact` 置为 `RequireConfirmation`；条件解除后必须调用 `RaiseAlertClearedAsync(source, marketType, symbol, title)` 释放联动门，否则该标的会持续被门控。
+- 一律通过 `IAlertCenterService.RaiseAlertAsync(AlertEvent)` 上报，**不要**在业务服务里直接调用 `INotificationService` 弹告警窗（触达由告警中心统一按级别、免打扰时段与抑制策略分发到桌面与各扩展通道）。
+- 需要"告警期间该标的 AI 交易强制人工确认"时，把 `AlertEvent.TradingImpact` 置为 `RequireConfirmation`；条件解除后必须调用 `RaiseAlertClearedAsync(source, marketType, symbol, title)` 释放联动门，否则该标的会持续被门控。**标题必须是稳定字符串**——联动门按 (来源, 市场, 标的, 标题) 登记与释放。
 - 保护性平仓（`requireClose`）不受联动门影响，确保告警期间仍能及时离场。
 - 抑制状态为内存态，重启清零可接受；持久化只存告警记录本身。
+- 通道实现必须自行隔离异常：单通道失败只记日志，不得影响告警主链与其它通道。
+
+### 告警规则维度（Applications/PriceAlert）
+
+规则条件分两族，评估链路不同：
+
+- **价格 / 涨跌幅**：随行情 tick 评估（Crypto 走 WS、A 股走 20s 轮询）。
+- **指标类**（量比、MACD/RSI/KDJ/BOLL/MA 交叉与突破）：由 `IndicatorAlertEvaluator` 每 5 分钟周期评估，经 keyed `ITechnicalIndicatorService` + `IKLineService` 取数；指标公式一律复用 `TechnicalIndicatorService`（`CalculateFrom` 允许传入已取到的 K 线，避免重复请求），**不得在规则层重写公式**。
+- `AlertRuleSymbolResolver`：`Scope=Watchlist` 的批量规则按市场展开自选股（30s TTL 缓存 + 冷缓存预热）；自选股查询失败向外抛，由调用方按规则隔离，**不得降级为空列表**（那会让批量规则静默失效）。
+- 批量规则的每个符号持有独立运行时副本（`PriceAlertRule.CloneForSymbol`）：去抖/冷却/触发计数跨符号隔离，否则会互相污染。
+- 指标度量样本不足（值为 null）时该符号本轮跳过，不得伪装成"条件未满足"。
+- `AnalysisRatingAlertService`：报告归档后与同一标的的上一次评级比对，变化即上报（下调 Warning / 上调 Info），可在设置中关闭。
+
+---
+
+## 自主交易模块成熟化约定（Trading）
+
+在既有资金安全链（风控 → 确认 → symbol 锁 → 客户端快照 → 重试 → 记录）之上，遵循以下约定：
+
+- **紧急停止（kill switch）是总闸**：`EmergencyStopService` 提供两条独立路径——「停止策略并撤单」与「停止并全部平仓」。停机标记持久化在 `trading_control` 表（全局、不随环境分键），`RiskManager` 拒单 + `MarketMonitor` 拒绝启动双重强制执行；解除停机不自动恢复策略（由用户逐个启用）。
+- **紧急平仓绕过风控与确认，但不绕过安全机制**：仍走 `TradeExecutor` 的客户端快照、symbol 锁、合约开平仓判定、网络重试、成交记录与持仓回写。
+- **合约强平距离是一等风险指标**：`LiquidationRiskEvaluator` 周期评估 `|标记价-强平价|/标记价`，Critical 级登记联动门（阻止该标的自动加仓），距离恢复后必须用**固定标题**调用 `RaiseAlertClearedAsync` 释放。
+- **交易所侧保护优先**：退出型策略（含 AI 策略首次成交后的固定护栏）挂 reduceOnly 条件单；双腿用 `MC`+策略ID+`S`/`T` 区分，任一腿成交即撤另一条腿（OCO）。`HasLiveOrder` 为 true 时客户端评估跳过，防止双触发。
+- **执行质量**：策略限价单超时由 `PendingOrderTimeoutService` 撤单告警（手动单不处理）；市价单成交后计算滑点，超阈值告警（市价单无法事前限滑点）；部分成交告警但不自动撤单（挂单继续工作才可能等到剩余成交）。
+- **风控分层**：账户级（既有）+ 单策略仓位上限（`ValidateOrderAsync` 的 `strategyId` 参数，与账户级取更严者）+ 连续亏损熔断（`daily_stats.consecutive_losses`，只计已实现盈亏）+ 合约名义总敞口上限（Σ|持仓名义|/权益，现货仓位占比无法反映杠杆风险）+ API 错误率熔断（`ApiHealthMonitor` 在 `RoutingExchangeClient` 统一埋点，5 分钟滑窗）。
+- **影子模式必须记账**：`ShadowTradingService` 按与实盘一致口径（FIFO + 手续费）记录模拟成交，影子策略的任何路径（含硬性边界）都不得触达交易所；`StrategyPerformanceService` 输出胜率/盈亏比/最大回撤，影子与实盘同口径可对比。
+- 新增 `RiskConfig` 字段直接加属性即可（JSON 持久化，无迁移）；新增表/列走 `TradingSchemaInitializer` 的 `EnsureColumnAsync` 与 `TableDefinitions`，并用 `TradingDataServiceMigrationTest` 覆盖。
 
 ---
 

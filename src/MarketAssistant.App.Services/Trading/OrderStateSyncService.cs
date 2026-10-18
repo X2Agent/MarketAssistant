@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -14,6 +15,7 @@ public sealed class OrderStateSyncService(
     [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
     TradingDataService dataService,
     CryptoPortfolioService portfolioService,
+    IAlertCenterService alertCenterService,
     ILogger<OrderStateSyncService> logger)
 {
     private static readonly TimeSpan AutoSyncInterval = TimeSpan.FromSeconds(10);
@@ -23,6 +25,7 @@ public sealed class OrderStateSyncService(
     private readonly IExchangeClient _exchangeClient = exchangeClient;
     private readonly TradingDataService _dataService = dataService;
     private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly IAlertCenterService _alertCenterService = alertCenterService;
     private readonly ILogger<OrderStateSyncService> _logger = logger;
 
     /// <summary>
@@ -116,6 +119,15 @@ public sealed class OrderStateSyncService(
                         // 首次到达成交终态：通知策略层完结保护策略（条件单成交自动离场）
                         if (previousStatus != TradeRecordStatus.Filled && record.Status == TradeRecordStatus.Filled)
                             TradeRecordFilled?.Invoke(record);
+
+                        // 首次进入部分成交：提示用户剩余数量仍在挂单中。
+                        // 不自动撤单——挂单继续工作才能等到剩余成交；但用户必须知道
+                        // "策略已触发"并不等于"仓位已完全退出"
+                        if (previousStatus != TradeRecordStatus.PartiallyFilled
+                            && record.Status == TradeRecordStatus.PartiallyFilled)
+                        {
+                            await NotifyPartialFillAsync(record, ct).ConfigureAwait(false);
+                        }
                     }
                     catch (Exception ex) when (ex is FriendlyException or HttpRequestException)
                     {
@@ -140,6 +152,31 @@ public sealed class OrderStateSyncService(
         }
 
         return updatedCount;
+    }
+
+    /// <summary>
+    /// 部分成交告警：剩余数量仍在交易所挂单中，用户需要知道"触发≠完成"。
+    /// 告警失败仅记录，不影响订单同步主链。
+    /// </summary>
+    private async Task NotifyPartialFillAsync(TradeRecord record, CancellationToken ct)
+    {
+        try
+        {
+            var remaining = record.RequestedQty - record.ExecutedQty;
+            await _alertCenterService.RaiseAlertAsync(new AlertEvent
+            {
+                MarketType = MarketType.Crypto,
+                Symbol = record.Symbol,
+                Level = AlertLevel.Warning,
+                Source = AlertSource.System,
+                Title = "订单部分成交",
+                Content = $"{record.Symbol} 订单已成交 {record.ExecutedQty}，剩余 {remaining} 仍在挂单中等待成交"
+            }, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "上报部分成交告警失败: {OrderId}", record.ExchangeOrderId);
+        }
     }
 
     private bool ShouldSync(string syncKey)

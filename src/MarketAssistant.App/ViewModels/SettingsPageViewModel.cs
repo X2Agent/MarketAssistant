@@ -2,6 +2,7 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications.AlertCenter.Channels;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
@@ -33,6 +34,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly IMarketMonitorProvider _marketMonitorProvider;
     private readonly IDialogService _dialogService;
     private readonly DocumentVectorizationService _documentVectorizationService;
+    private readonly FeishuWebhookClient _feishuWebhookClient;
     private IStorageProvider? _storageProvider;
     private bool _isInitializingProvider;
     private CancellationTokenSource? _modelFetchCancellationTokenSource;
@@ -228,6 +230,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         IMarketMonitorProvider marketMonitorProvider,
         IDialogService dialogService,
         DocumentVectorizationService documentVectorizationService,
+        FeishuWebhookClient feishuWebhookClient,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
         _notificationService = notificationService;
@@ -238,6 +241,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _marketMonitorProvider = marketMonitorProvider;
         _dialogService = dialogService;
         _documentVectorizationService = documentVectorizationService;
+        _feishuWebhookClient = feishuWebhookClient;
 
         SetRetryCommand(() => LoadSettingsAsync());
         _ = LoadSettingsAsync();

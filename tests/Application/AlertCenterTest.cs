@@ -56,6 +56,7 @@ public sealed class AlertCenterTest
             _notification,
             _settings,
             _gate,
+            [],
             LoggerFactory.Create(_ => { }).CreateLogger<AlertCenterService>());
 
         await _service.InitializeAsync();
@@ -201,6 +202,7 @@ public sealed class AlertCenterTest
             _notification,
             _settings,
             new AlertGate(),
+            [],
             LoggerFactory.Create(_ => { }).CreateLogger<AlertCenterService>());
         await restarted.InitializeAsync();
 

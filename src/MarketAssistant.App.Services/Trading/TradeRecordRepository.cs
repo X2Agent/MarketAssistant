@@ -28,11 +28,11 @@ internal sealed class TradeRecordRepository(
             INSERT INTO trade_records
                 (id, environment, strategy_id, symbol, side, order_type, requested_qty, executed_qty,
                  requested_price, executed_price, commission, commission_asset, status,
-                 binance_order_id, ai_reasoning, created_at, completed_at)
+                 binance_order_id, ai_reasoning, created_at, completed_at, slippage_percent, realized_pnl)
             VALUES
                 (@id, @environment, @stratId, @symbol, @side, @orderType, @reqQty, @execQty,
                  @reqPrice, @execPrice, @commission, @commAsset, @status,
-                 @binanceId, @aiReasoning, @createdAt, @completedAt)
+                 @binanceId, @aiReasoning, @createdAt, @completedAt, @slippagePercent, @realizedPnl)
             """;
         cmd.Parameters.AddWithValue("@id", record.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -51,6 +51,8 @@ internal sealed class TradeRecordRepository(
         cmd.Parameters.AddWithValue("@aiReasoning", (object?)record.AIReasoning ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", record.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
+        cmd.Parameters.AddWithValue("@slippagePercent", ToDbNullable(record.SlippagePercent));
+        cmd.Parameters.AddWithValue("@realizedPnl", ToDb(record.RealizedPnl));
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -289,6 +291,18 @@ internal sealed class TradeRecordRepository(
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>回写单笔交易记录的已实现盈亏（绩效统计用）。</summary>
+    public async Task UpdateRealizedPnlAsync(string recordId, decimal pnl, CancellationToken ct = default)
+    {
+        await EnsureInitializedAsync();
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE trade_records SET realized_pnl = @pnl WHERE id = @id";
+        cmd.Parameters.AddWithValue("@pnl", ToDb(pnl));
+        cmd.Parameters.AddWithValue("@id", recordId);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     private static TradeRecord ReadTradeRecord(SqliteDataReader reader)
     {
         var record = new TradeRecord
@@ -318,6 +332,12 @@ internal sealed class TradeRecordRepository(
 
         var coOrd = reader.GetOrdinal("completed_at");
         if (!reader.IsDBNull(coOrd)) record.CompletedAt = DateTime.Parse(reader.GetString(coOrd), CultureInfo.InvariantCulture);
+
+        var spOrd = reader.GetOrdinal("slippage_percent");
+        if (!reader.IsDBNull(spOrd)) record.SlippagePercent = ReadDecimal(reader, spOrd);
+
+        var realizedOrd = reader.GetOrdinal("realized_pnl");
+        if (!reader.IsDBNull(realizedOrd)) record.RealizedPnl = ReadDecimal(reader, realizedOrd);
 
         return record;
     }

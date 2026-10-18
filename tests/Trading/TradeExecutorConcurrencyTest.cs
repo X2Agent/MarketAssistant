@@ -34,11 +34,12 @@ public sealed class TradeExecutorConcurrencyTest
             });
 
         // 风控直接放行：模拟两笔卖出都基于同一持仓快照在锁外通过了风控（旧 A2 竞态前提）
-        var riskManager = new Mock<RiskManager>(null!, null!, null!, NullLogger<RiskManager>.Instance);
+        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance);
         riskManager
             .Setup(manager => manager.ValidateOrderAsync(
                 It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<decimal>(),
-                It.IsAny<decimal>(), It.IsAny<OrderType>(), It.IsAny<CancellationToken>()))
+                It.IsAny<decimal>(), It.IsAny<OrderType>(), It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(RiskCheckResult.Pass());
 
         // 锁内复检读取的本地 FIFO 持仓：第一次 1.0（首单放行），第二次 0.4（首单已消耗 0.6）
@@ -114,12 +115,17 @@ public sealed class TradeExecutorConcurrencyTest
         dataService
             .Setup(service => service.GetTodayStatsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DailyStats());
+        dataService
+            .Setup(service => service.LoadTradingHaltAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((false, string.Empty, (DateTime?)null));
 
         // "UNKNOWNQUOTE" 无法从固定报价后缀表解析出基础资产
         var riskManager = new RiskManager(
             dataService.Object,
             portfolioService.Object,
             exchangeClient.Object,
+            new TradingHaltState(dataService.Object, NullLogger<TradingHaltState>.Instance),
+            new ApiHealthMonitor(),
             NullLogger<RiskManager>.Instance);
 
         var result = await riskManager.ValidateOrderAsync(
@@ -127,6 +133,69 @@ public sealed class TradeExecutorConcurrencyTest
 
         Assert.IsFalse(result.Passed, "无法解析基础资产时卖出校验必须 fail-closed");
         Assert.Contains("fail-closed", result.Reason ?? string.Empty);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task Futures_ShortOpen_ExceedingNotionalCap_ShouldBeRejected()
+    {
+        var exchangeClient = new Mock<IExchangeClient>();
+        exchangeClient.Setup(client => client.IsFutures).Returns(true);
+        exchangeClient
+            .Setup(client => client.GetPositionsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ExchangePosition { Symbol = "ETHUSDT", PositionAmt = -1m, MarkPrice = 2900m, EntryPrice = 2900m }
+            ]);
+
+        var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
+        portfolioService
+            .Setup(service => service.GetAccountBalanceSummaryAsync(It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ReturnsAsync(new AccountBalanceSummary
+            {
+                TotalValueUSDT = 1000m,
+                Assets = [new AssetBalance { Asset = "USDT", Free = 1000m, Locked = 0m, ValueUSDT = 1000m }]
+            });
+
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        dataService
+            .Setup(service => service.LoadRiskConfigAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RiskConfig
+            {
+                MaxSingleOrderPercent = 50,
+                MaxTotalPositionPercent = 0,
+                MaxSinglePositionPercent = 0,
+                MaxDrawdownPercent = 0,
+                MaxFuturesNotionalPercent = 300,
+                RequireConfirmation = false
+            });
+        dataService
+            .Setup(service => service.GetTodayStatsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DailyStats());
+        dataService
+            .Setup(service => service.LoadTradingHaltAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((false, string.Empty, (DateTime?)null));
+
+        var riskManager = new RiskManager(
+            dataService.Object,
+            portfolioService.Object,
+            exchangeClient.Object,
+            new TradingHaltState(dataService.Object, NullLogger<TradingHaltState>.Instance),
+            new ApiHealthMonitor(),
+            NullLogger<RiskManager>.Instance);
+
+        // 现有空头敞口 2900 USDT (290%)，再卖出开空 200 USDT 将超 300% 上限
+        var openShortResult = await riskManager.ValidateOrderAsync(
+            "BTCUSDT", OrderSide.Sell, 2m, 100m, OrderType.Limit);
+
+        Assert.IsFalse(openShortResult.Passed, "卖出开空增加合约名义敞口时必须受 MaxFuturesNotionalPercent 约束");
+        Assert.Contains("合约名义总敞口", openShortResult.Reason ?? string.Empty);
+
+        // 买入平空属于减风险操作，不应被名义敞口上限拦截
+        var closeShortResult = await riskManager.ValidateOrderAsync(
+            "ETHUSDT", OrderSide.Buy, 0.1m, 2900m, OrderType.Limit);
+
+        Assert.IsTrue(closeShortResult.Passed, "买入平空减小敞口时不应被名义敞口上限拒绝");
     }
 
     private static Position CreatePosition(decimal remainingQuantity)

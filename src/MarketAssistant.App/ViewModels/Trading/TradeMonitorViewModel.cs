@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Services.Dialog;
+using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -22,11 +24,19 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     private readonly TradingDataService _dataService;
     private readonly TradingStrategyService _strategyService;
     private readonly OrderStateSyncService _orderStateSyncService;
+    private readonly EmergencyStopService _emergencyStopService;
+    private readonly TradingHaltState _haltState;
+    private readonly LiquidationRiskEvaluator _liquidationRiskEvaluator;
+    private readonly StrategyPerformanceService _performanceService;
+    private readonly IDialogService _dialogService;
+    private readonly INotificationService _notificationService;
 
     public ObservableCollection<AssetBalance> Balances { get; } = [];
     public ObservableCollection<ExchangeOrderResult> OpenOrders { get; } = [];
     public ObservableCollection<Position> Positions { get; } = [];
     public ObservableCollection<TradingStrategy> ActiveStrategies { get; } = [];
+    /// <summary>合约持仓强平风险（仅合约模式有数据）。</summary>
+    public ObservableCollection<LiquidationRiskInfo> LiquidationRisks { get; } = [];
 
     [ObservableProperty] private decimal _totalValueUSDT;
     [ObservableProperty] private bool _isMonitorRunning;
@@ -38,11 +48,23 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _remainingDailyTrades;
     [ObservableProperty] private RiskConfig _riskConfig = new();
 
+    /// <summary>合约名义敞口占权益百分比（现货恒为 0）。</summary>
+    [ObservableProperty] private decimal _futuresNotionalPercent;
+
     // 派生展示属性（由 RefreshAsync 计算）
     [ObservableProperty] private decimal _todayPnlPercent;
     [ObservableProperty] private bool _isTodayProfitable;
     [ObservableProperty] private bool _isDailyLossHigh;
     [ObservableProperty] private bool _isPositionHigh;
+
+    /// <summary>是否存在合约强平风险数据（控制风险卡片显隐）。</summary>
+    public bool HasLiquidationRisks => LiquidationRisks.Count > 0;
+
+    /// <summary>合约名义敞口展示文本（现货模式显示"--"）。</summary>
+    public string FuturesNotionalText =>
+        _exchangeClient.IsFutures
+            ? $"{FuturesNotionalPercent:F0}% / {RiskConfig.MaxFuturesNotionalPercent:F0}%"
+            : "--";
 
     // 说明：Human-in-the-Loop 交易确认已上移至应用级 TradeConfirmationService
     // （全局对话框，不依赖本页存活），本 ViewModel 不再订阅 ConfirmationRequested。
@@ -54,6 +76,12 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         TradingDataService dataService,
         TradingStrategyService strategyService,
         OrderStateSyncService orderStateSyncService,
+        EmergencyStopService emergencyStopService,
+        TradingHaltState haltState,
+        LiquidationRiskEvaluator liquidationRiskEvaluator,
+        StrategyPerformanceService performanceService,
+        IDialogService dialogService,
+        INotificationService notificationService,
         ILogger<TradeMonitorViewModel> logger)
         : base(logger)
     {
@@ -63,9 +91,18 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         _dataService = dataService;
         _strategyService = strategyService;
         _orderStateSyncService = orderStateSyncService;
+        _emergencyStopService = emergencyStopService;
+        _haltState = haltState;
+        _liquidationRiskEvaluator = liquidationRiskEvaluator;
+        _performanceService = performanceService;
+        _dialogService = dialogService;
+        _notificationService = notificationService;
 
         _isMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
+
+        // 停机状态是本页横幅与按钮的数据源；首屏加载时刷新
+        _haltState.HaltStateChanged += OnHaltStateChanged;
 
         // 本页为分区仪表盘：空态由各分区自行提示，浮层只承担首屏骨架与失败重试
         SetRetryCommand(() => RefreshAsync());
@@ -80,6 +117,13 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
             TodayStats = await _dataService.GetTodayStatsAsync();
             RiskConfig = await _dataService.LoadRiskConfigAsync();
+
+            // 停机状态是页面横幅与紧急停止按钮的数据源，随刷新同步
+            await _haltState.EnsureLoadedAsync();
+            SyncHaltState();
+
+            // 绩效统计走本地数据库，与交易所可用性无关
+            await LoadPerformanceAsync();
 
             // 计算风控指标
             RemainingDailyTrades = Math.Max(0, RiskConfig.MaxDailyTrades - TodayStats.TradeCount);
@@ -135,6 +179,23 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
                 OpenOrders.Clear();
                 foreach (var o in orders)
                     OpenOrders.Add(o);
+
+                // 强平风险快照：由周期评估器维护，此处只读取（避免页面刷新触发额外交易所查询）
+                LiquidationRisks.Clear();
+                foreach (var risk in _liquidationRiskEvaluator.LatestRisks)
+                    LiquidationRisks.Add(risk);
+                OnPropertyChanged(nameof(HasLiquidationRisks));
+
+                // 合约名义敞口：现货无杠杆敞口概念，保持 0
+                FuturesNotionalPercent = 0;
+                if (_exchangeClient.IsFutures && TotalValueUSDT > 0)
+                {
+                    var exchangePositions = await _exchangeClient.GetPositionsAsync();
+                    var notional = exchangePositions.Sum(p =>
+                        Math.Abs(p.PositionAmt) * (p.MarkPrice > 0 ? p.MarkPrice : p.EntryPrice));
+                    FuturesNotionalPercent = notional / TotalValueUSDT * 100;
+                    OnPropertyChanged(nameof(FuturesNotionalText));
+                }
             }
             catch (Exception ex) when (ex is InvalidOperationException ||
                                        ex.InnerException is InvalidOperationException)
@@ -186,9 +247,20 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         Avalonia.Threading.Dispatcher.UIThread.Post(() => IsMonitorRunning = isRunning);
     }
 
+    /// <summary>停机状态变化（可能来自其它页面或重启后的首次加载）时同步到绑定属性。</summary>
+    private void OnHaltStateChanged(bool halted)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsTradingHalted = halted;
+            HaltReason = _haltState.HaltReason;
+        });
+    }
+
     public void Dispose()
     {
         _marketMonitor.StatusChanged -= OnMonitorStatusChanged;
+        _haltState.HaltStateChanged -= OnHaltStateChanged;
         GC.SuppressFinalize(this);
     }
 }

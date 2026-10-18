@@ -138,7 +138,10 @@
     <x:Double x:Key="SidebarMinWidth">420</x:Double>
     <x:Double x:Key="SidebarMaxWidth">800</x:Double>
     <x:Double x:Key="NotificationWidth">440</x:Double>
-    <x:Double x:Key="NotificationHeight">120</x:Double>
+    <x:Double x:Key="NotificationHeight">88</x:Double>
+    <!-- 通知正文最大高度：88 高度 - 上下 Padding 24 - 边框 2，可容纳 3 行（3 × CompactLineHeight 20） -->
+    <x:Double x:Key="NotificationMessageMaxHeight">60</x:Double>
+    <CornerRadius x:Key="NotificationIconCornerRadius">16</CornerRadius>
     <x:Double x:Key="DialogWidth">400</x:Double>
     <x:Double x:Key="DialogHeight">200</x:Double>
     <x:Double x:Key="LogoSize">80</x:Double>

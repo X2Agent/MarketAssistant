@@ -57,6 +57,8 @@ internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBa
                 ai_reasoning TEXT,
                 created_at TEXT NOT NULL,
                 completed_at TEXT,
+                slippage_percent TEXT,
+                realized_pnl TEXT,
                 FOREIGN KEY (strategy_id) REFERENCES strategies(id)
             )
             """,
@@ -68,6 +70,7 @@ internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBa
                 trade_count INTEGER DEFAULT 0,
                 total_pnl TEXT DEFAULT '0',
                 total_commission TEXT DEFAULT '0',
+                consecutive_losses INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (environment, date)
             )
             """,
@@ -101,6 +104,34 @@ internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBa
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (environment, market_type)
             )
+            """,
+
+        // 交易紧急停止状态：全局单例行（不随 environment 分键）——
+        // 停机必须跨重启生效，否则重启后策略会自动复活
+        ["trading_control"] = """
+            CREATE TABLE IF NOT EXISTS trading_control (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                halted INTEGER NOT NULL DEFAULT 0,
+                reason TEXT NOT NULL DEFAULT '',
+                halted_at TEXT
+            )
+            """,
+
+        // 影子交易流水：影子模式（不下单）下的模拟成交与已实现盈亏
+        ["shadow_trades"] = """
+            CREATE TABLE IF NOT EXISTS shadow_trades (
+                id TEXT PRIMARY KEY,
+                environment TEXT NOT NULL DEFAULT 'crypto-live-spot',
+                strategy_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                side INTEGER NOT NULL,
+                quantity TEXT NOT NULL,
+                price TEXT NOT NULL,
+                fee TEXT NOT NULL DEFAULT '0',
+                pnl TEXT NOT NULL DEFAULT '0',
+                closed_quantity TEXT NOT NULL DEFAULT '0',
+                created_at TEXT NOT NULL
+            )
             """
     };
 
@@ -108,7 +139,7 @@ internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBa
     private static readonly (string Table, string[] MoneyColumns)[] MoneyColumnMigrations =
     [
         ("strategies", ["trigger_price", "stop_loss_price", "take_profit_price", "quantity", "max_position_percent", "trailing_peak_price"]),
-        ("trade_records", ["requested_qty", "executed_qty", "requested_price", "executed_price", "commission"]),
+        ("trade_records", ["requested_qty", "executed_qty", "requested_price", "executed_price", "commission", "slippage_percent", "realized_pnl"]),
         ("daily_stats", ["total_pnl", "total_commission"]),
         ("positions", ["quantity", "entry_price", "closed_quantity"]),
         ("account_snapshots", ["total_value_usdt"])
@@ -283,6 +314,12 @@ internal sealed class TradingSchemaInitializer(ILogger logger) : SqliteServiceBa
         await EnsureColumnAsync(conn, transaction, "strategies", "slippage_tolerance", "TEXT DEFAULT '0.003'").ConfigureAwait(false);
         // 交易所侧保护性条件单的参数指纹（策略编辑后撤旧挂新的比对依据）
         await EnsureColumnAsync(conn, transaction, "strategies", "condition_order_fingerprint", "TEXT").ConfigureAwait(false);
+        // 成交滑点（相对信号价的百分比，风控与绩效分析用）
+        await EnsureColumnAsync(conn, transaction, "trade_records", "slippage_percent", "TEXT").ConfigureAwait(false);
+        // 已实现盈亏（绩效统计用；对账补成交时增量回写）
+        await EnsureColumnAsync(conn, transaction, "trade_records", "realized_pnl", "TEXT").ConfigureAwait(false);
+        // 连续亏损计数（连续亏损熔断用）
+        await EnsureColumnAsync(conn, transaction, "daily_stats", "consecutive_losses", "INTEGER NOT NULL DEFAULT 0").ConfigureAwait(false);
         await MigrateDailyStatsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateAccountSnapshotsAsync(conn, transaction).ConfigureAwait(false);
         await MigrateRiskConfigAsync(conn, transaction).ConfigureAwait(false);

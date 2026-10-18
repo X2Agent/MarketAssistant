@@ -19,12 +19,14 @@ public class CryptoTradingExecutionTools(
     [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
     BinanceMarketDataService marketDataService,
     TradeExecutor tradeExecutor,
-    ILogger<CryptoTradingExecutionTools> logger) : ITradingExecutionTools
+    ILogger<CryptoTradingExecutionTools> logger,
+    TradingHaltState? haltState = null) : ITradingExecutionTools
 {
     private readonly CryptoPortfolioService _portfolioService = portfolioService;
     private readonly IExchangeClient _exchangeClient = exchangeClient;
     private readonly BinanceMarketDataService _marketDataService = marketDataService;
     private readonly TradeExecutor _tradeExecutor = tradeExecutor;
+    private readonly TradingHaltState? _haltState = haltState;
     private readonly ILogger<CryptoTradingExecutionTools> _logger = logger;
 
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
@@ -99,6 +101,16 @@ public class CryptoTradingExecutionTools(
     {
         try
         {
+            if (_haltState != null)
+            {
+                await _haltState.EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
+                if (_haltState.IsHalted)
+                {
+                    _logger.LogWarning("交易处于紧急停止状态，拒绝 Agent 撤单请求: {Symbol} {OrderId}", symbol, orderId);
+                    return false;
+                }
+            }
+
             await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString(), cancellationToken);
             return true;
         }
