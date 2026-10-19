@@ -182,22 +182,53 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void RebuildNavigationItems()
     {
-        MainNavigationItems.Clear();
-        BottomNavigationItems.Clear();
-
-        MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
-        // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
-        if (IsTradingVisible())
+        _isSynchronizingNavigationSelection = true;
+        try
         {
-            MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _pageViewModelFactory.Create<TradingPageViewModel>()));
-        }
+            MainNavigationItems.Clear();
+            BottomNavigationItems.Clear();
 
-        // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
-        BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
-        BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
+            // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
+            if (IsTradingVisible())
+            {
+                MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _pageViewModelFactory.Create<TradingPageViewModel>()));
+            }
+
+            // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
+            BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
+            BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
+
+            SyncNavigationSelectionToRootTitle();
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
+        }
+    }
+
+    private void SyncNavigationSelectionToRootTitle()
+    {
+        var rootTitle = _navigationService.CurrentRootNavigationItemTitle;
+        if (rootTitle == null)
+            return;
+
+        _isSynchronizingNavigationSelection = true;
+        try
+        {
+            var mainItem = MainNavigationItems.FirstOrDefault(item => item.Title == rootTitle);
+            SelectedMainNavigationItem = mainItem;
+            SelectedBottomNavigationItem = mainItem == null
+                ? BottomNavigationItems.FirstOrDefault(item => item.Title == rootTitle)
+                : null;
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
+        }
     }
 
     /// <summary>
@@ -292,25 +323,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         else if (e.PropertyName == nameof(NavigationService.CurrentRootNavigationItemTitle))
         {
-            if (_navigationService.CurrentRootNavigationItemTitle != null)
-            {
-                _isSynchronizingNavigationSelection = true;
-                try
-                {
-                    var mainItem = MainNavigationItems.FirstOrDefault(
-                        item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
-                    SelectedMainNavigationItem = mainItem;
-                    SelectedBottomNavigationItem = mainItem == null
-                        ? BottomNavigationItems.FirstOrDefault(
-                            item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
-                        : null;
-                }
-                finally
-                {
-                    _isSynchronizingNavigationSelection = false;
-                }
-            }
-
+            SyncNavigationSelectionToRootTitle();
             OnTickerPageChanged();
         }
     }

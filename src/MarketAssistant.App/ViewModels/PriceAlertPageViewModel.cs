@@ -41,7 +41,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     private readonly MarketContext _marketContext;
     private readonly IDialogService _dialogService;
     private readonly IUserSettingService _userSettingService;
-    private readonly IAlertCenterService _alertCenterService;
 
     /// <summary>
     /// 资产下拉列表加载取消令牌，避免快速切换市场时竞态覆盖。
@@ -110,19 +109,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
 
         // 进入历史标签页即视为已阅：清除未读徽标（MainWindowViewModel 经 AlertsChanged 刷新）
         if (value == 1)
-            _ = MarkAllAlertsReadAsync();
-    }
-
-    private async Task MarkAllAlertsReadAsync()
-    {
-        try
-        {
-            await _alertCenterService.MarkAllReadAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "进入历史页标记告警已读失败");
-        }
+            _ = AlertHistory.MarkAllReadCommand.ExecuteAsync(null);
     }
 
     public PriceAlertPageViewModel(
@@ -138,7 +125,6 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
         _marketContext = marketContext;
         _dialogService = dialogService;
         _userSettingService = userSettingService;
-        _alertCenterService = alertCenterService;
         AlertHistory = new AlertHistoryViewModel(alertCenterService, marketContext, logger);
 
         EmptyMessage = "在上方添加价格告警规则：持续告警进入目标区间提醒一次、离开后自动复位；一次性告警触发后自动停用";
@@ -183,10 +169,7 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     /// </summary>
     private async Task SearchAssetsAsync(string keyword)
     {
-        // 只取消不 Dispose：在飞搜索仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
-        _assetLoadCts?.Cancel();
-        _assetLoadCts = new CancellationTokenSource();
-        var cancellationToken = _assetLoadCts.Token;
+        var cancellationToken = ResetCancellationToken(ref _assetLoadCts);
 
         try
         {

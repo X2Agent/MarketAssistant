@@ -81,16 +81,19 @@ public sealed class AlertCenterService(
         else
             await InsertAlertAsync(alert, cancellationToken);
 
-        // 确认级交易联动：登记触发中的告警，TradeExecutor 据此强制人工确认
+        // 确认级交易联动：登记触发中的告警，TradeExecutor 据此强制人工确认。
+        // 同一 (来源, 市场, 标的, 标题) 重入或合并窗口内重复触发时只激活一次计数，
+        // 保证后续单次 RaiseAlertClearedAsync 即可将对应门控计数归零。
         if (alert.TradingImpact == AlertTradingImpact.RequireConfirmation)
         {
+            var gateKey = (alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol), alert.Title);
             lock (_stateSync)
             {
-                _activeGatedAlerts[(alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol), alert.Title)] =
-                    mergedAlertId ?? alert.Id;
+                var isNewGate = !_activeGatedAlerts.ContainsKey(gateKey);
+                _activeGatedAlerts[gateKey] = mergedAlertId ?? alert.Id;
+                if (isNewGate)
+                    _alertGate.Activate(alert.MarketType, alert.Symbol);
             }
-
-            _alertGate.Activate(alert.MarketType, alert.Symbol);
         }
 
         // policy 已统一判定触达抑制（合并窗口 + 静默），被抑制的告警仍落库、

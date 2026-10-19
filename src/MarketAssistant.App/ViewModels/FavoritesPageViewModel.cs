@@ -128,11 +128,7 @@ public partial class FavoritesPageViewModel : ViewModelBase, IRecipient<AssetFav
 
     private async Task LoadFavoriteAssetsAsync()
     {
-        // 取消上一次加载任务，避免并发加载导致列表闪烁或重复项；
-        // 只取消不 Dispose：在飞加载仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
-        _loadCts?.Cancel();
-        _loadCts = new CancellationTokenSource();
-        var ct = _loadCts.Token;
+        var ct = ResetCancellationToken(ref _loadCts);
 
         await LoadAsync(async token =>
         {

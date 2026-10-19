@@ -18,8 +18,32 @@ env:
   APP_NAME: MarketAssistant
 
 jobs:
+  # 单元测试质量门禁
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore MarketAssistant.slnx
+
+      - name: Build solution
+        run: dotnet build MarketAssistant.slnx -c Debug --no-restore
+
+      - name: Run unit tests
+        run: dotnet test tests/TestMarketAssistant.csproj -c Debug --no-build -s tests/unit.runsettings --logger "trx;LogFileName=test-results.trx"
+
   # Windows 构建
   build-windows:
+    needs: [test]
     runs-on: windows-latest
 
     steps:
@@ -111,6 +135,7 @@ jobs:
 
   # macOS 构建
   build-macos:
+    needs: [test]
     runs-on: macos-latest
 
     steps:
@@ -179,6 +204,7 @@ jobs:
 
   # Linux 构建
   build-linux:
+    needs: [test]
     runs-on: ubuntu-latest
 
     steps:

@@ -162,9 +162,11 @@ public sealed partial class AISignalStrategyExecutor
             : currentPrice * (1 - aiParams.TakeProfitPercent / 100m);
         var takeProfit = Math.Round(takeProfitValid ? aiTakeProfit!.Value : takeProfitFallback, 8);
 
+        if (executedQty > 0)
+            strategy.Quantity = executedQty;
         strategy.StopLossPrice = stopLoss;
         strategy.TakeProfitPrice = takeProfit;
-        await _dataService.UpdateStrategyGuardrailsAsync(strategy.Id, stopLoss, takeProfit, ct)
+        await _dataService.UpdateStrategyGuardrailsAsync(strategy.Id, stopLoss, takeProfit, executedQty, ct)
             .ConfigureAwait(false);
         _logger.LogInformation(
             "AI 护栏已附加: {StrategyId} 止损 {StopLoss} 止盈 {TakeProfit}（{Source}）",

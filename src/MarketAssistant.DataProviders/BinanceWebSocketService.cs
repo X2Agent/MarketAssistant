@@ -255,8 +255,10 @@ public sealed class BinanceWebSocketService(ILogger<BinanceWebSocketService> log
                     result = await ws.ReceiveAsync(buffer, ct);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        _logger.LogInformation("Binance WebSocket 服务端关闭连接");
+                        _logger.LogInformation("Binance WebSocket 服务端关闭连接，将在 {Delay}ms 后重连", ReconnectDelayMs);
                         NotifyConnectionInterrupted();
+                        if (!ct.IsCancellationRequested)
+                            await ScheduleReconnectIfCurrentAsync(ws, ct);
                         return;
                     }
                     messageStream.Write(buffer, 0, result.Count);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.DataProviders;
@@ -71,7 +72,21 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
         _symbolResolver = symbolResolver;
 
         _wsService.PriceUpdated += OnCryptoPriceUpdated;
+        WeakReferenceMessenger.Default.Register<AssetFavoritesChanged>(this, OnFavoritesChanged);
         _pollingTask = Task.Run(() => PollASharePricesAsync(_pollingCts.Token));
+    }
+
+    private void OnFavoritesChanged(object recipient, AssetFavoritesChanged message)
+    {
+        _symbolResolver.InvalidateCache();
+        _ = RefreshWatchlistOnFavoritesChangedAsync();
+    }
+
+    private async Task RefreshWatchlistOnFavoritesChangedAsync()
+    {
+        await _symbolResolver.WarmWatchlistCacheAsync(MarketType.Crypto, _pollingCts.Token);
+        await _symbolResolver.WarmWatchlistCacheAsync(MarketType.AShare, _pollingCts.Token);
+        await RefreshCryptoSubscriptionSafeAsync();
     }
 
     /// <summary>
@@ -867,6 +882,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
     /// </summary>
     public async ValueTask DisposeAsync()
     {
+        WeakReferenceMessenger.Default.UnregisterAll(this);
         _wsService.PriceUpdated -= OnCryptoPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.PriceAlerts);
         _pollingCts.Cancel();
@@ -895,6 +911,7 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
     /// </summary>
     public void Dispose()
     {
+        WeakReferenceMessenger.Default.UnregisterAll(this);
         _wsService.PriceUpdated -= OnCryptoPriceUpdated;
         _ = _wsService.UnsubscribeAllAsync(WebSocketSubscriberKeys.PriceAlerts);
         _pollingCts.Cancel();

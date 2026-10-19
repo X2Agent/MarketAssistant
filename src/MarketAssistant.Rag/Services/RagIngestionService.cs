@@ -183,24 +183,42 @@ public class RagIngestionService(
             }
         }
 
-        // P1-01 文档级替换：有任何段落入库时，删除旧版本残留 Key 并更新清单；
+        // P1-01 文档级替换：全部分块成功入库时，删除旧版本残留 Key 并更新清单；
+        // 部分分块失败时保留未覆盖的旧版段落键，避免网络抖动导致知识库段落缺失；
         // 全失败（IsFailure）时保留旧清单，便于下次重试后恢复一致。
         if (paragraphCount > 0)
         {
             try
             {
                 var oldKeys = await _documentCatalog.GetKeysAsync(collectionName, documentId, cancellationToken);
-                var staleKeys = oldKeys.Except(newKeys).ToList();
-                foreach (var staleKey in staleKeys)
+                if (failures.Count == 0)
                 {
-                    await collection.DeleteAsync(staleKey, cancellationToken);
-                }
+                    var staleKeys = oldKeys.Except(newKeys).ToList();
+                    foreach (var staleKey in staleKeys)
+                    {
+                        await collection.DeleteAsync(staleKey, cancellationToken);
+                    }
 
-                if (staleKeys.Count > 0)
+                    if (staleKeys.Count > 0)
+                    {
+                        _logger.LogInformation(
+                            "文档级替换：{File} 删除旧段落 {StaleCount} 个（新段落 {NewCount} 个）",
+                            filePath, staleKeys.Count, newKeys.Count);
+                    }
+                }
+                else
                 {
-                    _logger.LogInformation(
-                        "文档级替换：{File} 删除旧段落 {StaleCount} 个（新段落 {NewCount} 个）",
-                        filePath, staleKeys.Count, newKeys.Count);
+                    foreach (var oldKey in oldKeys)
+                    {
+                        if (!newKeys.Contains(oldKey, StringComparer.Ordinal))
+                        {
+                            newKeys.Add(oldKey);
+                        }
+                    }
+
+                    _logger.LogWarning(
+                        "文档部分分块摄取失败（失败 {FailureCount} 个），跳过旧段落清理以保护既有知识库完整性: {File}",
+                        failures.Count, filePath);
                 }
 
                 // 文档内容哈希：以原始字节流计算 SHA-256，避免整文件读入内存

@@ -480,6 +480,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                 assetCode,
                 runId,
                 _analysisCts.Token);
+            if (_disposed || runId != _activeAnalysisRunId)
+                return;
+
             var report = result.Report;
 
             _lastReport = report;
@@ -490,8 +493,14 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             if (!result.FromCache)
                 await RefreshHistoryAsync(StockCode);
 
+            if (_disposed || runId != _activeAnalysisRunId)
+                return;
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
+                if (_disposed || runId != _activeAnalysisRunId)
+                    return;
+
                 AnalysisReportViewModel.UpdateWithReport(report);
                 if (ChatSidebarViewModel != null)
                 {
@@ -661,6 +670,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     public void OnNavigatedFrom()
     {
         _analysisCts?.Cancel();
+        _progressSmoothTimer.Stop();
         _activeAnalysisRunId = null;
         IsChatSidebarVisible = false;
     }

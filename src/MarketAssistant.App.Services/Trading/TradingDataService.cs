@@ -89,9 +89,9 @@ public class TradingDataService
     public virtual Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
         => _strategies.UpdateStrategyCustomParamsAsync(id, customParams, ct);
 
-    public Task UpdateStrategyGuardrailsAsync(
-        string id, decimal? stopLossPrice, decimal? takeProfitPrice, CancellationToken ct = default)
-        => _strategies.UpdateStrategyGuardrailsAsync(id, stopLossPrice, takeProfitPrice, ct);
+    public virtual Task UpdateStrategyGuardrailsAsync(
+        string id, decimal? stopLossPrice, decimal? takeProfitPrice, decimal? quantity = null, CancellationToken ct = default)
+        => _strategies.UpdateStrategyGuardrailsAsync(id, stopLossPrice, takeProfitPrice, quantity, ct);
 
     /// <remarks>virtual 供单元测试替换。</remarks>
     public virtual Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
@@ -149,10 +149,10 @@ public class TradingDataService
 
     // ─────────────────────────── 账户快照 ───────────────────────────
 
-    public Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
+    public virtual Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
         => _accountSnapshots.SaveAccountSnapshotAsync(totalValueUsdt, ct);
 
-    public Task<decimal> GetPeakAccountValueAsync(DateTime? since = null, CancellationToken ct = default)
+    public virtual Task<decimal> GetPeakAccountValueAsync(DateTime? since = null, CancellationToken ct = default)
         => _accountSnapshots.GetPeakAccountValueAsync(since, ct);
 
     // ─────────────────────────── 风控配置 ───────────────────────────

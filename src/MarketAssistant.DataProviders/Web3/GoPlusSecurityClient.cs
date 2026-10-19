@@ -43,10 +43,9 @@ public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, I
         if (data.Result.TryGetValue(lookupKey, out var security))
             return security;
 
-        // GoPlus 返回的 result 键大小写不保证与入参一致，未精确命中时忽略大小写回退
+        // GoPlus 返回的 result 键大小写不保证与入参一致，未精确命中时忽略大小写匹配目标地址；仍未命中则返回 null
         return data.Result.FirstOrDefault(kv =>
-            string.Equals(kv.Key, normalAddress, StringComparison.OrdinalIgnoreCase)).Value
-            ?? data.Result.Values.First();
+            string.Equals(kv.Key, normalAddress, StringComparison.OrdinalIgnoreCase)).Value;
     }
 
     /// <summary>

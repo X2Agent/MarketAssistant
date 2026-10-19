@@ -47,6 +47,7 @@ public sealed partial class AnalysisAggregatorExecutor(
     private readonly object _syncRoot = new();
     private readonly List<ChatMessage> _analystMessages = [];
     private readonly List<ChatMessage> _failedMessages = [];
+    private CancellationTokenSource? _degradeCts;
     private bool _sentToCoordinator;
     private bool _degradeSendScheduled;
 
@@ -103,9 +104,12 @@ public sealed partial class AnalysisAggregatorExecutor(
             {
                 // Fan-In barrier 缺陷缓解（P0-1）：消息未收齐时不无限静默等待，
                 // 启动有界宽限计时，到期后降级发送已有结果
-                ScheduleDegradeSend(context);
+                ScheduleDegradeSend(context, cancellationToken);
                 return;
             }
+
+            // 已收齐（含全部失败）：立即取消可能正在倒计时的降级任务
+            _degradeCts?.Cancel();
 
             if (collectedCount == 0)
             {
@@ -135,14 +139,18 @@ public sealed partial class AnalysisAggregatorExecutor(
     /// <summary>
     /// 启动一次性的降级发送计时：宽限期内若正常路径仍未收齐，
     /// 则将已收到的成功结果（附降级说明）发送给 Coordinator，避免事件流无声终止。
+    /// 计时器绑定工作流取消令牌，并在正常收齐或工作流取消时立即终止。
     /// </summary>
-    private void ScheduleDegradeSend(IWorkflowContext context)
+    private void ScheduleDegradeSend(IWorkflowContext context, CancellationToken workflowCancellationToken)
     {
+        CancellationToken degradeToken;
         lock (_syncRoot)
         {
-            if (_degradeSendScheduled || _sentToCoordinator)
+            if (_degradeSendScheduled || _sentToCoordinator || workflowCancellationToken.IsCancellationRequested)
                 return;
             _degradeSendScheduled = true;
+            _degradeCts = CancellationTokenSource.CreateLinkedTokenSource(workflowCancellationToken);
+            degradeToken = _degradeCts.Token;
         }
 
         _logger.LogWarning(
@@ -156,33 +164,37 @@ public sealed partial class AnalysisAggregatorExecutor(
         {
             try
             {
-                await Task.Delay(_incompleteGrace).ConfigureAwait(false);
+                await Task.Delay(_incompleteGrace, degradeToken).ConfigureAwait(false);
 
                 List<ChatMessage> successes;
                 List<ChatMessage> failures;
                 lock (_syncRoot)
                 {
-                    if (_sentToCoordinator || _analystMessages.Count == 0)
-                        return; // 正常路径已完成，或无任何成功结果可降级
+                    if (_sentToCoordinator || _analystMessages.Count == 0 || degradeToken.IsCancellationRequested)
+                        return; // 正常路径已完成、工作流已取消，或无任何成功结果可降级
                     _sentToCoordinator = true;
                     successes = [.. _analystMessages];
                     failures = [.. _failedMessages];
                 }
 
                 var payload = await BuildCoordinatorPayloadAsync(
-                    successes, failures, degraded: true, CancellationToken.None).ConfigureAwait(false);
+                    successes, failures, degraded: true, degradeToken).ConfigureAwait(false);
                 await context.SendMessageAsync(
-                    payload, CoordinatorExecutorId, CancellationToken.None).ConfigureAwait(false);
+                    payload, CoordinatorExecutorId, degradeToken).ConfigureAwait(false);
 
                 _logger.LogWarning(
                     "宽限期到，已降级发送：{SuccessCount} 成功 / {FailedCount} 失败 / 期望 {Expected}",
                     successes.Count, failures.Count, _expectedAnalystCount);
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("聚合器降级计时已取消（已正常收齐或工作流已取消）");
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "聚合器降级发送失败");
             }
-        });
+        }, degradeToken);
     }
 
     /// <summary>

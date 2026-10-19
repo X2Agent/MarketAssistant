@@ -133,6 +133,24 @@ public sealed class AnalysisAggregatorExecutorTest
         Assert.HasCount(1, sentBatches, "宽限期内收齐应走正常路径且只派发一次");
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task Collect_IncompleteWhenWorkflowCancelled_ShouldNotDegradeSend()
+    {
+        var (aggregator, context, sentBatches, _) = CreateAggregator(
+            expectedAnalystCount: 2, incompleteGrace: TimeSpan.FromMilliseconds(200));
+        using var cts = new CancellationTokenSource();
+
+        await DeliverAsync(aggregator, context, cts.Token,
+            CreateAssistantMessage("NewsEventAnalyst", "取消前收到的部分结论"));
+
+        // 宽限期到期前用户取消工作流
+        await cts.CancelAsync();
+        await Task.Delay(500);
+
+        Assert.IsEmpty(sentBatches, "工作流取消后降级计时器必须随之终止，不得向 Coordinator 派发消息");
+    }
+
     [TestCleanup]
     public void Cleanup()
     {
@@ -172,16 +190,23 @@ public sealed class AnalysisAggregatorExecutorTest
         return (aggregator, context.Object, sentBatches, instance.Store);
     }
 
+    private static Task DeliverAsync(
+        AnalysisAggregatorExecutor aggregator,
+        IWorkflowContext context,
+        params ChatMessage[] messages)
+        => DeliverAsync(aggregator, context, CancellationToken.None, messages);
+
     private static async Task DeliverAsync(
         AnalysisAggregatorExecutor aggregator,
         IWorkflowContext context,
+        CancellationToken cancellationToken,
         params ChatMessage[] messages)
     {
         // MessageHandler 为私有方法，通过反射调用（与 MAF 类型路由行为一致）
         var method = typeof(AnalysisAggregatorExecutor)
             .GetMethod("HandleAsync", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         Assert.IsNotNull(method, "私有 MessageHandler HandleAsync 应存在");
-        var task = (ValueTask)method!.Invoke(aggregator, [messages.ToList(), context, CancellationToken.None])!;
+        var task = (ValueTask)method!.Invoke(aggregator, [messages.ToList(), context, cancellationToken])!;
         await task;
     }
 

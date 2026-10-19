@@ -54,12 +54,7 @@ public partial class HomeSearchViewModel(
     /// </summary>
     partial void OnSearchQueryChanged(string value)
     {
-        // 只取消不 Dispose：在飞请求仍持有旧令牌，立即 Dispose 会偶发 ObjectDisposedException
-        // （未释放的 CTS 无非等待 GC，安全）
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
-
-        var cancellationToken = _debounceCts.Token;
+        var cancellationToken = ResetCancellationToken(ref _debounceCts);
 
         // 空字符串立即清空，不需要防抖
         if (string.IsNullOrWhiteSpace(value))

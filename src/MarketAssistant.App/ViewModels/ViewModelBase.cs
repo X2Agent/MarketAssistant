@@ -299,6 +299,18 @@ public abstract class ViewModelBase(ILogger? logger = null) : ObservableObject
     protected void UnsubscribeFromMarketChanges(MarketContext marketContext)
     {
         marketContext.PropertyChanged -= OnMarketContextPropertyChanged;
+        MarketContext = null;
+    }
+
+    /// <summary>
+    /// 取消上一次操作并创建新的 <see cref="CancellationTokenSource"/>。
+    /// 仅调用 <c>Cancel()</c> 而不立即 <c>Dispose()</c>，避免在飞异步任务读取旧令牌时抛出 <see cref="ObjectDisposedException"/>。
+    /// </summary>
+    protected static CancellationToken ResetCancellationToken(ref CancellationTokenSource? cts)
+    {
+        cts?.Cancel();
+        cts = new CancellationTokenSource();
+        return cts.Token;
     }
 
     private void OnMarketContextPropertyChanged(object? sender, PropertyChangedEventArgs e)

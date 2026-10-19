@@ -86,7 +86,7 @@ public class MarketMonitor : IDisposable
     private readonly Action _connectionInterruptedAdapter;
     private readonly Action _connectionRestoredAdapter;
 
-    public bool IsRunning => _isRunning;
+    public virtual bool IsRunning => _isRunning;
 
     /// <summary>
     /// 当交易执行时触发的事件（UI 可订阅来刷新）
@@ -97,6 +97,27 @@ public class MarketMonitor : IDisposable
     /// 当监控状态变化时触发
     /// </summary>
     public event Action<bool>? StatusChanged;
+
+    /// <summary>供单元测试派生/Mock 使用。</summary>
+    protected MarketMonitor()
+    {
+        _webSocketService = null!;
+        _strategyEngine = null!;
+        _tradeExecutor = null!;
+        _aiSignalExecutor = null!;
+        _orderStateSyncService = null!;
+        _conditionOrderService = null!;
+        _strategyService = null!;
+        _dataService = null!;
+        _userDataStreamService = null!;
+        _riskAlertEvaluator = null!;
+        _signalAlertEvaluator = null!;
+        _haltState = null!;
+        _logger = Microsoft.Extensions.Logging.Abstractions.NullLogger<MarketMonitor>.Instance;
+        _priceUpdatedAdapter = static (_, _, _) => { };
+        _connectionInterruptedAdapter = static () => { };
+        _connectionRestoredAdapter = static () => { };
+    }
 
     public MarketMonitor(
         BinanceWebSocketService webSocketService,
@@ -199,7 +220,7 @@ public class MarketMonitor : IDisposable
     /// </summary>
     /// <returns>true = 所有在途策略任务已结束；false = 等待超时，仍有未完成任务，
     /// 调用方（如交易模式切换）应据此中止后续操作</returns>
-    public async Task<bool> TryStopAsync()
+    public virtual async Task<bool> TryStopAsync()
     {
         await _lifecycleLock.WaitAsync();
         try

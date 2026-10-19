@@ -5,7 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.DataProviders;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Dialog;
@@ -22,7 +21,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     private readonly TradingDataService _dataService;
     private readonly MarketMonitor _marketMonitor;
     private readonly IDialogService _dialogService;
-    private readonly BinanceMarketDataService _marketDataService;
+    private readonly CryptoPortfolioService _portfolioService;
     private readonly INotificationService _notificationService;
     private bool _disposed;
 
@@ -171,7 +170,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         TradingDataService dataService,
         MarketMonitor marketMonitor,
         IDialogService dialogService,
-        BinanceMarketDataService marketDataService,
+        CryptoPortfolioService portfolioService,
         INotificationService notificationService,
         ILogger<StrategyConfigViewModel> logger)
         : base(logger)
@@ -180,7 +179,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         _dataService = dataService;
         _marketMonitor = marketMonitor;
         _dialogService = dialogService;
-        _marketDataService = marketDataService;
+        _portfolioService = portfolioService;
         _notificationService = notificationService;
         IsMonitorRunning = _marketMonitor.IsRunning;
         _marketMonitor.StatusChanged += OnMonitorStatusChanged;
@@ -395,8 +394,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         {
             ValidationError = string.Empty;
             var symbol = NewSymbol.ToUpperInvariant().Trim();
-            var ticker = await _marketDataService.Get24hrTickerAsync(symbol);
-            var lastPrice = ticker?.LastPrice;
+            var lastPrice = await _portfolioService.GetLatestPriceAsync(symbol);
             if (lastPrice is not > 0)
             {
                 ValidationError = $"无法获取 {symbol} 当前价格，请检查交易对或手动填写区间";

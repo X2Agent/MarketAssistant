@@ -258,6 +258,7 @@ internal sealed class TradeRecordRepository(
             existingRecord.CommissionAsset = latestOrder.CommissionAsset!;
         existingRecord.Status = latestStatus;
         existingRecord.CompletedAt = completedAt;
+        existingRecord.RealizedPnl += realizedPnl;
 
         await UpdateTradeRecordAsync(existingRecord, ct).ConfigureAwait(false);
         return existingRecord;
@@ -276,7 +277,8 @@ internal sealed class TradeRecordRepository(
                 commission = @commission,
                 commission_asset = @commissionAsset,
                 status = @status,
-                completed_at = @completedAt
+                completed_at = @completedAt,
+                realized_pnl = @realizedPnl
             WHERE id = @id AND environment = @environment
             """;
         cmd.Parameters.AddWithValue("@id", record.Id);
@@ -288,6 +290,7 @@ internal sealed class TradeRecordRepository(
         cmd.Parameters.AddWithValue("@commissionAsset", (object?)record.CommissionAsset ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@status", (int)record.Status);
         cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
+        cmd.Parameters.AddWithValue("@realizedPnl", ToDb(record.RealizedPnl));
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

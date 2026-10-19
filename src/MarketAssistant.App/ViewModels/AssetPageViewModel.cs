@@ -697,24 +697,24 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
             // 之后自动回到 UI 线程，包 Task.Run 会把 IsBusy/HasError 等绑定属性丢到线程池线程写入，
             // 触发 Avalonia 跨线程异常
             _ = LoadAssetDataAsync(parameter.Code);
-
-            // 支持实时推送的市场订阅实时价格
-            // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
-            var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
-            if (_marketContext.GetService<IMarketCapability>(effectiveMarket).SupportsRealtime)
-            {
-                BindRealtimeQuoteService(_marketContext.GetService<IRealtimeQuoteService>(effectiveMarket));
-                // 订阅前先整体替换，防止重复
-                _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.AssetDetail, [parameter.Code]);
-            }
-            else
-            {
-                DetachRealtimeQuoteService();
-            }
-
-            // 无实时推送的市场（A 股）由轮询计时器保持盘口新鲜；有推送的市场轮询触发会被节流跳过
-            StartOrderBookPolling();
         }
+
+        // 支持实时推送的市场订阅实时价格（首次进入与 GoBack 重新激活均需恢复事件与订阅）
+        // 优先使用参数携带的 MarketType，避免导航期间切换市场导致的竞态
+        var effectiveMarket = parameter.MarketType ?? _marketContext.CurrentMarket;
+        if (_marketContext.GetService<IMarketCapability>(effectiveMarket).SupportsRealtime)
+        {
+            BindRealtimeQuoteService(_marketContext.GetService<IRealtimeQuoteService>(effectiveMarket));
+            // 订阅前先整体替换，防止重复
+            _ = _quoteService!.SubscribeAsync(RealtimeQuoteSubscriberKeys.AssetDetail, [parameter.Code]);
+        }
+        else
+        {
+            DetachRealtimeQuoteService();
+        }
+
+        // 无实时推送的市场（A 股）由轮询计时器保持盘口新鲜；有推送的市场轮询触发会被节流跳过
+        StartOrderBookPolling();
 
         // 刷新收藏状态（首次进入与 GoBack 重新激活均需同步）
         _ = RefreshFavoriteStateAsync();
@@ -745,7 +745,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         _orderBookPollTimer.Start();
     }
 
-    private void StopOrderBookPolling() => _orderBookPollTimer?.Stop();
+    private void StopOrderBookPolling()
+    {
+        if (_orderBookPollTimer == null)
+            return;
+
+        _orderBookPollTimer.Stop();
+        _orderBookPollTimer.Tick -= OnOrderBookPollTick;
+    }
 
     private void OnOrderBookPollTick(object? sender, EventArgs e)
     {
@@ -761,7 +768,11 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     private void BindRealtimeQuoteService(IRealtimeQuoteService service)
     {
         if (ReferenceEquals(service, _quoteService))
+        {
+            _quoteService.PriceUpdated -= OnDetailPriceUpdated;
+            _quoteService.PriceUpdated += OnDetailPriceUpdated;
             return;
+        }
 
         DetachRealtimeQuoteService();
         _quoteService = service;
@@ -804,7 +815,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void OnNavigatedFrom()
     {
         _loadingCancellationTokenSource?.Cancel();
-        _quoteService?.PriceUpdated -= OnDetailPriceUpdated;
+        DetachRealtimeQuoteService();
         StopOrderBookPolling();
     }
 

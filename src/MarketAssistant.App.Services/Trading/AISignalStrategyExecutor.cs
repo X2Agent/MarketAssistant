@@ -237,7 +237,8 @@ public sealed partial class AISignalStrategyExecutor(
             return new AISignalExecutionResult(null, result);
 
         // 成交后自动附加护栏：本地按决策价/档案兜底价生成并持久化，下个 tick 即生效
-        await ApplyGuardrailsAsync(strategy, aiParams, entrySide, currentPrice, quantity, decision, ct)
+        var effectiveExecutedQty = result.Record.ExecutedQty > 0 ? result.Record.ExecutedQty : quantity;
+        await ApplyGuardrailsAsync(strategy, aiParams, entrySide, currentPrice, effectiveExecutedQty, decision, ct)
             .ConfigureAwait(false);
         await _dataService.UpdateStrategyTriggeredAsync(strategy.Id, ct).ConfigureAwait(false);
 

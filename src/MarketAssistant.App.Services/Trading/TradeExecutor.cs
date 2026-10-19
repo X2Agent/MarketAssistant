@@ -442,7 +442,7 @@ public class TradeExecutor(
     /// 紧急场景下等确认等于把用户暴露在风险中——但保留客户端快照一致性、symbol 锁、
     /// 合约开平仓判定、网络重试、成交记录与持仓回写等全部资金安全机制。
     /// </summary>
-    public async Task<TradeResult> ExecuteEmergencyCloseAsync(
+    public virtual async Task<TradeResult> ExecuteEmergencyCloseAsync(
         string instrumentSymbol, OrderSide side, decimal quantity, decimal currentPrice,
         CancellationToken ct = default,
         TradingMode? expectedMode = null)

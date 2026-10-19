@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,15 +16,25 @@ namespace MarketAssistant.Applications.PriceAlert;
 /// <para>自选股集合带 TTL 缓存：价格 tick 每秒到达，逐 tick 查库会把批量规则的评估
 /// 变成数据库压力；行情事件处理器是同步回调，冷缓存时只预热并跳过本次 tick。</para>
 /// </remarks>
-public sealed class AlertRuleSymbolResolver(
-    IServiceProvider serviceProvider,
-    ILogger<AlertRuleSymbolResolver> logger)
+public sealed class AlertRuleSymbolResolver : IDisposable
 {
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<AlertRuleSymbolResolver> _logger;
+
     /// <summary>自选股集合缓存时长。自选股变更有独立路径，TTL 兜底新鲜度。</summary>
     private static readonly TimeSpan WatchlistCacheTtl = TimeSpan.FromSeconds(30);
 
     private readonly object _cacheSync = new();
     private readonly Dictionary<MarketType, (DateTime CachedAtUtc, IReadOnlyList<string> Symbols)> _watchlistCache = [];
+
+    public AlertRuleSymbolResolver(
+        IServiceProvider serviceProvider,
+        ILogger<AlertRuleSymbolResolver> logger)
+    {
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        WeakReferenceMessenger.Default.Register<AssetFavoritesChanged>(this, (_, _) => InvalidateCache());
+    }
 
     /// <summary>解析单条规则实际评估的行情符号（符号形式与规则的 AssetCode 约定一致，由调用方按市场转换）。</summary>
     public async Task<IReadOnlyList<string>> ResolveSymbolsAsync(
@@ -89,7 +100,7 @@ public sealed class AlertRuleSymbolResolver(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "预热自选股缓存失败: {MarketType}", marketType);
+            _logger.LogWarning(ex, "预热自选股缓存失败: {MarketType}", marketType);
         }
     }
 
@@ -121,11 +132,17 @@ public sealed class AlertRuleSymbolResolver(
     private async Task<IReadOnlyList<string>> LoadWatchlistSymbolsAsync(
         MarketType marketType, CancellationToken cancellationToken)
     {
-        var favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
+        var favoriteService = _serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
         var favorites = await favoriteService.GetFavoritesCodesAsync(cancellationToken).ConfigureAwait(false);
         return [.. favorites
             .Select(favorite => favorite.Code)
             .Where(code => !string.IsNullOrWhiteSpace(code))
             .Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    public void Dispose()
+    {
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        GC.SuppressFinalize(this);
     }
 }

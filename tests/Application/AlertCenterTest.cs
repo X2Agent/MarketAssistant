@@ -162,6 +162,28 @@ public sealed class AlertCenterTest
         Assert.IsFalse(_gate.IsGated(MarketType.Crypto, TestSymbol));
     }
 
+    /// <summary>
+    /// 同一确认级规则在未解除前重复触发（如合并窗口内多次上报）：
+    /// 门计数只应登记一次，单次 RaiseAlertClearedAsync 即可完全释放门控。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task RaiseAlert_DuplicateConfirmationSameKey_ShouldReleaseGateOnSingleClear()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            await _service.RaiseAlertAsync(CreateAlert(
+                "重复确认级告警", AlertLevel.Critical, AlertTradingImpact.RequireConfirmation));
+        }
+
+        Assert.IsTrue(_gate.IsGated(MarketType.Crypto, TestSymbol));
+
+        await _service.RaiseAlertClearedAsync(
+            AlertSource.PriceAlert, MarketType.Crypto, TestSymbol, "重复确认级告警");
+        Assert.IsFalse(_gate.IsGated(MarketType.Crypto, TestSymbol),
+            "重复触发同一确认级告警后，单次解除应将门计数归零");
+    }
+
     [TestMethod]
     [TestCategory("Unit")]
     public async Task RaiseAlert_NonConfirmationImpact_ShouldNotTouchGate()

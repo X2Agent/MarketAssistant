@@ -143,6 +143,15 @@ public class CryptoPortfolioService(
         return positions;
     }
 
+    /// <summary>
+    /// 获取指定交易对的最新成交价（供 UI 策略配置生成参考区间等使用）。
+    /// </summary>
+    public virtual async Task<decimal?> GetLatestPriceAsync(string symbol, CancellationToken ct = default)
+    {
+        var ticker = await TryGetTickerAsync(symbol, ct).ConfigureAwait(false);
+        return ticker?.LastPrice;
+    }
+
     private async Task<Binance24hrTicker?> TryGetTickerAsync(string symbol, CancellationToken ct)
     {
         try

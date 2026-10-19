@@ -122,8 +122,9 @@
       </div>
     </div>
 
+    <script>/* __KLINECHARTS_BUNDLE__ */</script>
     <script>
-      // CDN地址配置
+      // CDN地址配置（当内置脚本未注入时的兜底回退）
       const cdnUrls = [
         'https://unpkg.com/klinecharts@9.6.0/dist/klinecharts.min.js',
         'https://cdn.jsdelivr.net/npm/klinecharts@9.6.0/dist/klinecharts.min.js'
@@ -146,8 +147,14 @@
         });
       }
 
-      // 尝试加载KLineChart库
+      // 尝试加载KLineChart库（优先使用内置本地脚本，离线/内网无需访问外网CDN）
       async function loadKLineCharts() {
+        if (typeof klinecharts !== 'undefined') {
+          console.log('KLineChart库已通过本地内置资源加载');
+          initializeChart();
+          return;
+        }
+
         for (let i = 0; i < cdnUrls.length; i++) {
           try {
             await loadScript(cdnUrls[i]);
