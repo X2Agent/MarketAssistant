@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Services.Trading;
@@ -5,14 +6,9 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 策略编排服务：统一封装策略增删改，并广播策略集合变化。
 /// </summary>
-public class TradingStrategyService
+public class TradingStrategyService(TradingDataService dataService)
 {
-    private readonly TradingDataService _dataService;
-
-    public TradingStrategyService(TradingDataService dataService)
-    {
-        _dataService = dataService;
-    }
+    private readonly TradingDataService _dataService = dataService;
 
     public event EventHandler? StrategiesChanged;
 
@@ -28,6 +24,11 @@ public class TradingStrategyService
 
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(strategy.Symbol))
+        {
+            strategy.Symbol = CryptoSymbolConverter.ToBinanceFormat(strategy.Symbol);
+        }
+
         await _dataService.SaveStrategyAsync(strategy, ct).ConfigureAwait(false);
         RaiseStrategiesChanged();
     }

@@ -231,47 +231,4 @@ public sealed class SecureSettingsMigrationTest
         Assert.AreEqual(MCPServerConfig.CurrentToolsSchemaVersion, reloaded.GetConfig("server-new")!.ToolsSchemaVersion);
     }
 
-    private sealed class InMemorySecureSettingsStore : ISecureSettingsStore
-    {
-        public bool FailWrites { get; init; }
-
-        public string Json { get; private set; } = string.Empty;
-
-        public bool Exists() => Json.Length > 0;
-
-        public T? Read<T>() => Json.Length == 0 ? default : JsonSerializer.Deserialize<T>(Json);
-
-        public void Write<T>(T value)
-        {
-            if (FailWrites)
-                throw new SecureSettingsException("simulated", new InvalidOperationException());
-
-            Json = JsonSerializer.Serialize(value);
-        }
-
-        public void Seed<T>(T value)
-        {
-            Json = JsonSerializer.Serialize(value);
-        }
-    }
-
-    private sealed class TemporaryDirectory : IDisposable
-    {
-        public TemporaryDirectory()
-        {
-            Path = System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "MarketAssistantTests",
-                Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(Path);
-        }
-
-        public string Path { get; }
-
-        public void Dispose()
-        {
-            if (Directory.Exists(Path))
-                Directory.Delete(Path, recursive: true);
-        }
-    }
 }

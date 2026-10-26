@@ -8,14 +8,9 @@ namespace MarketAssistant.DataProviders.AShare;
 /// 泛型反序列化由本层统一执行（容错字符串数值/null/-- 占位），
 /// 业务 DTO 类型仍归属上层契约模块。
 /// </summary>
-public sealed class ZhiTuMarketClient
+public sealed class ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    }
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
 
     /// <summary>
     /// 获取财务报表类列表数据（<c>/hs/fin/{endpoint}/{code}</c>）。
@@ -25,7 +20,7 @@ public sealed class ZhiTuMarketClient
         string endpoint, string zhiTuCode, string token,
         string startDate, string endDate, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/fin/{endpoint}/{zhiTuCode}?token={token}&st={startDate}&et={endDate}";
+        var path = $"/hs/fin/{Uri.EscapeDataString(endpoint)}/{Uri.EscapeDataString(zhiTuCode)}?token={Uri.EscapeDataString(token)}&st={Uri.EscapeDataString(startDate)}&et={Uri.EscapeDataString(endDate)}";
         return await GetListAsync<T>(path, cancellationToken);
     }
 
@@ -36,7 +31,7 @@ public sealed class ZhiTuMarketClient
     public async Task<List<T>> GetIndicatorListAsync<T>(
         string indicator, string zhiTuCode, string token, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/history/{indicator}/{zhiTuCode}/d/n?token={token}&lt=30";
+        var path = $"/hs/history/{Uri.EscapeDataString(indicator)}/{Uri.EscapeDataString(zhiTuCode)}/d/n?token={Uri.EscapeDataString(token)}&lt=30";
         return await GetListAsync<T>(path, cancellationToken);
     }
 
@@ -48,7 +43,7 @@ public sealed class ZhiTuMarketClient
         string zhiTuCode, string interval, string token,
         string startDate, string endDate, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/history/{zhiTuCode}/{interval}/n?token={token}&st={startDate}&et={endDate}";
+        var path = $"/hs/history/{Uri.EscapeDataString(zhiTuCode)}/{Uri.EscapeDataString(interval)}/n?token={Uri.EscapeDataString(token)}&st={Uri.EscapeDataString(startDate)}&et={Uri.EscapeDataString(endDate)}";
         return await GetListAsync<TBar>(path, cancellationToken);
     }
 
@@ -59,7 +54,7 @@ public sealed class ZhiTuMarketClient
     public async Task<List<T>> GetTransactionHistoryAsync<T>(
         string digitsCode, string token, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/history/transaction/{digitsCode}?token={token}&lt=20";
+        var path = $"/hs/history/transaction/{Uri.EscapeDataString(digitsCode)}?token={Uri.EscapeDataString(token)}&lt=20";
         return await GetListAsync<T>(path, cancellationToken);
     }
 
@@ -70,7 +65,7 @@ public sealed class ZhiTuMarketClient
     public async Task<T?> GetCompanyInfoAsync<T>(
         string digitsCode, string token, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/gs/gsjj/{digitsCode}?token={token}";
+        var path = $"/hs/gs/gsjj/{Uri.EscapeDataString(digitsCode)}?token={Uri.EscapeDataString(token)}";
         using var httpClient = _httpClientFactory.CreateClient("ZhiTu");
         var response = await httpClient.GetStringAsync(path, cancellationToken);
         return JsonSerializer.Deserialize<T>(response, AShareJsonOptions.Instance);

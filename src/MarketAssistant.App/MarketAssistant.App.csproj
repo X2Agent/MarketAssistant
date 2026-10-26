@@ -13,7 +13,9 @@
     <AssemblyName>MarketAssistant</AssemblyName>
 	<AssemblyVersion>1.0.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
-    <Version>1.0.0-beta1</Version>
+    <!-- 静态兜底版本号：有 Git Tag 时由 ResolveVersionFromGitTag 自动覆盖为最新 Tag，发版后由 CI 自动回写 -->
+    <FallbackVersion>1.0.0-beta2</FallbackVersion>
+    <Version>$(FallbackVersion)</Version>
     <Company>X2Agent</Company>
     <Product>Market Assistant</Product>
     <AssemblyTitle>Market Assistant</AssemblyTitle>
@@ -45,7 +47,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**" />
+    <!-- logo_1024.png 仅供 macOS 打包脚本生成 icns 使用，运行期无需随包分发 -->
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\logo_1024.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,6 +71,8 @@
 	<PackageReference Include="CommunityToolkit.Mvvm" />
 	<PackageReference Include="Svg.Controls.Skia.Avalonia" />
 	<PackageReference Include="Svg.Skia" />
+	<!-- SkiaSharp：分享卡 PDF 封装（SKDocument）。Svg.Skia 已传递依赖，显式引用避免隐式依赖漂移 -->
+	<PackageReference Include="SkiaSharp" />
 	<!-- Avalonia 官方 WebView（MIT 开源,无需许可证） -->
 	<PackageReference Include="Avalonia.Controls.WebView" />
 	<PackageReference Include="Avalonia.Controls.DataGrid" />
@@ -87,4 +92,26 @@
     <Content Remove="**/libEGL.dylib" />
     <Content Remove="**/libGLESv2.dylib" />
   </ItemGroup>
+
+  <!-- 编译期自动从最新 Git Tag (v*) 推导版本号：当未通过命令行显式指定 -p:Version 时生效 -->
+  <Target Name="ResolveVersionFromGitTag"
+          BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo;PrepareForBuild"
+          Condition="'$(DisableGitVersionLookup)' != 'true' And '$(Version)' == '$(FallbackVersion)'">
+    <Exec Command="git describe --tags --abbrev=0 --match &quot;v[0-9]*&quot;"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitLatestTag" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitDescribeExitCode" />
+    </Exec>
+    <PropertyGroup Condition="'$(_GitDescribeExitCode)' == '0' And '$(_GitLatestTag)' != ''">
+      <_ResolvedGitVersion>$(_GitLatestTag.Trim().TrimStart('v'))</_ResolvedGitVersion>
+      <Version Condition="'$(_ResolvedGitVersion)' != ''">$(_ResolvedGitVersion)</Version>
+      <PackageVersion Condition="'$(_ResolvedGitVersion)' != ''">$(_ResolvedGitVersion)</PackageVersion>
+      <InformationalVersion Condition="'$(_ResolvedGitVersion)' != ''">$(_ResolvedGitVersion)</InformationalVersion>
+      <CFBundleVersion Condition="'$(_ResolvedGitVersion)' != ''">$(_ResolvedGitVersion)</CFBundleVersion>
+      <CFBundleShortVersionString Condition="'$(_ResolvedGitVersion)' != ''">$(_ResolvedGitVersion)</CFBundleShortVersionString>
+    </PropertyGroup>
+  </Target>
 </Project>

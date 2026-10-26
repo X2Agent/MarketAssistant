@@ -16,7 +16,7 @@ public sealed class SignalAlertEvaluatorTest
     /// <summary>记录所有上报告警的桩实现，用于断言来源/级别/标题映射。</summary>
     private sealed class RecordingAlertCenter : IAlertCenterService
     {
-        public List<AlertEvent> Raised { get; } = new();
+        public List<AlertEvent> Raised { get; } = [];
 
         public event Action<AlertEvent>? AlertRaised { add { } remove { } }
         public event Action? AlertsChanged { add { } remove { } }
@@ -64,7 +64,7 @@ public sealed class SignalAlertEvaluatorTest
 
         public Task<IReadOnlyList<AlertEvent>> GetRecentAlertsAsync(
             int limit = 200, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<AlertEvent>>(Array.Empty<AlertEvent>());
+            Task.FromResult<IReadOnlyList<AlertEvent>>([]);
 
         public Task<int> GetUnreadCountAsync(CancellationToken cancellationToken = default) => Task.FromResult(0);
 
@@ -103,7 +103,7 @@ public sealed class SignalAlertEvaluatorTest
         await _evaluator.NotifyStrategyPausedSafeAsync(
             CreateStrategy(), Rejection("用户拒绝交易: 风控要求人工确认"));
 
-        Assert.AreEqual(1, _alertCenter.Raised.Count);
+        Assert.HasCount(1, _alertCenter.Raised);
         var alert = _alertCenter.Raised[0];
         Assert.AreEqual(AlertSource.Signal, alert.Source);
         Assert.AreEqual(AlertLevel.Warning, alert.Level);
@@ -118,7 +118,7 @@ public sealed class SignalAlertEvaluatorTest
         await _evaluator.NotifyStrategyPausedSafeAsync(
             CreateStrategy(), Rejection("风控拒绝: 超过单笔仓位上限"));
 
-        Assert.AreEqual(0, _alertCenter.Raised.Count);
+        Assert.IsEmpty(_alertCenter.Raised);
     }
 
     [TestMethod]
@@ -127,7 +127,7 @@ public sealed class SignalAlertEvaluatorTest
     {
         await _evaluator.NotifyStrategyCompletedSafeAsync(CreateStrategy());
 
-        Assert.AreEqual(1, _alertCenter.Raised.Count);
+        Assert.HasCount(1, _alertCenter.Raised);
         Assert.AreEqual(AlertSource.Signal, _alertCenter.Raised[0].Source);
         Assert.AreEqual(AlertLevel.Info, _alertCenter.Raised[0].Level);
         Assert.AreEqual("策略已完结", _alertCenter.Raised[0].Title);
@@ -139,12 +139,12 @@ public sealed class SignalAlertEvaluatorTest
     {
         await _evaluator.NotifySignalExecutedSafeAsync(CreateStrategy(), 43250.5m);
 
-        Assert.AreEqual(1, _alertCenter.Raised.Count);
+        Assert.HasCount(1, _alertCenter.Raised);
         var alert = _alertCenter.Raised[0];
         Assert.AreEqual(AlertSource.Signal, alert.Source);
         Assert.AreEqual(AlertLevel.Info, alert.Level);
         Assert.AreEqual("BTCUSDT", alert.Symbol);
-        StringAssert.Contains(alert.Content, 43250.5m.ToString("N6"));
+        Assert.Contains(43250.5m.ToString("N6"), alert.Content);
     }
 
     [TestMethod]

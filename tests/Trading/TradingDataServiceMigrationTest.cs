@@ -48,6 +48,13 @@ public sealed class TradingDataServiceMigrationTest
         await AssertColumnExistsAsync(connection, "strategies", "order_type");
         await AssertColumnExistsAsync(connection, "strategies", "slippage_tolerance");
 
+        // 交易模块成熟化新增的持久化结构
+        await AssertColumnExistsAsync(connection, "trade_records", "slippage_percent");
+        await AssertColumnExistsAsync(connection, "trade_records", "realized_pnl");
+        await AssertColumnExistsAsync(connection, "daily_stats", "consecutive_losses");
+        await AssertTableExistsAsync(connection, "trading_control");
+        await AssertTableExistsAsync(connection, "shadow_trades");
+
         await AssertRowValueAsync(connection, "SELECT environment FROM strategies WHERE id = 'strategy-1'", LiveSpotEnvironment);
         await AssertRowValueAsync(connection, "SELECT environment FROM trade_records WHERE id = 'record-1'", LiveSpotEnvironment);
         await AssertRowValueAsync(connection, "SELECT environment FROM positions WHERE id = 'position-1'", LiveSpotEnvironment);
@@ -208,8 +215,15 @@ public sealed class TradingDataServiceMigrationTest
         return connection;
     }
 
-    private static async Task AssertColumnExistsAsync(
-        SqliteConnection connection,
+    private static async Task AssertTableExistsAsync(SqliteConnection connection, string tableName)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = @name";
+        command.Parameters.AddWithValue("@name", tableName);
+        Assert.AreEqual(1L, await command.ExecuteScalarAsync(), $"表 {tableName} 应存在");
+    }
+
+    private static async Task AssertColumnExistsAsync(SqliteConnection connection,
         string tableName,
         string columnName)
     {

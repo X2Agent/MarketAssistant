@@ -77,26 +77,25 @@ public partial class AdaptiveCardView : UserControl
         {
             Text = textBlock.Text,
             TextWrapping = textBlock.Wrap ? TextWrapping.Wrap : TextWrapping.NoWrap,
-        };
+            // Size
+            FontSize = textBlock.Size switch
+            {
+                AdaptiveTextSize.Small => SmallFontSize,
+                AdaptiveTextSize.Default => DefaultFontSize,
+                AdaptiveTextSize.Medium => MediumFontSize,
+                AdaptiveTextSize.Large => LargeFontSize,
+                AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
+                _ => DefaultFontSize
+            },
 
-        // Size
-        tb.FontSize = textBlock.Size switch
-        {
-            AdaptiveTextSize.Small => SmallFontSize,
-            AdaptiveTextSize.Default => DefaultFontSize,
-            AdaptiveTextSize.Medium => MediumFontSize,
-            AdaptiveTextSize.Large => LargeFontSize,
-            AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
-            _ => DefaultFontSize
-        };
-
-        // Weight
-        tb.FontWeight = textBlock.Weight switch
-        {
-            AdaptiveTextWeight.Lighter => FontWeight.Light,
-            AdaptiveTextWeight.Default => FontWeight.Normal,
-            AdaptiveTextWeight.Bolder => FontWeight.Bold,
-            _ => FontWeight.Normal
+            // Weight
+            FontWeight = textBlock.Weight switch
+            {
+                AdaptiveTextWeight.Lighter => FontWeight.Light,
+                AdaptiveTextWeight.Default => FontWeight.Normal,
+                AdaptiveTextWeight.Bolder => FontWeight.Bold,
+                _ => FontWeight.Normal
+            }
         };
 
         // Color — 对齐到项目真实主题资源（不再依赖幽灵 SystemControl* 画刷）
@@ -170,7 +169,7 @@ public partial class AdaptiveCardView : UserControl
         for (int i = 0; i < columnSet.Columns.Count; i++)
         {
             var col = columnSet.Columns[i];
-            var width = col.Width?.ToLower();
+            var width = col.Width?.ToLowerInvariant();
 
             if (width == "auto")
             {
@@ -184,7 +183,8 @@ public partial class AdaptiveCardView : UserControl
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition(w, GridUnitType.Star));
             }
-            else if (width.EndsWith("px") && double.TryParse(width.TrimEnd('p', 'x'), out double px))
+            else if (width.EndsWith("px", StringComparison.Ordinal)
+                 && double.TryParse(width.TrimEnd('p', 'x'), out double px))
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition(px, GridUnitType.Pixel));
             }
@@ -264,8 +264,11 @@ public partial class AdaptiveCardView : UserControl
         var urlStr = image.Url?.ToString() ?? string.Empty;
         if (urlStr.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
         {
-            // Svg 控件无无参构造，须显式传入 baseUri；avares:// 绝对 URI 不依赖 baseUri 解析
-            return new Avalonia.Svg.Skia.Svg((Uri?)null)
+            // Svg 控件无无参构造，须显式传入 baseUri；avares:// 绝对 URI 不依赖 baseUri 解析。
+            // 该构造函数签名把 baseUri 标注为非空 Uri，故用 (Uri)null!：
+            // 先转型以在 Svg(Uri) 与 Svg(IServiceProvider) 之间消歧义，再以 null! 抑制
+            // “不可为 null 实参”告警。此处传 null 是控件的既定用法（依赖绝对 URI 解析）。
+            return new Avalonia.Svg.Skia.Svg((Uri)null!)
             {
                 Path = urlStr,
                 Width = image.PixelWidth > 0 ? image.PixelWidth : 20,

@@ -9,7 +9,7 @@ namespace MarketAssistant.Agents.Middleware;
 /// 为每个聊天会话创建独立的 MAF Compaction Provider。
 /// 官方 Provider 按原子消息组处理历史，保证 Function Call 与 Function Result 不被拆分。
 /// </summary>
-public sealed class ConversationCompactionProviderFactory
+public sealed class ConversationCompactionProviderFactory(ILoggerFactory loggerFactory)
 {
     /// <summary>
     /// 统一压缩阈值。按主流 128K 上下文档位设定；真实窗口更小的模型在超长对话中可能先触发
@@ -19,12 +19,7 @@ public sealed class ConversationCompactionProviderFactory
     public const int DefaultMinimumPreservedGroups = 8;
     public const string StateKey = "market-chat:compaction";
 
-    private readonly ILoggerFactory _loggerFactory;
-
-    public ConversationCompactionProviderFactory(ILoggerFactory loggerFactory)
-    {
-        _loggerFactory = loggerFactory;
-    }
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
 
     public AIContextProvider Create(
         IChatClient chatClient,

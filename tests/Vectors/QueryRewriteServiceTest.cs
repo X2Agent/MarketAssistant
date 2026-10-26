@@ -27,7 +27,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
+        Assert.IsEmpty(result);
     }
 
     [TestMethod]
@@ -39,7 +39,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
+        Assert.IsEmpty(result);
     }
 
     [TestMethod]
@@ -51,7 +51,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.AreEqual(0, result.Count);
+        Assert.IsEmpty(result);
     }
 
     #endregion
@@ -71,8 +71,8 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.IsTrue(result.Count <= expectedCandidates);
+        Assert.IsNotEmpty(result);
+        Assert.IsLessThanOrEqualTo(expectedCandidates, result.Count);
 
         // Verify that none of the results are empty or whitespace
         foreach (var rewrittenQuery in result)
@@ -94,7 +94,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count <= 3); // Should be limited to default 3
+        Assert.IsLessThanOrEqualTo(3, result.Count); // Should be limited to default 3
 
         foreach (var rewrittenQuery in result)
         {
@@ -115,7 +115,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
+        Assert.IsNotEmpty(result);
 
         // 应通过同义词替换生成变体（如"股票"→"证券"/"股份"/"个股"等）
         var hasSynonymVariant = result.Any(r =>
@@ -144,7 +144,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
+        Assert.IsNotEmpty(result);
 
         // 应通过同义词替换生成变体（如"股票"→"证券"/"股份"等）
         var hasSynonymVariant = result.Any(r =>
@@ -172,7 +172,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
+        Assert.IsNotEmpty(result);
 
         // 应通过同义词替换生成变体
         var hasSynonymVariant = result.Any(r =>
@@ -204,7 +204,7 @@ public class QueryRewriteServiceTest : BaseAgentTest
         if (result.Count > 1)
         {
             var uniqueResults = result.Distinct().ToList();
-            Assert.AreEqual(result.Count, uniqueResults.Count, "Results should be unique");
+            Assert.HasCount(result.Count, uniqueResults, "Results should be unique");
         }
 
         foreach (var variant in result)
@@ -226,9 +226,9 @@ public class QueryRewriteServiceTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
+        Assert.IsNotEmpty(result);
         // Algorithm-based service should generate reasonable amount, not necessarily 20
-        Assert.IsTrue(result.Count <= largeNumber);
+        Assert.IsLessThanOrEqualTo(largeNumber, result.Count);
 
         Console.WriteLine($"Generated {result.Count} variants for large request");
         foreach (var variant in result)

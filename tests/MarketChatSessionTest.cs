@@ -38,7 +38,7 @@ public class MarketChatSessionTest : BaseAgentTest
 
         var responseText = responseBuilder.ToString();
         Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
-        Assert.IsTrue(responseText.Length > 20, "基础对话应返回有实质内容的回复");
+        Assert.IsGreaterThan(20, responseText.Length, "基础对话应返回有实质内容的回复");
     }
 
     [TestMethod]
@@ -77,7 +77,7 @@ public class MarketChatSessionTest : BaseAgentTest
         Assert.IsFalse(string.IsNullOrWhiteSpace(responseText));
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count >= 6, "三轮对话应至少包含 3 条用户消息和 3 条助手回复");
+        Assert.IsGreaterThanOrEqualTo(6, history.Count, "三轮对话应至少包含 3 条用户消息和 3 条助手回复");
         Assert.IsTrue(
             ContainsAnyKeyword(responseText, "市盈率", "PE", "估值", "盈利", "市净率", "指标", "比率"),
             "第三轮回复应延续前两轮讨论的估值指标话题");
@@ -90,12 +90,12 @@ public class MarketChatSessionTest : BaseAgentTest
         await foreach (var _ in _chatSession.SendMessageStreamAsync("测试消息")) { }
 
         var historyBefore = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(historyBefore.Count > 0);
+        Assert.IsNotEmpty(historyBefore);
 
         _chatSession.ClearHistory();
 
         var historyAfter = await _chatSession.GetConversationHistoryAsync();
-        Assert.AreEqual(0, historyAfter.Count);
+        Assert.IsEmpty(historyAfter);
     }
 
     [TestMethod]
@@ -110,7 +110,7 @@ public class MarketChatSessionTest : BaseAgentTest
         }
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count > 0, "多轮对话后历史不应为空");
+        Assert.IsNotEmpty(history, "多轮对话后历史不应为空");
         Assert.AreEqual("sz002594", _chatSession.CurrentStockCode);
     }
 
@@ -148,7 +148,7 @@ public class MarketChatSessionTest : BaseAgentTest
             }
         }
 
-        Assert.IsTrue(allContent.Count > 1, "流式响应应产生多个内容块");
+        Assert.IsGreaterThan(1, allContent.Count, "流式响应应产生多个内容块");
     }
 
     [TestMethod]
@@ -158,7 +158,7 @@ public class MarketChatSessionTest : BaseAgentTest
         Assert.IsFalse(_chatSession.IsProcessing, "新会话初始不应处于处理中状态");
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.AreEqual(0, history.Count, "新会话初始对话历史应为空");
+        Assert.IsEmpty(history, "新会话初始对话历史应为空");
 
         _chatSession.StopCurrentRequest();
         Assert.IsFalse(_chatSession.IsProcessing, "空闲会话调用 StopCurrentRequest 后仍不应处于处理中状态");
@@ -181,7 +181,7 @@ public class MarketChatSessionTest : BaseAgentTest
             response1Builder.Append(update);
         }
         var response1 = response1Builder.ToString();
-        Assert.IsTrue(response1.Length > 50, "技术分析回复应有足够深度");
+        Assert.IsGreaterThan(50, response1.Length, "技术分析回复应有足够深度");
 
         var response2Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("这家公司的ROE和净利润如何？"))
@@ -189,7 +189,7 @@ public class MarketChatSessionTest : BaseAgentTest
             response2Builder.Append(update);
         }
         var response2 = response2Builder.ToString();
-        Assert.IsTrue(response2.Length > 50, "财务分析回复应有足够深度");
+        Assert.IsGreaterThan(50, response2.Length, "财务分析回复应有足够深度");
 
         var response3Builder = new System.Text.StringBuilder();
         await foreach (var update in _chatSession.SendMessageStreamAsync("投资这只股票有什么风险？"))
@@ -197,10 +197,10 @@ public class MarketChatSessionTest : BaseAgentTest
             response3Builder.Append(update);
         }
         var response3 = response3Builder.ToString();
-        Assert.IsTrue(response3.Length > 50, "风险分析回复应有足够深度");
+        Assert.IsGreaterThan(50, response3.Length, "风险分析回复应有足够深度");
 
         var history = await _chatSession.GetConversationHistoryAsync();
-        Assert.IsTrue(history.Count >= 6, "三轮分析对话应累积至少 6 条历史消息");
+        Assert.IsGreaterThanOrEqualTo(6, history.Count, "三轮分析对话应累积至少 6 条历史消息");
     }
 
     private static bool ContainsAnyKeyword(string text, params string[] keywords)

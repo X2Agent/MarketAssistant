@@ -76,6 +76,7 @@ public class RichTextBlock : UserControl
     /// Markdown 渲染器整树互换（可见闪烁），Markdown 输出中段回退纯文本毫无收益
     /// </summary>
     private bool _markdownLocked;
+    private bool _markdownStyleAdded;
 
     /// <summary>
     /// 当前监听状态变化的 DataContext（ChatMessageAdapter）
@@ -351,7 +352,11 @@ public class RichTextBlock : UserControl
             // 裸引擎不自带 MarkdownScrollViewer 的默认观感（反射确认其默认为 Standard 样式、
             // 默认引擎即 Markdown.Avalonia.Markdown），补挂同款 Standard 样式保证观感一致，
             // 挂在本控件 Styles 上即可命中引擎产出并挂入本控件子树的全部元素
-            Styles.Add(new global::Markdown.Avalonia.StyleCollections.MarkdownStyleStandard());
+            if (!_markdownStyleAdded)
+            {
+                Styles.Add(new global::Markdown.Avalonia.StyleCollections.MarkdownStyleStandard());
+                _markdownStyleAdded = true;
+            }
         }
 
         // 引擎每次解析产出全新控件树，靠 ContentControl.Content 原子替换，
@@ -384,12 +389,31 @@ public class RichTextBlock : UserControl
         // WebView 持有原生资源，必须 Dispose 避免内存泄漏
         if (_webView is IDisposable disposableWebView)
         {
+            if (_contentContainer != null && ReferenceEquals(_contentContainer.Content, _webView))
+            {
+                _contentContainer.Content = null;
+            }
             try { disposableWebView.Dispose(); }
             catch { /* 忽略 Dispose 异常 */ }
         }
         _webView = null;
         _markdownEngine = null;
         _textBlock = null;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (_observedAdapter is null && DataContext is INotifyPropertyChanged npc)
+        {
+            _observedAdapter = npc;
+            _observedAdapter.PropertyChanged += OnAdapterPropertyChanged;
+        }
+        if (_contentContainer?.Content is null && !string.IsNullOrEmpty(Text))
+        {
+            _pendingRenderText = Text;
+            RenderPendingText();
+        }
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

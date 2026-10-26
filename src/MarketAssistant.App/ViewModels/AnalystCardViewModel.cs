@@ -9,41 +9,27 @@ namespace MarketAssistant.ViewModels;
 /// <summary>
 /// 分析师结果卡片中的单条评分条
 /// </summary>
-public sealed class AnalystScoreBarItem
+public sealed class AnalystScoreBarItem(string label, double value)
 {
-    public AnalystScoreBarItem(string label, double value)
-    {
-        Label = label;
-        Value = value;
-        NormalizedValue = Math.Clamp(value / 10.0 * 100.0, 0, 100);
-        ValueText = value.ToString("0.#");
-    }
-
-    public string Label { get; }
+    public string Label { get; } = label;
 
     /// <summary>原始分值（1-10）</summary>
-    public double Value { get; }
+    public double Value { get; } = value;
 
     /// <summary>归一化到 0-100 的进度条值</summary>
-    public double NormalizedValue { get; }
+    public double NormalizedValue { get; } = Math.Clamp(value / 10.0 * 100.0, 0, 100);
 
-    public string ValueText { get; }
+    public string ValueText { get; } = value.ToString("0.#");
 }
 
 /// <summary>
 /// 分析师结果卡片中的单条"标签: 数值"关键数据
 /// </summary>
-public sealed class AnalystKeyValueItem
+public sealed class AnalystKeyValueItem(string label, string value)
 {
-    public AnalystKeyValueItem(string label, string value)
-    {
-        Label = label;
-        Value = value;
-    }
+    public string Label { get; } = label;
 
-    public string Label { get; }
-
-    public string Value { get; }
+    public string Value { get; } = value;
 }
 
 /// <summary>
@@ -258,7 +244,7 @@ public sealed class AnalystCardViewModel
             r.ProfitQuality.ProfitSustainability,
             r.CashFlow.EfficiencyDescription);
 
-        var risks = CollectNonEmpty(r.RiskWarning.KeyRiskIndicators.ToArray());
+        var risks = CollectNonEmpty([.. r.RiskWarning.KeyRiskIndicators]);
         risks.AddRange(r.RiskWarning.MonitoringPoints);
         risks.Add(r.RiskWarning.FraudRiskRationale);
         risks.RemoveAll(string.IsNullOrWhiteSpace);
@@ -305,7 +291,7 @@ public sealed class AnalystCardViewModel
                 ("当前价", FormatPrice(r.PriceLevels.CurrentPrice)),
                 ("目标区间", FormatRange(r.Strategy.TargetPriceLow, r.Strategy.TargetPriceHigh)),
                 ("止损位", FormatPrice(r.Strategy.StopLossPrice)),
-                ("持仓周期", r.Strategy.HoldingPeriod.GetDescription()),
+                ("持仓周期", r.Strategy.HoldingPeriod?.GetDescription() ?? string.Empty),
                 ("风险等级", r.Strategy.RiskLevel.GetDescription())),
             CollectNonEmpty(
                 r.Strategy.RiskLevel == Level.High ? "风险等级偏高，注意仓位控制" : null));
@@ -438,7 +424,7 @@ public sealed class AnalystCardViewModel
                 ("价格预期", r.PriceChangeExpectation),
                 ("投资周期", JoinNonEmpty(" ", r.TimeHorizon.GetDescription(), r.TimeHorizonDescription)),
                 ("风险等级", r.RiskLevel.GetDescription())),
-            CollectNonEmpty(r.RiskFactors.ToArray()));
+            CollectNonEmpty([.. r.RiskFactors]));
     }
 
     private static (string?, AnalystRatingTone) MapInvestmentRating(InvestmentRating rating) => rating switch
@@ -485,13 +471,12 @@ public sealed class AnalystCardViewModel
         => confidence > 0 ? new AnalystScoreBarItem("置信度", Math.Clamp(confidence / 10f, 0f, 10f)) : null;
 
     private static List<string> CollectNonEmpty(params string?[] values)
-        => values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim()).ToList();
+        => [.. values.Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v!.Trim())];
 
     private static IReadOnlyList<AnalystKeyValueItem> CollectKeyValues(params (string Label, string Value)[] items)
-        => items
+        => [.. items
             .Where(i => !string.IsNullOrWhiteSpace(i.Value))
-            .Select(i => new AnalystKeyValueItem(i.Label, i.Value.Trim()))
-            .ToList();
+            .Select(i => new AnalystKeyValueItem(i.Label, i.Value.Trim()))];
 
     private static string JoinNonEmpty(string separator, params string?[] values)
         => string.Join(separator, values.Where(v => !string.IsNullOrWhiteSpace(v)));

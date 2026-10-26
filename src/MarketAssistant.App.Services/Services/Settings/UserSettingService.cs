@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using MarketAssistant.Applications.Settings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,14 +7,9 @@ namespace MarketAssistant.Services.Settings;
 /// <summary>
 /// 用户设置服务，提供对UserSetting的统一访问和管理
 /// </summary>
-public class UserSettingService : IUserSettingService
+public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSettingService
 {
-    private static readonly ConcurrentDictionary<string, object> FileLocks = new(
-        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-
     private readonly ILogger<UserSettingService> _logger;
-    private readonly object _fileLock;
-    private readonly string _settingsFilePath;
     private readonly ISecureSettingsStore _secretStore;
 
     private UserSetting _currentSetting = new();
@@ -37,12 +31,10 @@ public class UserSettingService : IUserSettingService
         string settingsFilePath,
         ISecureSettingsStore secretStore,
         ILogger<UserSettingService>? logger = null)
+        : base(settingsFilePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(settingsFilePath);
         ArgumentNullException.ThrowIfNull(secretStore);
 
-        _settingsFilePath = Path.GetFullPath(settingsFilePath);
-        _fileLock = FileLocks.GetOrAdd(_settingsFilePath, static _ => new object());
         _secretStore = secretStore;
         _logger = logger ?? NullLogger<UserSettingService>.Instance;
         LoadSettings();
@@ -53,20 +45,14 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void LoadSettings()
     {
-        lock (_fileLock)
+        lock (FileLock)
         {
             try
             {
-                string? legacyJson = null;
-                if (File.Exists(_settingsFilePath))
-                {
-                    legacyJson = File.ReadAllText(_settingsFilePath);
-                    _currentSetting = JsonSerializer.Deserialize<UserSetting>(legacyJson) ?? new UserSetting();
-                }
-                else
-                {
-                    _currentSetting = new UserSetting();
-                }
+                string? legacyJson = ReadRawJson();
+                _currentSetting = legacyJson is null
+                    ? new UserSetting()
+                    : ParseJson(legacyJson) ?? new UserSetting();
 
                 var migratedLegacySecrets = LoadSecrets(_currentSetting, legacyJson);
                 if (migratedLegacySecrets)
@@ -98,25 +84,14 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void SaveSettings()
     {
-        lock (_fileLock)
+        lock (FileLock)
         {
             try
             {
-                // 确保目录存在
-                var directory = Path.GetDirectoryName(_settingsFilePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                // 先写安全存储，成功后再写不含 Secret 的普通设置，避免界面显示“已保存”但密钥丢失。
+                // 先写安全存储，成功后再写不含 Secret 的普通设置，避免界面显示"已保存"但密钥丢失。
                 _secretStore.Write(UserSecrets.From(_currentSetting));
 
-                // 先写临时文件，再原子替换，避免进程中断留下半个 JSON。
-                var json = JsonSerializer.Serialize(_currentSetting, new JsonSerializerOptions { WriteIndented = true });
-                var tempFilePath = _settingsFilePath + ".tmp";
-                File.WriteAllText(tempFilePath, json);
-                File.Move(tempFilePath, _settingsFilePath, overwrite: true);
+                SaveAtomic(_currentSetting);
             }
             catch (Exception ex)
             {
@@ -134,7 +109,7 @@ public class UserSettingService : IUserSettingService
     {
         ArgumentNullException.ThrowIfNull(setting);
 
-        lock (_fileLock)
+        lock (FileLock)
         {
             _currentSetting = setting;
             SaveSettings();
@@ -146,9 +121,9 @@ public class UserSettingService : IUserSettingService
     {
         ArgumentNullException.ThrowIfNull(mutate);
 
-        // Monitor 对同一线程可重入：变更与保存共用 _fileLock，
+        // Monitor 对同一线程可重入：变更与保存共用 FileLock，
         // 保证跨线程变更不会与序列化/文件替换交错
-        lock (_fileLock)
+        lock (FileLock)
         {
             mutate(_currentSetting);
             SaveSettings();
@@ -188,7 +163,9 @@ public class UserSettingService : IUserSettingService
         string CoinGeckoApiKey,
         string BinanceApiKey,
         string BinanceSecretKey,
-        string WebSearchApiKey)
+        string WebSearchApiKey,
+        string FeishuWebhookUrl,
+        string FeishuWebhookSecret)
     {
         public static UserSecrets From(UserSetting setting) => new(
             new Dictionary<string, string>(setting.ProviderApiKeys, StringComparer.Ordinal),
@@ -197,7 +174,9 @@ public class UserSettingService : IUserSettingService
             setting.CoinGeckoApiKey,
             setting.BinanceApiKey,
             setting.BinanceSecretKey,
-            setting.WebSearchApiKey);
+            setting.WebSearchApiKey,
+            setting.FeishuWebhookUrl,
+            setting.FeishuWebhookSecret);
 
         public void ApplyTo(UserSetting setting)
         {
@@ -208,6 +187,8 @@ public class UserSettingService : IUserSettingService
             setting.BinanceApiKey = BinanceApiKey;
             setting.BinanceSecretKey = BinanceSecretKey;
             setting.WebSearchApiKey = WebSearchApiKey;
+            setting.FeishuWebhookUrl = FeishuWebhookUrl;
+            setting.FeishuWebhookSecret = FeishuWebhookSecret;
         }
     }
 
@@ -249,7 +230,7 @@ public class UserSettingService : IUserSettingService
     /// </summary>
     public void ResetSettings()
     {
-        lock (_fileLock)
+        lock (FileLock)
         {
             _currentSetting = new UserSetting();
             SaveSettings();

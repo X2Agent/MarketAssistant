@@ -15,8 +15,10 @@ MarketAssistant.App/
 │       ├── TechnicalAnalyst.yaml
 │       ├── MarketSentimentAnalyst.yaml
 │       ├── NewsEventAnalyst.yaml
-│       └── CoordinatorAnalyst.yaml
-├── Converts/                      ← AXAML 值转换器
+│       ├── CryptoMetricsAnalyst.yaml   ← Crypto 专属指标分析师
+│       ├── CoordinatorAnalyst.yaml
+│       └── Crypto/                     ← Crypto 市场差异化提示词
+├── Converters/                    ← AXAML 值转换器
 ├── Infrastructure/                ← ViewLocator 等 UI 宿主基础设施
 ├── Resources/Styles/              ← Avalonia 样式资源字典
 ├── Services/                      ← UI 适配服务
@@ -48,6 +50,36 @@ MarketAssistant.App/
 - **控件**：优先使用 Avalonia 内置控件。
 - **资产**：非必要不改动图片与资产文件。
 
+### 加载态与状态浮层（强制约定）
+
+页面/区块的加载、空、失败三态必须走统一机制，禁止每页自行手写提示面板。
+
+- **状态源**：`ViewModelBase` 提供 `State`（`LoadState`）、`IsInitialLoading`、`OverlayState`、`OverlayMessage`、`ErrorMessage`、`EmptyMessage`、`RetryCommand`。
+  - 加载方法一律通过 `protected Task LoadAsync(Func<CancellationToken, Task<bool>> loader, string operationName, ...)` 编写：loader 返回 `true` → `Ready`，`false` → `Empty`，抛 `OperationCanceledException` → `Idle`，其他异常 → `Failed`（经 `ErrorMessageMapper` 转可读文案）。
+  - 构造函数末尾用 `SetRetryCommand(() => LoadXxxAsync())` 注册重试入口，再 `_ = LoadXxxAsync();` 触发首屏加载。
+- **状态浮层**：统一使用 `Views/Controls/StateOverlayView`，绑定 `OverlayState` / `OverlayMessage` / `RetryCommand`。该控件**自管理 `IsVisible`**（加载/空/失败时可见），页面无法从 XAML 外部关闭它——只能通过改变绑定的 `State` 来控制。
+  - `OverlayState` 而非 `State`：已有内容时刷新不显示浮层，避免内容闪烁。
+  - 重试按钮仅在 `Failed` 且 `RetryCommand` 非空时出现（`CanRetry`），空态不会误显示"重试"。
+- **骨架屏优先于转圈**：首屏加载展示骨架屏（绑定 `IsInitialLoading`），同时把内容区反相门控为 `{Binding !IsInitialLoading}`。骨架屏存在时必须给 `StateOverlayView` 加 `ShowLoading="False"`，否则浮层的加载点阵会叠在骨架上。
+- **不要把长耗时 AI 操作接入该机制**：分析进度蒙层（如 `AssetSelectionPageView` 的 `ZIndex=1000` 分析中蒙层、`AgentAnalysisPageView` 的 `ProgressDisplayView`）表达的是"任务进行中"而非"数据加载中"，继续使用 `IsBusy` + `SafeExecuteAsync`。
+
+### 骨架样式
+
+骨架屏统一使用 `Resources/Styles/SkeletonStyles.axaml` 的类：
+
+| 类 | 语义 |
+|---|---|
+| `Border.skeleton` | 基础类，带呼吸动画，必须搭配下方修饰类 |
+| `skeleton-text` | 文本行（H12） |
+| `skeleton-title` | 标题行（H18） |
+| `skeleton-row` | 列表行（H44） |
+| `skeleton-card` | 卡片（MinHeight 96） |
+| `skeleton-panel` | 面板（MinHeight 240） |
+| `skeleton-circle` | 头像/图标（32×32） |
+
+- 骨架尺寸按真实内容形态用显式 `Height`/`Margin` 覆盖，行数与真实列表首屏可见条数一致，避免加载完成时的布局跳动。
+- 骨架只服务**首屏**（`IsInitialLoading`）；刷新（`IsLoading` 且已有内容）不显示骨架。
+
 ---
 
 ## ViewModel 编码规范
@@ -59,6 +91,28 @@ MarketAssistant.App/
 - 异常处理：使用 `SafeExecuteAsync` 或 `ErrorMessageMapper`，**不要吞并异常**。
 - 通过 DI 容器获取依赖，不使用 `ServiceLocator`。
 - ViewModel 可以消费 `MarketAssistant.App.Services` 暴露的业务服务，但不要在 UI 层新增 Agent、Tool、Workflow 实现。
+- 列表页筛选逻辑（纯函数、无 IO）抽为独立静态类（如 `AlertHistoryFilter`），ViewModel 只做装配与状态映射，便于脱离 Avalonia 单测。
+
+### 告警历史页（PriceAlertPage → 告警历史）
+
+- `AlertHistoryViewModel` 持有 `_allAlerts` 全量副本，可见集 `Alerts` 由 `AlertHistoryFilter.Matches` 按级别/标的关键词重建；筛选后为空与"无告警记录"是两种空态，文案必须区分（`SetEmpty` 传不同消息，不要复用同一句）。
+- 历史告警的"AI 归因"按钮经 `NavigationMessage("Analysis", ...)` 跳转多分析师研判页；告警归属市场与当前市场不一致时先 `MarketContext.SwitchMarket`，否则分析链路会解析错市场的 Keyed 数据服务。系统级告警（无标的）不展示该按钮（`AlertEvent.HasSymbol` 门控）。
+- `DataTemplate` 内的按钮命令经 `$parent[ItemsControl].((vm:XxxViewModel)DataContext).Command` 绑定到宿主 VM（`x:DataType` 不可跨 DataTemplate 冒泡）。
+
+### 每日简报（HomePage → DailyBriefingViewModel → DailyBriefingWindow）
+
+- 简报 VM 是**例外**：纯手动生成策略下它 Singleton 注册（`AddViewModels()` 内），构造/市场切换只读当天缓存，绝不自动生成（生成会产生真实模型费用）；故 `HomePageViewModel.Dispose` 不释放它，归 DI 容器所有。
+- 首页仅保留简报**入口按钮**，正文在独立弹窗 `DailyBriefingWindow` 中展示：窗口经 `IWindowService.ShowDailyBriefingWindow` 打开（统一 owner 选择与重复打开防护），ViewModel 不直接 new 窗口。
+- 总开关关闭时生成按钮禁用、生成入口直接拦截并给出"已关闭"空态文案；近 30 天 Token 用量摘要展示在弹窗底部（只展示 Token 计数，货币成本估算已移除）。
+- 生成中与失败/空态用骨架与 `StateOverlayView` 表达，不要把"生成中"做成阻塞按钮。
+
+### 报告导出（Markdown / 分享图 / PDF）
+
+- Markdown 导出走 App.Services 的 `MarkdownReportExporter`（纯文本，无渲染依赖）。
+- 分享图/PDF 走本项目的 `ReportShareCardRenderer`：固定 1080×1350 画布离屏渲染 `ReportShareCardView`（Avalonia 视觉树，中文与应用字体由宿主保证），PDF 由渲染位图经 SkiaSharp `SKDocument` 封装单页——**不引入第二套排版**，分享图与 PDF 永远视觉一致。
+- `RenderTargetBitmap` 要求 UI 线程：导出命令只在 VM（UI 线程）同步调用渲染，不要 `Task.Run`。
+- PDF 写入前先释放 `SaveFilePickerAsync` 返回的流，再以本地路径交给 SkiaSharp，避免文件占用；本地路径取 `IStorageFile.TryGetLocalPath()`。
+- 分享卡数据模型是 `ReportShareCardData`（不可变快照）：只带展示必需字段，不要把 `MarketAnalysisReport` 直接绑到离屏视图上。
 
 ---
 

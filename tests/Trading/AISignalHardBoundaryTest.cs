@@ -21,7 +21,7 @@ public sealed class AISignalHardBoundaryTest
     public async Task StopLoss_Triggered_ShouldCloseInverse_AndCompleteStrategy_AndRestoreSide()
     {
         var tradeExecutor = new Mock<TradeExecutor>(
-            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null!, null!, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: true,
@@ -31,9 +31,8 @@ public sealed class AISignalHardBoundaryTest
 
         Assert.IsTrue(result.TradeExecuted, "平仓成功时应返回成交记录");
         Assert.AreEqual(AISignalOutcome.Executed, result.Outcome, "平仓成功的结局应为 Executed");
-        CollectionAssert.AreEqual(new[] { OrderSide.Sell }, capturedSides,
-            "止损平仓方向应为持仓方向的反向");
-        Assert.IsTrue(capturedRequireClose.Contains(true), "硬性边界必须以 requireClose 语义平仓");
+        Assert.AreSequenceEqual([OrderSide.Sell], capturedSides, "止损平仓方向应为持仓方向的反向");
+        Assert.Contains(true, capturedRequireClose, "硬性边界必须以 requireClose 语义平仓");
         Assert.AreEqual(OrderSide.Buy, strategy.Side, "执行结束后策略方向必须恢复为原始持仓方向");
         strategyService.Verify(
             service => service.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, It.IsAny<CancellationToken>()),
@@ -46,7 +45,7 @@ public sealed class AISignalHardBoundaryTest
     public async Task StopLoss_Triggered_WithoutPosition_ShouldCompleteWithoutOrdering()
     {
         var tradeExecutor = new Mock<TradeExecutor>(
-            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null!, null!, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: false,
@@ -74,7 +73,7 @@ public sealed class AISignalHardBoundaryTest
     public async Task StopLoss_Triggered_CloseFailed_StrategyShouldStayActive()
     {
         var tradeExecutor = new Mock<TradeExecutor>(
-            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null, null!);
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null!, null!, null!);
         var strategyService = new Mock<TradingStrategyService>(null!);
         var (executor, strategy) = CreateExecutor(
             tradeExecutor, strategyService.Object, hasPosition: true,
@@ -154,6 +153,9 @@ public sealed class AISignalHardBoundaryTest
             portfolioService.Object,
             new AnalysisReportCache(new MarketContext(settingService.Object, Mock.Of<IServiceProvider>())),
             tradeExecutor.Object,
+            new ShadowTradingService(
+                new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance).Object,
+                NullLogger<ShadowTradingService>.Instance),
             NullLogger<AISignalStrategyExecutor>.Instance);
 
         return (executor, strategy);

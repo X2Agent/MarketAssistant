@@ -14,6 +14,9 @@ namespace MarketAssistant.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    /// <summary>首页导航项标题：行情条仅在该根页面常驻。</summary>
+    private const string HomeNavigationTitle = "首页";
+
     // 页面 ViewModel 由工厂在导航项点击时才实例化，避免构造主窗口时实例化全部页面
     private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly NavigationService _navigationService;
@@ -64,14 +67,37 @@ public partial class MainWindowViewModel : ViewModelBase
     private int _tickerRequestId;
 
     /// <summary>
-    /// 行情条是否可见（无数据时整段隐藏，对齐设计系统裁决 #6）
+    /// 行情条是否有数据（无数据时整段隐藏，对齐设计系统裁决 #6）。
     /// </summary>
     public bool HasIndexTickers => IndexTickers.Count > 0;
+
+    /// <summary>
+    /// 行情条是否可见：仅在首页根页面常驻——行情条是首页盯盘的背景信息，
+    /// 自选/告警/设置等其余根页面与二级详情页一律隐藏，避免与页面无关的市场指数分散注意力；
+    /// 无数据时整段隐藏。
+    /// </summary>
+    public bool ShowIndexTickers => HasIndexTickers && IsOnHomeRootPage;
+
+    /// <summary>当前是否处于首页根页面（行情条的唯一常驻页面）。</summary>
+    private bool IsOnHomeRootPage =>
+        _navigationService.CurrentRootNavigationItemTitle == HomeNavigationTitle && !_navigationService.CanGoBack;
+
+    /// <summary>
+    /// 顶栏是否可见：只在有内容时出现——首页（行情条）或二级页面（返回 + 标题）。
+    /// 其余根页面顶栏仅剩市场切换器（已移入导航栏），整条隐藏避免空白带；
+    /// 行情条无数据时首页顶栏同样不渲染。
+    /// </summary>
+    public bool ShowTopBar => ShowIndexTickers || CanGoBack;
 
     /// <summary>
     /// 当前市场类型显示文本
     /// </summary>
     public string CurrentMarketText => _marketContext.CurrentMarket == MarketType.AShare ? "A股市场" : "虚拟币市场";
+
+    /// <summary>
+    /// 当前市场简短名称（导航栏切换芯片用，72px 轨道内完整显示）
+    /// </summary>
+    public string CurrentMarketShortText => _marketContext.CurrentMarket == MarketType.AShare ? "A股" : "虚拟币";
 
     /// <summary>
     /// 当前是否为 A 股市场（用于顶栏分段切换器视觉状态）
@@ -98,12 +124,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _notificationService = notificationService;
         _alertCenterService = alertCenterService;
 
-        MainNavigationItems = new ObservableCollection<NavigationItemViewModel>();
-        BottomNavigationItems = new ObservableCollection<NavigationItemViewModel>();
-        IndexTickers = new ObservableCollection<IndexTickerItemViewModel>();
+        MainNavigationItems = [];
+        BottomNavigationItems = [];
+        IndexTickers = [];
         RebuildNavigationItems();
         _ = RefreshIndexTickersAsync();
-        StartTickerTimer();
 
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
@@ -114,6 +139,7 @@ public partial class MainWindowViewModel : ViewModelBase
         SubscribeToMarketChanges(_marketContext);
 
         // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
+        // 导航事件会经 OnNavigationServicePropertyChanged 启动行情条定时刷新（仅首页常驻）。
         SelectedMainNavigationItem = MainNavigationItems[0];
     }
 
@@ -144,6 +170,7 @@ public partial class MainWindowViewModel : ViewModelBase
     protected override void OnMarketChanged(MarketType newMarket)
     {
         OnPropertyChanged(nameof(CurrentMarketText));
+        OnPropertyChanged(nameof(CurrentMarketShortText));
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
@@ -155,22 +182,53 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void RebuildNavigationItems()
     {
-        MainNavigationItems.Clear();
-        BottomNavigationItems.Clear();
-
-        MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
-        MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
-        // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
-        if (IsTradingVisible())
+        _isSynchronizingNavigationSelection = true;
+        try
         {
-            MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _pageViewModelFactory.Create<TradingPageViewModel>()));
-        }
+            MainNavigationItems.Clear();
+            BottomNavigationItems.Clear();
 
-        // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
-        BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
-        BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
+            MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
+            // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
+            if (IsTradingVisible())
+            {
+                MainNavigationItems.Add(new NavigationItemViewModel("交易", "avares://MarketAssistant/Assets/Images/tab_trading.svg", "avares://MarketAssistant/Assets/Images/tab_trading_on.svg", () => _pageViewModelFactory.Create<TradingPageViewModel>()));
+            }
+
+            // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
+            BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
+            BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
+
+            SyncNavigationSelectionToRootTitle();
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
+        }
+    }
+
+    private void SyncNavigationSelectionToRootTitle()
+    {
+        var rootTitle = _navigationService.CurrentRootNavigationItemTitle;
+        if (rootTitle == null)
+            return;
+
+        _isSynchronizingNavigationSelection = true;
+        try
+        {
+            var mainItem = MainNavigationItems.FirstOrDefault(item => item.Title == rootTitle);
+            SelectedMainNavigationItem = mainItem;
+            SelectedBottomNavigationItem = mainItem == null
+                ? BottomNavigationItems.FirstOrDefault(item => item.Title == rootTitle)
+                : null;
+        }
+        finally
+        {
+            _isSynchronizingNavigationSelection = false;
+        }
     }
 
     /// <summary>
@@ -206,6 +264,8 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             OnPropertyChanged(nameof(HasIndexTickers));
+            OnPropertyChanged(nameof(ShowIndexTickers));
+            OnPropertyChanged(nameof(ShowTopBar));
         }
     }
 
@@ -219,6 +279,25 @@ public partial class MainWindowViewModel : ViewModelBase
         _tickerTimer.Tick -= OnTickerTimerTick;
         _tickerTimer.Tick += OnTickerTimerTick;
         _tickerTimer.Start();
+    }
+
+    /// <summary>
+    /// 按当前页面维护行情条定时刷新：仅在首页根页面运行，
+    /// 离开即暂停（省去无谓的指数请求），回到首页立即补刷一次避免展示陈旧数据。
+    /// </summary>
+    private void UpdateTickerTimer()
+    {
+        if (!IsOnHomeRootPage)
+        {
+            _tickerTimer?.Stop();
+            return;
+        }
+
+        if (_tickerTimer?.IsEnabled != true)
+        {
+            StartTickerTimer();
+            _ = RefreshIndexTickersAsync();
+        }
     }
 
     private void OnTickerTimerTick(object? sender, EventArgs e) => _ = RefreshIndexTickersAsync();
@@ -235,32 +314,28 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(CurrentPageTitle));
+            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CanGoBack))
         {
             OnPropertyChanged(nameof(CanGoBack));
+            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CurrentRootNavigationItemTitle))
         {
-            if (_navigationService.CurrentRootNavigationItemTitle != null)
-            {
-                _isSynchronizingNavigationSelection = true;
-                try
-                {
-                    var mainItem = MainNavigationItems.FirstOrDefault(
-                        item => item.Title == _navigationService.CurrentRootNavigationItemTitle);
-                    SelectedMainNavigationItem = mainItem;
-                    SelectedBottomNavigationItem = mainItem == null
-                        ? BottomNavigationItems.FirstOrDefault(
-                            item => item.Title == _navigationService.CurrentRootNavigationItemTitle)
-                        : null;
-                }
-                finally
-                {
-                    _isSynchronizingNavigationSelection = false;
-                }
-            }
+            SyncNavigationSelectionToRootTitle();
+            OnTickerPageChanged();
         }
+    }
+
+    /// <summary>
+    /// 页面/导航栈变化后刷新行情条可见性，并按页面启停定时刷新。
+    /// </summary>
+    private void OnTickerPageChanged()
+    {
+        OnPropertyChanged(nameof(ShowIndexTickers));
+        OnPropertyChanged(nameof(ShowTopBar));
+        UpdateTickerTimer();
     }
 
     [RelayCommand]
@@ -353,12 +428,12 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 }
 
-public class NavigationItemViewModel : ViewModelBase
+public class NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel) : ViewModelBase
 {
-    public override string Title { get; }
-    public string IconPath { get; }
-    public string SelectedIconPath { get; }
-    public Func<ViewModelBase> CreateViewModel { get; }
+    public override string Title { get; } = title;
+    public string IconPath { get; } = iconPath;
+    public string SelectedIconPath { get; } = selectedIconPath;
+    public Func<ViewModelBase> CreateViewModel { get; } = createViewModel;
 
     /// <summary>是否显示未读徽标（仅告警导航项在存在未读告警时为 true）。</summary>
     private bool _hasUnreadBadge;
@@ -366,13 +441,5 @@ public class NavigationItemViewModel : ViewModelBase
     {
         get => _hasUnreadBadge;
         set => SetProperty(ref _hasUnreadBadge, value);
-    }
-
-    public NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel)
-    {
-        Title = title;
-        IconPath = iconPath;
-        SelectedIconPath = selectedIconPath;
-        CreateViewModel = createViewModel;
     }
 }

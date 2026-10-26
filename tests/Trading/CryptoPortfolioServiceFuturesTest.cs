@@ -49,7 +49,7 @@ public sealed class CryptoPortfolioServiceFuturesTest
 
         var result = await service.Object.GetCurrentPositionsAsync();
 
-        Assert.AreEqual(2, result.Count, "零数量与空符号持仓应被过滤");
+        Assert.HasCount(2, result, "零数量与空符号持仓应被过滤");
 
         var longPosition = result.Single(p => p.Symbol == "BTCUSDT");
         Assert.AreEqual(2m, longPosition.Quantity, "多头数量应归一为绝对值");
@@ -81,7 +81,7 @@ public sealed class CryptoPortfolioServiceFuturesTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task Futures_QueryFails_ShouldReturnEmptyList()
+    public async Task Futures_QueryFails_ShouldPropagateException()
     {
         var client = new Mock<IExchangeClient>();
         client.SetupGet(c => c.IsFutures).Returns(true);
@@ -89,8 +89,8 @@ public sealed class CryptoPortfolioServiceFuturesTest
               .ThrowsAsync(new System.Net.Http.HttpRequestException("network down"));
         var service = CreateService(client.Object);
 
-        var result = await service.Object.GetCurrentPositionsAsync();
-
-        Assert.AreEqual(0, result.Count, "合约持仓查询失败应返回空视图而非抛出");
+        await Assert.ThrowsExactlyAsync<System.Net.Http.HttpRequestException>(
+            () => service.Object.GetCurrentPositionsAsync(),
+            "合约持仓查询失败必须向外抛出异常，避免紧急全部平仓与硬性边界把接口故障误判为无持仓");
     }
 }

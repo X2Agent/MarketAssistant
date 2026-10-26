@@ -30,14 +30,14 @@
 
 
     <!-- ================================================================== -->
-    <!-- 基础交互卡片样式 (公共定义) -->
-    <!-- 包含: 策略卡片、股票卡片、热门股票卡片、最近查看卡片 -->
+    <!-- 热门资产卡片样式 -->
     <!-- ================================================================== -->
-    <Style Selector="Border.strategy-card, Border.stock-card, Border.hot-stock-card, Border.recent-stock-card">
+    <Style Selector="Border.hot-stock-card">
         <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
         <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
@@ -48,17 +48,20 @@
             </Transitions>
         </Setter>
     </Style>
-
-    <Style Selector="Border.strategy-card:pointerover, Border.stock-card:pointerover, Border.hot-stock-card:pointerover, Border.recent-stock-card:pointerover">
+    <Style Selector="Border.hot-stock-card:pointerover">
         <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
         <Setter Property="RenderTransform" Value="{StaticResource HoverLiftTransform}"/>
     </Style>
-    <Style Selector="Border.strategy-card:focus, Border.stock-card:focus, Border.hot-stock-card:focus, Border.recent-stock-card:focus">
+    <Style Selector="Border.hot-stock-card:focus">
         <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
         <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
         <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
+    </Style>
+    <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
+        <Setter Property="Opacity" Value="1"/>
+        <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
     <!-- ================================================================== -->
@@ -96,45 +99,6 @@
     </Style>
     <Style Selector="Border.mode-card.selected TextBlock.mode-name">
         <Setter Property="Foreground" Value="{DynamicResource ModeCardSelectedTextBrush}"/>
-    </Style>
-
-    <!-- ================================================================== -->
-    <!-- 各卡片特定属性 -->
-    <!-- ================================================================== -->
-
-    <!-- 快速策略卡片 -->
-    <Style Selector="Border.strategy-card">
-        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
-    </Style>
-
-    <!-- 股票卡片 -->
-    <Style Selector="Border.stock-card">
-        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
-    </Style>
-    <Style Selector="Border.stock-card[Cursor=Hand]:pressed">
-        <Setter Property="Opacity" Value="0.8"/>
-    </Style>
-    <Style Selector="Border.stock-card:pointerover Button.delete-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
-    </Style>
-
-    <!-- 热门股票卡片 -->
-    <Style Selector="Border.hot-stock-card">
-        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
-    </Style>
-    <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
-    </Style>
-
-    <!-- 最近查看卡片 -->
-    <Style Selector="Border.recent-stock-card">
-        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
-    </Style>
-    <Style Selector="Border.recent-stock-card:pointerover Button.favorite-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
     <!-- 新闻卡片样式 -->

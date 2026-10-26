@@ -9,11 +9,11 @@ namespace MarketAssistant.DataProviders;
 /// <summary>
 /// Binance WebSocket 实时行情服务，通过 mini-ticker 推送价格更新
 /// </summary>
-public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
+public sealed class BinanceWebSocketService(ILogger<BinanceWebSocketService> logger) : IAsyncDisposable, IDisposable
 {
     private const string WsBaseUrl = "wss://stream.binance.com:9443/stream?streams=";
     private const int ReconnectDelayMs = 5000;
-    private readonly ILogger<BinanceWebSocketService> _logger;
+    private readonly ILogger<BinanceWebSocketService> _logger = logger;
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
     private volatile bool _disposed;
@@ -53,11 +53,6 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 
     private int _connectionInterrupted;
 
-    public BinanceWebSocketService(ILogger<BinanceWebSocketService> logger)
-    {
-        _logger = logger;
-    }
-
     /// <summary>
     /// 以指定订阅方身份订阅实时行情。同一订阅方重复调用会整体替换其交易对集合，
     /// 因此调用方应在此传入该订阅方当前需要的完整集合。
@@ -80,6 +75,12 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 
             if (!changed) return;
             await ApplySubscriptionAsync();
+        }
+        catch (BinanceRegionUnavailableException ex)
+        {
+            // 地区限制：调度重试只会立刻失败并再次进入本分支，形成刷屏循环
+            _logger.LogError(ex, "Binance WebSocket 订阅失败：当前地区不可用，已停止自动重试");
+            NotifyConnectionInterrupted();
         }
         catch (Exception ex)
         {
@@ -109,6 +110,11 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 
             if (!changed) return;
             await ApplySubscriptionAsync();
+        }
+        catch (BinanceRegionUnavailableException ex)
+        {
+            _logger.LogError(ex, "Binance WebSocket 退订重连失败：当前地区不可用，已停止自动重试");
+            NotifyConnectionInterrupted();
         }
         catch (Exception ex)
         {
@@ -162,6 +168,22 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
         {
             _logger.LogInformation("连接 Binance WebSocket，订阅 {Count} 个交易对", symbols.Count);
             await ws.ConnectAsync(new Uri(url), cts.Token);
+        }
+        catch (WebSocketException ex)
+        {
+            cts.Dispose();
+            ws.Dispose();
+
+            // 握手返回 451 表示地区限制：重试永远不会成功，转为永久异常让重连循环停止，
+            // 否则会以固定间隔无限重试并刷屏（实测每 5 秒一条警告，持续占用日志 IO）。
+            if (IsRegionUnavailable(ex))
+            {
+                _logger.LogError("Binance WebSocket 因地区限制无法连接，已停止重试");
+                throw new BinanceRegionUnavailableException(
+                    BinanceMarketDataService.RegionUnavailableMessage, ex);
+            }
+
+            throw;
         }
         catch
         {
@@ -233,8 +255,10 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
                     result = await ws.ReceiveAsync(buffer, ct);
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        _logger.LogInformation("Binance WebSocket 服务端关闭连接");
+                        _logger.LogInformation("Binance WebSocket 服务端关闭连接，将在 {Delay}ms 后重连", ReconnectDelayMs);
                         NotifyConnectionInterrupted();
+                        if (!ct.IsCancellationRequested)
+                            await ScheduleReconnectIfCurrentAsync(ws, ct);
                         return;
                     }
                     messageStream.Write(buffer, 0, result.Count);
@@ -281,6 +305,12 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
             if (_disposed || _ws != ws) return;
             await ApplySubscriptionAsync();
         }
+        catch (BinanceRegionUnavailableException ex)
+        {
+            // 地区限制：重试无意义，直接停止并通知订阅方，与其他入口保持一致
+            _logger.LogError("Binance WebSocket 因地区限制停止重连: {Reason}", ex.Message);
+            NotifyConnectionInterrupted();
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Binance WebSocket 重连失败，{Delay}ms 后自动重试", ReconnectDelayMs);
@@ -291,6 +321,19 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
             _lifecycleGate.Release();
         }
     }
+
+    /// <summary>
+    /// 判断握手异常是否为地区限制（HTTP 451）。
+    /// </summary>
+    /// <remarks>
+    /// 不解析 <see cref="WebSocketException"/> 的内部响应（其 <c>WebSocketError</c>
+    /// 不暴露状态码），而是匹配框架在握手失败时写入消息的固定文本
+    /// "The server returned status code '451'"。带上状态码引号片段而非裸 "451"，
+    /// 避免端口号、字节数等场景误判。仅用于"停止重试"这一宽松判定，
+    /// 即便文本格式变化，最坏也只是退回到原有的重试行为。
+    /// </remarks>
+    internal static bool IsRegionUnavailable(WebSocketException ex)
+        => ex.Message.Contains("status code '451'", StringComparison.Ordinal);
 
     /// <summary>
     /// 连接失败后的退避重试（去重排队）。成功连接或并集清空后自动退出。
@@ -321,6 +364,13 @@ public sealed class BinanceWebSocketService : IAsyncDisposable, IDisposable
 
                     await ApplySubscriptionAsync();
                     shouldContinue = false;
+                }
+                catch (BinanceRegionUnavailableException ex)
+                {
+                    // 地区限制：重试无意义，停止循环并通知订阅方（UI 据此展示不可用状态）
+                    _logger.LogError("Binance WebSocket 因地区限制停止重连: {Reason}", ex.Message);
+                    NotifyConnectionInterrupted();
+                    return;
                 }
                 catch (Exception ex)
                 {

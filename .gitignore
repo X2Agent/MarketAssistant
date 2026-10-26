@@ -68,6 +68,18 @@ project.fragment.lock.json
 # 仅忽略仓库根目录的构建产物目录，避免误伤源码子目录（如 Agents/MarketAnalysis/Artifacts/）
 /artifacts/
 
+# IDE 隔离构建产物（VS Isolated MSBuild / WorkBuddy 会生成带后缀的目录）。
+# 下面的 [Bb]in/、[Oo]bj/ 只匹配无后缀目录名，这些带后缀的目录不会被忽略，
+# 存在被 `git add .` 误提交的风险。Directory.Build.props 的 DefaultItemExcludes
+# 已排除它们不参与编译，此处补齐版本控制忽略规则。
+**/bin-isolated/
+**/obj-isolated/
+**/bin-workbuddy/
+**/obj-workbuddy/
+
+# C# Dev Kit（VS Code）语言服务器缓存与项目缓存
+*.lscache
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
@@ -409,8 +421,25 @@ FodyWeavers.xsd
 # 仓库根目录下所有以 . 开头的文件夹（各工具的本地缓存/配置目录）
 /.[!.]*/
 
+# 例外：.github 存放版本化的 CI 配置，必须可追踪。
+# 缺少此白名单时，上面的 /.[!.]*/ 会把新增的 workflow 文件静默忽略，
+# 导致 `git add .github/workflows/xxx.yml` 表现为"成功"但文件未入库。
+!/.github/
+
 # Secrets and credentials
+# 注意：历史提交中曾误追踪 .secrets（内容形如 GITHUB_TOKEN=...），
+# 已通过 git rm --cached 解除追踪。若这些 token 曾在远端公开，需在 GitHub
+# Settings → Developer settings 中轮换，旧值即使已删除仍然有效。
 .secrets
 .env
 *.pem
 *.key.zcode/
+
+# 本地临时产物（本轮质量治理期间的构建日志）
+verify*.txt
+analyzer*.txt
+a3.txt
+final.txt
+build_log.txt
+*.trx
+TestResults/

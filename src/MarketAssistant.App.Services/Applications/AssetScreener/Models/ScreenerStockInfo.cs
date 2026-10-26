@@ -10,5 +10,5 @@ public class ScreenerStockInfo : ScreenerAssetInfo
     /// 字段名与雪球 screener API 返回的 JSON key 一致。
     /// API 只返回 order_by 和筛选条件涉及的字段，因此不同查询返回的字段不同。
     /// </summary>
-    public Dictionary<string, decimal> Indicators { get; set; } = new();
+    public Dictionary<string, decimal> Indicators { get; set; } = [];
 }

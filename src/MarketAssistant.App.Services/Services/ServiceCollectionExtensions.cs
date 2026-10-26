@@ -1,10 +1,13 @@
 using MarketAssistant.Agents.ContextProviders;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.PromptConfiguration;
+using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Agents.Trading;
 using MarketAssistant.Agents.InvestmentSelection;
 using MarketAssistant.Applications.AlertCenter;
+using MarketAssistant.Applications.AlertCenter.Channels;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Applications.Briefing;
 using MarketAssistant.Agents.InvestmentSelection.Executors;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
 using MarketAssistant.Agents.MarketAnalysis;
@@ -96,9 +99,6 @@ public static class BusinessServiceCollectionExtensions
     public static IServiceCollection AddNamedMarketHttpClients(this IServiceCollection services) =>
         AddHttpClientsCore(services);
 
-    internal static IServiceCollection AddHttpClients(this IServiceCollection services) =>
-        AddHttpClientsCore(services);
-
     private static IServiceCollection AddHttpClientsCore(IServiceCollection services)
     {
         services.AddHttpClient("Binance", client =>
@@ -178,6 +178,19 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
         }).AddStandardResilienceHandler();
 
+        // 飞书自定义机器人（告警推送）：地址由用户配置，无 BaseAddress；
+        // 短超时 + 重试一次，避免告警主链被外部服务拖住
+        services.AddHttpClient(FeishuWebhookClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        }).AddStandardResilienceHandler(options =>
+        {
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(12);
+            options.Retry.MaxRetryAttempts = 1;
+        });
+
         // 新浪财经资金流接口（热门股票资金流排行）
         // 原 push2.eastmoney.com 端点在部分网络环境下 TLS 重协商被中断，改用新浪接口
         services.AddHttpClient("SinaFinance", client =>
@@ -197,6 +210,15 @@ public static class BusinessServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+            client.DefaultRequestHeaders.Referrer = new Uri("https://finance.sina.com.cn/");
+        }).AddStandardResilienceHandler();
+
+        // 新浪 K 线历史（智兔不覆盖基金/ETF 时的 A 股 K 线兜底数据源）
+        // quotes.sina.cn 实测无需 Referer、无限流；datalen 上限 1900 由 SinaKLineClient 钳制
+        services.AddHttpClient("SinaKLine", client =>
+        {
+            client.BaseAddress = new Uri("https://quotes.sina.cn");
+            client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.Referrer = new Uri("https://finance.sina.com.cn/");
         }).AddStandardResilienceHandler();
 
@@ -343,6 +365,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<AnalystPromptLoader>();
 
         // MAF 中间件与会话级 Context Provider 工厂
+        services.AddSingleton<ITokenUsageRecorder, TokenUsageRecorder>();
         services.AddSingleton<TokenTrackingMiddleware>();
         services.AddSingleton<ConversationCompactionProviderFactory>();
 
@@ -367,7 +390,6 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<UserKnowledgeGraphService>();
         services.AddSingleton<MemoryExtractionService>();
         services.AddSingleton<ChatSessionPersistenceService>();
-        services.AddSingleton<WorkflowVisualizationService>();
         services.AddSingleton<IMarketChatSessionFactory, MarketChatSessionFactory>();
 
         var store = Path.Combine(
@@ -404,9 +426,22 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<IAlertGate>(sp => sp.GetRequiredService<AlertGate>());
         services.AddSingleton<IAlertCenterService, AlertCenterService>();
 
+        // 告警触达通道：桌面通知之外的进程外出口（飞书自定义机器人）
+        services.AddSingleton<FeishuWebhookClient>();
+        services.AddSingleton<IAlertChannel, FeishuAlertChannel>();
+
         services.AddSingleton<PriceAlertService>();
+        // 自选股批量规则符号解析与指标类规则周期评估（指标规则不走价格 tick 路径）
+        services.AddSingleton<AlertRuleSymbolResolver>();
+        services.AddSingleton<IndicatorAlertEvaluator>();
+        // AI 评级变化告警：订阅报告归档事件，显式解析激活
+        services.AddSingleton<AnalysisRatingAlertService>();
         services.AddSingleton<ReportArchiveService>();
         services.AddSingleton<IAnalysisCacheService, AnalysisCacheService>();
+
+        // 每日 AI 简报：按市场 Keyed 注册（各自的市场自选/要闻数据源）
+        services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.AShare);
+        services.AddKeyedSingleton<IDailyBriefingService, DailyBriefingService>(MarketType.Crypto);
 
         return services;
     }
@@ -427,19 +462,31 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<RoutingExchangeClient>(sp =>
         {
             var factory = sp.GetRequiredService<IExchangeClientFactory>();
-            var clients = Enum.GetValues<CryptoTradingMode>()
+            var clients = Enum.GetValues<TradingMode>()
                 .ToDictionary(mode => mode, factory.Create);
             return new RoutingExchangeClient(
                 sp.GetRequiredService<TradingEnvironmentService>(),
-                clients);
+                clients,
+                sp.GetRequiredService<ApiHealthMonitor>());
         });
         services.AddSingleton<TradingStrategyService>();
         services.AddSingleton<RiskManager>();
+        // API 健康度监控：RoutingExchangeClient 统一埋点，风控据此熔断
+        services.AddSingleton<ApiHealthMonitor>();
+        // 交易紧急停止状态：风控与监控启动的共同闸门（内存态 + 持久化）
+        services.AddSingleton<TradingHaltState>();
         services.AddSingleton<StrategyEngine>();
         services.AddSingleton<AISignalStrategyExecutor>();
+        // 影子交易账本：影子模式的模拟成交与 FIFO 盈亏（绩效验证）
+        services.AddSingleton<ShadowTradingService>();
+        services.AddSingleton<StrategyPerformanceService>();
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
         services.AddSingleton<ExchangeConditionOrderService>();
+        services.AddSingleton<EmergencyStopService>();
+        services.AddSingleton<LiquidationRiskEvaluator>();
+        // 策略限价单超时撤单（自启动周期扫描）
+        services.AddSingleton<PendingOrderTimeoutService>();
         services.AddSingleton<RiskAlertEvaluator>();
         services.AddSingleton<SignalAlertEvaluator>();
         services.AddSingleton<MarketMonitor>();

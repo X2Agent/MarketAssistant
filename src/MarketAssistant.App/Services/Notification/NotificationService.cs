@@ -6,18 +6,13 @@ namespace MarketAssistant.Services.Notification;
 /// <summary>
 /// Avalonia 平台的通知服务实现（桌面右下角通知，多通知按槽位向上堆叠）
 /// </summary>
-public class NotificationService : INotificationService
+public class NotificationService(ILogger<NotificationService> logger) : INotificationService
 {
     private const int DefaultDuration = 5000;
-    private readonly ILogger<NotificationService> _logger;
+    private readonly ILogger<NotificationService> _logger = logger;
 
     // 在屏通知列表（仅 UI 线程访问）：索引即堆叠槽位，0 = 底部基准位
     private readonly List<NotificationWindow> _activeNotifications = [];
-
-    public NotificationService(ILogger<NotificationService> logger)
-    {
-        _logger = logger;
-    }
 
     public void ShowSuccess(string message, int durationMs = DefaultDuration)
     {

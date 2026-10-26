@@ -13,29 +13,20 @@ namespace MarketAssistant.Applications.Favorites;
 /// 收藏服务：封装 SQLite 持久化与最新行情查询的共同行为。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
+public sealed class FavoriteService(
+    [ServiceKey] MarketType marketType,
+    IServiceProvider serviceProvider,
+    ILogger<FavoriteService> logger) : SqliteServiceBase(logger), IFavoriteService
 {
-    private readonly IAssetInfoService _assetInfoService;
-    private readonly ILogger<FavoriteService> _logger;
-    private readonly MarketType _marketType;
-    private readonly string _marketLabel;
-
-    public FavoriteService(
-        [ServiceKey] MarketType marketType,
-        IServiceProvider serviceProvider,
-        ILogger<FavoriteService> logger)
-        : base(logger)
+    private readonly IAssetInfoService _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
+    private readonly ILogger<FavoriteService> _logger = logger;
+    private readonly MarketType _marketType = marketType;
+    private readonly string _marketLabel = marketType switch
     {
-        _marketType = marketType;
-        _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
-        _logger = logger;
-        _marketLabel = marketType switch
-        {
-            MarketType.AShare => "A股",
-            MarketType.Crypto => "虚拟币",
-            _ => marketType.ToString()
-        };
-    }
+        MarketType.AShare => "A股",
+        MarketType.Crypto => "虚拟币",
+        _ => marketType.ToString()
+    };
 
     protected override async Task InitializeDatabaseAsync()
     {
@@ -54,18 +45,52 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
             """;
         await cmd.ExecuteNonQueryAsync();
 
-        // 存量数据归一化迁移（幂等）：历史数据存在小写/带 SH/SZ 前缀的代码，
+        // 存量数据归一化迁移（幂等）：历史数据存在小写/带 SH/SZ/BJ 前缀的代码，
         // 与归一化后的查询（大写、无前缀）无法匹配，导致详情页收藏状态判定失败。
         // 顺序：先按归一化后的键去重（保留最早一条），再统一大写，最后剥离 A 股交易所前缀。
+        // BJ 与 SH/SZ 同规则：前缀剥离逻辑统一在 StockSymbolConverter，此处保持同步。
         await using var migrateCmd = conn.CreateCommand();
         migrateCmd.CommandText = """
             DELETE FROM favorite_assets
             WHERE id NOT IN (SELECT MIN(id) FROM favorite_assets GROUP BY UPPER(code), market_type);
             UPDATE favorite_assets SET code = UPPER(code);
             UPDATE favorite_assets SET code = SUBSTR(code, 3)
-            WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ');
+            WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ', 'BJ');
             """;
         await migrateCmd.ExecuteNonQueryAsync();
+
+        // 虚拟币存量数据归一化迁移（幂等）：将历史遗留的基础币种（如 BTC）统一转为币安交易对格式（如 BTCUSDT）
+        var cryptoRows = new List<(long Id, string Code)>();
+        await using (var selectCryptoCmd = conn.CreateCommand())
+        {
+            selectCryptoCmd.CommandText = "SELECT id, code FROM favorite_assets WHERE market_type = 1 ORDER BY id";
+            await using var reader = await selectCryptoCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                cryptoRows.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+        }
+
+        var seenCryptoCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, rawCode) in cryptoRows)
+        {
+            var normalizedCode = FavoriteCodeNormalizer.Normalize(rawCode, MarketType.Crypto);
+            if (!seenCryptoCodes.Add(normalizedCode))
+            {
+                await using var delCmd = conn.CreateCommand();
+                delCmd.CommandText = "DELETE FROM favorite_assets WHERE id = @id";
+                delCmd.Parameters.AddWithValue("@id", id);
+                await delCmd.ExecuteNonQueryAsync();
+            }
+            else if (!string.Equals(rawCode, normalizedCode, StringComparison.Ordinal))
+            {
+                await using var updCmd = conn.CreateCommand();
+                updCmd.CommandText = "UPDATE favorite_assets SET code = @code WHERE id = @id";
+                updCmd.Parameters.AddWithValue("@code", normalizedCode);
+                updCmd.Parameters.AddWithValue("@id", id);
+                await updCmd.ExecuteNonQueryAsync();
+            }
+        }
     }
 
     public async Task AddFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
@@ -104,7 +129,8 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 
     public async Task RemoveFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
-        code = code.Trim();
+        // 与写入端共用归一化入口：调用方传入 sh600519 等未归一化代码时也能命中
+        code = FavoriteCodeNormalizer.Normalize(code, _marketType);
         market = market.Trim();
 
         try
@@ -133,7 +159,8 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
 
     public async Task<bool> IsFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
     {
-        code = code.Trim();
+        // 与写入端共用归一化入口：调用方传入 sh600519 等未归一化代码时也能正确判定
+        code = FavoriteCodeNormalizer.Normalize(code, _marketType);
         market = market.Trim();
 
         try
@@ -193,21 +220,26 @@ public sealed class FavoriteService : SqliteServiceBase, IFavoriteService
         if (favoritesCodes.Count == 0)
             return [];
 
-        var tasks = favoritesCodes.Select(async favorite =>
+        try
         {
-            try
+            var fetched = await _assetInfoService.GetAssetInfosAsync(favoritesCodes, cancellationToken);
+            var results = new List<AssetInfo>(favoritesCodes.Count);
+            for (var i = 0; i < favoritesCodes.Count; i++)
             {
-                return await _assetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market, cancellationToken);
+                var info = i < fetched.Count ? fetched[i] : null;
+                results.Add(info ?? CreateFallbackAssetInfo(favoritesCodes[i]));
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "获取{Market} {Code} 最新数据时出错: {Message}", _marketLabel, favorite.Code, ex.Message);
-                return CreateFallbackAssetInfo(favorite);
-            }
-        });
-
-        var results = await Task.WhenAll(tasks);
-        return results.Where(result => result != null).ToList();
+            return results;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "批量获取{Market}收藏最新数据时出错: {Message}", _marketLabel, ex.Message);
+            return [.. favoritesCodes.Select(CreateFallbackAssetInfo)];
+        }
     }
 
     public async Task ClearFavoritesAsync(CancellationToken cancellationToken = default)

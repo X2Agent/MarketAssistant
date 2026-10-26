@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, develop, feat/*]
+    branches: [main, develop, 'feat/**', 'fix/**', 'refactor/**']
   pull_request:
     branches: [main, develop]
 
@@ -10,6 +10,32 @@ env:
   DOTNET_VERSION: "10.0.x"
 
 jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore MarketAssistant.slnx
+
+      # AGENTS.md 约定代码格式须与 dotnet format 一致，但此前 CI 从未校验，
+      # 导致格式问题只能靠本地自觉。此步骤把它变成硬门禁。
+      - name: Verify formatting
+        run: dotnet format MarketAssistant.slnx --verify-no-changes --verbosity minimal
+
+      # Directory.Build.props 已开启 TreatWarningsAsErrors：
+      # Release 构建出现任何警告即失败，防止警告静默累积。
+      - name: Build (warnings as errors)
+        run: dotnet build MarketAssistant.slnx -c Release --no-restore -warnaserror
+
   build-windows:
     name: Build Windows
     runs-on: windows-latest

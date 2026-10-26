@@ -69,13 +69,13 @@ public partial class TradingPageViewModel : ViewModelBase, IDisposable, INavigat
             TradeHistory.RefreshCommand.Execute(null);
     }
 
-    private void OnTradingModeChanged(CryptoTradingMode mode)
+    private void OnTradingModeChanged(TradingMode mode)
     {
         // 防御：ModeChanged 若由后台线程触发（如监控停止路径），绑定属性更新必须切回 UI 线程
         Avalonia.Threading.Dispatcher.UIThread.Post(() => UpdateTradingModeState(mode));
     }
 
-    private void UpdateTradingModeState(CryptoTradingMode mode)
+    private void UpdateTradingModeState(TradingMode mode)
     {
         CurrentTradingModeText = TradingEnvironmentService.GetModeDisplayName(mode);
         TradingModeDescription = TradingEnvironmentService.GetModeDescription(mode);

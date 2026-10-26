@@ -10,12 +10,13 @@ namespace MarketAssistant.Services.Archive;
 /// <summary>
 /// 分析报告存档服务，使用 SQLite 持久化历史报告。
 /// </summary>
-public class ReportArchiveService : SqliteServiceBase
+public class ReportArchiveService(ILogger<ReportArchiveService> logger) : SqliteServiceBase(logger)
 {
-    public ReportArchiveService(ILogger<ReportArchiveService> logger)
-        : base(logger)
-    {
-    }
+    /// <summary>
+    /// 报告归档成功后触发（携带完整报告）。供评级变化告警等旁路消费，
+    /// 订阅方异常不得影响归档主链（由订阅方自行隔离）。
+    /// </summary>
+    public event Action<MarketAnalysisReport>? ReportSaved;
 
     /// <summary>
     /// 保存分析报告。失败时抛出异常，调用方可据此决定是否回滚缓存等后续操作。
@@ -30,14 +31,18 @@ public class ReportArchiveService : SqliteServiceBase
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                INSERT INTO reports (asset_code, score, created_at, report_json)
-                VALUES (@code, @score, @time, @json)
+                INSERT INTO reports (asset_code, market_type, rating, score, created_at, report_json)
+                VALUES (@code, @market, @rating, @score, @time, @json)
                 """;
             cmd.Parameters.AddWithValue("@code", report.AssetSymbol);
+            cmd.Parameters.AddWithValue("@market", report.MarketType.HasValue ? (int)report.MarketType.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@rating", (int)report.CoordinatorResult.InvestmentRating);
             cmd.Parameters.AddWithValue("@score", report.CoordinatorResult.OverallScore);
             cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
             cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
             await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            ReportSaved?.Invoke(report);
         }
         catch (Exception ex)
         {
@@ -49,10 +54,14 @@ public class ReportArchiveService : SqliteServiceBase
     /// <summary>
     /// 获取某资产的历史报告摘要（按时间倒序）
     /// </summary>
+    /// <param name="marketType">
+    /// 可选市场过滤；为 null 时返回该标的的全部报告。历史报告的市场列为空，仅在未指定市场时可见。
+    /// </param>
     public async Task<List<ReportSummary>> GetSummariesAsync(
         string assetCode,
         int limit = 20,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        MarketType? marketType = null)
     {
         var results = new List<ReportSummary>();
         try
@@ -61,11 +70,12 @@ public class ReportArchiveService : SqliteServiceBase
             await using var conn = await OpenConnectionAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = """
-                SELECT id, asset_code, score, created_at, report_json
-                FROM reports WHERE asset_code = @code
+                SELECT id, asset_code, market_type, rating, score, created_at, report_json
+                FROM reports WHERE asset_code = @code AND (@market IS NULL OR market_type = @market)
                 ORDER BY created_at DESC LIMIT @limit
                 """;
             cmd.Parameters.AddWithValue("@code", assetCode);
+            cmd.Parameters.AddWithValue("@market", marketType.HasValue ? (int)marketType.Value : DBNull.Value);
             cmd.Parameters.AddWithValue("@limit", limit);
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
@@ -75,13 +85,15 @@ public class ReportArchiveService : SqliteServiceBase
                 {
                     Id = reader.GetInt64(0),
                     AssetCode = reader.GetString(1),
-                    Score = reader.GetDouble(2),
-                    CreatedAt = DateTime.Parse(reader.GetString(3), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                    MarketType = reader.IsDBNull(2) ? null : (MarketType)reader.GetInt32(2),
+                    Rating = reader.IsDBNull(3) ? null : (InvestmentRating)reader.GetInt32(3),
+                    Score = reader.GetDouble(4),
+                    CreatedAt = DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
                 });
 
-                if (!reader.IsDBNull(4))
+                if (!reader.IsDBNull(6))
                 {
-                    TryFillDimensionScores(results[^1], reader.GetString(4));
+                    TryFillDimensionScores(results[^1], reader.GetString(6));
                 }
             }
 
@@ -147,6 +159,8 @@ public class ReportArchiveService : SqliteServiceBase
                 CREATE TABLE IF NOT EXISTS reports (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     asset_code TEXT NOT NULL,
+                    market_type INTEGER,
+                    rating INTEGER,
                     score REAL NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
                     report_json TEXT NOT NULL
@@ -155,6 +169,13 @@ public class ReportArchiveService : SqliteServiceBase
                 CREATE INDEX IF NOT EXISTS idx_reports_time ON reports(created_at);
                 """;
             await cmd.ExecuteNonQueryAsync();
+
+            await EnsureMarketColumnsAsync(conn);
+
+            await using var indexCmd = conn.CreateCommand();
+            indexCmd.CommandText =
+                "CREATE INDEX IF NOT EXISTS idx_reports_market ON reports(market_type, created_at);";
+            await indexCmd.ExecuteNonQueryAsync();
         }
         catch (Exception ex)
         {
@@ -162,6 +183,46 @@ public class ReportArchiveService : SqliteServiceBase
             // 后续 await _initializeTask 会抛出异常，调用方能感知数据库不可用
             Logger.LogError(ex, "初始化报告数据库失败");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 为既有 reports 表补齐后加列（旧库升级路径）。
+    /// 历史行的 market_type/rating 保持 NULL，表示市场与评级未知，不做推断回填。
+    /// </summary>
+    /// <remarks>
+    /// <b>此处不做任何回填是刻意的：</b>roadmap 明确要求「旧行为 NULL，读取方必须按
+    /// 未知处理，<b>禁止从 asset_code 反推市场</b>」。反推会把 A 股代码误判为币圈，
+    /// 使 M3 按市场分基准的胜率统计整体失真——且不报错，属最难察觉的一类错误。
+    /// </remarks>
+    /// <param name="conn">已打开的连接，且 <c>reports</c> 表已存在。</param>
+    internal static async Task EnsureMarketColumnsAsync(SqliteConnection conn)
+    {
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using (var pragmaCmd = conn.CreateCommand())
+        {
+            pragmaCmd.CommandText = "PRAGMA table_info(reports)";
+            await using var reader = await pragmaCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                existingColumns.Add(reader.GetString(1));
+            }
+        }
+
+        foreach (var (columnName, columnDefinition) in new[]
+                 {
+                     ("market_type", "INTEGER"),
+                     ("rating", "INTEGER")
+                 })
+        {
+            if (existingColumns.Contains(columnName))
+            {
+                continue;
+            }
+
+            await using var alterCmd = conn.CreateCommand();
+            alterCmd.CommandText = $"ALTER TABLE reports ADD COLUMN {columnName} {columnDefinition}";
+            await alterCmd.ExecuteNonQueryAsync();
         }
     }
 
@@ -217,6 +278,13 @@ public class ReportSummary
 {
     public long Id { get; set; }
     public string AssetCode { get; set; } = string.Empty;
+
+    /// <summary>报告所属市场；该字段上线前归档的历史报告为 null（未知）。</summary>
+    public MarketType? MarketType { get; set; }
+
+    /// <summary>协调器给出的综合投资评级；历史报告为 null（未知）。</summary>
+    public InvestmentRating? Rating { get; set; }
+
     public double Score { get; set; }
     public DateTime CreatedAt { get; set; }
     public double FundamentalScore { get; set; }

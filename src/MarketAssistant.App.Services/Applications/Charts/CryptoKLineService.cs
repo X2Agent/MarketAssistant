@@ -11,18 +11,12 @@ namespace MarketAssistant.Applications.Charts;
 /// <summary>
 /// 虚拟币K线数据服务实现，委托 BinanceMarketDataService 获取原始数据
 /// </summary>
-public class CryptoKLineService : IKLineService
+public class CryptoKLineService(
+    BinanceMarketDataService binanceService,
+    ILogger<CryptoKLineService> logger) : IKLineService
 {
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly ILogger<CryptoKLineService> _logger;
-
-    public CryptoKLineService(
-        BinanceMarketDataService binanceService,
-        ILogger<CryptoKLineService> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _logger = logger;
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly ILogger<CryptoKLineService> _logger = logger;
 
     /// <summary>
     /// 获取K线数据

@@ -35,25 +35,17 @@ public interface IAnalystAgentFactory
 /// 分析师代理工厂实现
 /// 负责创建配置好的分析师代理（使用 DI 容器）
 /// </summary>
-public class AnalystAgentFactory : AgentFactoryBase, IAnalystAgentFactory
+public class AnalystAgentFactory(
+    IServiceProvider serviceProvider,
+    MarketContext marketContext,
+    AgentSkillsProvider skillsProvider,
+    AnalystPromptLoader promptLoader,
+    TokenTrackingMiddleware tokenTracking,
+    ILogger<AnalystAgentFactory> logger) : AgentFactoryBase(serviceProvider, tokenTracking, logger), IAnalystAgentFactory
 {
-    private readonly MarketContext _marketContext;
-    private readonly AgentSkillsProvider _skillsProvider;
-    private readonly AnalystPromptLoader _promptLoader;
-
-    public AnalystAgentFactory(
-        IServiceProvider serviceProvider,
-        MarketContext marketContext,
-        AgentSkillsProvider skillsProvider,
-        AnalystPromptLoader promptLoader,
-        TokenTrackingMiddleware tokenTracking,
-        ILogger<AnalystAgentFactory> logger)
-        : base(serviceProvider, tokenTracking, logger)
-    {
-        _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
-        _skillsProvider = skillsProvider ?? throw new ArgumentNullException(nameof(skillsProvider));
-        _promptLoader = promptLoader ?? throw new ArgumentNullException(nameof(promptLoader));
-    }
+    private readonly MarketContext _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
+    private readonly AgentSkillsProvider _skillsProvider = skillsProvider ?? throw new ArgumentNullException(nameof(skillsProvider));
+    private readonly AnalystPromptLoader _promptLoader = promptLoader ?? throw new ArgumentNullException(nameof(promptLoader));
 
     public AIAgent CreateAnalyst(
         Type agentType,
@@ -112,7 +104,7 @@ public class AnalystAgentFactory : AgentFactoryBase, IAnalystAgentFactory
             ];
             parameters.Add(contextProviders);
 
-            var agent = (AIAgent)ActivatorUtilities.CreateInstance(ServiceProvider, agentType, parameters.ToArray());
+            var agent = (AIAgent)ActivatorUtilities.CreateInstance(ServiceProvider, agentType, [.. parameters]);
 
             var middlewareAgent = WrapWithTokenTracking(agent);
 

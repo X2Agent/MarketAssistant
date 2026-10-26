@@ -277,8 +277,16 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         }
     }
 
-    protected string GetEnumDescription(Enum value)
+    /// <summary>
+    /// 枚举的描述文本；为 null 时返回 <paramref name="fallback"/>（模型未给出该字段）。
+    /// </summary>
+    protected string GetEnumDescription(Enum? value, string fallback = "未给出")
     {
+        if (value is null)
+        {
+            return fallback;
+        }
+
         var field = value.GetType().GetField(value.ToString());
         var attribute = field?.GetCustomAttribute<DescriptionAttribute>();
         return attribute?.Description ?? value.ToString();

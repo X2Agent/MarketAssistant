@@ -2,52 +2,45 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.Technical;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Technical;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Skender.Stock.Indicators;
 using System.ComponentModel;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
 /// <summary>
-/// 虚拟币技术分析工具实现（基于币安 K 线数据计算）
+/// 虚拟币技术分析工具实现（基于币安 K 线数据，指标计算复用 <see cref="ITechnicalIndicatorService"/>）
 /// </summary>
-public sealed class CryptoTechnicalTools : ITechnicalDataTools
+public sealed class CryptoTechnicalTools(
+    ILogger<CryptoTechnicalTools> logger,
+    [FromKeyedServices(MarketType.Crypto)] IKLineService kLineService,
+    [FromKeyedServices(MarketType.Crypto)] ITechnicalIndicatorService indicatorService) : ITechnicalDataTools
 {
-    private readonly ILogger<CryptoTechnicalTools> _logger;
-    private readonly IServiceProvider _serviceProvider;
+    /// <summary>指标计算所需的最大 K 线根数（MA250 需要 250 根）。</summary>
+    private const int IndicatorBarCount = 250;
 
-    public CryptoTechnicalTools(ILogger<CryptoTechnicalTools> logger, IServiceProvider serviceProvider)
-    {
-        _logger = logger;
-        _serviceProvider = serviceProvider;
-    }
+    private readonly ILogger<CryptoTechnicalTools> _logger = logger;
+    private readonly IKLineService _kLineService = kLineService ?? throw new ArgumentNullException(nameof(kLineService));
+    private readonly ITechnicalIndicatorService _indicatorService = indicatorService ?? throw new ArgumentNullException(nameof(indicatorService));
 
     [Description("获取近30日最新日线KDJ，支持BTC、ETH等币种")]
     public async Task<TechnicalKDJ> GetKDJAsync([Description("虚拟币代码（如BTC、ETH）")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
-
-            if (klineData == null || klineData.Count < 9)
-            {
+            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
+            if (snapshot.KdjK is null || snapshot.KdjD is null || snapshot.KdjJ is null)
                 throw new FriendlyException($"K线数据不足，无法计算KDJ指标: {assetSymbol}");
-            }
-
-            var quotes = ToIndicatorQuotes(klineData);
-            var result = quotes.GetStoch(9, 3, 3)
-                .LastOrDefault(item => item.K is not null && item.D is not null && item.J is not null)
-                ?? throw new FriendlyException($"KDJ 指标结果为空: {assetSymbol}");
 
             var kdj = new TechnicalKDJ
             {
-                T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                K = Round(result.K),
-                D = Round(result.D),
-                J = Round(result.J)
+                T = snapshot.Date,
+                K = snapshot.KdjK,
+                D = snapshot.KdjD,
+                J = snapshot.KdjJ
             };
 
             _logger.LogInformation("成功计算虚拟币KDJ指标: {Symbol}, K={K}, D={D}, J={J}",
@@ -67,30 +60,18 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     {
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
-
-            if (klineData == null || klineData.Count < 26)
-            {
+            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
+            if (snapshot.MacdDiff is null || snapshot.MacdDea is null)
                 throw new FriendlyException($"K线数据不足，无法计算MACD指标: {assetSymbol}");
-            }
 
-            var quotes = ToIndicatorQuotes(klineData);
-            var result = quotes.GetMacd(12, 26, 9)
-                .LastOrDefault(item => item.Macd is not null && item.Signal is not null)
-                ?? throw new FriendlyException($"MACD 指标结果为空: {assetSymbol}");
-
-            var diff = Round(result.Macd) ?? 0;
-            var dea = Round(result.Signal) ?? 0;
             var macd = new TechnicalMACD
             {
-                T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                Diff = diff,
-                Dea = dea,
-                // 国内惯例 MACD 柱线 = 2*(DIFF-DEA)，与模型契约及 A 股智兔数据口径保持一致
-                Macd = 2 * (diff - dea),
-                Ema12 = Round(result.FastEma) ?? 0,
-                Ema26 = Round(result.SlowEma) ?? 0
+                T = snapshot.Date,
+                Diff = snapshot.MacdDiff.Value,
+                Dea = snapshot.MacdDea.Value,
+                Macd = snapshot.MacdBar ?? 0,
+                Ema12 = snapshot.MacdFastEma ?? 0,
+                Ema26 = snapshot.MacdSlowEma ?? 0
             };
 
             _logger.LogInformation("成功计算虚拟币MACD指标: {Symbol}, DIFF={Diff}, DEA={Dea}, MACD={Macd}",
@@ -110,25 +91,16 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     {
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
-
-            if (klineData == null || klineData.Count < 20)
-            {
+            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
+            if (snapshot.BollUpper is null || snapshot.BollMiddle is null || snapshot.BollLower is null)
                 throw new FriendlyException($"K线数据不足，无法计算BOLL指标: {assetSymbol}");
-            }
-
-            var quotes = ToIndicatorQuotes(klineData);
-            var result = quotes.GetBollingerBands(20, 2)
-                .LastOrDefault(item => item.UpperBand is not null && item.Sma is not null && item.LowerBand is not null)
-                ?? throw new FriendlyException($"BOLL 指标结果为空: {assetSymbol}");
 
             var boll = new TechnicalBoll
             {
-                T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                U = Round(result.UpperBand),
-                M = Round(result.Sma),
-                D = Round(result.LowerBand)
+                T = snapshot.Date,
+                U = snapshot.BollUpper,
+                M = snapshot.BollMiddle,
+                D = snapshot.BollLower
             };
 
             _logger.LogInformation("成功计算虚拟币BOLL指标: {Symbol}, 上轨={U}, 中轨={M}, 下轨={D}",
@@ -148,28 +120,23 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
     {
         try
         {
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, KLineType.Daily, 250);
-
-            if (klineData == null || klineData.Count < 3)
-            {
+            var snapshot = await _indicatorService.GetSnapshotAsync(assetSymbol, KLineType.Daily, IndicatorBarCount, cancellationToken);
+            if (!snapshot.HasAnyValue)
                 throw new FriendlyException($"K线数据不足，无法计算MA指标: {assetSymbol}");
-            }
 
-            var quotes = ToIndicatorQuotes(klineData);
             var ma = new TechnicalMA
             {
-                T = klineData.Last().Timestamp.ToString("yyyy-MM-dd"),
-                MA3 = GetLatestSma(quotes, 3),
-                MA5 = GetLatestSma(quotes, 5),
-                MA10 = GetLatestSma(quotes, 10),
-                MA15 = GetLatestSma(quotes, 15),
-                MA20 = GetLatestSma(quotes, 20),
-                MA30 = GetLatestSma(quotes, 30),
-                MA60 = GetLatestSma(quotes, 60),
-                MA120 = GetLatestSma(quotes, 120),
-                MA200 = GetLatestSma(quotes, 200),
-                MA250 = GetLatestSma(quotes, 250)
+                T = snapshot.Date,
+                MA3 = snapshot.GetMovingAverage(3),
+                MA5 = snapshot.GetMovingAverage(5),
+                MA10 = snapshot.GetMovingAverage(10),
+                MA15 = snapshot.GetMovingAverage(15),
+                MA20 = snapshot.GetMovingAverage(20),
+                MA30 = snapshot.GetMovingAverage(30),
+                MA60 = snapshot.GetMovingAverage(60),
+                MA120 = snapshot.GetMovingAverage(120),
+                MA200 = snapshot.GetMovingAverage(200),
+                MA250 = snapshot.GetMovingAverage(250)
             };
 
             _logger.LogInformation("成功计算虚拟币MA指标: {Symbol}, MA5={MA5}, MA10={MA10}, MA20={MA20}",
@@ -193,32 +160,6 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
         yield return AIFunctionFactory.Create(GetKLinesAsync);
     }
 
-    private static List<IndicatorQuote> ToIndicatorQuotes(IEnumerable<KLineData> klineData)
-    {
-        return klineData
-            .OrderBy(item => item.Timestamp)
-            .Select(item => new IndicatorQuote
-            {
-                Date = item.Timestamp,
-                Open = item.Open,
-                High = item.High,
-                Low = item.Low,
-                Close = item.Close,
-                Volume = item.Volume
-            })
-            .ToList();
-    }
-
-    private static decimal? GetLatestSma(List<IndicatorQuote> quotes, int period)
-    {
-        return Round(quotes.GetSma(period).LastOrDefault(item => item.Sma is not null)?.Sma);
-    }
-
-    private static decimal? Round(double? value)
-    {
-        return value.HasValue ? Math.Round((decimal)value.Value, 2) : null;
-    }
-
     [Description("获取K线历史序列（OHLCV），interval支持5m/15m/daily/weekly，用于判断趋势方向及多周期确认")]
     public async Task<List<OhlcvBar>> GetKLinesAsync(
         [Description("虚拟币代码（如BTC、ETH）")] string assetSymbol,
@@ -236,8 +177,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
                 _ => KLineType.Daily
             };
 
-            var klineService = _serviceProvider.GetRequiredKeyedService<IKLineService>(MarketType.Crypto);
-            var klineData = await klineService.GetKLineDataAsync(assetSymbol, klineType, Math.Clamp(count, 1, 500));
+            var klineData = await _kLineService.GetKLineDataAsync(assetSymbol, klineType, Math.Clamp(count, 1, 500));
 
             if (klineData == null || klineData.Count == 0)
                 throw new FriendlyException($"K线数据为空: {assetSymbol}");
@@ -245,7 +185,7 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
             var timeFormat = klineType is KLineType.Minute5 or KLineType.Minute15
                 ? "yyyy-MM-dd HH:mm" : "yyyy-MM-dd";
 
-            return klineData
+            return [.. klineData
                 .OrderBy(k => k.Timestamp)
                 .Select(k => new OhlcvBar
                 {
@@ -255,23 +195,12 @@ public sealed class CryptoTechnicalTools : ITechnicalDataTools
                     L = k.Low,
                     C = k.Close,
                     V = k.Volume
-                })
-                .ToList();
+                })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
             _logger.LogError(ex, "获取K线序列失败: {Symbol} {Interval}", assetSymbol, interval);
             throw new FriendlyException($"获取K线序列失败: {ex.Message}", ex);
         }
-    }
-
-    private sealed class IndicatorQuote : IQuote
-    {
-        public DateTime Date { get; init; }
-        public decimal Open { get; init; }
-        public decimal High { get; init; }
-        public decimal Low { get; init; }
-        public decimal Close { get; init; }
-        public decimal Volume { get; init; }
     }
 }

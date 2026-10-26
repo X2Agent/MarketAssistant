@@ -17,35 +17,28 @@ namespace MarketAssistant.Rag.Services;
 /// 降级策略：图像嵌入失败抛出异常由调用方降级为 Caption 文本召回；
 /// Caption 不可用或失败时返回占位符。ONNX 会话延迟到首次调用时加载。
 /// </summary>
-public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
+/// <remarks>
+/// 构造函数：模型路径优先取环境变量 CLIP_IMAGE_ONNX，否则用本地默认路径。
+/// Caption 客户端由工厂延迟创建，AI 未配置时为 null（Caption 降级为占位符）。
+/// </remarks>
+public class ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IImageCaptionClientFactory captionClientFactory) : IImageEmbeddingService, IDisposable
 {
     // 目标嵌入向量维度，引用统一常量
     private const int TargetDim = RagConstants.EmbeddingDimension;
 
     // ImageNet 标准化参数（CLIP 模型训练时使用）
-    private static readonly float[] ImageNetMean = { 0.485f, 0.456f, 0.406f };
-    private static readonly float[] ImageNetStd = { 0.229f, 0.224f, 0.225f };
+    private static readonly float[] ImageNetMean = [0.485f, 0.456f, 0.406f];
+    private static readonly float[] ImageNetStd = [0.229f, 0.224f, 0.225f];
 
-    private readonly ILogger<ClipImageEmbeddingService> _logger;
-    private readonly IChatCompletionService? _chat;
-    private readonly string? _modelPath;
+    private readonly ILogger<ClipImageEmbeddingService> _logger = logger;
+    private bool _disposed;
+    private readonly IChatCompletionService? _chat = captionClientFactory.Create();
+    private readonly string? _modelPath = Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")
+                     ?? Path.Combine(AppContext.BaseDirectory, "models", "clip-image.onnx");
 
     private InferenceSession? _session;
     private volatile bool _initAttempted;
     private readonly object _initLock = new();
-
-    /// <summary>
-    /// 构造函数：模型路径优先取环境变量 CLIP_IMAGE_ONNX，否则用本地默认路径。
-    /// Caption 客户端由工厂延迟创建，AI 未配置时为 null（Caption 降级为占位符）。
-    /// </summary>
-    public ClipImageEmbeddingService(ILogger<ClipImageEmbeddingService> logger, IImageCaptionClientFactory captionClientFactory)
-    {
-        _logger = logger;
-        _chat = captionClientFactory.Create();
-
-        _modelPath = Environment.GetEnvironmentVariable("CLIP_IMAGE_ONNX")
-                     ?? Path.Combine(AppContext.BaseDirectory, "models", "clip-image.onnx");
-    }
 
     /// <summary>
     /// 生成图像嵌入向量（ONNX 推理 + 归一化）。
@@ -83,7 +76,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                     var inputs = CreateModelInputs(imageInput, tensor);
 
                     // 执行ONNX推理并获取输出向量
-                    using var results = _session.Run(inputs, new[] { imageOutput });
+                    using var results = _session.Run(inputs, [imageOutput]);
                     var output = results.First().AsEnumerable<float>().ToArray();
 
                     // 后处理：归一化和调整维度
@@ -145,10 +138,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     /// </summary>
     private List<NamedOnnxValue> CreateModelInputs(string imageInputName, DenseTensor<float> imageTensor)
     {
-        var inputs = new List<NamedOnnxValue>();
-
-        // 添加图像输入
-        inputs.Add(NamedOnnxValue.CreateFromTensor(imageInputName, imageTensor));
+        var inputs = new List<NamedOnnxValue>
+        {
+            // 添加图像输入
+            NamedOnnxValue.CreateFromTensor(imageInputName, imageTensor)
+        };
 
         // 处理其他可能需要的输入
         foreach (var inputMeta in _session!.InputMetadata)
@@ -156,11 +150,11 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
             if (inputMeta.Key == imageInputName) continue; // 跳过图像输入
 
             // 处理文本输入（input_ids, text等）
-            if (inputMeta.Key.Contains("input_ids") || inputMeta.Key.Contains("text"))
+            if (inputMeta.Key.Contains("input_ids", StringComparison.Ordinal) || inputMeta.Key.Contains("text", StringComparison.Ordinal))
             {
                 // 创建空文本输入（表示只处理图像）
                 var textShape = inputMeta.Value.Dimensions.ToArray();
-                if (textShape.Any(d => d <= 0)) textShape = new[] { 1, 1 }; // 默认形状
+                if (textShape.Any(d => d <= 0)) textShape = [1, 1]; // 默认形状
 
                 var emptyTextTensor = new DenseTensor<long>(new long[textShape.Aggregate(1, (a, b) => a * b)], textShape);
                 inputs.Add(NamedOnnxValue.CreateFromTensor(inputMeta.Key, emptyTextTensor));
@@ -168,10 +162,10 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                     inputMeta.Key, string.Join(", ", textShape));
             }
             // 处理attention_mask输入
-            else if (inputMeta.Key.Contains("attention_mask"))
+            else if (inputMeta.Key.Contains("attention_mask", StringComparison.Ordinal))
             {
                 var maskShape = inputMeta.Value.Dimensions.ToArray();
-                if (maskShape.Any(d => d <= 0)) maskShape = new[] { 1, 1 };
+                if (maskShape.Any(d => d <= 0)) maskShape = [1, 1];
 
                 var emptyMaskTensor = new DenseTensor<long>(new long[maskShape.Aggregate(1, (a, b) => a * b)], maskShape);
                 inputs.Add(NamedOnnxValue.CreateFromTensor(inputMeta.Key, emptyMaskTensor));
@@ -349,7 +343,7 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
                 }
             }
 
-            return new DenseTensor<float>(tensorData, new[] { 1, channels, size, size });
+            return new DenseTensor<float>(tensorData, [1, channels, size, size]);
         }
         catch (Exception ex)
         {
@@ -395,8 +389,18 @@ public class ClipImageEmbeddingService : IImageEmbeddingService, IDisposable
     /// </summary>
     public void Dispose()
     {
+        // 幂等保护：Dispose 可能被多次调用（DI 容器与显式调用并存），
+        // ONNX InferenceSession 重复释放不保证安全。
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         // 资源释放：释放ONNX会话的非托管资源
         _session?.Dispose();
         // 注意：托管字段（_logger, _chatCompletion等）由DI容器自动管理
+        GC.SuppressFinalize(this);
     }
 }

@@ -20,7 +20,7 @@ public sealed class MarketAnalysisWorkflowIdentityTest
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(service => service.CurrentSetting).Returns(new UserSetting
         {
-            EnabledAnalystRoles = new Dictionary<string, bool>()
+            EnabledAnalystRoles = []
         });
         var marketContext = new MarketContext(settingService.Object, Mock.Of<IServiceProvider>());
         var workflow = new MarketAnalysisWorkflow(
@@ -50,11 +50,11 @@ public sealed class MarketAnalysisWorkflowIdentityTest
         Assert.HasCount(2, eventsB);
         Assert.IsTrue(eventsA.All(item => item.AssetSymbol == "000001"));
         Assert.IsTrue(eventsB.All(item => item.AssetSymbol == "BTCUSDT"));
-        Assert.IsTrue(eventsA.Any(item => !item.IsInProgress));
-        Assert.IsTrue(eventsB.Any(item => !item.IsInProgress));
-        Assert.IsFalse(events.Any(item =>
+        Assert.Contains(item => !item.IsInProgress, eventsA);
+        Assert.Contains(item => !item.IsInProgress, eventsB);
+        Assert.DoesNotContain(item =>
             item.RunId == runA && item.AssetSymbol != "000001" ||
-            item.RunId == runB && item.AssetSymbol != "BTCUSDT"));
+            item.RunId == runB && item.AssetSymbol != "BTCUSDT", events);
     }
 
     [TestMethod]
@@ -97,7 +97,7 @@ public sealed class MarketAnalysisWorkflowIdentityTest
 }
 internal sealed class InMemoryArtifactStore : MarketAssistant.Services.Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore
 {
-    public System.Collections.Generic.Dictionary<(Guid RunId, string Analyst), string> Map { get; } = new();
+    public System.Collections.Generic.Dictionary<(Guid RunId, string Analyst), string> Map { get; } = [];
     public System.Threading.Tasks.Task SaveAsync(Guid runId, string analystName, string content, System.Threading.CancellationToken cancellationToken = default)
     { Map[(runId, analystName)] = content; return System.Threading.Tasks.Task.CompletedTask; }
     public System.Threading.Tasks.Task<string?> GetAsync(Guid runId, string analystName, System.Threading.CancellationToken cancellationToken = default)

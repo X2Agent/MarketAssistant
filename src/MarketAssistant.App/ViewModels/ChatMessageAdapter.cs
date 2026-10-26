@@ -229,8 +229,8 @@ public partial class ChatMessageAdapter : ObservableObject
         if (string.IsNullOrWhiteSpace(content)) return false;
         content = content.Trim();
 
-        if (!((content.StartsWith("{") && content.EndsWith("}")) ||
-              (content.StartsWith("[") && content.EndsWith("]"))))
+        if (!((content.StartsWith('{') && content.EndsWith('}')) ||
+              (content.StartsWith('[') && content.EndsWith(']'))))
         {
             return false;
         }

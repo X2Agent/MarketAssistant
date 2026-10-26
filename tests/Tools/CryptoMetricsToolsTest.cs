@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Applications.Charts;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services;
@@ -38,6 +39,9 @@ public class CryptoMetricsToolsTest
         services.AddSingleton<CoinGeckoApiService>();
         // CryptoMetricsTools 依赖 IKLineService（虚拟币 K线服务，基于币安行情）
         services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
+        // 盘口深度与逐笔成交已抽取为独立服务，工具通过委托调用
+        services.AddKeyedSingleton<IOrderBookService, CryptoOrderBookService>(MarketType.Crypto);
+        services.AddKeyedSingleton<ITickTradeService, CryptoTickTradeService>(MarketType.Crypto);
 
         // 通过 Mock 注入 UserSetting（CoinGeckoApiKey 可为空，使用免费 API）
         var userSetting = new UserSetting();
@@ -68,12 +72,12 @@ public class CryptoMetricsToolsTest
         var result = await service.GetVolumeDistributionAsync("BTC");
 
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0);
-        Assert.IsTrue(result[0].Volume > 0);
+        Assert.IsNotEmpty(result);
+        Assert.IsGreaterThan(0, result[0].Volume);
         // 加强验证：交易所名称、占比、交易对数量等字段
         Assert.IsFalse(string.IsNullOrEmpty(result[0].Exchange), $"交易所名称不应为空，实际: '{result[0].Exchange}'");
-        Assert.IsTrue(result[0].Percentage > 0, $"占比应大于0，实际: {result[0].Percentage}");
-        Assert.IsTrue(result[0].PairCount > 0, $"交易对数量应大于0，实际: {result[0].PairCount}");
+        Assert.IsGreaterThan(0, result[0].Percentage, $"占比应大于0，实际: {result[0].Percentage}");
+        Assert.IsGreaterThan(0, result[0].PairCount, $"交易对数量应大于0，实际: {result[0].PairCount}");
         // 所有条目的占比之和应接近 100（允许浮点精度误差）
         var totalPercentage = result.Sum(x => x.Percentage);
         Assert.IsTrue(totalPercentage > 98 && totalPercentage < 102, $"占比总和应接近100，实际: {totalPercentage}");
@@ -88,7 +92,7 @@ public class CryptoMetricsToolsTest
         var functions = service.GetFunctions().ToList();
 
         Assert.IsNotNull(functions);
-        Assert.AreEqual(6, functions.Count); // 6个函数：OHLCV、深度、成交、市场指标、交易量分布、波动性
+        Assert.HasCount(6, functions); // 6个函数：OHLCV、深度、成交、市场指标、交易量分布、波动性
     }
 
     [TestMethod]
@@ -102,18 +106,35 @@ public class CryptoMetricsToolsTest
         Assert.IsNotNull(result);
         Assert.AreEqual("BTCUSDT", result.Symbol);
         Assert.AreEqual("1d", result.Interval);
-        Assert.IsTrue(result.Candles.Count > 0);
-        Assert.IsTrue(result.Candles[0].Close > 0);
+        Assert.IsNotEmpty(result.Candles);
+        Assert.IsGreaterThan(0, result.Candles[0].Close);
         // 加强验证：OHLC 关系与成交量/时间戳
-        Assert.IsTrue(result.Candles[0].Open > 0, $"开盘价应大于0，实际: {result.Candles[0].Open}");
-        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Low, $"最高价({result.Candles[0].High})应大于等于最低价({result.Candles[0].Low})");
-        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Open, $"最高价({result.Candles[0].High})应大于等于开盘价({result.Candles[0].Open})");
-        Assert.IsTrue(result.Candles[0].High >= result.Candles[0].Close, $"最高价({result.Candles[0].High})应大于等于收盘价({result.Candles[0].Close})");
-        Assert.IsTrue(result.Candles[0].Low <= result.Candles[0].Open, $"最低价({result.Candles[0].Low})应小于等于开盘价({result.Candles[0].Open})");
-        Assert.IsTrue(result.Candles[0].Low <= result.Candles[0].Close, $"最低价({result.Candles[0].Low})应小于等于收盘价({result.Candles[0].Close})");
-        Assert.IsTrue(result.Candles[0].Volume > 0, $"成交量应大于0，实际: {result.Candles[0].Volume}");
-        Assert.IsTrue(result.Candles[0].OpenTime > 0, $"开盘时间戳应大于0，实际: {result.Candles[0].OpenTime}");
-        Assert.IsTrue(result.Candles[0].CloseTime > result.Candles[0].OpenTime, $"收盘时间戳({result.Candles[0].CloseTime})应大于开盘时间戳({result.Candles[0].OpenTime})");
+        Assert.IsGreaterThan(0, result.Candles[0].Open, $"开盘价应大于0，实际: {result.Candles[0].Open}");
+        Assert.IsGreaterThanOrEqualTo(result.Candles[0].Low, result.Candles[0].High, $"最高价({result.Candles[0].High})应大于等于最低价({result.Candles[0].Low})");
+        Assert.IsGreaterThanOrEqualTo(result.Candles[0].Open, result.Candles[0].High, $"最高价({result.Candles[0].High})应大于等于开盘价({result.Candles[0].Open})");
+        Assert.IsGreaterThanOrEqualTo(result.Candles[0].Close, result.Candles[0].High, $"最高价({result.Candles[0].High})应大于等于收盘价({result.Candles[0].Close})");
+        Assert.IsLessThanOrEqualTo(result.Candles[0].Open, result.Candles[0].Low, $"最低价({result.Candles[0].Low})应小于等于开盘价({result.Candles[0].Open})");
+        Assert.IsLessThanOrEqualTo(result.Candles[0].Close, result.Candles[0].Low, $"最低价({result.Candles[0].Low})应小于等于收盘价({result.Candles[0].Close})");
+        Assert.IsGreaterThan(0, result.Candles[0].Volume, $"成交量应大于0，实际: {result.Candles[0].Volume}");
+        Assert.IsGreaterThan(0, result.Candles[0].OpenTime, $"开盘时间戳应大于0，实际: {result.Candles[0].OpenTime}");
+        Assert.IsGreaterThan(result.Candles[0].OpenTime, result.Candles[0].CloseTime, $"收盘时间戳({result.Candles[0].CloseTime})应大于开盘时间戳({result.Candles[0].OpenTime})");
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task GetOHLCVAsync_OneHour_ShouldReturnHourlyCandlesNotDaily()
+    {
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
+
+        var result = await service.GetOHLCVAsync("BTCUSDT", interval: MarketInterval.OneHour, limit: 5);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("BTCUSDT", result.Symbol);
+        Assert.AreEqual("1h", result.Interval);
+        Assert.IsTrue(result.Candles.Count >= 2);
+        // 相邻两根 1h K 线的 OpenTime 间隔应为 3,600,000 ms（1小时），而非 86,400,000 ms（1天）
+        var deltaMs = result.Candles[1].OpenTime - result.Candles[0].OpenTime;
+        Assert.AreEqual(3_600_000L, deltaMs, $"1h K线相邻间隔应为 3600000ms，实际: {deltaMs}ms");
     }
 
     [TestMethod]
@@ -126,11 +147,11 @@ public class CryptoMetricsToolsTest
 
         Assert.IsNotNull(result);
         Assert.AreEqual("BTCUSDT", result.Symbol);
-        Assert.IsTrue(result.Bids.Count > 0);
-        Assert.IsTrue(result.Asks.Count > 0);
-        Assert.IsTrue(result.BestBidPrice > 0);
-        Assert.IsTrue(result.BestAskPrice > 0);
-        Assert.IsTrue(result.Spread > 0);
+        Assert.IsNotEmpty(result.Bids);
+        Assert.IsNotEmpty(result.Asks);
+        Assert.IsGreaterThan(0, result.BestBidPrice);
+        Assert.IsGreaterThan(0, result.BestAskPrice);
+        Assert.IsGreaterThan(0, result.Spread);
     }
 
     [TestMethod]
@@ -143,9 +164,9 @@ public class CryptoMetricsToolsTest
 
         Assert.IsNotNull(result);
         Assert.AreEqual("BTCUSDT", result.Symbol);
-        Assert.IsTrue(result.Trades.Count > 0);
-        Assert.IsTrue(result.TotalVolume > 0);
-        Assert.IsTrue(result.BuyerVolumePercent + result.SellerVolumePercent == 100);
+        Assert.IsNotEmpty(result.Trades);
+        Assert.IsGreaterThan(0, result.TotalVolume);
+        Assert.AreEqual(100, result.BuyerVolumePercent + result.SellerVolumePercent);
     }
 
     [TestMethod]
@@ -158,9 +179,9 @@ public class CryptoMetricsToolsTest
 
         Assert.IsNotNull(result);
         Assert.AreEqual("BTC", result.Symbol);
-        Assert.IsTrue(result.CurrentPriceUsd > 0);
-        Assert.IsTrue(result.MarketCapUsd > 0);
-        Assert.IsTrue(result.CirculatingSupply > 0);
+        Assert.IsGreaterThan(0, result.CurrentPriceUsd);
+        Assert.IsGreaterThan(0, result.MarketCapUsd);
+        Assert.IsGreaterThan(0, result.CirculatingSupply);
         Assert.IsNotNull(result.MarketCapRank);
     }
 
@@ -174,8 +195,8 @@ public class CryptoMetricsToolsTest
 
         Assert.IsNotNull(result);
         Assert.AreEqual("BTCUSDT", result.Symbol);
-        Assert.IsTrue(result.AnnualizedVolatility > 0);
-        Assert.IsTrue(result.DailyVolatility > 0);
-        Assert.IsTrue(result.PeriodDays == 30);
+        Assert.IsGreaterThan(0, result.AnnualizedVolatility);
+        Assert.IsGreaterThan(0, result.DailyVolatility);
+        Assert.AreEqual(30, result.PeriodDays);
     }
 }

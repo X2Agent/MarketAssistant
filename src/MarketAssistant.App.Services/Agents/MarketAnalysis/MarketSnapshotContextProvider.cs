@@ -18,7 +18,7 @@ public class MarketSnapshotContextProvider : MessageAIContextProvider
         InvokingContext context, CancellationToken cancellationToken = default)
     {
         if (_sharedData.IsEmpty)
-            return new ValueTask<IEnumerable<ChatMessage>>(Enumerable.Empty<ChatMessage>());
+            return new ValueTask<IEnumerable<ChatMessage>>([]);
 
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("## 市场快照（共享数据）");

@@ -15,24 +15,16 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// 代币安全审计与蜜罐检测（GoPlus）。仅注册于 Crypto 市场。
 /// 检出蜜罐/高危代币时经统一告警中心发布确认级告警（RequireConfirmation）。
 /// </summary>
-public sealed class CryptoOnChainTools : IOnChainTools
+public sealed class CryptoOnChainTools(
+    ILogger<CryptoOnChainTools> logger,
+    DexScreenerClient dexScreenerClient,
+    GoPlusSecurityClient goPlusClient,
+    IAlertCenterService alertCenterService) : IOnChainTools
 {
-    private readonly ILogger<CryptoOnChainTools> _logger;
-    private readonly DexScreenerClient _dexScreenerClient;
-    private readonly GoPlusSecurityClient _goPlusClient;
-    private readonly IAlertCenterService _alertCenterService;
-
-    public CryptoOnChainTools(
-        ILogger<CryptoOnChainTools> logger,
-        DexScreenerClient dexScreenerClient,
-        GoPlusSecurityClient goPlusClient,
-        IAlertCenterService alertCenterService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _dexScreenerClient = dexScreenerClient ?? throw new ArgumentNullException(nameof(dexScreenerClient));
-        _goPlusClient = goPlusClient ?? throw new ArgumentNullException(nameof(goPlusClient));
-        _alertCenterService = alertCenterService ?? throw new ArgumentNullException(nameof(alertCenterService));
-    }
+    private readonly ILogger<CryptoOnChainTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly DexScreenerClient _dexScreenerClient = dexScreenerClient ?? throw new ArgumentNullException(nameof(dexScreenerClient));
+    private readonly GoPlusSecurityClient _goPlusClient = goPlusClient ?? throw new ArgumentNullException(nameof(goPlusClient));
+    private readonly IAlertCenterService _alertCenterService = alertCenterService ?? throw new ArgumentNullException(nameof(alertCenterService));
 
     /// <summary>
     /// 按关键字搜索链上热门交易对（DexScreener）。

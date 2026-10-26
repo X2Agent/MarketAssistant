@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 
@@ -12,10 +13,19 @@ namespace MarketAssistant.DataProviders;
 /// <summary>
 /// CoinGecko API服务（含客户端限流，免费版 30 次/分钟）
 /// </summary>
-public sealed class CoinGeckoApiService
+public sealed class CoinGeckoApiService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<CoinGeckoApiService> logger,
+    IMemoryCache? memoryCache = null)
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<CoinGeckoApiService> _logger;
+    private const string CoinsListSymbolMapCacheKey = "CoinGecko:CoinsListSymbolMap";
+    private static readonly TimeSpan CoinsListCacheDuration = TimeSpan.FromHours(12);
+
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly ILogger<CoinGeckoApiService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IMemoryCache? _memoryCache = memoryCache;
+    private Dictionary<string, string>? _fallbackSymbolMap;
+    private DateTimeOffset _fallbackSymbolMapExpiresAt;
 
     // 统一限流：令牌桶容量 1、每 2.5 秒补充 1 个令牌，等价于串行 + 最小 2.5s 请求间隔。
     // QueueLimit 有限：突发排队超过 8 个直接失败并抛错（无界排队会让调用方长时间悬挂）
@@ -35,14 +45,6 @@ public sealed class CoinGeckoApiService
         PropertyNameCaseInsensitive = true,
         Converters = { new StringToDecimalConverter() }
     };
-
-    public CoinGeckoApiService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<CoinGeckoApiService> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// 限流执行：确保请求间隔不低于 MinRequestIntervalMs（约 24 次/分钟）
@@ -94,7 +96,7 @@ public sealed class CoinGeckoApiService
                 cancellationToken);
 
             _logger.LogInformation("成功获取CoinGecko市场数据，币种数量: {Count}", markets?.Count ?? 0);
-            return markets ?? new List<CoinGeckoMarket>();
+            return markets ?? [];
         }, cancellationToken);
     }
 
@@ -229,27 +231,60 @@ public sealed class CoinGeckoApiService
             return mappedId;
         }
 
-        // 未命中映射表，调用 /coins/list 查询
+        // 未命中映射表，调用 /coins/list 查询并缓存全量 symbol → id 映射字典，避免长尾币种重复下载数 MB 列表
         try
         {
-            return await ThrottledExecuteAsync(async httpClient =>
-            {
-                var response = await httpClient.GetAsync("coins/list", cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                var coins = await response.Content.ReadFromJsonAsync<List<CoinGeckoCoinListItem>>(
-                    CoinGeckoJsonOptions, cancellationToken);
-
-                var hit = coins?.FirstOrDefault(c =>
-                    string.Equals(c.Symbol, baseSymbol, StringComparison.OrdinalIgnoreCase));
-                return hit?.Id;
-            }, cancellationToken);
+            var symbolMap = await GetOrLoadCoinsListSymbolMapAsync(cancellationToken);
+            return symbolMap != null && symbolMap.TryGetValue(baseSymbol, out var resolvedId)
+                ? resolvedId
+                : null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "调用 /coins/list 解析 coinId 失败: {Symbol}", baseSymbol);
             return null;
         }
+    }
+
+    private async Task<Dictionary<string, string>?> GetOrLoadCoinsListSymbolMapAsync(CancellationToken cancellationToken)
+    {
+        if (_memoryCache != null &&
+            _memoryCache.TryGetValue<Dictionary<string, string>>(CoinsListSymbolMapCacheKey, out var cachedMap) &&
+            cachedMap != null)
+        {
+            return cachedMap;
+        }
+
+        if (_fallbackSymbolMap != null && DateTimeOffset.UtcNow < _fallbackSymbolMapExpiresAt)
+        {
+            return _fallbackSymbolMap;
+        }
+
+        return await ThrottledExecuteAsync(async httpClient =>
+        {
+            var response = await httpClient.GetAsync("coins/list", cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var coins = await response.Content.ReadFromJsonAsync<List<CoinGeckoCoinListItem>>(
+                CoinGeckoJsonOptions, cancellationToken);
+
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (coins != null)
+            {
+                foreach (var coin in coins)
+                {
+                    if (!string.IsNullOrWhiteSpace(coin.Symbol) && !string.IsNullOrWhiteSpace(coin.Id))
+                    {
+                        map.TryAdd(coin.Symbol, coin.Id);
+                    }
+                }
+            }
+
+            _memoryCache?.Set(CoinsListSymbolMapCacheKey, map, CoinsListCacheDuration);
+            _fallbackSymbolMap = map;
+            _fallbackSymbolMapExpiresAt = DateTimeOffset.UtcNow.Add(CoinsListCacheDuration);
+            return map;
+        }, cancellationToken);
     }
 }
 

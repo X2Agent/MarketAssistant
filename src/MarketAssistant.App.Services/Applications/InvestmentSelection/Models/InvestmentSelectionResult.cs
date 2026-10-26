@@ -35,7 +35,7 @@ public class InvestmentSelectionResult
     /// 推荐投资标的列表
     /// </summary>
     [Description("推荐投资标的列表，按推荐优先级从高到低排序。若无合适标的则返回空数组[]")]
-    public List<InvestmentRecommendation> Recommendations { get; set; } = new();
+    public List<InvestmentRecommendation> Recommendations { get; set; } = [];
 
     /// <summary>
     /// 风险提示
@@ -43,7 +43,7 @@ public class InvestmentSelectionResult
     [MinLength(3)]
     [MaxLength(10)]
     [Description("投资风险警示，每条风险提示应清晰具体，建议3-5条，每条30-100字")]
-    public List<string> RiskWarnings { get; set; } = new();
+    public List<string> RiskWarnings { get; set; } = [];
 
     /// <summary>
     /// 投资建议

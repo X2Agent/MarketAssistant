@@ -6,18 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Navigation;
 
-public class NavigationItem
+public class NavigationItem(ViewModelBase viewModel, string? rootNavigationItemTitle = null, object? parameter = null)
 {
-    public ViewModelBase ViewModel { get; }
-    public string? RootNavigationItemTitle { get; }
-    public object? Parameter { get; }
-
-    public NavigationItem(ViewModelBase viewModel, string? rootNavigationItemTitle = null, object? parameter = null)
-    {
-        ViewModel = viewModel;
-        RootNavigationItemTitle = rootNavigationItemTitle;
-        Parameter = parameter;
-    }
+    public ViewModelBase ViewModel { get; } = viewModel;
+    public string? RootNavigationItemTitle { get; } = rootNavigationItemTitle;
+    public object? Parameter { get; } = parameter;
 }
 
 public partial class NavigationService : ObservableObject, IRecipient<NavigationMessage>
@@ -25,7 +18,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
     private readonly ILogger<NavigationService>? _logger;
     private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly Stack<NavigationItem> _navigationStack = new();
-    private readonly Dictionary<string, Type> _routes = new();
+    private readonly Dictionary<string, Type> _routes = [];
 
     [ObservableProperty]
     private bool _canGoBack;
@@ -46,6 +39,7 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
         RegisterRoute<AgentAnalysisViewModel>("Analysis");
         RegisterRoute<BalanceDetailPageViewModel>("BalanceDetail");
         RegisterRoute<TradingPageViewModel>("Trading");
+        RegisterRoute<PriceAlertPageViewModel>("PriceAlert");
 
         WeakReferenceMessenger.Default.Register(this);
     }
@@ -161,8 +155,6 @@ public partial class NavigationService : ObservableObject, IRecipient<Navigation
 
         NavigateToInternal(viewModel, null, rootNavigationItemTitle);
     }
-
-    public int GetStackDepth() => _navigationStack.Count;
 
     public void Clear()
     {

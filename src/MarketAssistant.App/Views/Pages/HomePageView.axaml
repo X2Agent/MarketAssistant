@@ -22,6 +22,7 @@
         <Style Selector="Border.recent-chip">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="{StaticResource SmallCardPadding}"/>
             <Setter Property="Transitions">
                 <Transitions>
@@ -64,29 +65,38 @@
                                 BorderThickness="{StaticResource DefaultBorderThickness}"
                                 CornerRadius="{StaticResource SmallCornerRadius}"
                                 ClipToBounds="True">
-                            <ListBox x:Name="SearchResultsList"
-                                     ItemsSource="{Binding Search.SearchResults}"
-                                     SelectedItem="{Binding Search.SelectedResult, Mode=TwoWay}"
-                                     SelectionMode="Single"
-                                     Background="Transparent"
-                                     BorderThickness="{StaticResource NoBorderThickness}"
-                                     Padding="{StaticResource NoPadding}">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="assets:AssetItem">
-                                        <StackPanel Margin="{StaticResource TinyMargin}"
-                                                   Background="Transparent"
-                                                   Cursor="Hand"
-                                                   Tapped="SearchResultItem_Tapped">
-                                            <TextBlock Text="{Binding Name}" 
-                                                       FontWeight="SemiBold"
-                                                       FontSize="{StaticResource LabelFontSize}"/>
-                                            <TextBlock Text="{Binding Code}" 
-                                                       FontSize="{StaticResource SmallFontSize}"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <Panel>
+                                <ListBox x:Name="SearchResultsList"
+                                         ItemsSource="{Binding Search.SearchResults}"
+                                         SelectedItem="{Binding Search.SelectedResult, Mode=TwoWay}"
+                                         SelectionMode="Single"
+                                         Background="Transparent"
+                                         BorderThickness="{StaticResource NoBorderThickness}"
+                                         Padding="{StaticResource NoPadding}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="assets:AssetItem">
+                                            <StackPanel Margin="{StaticResource TinyMargin}"
+                                                       Background="Transparent"
+                                                       Cursor="Hand"
+                                                       Tapped="SearchResultItem_Tapped">
+                                                <TextBlock Text="{Binding Name}" 
+                                                           FontWeight="SemiBold"
+                                                           FontSize="{StaticResource LabelFontSize}"/>
+                                                <TextBlock Text="{Binding Code}" 
+                                                           FontSize="{StaticResource SmallFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <!-- 搜索失败提示：与"无匹配结果"区分（后者不弹层） -->
+                                <TextBlock Text="{Binding Search.SearchErrorMessage}"
+                                           IsVisible="{Binding Search.HasSearchError}"
+                                           Margin="{StaticResource SmallCardPadding}"
+                                           TextWrapping="Wrap"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Panel>
                         </Border>
                     </Popup>
                 </Panel>
@@ -131,7 +141,16 @@
                           HorizontalScrollBarVisibility="Hidden"
                           VerticalScrollBarVisibility="Disabled"
                           Margin="{StaticResource SmallLeftMargin}">
-                <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}">
+                <Panel>
+                    <!-- 首屏骨架 -->
+                    <StackPanel Orientation="Horizontal" IsVisible="{Binding RecentAssets.IsInitialLoading}">
+                        <Border Classes="skeleton skeleton-text" Width="96" Height="28" Margin="{StaticResource SmallRightMargin}"/>
+                        <Border Classes="skeleton skeleton-text" Width="96" Height="28" Margin="{StaticResource SmallRightMargin}"/>
+                        <Border Classes="skeleton skeleton-text" Width="96" Height="28" Margin="{StaticResource SmallRightMargin}"/>
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding RecentAssets.RecentAssets}"
+                                  IsVisible="{Binding !RecentAssets.IsInitialLoading}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal"/>
@@ -170,7 +189,33 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </Panel>
             </ScrollViewer>
+        </Grid>
+
+        <!-- 最近查看加载失败：行内错误提示 + 重试（该条仅在本区块自身失败时出现） -->
+        <Grid ColumnDefinitions="Auto,*"
+              IsVisible="{Binding RecentAssets.HasError}"
+              Margin="{StaticResource BottomMargin}">
+            <TextBlock Grid.Column="0"
+                       Text="最近查看"
+                       FontSize="{StaticResource SmallFontSize}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="{StaticResource SmallSpacing}"
+                        Margin="{StaticResource SmallLeftMargin}"
+                        VerticalAlignment="Center">
+                <TextBlock Text="{Binding RecentAssets.ErrorMessage}"
+                           FontSize="{StaticResource SmallFontSize}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"/>
+                <Button Content="重试"
+                        Classes="btn-ghost btn-sm"
+                        Command="{Binding RecentAssets.RetryCommand}"/>
+            </StackPanel>
         </Grid>
       </StackPanel>
 
@@ -178,15 +223,38 @@
         <Grid Grid.Row="1"
               ColumnDefinitions="3*,2*">
             
-            <!-- 上排右列：7*24小时新闻快讯 -->
+            <!-- 上排右列：7*24小时新闻快讯（每日简报为其 AI 解读入口，同属资讯域） -->
             <controls:CardView Grid.Column="1" Grid.Row="0">
                 <controls:CardView.Header>
-                    <Grid ColumnDefinitions="*,Auto">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                         <TextBlock Grid.Column="0"
                                    Text="7*24小时快讯"
                                    FontSize="{StaticResource SectionTitleFontSize}" 
                                    FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="1"
+
+                        <!-- 每日简报入口：与快讯同属资讯域（简报是快讯+自选的 AI 解读），
+                             置于同一卡片标题栏语义自洽，也不占用首页黄金位置。
+                             此处不承载加载态——简报的生成状态只在弹窗内呈现：
+                             标题栏是导航区，塞入指示器会与快讯自身的刷新状态混淆。 -->
+                        <Button Grid.Column="1"
+                                Content="简报"
+                                Classes="btn-secondary"
+                                Command="{Binding Briefing.OpenBriefingWindowCommand}"
+                                ToolTip.Tip="今日 AI 简报：要闻速览 + 自选异动归因"
+                                Margin="{StaticResource SmallLeftMargin}"
+                                VerticalAlignment="Center"/>
+
+                        <!-- 快讯列表自身的加载态：首次推送到达前显示圆形 loading，
+                             归属明确（它加载的就是这个列表本身） -->
+                        <ProgressBar Grid.Column="2"
+                                     IsIndeterminate="True"
+                                     Width="{StaticResource LargeSpacing}"
+                                     Height="{StaticResource LargeSpacing}"
+                                     Margin="{StaticResource SmallLeftMargin}"
+                                     VerticalAlignment="Center"
+                                     IsVisible="{Binding News.IsAwaitingFirstNews}"/>
+
+                        <TextBlock Grid.Column="3"
                                    Text="{Binding News.TelegraphRefreshCountdown}"
                                    FontSize="{StaticResource SmallFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -195,8 +263,33 @@
                     </Grid>
                 </controls:CardView.Header>
                 
-                <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding News.Telegraphs}">
+                <Panel>
+                    <!-- 首屏骨架：3 条快讯行占位 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}"
+                                IsVisible="{Binding News.IsAwaitingFirstNews}">
+                        <Border Classes="skeleton skeleton-row" Height="72"/>
+                        <Border Classes="skeleton skeleton-row" Height="72"/>
+                        <Border Classes="skeleton skeleton-row" Height="72"/>
+                    </StackPanel>
+
+                    <!-- 空态：已收到推送但无内容 -->
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="{StaticResource SmallSpacing}"
+                                IsVisible="{Binding News.IsNewsEmpty}">
+                        <svg:Svg Path="/Assets/Images/empty_data.svg"
+                                 Width="48"
+                                 Height="48"
+                                 HorizontalAlignment="Center"
+                                 Opacity="0.7"/>
+                        <TextBlock Text="暂无快讯"
+                                   FontSize="{StaticResource LabelFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ScrollViewer IsVisible="{Binding !News.IsAwaitingFirstNews}">
+                        <ItemsControl ItemsSource="{Binding News.Telegraphs}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Spacing="{StaticResource SmallSpacing}"/>
@@ -260,11 +353,13 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+                </Panel>
             </controls:CardView>
             
-            <!-- 左列：热门资产（撑满列高，与右侧快讯对齐） -->
-            <controls:CardView Grid.Column="0"
-                               Margin="{StaticResource SmallRightMargin}">
+        <!-- 左列：热门资产 -->
+        <controls:CardView Grid.Column="0"
+                           Grid.Row="0"
+                           Margin="{StaticResource SmallRightMargin}">
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0"
@@ -279,9 +374,20 @@
                     </Grid>
                 </controls:CardView.Header>
                 
-                <ScrollViewer>
-                    <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}"
-                                  VerticalAlignment="Top">
+                <Panel>
+                    <!-- 首屏骨架：两列瓦片占位 -->
+                    <UniformGrid Columns="2" Rows="3" IsVisible="{Binding HotAssets.IsInitialLoading}">
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                        <Border Classes="skeleton skeleton-card" Margin="{StaticResource SmallMargin}"/>
+                    </UniformGrid>
+
+                    <ScrollViewer IsVisible="{Binding !HotAssets.IsInitialLoading}">
+                        <ItemsControl ItemsSource="{Binding HotAssets.HotAssets}"
+                                      VerticalAlignment="Top">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <!-- 恢复重构前写法：两列均分卡片宽度 -->
@@ -361,11 +467,16 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+
+                    <!-- 空态 / 失败态（含重试入口） -->
+                    <controls:StateOverlayView State="{Binding HotAssets.OverlayState}"
+                                               Message="{Binding HotAssets.OverlayMessage}"
+                                               RetryCommand="{Binding HotAssets.RetryCommand}"
+                                               RetryText="重新加载"
+                                               ShowLoading="False"/>
+                </Panel>
             </controls:CardView>
-            
-
-
 
         </Grid>
-            </Grid>
+    </Grid>
 </UserControl>

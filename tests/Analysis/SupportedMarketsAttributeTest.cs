@@ -42,7 +42,7 @@ public class SupportedMarketsAttributeTest
     public void Registry_ShouldDiscoverCryptoMetricsAnalyst()
     {
         var types = AnalystTypeRegistry.GetConcreteAnalystTypes();
-        Assert.IsTrue(types.Any(t => t.Name == nameof(CryptoMetricsAnalystAgent)),
+        Assert.Contains(t => t.Name == nameof(CryptoMetricsAnalystAgent), types,
             "类型注册表应能发现新增的项目指标分析师");
     }
 }

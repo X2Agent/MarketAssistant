@@ -12,14 +12,9 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards;
 /// 自适应卡片转换器
 /// 使用责任链模式尝试将 JSON 字符串解析为特定类型的自适应卡片
 /// </summary>
-public class AdaptiveCardConverter : IValueConverter
+public class AdaptiveCardConverter(IEnumerable<IJsonToAdaptiveCardParser> parsers) : IValueConverter
 {
-    private readonly List<IJsonToAdaptiveCardParser> _parsers;
-
-    public AdaptiveCardConverter(IEnumerable<IJsonToAdaptiveCardParser> parsers)
-    {
-        _parsers = new List<IJsonToAdaptiveCardParser>(parsers);
-    }
+    private readonly List<IJsonToAdaptiveCardParser> _parsers = [.. parsers];
 
     public AdaptiveCard? Convert(string json)
     {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text.Json;
 
@@ -30,6 +31,14 @@ public static class ErrorMessageMapper
 
             // 权限相关异常
             UnauthorizedAccessException => "权限不足，请以管理员身份运行或检查文件权限",
+
+            // LLM 供应商错误：必须透出服务端原文。
+            // 典型场景（实测）：模型 slug 下线时服务端返回 404，响应体写明
+            // "This model is unavailable for free ... use this slug instead: minimax/minimax-m3"。
+            // 若映射成通用文案，用户只能看到"操作失败"，无法自查修复，必须去翻日志。
+            // 注意：按类型名匹配，避免 Core 依赖 System.ClientModel。
+            Exception ex when IsClientResultException(ex, out var serviceMessage)
+                => BuildServiceErrorMessage(serviceMessage),
 
             // 参数相关异常（子类在前）
             ArgumentNullException => "参数错误，请检查输入",
@@ -72,5 +81,78 @@ public static class ErrorMessageMapper
         var baseMessage = GetUserFriendlyMessage(exception);
         return $"{operationName}失败：{baseMessage}";
     }
+
+    /// <summary>
+    /// 识别 LLM 供应商异常（System.ClientModel.ClientResultException）并取出其 <c>Message</c>。
+    /// </summary>
+    /// <remarks>
+    /// 按类型名 + 反射匹配，而非直接引用该包：<c>MarketAssistant.Core</c> 不应为了
+    /// 一条错误文案引入 LLM SDK 依赖。Message 已由 SDK 组合好（状态码 + 服务端原文），
+    /// 无需再单独取 Status 与响应体。取不到可用 Message 时返回 false，
+    /// 由调用方落入默认文案，避免错误映射器自身抛异常。
+    /// </remarks>
+    private static bool IsClientResultException(Exception exception, out string message)
+    {
+        for (var type = exception.GetType(); type is not null; type = type.BaseType)
+        {
+            if (!string.Equals(type.Name, "ClientResultException", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var value = type.GetProperty("Message")?.GetValue(exception) as string;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                message = string.Empty;
+                return false;
+            }
+
+            message = value.Trim();
+            return true;
+        }
+
+        message = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// 拼装供应商错误文案：保留服务端原文（它是唯一能指导用户修复的信息），
+    /// 跳过无信息量的状态码行（如 "HTTP 404 (: )"），并限长避免撑破提示浮层。
+    /// </summary>
+    /// <remarks>
+    /// 实测形态：Message 为多行，首行仅是状态码（"HTTP 404 (: )"），
+    /// 真正有用的说明在后续行（"This model is unavailable for free ... use this slug
+    /// instead: minimax/minimax-m3"）。若只取首行，用户依旧看不到可操作信息。
+    /// </remarks>
+    private static string BuildServiceErrorMessage(string serviceMessage)
+    {
+        var lines = serviceMessage
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0)
+            .ToList();
+
+        // 首选第一条"有实质内容"的行；全为噪声时退回首行，保证不丢失服务端信息
+        var detail = lines.FirstOrDefault(line => !IsNoiseLine(line))
+            ?? lines.FirstOrDefault()
+            ?? string.Empty;
+
+        // 服务端原文过长时截断：既够用户判断，也不破坏 UI 布局。
+        // 按 TextElement 截断，避免把 emoji 等代理对切成非法字符串。
+        const int MaxLength = 200;
+        var elements = new StringInfo(detail);
+        var truncated = elements.LengthInTextElements <= MaxLength
+            ? detail
+            : elements.SubstringByTextElements(0, MaxLength) + "…";
+        return $"模型服务返回错误：{truncated}";
+    }
+
+    /// <summary>
+    /// 判断是否为无信息量的状态码行，例如 "HTTP 404 (: )"、"HTTP 500"。
+    /// </summary>
+    private static bool IsNoiseLine(string line)
+        => line.Contains("(: )", StringComparison.Ordinal)
+            || (line.StartsWith("HTTP ", StringComparison.OrdinalIgnoreCase)
+                && !line.Contains(':', StringComparison.Ordinal));
 }
 

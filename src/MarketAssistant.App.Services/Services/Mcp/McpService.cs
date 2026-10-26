@@ -119,7 +119,7 @@ public sealed class McpService : IAsyncDisposable
     /// </summary>
     public List<MCPServerConfig> GetEnabledConfigs()
     {
-        return _configService.ServerConfigs.Where(config => config.IsEnabled).ToList();
+        return [.. _configService.ServerConfigs.Where(config => config.IsEnabled)];
     }
 
     /// <summary>
@@ -439,7 +439,7 @@ internal sealed class McpClientSession(McpClient client) : IMcpClientSession
     {
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        return tools.Cast<AITool>().ToList();
+        return [.. tools.Cast<AITool>()];
     }
 
     public ValueTask DisposeAsync()

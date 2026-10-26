@@ -60,14 +60,14 @@ public class RagDocumentIdAndCatalogTest
                 ["k1", "k2", "k3"], "test-model", 1024, DateTimeOffset.UtcNow));
 
             keys = await catalog.GetKeysAsync("knowledge", "doc-1");
-            CollectionAssert.AreEquivalent(new[] { "k1", "k2", "k3" }, keys.ToList());
+            Assert.AreSequenceEqual(["k1", "k2", "k3"], [.. keys], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
 
             // 覆盖写入
             await catalog.ReplaceAsync(new RagDocumentCatalogEntry(
                 "knowledge", "doc-1", @"C:\docs\a.pdf", "hash-a2",
                 ["k4"], "test-model", 1024, DateTimeOffset.UtcNow));
             keys = await catalog.GetKeysAsync("knowledge", "doc-1");
-            CollectionAssert.AreEquivalent(new[] { "k4" }, keys.ToList(), "覆盖后应只剩新 Key");
+            Assert.AreSequenceEqual(["k4"], [.. keys], Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder, "覆盖后应只剩新 Key");
 
             // 集合隔离
             var otherKeys = await catalog.GetKeysAsync("other-collection", "doc-1");
@@ -98,7 +98,7 @@ public class RagDocumentIdAndCatalogTest
             @"C:\docs\a.pdf", "doc123", 0, null);
 
         var paragraph = paragraphs.Single();
-        StringAssert.StartsWith(paragraph.Key, "doc123:", "Key 应以 DocumentId 开头");
-        StringAssert.StartsWith(paragraph.Key, "doc123:1:000000:", "Key 应包含块类型与 Order 段");
+        Assert.StartsWith("doc123:", paragraph.Key, "Key 应以 DocumentId 开头");
+        Assert.StartsWith("doc123:1:000000:", paragraph.Key, "Key 应包含块类型与 Order 段");
     }
 }

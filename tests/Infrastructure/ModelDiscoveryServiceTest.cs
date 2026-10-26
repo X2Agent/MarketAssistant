@@ -34,9 +34,8 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, null);
 
-        CollectionAssert.AreEqual(
-            new[] { "deepseek-v4-flash-free", "future-unknown-model", "gpt-5.6-sol", "kimi-k3" },
-            models.ToArray());
+        Assert.AreSequenceEqual(
+            ["deepseek-v4-flash-free", "future-unknown-model", "gpt-5.6-sol", "kimi-k3"], [.. models]);
         Assert.IsNotNull(handler.Request);
         Assert.IsNull(handler.Request.Headers.Authorization);
         Assert.AreEqual("https://opencode.ai/zen/v1/models", handler.Request.RequestUri?.AbsoluteUri);
@@ -87,7 +86,7 @@ public class ModelDiscoveryServiceTest
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             () => service.ListModelsAsync(provider, null));
 
-        StringAssert.Contains(exception.Message, "API Key");
+        Assert.Contains("API Key", exception.Message);
         Assert.IsNull(handler.Request);
     }
 
@@ -120,7 +119,7 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, null);
 
-        CollectionAssert.AreEqual(new[] { "local-model" }, models.ToArray());
+        Assert.AreSequenceEqual(["local-model"], [.. models]);
         Assert.IsNull(handler.Request?.Headers.Authorization);
         Assert.AreEqual("http://localhost:1234/v1/models", handler.Request?.RequestUri?.AbsoluteUri);
     }
@@ -138,7 +137,7 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, "sk-test");
 
-        CollectionAssert.AreEqual(new[] { "deepseek-v4-flash" }, models.ToArray());
+        Assert.AreSequenceEqual(["deepseek-v4-flash"], [.. models]);
         Assert.AreEqual("Bearer sk-test", handler.Request?.Headers.Authorization?.ToString());
         Assert.AreEqual("https://api.deepseek.com/models", handler.Request?.RequestUri?.AbsoluteUri);
     }
@@ -156,7 +155,7 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, "sk-optional");
 
-        CollectionAssert.AreEqual(new[] { "deepseek-v4-flash-free" }, models.ToArray());
+        Assert.AreSequenceEqual(["deepseek-v4-flash-free"], [.. models]);
         Assert.AreEqual("Bearer sk-optional", handler.Request?.Headers.Authorization?.ToString());
     }
 
@@ -173,7 +172,7 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, null);
 
-        CollectionAssert.AreEqual(new[] { "llama3.2" }, models.ToArray());
+        Assert.AreSequenceEqual(["llama3.2"], [.. models]);
         Assert.IsNull(handler.Request?.Headers.Authorization);
         Assert.AreEqual("http://localhost:11434/api/tags", handler.Request?.RequestUri?.AbsoluteUri);
     }
@@ -192,9 +191,8 @@ public class ModelDiscoveryServiceTest
 
         var models = await service.ListModelsAsync(provider, "sk-test");
 
-        CollectionAssert.AreEqual(
-            new[] { "id-field", "model-field", "name-field", "root-model" },
-            models.ToArray());
+        Assert.AreSequenceEqual(
+            ["id-field", "model-field", "name-field", "root-model"], [.. models]);
     }
 
     [TestMethod]

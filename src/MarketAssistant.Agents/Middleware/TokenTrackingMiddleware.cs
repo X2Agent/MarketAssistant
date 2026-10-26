@@ -12,7 +12,9 @@ namespace MarketAssistant.Agents.Middleware;
 /// Token 追踪中间件，拦截 Agent 运行以估算并记录输入/输出 Token 用量。
 /// 通过 agent.AsBuilder().Use(runFunc:, runStreamingFunc:).Build() 附加到任意 AIAgent。
 /// </summary>
-public sealed class TokenTrackingMiddleware
+public sealed class TokenTrackingMiddleware(
+    ILogger<TokenTrackingMiddleware> logger,
+    ITokenUsageRecorder? tokenUsageRecorder = null)
 {
     /// <summary>
     /// AgentSession.StateBag 中累计 Token 数的键
@@ -26,12 +28,8 @@ public sealed class TokenTrackingMiddleware
     /// </summary>
     public const int MaxCumulativeTokens = 200_000;
 
-    private readonly ILogger _logger;
-
-    public TokenTrackingMiddleware(ILogger<TokenTrackingMiddleware> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger _logger = logger;
+    private readonly ITokenUsageRecorder? _tokenUsageRecorder = tokenUsageRecorder;
 
     /// <summary>
     /// 非流式 Agent Run 中间件
@@ -111,6 +109,10 @@ public sealed class TokenTrackingMiddleware
             activity.SetTag("gen_ai.usage.output_tokens", outputTokens);
             activity.SetTag("marketassistant.token_usage.precise", isPrecise);
         }
+
+        // 运行级用量记录：分析工作流的 Agent 以 session: null 无状态调用，
+        // 会话级累计不生效，因此必须先向环境作用域上报，再走会话累计与熔断逻辑。
+        _tokenUsageRecorder?.CurrentScope?.Report(agentName, inputTokens, outputTokens, isPrecise);
 
         if (session == null) return;
 

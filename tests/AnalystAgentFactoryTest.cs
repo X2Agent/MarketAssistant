@@ -214,7 +214,7 @@ public class AnalystAgentFactoryTest : BaseAgentTest
                 item => item.Conversation?.Any(m => m.Contents.Any(c => c is FunctionCallContent)) == true)
         };
         checks.AddRange(additionalChecks);
-        return new LocalEvaluator(checks.ToArray());
+        return new LocalEvaluator([.. checks]);
     }
 
     private static EvalCheck MeaningfulJsonResponseCheck() =>
@@ -226,8 +226,8 @@ public class AnalystAgentFactoryTest : BaseAgentTest
 
     private static void AssertFunctionCallsPresent(IEnumerable<ChatMessage> messages)
     {
-        Assert.IsTrue(
-            messages.Any(m => m.Contents.Any(c => c is FunctionCallContent)),
+        Assert.Contains(
+            m => m.Contents.Any(c => c is FunctionCallContent), messages,
             "Agent 响应应包含工具调用");
     }
 }

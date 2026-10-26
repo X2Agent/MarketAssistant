@@ -17,7 +17,7 @@ public sealed class DiagnosticsTest
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == MarketAssistantDiagnostics.SourceName,
-            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            Sample = static (ref _) => ActivitySamplingResult.AllData,
             ActivityStopped = activity =>
             {
                 if (activity.DisplayName == "test.agent.run")
@@ -42,7 +42,7 @@ public sealed class DiagnosticsTest
         Assert.IsNotNull(stoppedActivity);
         Assert.AreEqual(123L, stoppedActivity.GetTagItem("gen_ai.usage.input_tokens"));
         Assert.AreEqual(45L, stoppedActivity.GetTagItem("gen_ai.usage.output_tokens"));
-        Assert.AreEqual(true, stoppedActivity.GetTagItem("marketassistant.token_usage.precise"));
+        Assert.IsTrue((bool?)stoppedActivity.GetTagItem("marketassistant.token_usage.precise"));
     }
 
     [TestMethod]
@@ -54,7 +54,7 @@ public sealed class DiagnosticsTest
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == MarketAssistantDiagnostics.SourceName,
-            Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            Sample = static (ref _) => ActivitySamplingResult.AllData,
             ActivityStopped = activity =>
             {
                 if (activity.DisplayName == "test.failure")
@@ -75,6 +75,6 @@ public sealed class DiagnosticsTest
         Assert.IsNotNull(stoppedActivity);
         Assert.AreEqual(ActivityStatusCode.Error, stoppedActivity.Status);
         Assert.AreEqual(typeof(InvalidOperationException).FullName, stoppedActivity.GetTagItem("error.type"));
-        Assert.IsFalse(stoppedActivity.Tags.Any(tag => tag.Value?.Contains("sensitive details", StringComparison.Ordinal) == true));
+        Assert.DoesNotContain(tag => tag.Value?.Contains("sensitive details", StringComparison.Ordinal) == true, stoppedActivity.Tags);
     }
 }

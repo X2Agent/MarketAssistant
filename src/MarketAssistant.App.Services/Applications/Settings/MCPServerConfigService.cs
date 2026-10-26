@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using MarketAssistant.Services.Settings;
 
 namespace MarketAssistant.Applications.Settings;
@@ -7,15 +6,10 @@ namespace MarketAssistant.Applications.Settings;
 /// MCP服务器配置服务，提供对MCPServerConfig的统一访问和管理。
 /// 所有读写操作通过锁保护，确保 UI 线程与后台线程并发访问时的线程安全。
 /// </summary>
-public class MCPServerConfigService
+public class MCPServerConfigService : JsonFileConfigStore<List<MCPServerConfig>>
 {
-    private static readonly ConcurrentDictionary<string, object> FileLocks = new(
-        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-
-    private List<MCPServerConfig> _serverConfigs = new();
-    private readonly object _lock;
+    private List<MCPServerConfig> _serverConfigs = [];
     private readonly ISecureSettingsStore _secretStore;
-    private readonly string _configFilePath;
 
     /// <summary>
     /// 当前所有MCP服务器配置（返回副本，避免外部修改影响内部状态）
@@ -24,9 +18,9 @@ public class MCPServerConfigService
     {
         get
         {
-            lock (_lock)
+            lock (FileLock)
             {
-                return _serverConfigs.ToList();
+                return [.. _serverConfigs];
             }
         }
     }
@@ -39,12 +33,10 @@ public class MCPServerConfigService
     }
 
     internal MCPServerConfigService(string configFilePath, ISecureSettingsStore secretStore)
+        : base(configFilePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(configFilePath);
         ArgumentNullException.ThrowIfNull(secretStore);
 
-        _configFilePath = Path.GetFullPath(configFilePath);
-        _lock = FileLocks.GetOrAdd(_configFilePath, static _ => new object());
         _secretStore = secretStore;
         LoadConfigs();
     }
@@ -54,13 +46,12 @@ public class MCPServerConfigService
     /// </summary>
     public void LoadConfigs()
     {
-        lock (_lock)
+        lock (FileLock)
         {
-            string? legacyJson = null;
-            if (File.Exists(_configFilePath))
+            string? legacyJson = ReadRawJson();
+            if (legacyJson is not null)
             {
-                legacyJson = File.ReadAllText(_configFilePath);
-                _serverConfigs = JsonSerializer.Deserialize<List<MCPServerConfig>>(legacyJson) ?? [];
+                _serverConfigs = ParseJson(legacyJson) ?? [];
             }
 
             var legacyConfigs = string.IsNullOrWhiteSpace(legacyJson)
@@ -92,15 +83,9 @@ public class MCPServerConfigService
     /// </summary>
     public void SaveConfigs()
     {
-        lock (_lock)
+        lock (FileLock)
         {
             var snapshot = _serverConfigs.ToList();
-
-            var directory = Path.GetDirectoryName(_configFilePath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
 
             var environmentVariables = snapshot.ToDictionary(
                 config => config.Id,
@@ -109,10 +94,7 @@ public class MCPServerConfigService
             _secretStore.Write(environmentVariables);
 
             // 序列化不含环境变量 Secret 的配置对象并原子替换目标文件。
-            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
-            var tempFilePath = _configFilePath + ".tmp";
-            File.WriteAllText(tempFilePath, json);
-            File.Move(tempFilePath, _configFilePath, overwrite: true);
+            SaveAtomic(snapshot);
         }
     }
 
@@ -122,7 +104,7 @@ public class MCPServerConfigService
     /// <param name="config">MCP服务器配置</param>
     public void AddOrUpdateConfig(MCPServerConfig config)
     {
-        lock (_lock)
+        lock (FileLock)
         {
             // 查找是否已存在相同ID的配置
             int index = _serverConfigs.FindIndex(c => c.Id == config.Id);
@@ -148,7 +130,7 @@ public class MCPServerConfigService
     /// <param name="id">配置ID</param>
     public void DeleteConfig(string id)
     {
-        lock (_lock)
+        lock (FileLock)
         {
             // 查找并删除配置
             _serverConfigs.RemoveAll(c => c.Id == id);
@@ -181,7 +163,7 @@ public class MCPServerConfigService
     /// <returns>MCP服务器配置，如果不存在则返回null</returns>
     public MCPServerConfig? GetConfig(string id)
     {
-        lock (_lock)
+        lock (FileLock)
         {
             return _serverConfigs.FirstOrDefault(c => c.Id == id);
         }

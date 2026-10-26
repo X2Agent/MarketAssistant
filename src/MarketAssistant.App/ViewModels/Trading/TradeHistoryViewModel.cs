@@ -22,14 +22,16 @@ public partial class TradeHistoryViewModel : ViewModelBase
         : base(logger)
     {
         _dataService = dataService;
+        EmptyMessage = "暂无交易记录";
+        SetRetryCommand(() => RefreshAsync());
     }
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
-            var symbol = string.IsNullOrWhiteSpace(FilterSymbol) ? null : FilterSymbol.Trim().ToUpper();
+            var symbol = string.IsNullOrWhiteSpace(FilterSymbol) ? null : FilterSymbol.Trim().ToUpperInvariant();
             var records = await _dataService.GetTradeRecordsAsync(symbol: symbol, limit: 100);
 
             Records.Clear();
@@ -37,6 +39,8 @@ public partial class TradeHistoryViewModel : ViewModelBase
                 Records.Add(r);
 
             TodayStats = await _dataService.GetTodayStatsAsync();
+
+            return Records.Count > 0;
         }, "加载交易历史");
     }
 

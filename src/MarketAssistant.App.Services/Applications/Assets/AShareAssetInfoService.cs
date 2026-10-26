@@ -8,24 +8,17 @@ namespace MarketAssistant.Applications.Assets;
 /// <summary>
 /// A股资产信息服务实现
 /// </summary>
-public class AShareAssetInfoService : IAssetInfoService
+public class AShareAssetInfoService(
+    ClsQuoteClient clsClient,
+    SinaFundFlowClient sinaFundFlowClient,
+    ILogger<AShareAssetInfoService> logger) : IAssetInfoService
 {
     /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
     private const int HotAssetCount = 10;
 
-    private readonly ClsQuoteClient _clsClient;
-    private readonly SinaFundFlowClient _sinaFundFlowClient;
-    private readonly ILogger<AShareAssetInfoService> _logger;
-
-    public AShareAssetInfoService(
-        ClsQuoteClient clsClient,
-        SinaFundFlowClient sinaFundFlowClient,
-        ILogger<AShareAssetInfoService> logger)
-    {
-        _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-        _sinaFundFlowClient = sinaFundFlowClient ?? throw new ArgumentNullException(nameof(sinaFundFlowClient));
-        _logger = logger;
-    }
+    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
+    private readonly SinaFundFlowClient _sinaFundFlowClient = sinaFundFlowClient ?? throw new ArgumentNullException(nameof(sinaFundFlowClient));
+    private readonly ILogger<AShareAssetInfoService> _logger = logger;
 
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
     {
@@ -33,12 +26,18 @@ public class AShareAssetInfoService : IAssetInfoService
         {
             // HTTP 访问与解析由 ClsQuoteClient 负责
             var items = await _clsClient.SearchStocksAsync(keyword, cancellationToken);
-            return items.Select(i => (i.Name, i.StockId)).ToList();
+            return [.. items.Select(i => (i.Name, i.StockId))];
+        }
+        catch (OperationCanceledException)
+        {
+            // 用户继续输入或切换市场导致的取消，交由调用方按取消处理
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "搜索股票失败，返回空结果");
-            return [];
+            // 不吞异常：返回空列表会让"数据源不可用"伪装成"没有匹配结果"
+            _logger.LogError(ex, "搜索股票失败: {Keyword}", keyword);
+            throw new FriendlyException($"搜索股票失败: {ex.Message}", ex);
         }
     }
 
@@ -68,34 +67,43 @@ public class AShareAssetInfoService : IAssetInfoService
             if (!string.IsNullOrWhiteSpace(data.SecurityName))
                 assetInfo.Name = data.SecurityName.Trim();
 
-            // 股票代码 & 市场
+            // 股票代码 & 市场：统一走交易所前缀拆分（SH/SZ/BJ，大小写不敏感）。
+            // 未识别前缀时保留既有市场归属、代码原样落入，不做默认猜测。
             var rawCode = data.SecurityCode?.Trim() ?? "";
-            if (rawCode.StartsWith("SH", StringComparison.OrdinalIgnoreCase))
+            var (prefixMarket, prefixCode) = StockSymbolConverter.SplitExchangePrefix(rawCode);
+            if (prefixMarket.Length > 0)
             {
-                assetInfo.Market = "SH";
-                assetInfo.Code = rawCode[2..];
+                assetInfo.Market = prefixMarket;
             }
-            else if (rawCode.StartsWith("SZ", StringComparison.OrdinalIgnoreCase))
+
+            assetInfo.Code = prefixCode;
+
+            // 当前价格（CLS 对停牌/无成交返回 null，保留默认空串表示「未提供」，不伪造 0）
+            if (data.LastPrice is { } lastPrice)
             {
-                assetInfo.Market = "SZ";
-                assetInfo.Code = rawCode[2..];
+                assetInfo.CurrentPrice = PriceFormatter.Format(lastPrice);
             }
             else
             {
-                assetInfo.Code = rawCode;
+                _logger.LogDebug("财联社未返回 {Code} 的最新价（可能停牌或暂无成交）", code);
             }
 
-            // 当前价格
-            assetInfo.CurrentPrice = PriceFormatter.Format(data.LastPrice);
-
             // 涨跌幅（CLS 的 change 为小数比率，如 -0.0082 表示 -0.82%）。
-            // InvariantCulture：下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
-            var changeRatio = data.Change;
-            assetInfo.ChangePercentage = (changeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
+            // 下游 PriceChangeColorConverter 以 InvariantCulture 解析该字符串
+            if (data.Change is { } changeRatio)
+            {
+                assetInfo.ChangePercentage = PercentFormatter.Format(changeRatio * 100);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "获取股票详细数据异常: {Code}", code);
+            // 不吞异常：返回"未知股票"会让"数据源不可用"伪装成"资产不存在"
+            _logger.LogError(ex, "获取股票详细数据失败: {Code}", code);
+            throw new FriendlyException($"获取股票信息失败: {ex.Message}", ex);
         }
 
         return assetInfo;
@@ -108,24 +116,24 @@ public class AShareAssetInfoService : IAssetInfoService
         {
             var items = await _sinaFundFlowClient.GetTopNetInflowAsync(HotAssetCount);
 
-            return items.Select(item =>
+            return [.. items.Select(item =>
             {
-                var market = item.Symbol.StartsWith("sh", StringComparison.OrdinalIgnoreCase) ? "SH" :
-                             item.Symbol.StartsWith("sz", StringComparison.OrdinalIgnoreCase) ? "SZ" :
-                             item.Symbol.StartsWith("bj", StringComparison.OrdinalIgnoreCase) ? "BJ" : "";
+                // 交易所标识统一拆分（SH/SZ/BJ）：新浪符号恒带两字符前缀，
+                // 未识别时市场留空、代码原样落入（不再无条件截掉前两字符）
+                var (market, code) = StockSymbolConverter.SplitExchangePrefix(item.Symbol);
 
                 return new HotAsset
                 {
                     Name = item.Name,
-                    Code = item.Symbol[2..],
+                    Code = code,
                     Market = market,
                     CurrentPrice = item.Price,
-                    ChangePercentage = (item.ChangeRatio * 100).ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) + "%",
+                    ChangePercentage = PercentFormatter.Format(item.ChangeRatio * 100),
                     MetricLabel = "净流入",
                     MetricValue = item.NetAmount.ToString("F0"),
                     MarketType = MarketType.AShare
                 };
-            }).ToList();
+            })];
         }
         catch (Exception ex)
         {

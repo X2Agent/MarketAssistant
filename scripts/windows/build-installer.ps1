@@ -3,10 +3,25 @@
 
 param(
     [string]$Configuration = "Release",
-    [string]$Version = "1.0.0"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# 自动解析版本号：命令行参数 > 环境变量 APP_VERSION > 最新 Git Tag > MarketAssistant.App.csproj
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = $env:APP_VERSION
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $gitTag = git describe --tags --abbrev=0 --match "v[0-9]*" 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitTag)) {
+        $Version = $gitTag.Trim().TrimStart('v')
+    }
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    [xml]$csproj = Get-Content "src/MarketAssistant.App/MarketAssistant.App.csproj"
+    $Version = ($csproj.Project.PropertyGroup | ForEach-Object { $_.FallbackVersion, $_.Version } | Where-Object { $_ -and $_ -notlike '$*' } | Select-Object -First 1)
+}
 
 Write-Host "🚀 Building Windows Installer..." -ForegroundColor Cyan
 Write-Host ""

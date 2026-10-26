@@ -10,6 +10,8 @@ namespace MarketAssistant.DataProviders;
 /// - globalLongShortAccountRatio (longAccount/shortAccount 表示账户占比)
 /// - topLongShortAccountRatio (longAccount/shortAccount 表示大户账户占比)
 /// - topLongShortPositionRatio (longAccount/shortAccount 表示大户持仓占比)
+/// 币安对上述字段恒返回字符串，非空 decimal 依赖该契约；
+/// <see cref="StringToDecimalConverter"/> 对 null 抛错，兼任上游 schema 违约哨兵。
 /// </remarks>
 public class BinanceLongShortRatioResponse
 {

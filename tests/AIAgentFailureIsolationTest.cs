@@ -21,11 +21,11 @@ public sealed class AIAgentFailureIsolationTest
 
         var response = await wrapped.RunAsync([new ChatMessage(ChatRole.User, "分析")]);
 
-        Assert.AreEqual(1, failures.Count, "失败回调应被触发一次");
+        Assert.HasCount(1, failures, "失败回调应被触发一次");
         Assert.IsTrue(AnalystFailureMessages.IsFailureMarker(response.Text),
             $"响应应为失败标记，实际: {response.Text}");
-        StringAssert.Contains(response.Text, "FundamentalAnalyst");
-        StringAssert.Contains(response.Text, ThrowingChatClient.FailureReason);
+        Assert.Contains("FundamentalAnalyst", response.Text);
+        Assert.Contains(ThrowingChatClient.FailureReason, response.Text);
         Assert.AreEqual(ChatRole.Assistant, response.Messages[0].Role);
     }
 
@@ -42,8 +42,8 @@ public sealed class AIAgentFailureIsolationTest
             updates.Add(update);
         }
 
-        Assert.AreEqual(1, updates.Count, "失败时应恰好产出一个失败标记更新");
-        Assert.AreEqual(1, failures.Count);
+        Assert.HasCount(1, updates, "失败时应恰好产出一个失败标记更新");
+        Assert.HasCount(1, failures);
         Assert.IsTrue(AnalystFailureMessages.IsFailureMarker(updates[0].Text));
     }
 
@@ -70,7 +70,7 @@ public sealed class AIAgentFailureIsolationTest
         var response = await wrapped.RunAsync([new ChatMessage(ChatRole.User, "分析")]);
 
         Assert.IsTrue(AnalystFailureMessages.IsFailureMarker(response.Text), "空输出应视为失败");
-        StringAssert.Contains(response.Text, "未返回任何文本结论");
+        Assert.Contains("未返回任何文本结论", response.Text);
     }
 
     [TestMethod]

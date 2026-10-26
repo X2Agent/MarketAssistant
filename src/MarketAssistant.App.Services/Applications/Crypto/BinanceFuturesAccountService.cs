@@ -11,18 +11,13 @@ namespace MarketAssistant.Applications.Crypto;
 /// 端点：/fapi/v2/account、/fapi/v1/order、/fapi/v1/openOrders、/fapi/v2/positionRisk
 /// API文档：https://developers.binance.com/docs/derivatives/usds-margined-futures/general-info
 /// </summary>
-public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
+public sealed class BinanceFuturesAccountService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<BinanceFuturesAccountService> logger,
+    IBinanceAuthService authService,
+    string httpClientName,
+    string label) : BinanceAccountServiceBase(httpClientFactory, logger, authService, httpClientName, label)
 {
-    public BinanceFuturesAccountService(
-        IHttpClientFactory httpClientFactory,
-        ILogger<BinanceFuturesAccountService> logger,
-        IBinanceAuthService authService,
-        string httpClientName,
-        string label)
-        : base(httpClientFactory, logger, authService, httpClientName, label)
-    {
-    }
-
     protected override string AccountEndpoint => "/fapi/v2/account";
     protected override string OrderEndpoint => "/fapi/v1/order";
     protected override string OpenOrdersEndpoint => "/fapi/v1/openOrders";
@@ -34,7 +29,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     protected override void AppendPlaceOrderParameters(Dictionary<string, string> parameters, string? positionSide)
     {
         if (!string.IsNullOrEmpty(positionSide))
-            parameters["positionSide"] = positionSide.ToUpper();
+            parameters["positionSide"] = positionSide.ToUpperInvariant();
     }
 
     /// <summary>
@@ -49,7 +44,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
         return new BinanceAccountInfo
         {
             CanTrade = futuresAccount.CanTrade,
-            Balances = futuresAccount.Assets
+            Balances = [.. futuresAccount.Assets
                 .Where(a => decimal.TryParse(a.WalletBalance, NumberStyles.Number, CultureInfo.InvariantCulture, out _) &&
                             decimal.Parse(a.WalletBalance, NumberStyles.Number, CultureInfo.InvariantCulture) != 0)
                 .Select(a =>
@@ -62,7 +57,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
                         Free = a.AvailableBalance,
                         Locked = (wallet - available).ToString("F8", CultureInfo.InvariantCulture)
                     };
-                }).ToList()
+                })]
         };
     }
 
@@ -76,7 +71,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     protected override async Task<List<BinanceOrderResponse>> ParseOrderListResponseAsync(HttpContent content, CancellationToken cancellationToken)
     {
         var futuresOrders = await content.ReadFromJsonAsync<List<BinanceFuturesOrderResponse>>(cancellationToken) ?? [];
-        return futuresOrders.Select(MapFuturesOrderResponse).ToList();
+        return [.. futuresOrders.Select(MapFuturesOrderResponse)];
     }
 
     /// <summary>
@@ -87,7 +82,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     {
         try
         {
-            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpper()}";
+            var queryString = string.IsNullOrEmpty(symbol) ? "" : $"symbol={symbol.ToUpperInvariant()}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"/fapi/v2/positionRisk?{signedQuery}";
 
@@ -121,7 +116,7 @@ public sealed class BinanceFuturesAccountService : BinanceAccountServiceBase
     {
         try
         {
-            var queryString = $"symbol={symbol.ToUpper()}&leverage={leverage}";
+            var queryString = $"symbol={symbol.ToUpperInvariant()}&leverage={leverage}";
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
             var url = $"/fapi/v1/leverage?{signedQuery}";
 

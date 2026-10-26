@@ -21,9 +21,11 @@ public sealed class BalanceDisplayItem
     public decimal PortfolioPercent { get; init; }
 }
 
-public partial class BalanceDetailPageViewModel : ViewModelBase, INavigationAware
+public partial class BalanceDetailPageViewModel(
+    CryptoPortfolioService portfolioService,
+    ILogger<BalanceDetailPageViewModel> logger) : ViewModelBase(logger), INavigationAware
 {
-    private readonly CryptoPortfolioService _portfolioService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
 
     public ObservableCollection<BalanceDisplayItem> Balances { get; } = [];
 
@@ -35,14 +37,6 @@ public partial class BalanceDetailPageViewModel : ViewModelBase, INavigationAwar
     [ObservableProperty] private bool _hasData;
 
     public override string Title => "账户余额";
-
-    public BalanceDetailPageViewModel(
-        CryptoPortfolioService portfolioService,
-        ILogger<BalanceDetailPageViewModel> logger)
-        : base(logger)
-    {
-        _portfolioService = portfolioService;
-    }
 
     public void OnNavigatedTo(object? parameter, bool isReactivation)
     {

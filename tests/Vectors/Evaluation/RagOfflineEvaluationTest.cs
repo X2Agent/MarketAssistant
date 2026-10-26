@@ -118,7 +118,7 @@ public class RagOfflineEvaluationTest
         Console.WriteLine($"RAG 离线评估 Recall@1: {recall:P0} ({hits}/{fixtures.Length})" +
             (failures.Count > 0 ? $" 未命中: {string.Join("; ", failures)}" : ""));
 
-        Assert.IsTrue(recall >= 0.8,
+        Assert.IsGreaterThanOrEqualTo(0.8, recall,
             $"Recall@1 应 ≥ 80%，实际 {recall:P0}。未命中: {string.Join("; ", failures)}");
     }
 }

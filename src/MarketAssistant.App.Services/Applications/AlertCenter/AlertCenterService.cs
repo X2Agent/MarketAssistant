@@ -9,15 +9,23 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Applications.AlertCenter;
 
 /// <summary>
-/// 统一告警中心服务：SQLite 持久化告警事件（alert_events 表），执行冷却合并、
-/// 每小时配额、免打扰静默等抑制逻辑，按级别经 INotificationService 处理触达，
+/// 统一告警中心服务：SQLite 持久化告警事件（alert_events 表），执行同类合并窗口（5 分钟）、
+/// 触达抑制（休市静默 / 免打扰时段 / 关闭通知）等抑制逻辑，按级别经各触达通道
+/// （桌面通知与 IAlertChannel 扩展通道，Critical 穿透免打扰）分发，
 /// 并维护确认级交易联动门（AlertGate）的登记与解除。
 /// </summary>
-public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
+public sealed class AlertCenterService(
+    INotificationService notificationService,
+    IUserSettingService userSettingService,
+    AlertGate alertGate,
+    IEnumerable<IAlertChannel> alertChannels,
+    ILogger<AlertCenterService> logger,
+    string? dbPath = null) : SqliteServiceBase(logger, dbPath), IAlertCenterService
 {
-    private readonly INotificationService _notificationService;
-    private readonly IUserSettingService _userSettingService;
-    private readonly AlertGate _alertGate;
+    private readonly INotificationService _notificationService = notificationService;
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly AlertGate _alertGate = alertGate;
+    private readonly IReadOnlyList<IAlertChannel> _alertChannels = [.. alertChannels];
     private readonly AlertSuppressionPolicy _policy = new();
 
     /// <summary>历史告警保留期：超期记录在启动初始化时裁剪，避免 alert_events 无界增长。</summary>
@@ -26,31 +34,18 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
     private readonly object _stateSync = new();
     private readonly Dictionary<string, AlertSuppressionPolicy.MergeState> _mergeStates =
         new(StringComparer.Ordinal);
-    private AlertSuppressionPolicy.QuotaState _quotaState = AlertSuppressionPolicy.QuotaState.Empty;
 
     /// <summary>触发中的确认级告警：(来源, 市场, 标的, 标题) → 告警 Id，供告警解除时释放联动门。
     /// 键含标题：同一标的多条不同条件的确认级规则各自独立登记，解除时精确匹配，
     /// 避免后触发覆盖先触发导致门计数无法归零。</summary>
     private readonly Dictionary<(AlertSource Source, MarketType MarketType, string Symbol, string Title), string>
-        _activeGatedAlerts = new();
+        _activeGatedAlerts = [];
 
     /// <inheritdoc />
     public event Action<AlertEvent>? AlertRaised;
 
     /// <inheritdoc />
     public event Action? AlertsChanged;
-
-    public AlertCenterService(
-        INotificationService notificationService,
-        IUserSettingService userSettingService,
-        AlertGate alertGate,
-        ILogger<AlertCenterService> logger)
-        : base(logger)
-    {
-        _notificationService = notificationService;
-        _userSettingService = userSettingService;
-        _alertGate = alertGate;
-    }
 
     /// <inheritdoc />
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
@@ -63,8 +58,8 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         await EnsureInitializedAsync(InitializeDatabaseAsync);
 
         var settings = _userSettingService.CurrentSetting;
-        // 触达抑制（休市静默 / 用户关闭通知 / 免打扰时段）在配额评估前算好传入 policy：
-        // 被抑制的告警只落库不弹窗，也不消耗每小时配额，避免静默期噪声挤占交易时段配额
+        // 触达抑制（休市静默 / 用户关闭通知 / 免打扰时段）在策略评估前算好传入 policy：
+        // 被抑制的告警只落库不弹窗
         var isSessionSilenced = AlertSuppressionPolicy.IsSilencedByTradingSession(
             alert, AShareTradingHours.IsTradingSession());
         var suppressNotification =
@@ -75,11 +70,8 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         {
             var mergeState = _mergeStates.GetValueOrDefault(alert.DedupeKey)
                              ?? AlertSuppressionPolicy.MergeState.Empty;
-            decision = _policy.Evaluate(
-                alert, mergeState, _quotaState, settings.AlertHourlyQuota, DateTime.UtcNow,
-                suppressNotification);
+            decision = _policy.Evaluate(alert, mergeState, DateTime.UtcNow, suppressNotification);
             _mergeStates[alert.DedupeKey] = decision.NewMergeState;
-            _quotaState = decision.NewQuotaState;
         }
 
         // 命中合并窗口：并入最近一条同类记录（累计次数），不新增行
@@ -89,25 +81,54 @@ public sealed class AlertCenterService : SqliteServiceBase, IAlertCenterService
         else
             await InsertAlertAsync(alert, cancellationToken);
 
-        // 确认级交易联动：登记触发中的告警，TradeExecutor 据此强制人工确认
+        // 确认级交易联动：登记触发中的告警，TradeExecutor 据此强制人工确认。
+        // 同一 (来源, 市场, 标的, 标题) 重入或合并窗口内重复触发时只激活一次计数，
+        // 保证后续单次 RaiseAlertClearedAsync 即可将对应门控计数归零。
         if (alert.TradingImpact == AlertTradingImpact.RequireConfirmation)
         {
+            var gateKey = (alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol), alert.Title);
             lock (_stateSync)
             {
-                _activeGatedAlerts[(alert.Source, alert.MarketType, AlertEvent.NormalizeSymbol(alert.Symbol), alert.Title)] =
-                    mergedAlertId ?? alert.Id;
+                var isNewGate = !_activeGatedAlerts.ContainsKey(gateKey);
+                _activeGatedAlerts[gateKey] = mergedAlertId ?? alert.Id;
+                if (isNewGate)
+                    _alertGate.Activate(alert.MarketType, alert.Symbol);
             }
-
-            _alertGate.Activate(alert.MarketType, alert.Symbol);
         }
 
-        // policy 已统一判定触达抑制（配额 + 静默），被抑制的告警仍落库、
+        // policy 已统一判定触达抑制（合并窗口 + 静默），被抑制的告警仍落库、
         // 确认级交易联动门仍登记
         if (decision.ShouldNotify)
+        {
             Notify(alert);
+            _ = NotifyChannelsAsync(alert);
+        }
 
         AlertRaised?.Invoke(alert);
         AlertsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// 向扩展通道（飞书等）异步投递。与桌面弹窗共用同一 <see cref="AlertSuppressionPolicy.Decision.ShouldNotify"/>
+    /// 判定结果——通道不做二次抑制，只按各自的最低级别过滤。
+    /// 单通道失败仅记录，不影响其它通道与告警主链。
+    /// </summary>
+    private async Task NotifyChannelsAsync(AlertEvent alert)
+    {
+        foreach (var channel in _alertChannels)
+        {
+            if (alert.Level < channel.MinimumLevel)
+                continue;
+
+            try
+            {
+                await channel.SendAsync(alert, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "告警通道投递失败: {Channel} {AlertId}", channel.Name, alert.Id);
+            }
+        }
     }
 
     /// <inheritdoc />

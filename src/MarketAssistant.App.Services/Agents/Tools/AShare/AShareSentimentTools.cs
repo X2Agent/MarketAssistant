@@ -13,28 +13,21 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股市场情绪工具实现
 /// </summary>
-public sealed class AShareSentimentTools : ISentimentTools
+public sealed class AShareSentimentTools(
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareSentimentTools> logger) : ISentimentTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareSentimentTools> _logger;
-
-    public AShareSentimentTools(
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareSentimentTools> logger)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareSentimentTools> _logger = logger;
 
     [Description("根据股票代码获取资金流向数据")]
     public async Task<FundFlow> GetFundFlowAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
         try
         {
-            var stockCode = new string(assetSymbol.Where(char.IsDigit).ToArray());
+            var stockCode = new string([.. assetSymbol.Where(char.IsDigit)]);
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
 
             var dailyFlows = await _zhiTuClient.GetTransactionHistoryAsync<ZhiTuFundFlowData>(stockCode, token, cancellationToken);
@@ -58,15 +51,15 @@ public sealed class AShareSentimentTools : ISentimentTools
 
         var latest = dailyFlows[0];
 
-        // 资金流向标准定义：净流入 = 主动买入成交额 − 主动卖出成交额
-        var superDiff = latest.ZmbtdCje - latest.ZmstdCje;
-        var largeDiff = latest.ZmbddCje - latest.ZmsddCje;
-        var mediumDiff = latest.ZmbzdCje - latest.ZmszdCje;
-        var littleDiff = latest.ZmbxdCje - latest.ZmsxdCje;
+        // 资金流向标准定义：净流入 = 主动买入成交额 − 主动卖出成交额（缺失成分按 0 计入）
+        var superDiff = OrZero(latest.ZmbtdCje) - OrZero(latest.ZmstdCje);
+        var largeDiff = OrZero(latest.ZmbddCje) - OrZero(latest.ZmsddCje);
+        var mediumDiff = OrZero(latest.ZmbzdCje) - OrZero(latest.ZmszdCje);
+        var littleDiff = OrZero(latest.ZmbxdCje) - OrZero(latest.ZmsxdCje);
 
         // 主力 = 特大单 + 大单（成交额 ≥ 20万 或 成交量 ≥ 1000手）
-        var mainIn = latest.ZmbtdCje + latest.ZmbddCje;
-        var mainOut = latest.ZmstdCje + latest.ZmsddCje;
+        var mainIn = OrZero(latest.ZmbtdCje) + OrZero(latest.ZmbddCje);
+        var mainOut = OrZero(latest.ZmstdCje) + OrZero(latest.ZmsddCje);
         var mainDiff = mainIn - mainOut;
 
         return new FundFlow
@@ -87,8 +80,11 @@ public sealed class AShareSentimentTools : ISentimentTools
         };
     }
 
+    /// <summary>智兔对缺失的成交额返回 null，汇总时按 0 计入。</summary>
+    private static decimal OrZero(decimal? value) => value ?? 0m;
+
     private static decimal CalcMainDiff(List<ZhiTuFundFlowData> flows, int days) =>
-        flows.Take(days).Sum(d => d.ZmbtdCje + d.ZmbddCje - d.ZmstdCje - d.ZmsddCje);
+        flows.Take(days).Sum(d => OrZero(d.ZmbtdCje) + OrZero(d.ZmbddCje) - OrZero(d.ZmstdCje) - OrZero(d.ZmsddCje));
 
     public IEnumerable<AIFunction> GetFunctions()
     {
@@ -114,23 +110,23 @@ internal sealed class ZhiTuFundFlowData
 
     // ── 主动买入(zmb)成交额 ──
 
-    /// <summary>主买特大单成交额</summary>
-    [JsonPropertyName("zmbtdcje")] public decimal ZmbtdCje { get; set; }
-    /// <summary>主买大单成交额</summary>
-    [JsonPropertyName("zmbddcje")] public decimal ZmbddCje { get; set; }
-    /// <summary>主买中单成交额</summary>
-    [JsonPropertyName("zmbzdcje")] public decimal ZmbzdCje { get; set; }
-    /// <summary>主买小单成交额</summary>
-    [JsonPropertyName("zmbxdcje")] public decimal ZmbxdCje { get; set; }
+    /// <summary>主买特大单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmbtdcje")] public decimal? ZmbtdCje { get; set; }
+    /// <summary>主买大单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmbddcje")] public decimal? ZmbddCje { get; set; }
+    /// <summary>主买中单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmbzdcje")] public decimal? ZmbzdCje { get; set; }
+    /// <summary>主买小单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmbxdcje")] public decimal? ZmbxdCje { get; set; }
 
     // ── 主动卖出(zms)成交额 ──
 
-    /// <summary>主卖特大单成交额</summary>
-    [JsonPropertyName("zmstdcje")] public decimal ZmstdCje { get; set; }
-    /// <summary>主卖大单成交额</summary>
-    [JsonPropertyName("zmsddcje")] public decimal ZmsddCje { get; set; }
-    /// <summary>主卖中单成交额</summary>
-    [JsonPropertyName("zmszdcje")] public decimal ZmszdCje { get; set; }
-    /// <summary>主卖小单成交额</summary>
-    [JsonPropertyName("zmsxdcje")] public decimal ZmsxdCje { get; set; }
+    /// <summary>主卖特大单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmstdcje")] public decimal? ZmstdCje { get; set; }
+    /// <summary>主卖大单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmsddcje")] public decimal? ZmsddCje { get; set; }
+    /// <summary>主卖中单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmszdcje")] public decimal? ZmszdCje { get; set; }
+    /// <summary>主卖小单成交额；智兔对缺失数据返回 null</summary>
+    [JsonPropertyName("zmsxdcje")] public decimal? ZmsxdCje { get; set; }
 }

@@ -9,25 +9,17 @@ namespace MarketAssistant.Applications.History;
 /// 资产历史记录服务：封装 SQLite 持久化与容量控制逻辑。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
-public sealed class AssetHistoryService : SqliteServiceBase, IAssetHistoryService
+public sealed class AssetHistoryService([ServiceKey] MarketType marketType, ILogger<AssetHistoryService> logger) : SqliteServiceBase(logger), IAssetHistoryService
 {
     private const int MaxHistoryCount = 10;
-    private readonly ILogger<AssetHistoryService> _logger;
-    private readonly MarketType _marketType;
-    private readonly string _marketLabel;
-
-    public AssetHistoryService([ServiceKey] MarketType marketType, ILogger<AssetHistoryService> logger)
-        : base(logger)
+    private readonly ILogger<AssetHistoryService> _logger = logger;
+    private readonly MarketType _marketType = marketType;
+    private readonly string _marketLabel = marketType switch
     {
-        _marketType = marketType;
-        _logger = logger;
-        _marketLabel = marketType switch
-        {
-            MarketType.AShare => "A股",
-            MarketType.Crypto => "虚拟币",
-            _ => marketType.ToString()
-        };
-    }
+        MarketType.AShare => "A股",
+        MarketType.Crypto => "虚拟币",
+        _ => marketType.ToString()
+    };
 
     protected override async Task InitializeDatabaseAsync()
     {

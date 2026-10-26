@@ -27,6 +27,8 @@
             ProgressPercent="{Binding AnalysisProgressPercent}"
             AnalysisPhase="{Binding AnalysisPhase}"
             AnalystRunItems="{Binding AnalystRunItems}"
+            UsageSummaryText="{Binding UsageSummaryText}"
+            UsageDetailText="{Binding UsageDetailText}"
             FailedAnalystsInfo="{Binding FailedAnalystsInfo}"
             CancelCommand="{Binding CancelAnalysisCommand}"/>
 
@@ -108,6 +110,40 @@
                                                          Height="{StaticResource LabelFontSize}"
                                                          VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- 导出分享图 / PDF -->
+                                        <Button HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                Padding="{StaticResource CompactCardPadding}"
+                                                Margin="{StaticResource TinyBottomMargin}"
+                                                Command="{Binding ExportShareImageCommand}"
+                                                IsEnabled="{Binding CanExportReport}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_chart.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Text="导出分享图（PNG）" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                Padding="{StaticResource CompactCardPadding}"
+                                                Margin="{StaticResource TinyBottomMargin}"
+                                                Command="{Binding ExportPdfCommand}"
+                                                IsEnabled="{Binding CanExportReport}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_document.svg"
+                                                         Width="{StaticResource LabelFontSize}"
+                                                         Height="{StaticResource LabelFontSize}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Text="导出 PDF" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
@@ -227,55 +263,14 @@
                     </Button>
                 </Grid>
 
-                <!-- 分析未完成状态：分析失败或取消且无报告可展示时出现 -->
-                <Border Grid.Row="1"
-                        IsVisible="{Binding !HasActiveReport}"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
-                        CornerRadius="{StaticResource DefaultCornerRadius}"
-                        Padding="{StaticResource DefaultCardPadding}"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Width="{StaticResource ProgressDialogWidth}">
-                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                        <svg:Svg Path="/Assets/Images/icon_warning.svg"
-                                 Width="28" Height="28"
-                                 HorizontalAlignment="Center"/>
-
-                        <TextBlock Text="分析未完成"
-                                   FontSize="{StaticResource LargeFontSize}"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-
-                        <TextBlock Text="{Binding AnalysisFailureMessage}"
-                                   FontSize="{StaticResource SmallFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   IsVisible="{Binding AnalysisFailureMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-                        <Button Content="重新分析"
-                                Command="{Binding RetryAnalysisCommand}"
-                                HorizontalAlignment="Center"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="{StaticResource TextOnEmphasisBrush}"
-                                BorderThickness="{StaticResource NoBorderThickness}"
-                                CornerRadius="{StaticResource SmallCornerRadius}"
-                                Padding="{StaticResource CompactCardPadding}">
-                            <Button.Styles>
-                                <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
-                                </Style>
-                                <Style Selector="Button:pressed /template/ ContentPresenter">
-                                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
-                                </Style>
-                            </Button.Styles>
-                        </Button>
-                    </StackPanel>
-                </Border>
+                <!-- 报告区空态 / 失败态（含重新分析入口）：分析中由进度视图接管，有报告时由报告视图接管 -->
+                <controls:StateOverlayView Grid.Row="1"
+                                           State="{Binding ReportOverlayState}"
+                                           Message="{Binding ReportOverlayMessage}"
+                                           RetryCommand="{Binding RetryAnalysisCommand}"
+                                           RetryText="重新分析"
+                                           ShowLoading="False"
+                                           ZIndex="1"/>
             </Grid>
 
             <!-- 右侧：并列常驻/展开的 AI 伴侣助手侧边栏 (无遮罩，边看研报边提问) -->

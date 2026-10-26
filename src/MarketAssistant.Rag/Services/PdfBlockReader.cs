@@ -6,14 +6,9 @@ namespace MarketAssistant.Rag.Services;
 /// PDF 文档块读取器：支持结构化块读取
 /// 使用适配器模式，内部委托给 MarkdownDocumentBlockReader 处理
 /// </summary>
-public class PdfBlockReader : IDocumentBlockReader
+public class PdfBlockReader(MarkdownDocumentBlockReader markdownReader) : IDocumentBlockReader
 {
-    private readonly MarkdownDocumentBlockReader _markdownReader;
-
-    public PdfBlockReader(MarkdownDocumentBlockReader markdownReader)
-    {
-        _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
-    }
+    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
 
     public bool CanRead(string filePath) =>
         filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);

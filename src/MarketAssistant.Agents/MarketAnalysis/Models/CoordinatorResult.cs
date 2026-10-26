@@ -18,6 +18,23 @@ public sealed class CoordinatorResult
     [Description("综合目标价格区间，例如：'45-50 元'，综合考虑基本面估值、技术目标位、资金推动、事件影响")]
     public string TargetPrice { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 目标价数值（交易货币单位），取区间代表性数值（中值或单值），无明确目标价时为 null。
+    /// 供回测与绩效统计使用的机器可读字段，与 <see cref="TargetPrice"/> 文本并存；
+    /// 历史报告由旧模型生成时为 null，读取方需按缺失处理。
+    /// </summary>
+    [Range(0, 100000000)]
+    [Description("目标价数值（单位与标的计价货币一致），取目标区间的中值或单一目标值；无明确目标价时为 null")]
+    public decimal? TargetPriceValue { get; set; }
+
+    /// <summary>
+    /// 预期涨跌幅百分比数值（负数表示看跌），无明确预期时为 null。
+    /// 与 <see cref="PriceChangeExpectation"/> 文本对应的机器可读字段。
+    /// </summary>
+    [Range(-100, 10000)]
+    [Description("预期涨跌幅百分比数值，如 12.5 表示预计上涨12.5%，-8 表示预计下跌8%；无明确预期时为 null")]
+    public decimal? ExpectedChangePercent { get; set; }
+
     [MinLength(10)]
     [MaxLength(100)]
     [Description("综合价格变化预期，例如：'综合判断预计上涨 8-12%'，基于证据，避免过度乐观或悲观")]
@@ -44,17 +61,17 @@ public sealed class CoordinatorResult
     [MinLength(1)]
     [MaxLength(3)]
     [Description("核心的投资驱动因素，结合最新信息，避免空洞描述")]
-    public List<string> InvestmentHighlights { get; set; } = new();
+    public List<string> InvestmentHighlights { get; set; } = [];
 
     [MinLength(1)]
     [MaxLength(3)]
     [Description("主要的潜在风险，包含新识别的风险")]
-    public List<string> RiskFactors { get; set; } = new();
+    public List<string> RiskFactors { get; set; } = [];
 
     [MinLength(3)]
     [MaxLength(5)]
     [Description("可执行的操作建议，整合各分析师建议，提供具体方案（入场点、止损位、仓位管理）。例如：'建议在 45-48 元区间分批建仓（技术支撑+估值合理）'")]
-    public List<string> OperationSuggestions { get; set; } = new();
+    public List<string> OperationSuggestions { get; set; } = [];
 
     [MinLength(50)]
     [MaxLength(200)]
@@ -74,7 +91,7 @@ public sealed class CoordinatorResult
     [MinLength(6)]
     [MaxLength(10)]
     [Description("各专业分析师的自然语言分析中提取的最关键指标和数据点，数据具体、判断清晰、建议可行")]
-    public List<KeyIndicator> KeyIndicators { get; set; } = new();
+    public List<KeyIndicator> KeyIndicators { get; set; } = [];
 
     [Description("分析质量自评估，包含数据完整度、分析师一致性和局限性说明")]
     public AnalysisQualityMetrics QualityMetrics { get; set; } = new();

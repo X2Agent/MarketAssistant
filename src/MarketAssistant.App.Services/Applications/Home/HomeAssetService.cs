@@ -14,36 +14,27 @@ namespace MarketAssistant.Applications.Home;
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型，
 /// 构造时一次性解析同市场的 keyed 依赖。
 /// </summary>
-public sealed class HomeAssetService : IHomeAssetService
+public sealed class HomeAssetService(
+    [ServiceKey] MarketType marketType,
+    IServiceProvider serviceProvider,
+    IDialogService dialogService,
+    ILogger<HomeAssetService> logger) : IHomeAssetService
 {
-    private readonly IAssetInfoService _assetInfoService;
-    private readonly IAssetHistoryService _historyService;
-    private readonly IFavoriteService _favoriteService;
-    private readonly IDialogService _dialogService;
-    private readonly ILogger<HomeAssetService> _logger;
-    private readonly MarketType _marketType;
-
-    public HomeAssetService(
-        [ServiceKey] MarketType marketType,
-        IServiceProvider serviceProvider,
-        IDialogService dialogService,
-        ILogger<HomeAssetService> logger)
-    {
-        _marketType = marketType;
-        _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
-        _historyService = serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(marketType);
-        _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
-        _dialogService = dialogService;
-        _logger = logger;
-    }
+    private readonly IAssetInfoService _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
+    private readonly IAssetHistoryService _historyService = serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(marketType);
+    private readonly IFavoriteService _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
+    private readonly IDialogService _dialogService = dialogService;
+    private readonly ILogger<HomeAssetService> _logger = logger;
+    private readonly MarketType _marketType = marketType;
 
     public async Task<List<AssetItem>> SearchAssetAsync(string query, CancellationToken cancellationToken = default)
     {
+        // 空查询属于"无结果"，直接返回空列表；数据源故障由 SearchAsync 抛出，交由上层展示失败态
         if (string.IsNullOrWhiteSpace(query))
             return [];
 
         var results = await _assetInfoService.SearchAsync(query, cancellationToken);
-        return results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code }).ToList();
+        return [.. results.Select(asset => new AssetItem { Name = asset.Name, Code = asset.Code })];
     }
 
     public Task<List<HotAsset>> GetHotAssetsAsync()
@@ -111,17 +102,12 @@ public sealed class HomeAssetService : IHomeAssetService
         {
             assetName = assetItem.Name;
 
-            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记
+            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记。
+            // 前缀识别统一走 StockSymbolConverter（沪深京一套规则）
             market = string.Empty;
             if (_marketType == MarketType.AShare)
             {
-                var rawCode = assetItem.Code.Trim().ToUpperInvariant();
-                if (rawCode.Length > 2
-                    && (rawCode.StartsWith("SH", StringComparison.Ordinal)
-                        || rawCode.StartsWith("SZ", StringComparison.Ordinal)))
-                {
-                    market = rawCode[..2];
-                }
+                (market, _) = StockSymbolConverter.SplitExchangePrefix(assetItem.Code);
             }
 
             code = FavoriteCodeNormalizer.Normalize(assetItem.Code, _marketType);

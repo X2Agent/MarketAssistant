@@ -40,4 +40,18 @@ public class TradeRecord
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     [Description("完成时间")]
     public DateTime? CompletedAt { get; set; }
+
+    /// <summary>
+    /// 成交滑点（相对信号价的百分比，绝对值）。市价单无法事前限制滑点，
+    /// 成交后计算并落库，超过风控阈值时告警。
+    /// </summary>
+    [Description("成交滑点百分比")]
+    public decimal? SlippagePercent { get; set; }
+
+    /// <summary>
+    /// 本笔成交实现的盈亏（USDT）。开仓成交为 0；平仓成交为 FIFO 结算结果。
+    /// 策略绩效统计（胜率/盈亏比/最大回撤）以此列为数据基础。
+    /// </summary>
+    [Description("已实现盈亏")]
+    public decimal RealizedPnl { get; set; }
 }

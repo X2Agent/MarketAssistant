@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:models="using:MarketAssistant.Trading.Models"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradeHistoryView"
              x:DataType="vm:TradeHistoryViewModel">
@@ -50,15 +51,18 @@
         </Border>
 
         <!-- 记录列表 -->
-        <ScrollViewer Grid.Row="1">
-            <StackPanel Spacing="{StaticResource TinySpacing}">
-                <TextBlock Text="暂无交易记录"
-                           IsVisible="{Binding !Records.Count}"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="{StaticResource LabelFontSize}"
-                           HorizontalAlignment="Center"
-                           Margin="{StaticResource DefaultMargin}"/>
+        <Panel Grid.Row="1">
+            <!-- 首屏骨架：5 行记录占位 -->
+            <StackPanel Spacing="{StaticResource TinySpacing}"
+                        IsVisible="{Binding IsInitialLoading}">
+                <Border Classes="skeleton skeleton-row" Height="88"/>
+                <Border Classes="skeleton skeleton-row" Height="88"/>
+                <Border Classes="skeleton skeleton-row" Height="88"/>
+                <Border Classes="skeleton skeleton-row" Height="88"/>
+                <Border Classes="skeleton skeleton-row" Height="88"/>
+            </StackPanel>
 
+            <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
                 <ItemsControl ItemsSource="{Binding Records}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="models:TradeRecord">
@@ -124,7 +128,14 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+
+            <!-- 空态 / 失败态（含重试入口） -->
+            <controls:StateOverlayView State="{Binding OverlayState}"
+                                       Message="{Binding OverlayMessage}"
+                                       RetryCommand="{Binding RetryCommand}"
+                                       RetryText="重新加载"
+                                       ShowLoading="False"/>
+        </Panel>
     </Grid>
 </UserControl>

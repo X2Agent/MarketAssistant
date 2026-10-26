@@ -6,16 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.ContextProviders;
 
-public class InvestmentPreferenceContextProvider : MessageAIContextProvider
+public class InvestmentPreferenceContextProvider(InvestmentPreference preference, ILogger? logger = null) : MessageAIContextProvider
 {
-    private readonly InvestmentPreference _preference;
-    private readonly ILogger? _logger;
-
-    public InvestmentPreferenceContextProvider(InvestmentPreference preference, ILogger? logger = null)
-    {
-        _preference = preference;
-        _logger = logger;
-    }
+    private readonly InvestmentPreference _preference = preference;
+    private readonly ILogger? _logger = logger;
 
     protected override ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(InvokingContext context, CancellationToken cancellationToken = default)
     {

@@ -32,11 +32,11 @@ public class StockQuoteInfo
     [Description("今日最低价（元）")]
     public decimal LowPrice { get; set; }
 
-    [Description("涨停价格")]
-    public decimal UpLimitPrice { get; set; }
+    [Description("涨停价格；null 表示数据源未提供")]
+    public decimal? UpLimitPrice { get; set; }
 
-    [Description("跌停价格")]
-    public decimal DownLimitPrice { get; set; }
+    [Description("跌停价格；null 表示数据源未提供")]
+    public decimal? DownLimitPrice { get; set; }
 
     [Description("涨跌金额")]
     public decimal PriceChange { get; set; }
@@ -44,14 +44,14 @@ public class StockQuoteInfo
     [Description("涨跌幅（%）")]
     public decimal PercentageChange { get; set; }
 
-    [Description("3日涨跌幅（%）")]
-    public decimal PercentageChange3Day { get; set; }
+    [Description("3日涨跌幅（%）；null 表示数据源未提供")]
+    public decimal? PercentageChange3Day { get; set; }
 
-    [Description("5日涨跌幅（%）")]
-    public decimal PercentageChange5Day { get; set; }
+    [Description("5日涨跌幅（%）；null 表示数据源未提供")]
+    public decimal? PercentageChange5Day { get; set; }
 
-    [Description("振幅（%）")]
-    public decimal Amplitude { get; set; }
+    [Description("振幅（%）；null 表示数据源未提供")]
+    public decimal? Amplitude { get; set; }
 
     [Description("成交量（手）")]
     public decimal Volume { get; set; }
@@ -59,39 +59,39 @@ public class StockQuoteInfo
     [Description("成交额（元）")]
     public decimal Amount { get; set; }
 
-    [Description("换手率（%）")]
-    public decimal TurnoverRate { get; set; }
+    [Description("换手率（%）；null 表示数据源未提供")]
+    public decimal? TurnoverRate { get; set; }
 
-    [Description("量比（大于1表示放量）")]
-    public decimal VolumeRatio { get; set; }
+    [Description("量比（大于1表示放量）；null 表示数据源未提供")]
+    public decimal? VolumeRatio { get; set; }
 
-    [Description("委比（%），正值表示买盘强")]
-    public decimal EntrustRatio { get; set; }
+    [Description("委比（%），正值表示买盘强；null 表示数据源未提供")]
+    public decimal? EntrustRatio { get; set; }
 
-    [Description("均价（元）")]
-    public decimal AveragePrice { get; set; }
+    [Description("均价（元）；null 表示数据源未提供")]
+    public decimal? AveragePrice { get; set; }
 
-    [Description("总股本")]
-    public decimal TotalShares { get; set; }
+    [Description("总股本；null 表示数据源未提供")]
+    public decimal? TotalShares { get; set; }
 
-    [Description("流通股本")]
-    public decimal NonRestrictedShares { get; set; }
+    [Description("流通股本；null 表示数据源未提供")]
+    public decimal? NonRestrictedShares { get; set; }
 
-    [Description("总市值（元）")]
-    public decimal MarketCapitalization { get; set; }
+    [Description("总市值（元）；null 表示数据源未提供")]
+    public decimal? MarketCapitalization { get; set; }
 
-    [Description("流通市值（元）")]
-    public decimal CirculationMarketCap { get; set; }
+    [Description("流通市值（元）；null 表示数据源未提供")]
+    public decimal? CirculationMarketCap { get; set; }
 
-    [Description("市盈率（静）")]
-    public decimal PERatio { get; set; }
+    [Description("市盈率（静）；亏损或不适用的股票为 null，禁止按 0 解读")]
+    public decimal? PERatio { get; set; }
 
-    [Description("市盈率（TTM）")]
-    public decimal TTMPERatio { get; set; }
+    [Description("市盈率（TTM）；亏损或不适用的股票为 null，禁止按 0 解读")]
+    public decimal? TTMPERatio { get; set; }
 
-    [Description("市净率")]
-    public decimal PBRatio { get; set; }
+    [Description("市净率；null 表示数据源未提供")]
+    public decimal? PBRatio { get; set; }
 
-    [Description("每股净资产（元）")]
-    public decimal NetAssetPerShare { get; set; }
+    [Description("每股净资产（元）；null 表示数据源未提供")]
+    public decimal? NetAssetPerShare { get; set; }
 }

@@ -18,18 +18,12 @@ namespace MarketAssistant.Agents.InvestmentSelection;
 /// 由 <see cref="IInvestmentExecutorFactory"/> 在每次 Run 内重新创建，
 /// 避免 Singleton Executor 在并发分析间共享可变状态与模型/运行时引用。
 /// </remarks>
-public class InvestmentSelectionWorkflow
+public class InvestmentSelectionWorkflow(
+    IInvestmentExecutorFactory executorFactory,
+    ILogger<InvestmentSelectionWorkflow> logger)
 {
-    private readonly IInvestmentExecutorFactory _executorFactory;
-    private readonly ILogger<InvestmentSelectionWorkflow> _logger;
-
-    public InvestmentSelectionWorkflow(
-        IInvestmentExecutorFactory executorFactory,
-        ILogger<InvestmentSelectionWorkflow> logger)
-    {
-        _executorFactory = executorFactory ?? throw new ArgumentNullException(nameof(executorFactory));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly IInvestmentExecutorFactory _executorFactory = executorFactory ?? throw new ArgumentNullException(nameof(executorFactory));
+    private readonly ILogger<InvestmentSelectionWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <summary>
     /// 执行基于用户需求的 AI 投资分析。

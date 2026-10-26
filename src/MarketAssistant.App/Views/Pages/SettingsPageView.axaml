@@ -5,7 +5,7 @@
              xmlns:vm="using:MarketAssistant.ViewModels"
               xmlns:providers="using:MarketAssistant.Infrastructure.Providers"
 
-             xmlns:controls="using:MarketAssistant.Views.Controls"
+              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="MarketAssistant.Views.Pages.SettingsPageView"
@@ -55,8 +55,21 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="*,Auto">
+        <!-- 首屏骨架：表单区块占位（仅首屏补骨架） -->
+        <ScrollViewer Grid.Row="0"
+                      Background="{DynamicResource CardBackgroundBrush}"
+                      IsVisible="{Binding IsInitialLoading}">
+            <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
+                <Border Classes="skeleton skeleton-panel" Height="200"/>
+                <Border Classes="skeleton skeleton-panel" Height="280"/>
+                <Border Classes="skeleton skeleton-panel" Height="240"/>
+            </StackPanel>
+        </ScrollViewer>
+
         <!-- 主内容区域 -->
-        <ScrollViewer Grid.Row="0" Background="{DynamicResource CardBackgroundBrush}">
+        <ScrollViewer Grid.Row="0"
+                      Background="{DynamicResource CardBackgroundBrush}"
+                      IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
 
                 <!-- 通用设置（主题 + 通知 + 日志） -->
@@ -94,48 +107,133 @@
                         <Border Height="{StaticResource DividerHeight}"
                                 Background="{DynamicResource BorderBrush}"/>
 
-                        <!-- 告警中心 -->
+                        <!-- 每日 AI 简报：唯一"用户未点击也会产生模型调用与费用"的路径，
+                             故提供两级开关 + 明确的费用说明 -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="每日 AI 简报"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="简报由你在简报弹窗内显式点击「生成今日简报」触发，会产生真实的模型调用与费用，不会自动生成。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+
+                            <CheckBox IsChecked="{Binding UserSetting.EnableDailyBriefing, Mode=TwoWay}"
+                                      Content="启用每日简报功能"/>
+
+                            <TextBlock Text="每次生成的 Token 消耗与估算成本会显示在首页简报卡片上。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 告警中心：免打扰时段（标题与启用开关同行，时段行未启用时禁用置灰） -->
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <TextBlock Text="告警中心"
                                        FontSize="{StaticResource LabelFontSize}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <TextBlock Text="控制告警弹窗频率与免打扰时段（紧急告警不受限制）"
+                            <TextBlock Text="控制告警触发来源与免打扰时段（紧急告警不受免打扰时段限制）"
                                        FontSize="{StaticResource SmallFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        TextWrapping="Wrap"/>
-                            <!-- 每小时弹窗上限：标签在上、控件在下靠左，与其他表单行统一 -->
-                            <TextBlock Text="每小时弹窗上限" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding UserSetting.AlertHourlyQuota, Mode=TwoWay}"
-                                           Minimum="1"
-                                           Maximum="200"
-                                           Increment="1"
-                                           Width="200"
-                                           HorizontalAlignment="Left"/>
-                            <!-- 免打扰时段：标签在上、开关在左、起止行缩进随动 -->
-                            <TextBlock Text="免打扰时段" Classes="form-label"/>
-                            <CheckBox IsChecked="{Binding UserSetting.AlertQuietHoursEnabled}"
-                                      Content="启用免打扰时段"/>
-                            <!-- 免打扰时段起止：未启用时整行禁用置灰 -->
-                            <StackPanel Orientation="Horizontal"
-                                        Spacing="{StaticResource SmallSpacing}"
+                            <CheckBox IsChecked="{Binding UserSetting.EnableRatingChangeAlert, Mode=TwoWay}"
+                                      Content="启用 AI 评级变化告警（分析报告归档后与上次评级不同时发出提醒）"/>
+                            <!-- 告警中心：免打扰时段标题与启用开关同行，时段行未启用时禁用置灰 -->
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource DefaultSpacing}"
+                                            VerticalAlignment="Center">
+                                    <CheckBox IsChecked="{Binding UserSetting.AlertQuietHoursEnabled}"
+                                              Content="启用免打扰时段"
+                                              VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource SmallSpacing}"
+                                            Margin="{StaticResource SmallLeftMargin}"
+                                            IsEnabled="{Binding UserSetting.AlertQuietHoursEnabled}">
+                                    <TextBlock Text="从" VerticalAlignment="Center"/>
+                                    <NumericUpDown Value="{Binding UserSetting.AlertQuietStartHour, Mode=TwoWay}"
+                                                   Minimum="0"
+                                                   Maximum="23"
+                                                   Increment="1"
+                                                   Width="200"
+                                                   HorizontalAlignment="Left"/>
+                                    <TextBlock Text="点至" VerticalAlignment="Center"/>
+                                    <NumericUpDown Value="{Binding UserSetting.AlertQuietEndHour, Mode=TwoWay}"
+                                                   Minimum="0"
+                                                   Maximum="23"
+                                                   Increment="1"
+                                                   Width="200"
+                                                   HorizontalAlignment="Left"/>
+                                    <TextBlock Text="点（支持跨零点）" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 分隔线 -->
+                        <Border Height="{StaticResource DividerHeight}"
+                                Background="{DynamicResource BorderBrush}"/>
+
+                        <!-- 告警推送通道：飞书自定义机器人（进程外触达，关闭时不投递） -->
+                        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                            <TextBlock Text="告警推送（飞书）"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                            <TextBlock Text="把通过免打扰判定的告警推送到飞书自定义机器人；关闭时仅使用桌面通知。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+
+                            <CheckBox IsChecked="{Binding UserSetting.FeishuWebhookEnabled}"
+                                      Content="启用飞书推送"/>
+
+                            <StackPanel Spacing="{StaticResource SmallSpacing}"
                                         Margin="{StaticResource SmallLeftMargin}"
-                                        IsEnabled="{Binding UserSetting.AlertQuietHoursEnabled}">
-                                <TextBlock Text="从" VerticalAlignment="Center"/>
-                                <NumericUpDown Value="{Binding UserSetting.AlertQuietStartHour, Mode=TwoWay}"
-                                               Minimum="0"
-                                               Maximum="23"
-                                               Increment="1"
-                                               Width="110"
-                                               HorizontalAlignment="Left"/>
-                                <TextBlock Text="点至" VerticalAlignment="Center"/>
-                                <NumericUpDown Value="{Binding UserSetting.AlertQuietEndHour, Mode=TwoWay}"
-                                               Minimum="0"
-                                               Maximum="23"
-                                               Increment="1"
-                                               Width="110"
-                                               HorizontalAlignment="Left"/>
-                                <TextBlock Text="点（支持跨零点）" VerticalAlignment="Center"/>
+                                        IsEnabled="{Binding UserSetting.FeishuWebhookEnabled}">
+                                <TextBlock Text="Webhook 地址"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.FeishuWebhookUrl, Mode=TwoWay}"
+                                         PlaceholderText="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                                         ToolTip.Tip="在飞书群「设置 → 群机器人 → 添加机器人 → 自定义机器人」中获取，地址含密钥，仅保存在本机安全存储"/>
+
+                                <TextBlock Text="签名校验密钥（可选）"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBox Text="{Binding UserSetting.FeishuWebhookSecret, Mode=TwoWay}"
+                                         PlaceholderText="机器人开启签名校验时填写"
+                                         ToolTip.Tip="与 Webhook 地址一同在本机安全存储，不会写入普通设置文件"/>
+
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="{StaticResource SmallSpacing}"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="最低推送级别"
+                                               VerticalAlignment="Center"/>
+                                    <ComboBox ItemsSource="{Binding AlertLevelOptions}"
+                                              SelectedItem="{Binding UserSetting.FeishuMinAlertLevel}"
+                                              MinWidth="140">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Content="发送测试消息"
+                                            Classes="btn-info"
+                                            Command="{Binding TestFeishuWebhookCommand}"/>
+                                </StackPanel>
+
+                                <TextBlock Text="提示：自定义机器人有频率限制，告警合并窗口内不会重复推送。"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -563,18 +661,29 @@
                                        Foreground="{StaticResource ErrorBrush}"/>
                         </StackPanel>
 
+                        <!-- 模型分配总开关：默认关闭，避免每个角色的模型输入框全部铺开造成视觉过载；
+                             开启后才逐角色编辑。角色级分配始终生效，关闭仅隐藏编辑入口 -->
+                        <StackPanel Spacing="{StaticResource SmallSpacing}">
+                            <CheckBox IsChecked="{Binding IsPerAnalystModelEnabled}"
+                                      Content="为每个分析师单独指定模型"/>
+                            <TextBlock Text="默认所有角色跟随上方「模型 ID」的默认模型。开启后可逐角色指定模型（按服务商分别保存，仅对勾选启用的角色生效）；已有的角色分配不受开关影响，保存后继续生效。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
                         <ItemsControl ItemsSource="{Binding AnalystRoles}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <UniformGrid Columns="2" />
+                                    <controls:AdaptiveUniformGrid MinColumnWidth="260" MaxColumns="3"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid ColumnDefinitions="Auto,*" 
-                                          RowDefinitions="Auto,Auto" 
+                                          RowDefinitions="Auto,Auto,Auto" 
                                           Margin="{StaticResource GridItemMargin}">
-                                        <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="2"
+                                        <CheckBox Grid.Row="0" Grid.Column="0" Grid.RowSpan="3"
                                                   IsChecked="{Binding IsEnabled}"
                                                   IsEnabled="{Binding !IsRequired}"
                                                   VerticalAlignment="Top"
@@ -590,6 +699,28 @@
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    Margin="{StaticResource TinyTopMargin}"
                                                    TextWrapping="Wrap"/>
+                                        <!-- 模型编辑器仅总开关开启时可见；关闭时已有分配以小字提示 -->
+                                        <AutoCompleteBox Grid.Row="2" Grid.Column="1"
+                                                         ItemsSource="{Binding ModelOptions}"
+                                                         Text="{Binding ModelIdOverride, Mode=TwoWay}"
+                                                         FilterMode="Contains"
+                                                         MinimumPrefixLength="0"
+                                                         PlaceholderText="跟随默认模型"
+                                                         MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
+                                                         HorizontalAlignment="Stretch"
+                                                         IsVisible="{Binding ShowModelEditor}"
+                                                         IsEnabled="{Binding IsEnabled}"
+                                                         Margin="{StaticResource TinyTopMargin}"
+                                                         ToolTip.Tip="为该角色单独指定模型；留空则使用默认模型"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1"
+                                                   Text="{Binding ModelAssignmentHintText}"
+                                                   IsVisible="{Binding ShowModelAssignmentHint}"
+                                                   FontSize="{StaticResource SmallFontSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="{StaticResource TinyTopMargin}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip.Tip="{Binding ModelIdOverride}"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -599,6 +730,15 @@
 
             </StackPanel>
         </ScrollViewer>
+
+        <!-- 失败态（含重试入口） -->
+        <controls:StateOverlayView Grid.Row="0"
+                                   State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"
+                                   ZIndex="999"/>
 
         <!-- 底部操作栏 -->
         <Border Grid.Row="1" 

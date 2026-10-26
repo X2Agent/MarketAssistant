@@ -1,12 +1,11 @@
 using Avalonia.Controls;
 
-namespace MarketAssistant.Views.Pages
+namespace MarketAssistant.Views.Pages;
+
+public partial class AboutPageView : UserControl
 {
-    public partial class AboutPageView : UserControl
+    public AboutPageView()
     {
-        public AboutPageView()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
     }
 }

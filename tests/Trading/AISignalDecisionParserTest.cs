@@ -68,8 +68,10 @@ public sealed class AISignalDecisionParserTest
             out var decision);
 
         Assert.IsTrue(ok);
-        Assert.IsTrue(decision!.IsHold);
-        Assert.IsTrue(decision.Reason!.Contains("{快速}"));
+        Assert.IsNotNull(decision);
+        Assert.IsTrue(decision.IsHold);
+        Assert.IsNotNull(decision.Reason);
+        Assert.Contains("{快速}", decision.Reason);
     }
 
     [TestMethod]

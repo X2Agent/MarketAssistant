@@ -23,51 +23,34 @@ public interface IMarketChatSessionFactory
 /// <summary>
 /// MarketChatSession 工厂实现，从 DI 容器解析所有依赖并组装会话
 /// </summary>
-public class MarketChatSessionFactory : IMarketChatSessionFactory
+public class MarketChatSessionFactory(
+    IChatClientFactory chatClientFactory,
+    ILoggerFactory loggerFactory,
+    McpToolContextProvider mcpToolProvider,
+    GroundingSearchTools searchTools,
+    MemoryManagementTools memoryTools,
+    SessionSearchTools sessionSearchTools,
+    KnowledgeGraphTools knowledgeGraphTools,
+    TokenTrackingMiddleware tokenTracking,
+    ConversationCompactionProviderFactory compactionProviderFactory,
+    LayeredMemoryContextProvider layeredMemoryProvider,
+    ChatSessionPersistenceService sessionPersistence,
+    MemoryExtractionService memoryExtraction,
+    AgentSkillsProvider? skillsProvider = null) : IMarketChatSessionFactory
 {
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly McpToolContextProvider _mcpToolProvider;
-    private readonly GroundingSearchTools _searchTools;
-    private readonly MemoryManagementTools _memoryTools;
-    private readonly SessionSearchTools _sessionSearchTools;
-    private readonly KnowledgeGraphTools _knowledgeGraphTools;
-    private readonly AgentSkillsProvider? _skillsProvider;
-    private readonly TokenTrackingMiddleware _tokenTracking;
-    private readonly ConversationCompactionProviderFactory _compactionProviderFactory;
-    private readonly LayeredMemoryContextProvider _layeredMemoryProvider;
-    private readonly ChatSessionPersistenceService _sessionPersistence;
-    private readonly MemoryExtractionService _memoryExtraction;
-
-    public MarketChatSessionFactory(
-        IChatClientFactory chatClientFactory,
-        ILoggerFactory loggerFactory,
-        McpToolContextProvider mcpToolProvider,
-        GroundingSearchTools searchTools,
-        MemoryManagementTools memoryTools,
-        SessionSearchTools sessionSearchTools,
-        KnowledgeGraphTools knowledgeGraphTools,
-        TokenTrackingMiddleware tokenTracking,
-        ConversationCompactionProviderFactory compactionProviderFactory,
-        LayeredMemoryContextProvider layeredMemoryProvider,
-        ChatSessionPersistenceService sessionPersistence,
-        MemoryExtractionService memoryExtraction,
-        AgentSkillsProvider? skillsProvider = null)
-    {
-        _chatClientFactory = chatClientFactory;
-        _loggerFactory = loggerFactory;
-        _mcpToolProvider = mcpToolProvider;
-        _searchTools = searchTools;
-        _memoryTools = memoryTools;
-        _sessionSearchTools = sessionSearchTools;
-        _knowledgeGraphTools = knowledgeGraphTools;
-        _skillsProvider = skillsProvider;
-        _tokenTracking = tokenTracking;
-        _compactionProviderFactory = compactionProviderFactory;
-        _layeredMemoryProvider = layeredMemoryProvider;
-        _sessionPersistence = sessionPersistence;
-        _memoryExtraction = memoryExtraction;
-    }
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
+    private readonly McpToolContextProvider _mcpToolProvider = mcpToolProvider;
+    private readonly GroundingSearchTools _searchTools = searchTools;
+    private readonly MemoryManagementTools _memoryTools = memoryTools;
+    private readonly SessionSearchTools _sessionSearchTools = sessionSearchTools;
+    private readonly KnowledgeGraphTools _knowledgeGraphTools = knowledgeGraphTools;
+    private readonly AgentSkillsProvider? _skillsProvider = skillsProvider;
+    private readonly TokenTrackingMiddleware _tokenTracking = tokenTracking;
+    private readonly ConversationCompactionProviderFactory _compactionProviderFactory = compactionProviderFactory;
+    private readonly LayeredMemoryContextProvider _layeredMemoryProvider = layeredMemoryProvider;
+    private readonly ChatSessionPersistenceService _sessionPersistence = sessionPersistence;
+    private readonly MemoryExtractionService _memoryExtraction = memoryExtraction;
 
     public MarketChatSession Create(string? initialStockCode = null)
     {

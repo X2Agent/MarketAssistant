@@ -52,7 +52,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     private string _newsContent = string.Empty;
 
     [ObservableProperty]
-    private ObservableCollection<SelectionModeItem> _selectionModes = new();
+    private ObservableCollection<SelectionModeItem> _selectionModes = [];
 
     [ObservableProperty]
     private SelectionModeItem? _selectedMode;
@@ -64,7 +64,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     private bool _hasResult;
 
     [ObservableProperty]
-    private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = new();
+    private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = [];
 
     [ObservableProperty]
     private string _validationMessage = string.Empty;
@@ -151,7 +151,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     /// 集合实例保持不变、结果变更时原地替换内容：
     /// 每次绑定求值新建集合会让整个 ItemsControl 重建（丢滚动位置）
     /// </summary>
-    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = new();
+    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = [];
 
     /// <summary>
     /// 格式化的风险提示文本（用于UI绑定）
@@ -220,8 +220,21 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
         SubscribeToMarketChanges(_marketContext);
         _dialogService = dialogService;
-        _ = LoadQuickStrategiesAsync();
-        _ = LoadSelectionModesAsync();
+
+        EmptyMessage = "暂无可用选股模式，请稍后重试";
+        SetRetryCommand(() => LoadPageAsync());
+        _ = LoadPageAsync();
+    }
+
+    /// <summary>首屏加载：选股模式卡与快速策略列表。</summary>
+    private async Task LoadPageAsync()
+    {
+        await LoadAsync(async _ =>
+        {
+            await LoadSelectionModesAsync();
+            await LoadQuickStrategiesAsync();
+            return SelectionModes.Count > 0;
+        }, "加载选股页面");
     }
 
     partial void OnSelectedModeChanged(SelectionModeItem? value)
@@ -281,14 +294,15 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     {
         if (stock == null) return;
 
-        // 归一化：统一大写，A股剥离 SH/SZ 前缀（如 SH600000 → Market: SH, Code: 600000）
+        // 归一化：统一大写，A股剥离交易所前缀（如 SH600000 → Market: SH, Code: 600000）。
+        // 市场归属从前缀统一识别（沪深京一套规则），不再用「长度是否变短」反推
         string market = string.Empty;
         var rawSymbol = stock.Symbol.Trim().ToUpperInvariant();
         var code = FavoriteCodeNormalizer.Normalize(rawSymbol, _marketContext.CurrentMarket);
 
-        if (_marketContext.CurrentMarket == MarketType.AShare && rawSymbol.Length > code.Length)
+        if (_marketContext.CurrentMarket == MarketType.AShare)
         {
-            market = rawSymbol[..2];
+            (market, _) = StockSymbolConverter.SplitExchangePrefix(rawSymbol);
         }
 
         var favoriteService = _marketContext.GetService<IFavoriteService>();
@@ -444,43 +458,38 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     private async Task LoadQuickStrategiesAsync()
     {
-        await SafeExecuteAsync(() =>
+        var strategies = _investmentSelectionService.GetQuickSelectionStrategies(_marketContext.CurrentMarket);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var strategies = _investmentSelectionService.GetQuickSelectionStrategies(_marketContext.CurrentMarket);
-            Dispatcher.UIThread.InvokeAsync(() =>
+            QuickStrategies.Clear();
+            foreach (var strategy in strategies)
             {
-                QuickStrategies.Clear();
-                foreach (var strategy in strategies)
-                {
-                    QuickStrategies.Add(strategy);
-                }
-            });
-            return Task.CompletedTask;
-        }, "加载快速选股策略");
+                QuickStrategies.Add(strategy);
+            }
+        });
     }
 
     private async Task LoadSelectionModesAsync()
     {
-        await SafeExecuteAsync(() =>
+        var modes = new ObservableCollection<SelectionModeItem>
         {
-            var modes = new ObservableCollection<SelectionModeItem>
-            {
-                new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
-                new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
-                new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
-            };
+            new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
+            new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
+            new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
+        };
 
-            Dispatcher.UIThread.InvokeAsync(() =>
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            SelectionModes.Clear();
+            foreach (var mode in modes)
             {
-                SelectionModes.Clear();
-                foreach (var mode in modes)
-                {
-                    SelectionModes.Add(mode);
-                }
+                SelectionModes.Add(mode);
+            }
+
+            if (SelectedMode is null)
                 SelectedMode = SelectionModes.FirstOrDefault();
-            });
-            return Task.CompletedTask;
-        }, "加载选股模式");
+        });
     }
 
     public void Dispose()

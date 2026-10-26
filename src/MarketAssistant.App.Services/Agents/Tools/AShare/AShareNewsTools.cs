@@ -12,21 +12,14 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股新闻数据工具实现
 /// </summary>
-public sealed class AShareNewsTools : INewsDataTools
+public sealed class AShareNewsTools(
+    EastMoneyNewsClient newsClient,
+    IChatClientFactory chatClientFactory,
+    ILogger<AShareNewsTools> logger) : INewsDataTools
 {
-    private readonly EastMoneyNewsClient _newsClient;
-    private readonly IChatClientFactory _chatClientFactory;
-    private readonly ILogger<AShareNewsTools> _logger;
-
-    public AShareNewsTools(
-        EastMoneyNewsClient newsClient,
-        IChatClientFactory chatClientFactory,
-        ILogger<AShareNewsTools> logger)
-    {
-        _newsClient = newsClient ?? throw new ArgumentNullException(nameof(newsClient));
-        _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-        _logger = logger;
-    }
+    private readonly EastMoneyNewsClient _newsClient = newsClient ?? throw new ArgumentNullException(nameof(newsClient));
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
+    private readonly ILogger<AShareNewsTools> _logger = logger;
 
     /// <summary>
     /// 根据新闻Url获取新闻详情
@@ -35,8 +28,10 @@ public sealed class AShareNewsTools : INewsDataTools
     {
         try
         {
-            var sr = new SmartReader.Reader(url);
-            sr.Debug = false;
+            var sr = new SmartReader.Reader(url)
+            {
+                Debug = false
+            };
 
             var article = sr.GetArticle();
             if (article.IsReadable)
@@ -96,20 +91,20 @@ public sealed class AShareNewsTools : INewsDataTools
         try
         {
             // 东方财富搜索 API 使用纯数字代码（如 600519）
-            var digits = new string(assetSymbol.Where(char.IsDigit).ToArray());
+            var digits = new string([.. assetSymbol.Where(char.IsDigit)]);
             if (string.IsNullOrEmpty(digits))
                 return [];
 
             var articles = await _newsClient.SearchNewsAsync(digits, cancellationToken);
 
-            return articles.Select(a => new NewsItem
+            return [.. articles.Select(a => new NewsItem
             {
                 Title = a.Title,
                 Link = a.Link,
                 Source = a.Source,
                 PublishTime = a.PublishTime,
                 Summary = a.Content
-            }).ToList();
+            })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {

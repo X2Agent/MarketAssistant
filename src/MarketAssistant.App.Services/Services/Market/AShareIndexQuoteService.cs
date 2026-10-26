@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.DataProviders.AShare;
 
 namespace MarketAssistant.Services.Market;
@@ -5,14 +6,9 @@ namespace MarketAssistant.Services.Market;
 /// <summary>
 /// A 股顶栏行情条：拉取新浪三大指数（上证/深证成指/创业板指），格式化为点位 + 涨跌幅。
 /// </summary>
-public sealed class AShareIndexQuoteService : IIndexQuoteService
+public sealed class AShareIndexQuoteService(SinaIndexQuoteClient client) : IIndexQuoteService
 {
-    private readonly SinaIndexQuoteClient _client;
-
-    public AShareIndexQuoteService(SinaIndexQuoteClient client)
-    {
-        _client = client;
-    }
+    private readonly SinaIndexQuoteClient _client = client;
 
     public async Task<IReadOnlyList<IndexQuoteItem>> GetLatestAsync(CancellationToken cancellationToken = default)
     {
@@ -21,12 +17,11 @@ public sealed class AShareIndexQuoteService : IIndexQuoteService
         var items = new List<IndexQuoteItem>(quotes.Count);
         foreach (var q in quotes)
         {
-            var trend = q.ChangePercent > 0 ? TickerTrend.Up
-                : q.ChangePercent < 0 ? TickerTrend.Down
-                : TickerTrend.Flat;
-
-            var changeText = $"{q.ChangePercent:+0.00;-0.00;0.00}%";
-            items.Add(new IndexQuoteItem(q.Name, q.Point.ToString("N2"), changeText, trend));
+            items.Add(new IndexQuoteItem(
+                q.Name,
+                q.Point.ToString("N2"),
+                PercentFormatter.Format(q.ChangePercent),
+                TickerTrendExtensions.FromChange(q.ChangePercent)));
         }
 
         return items;

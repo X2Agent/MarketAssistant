@@ -59,7 +59,7 @@ public class CryptoAssetInfoServiceTest
         var results = await service.GetAssetInfosAsync(favorites);
 
         // Assert：与请求等长同序，价格与涨跌幅已填充；批量路径不拉取市值（收藏列表不展示）
-        Assert.AreEqual(favorites.Count, results.Count);
+        Assert.HasCount(favorites.Count, results);
         Assert.IsNotNull(results[0]);
         Assert.AreEqual("BTCUSDT", results[0]!.Code);
         Assert.IsFalse(string.IsNullOrWhiteSpace(results[0]!.CurrentPrice));
@@ -67,5 +67,8 @@ public class CryptoAssetInfoServiceTest
         Assert.IsNotNull(results[1]);
         Assert.IsNotNull(results[2]);
         Assert.IsNull(results[0]!.MarketCap);
+        // 批量 MINI ticker 下三个主流币种不应全部恒为 0.00%
+        Assert.IsTrue(results.Any(r => r != null && r.ChangePercentage != "0.00%"),
+            "批量行情返回的涨跌幅不应全部恒为 0.00%");
     }
 }

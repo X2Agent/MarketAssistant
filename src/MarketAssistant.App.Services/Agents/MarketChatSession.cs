@@ -200,7 +200,7 @@ public class MarketChatSession : IDisposable
     {
         lock (_conversationLock)
         {
-            return Task.FromResult<IReadOnlyList<ChatMessage>>(_conversationHistory.ToList());
+            return Task.FromResult<IReadOnlyList<ChatMessage>>([.. _conversationHistory]);
         }
     }
 
@@ -456,7 +456,7 @@ public class MarketChatSession : IDisposable
             List<ChatMessage> historyCopy;
             lock (_conversationLock)
             {
-                historyCopy = _conversationHistory.ToList();
+                historyCopy = [.. _conversationHistory];
             }
 
             JsonElement? agentSessionState = null;
@@ -474,12 +474,12 @@ public class MarketChatSession : IDisposable
                 StockCode = _currentStockCode,
                 Title = BuildSessionTitle(historyCopy),
                 AnalysisContext = _analysisContext,
-                Messages = historyCopy.Select(m => new ChatMessageDto
+                Messages = [.. historyCopy.Select(m => new ChatMessageDto
                 {
                     Role = m.Role.Value,
                     Content = m.Text ?? string.Empty,
                     AuthorName = m.AuthorName
-                }).ToList(),
+                })],
                 AgentSessionState = agentSessionState,
                 SessionSchemaVersion = SessionSchemaVersion,
                 ProviderId = _providerId,
@@ -503,7 +503,7 @@ public class MarketChatSession : IDisposable
             List<ChatMessage> extractionSnapshot;
             lock (_conversationLock)
             {
-                extractionSnapshot = _conversationHistory.ToList();
+                extractionSnapshot = [.. _conversationHistory];
             }
             _ = Task.Run(async () =>
             {

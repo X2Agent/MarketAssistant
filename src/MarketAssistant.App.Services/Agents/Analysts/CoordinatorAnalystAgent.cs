@@ -21,29 +21,25 @@ namespace MarketAssistant.Services.Agents.Analysts;
 [Description("整合多维度分析师结论并提供投资建议")]
 [RequiredAnalyst]
 
-public class CoordinatorAnalystAgent : AnalystAgentBase
-{
-    public CoordinatorAnalystAgent(
-        IChatClient chatClient,
-        IList<AITool> tools,
-        GroundingSearchTools searchTools,
-        IUserSettingService userSettingService,
-        ILoggerFactory loggerFactory,
-        AnalystPromptConfig config,
-        StructuredOutputMode structuredOutputMode,
-        AIContextProvider[]? aiContextProviders = null)
-        : base(
-            chatClient,
-            config,
-            typeof(CoordinatorResult),
-            structuredOutputMode,
-            [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],
-            [
+public class CoordinatorAnalystAgent(
+    IChatClient chatClient,
+    IList<AITool> tools,
+    GroundingSearchTools searchTools,
+    IUserSettingService userSettingService,
+    ILoggerFactory loggerFactory,
+    AnalystPromptConfig config,
+    StructuredOutputMode structuredOutputMode,
+    AIContextProvider[]? aiContextProviders = null) : AnalystAgentBase(
+        chatClient,
+        config,
+        typeof(CoordinatorResult),
+        structuredOutputMode,
+        [.. tools, AIFunctionFactory.Create(searchTools.SearchAsync)],
+        [
                 new InvestmentPreferenceContextProvider(
                     userSettingService.CurrentSetting.InvestmentPreference,
                     loggerFactory.CreateLogger<InvestmentPreferenceContextProvider>()),
                 .. (aiContextProviders ?? [])
             ])
-    {
-    }
+{
 }

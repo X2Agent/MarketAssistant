@@ -51,7 +51,7 @@
                             Padding="{StaticResource DefaultCardPadding}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="{StaticResource DefaultBorderThickness}">
-                        <Image Source="avares://MarketAssistant/Assets/logo.png"
+                        <Image Source="avares://MarketAssistant/Assets/logo_ui.png"
                                Width="{StaticResource LogoSize}"
                                Height="{StaticResource LogoSize}"
                                Stretch="UniformToFill"/>

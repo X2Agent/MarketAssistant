@@ -1,17 +1,15 @@
+using MarketAssistant.Infrastructure.Core;
+
 namespace MarketAssistant.Services.Trading;
 
 /// <summary>
 /// 账户快照仓储（internal）：每日账户价值快照的保存与历史峰值查询（用于回撤计算）。
 /// </summary>
-internal sealed class AccountSnapshotRepository : TradingRepositoryBase
+internal sealed class AccountSnapshotRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public AccountSnapshotRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
 
     /// <summary>
     /// 保存每日账户快照（用于计算最大回撤）
@@ -19,7 +17,7 @@ internal sealed class AccountSnapshotRepository : TradingRepositoryBase
     public async Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = """

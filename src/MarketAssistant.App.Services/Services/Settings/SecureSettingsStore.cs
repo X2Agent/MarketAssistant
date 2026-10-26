@@ -12,12 +12,8 @@ internal interface ISecureSettingsStore
     bool Exists();
 }
 
-internal sealed class SecureSettingsException : Exception
+internal sealed class SecureSettingsException(string message, Exception innerException) : Exception(message, innerException)
 {
-    public SecureSettingsException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
 }
 
 /// <summary>

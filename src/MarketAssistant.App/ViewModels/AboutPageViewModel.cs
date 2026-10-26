@@ -41,7 +41,7 @@ public partial class AboutPageViewModel : ViewModelBase
     public string Company => AppInfo.Company;
     public string Copyright => AppInfo.Copyright;
 
-    public ObservableCollection<FeatureItem> FeatureItems { get; } = new ObservableCollection<FeatureItem>();
+    public ObservableCollection<FeatureItem> FeatureItems { get; } = [];
 
     public IAsyncRelayCommand CheckUpdateCommand { get; }
     public IAsyncRelayCommand DownloadUpdateCommand { get; }

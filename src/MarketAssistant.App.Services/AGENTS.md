@@ -26,6 +26,78 @@ MarketAssistant.App.Services/
 - Tool 接口定义保留在 `MarketAssistant.Agents/Tools/Abstractions/`，本项目只放实现。
 - 对外部 HTTP/API 的直接调用优先收敛到 `MarketAssistant.DataProviders` 或已存在的统一服务中，不在多个 Tool/Service 内重复实现。
 
+### 「空」与「失败」必须可区分（强制约定）
+
+数据服务禁止把异常吞成空集合或占位对象——那会让"数据源不可用"在 UI 上伪装成"没有数据"。
+
+- 返回空集合 / `null` / 默认占位对象，语义限定为**数据源正常但查无数据**。
+- 数据源故障、解析失败、超时等一律向外抛出。需要保留取消语义时先 `catch (OperationCanceledException) { throw; }` 再包装其余异常为 `FriendlyException`（携带原始异常）。
+- 批量接口（如 `IAssetInfoService.GetAssetInfosAsync`）按项隔离：单项失败占位为 `null`，不得让整批失败。
+- 编排层（`Applications/`）负责把异常翻译成 UI 状态，UI 层不再二次判断。
+
+---
+
+## 市场行情区块服务（Applications/Assets）
+
+详情页信息密度的数据来源，均为 **Keyed Services**（按 `MarketType` 注册，A 股与 Crypto 各一套实现）。
+
+| 接口 | 职责 | 注册 |
+|------|------|------|
+| `IMarketSnapshotService` | 行情速览（今开/最高/最低/昨收/量额/换手/振幅/量比/PE/PB） | `AShareMarketSnapshotService` / `CryptoMarketSnapshotService` |
+| `ITechnicalIndicatorService` | 技术指标快照（MA/MACD/BOLL/KDJ） | 市场无关实现（`TechnicalIndicatorService`，复用 `Skender.Stock.Indicators`），数据不足时返回 `null` 而非抛异常 |
+| `IOrderBookService` | 盘口深度 | Crypto：`CryptoOrderBookService`（币安深度）；A 股：`AShareOrderBookService`（新浪个股行情五档）。A 股解析器带交叉校验，任一条不满足即返回 `null` |
+| `ITickTradeService` | 逐笔成交 | Crypto：`CryptoTickTradeService`；A 股：`NoopTickTradeService`（新浪接口不提供逐笔明细，`SupportsTickTrades => false`，页面隐藏该区块）。**逐笔不含主动买卖方向**，UI 不得据 `IsBuyerMaker` 推断内外盘 |
+
+> A 股 `SupportsOrderBook` 为 `true`（新浪五档）、`SupportsTickTrades` 为 `false`（字段 26..29 实为卖四/卖五档位，早期据错误假设解析出的"逐笔"只是卖盘档位，已移除）；
+> Crypto 两项均为 `true`。`NoopOrderBookService` / `NoopTickTradeService` 仅作为新增市场缺少数据源时的兜底契约位保留。
+
+- 新增市场区块服务时，必须在 `MarketContext` 对应的 MarketModule 中注册，并同步更新 `IMarketCapability` 的能力位。每个市场都必须注册全部 keyed 接口——不支持的市场注册 `Noop*` 实现（返回空集合），**不要**抛异常伪装成加载失败，也不要在业务层用 `if/else` 绕开解析。
+- 不支持某能力的市场由页面显式说明数据源限制；区块之间必须可独立加载与独立失败，禁止把多个区块串成一个必须全部成功的事务。
+
+---
+
+## 每日 AI 简报（Applications/Briefing）
+
+自选股的"要闻速览 + 异动归因"摘要，按市场 Keyed 注册（`IDailyBriefingService`），SQLite 表 `briefings` 按 `(market_type, date_key)` 唯一，当天生成后各端复用。**纯手动生成**：构造函数只读当天缓存，绝不自动触发模型调用。
+
+- **重要性与相关性判断交给模型**：代码只做条数截断，**不做本地重要性/相关性过滤**。实测 A 股同花顺 `import` 字段 97% 为 0（无区分度）、88% 的快讯无关联股票（`stock` 为空或外盘），基于这些信号硬过滤等于用噪声决策。`Telegram.Symbols` 在 A 股因字段大小写不匹配恒为空，不可用。
+- **要闻覆盖约 28~29 小时**：数据源 `pagesize=100`（A股）/`take=100`（币圈）实测跨度 28.9h / 28.3h；原先 `20` 条仅覆盖 2.1h / 9.2h，缺失隔夜与开盘前消息。
+- **Token 预算硬边界**：`DailyBriefingService` 的 `MaxFavorites/MaxNewsItems/MaxNewsTitleLength/MaxNewsContentLength/MaxBriefingLength/MaxOutputTokens` 常量钳制输入输出；自选按异动幅度优先纳入，要闻按数据源时间倒序取前 N 条。调大任何边界前先评估成本（要闻部分当前约 2100 token/次，为早期 8 条方案的约 5.5 倍）。
+- **单次调用、无重试链**：经 `IChatClientFactory.CreateRuntime()` 默认模型一次 `GetResponseAsync` 完成；失败直接抛给调用方（UI 展示重试），不自动重试烧 Token，失败结果不落盘。
+- **空输入不是错误**：自选与要闻均空时返回 `null`，页面展示引导空态（"添加自选后……"），不要生成无意义内容。
+- **缓存语义**：`GenerateAsync(force: false)` 命中当天缓存直接返回；日期键用**本地时间** `yyyy-MM-dd`（跨时区/零点行为与用户感知一致）。
+- 提示词只允许给定事实，明确禁止编造与买卖建议——简报定位是事实归因，不是投资顾问。措辞上不使用"隔夜"：数据源虽覆盖跨日，但并不保证每条都落在隔夜时段。
+
+---
+
+## 成本估算（已移除）
+
+2026-10 决策：**移除货币成本估算，只保留 Token 用量展示**。原 `Services/Cost`（`ModelCostCalculator` / `AnalysisCostService`）、`UserSetting.ModelPrices` 与 `DefaultModelPriceCatalog` 内置参考价均已删除，设置页「模型价格表」分区一并移除。
+
+- 原因：价格表维护负担重、内置参考价快照会过期、未覆盖模型只能显示"部分未定价"，用户感知价值低于维护成本；Token 用量本身已足够支撑"这次分析花了多少算力"的判断。
+- 旧设置文件 JSON 中的 `ModelPrices` 字段由反序列化默认忽略，下次保存自然消失，无需迁移。
+- Token 用量的采集与展示（`ITokenUsageRecorder` / `TokenUsageFormatter` / 报告页与简报卡片）不受影响，仍在服役。
+- **不要重新引入"按默认模型猜价格"的逻辑**：宁可只展示 Token 数，也不给错误的金额预期。
+
+---
+
+## 模型分级调度（Infrastructure/Factories/ChatClientFactory）
+
+一次深度研判会并行启动多个分析师，全部使用同一个强模型既慢又贵。因此支持**按分析师角色**指定模型。
+
+- 角色 key 约定为**分析师类型类名**（如 `FundamentalAnalystAgent`、`CoordinatorAnalystAgent`），与 `UserSetting.EnabledAnalystRoles`、设置页 `AnalystRoleViewModel.Id` 保持一致。
+- 映射持久化在 `UserSetting.ProviderAnalystModelIds`（`AnalystModelAssignment`：角色 → 模型 ID），按 provider 分组。
+- 解析入口 `ChatClientFactory.CreateRuntime(string? modelIdOverride = null)`：传 `null` 走 provider 默认模型。`MarketAnalysisWorkflow.ResolveRuntimeForRole` 负责查表并**吞掉解析失败降级为默认 runtime**——角色配置错误绝不能导致整次分析失败。
+- 新增角色映射时必须同步更新 `AnalysisCacheService.GetConfigFingerprint()`：指纹由 `activeModelId | roleAssignments | enabledRoles` 组成。漏改会导致"换了模型却命中旧模型缓存"。
+- runtime 缓存按指纹区分，`MaxCachedRuntimes` 为上限；新增角色模型组合会占用缓存槽位，调整上限时注意内存占用。
+
+---
+
+## Token 消耗透出
+
+- 分析链路在 `MarketAnalysisWorkflow` 中通过 `ITokenUsageRecorder.BeginScope(runId)` 打开作用域，把各分析师的 Token 消耗归集到 `MarketAnalysisReport.Usage`。
+- 作用域与归属约定见 `src/MarketAssistant.Agents/AGENTS.md`；本项目只负责开启作用域、传递与写入报告，不重复实现计量逻辑。
+
 ---
 
 ## DI 注册
@@ -42,6 +114,12 @@ MarketAssistant.App.Services/
 - 工作流实现放在 `Agents/*Workflow*/`，执行器放在 `Executors/`。
 - 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 `FileAgentSkillsProvider` 加载，不在这里重复存放一份。
 
+### 分析师结构化信号落库
+
+`CoordinatorExecutor` 生成报告时调用 `AnalystSignalParser.ExtractSignals(reportAnalystMessages)`，把各分析师的结构化 JSON 提取为 `MarketAnalysisReport.AnalystSignals`（解析约定见 `src/MarketAssistant.Agents/AGENTS.md`）。信号随报告由 `ReportArchiveService` 全量序列化持久化，是 M3 回测与分析师绩效统计的数据基础；提取失败仅缺失单项，不阻断报告。
+
+`reports` 表除 `report_json` 外另存 `market_type` 与 `rating` 两个可索引列（`ReportSummary.MarketType`/`Rating` 供 UI 与统计直接筛选，避免全表反序列化）。旧库通过 `EnsureMarketColumnsAsync`（`PRAGMA table_info` + `ALTER TABLE ADD COLUMN`）迁移，**旧行为 NULL 属"未知"**，读取方不得从 `asset_code` 推断市场。
+
 ---
 
 ## 统一告警中心（Applications/AlertCenter）
@@ -51,17 +129,46 @@ MarketAssistant.App.Services/
 | 文件 | 职责 |
 |------|------|
 | `AlertEvent.cs` | 告警模型：`AlertLevel`（Info/Warning/Critical）、`AlertSource`、`AlertTradingImpact`、去重键 `DedupeKey` |
-| `IAlertCenterService.cs` / `AlertCenterService.cs` | 落库（`alert_events` 表）、抑制、弹窗触达、联动门登记/释放、历史与未读查询 |
-| `AlertSuppressionPolicy.cs` | 纯逻辑：同类 5 分钟合并窗口 + 全局每小时配额（Critical 不受限），无 IO 便于单测 |
+| `IAlertCenterService.cs` / `AlertCenterService.cs` | 落库（`alert_events` 表）、抑制、桌面与扩展通道触达、联动门登记/释放、历史与未读查询 |
+| `AlertSuppressionPolicy.cs` | 纯逻辑：同类 5 分钟合并窗口 + 触达抑制（休市静默 / 免打扰时段 / 用户关闭通知），Critical 穿透免打扰；无 IO 便于单测 |
 | `AlertGate.cs` | `IAlertGate` 内存计数门：某标的是否存在触发中的确认级告警 |
 | `AShareTradingHours.cs` | A 股交易时段判定，非交易时段跳过价格告警评估 |
+| `IAlertChannel.cs` / `Channels/FeishuAlertChannel.cs` | 进程外触达通道（飞书自定义机器人）：只投递已通过抑制判定的告警，按各自 `MinimumLevel` 过滤 |
+| `Channels/FeishuWebhookClient.cs` / `FeishuWebhookMessage.cs` | 飞书 webhook 客户端与签名/报文纯计算（命名 HttpClient "Feishu"，5s 超时 + 1 次重试） |
 
 新增告警来源时的约定：
 
-- 一律通过 `IAlertCenterService.RaiseAlertAsync(AlertEvent)` 上报，**不要**在业务服务里直接调用 `INotificationService` 弹告警窗（弹窗由告警中心统一按级别、免打扰时段与配额分发）。
-- 需要"告警期间该标的 AI 交易强制人工确认"时，把 `AlertEvent.TradingImpact` 置为 `RequireConfirmation`；条件解除后必须调用 `RaiseAlertClearedAsync(source, marketType, symbol, title)` 释放联动门，否则该标的会持续被门控。
+- 一律通过 `IAlertCenterService.RaiseAlertAsync(AlertEvent)` 上报，**不要**在业务服务里直接调用 `INotificationService` 弹告警窗（触达由告警中心统一按级别、免打扰时段与抑制策略分发到桌面与各扩展通道）。
+- 需要"告警期间该标的 AI 交易强制人工确认"时，把 `AlertEvent.TradingImpact` 置为 `RequireConfirmation`；条件解除后必须调用 `RaiseAlertClearedAsync(source, marketType, symbol, title)` 释放联动门，否则该标的会持续被门控。**标题必须是稳定字符串**——联动门按 (来源, 市场, 标的, 标题) 登记与释放。
 - 保护性平仓（`requireClose`）不受联动门影响，确保告警期间仍能及时离场。
 - 抑制状态为内存态，重启清零可接受；持久化只存告警记录本身。
+- 通道实现必须自行隔离异常：单通道失败只记日志，不得影响告警主链与其它通道。
+
+### 告警规则维度（Applications/PriceAlert）
+
+规则条件分两族，评估链路不同：
+
+- **价格 / 涨跌幅**：随行情 tick 评估（Crypto 走 WS、A 股走 20s 轮询）。
+- **指标类**（量比、MACD/RSI/KDJ/BOLL/MA 交叉与突破）：由 `IndicatorAlertEvaluator` 每 5 分钟周期评估，经 keyed `ITechnicalIndicatorService` + `IKLineService` 取数；指标公式一律复用 `TechnicalIndicatorService`（`CalculateFrom` 允许传入已取到的 K 线，避免重复请求），**不得在规则层重写公式**。
+- `AlertRuleSymbolResolver`：`Scope=Watchlist` 的批量规则按市场展开自选股（30s TTL 缓存 + 冷缓存预热）；自选股查询失败向外抛，由调用方按规则隔离，**不得降级为空列表**（那会让批量规则静默失效）。
+- 批量规则的每个符号持有独立运行时副本（`PriceAlertRule.CloneForSymbol`）：去抖/冷却/触发计数跨符号隔离，否则会互相污染。
+- 指标度量样本不足（值为 null）时该符号本轮跳过，不得伪装成"条件未满足"。
+- `AnalysisRatingAlertService`：报告归档后与同一标的的上一次评级比对，变化即上报（下调 Warning / 上调 Info），可在设置中关闭。
+
+---
+
+## 自主交易模块成熟化约定（Trading）
+
+在既有资金安全链（风控 → 确认 → symbol 锁 → 客户端快照 → 重试 → 记录）之上，遵循以下约定：
+
+- **紧急停止（kill switch）是总闸**：`EmergencyStopService` 提供两条独立路径——「停止策略并撤单」与「停止并全部平仓」。停机标记持久化在 `trading_control` 表（全局、不随环境分键），`RiskManager` 拒单 + `MarketMonitor` 拒绝启动双重强制执行；解除停机不自动恢复策略（由用户逐个启用）。
+- **紧急平仓绕过风控与确认，但不绕过安全机制**：仍走 `TradeExecutor` 的客户端快照、symbol 锁、合约开平仓判定、网络重试、成交记录与持仓回写。
+- **合约强平距离是一等风险指标**：`LiquidationRiskEvaluator` 周期评估 `|标记价-强平价|/标记价`，Critical 级登记联动门（阻止该标的自动加仓），距离恢复后必须用**固定标题**调用 `RaiseAlertClearedAsync` 释放。
+- **交易所侧保护优先**：退出型策略（含 AI 策略首次成交后的固定护栏）挂 reduceOnly 条件单；双腿用 `MC`+策略ID+`S`/`T` 区分，任一腿成交即撤另一条腿（OCO）。`HasLiveOrder` 为 true 时客户端评估跳过，防止双触发。
+- **执行质量**：策略限价单超时由 `PendingOrderTimeoutService` 撤单告警（手动单不处理）；市价单成交后计算滑点，超阈值告警（市价单无法事前限滑点）；部分成交告警但不自动撤单（挂单继续工作才可能等到剩余成交）。
+- **风控分层**：账户级（既有）+ 单策略仓位上限（`ValidateOrderAsync` 的 `strategyId` 参数，与账户级取更严者）+ 连续亏损熔断（`daily_stats.consecutive_losses`，只计已实现盈亏）+ 合约名义总敞口上限（Σ|持仓名义|/权益，现货仓位占比无法反映杠杆风险）+ API 错误率熔断（`ApiHealthMonitor` 在 `RoutingExchangeClient` 统一埋点，5 分钟滑窗）。
+- **影子模式必须记账**：`ShadowTradingService` 按与实盘一致口径（FIFO + 手续费）记录模拟成交，影子策略的任何路径（含硬性边界）都不得触达交易所；`StrategyPerformanceService` 输出胜率/盈亏比/最大回撤，影子与实盘同口径可对比。
+- 新增 `RiskConfig` 字段直接加属性即可（JSON 持久化，无迁移）；新增表/列走 `TradingSchemaInitializer` 的 `EnsureColumnAsync` 与 `TableDefinitions`，并用 `TradingDataServiceMigrationTest` 覆盖。
 
 ---
 

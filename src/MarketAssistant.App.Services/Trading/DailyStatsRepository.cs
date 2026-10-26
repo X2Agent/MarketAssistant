@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Services.Trading;
@@ -5,20 +6,15 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 日统计仓储（internal）：今日交易统计的查询与累计更新。
 /// </summary>
-internal sealed class DailyStatsRepository : TradingRepositoryBase
+internal sealed class DailyStatsRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public DailyStatsRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
-
     public async Task<DailyStats> GetTodayStatsAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT * FROM daily_stats WHERE environment = @environment AND date = @date";
@@ -33,7 +29,8 @@ internal sealed class DailyStatsRepository : TradingRepositoryBase
                 Date = reader.GetString(reader.GetOrdinal("date")),
                 TradeCount = reader.GetInt32(reader.GetOrdinal("trade_count")),
                 TotalPnl = ReadDecimal(reader, reader.GetOrdinal("total_pnl")),
-                TotalCommission = ReadDecimal(reader, reader.GetOrdinal("total_commission"))
+                TotalCommission = ReadDecimal(reader, reader.GetOrdinal("total_commission")),
+                ConsecutiveLosses = reader.GetInt32(reader.GetOrdinal("consecutive_losses"))
             };
         }
 
@@ -48,7 +45,7 @@ internal sealed class DailyStatsRepository : TradingRepositoryBase
     public async Task UpdateDailyStatsAsync(decimal pnl, decimal commission, bool countTrade = true, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
-        var today = GetTodayDateString();
+        var today = DateKeys.Today();
         await using var conn = await OpenConnectionAsync(ct);
 
         // 金额列以 TEXT 精确存储，SQL 数值加法会把 TEXT 退化为 double，
@@ -56,35 +53,59 @@ internal sealed class DailyStatsRepository : TradingRepositoryBase
         var tradeCount = countTrade ? 1 : 0;
         var totalPnl = pnl;
         var totalCommission = commission;
+        // 连续亏损：实现亏损 +1，实现盈利归零，无已实现盈亏（开仓成交）保持原值
+        var consecutiveLosses = pnl < 0 ? 1 : 0;
 
-        await using (var selectCmd = conn.CreateCommand())
+        await using var tx = (Microsoft.Data.Sqlite.SqliteTransaction)await conn.BeginTransactionAsync(ct);
+        try
         {
-            selectCmd.CommandText = "SELECT trade_count, total_pnl, total_commission FROM daily_stats WHERE environment = @environment AND date = @date";
-            selectCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-            selectCmd.Parameters.AddWithValue("@date", today);
-            await using var reader = await selectCmd.ExecuteReaderAsync(ct);
-            if (await reader.ReadAsync(ct))
+            await using (var selectCmd = conn.CreateCommand())
             {
-                tradeCount += reader.GetInt32(0);
-                totalPnl += ReadDecimal(reader, 1);
-                totalCommission += ReadDecimal(reader, 2);
-            }
-        }
+                selectCmd.Transaction = tx;
+                selectCmd.CommandText = "SELECT trade_count, total_pnl, total_commission, consecutive_losses FROM daily_stats WHERE environment = @environment AND date = @date";
+                selectCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+                selectCmd.Parameters.AddWithValue("@date", today);
+                await using var reader = await selectCmd.ExecuteReaderAsync(ct);
+                if (await reader.ReadAsync(ct))
+                {
+                    tradeCount += reader.GetInt32(0);
+                    totalPnl += ReadDecimal(reader, 1);
+                    totalCommission += ReadDecimal(reader, 2);
 
-        await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission)
-            VALUES (@environment, @date, @tradeCount, @pnl, @comm)
-            ON CONFLICT(environment, date) DO UPDATE SET
-                trade_count = @tradeCount,
-                total_pnl = @pnl,
-                total_commission = @comm
-            """;
-        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-        cmd.Parameters.AddWithValue("@date", today);
-        cmd.Parameters.AddWithValue("@tradeCount", tradeCount);
-        cmd.Parameters.AddWithValue("@pnl", ToDb(totalPnl));
-        cmd.Parameters.AddWithValue("@comm", ToDb(totalCommission));
-        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    var previousLosses = reader.GetInt32(3);
+                    consecutiveLosses = pnl switch
+                    {
+                        < 0 => Math.Max(0, previousLosses) + 1,
+                        > 0 => 0,
+                        _ => Math.Max(0, previousLosses)
+                    };
+                }
+            }
+
+            await using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = """
+                INSERT INTO daily_stats (environment, date, trade_count, total_pnl, total_commission, consecutive_losses)
+                VALUES (@environment, @date, @tradeCount, @pnl, @comm, @losses)
+                ON CONFLICT(environment, date) DO UPDATE SET
+                    trade_count = @tradeCount,
+                    total_pnl = @pnl,
+                    total_commission = @comm,
+                    consecutive_losses = @losses
+                """;
+            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+            cmd.Parameters.AddWithValue("@date", today);
+            cmd.Parameters.AddWithValue("@tradeCount", tradeCount);
+            cmd.Parameters.AddWithValue("@pnl", ToDb(totalPnl));
+            cmd.Parameters.AddWithValue("@comm", ToDb(totalCommission));
+            cmd.Parameters.AddWithValue("@losses", Math.Max(0, consecutiveLosses));
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            await tx.CommitAsync(ct);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 }

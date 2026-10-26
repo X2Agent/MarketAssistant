@@ -1,6 +1,7 @@
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.Logging.Abstractions;
+using TestMarketAssistant.Infrastructure;
 
 namespace TestMarketAssistant;
 
@@ -8,8 +9,12 @@ namespace TestMarketAssistant;
 /// McpService 核心功能测试
 /// </summary>
 [TestClass]
-public class McpServiceTest
+public sealed class McpServiceTest : IDisposable
 {
+    private readonly TemporaryDirectory _directory = new();
+
+    public void Dispose() => _directory.Dispose();
+
     [TestMethod]
     [TestCategory("Integration")]
     [Timeout(120000)]
@@ -23,17 +28,17 @@ public class McpServiceTest
             Arguments = "-y @modelcontextprotocol/server-everything",
             // 验证工具加载能力，显式允许全部；空白名单默认不暴露由 EmptyWhitelist 测试覆盖
             AllowAllTools = true,
-            EnvironmentVariables = new Dictionary<string, string?>()
+            EnvironmentVariables = []
         };
 
         var service = new McpService(
             NullLogger<McpService>.Instance,
             new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
-            new MCPServerConfigService());
+            CreateConfigService());
 
         var tools = await service.GetAIToolsAsync([config]);
 
-        Assert.IsTrue(tools.Count > 0, "应该返回至少一个 AI 工具");
+        Assert.IsNotEmpty(tools, "应该返回至少一个 AI 工具");
     }
 
     [TestMethod]
@@ -48,13 +53,13 @@ public class McpServiceTest
             Command = "npx",
             Arguments = "-y @modelcontextprotocol/server-everything",
             AllowedTools = [],
-            EnvironmentVariables = new Dictionary<string, string?>()
+            EnvironmentVariables = []
         };
 
         var service = new McpService(
             NullLogger<McpService>.Instance,
             new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
-            new MCPServerConfigService());
+            CreateConfigService());
 
         var tools = await service.GetAIToolsAsync([config]);
 
@@ -82,13 +87,21 @@ public class McpServiceTest
     [TestCategory("Unit")]
     public void GetEnabledConfigs_ReturnsOnlyEnabled()
     {
-        var configService = new MCPServerConfigService();
-        configService.ServerConfigs.Clear();
-        configService.ServerConfigs.AddRange(
-        [
-            new MCPServerConfig { Name = "enabled", Command = "test", IsEnabled = true },
-            new MCPServerConfig { Name = "disabled", Command = "test", IsEnabled = false }
-        ]);
+        var configService = CreateConfigService();
+        configService.AddOrUpdateConfig(new MCPServerConfig
+        {
+            Id = "enabled",
+            Name = "enabled",
+            Command = "test",
+            IsEnabled = true
+        });
+        configService.AddOrUpdateConfig(new MCPServerConfig
+        {
+            Id = "disabled",
+            Name = "disabled",
+            Command = "test",
+            IsEnabled = false
+        });
 
         var service = new McpService(
             NullLogger<McpService>.Instance,
@@ -97,8 +110,8 @@ public class McpServiceTest
 
         var configs = service.GetEnabledConfigs();
 
-        Assert.IsNotNull(configs);
-        Assert.IsTrue(configs.All(c => c.IsEnabled), "应该只返回启用的配置");
+        Assert.HasCount(1, configs, "应该只返回启用的配置");
+        Assert.AreEqual("enabled", configs[0].Id);
     }
 
     [TestMethod]
@@ -109,10 +122,13 @@ public class McpServiceTest
         var service = new McpService(
             NullLogger<McpService>.Instance,
             new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
-            new MCPServerConfigService());
+            CreateConfigService());
 
         var tools = await service.GetAIToolsAsync([]);
 
-        Assert.AreEqual(0, tools.Count, "空配置列表应该返回空工具列表");
+        Assert.IsEmpty(tools, "空配置列表应该返回空工具列表");
     }
+
+    private MCPServerConfigService CreateConfigService()
+        => TestConfigServices.CreateMcpServerConfigService(_directory);
 }

@@ -17,21 +17,14 @@ namespace MarketAssistant.Agents.ContextProviders;
 /// L3: 按需召回 — 通过 Agent 工具调用 (SessionSearch / RAG / KG)
 /// 此 Provider 合并了原 UserMemoryContextProvider 和 InvestmentPreferenceContextProvider 的职责。
 /// </summary>
-public class LayeredMemoryContextProvider : MessageAIContextProvider
+public class LayeredMemoryContextProvider(
+    UserMemoryService memoryService,
+    IUserSettingService settingService,
+    ILogger<LayeredMemoryContextProvider> logger) : MessageAIContextProvider
 {
-    private readonly UserMemoryService _memoryService;
-    private readonly IUserSettingService _settingService;
-    private readonly ILogger<LayeredMemoryContextProvider> _logger;
-
-    public LayeredMemoryContextProvider(
-        UserMemoryService memoryService,
-        IUserSettingService settingService,
-        ILogger<LayeredMemoryContextProvider> logger)
-    {
-        _memoryService = memoryService;
-        _settingService = settingService;
-        _logger = logger;
-    }
+    private readonly UserMemoryService _memoryService = memoryService;
+    private readonly IUserSettingService _settingService = settingService;
+    private readonly ILogger<LayeredMemoryContextProvider> _logger = logger;
 
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(
         InvokingContext context, CancellationToken cancellationToken = default)
@@ -100,7 +93,7 @@ public class LayeredMemoryContextProvider : MessageAIContextProvider
                 return;
 
             // 无高优先级记忆时，加载最近的关键条目（上限 10 条，约 200 tokens）
-            highPriorityMemories = allMemories.Take(10).ToList();
+            highPriorityMemories = [.. allMemories.Take(10)];
         }
 
         sb.AppendLine("## 关键记忆");

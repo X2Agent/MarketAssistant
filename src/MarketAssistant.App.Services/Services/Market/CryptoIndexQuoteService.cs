@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.DataProviders;
 
 namespace MarketAssistant.Services.Market;
@@ -7,16 +8,10 @@ namespace MarketAssistant.Services.Market;
 /// 与恐惧贪婪指数（alternative.me）。三项均为市场级聚合指标，非具体标的价格。
 /// 任一数据源失败仅省略对应项，全失败返回空集合（顶栏整体隐藏）。
 /// </summary>
-public sealed class CryptoIndexQuoteService : IIndexQuoteService
+public sealed class CryptoIndexQuoteService(CoinGeckoApiService coinGecko, AlternativeMeClient alternativeMe) : IIndexQuoteService
 {
-    private readonly CoinGeckoApiService _coinGecko;
-    private readonly AlternativeMeClient _alternativeMe;
-
-    public CryptoIndexQuoteService(CoinGeckoApiService coinGecko, AlternativeMeClient alternativeMe)
-    {
-        _coinGecko = coinGecko;
-        _alternativeMe = alternativeMe;
-    }
+    private readonly CoinGeckoApiService _coinGecko = coinGecko;
+    private readonly AlternativeMeClient _alternativeMe = alternativeMe;
 
     public async Task<IReadOnlyList<IndexQuoteItem>> GetLatestAsync(CancellationToken cancellationToken = default)
     {
@@ -30,14 +25,11 @@ public sealed class CryptoIndexQuoteService : IIndexQuoteService
         if (globalTask.Result is { } global)
         {
             // 全网总市值 + 24h 涨跌幅
-            var capTrend = global.MarketCapChangePct24h > 0 ? TickerTrend.Up
-                : global.MarketCapChangePct24h < 0 ? TickerTrend.Down
-                : TickerTrend.Flat;
             items.Add(new IndexQuoteItem(
                 "总市值",
                 FormatUsdCompact(global.TotalMarketCapUsd),
-                $"{global.MarketCapChangePct24h:+0.00;-0.00;0.00}%",
-                capTrend));
+                PercentFormatter.Format(global.MarketCapChangePct24h),
+                TickerTrendExtensions.FromChange(global.MarketCapChangePct24h)));
 
             // BTC 主导率（无涨跌语义，仅展示占比）
             items.Add(new IndexQuoteItem("BTC主导率", $"{global.BtcDominancePct:F1}%", null, TickerTrend.None));

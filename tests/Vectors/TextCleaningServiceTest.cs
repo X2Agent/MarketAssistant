@@ -133,7 +133,7 @@ public class TextCleaningServiceTest : BaseAgentTest
         // 千分位格式保持不变
         Assert.AreEqual("1,000,000", _service.Clean("1,000,000").Trim());
         // 中文叠词不是噪声，不得折叠
-        Assert.IsTrue(_service.Clean("哈哈哈哈").Contains("哈哈哈哈"));
+        Assert.Contains("哈哈哈哈", _service.Clean("哈哈哈哈"));
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public class TextCleaningServiceTest : BaseAgentTest
     {
         // 手机号语义（11 位 1[3-9] 开头）仍应被有损清洗移除
         var result = _service.Clean("咨询电话13800138000谢谢");
-        Assert.IsFalse(result.Contains("13800138000"));
+        Assert.DoesNotContain("13800138000", result);
         Assert.IsTrue(result.Contains("咨询电话") && result.Contains("谢谢"));
     }
 
@@ -153,7 +153,7 @@ public class TextCleaningServiceTest : BaseAgentTest
         // 摄取路径使用的 Normalize 必须完全无损
         var input = "成交额1000000000元\n咨询电话13800138000";
         var result = _service.Normalize(input);
-        StringAssert.Contains(result, "1000000000");
-        StringAssert.Contains(result, "13800138000");
+        Assert.Contains("1000000000", result);
+        Assert.Contains("13800138000", result);
     }
 }

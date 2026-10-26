@@ -11,29 +11,21 @@ namespace MarketAssistant.Applications.Analysis;
 /// 分析编排服务，封装工作流执行、缓存管理和报告归档逻辑，
 /// 将 ViewModel 与工作流实现解耦
 /// </summary>
-public class AnalysisOrchestrationService : IDisposable
+public class AnalysisOrchestrationService(
+    MarketAnalysisWorkflow workflow,
+    IAnalysisCacheService cacheService,
+    ReportArchiveService archiveService,
+    ILogger<AnalysisOrchestrationService> logger) : IDisposable
 {
-    private readonly MarketAnalysisWorkflow _workflow;
-    private readonly IAnalysisCacheService _cacheService;
-    private readonly ReportArchiveService _archiveService;
-    private readonly ILogger<AnalysisOrchestrationService> _logger;
+    private readonly MarketAnalysisWorkflow _workflow = workflow;
+    private readonly IAnalysisCacheService _cacheService = cacheService;
+    private readonly ReportArchiveService _archiveService = archiveService;
+    private readonly ILogger<AnalysisOrchestrationService> _logger = logger;
 
     /// <summary>
     /// 按标的代码加锁，防止缓存击穿：同一标的并发请求只执行一次工作流，其余等待缓存
     /// </summary>
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _perAssetLocks = new();
-
-    public AnalysisOrchestrationService(
-        MarketAnalysisWorkflow workflow,
-        IAnalysisCacheService cacheService,
-        ReportArchiveService archiveService,
-        ILogger<AnalysisOrchestrationService> logger)
-    {
-        _workflow = workflow;
-        _cacheService = cacheService;
-        _archiveService = archiveService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 工作流进度事件（透传给 UI 层）

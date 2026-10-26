@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,8 @@ namespace MarketAssistant.ViewModels;
 /// 分析报告视图模型
 /// 负责展示 MarketAnalysisReport 中的 CoordinatorResult 结构化数据
 /// </summary>
-public partial class AnalysisReportViewModel : ViewModelBase
+public partial class AnalysisReportViewModel(
+    ILogger<AnalysisReportViewModel> logger) : ViewModelBase(logger)
 {
     [ObservableProperty]
     private bool _isReportVisible;
@@ -50,11 +52,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
 
     // === 聚合的列表数据 ===
 
-    public ObservableCollection<ScoreItem> DimensionScores { get; } = new();
+    public ObservableCollection<ScoreItem> DimensionScores { get; } = [];
 
-    public ObservableCollection<string> InvestmentHighlights { get; } = new();
-    public ObservableCollection<string> RiskFactors { get; } = new();
-    public ObservableCollection<string> OperationSuggestions { get; } = new();
+    public ObservableCollection<string> InvestmentHighlights { get; } = [];
+    public ObservableCollection<string> RiskFactors { get; } = [];
+    public ObservableCollection<string> OperationSuggestions { get; } = [];
 
     // === Coordinator 专用（意见汇总） ===
 
@@ -87,17 +89,29 @@ public partial class AnalysisReportViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasQualityMetrics;
 
-    public ObservableCollection<string> MissingDataDimensions { get; } = new();
+    // === 本次分析的 Token 用量 ===
+
+    /// <summary>是否统计到 Token 用量</summary>
+    [ObservableProperty]
+    private bool _hasTokenUsage;
+
+    /// <summary>用量摘要文本（如"本次共调用 9 次模型 / 128.4k tokens"）</summary>
+    [ObservableProperty]
+    private string _tokenUsageSummary = string.Empty;
+
+    /// <summary>用量明细文本（输入/输出分别展示）</summary>
+    [ObservableProperty]
+    private string _tokenUsageDetail = string.Empty;
+
+    /// <summary>用量中是否包含本地估算值</summary>
+    [ObservableProperty]
+    private bool _tokenUsageIsEstimated;
+
+    public ObservableCollection<string> MissingDataDimensions { get; } = [];
 
     // === 各分析师的消息 ===
 
-    public ObservableCollection<ChatMessage> AnalystMessages { get; } = new();
-
-    public AnalysisReportViewModel(
-        ILogger<AnalysisReportViewModel> logger)
-        : base(logger)
-    {
-    }
+    public ObservableCollection<ChatMessage> AnalystMessages { get; } = [];
 
     partial void OnOverallScoreChanged(float value)
     {
@@ -118,6 +132,11 @@ public partial class AnalysisReportViewModel : ViewModelBase
         try
         {
             StockSymbol = report.AssetSymbol;
+
+            HasTokenUsage = report.Usage is { HasValue: true };
+            TokenUsageSummary = TokenUsageFormatter.FormatSummary(report.Usage);
+            TokenUsageDetail = TokenUsageFormatter.FormatDetail(report.Usage);
+            TokenUsageIsEstimated = report.Usage?.IsEstimated == true;
 
             var coordinatorResult = report.CoordinatorResult;
 
@@ -223,6 +242,10 @@ public partial class AnalysisReportViewModel : ViewModelBase
         LimitationsNote = string.Empty;
         QualityLevelText = string.Empty;
         HasQualityMetrics = false;
+        HasTokenUsage = false;
+        TokenUsageSummary = string.Empty;
+        TokenUsageDetail = string.Empty;
+        TokenUsageIsEstimated = false;
     }
 }
 

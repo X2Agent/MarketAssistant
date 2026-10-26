@@ -75,12 +75,12 @@ public class NewsDataToolsTest
 
         // Assert - 真实验证：东方财富应返回贵州茅台相关新闻（非空 + 内容校验）
         Assert.IsNotNull(newsData, "新闻列表不应为空");
-        Assert.IsTrue(newsData.Count > 0, "东方财富应返回至少 1 条新闻");
+        Assert.IsNotEmpty(newsData, "东方财富应返回至少 1 条新闻");
         var firstNews = newsData[0];
         Assert.IsFalse(string.IsNullOrEmpty(firstNews.Title), "新闻标题不应为空");
         Assert.IsFalse(string.IsNullOrEmpty(firstNews.Link), "新闻链接不应为空");
-        Assert.IsTrue(firstNews.Title.Length > 4, $"新闻标题应有实质内容（长度>4），实际: {firstNews.Title}");
-        Assert.IsTrue(firstNews.Link.StartsWith("http"), $"新闻链接应为合法 URL，实际: {firstNews.Link}");
+        Assert.IsGreaterThan(4, firstNews.Title.Length, $"新闻标题应有实质内容（长度>4），实际: {firstNews.Title}");
+        Assert.StartsWith("http", firstNews.Link, $"新闻链接应为合法 URL，实际: {firstNews.Link}");
         TestContext?.WriteLine($"A股新闻数量: {newsData.Count}, 首条标题: {firstNews.Title}");
     }
 
@@ -104,11 +104,11 @@ public class NewsDataToolsTest
 
         // Assert - 真实验证 RSS 返回的新闻数据（非空 + 内容校验）
         Assert.IsNotNull(newsData, "新闻列表不应为空");
-        Assert.IsTrue(newsData.Count > 0, "RSS 应返回至少 1 条新闻");
+        Assert.IsNotEmpty(newsData, "RSS 应返回至少 1 条新闻");
         var firstNews = newsData[0];
         Assert.IsFalse(string.IsNullOrEmpty(firstNews.Title), "新闻标题不应为空");
         Assert.IsFalse(string.IsNullOrEmpty(firstNews.Link), "新闻链接不应为空");
-        Assert.IsTrue(firstNews.Link.StartsWith("http"), $"新闻链接应为合法 URL，实际: {firstNews.Link}");
+        Assert.StartsWith("http", firstNews.Link, $"新闻链接应为合法 URL，实际: {firstNews.Link}");
         TestContext?.WriteLine($"虚拟币新闻数量: {newsData.Count}, 首条标题: {firstNews.Title}");
     }
 

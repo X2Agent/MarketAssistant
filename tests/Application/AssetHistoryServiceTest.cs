@@ -53,7 +53,7 @@ public class AssetHistoryServiceTest
 
         // Assert
         Assert.IsNotNull(history);
-        Assert.AreEqual(1, history.Count);
+        Assert.HasCount(1, history);
         Assert.AreEqual("SH600519", history[0].Code);
     }
 
@@ -71,7 +71,7 @@ public class AssetHistoryServiceTest
 
         // Assert
         Assert.IsNotNull(history);
-        Assert.AreEqual(2, history.Count);
+        Assert.HasCount(2, history);
         Assert.AreEqual("SH600036", history[0].Code); // 最新的在前面
     }
 
@@ -89,7 +89,7 @@ public class AssetHistoryServiceTest
 
         // Assert
         Assert.IsNotNull(history);
-        Assert.AreEqual(0, history.Count);
+        Assert.IsEmpty(history);
     }
 
     [TestMethod]
@@ -108,8 +108,8 @@ public class AssetHistoryServiceTest
         var cryptoHistory = await cryptoService.GetHistoryAsync();
 
         // Assert
-        Assert.AreEqual(1, aShareHistory.Count);
-        Assert.AreEqual(1, cryptoHistory.Count);
+        Assert.HasCount(1, aShareHistory);
+        Assert.HasCount(1, cryptoHistory);
         Assert.AreEqual("SH600519", aShareHistory[0].Code);
         Assert.AreEqual("BTCUSDT", cryptoHistory[0].Code);
     }

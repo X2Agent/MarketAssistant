@@ -9,15 +9,10 @@ namespace MarketAssistant.Services;
 /// 存储用户的投资偏好、历史分析结论、自定义标签等，供 AI 上下文使用。
 /// 采用有界设计：条目数上限 <see cref="MaxEntryCount"/>，总字符上限 <see cref="MaxTotalChars"/>。
 /// </summary>
-public class UserMemoryService : SqliteServiceBase
+public class UserMemoryService(ILogger<UserMemoryService> logger) : SqliteServiceBase(logger)
 {
     public const int MaxEntryCount = 50;
     public const int MaxTotalChars = 5000;
-
-    public UserMemoryService(ILogger<UserMemoryService> logger)
-        : base(logger)
-    {
-    }
 
     /// <summary>
     /// 保存一条记忆条目。如果容量已满，返回 false 并输出诊断信息。

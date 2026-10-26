@@ -21,18 +21,32 @@ public class TradingDataService
     private readonly AccountSnapshotRepository _accountSnapshots;
     private readonly RiskConfigRepository _riskConfig;
     private readonly TradeRecordRepository _records;
+    private readonly TradingControlRepository _control;
+    private readonly TradingEnvironmentService _environment;
 
     public TradingDataService(
         TradingEnvironmentService tradingEnvironmentService,
         ILogger<TradingDataService> logger)
     {
         _schema = new TradingSchemaInitializer(logger);
+        _environment = tradingEnvironmentService;
         _strategies = new TradingStrategyRepository(_schema, tradingEnvironmentService, logger);
         _positions = new PositionRepository(_schema, tradingEnvironmentService, logger);
         _dailyStats = new DailyStatsRepository(_schema, tradingEnvironmentService, logger);
         _accountSnapshots = new AccountSnapshotRepository(_schema, tradingEnvironmentService, logger);
         _riskConfig = new RiskConfigRepository(_schema, tradingEnvironmentService, logger);
         _records = new TradeRecordRepository(_schema, tradingEnvironmentService, logger, _positions, _dailyStats);
+        _control = new TradingControlRepository(_schema, tradingEnvironmentService, logger);
+    }
+
+    /// <summary>当前交易环境 key（与仓储一致，影子账本按环境隔离）。</summary>
+    public string CurrentEnvironmentKey => TradingEnvironmentKeys.FromMode(_environment.CurrentMode);
+
+    /// <summary>打开交易数据库连接（影子账本等跨仓储读写复用同一 schema 初始化）。</summary>
+    public async Task<Microsoft.Data.Sqlite.SqliteConnection> OpenShadowConnectionAsync(CancellationToken ct = default)
+    {
+        await _schema.EnsureSchemaInitializedAsync().ConfigureAwait(false);
+        return await _schema.CreateConnectionAsync(ct).ConfigureAwait(false);
     }
 
     // ─────────────────────────── 策略 ───────────────────────────
@@ -46,7 +60,8 @@ public class TradingDataService
     public Task<List<TradingStrategy>> GetStrategiesByStatusAsync(StrategyStatus status, CancellationToken ct = default)
         => _strategies.GetStrategiesByStatusAsync(status, ct);
 
-    public Task<List<TradingStrategy>> GetAllStrategiesAsync(CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换（绩效统计）。</remarks>
+    public virtual Task<List<TradingStrategy>> GetAllStrategiesAsync(CancellationToken ct = default)
         => _strategies.GetAllStrategiesAsync(ct);
 
     public Task UpdateStrategyStatusAsync(string id, StrategyStatus status, CancellationToken ct = default)
@@ -74,9 +89,9 @@ public class TradingDataService
     public virtual Task UpdateStrategyCustomParamsAsync(string id, string? customParams, CancellationToken ct = default)
         => _strategies.UpdateStrategyCustomParamsAsync(id, customParams, ct);
 
-    public Task UpdateStrategyGuardrailsAsync(
-        string id, decimal? stopLossPrice, decimal? takeProfitPrice, CancellationToken ct = default)
-        => _strategies.UpdateStrategyGuardrailsAsync(id, stopLossPrice, takeProfitPrice, ct);
+    public virtual Task UpdateStrategyGuardrailsAsync(
+        string id, decimal? stopLossPrice, decimal? takeProfitPrice, decimal? quantity = null, CancellationToken ct = default)
+        => _strategies.UpdateStrategyGuardrailsAsync(id, stopLossPrice, takeProfitPrice, quantity, ct);
 
     /// <remarks>virtual 供单元测试替换。</remarks>
     public virtual Task UpdateStrategyTrailingPeakAsync(string id, decimal? trailingPeakPrice, CancellationToken ct = default)
@@ -92,9 +107,9 @@ public class TradingDataService
         CancellationToken ct = default)
         => _records.GetTradeRecordsAsync(symbol, from, to, limit, ct);
 
-    public Task<List<TradeRecord>> GetRecordsByStrategyAsync(string strategyId, CancellationToken ct = default)
+    /// <remarks>virtual 供单元测试替换（绩效统计）。</remarks>
+    public virtual Task<List<TradeRecord>> GetRecordsByStrategyAsync(string strategyId, CancellationToken ct = default)
         => _records.GetRecordsByStrategyAsync(strategyId, ct);
-
     public Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
         string? symbol = null, CancellationToken ct = default)
         => _records.GetUnsettledTradeRecordsAsync(symbol, ct);
@@ -102,6 +117,10 @@ public class TradingDataService
     public Task<TradeRecord> ReconcileTradeRecordAsync(
         TradeRecord existingRecord, ExchangeOrderResult latestOrder, CancellationToken ct = default)
         => _records.ReconcileTradeRecordAsync(existingRecord, latestOrder, ct);
+
+    /// <summary>回写单笔交易记录的已实现盈亏（绩效统计数据基础）。</summary>
+    public virtual Task UpdateTradeRecordRealizedPnlAsync(string recordId, decimal pnl, CancellationToken ct = default)
+        => _records.UpdateRealizedPnlAsync(recordId, pnl, ct);
 
     // ─────────────────────────── 日统计 ───────────────────────────
 
@@ -130,10 +149,10 @@ public class TradingDataService
 
     // ─────────────────────────── 账户快照 ───────────────────────────
 
-    public Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
+    public virtual Task SaveAccountSnapshotAsync(decimal totalValueUsdt, CancellationToken ct = default)
         => _accountSnapshots.SaveAccountSnapshotAsync(totalValueUsdt, ct);
 
-    public Task<decimal> GetPeakAccountValueAsync(DateTime? since = null, CancellationToken ct = default)
+    public virtual Task<decimal> GetPeakAccountValueAsync(DateTime? since = null, CancellationToken ct = default)
         => _accountSnapshots.GetPeakAccountValueAsync(since, ct);
 
     // ─────────────────────────── 风控配置 ───────────────────────────
@@ -143,6 +162,18 @@ public class TradingDataService
 
     public Task SaveRiskConfigAsync(RiskConfig config, CancellationToken ct = default)
         => _riskConfig.SaveRiskConfigAsync(config, ct);
+
+    // ─────────────────────────── 紧急停止状态 ───────────────────────────
+
+    /// <summary>读取全局紧急停止状态（跨重启生效）。</summary>
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual Task<(bool Halted, string Reason, DateTime? HaltedAtUtc)> LoadTradingHaltAsync(CancellationToken ct = default)
+        => _control.LoadAsync(ct);
+
+    /// <summary>写入全局紧急停止状态。</summary>
+    /// <remarks>virtual 供单元测试替换。</remarks>
+    public virtual Task SaveTradingHaltAsync(bool halted, string reason, CancellationToken ct = default)
+        => halted ? _control.HaltAsync(reason, ct) : _control.ResumeAsync(ct);
 
     /// <summary>
     /// 在同一事务内完成建表、旧结构迁移和索引创建（供单元测试直接驱动 schema 迁移）。

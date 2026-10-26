@@ -36,10 +36,10 @@ public class ContextExpansionServiceTest
         var selected = pool[1];
         var expanded = service.BuildExpandedText(selected, pool);
 
-        StringAssert.Contains(expanded, "【上文】第一段");
-        StringAssert.Contains(expanded, "第二段");
-        StringAssert.Contains(expanded, "【下文】第三段");
-        Assert.IsFalse(expanded.Contains("另一文档"), "不同文档不应参与扩展");
+        Assert.Contains("【上文】第一段", expanded);
+        Assert.Contains("第二段", expanded);
+        Assert.Contains("【下文】第三段", expanded);
+        Assert.DoesNotContain("另一文档", expanded, "不同文档不应参与扩展");
     }
 
     [TestMethod]

@@ -40,9 +40,9 @@ public record ScoringConstants
 /// <summary>
 /// 评分结果
 /// </summary>
-public class ScoredResult
+public class ScoredResult(RagSearchCandidate item)
 {
-    public RagSearchCandidate Item { get; init; } = null!;
+    public RagSearchCandidate Item { get; init; } = item;
     public double NormalizedVectorSimilarity { get; init; }
     public double RelevanceScore { get; init; }
     public double FreshnessScore { get; init; }
@@ -51,28 +51,18 @@ public class ScoredResult
 
     /// <summary>候选文本的词元集合缓存（分词一次、评分与多样性优化复用，避免每条候选重复分词）。</summary>
     public HashSet<string>? TokenSet { get; set; }
-
-    public ScoredResult(RagSearchCandidate item)
-    {
-        Item = item;
-    }
 }
 
 /// <summary>
 /// 重排序服务 - 融合向量距离（反转归一为相似度）与启发式评分
 /// 多维度评分：向量相似度（主导） + 文本相关性 + 时效性 + 长度优化 + 多样性
 /// </summary>
-public class RerankerService : IRerankerService
+public class RerankerService(ILogger<RerankerService> logger) : IRerankerService
 {
-    private readonly ILogger<RerankerService> _logger;
+    private readonly ILogger<RerankerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     // 权重与常量当前为静态默认值（所有实例共享）；如需运行时调参，可后续改为构造注入 ScoringWeights/ScoringConstants
     private static readonly ScoringWeights Weights = new();
     private static readonly ScoringConstants Constants = new();
-
-    public RerankerService(ILogger<RerankerService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public IReadOnlyList<RagSearchCandidate> Rerank(
         string query,
@@ -84,7 +74,7 @@ public class RerankerService : IRerankerService
         if (itemList.Count == 0)
         {
             _logger.LogDebug("重排序输入为空，直接返回");
-            return new List<RagSearchCandidate>();
+            return [];
         }
 
         var safeQuery = query?.Trim() ?? string.Empty;
@@ -125,9 +115,7 @@ public class RerankerService : IRerankerService
         {
             _logger.LogError(ex, "重排序过程中发生错误，查询: '{Query}'", safeQuery);
             // 发生错误时返回原始排序（按向量距离升序，距离最小即最相关在前）
-            return itemList
-                .OrderBy(x => x.VectorDistance)
-                .ToList();
+            return [.. itemList.OrderBy(x => x.VectorDistance)];
         }
     }
 
@@ -281,7 +269,7 @@ public class RerankerService : IRerankerService
     private static List<TokenInfo> TokenizeWithBonus(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
-            return new List<TokenInfo>();
+            return [];
 
         text = text.ToLowerInvariant();
         text = Regex.Replace(text, @"[^\p{L}\p{N}]+", " ");
@@ -307,9 +295,7 @@ public class RerankerService : IRerankerService
             }
         }
 
-        return tokenCounts
-            .Select(kvp => new TokenInfo(kvp.Key, GetKeywordBonus(kvp.Key), kvp.Value))
-            .ToList();
+        return [.. tokenCounts.Select(kvp => new TokenInfo(kvp.Key, GetKeywordBonus(kvp.Key), kvp.Value))];
     }
 
     private static double GetKeywordBonus(string word) =>

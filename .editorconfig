@@ -73,7 +73,9 @@ csharp_style_var_when_type_is_apparent = false:silent
 csharp_style_var_elsewhere = false:silent
 csharp_prefer_simple_using_statement = true:suggestion
 csharp_prefer_braces = true:silent
-csharp_style_namespace_declarations = block_scoped:silent
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
 csharp_space_around_binary_operators = before_and_after
 csharp_indent_labels = one_less_than_current
 csharp_style_prefer_method_group_conversion = true:silent
@@ -95,6 +97,17 @@ csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
 csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
 csharp_style_prefer_not_pattern = true:suggestion
 csharp_style_prefer_extended_property_pattern = true:suggestion
+
+# 现代化代码风格（dotnet format 自动应用）
+dotnet_diagnostic.IDE0300.severity = suggestion  # 集合初始化 → 集合表达式
+dotnet_diagnostic.IDE0301.severity = suggestion  # 空集合创建 → []
+dotnet_diagnostic.IDE0305.severity = suggestion  # ToList() 流水线 → 集合表达式（仅限目标类型明确处）
+dotnet_diagnostic.IDE0028.severity = suggestion  # 字典初始化 → 集合表达式
+dotnet_diagnostic.IDE0041.severity = suggestion  # null 检查 → is null / is not null 模式
+dotnet_diagnostic.IDE0017.severity = suggestion  # 对象初始化器
+dotnet_diagnostic.IDE0066.severity = suggestion  # switch 语句 → switch 表达式
+dotnet_diagnostic.IDE0161.severity = suggestion  # file-scoped namespace
+dotnet_diagnostic.IDE0290.severity = suggestion  # 主构造函数（Roslyn 代码修复仅在纯赋值构造函数上触发）
 
 [*.vb]
 #### 命名样式 ####

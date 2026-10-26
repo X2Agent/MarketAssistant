@@ -55,6 +55,11 @@ public class AISignalParams
 
     public RiskProfile ParsedRiskProfile => RiskProfileExtensions.ParseOrDefault(RiskProfile);
 
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     /// <summary>从 CustomParams JSON 解析；为空或格式错误时返回 null（引擎按默认间隔处理）。</summary>
     public static AISignalParams? FromJson(string? customParams)
     {
@@ -63,7 +68,7 @@ public class AISignalParams
 
         try
         {
-            return JsonSerializer.Deserialize<AISignalParams>(customParams);
+            return JsonSerializer.Deserialize<AISignalParams>(customParams, JsonOptions);
         }
         catch (JsonException)
         {

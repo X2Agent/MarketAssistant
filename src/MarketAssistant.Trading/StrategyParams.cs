@@ -46,8 +46,6 @@ public class GridTradingParams
     public decimal? TakeProfitPrice { get; set; }
 
     public decimal GridSpacing => GridCount > 1 ? (UpperPrice - LowerPrice) / GridCount : 0;
-
-    public decimal GetGridPrice(int index) => LowerPrice + GridSpacing * index;
 }
 
 /// <summary>

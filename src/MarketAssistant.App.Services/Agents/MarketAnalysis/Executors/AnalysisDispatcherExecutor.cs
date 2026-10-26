@@ -16,18 +16,12 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// </summary>
 [SendsMessage(typeof(ChatMessage))]
 [SendsMessage(typeof(TurnToken))]
-public sealed partial class AnalysisDispatcherExecutor : Executor
+public sealed partial class AnalysisDispatcherExecutor(
+    ILogger<AnalysisDispatcherExecutor> logger) : Executor("AnalysisDispatcher")
 {
     private const string AnalysisPromptTemplate = "请对标的 {0} 进行专业分析，提供投资建议。";
 
-    private readonly ILogger<AnalysisDispatcherExecutor> _logger;
-
-    public AnalysisDispatcherExecutor(
-        ILogger<AnalysisDispatcherExecutor> logger)
-        : base("AnalysisDispatcher")
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<AnalysisDispatcherExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     [MessageHandler]
     private async ValueTask HandleAsync(

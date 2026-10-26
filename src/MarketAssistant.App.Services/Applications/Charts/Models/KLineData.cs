@@ -86,7 +86,7 @@ public class KLineDataSet
     /// <summary>
     /// K线数据列表
     /// </summary>
-    public List<KLineData> Data { get; set; } = new List<KLineData>();
+    public List<KLineData> Data { get; set; } = [];
 }
 
 

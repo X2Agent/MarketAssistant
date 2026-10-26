@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/avaloniaui/design"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             mc:Ignorable="d"
+             x:Class="MarketAssistant.Views.Components.ReportShareCardView"
+             x:DataType="vm:ReportShareCardData"
+             Width="1080" Height="1350"
+             Background="{DynamicResource AppBackgroundBrush}">
+    <!-- 分享卡：固定画布离屏渲染，禁止依赖外部布局测量 -->
+    <Border Padding="64">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <!-- 头部：标的与评级 -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="8">
+                    <TextBlock Text="{Binding AssetName}"
+                               FontSize="48"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding AssetSymbol}"
+                               FontSize="28"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <Border Grid.Column="1"
+                        VerticalAlignment="Center"
+                        CornerRadius="16"
+                        Padding="28,12"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1">
+                    <TextBlock Text="{Binding InvestmentRating}"
+                               FontSize="36"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                </Border>
+            </Grid>
+
+            <!-- 评分区 -->
+            <StackPanel Grid.Row="1" Spacing="12" Margin="0,48,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <TextBlock Text="综合评分"
+                               FontSize="28"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ScoreText}"
+                               FontSize="96"
+                               FontWeight="Bold"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="/ 10"
+                               FontSize="36"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Bottom"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="24">
+                    <TextBlock Text="目标价"
+                               FontSize="28"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding TargetPrice}"
+                               FontSize="32"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding PriceChangeExpectation}"
+                               FontSize="28"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding ConfidenceText}"
+                               FontSize="28"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 亮点区 -->
+            <StackPanel Grid.Row="2" Spacing="16" Margin="0,48,0,0">
+                <TextBlock Text="核心观点" FontSize="28" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <ItemsControl ItemsSource="{Binding Highlights}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <TextBlock Text="{Binding}"
+                                       FontSize="28"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,12"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- 页脚 -->
+            <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="{Binding UsageSummary}"
+                               FontSize="22"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding GeneratedAtText}"
+                               FontSize="22"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1"
+                           Text="MarketAssistant · AI 生成，仅供参考"
+                           FontSize="22"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Bottom"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

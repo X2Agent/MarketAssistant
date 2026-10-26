@@ -6,12 +6,12 @@ namespace MarketAssistant.Applications.News;
 /// <summary>
 /// 新闻更新服务实现
 /// </summary>
-public class NewsUpdateService : INewsUpdateService
+public class NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpdateService> logger) : INewsUpdateService
 {
     private const int UpdateIntervalSeconds = 60;
 
-    private readonly ITelegramService _telegramService;
-    private readonly ILogger<NewsUpdateService> _logger;
+    private readonly ITelegramService _telegramService = telegramService;
+    private readonly ILogger<NewsUpdateService> _logger = logger;
     private CancellationTokenSource? _cts;
     private Task? _updateLoopTask;
     private bool _disposed;
@@ -21,20 +21,12 @@ public class NewsUpdateService : INewsUpdateService
 
     public bool IsRunning => _updateLoopTask != null && !_updateLoopTask.IsCompleted;
 
-    public NewsUpdateService(ITelegramService telegramService, ILogger<NewsUpdateService> logger)
-    {
-        _telegramService = telegramService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// 启动定时更新
     /// </summary>
     public void StartUpdates()
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(NewsUpdateService));
-
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_updateLoopTask != null && !_updateLoopTask.IsCompleted)
         {
             // 旧循环尚未退出（刚调用过 StopUpdates）：串行排队，待其退出后再启动，
@@ -128,6 +120,7 @@ public class NewsUpdateService : INewsUpdateService
         {
             StopUpdates();
             _disposed = true;
+            GC.SuppressFinalize(this);
         }
     }
 }

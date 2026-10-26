@@ -12,29 +12,23 @@ namespace MarketAssistant.Services.Trading;
 /// - 策略信号被风控拒绝 → Warning；
 /// - 行情连接中断 → Critical / 恢复 → Info。
 /// </summary>
-public sealed class RiskAlertEvaluator
+public sealed class RiskAlertEvaluator(
+    IAlertCenterService alertCenterService,
+    TradingDataService dataService,
+    CryptoPortfolioService portfolioService,
+    LiquidationRiskEvaluator liquidationRiskEvaluator,
+    ILogger<RiskAlertEvaluator> logger)
 {
     private static readonly TimeSpan RiskCheckThrottle = TimeSpan.FromSeconds(60);
 
-    private readonly IAlertCenterService _alertCenterService;
-    private readonly TradingDataService _dataService;
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly ILogger<RiskAlertEvaluator> _logger;
+    private readonly IAlertCenterService _alertCenterService = alertCenterService;
+    private readonly TradingDataService _dataService = dataService;
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly LiquidationRiskEvaluator _liquidationRiskEvaluator = liquidationRiskEvaluator;
+    private readonly ILogger<RiskAlertEvaluator> _logger = logger;
 
     private DateTime _lastAccountRiskCheckUtc = DateTime.MinValue;
     private volatile bool _connectionAlertActive;
-
-    public RiskAlertEvaluator(
-        IAlertCenterService alertCenterService,
-        TradingDataService dataService,
-        CryptoPortfolioService portfolioService,
-        ILogger<RiskAlertEvaluator> logger)
-    {
-        _alertCenterService = alertCenterService;
-        _dataService = dataService;
-        _portfolioService = portfolioService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// 评估账户回撤风险：回撤达熔断阈值 80% 时发 Warning。
@@ -47,6 +41,9 @@ public sealed class RiskAlertEvaluator
         if (now - _lastAccountRiskCheckUtc < RiskCheckThrottle)
             return;
         _lastAccountRiskCheckUtc = now;
+
+        // 合约强平距离监控与账户回撤共用同一节流窗口（同为账户级风险巡检）
+        await _liquidationRiskEvaluator.EvaluateSafeAsync(ct).ConfigureAwait(false);
 
         try
         {
@@ -162,6 +159,30 @@ public sealed class RiskAlertEvaluator
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "上报行情连接恢复告警失败");
+        }
+    }
+
+    /// <summary>
+    /// 交易处于紧急停止状态：Critical 告警（登记停机或监控启动被拒时上报），
+    /// 确保用户明确知道"自动交易已停止"及其原因，而非面对静默无响应的策略列表。
+    /// </summary>
+    public async Task NotifyTradingHaltedSafeAsync(string reason)
+    {
+        try
+        {
+            await _alertCenterService.RaiseAlertAsync(new AlertEvent
+            {
+                MarketType = MarketType.Crypto,
+                Symbol = string.Empty,
+                Level = AlertLevel.Critical,
+                Source = AlertSource.System,
+                Title = "交易已紧急停止",
+                Content = $"全部策略已停止，新订单会被拒绝：{reason}。请在交易监控页解除紧急停止后逐个重新启用策略"
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "上报交易紧急停止告警失败");
         }
     }
 }

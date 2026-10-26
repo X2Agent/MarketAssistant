@@ -20,7 +20,19 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _telegraphRefreshCountdown = "";
 
-    public ObservableCollection<Telegram> Telegraphs { get; } = new();
+    /// <summary>
+    /// 尚未收到任何快讯推送。用于首屏骨架屏；快讯为推送式，无重试入口。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAwaitingFirstNews = true;
+
+    /// <summary>
+    /// 已收到推送但列表为空，用于区分「暂无快讯」与「尚未加载」。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isNewsEmpty;
+
+    public ObservableCollection<Telegram> Telegraphs { get; } = [];
 
     public IAsyncRelayCommand<Telegram> OpenNewsCommand { get; }
 
@@ -66,6 +78,8 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
 
             Telegraphs.Clear();
             TelegraphRefreshCountdown = "";
+            IsAwaitingFirstNews = true;
+            IsNewsEmpty = false;
 
             _newsUpdateService.StartUpdates();
 
@@ -83,6 +97,9 @@ public partial class TelegraphNewsViewModel : ViewModelBase, IDisposable
             {
                 Telegraphs.Add(item);
             }
+
+            IsAwaitingFirstNews = false;
+            IsNewsEmpty = Telegraphs.Count == 0;
         });
     }
 

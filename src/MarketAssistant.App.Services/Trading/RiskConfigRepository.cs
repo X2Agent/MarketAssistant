@@ -8,16 +8,11 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 风控配置仓储（internal）：风控配置 JSON 的加载与保存。
 /// </summary>
-internal sealed class RiskConfigRepository : TradingRepositoryBase
+internal sealed class RiskConfigRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public RiskConfigRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
-
     public async Task<RiskConfig> LoadRiskConfigAsync(CancellationToken ct = default)
     {
         await EnsureInitializedAsync();

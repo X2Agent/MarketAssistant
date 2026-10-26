@@ -25,6 +25,7 @@ internal static class PdfMarkdownPostProcessor
             var trimmedLine = line.Trim();
 
             // 标题前后确保有空行
+            // char 重载本身即按序数比较，无需 StringComparison（该组合无对应重载）
             if (trimmedLine.StartsWith('#'))
             {
                 if (!previousLineWasEmpty && result.Length > 0)
@@ -36,7 +37,7 @@ internal static class PdfMarkdownPostProcessor
                 previousLineWasEmpty = true;
             }
             // 列表项
-            else if (trimmedLine.StartsWith("- ") || trimmedLine.StartsWith("1. ") ||
+            else if (trimmedLine.StartsWith("- ", StringComparison.Ordinal) || trimmedLine.StartsWith("1. ", StringComparison.Ordinal) ||
                      Regex.IsMatch(trimmedLine, @"^\s*\d+\.\s"))
             {
                 result.AppendLine(trimmedLine);

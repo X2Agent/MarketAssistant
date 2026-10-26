@@ -90,46 +90,50 @@
                     <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                     <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
                 </Style>
+                <!-- 导航栏市场切换芯片：显示当前市场，点击在 A股/虚拟币间切换（导航栏唯一切换入口） -->
+                <Style Selector="Button.market-chip">
+                    <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                    <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+                    <Setter Property="Padding" Value="6,3"/>
+                    <Setter Property="FontSize" Value="{StaticResource MiniFontSize}"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                </Style>
+                <Style Selector="Button.market-chip:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+                </Style>
             </Border.Styles>
             <DockPanel Margin="{StaticResource LogoTopMargin}">
-                <!-- 应用Logo图标和市场名称 -->
-                <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center" Spacing="{StaticResource TinySpacing}">
-                    <!-- Logo按钮（点击切换市场） -->
-                    <Button Width="{StaticResource AppLogoSize}"
+                <!-- 应用 Logo（纯品牌展示）与市场切换芯片 -->
+                <StackPanel DockPanel.Dock="Top" HorizontalAlignment="Center" Spacing="{StaticResource SmallSpacing}">
+                    <!-- Logo：仅作品牌标识；市场切换由下方芯片与 Ctrl+M 承担，避免一处功能两个入口 -->
+                    <Border Width="{StaticResource AppLogoSize}"
                             Height="{StaticResource AppLogoSize}"
-                            AutomationProperties.Name="切换市场"
                             CornerRadius="{StaticResource DefaultCornerRadius}"
-                            HorizontalAlignment="Center"
-                            Padding="{StaticResource NoPadding}"
-                            Background="Transparent"
-                            BorderThickness="{StaticResource NoBorderThickness}"
-                            Command="{Binding ToggleMarketCommand}">
-                        <ToolTip.Tip>
-                            <StackPanel>
-                                <TextBlock Text="点击切换市场" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding CurrentMarketText}" FontSize="{StaticResource TinyFontSize}" Opacity="0.8"/>
-                                <TextBlock Text="快捷键: Ctrl+M" FontSize="{StaticResource MiniFontSize}" Opacity="0.6"/>
-                            </StackPanel>
-                        </ToolTip.Tip>
-                        <Border Width="{StaticResource AppLogoSize}"
-                                Height="{StaticResource AppLogoSize}"
-                                CornerRadius="{StaticResource DefaultCornerRadius}"
-                                ClipToBounds="True">
-                            <Image Source="/Assets/logo.png"
-                                   Stretch="UniformToFill"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                        </Border>
-                    </Button>
-                    
-                    <!-- 市场名称文字 -->
-                    <TextBlock Text="{Binding CurrentMarketText}" 
-                               FontSize="{StaticResource MiniFontSize}"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
+                            ClipToBounds="True"
+                            HorizontalAlignment="Center">
+                        <Image Source="/Assets/logo_ui.png"
+                               Stretch="UniformToFill"
                                HorizontalAlignment="Center"
-                               TextAlignment="Center"
-                               Margin="{StaticResource MarketLabelMargin}"/>
+                               VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- 市场切换芯片：当前市场名 + 切换指示，点击切换（ToggleMarket 与 Ctrl+M 等价） -->
+                    <Button Classes="market-chip"
+                            Width="60"
+                            HorizontalAlignment="Center"
+                            Command="{Binding ToggleMarketCommand}"
+                            AutomationProperties.Name="切换市场"
+                            ToolTip.Tip="点击切换市场（Ctrl+M）">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="{Binding CurrentMarketShortText}" VerticalAlignment="Center"/>
+                            <TextBlock Text="⇄" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <!-- 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）。
@@ -152,13 +156,15 @@
             </DockPanel>
         </Border>
 
-        <!-- 常驻顶部栏：标题/返回 + 分段市场切换器 -->
-        <Border Grid.Column="1" 
+        <!-- 常驻顶部栏：仅在首页（行情条）与二级页面（返回 + 标题）显示；
+             其余根页面顶栏无实质内容，整条隐藏（市场切换器已移入左侧导航栏） -->
+        <Border Grid.Column="1"
                 Grid.Row="0"
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource NavBarBottomBorder}">
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="{StaticResource PagePadding}">
+                BorderThickness="{StaticResource NavBarBottomBorder}"
+                IsVisible="{Binding ShowTopBar}">
+            <Grid ColumnDefinitions="Auto,Auto,*" Margin="{StaticResource PagePadding}">
                 <!-- 返回按钮 -->
                 <StackPanel Grid.Column="0" 
                             Orientation="Horizontal" 
@@ -194,10 +200,10 @@
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                 <!-- 行情条（贯穿标题与市场切换器之间的弹性区域，均分分块展示，对齐原型 tb-ticker）；
-                     无真实指数数据时随 HasIndexTickers 自动隐藏 -->
+                     仅首页根页面常驻（其余根页面与二级详情页隐藏），无数据时随 ShowIndexTickers 自动隐藏 -->
                 <ItemsControl Grid.Column="2"
                               ItemsSource="{Binding IndexTickers}"
-                              IsVisible="{Binding HasIndexTickers}"
+                              IsVisible="{Binding ShowIndexTickers}"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Center"
                               Margin="{StaticResource SmallHorizontalMargin}">
@@ -259,56 +265,6 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-
-                <!-- A股 / 虚拟币 分段市场切换器（二级页面隐藏：详情页等市场特定上下文下，
-                     切市场会丢失页面上下文，故不提供入口；行情条为被动背景信息，保持常驻） -->
-                <Border Grid.Column="3"
-                        Padding="{StaticResource TinyPadding}"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource SurfaceVariantBrush}"
-                        CornerRadius="{StaticResource DefaultCornerRadius}"
-                        IsVisible="{Binding !CanGoBack}"
-                        ToolTip.Tip="快捷键: Ctrl+M">
-                    <Border.Styles>
-                        <Style Selector="Button.market-switch-btn">
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-                        </Style>
-                        <Style Selector="Button.market-switch-btn[IsPressed=true]">
-                            <Setter Property="Background" Value="Transparent"/>
-                        </Style>
-                        <Style Selector="Button.market-switch-btn.active">
-                            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
-                            <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-                        </Style>
-                    </Border.Styles>
-                    <StackPanel Orientation="Horizontal" Spacing="2">
-                        <Button Classes="market-switch-btn"
-                                Classes.active="{Binding IsAShareMarket}"
-                                Command="{Binding SwitchMarketCommand}"
-                                CommandParameter="{x:Static infra:MarketType.AShare}"
-                                Padding="{StaticResource SegmentButtonPadding}"
-                                CornerRadius="{StaticResource DefaultCornerRadius}"
-                                BorderThickness="{StaticResource NoBorderThickness}"
-                                AutomationProperties.Name="切换到A股市场">
-                            <TextBlock Text="A股"
-                                       FontSize="{StaticResource TinyFontSize}"
-                                       FontWeight="SemiBold"/>
-                        </Button>
-                        <Button Classes="market-switch-btn"
-                                Classes.active="{Binding IsCryptoMarket}"
-                                Command="{Binding SwitchMarketCommand}"
-                                CommandParameter="{x:Static infra:MarketType.Crypto}"
-                                Padding="{StaticResource SegmentButtonPadding}"
-                                CornerRadius="{StaticResource DefaultCornerRadius}"
-                                BorderThickness="{StaticResource NoBorderThickness}"
-                                AutomationProperties.Name="切换到虚拟币市场">
-                            <TextBlock Text="虚拟币"
-                                       FontSize="{StaticResource TinyFontSize}"
-                                       FontWeight="SemiBold"/>
-                        </Button>
-                    </StackPanel>
-                </Border>
             </Grid>
         </Border>
 

@@ -56,7 +56,7 @@ public sealed class KeyPriceLevels
     [MinLength(1)]
     [MaxLength(2)]
     [Description("1-2个核心支撑价格点位，单位：元")]
-    public List<decimal> SupportLevels { get; set; } = new();
+    public List<decimal> SupportLevels { get; set; } = [];
 
     [Range(1, 10)]
     [Description("支撑强度评分，基于历史触及次数和成交密集度。评分标准：" + ScoringStandards.Strength)]
@@ -65,7 +65,7 @@ public sealed class KeyPriceLevels
     [MinLength(1)]
     [MaxLength(2)]
     [Description("核心阻力价格点位，单位：元")]
-    public List<decimal> ResistanceLevels { get; set; } = new();
+    public List<decimal> ResistanceLevels { get; set; } = [];
 
     [Range(1, 10)]
     [Description("阻力强度评分，基于历史触及次数和成交密集度。评分标准：" + ScoringStandards.Strength)]
@@ -139,9 +139,13 @@ public sealed class TradingStrategyRecommendation
     [Description("止损价格点位。A 股单位：元；虚拟币单位：USDT，无法预测时设为null")]
     public decimal? StopLossPrice { get; set; }
 
-    [Description("持仓周期")]
-    public Duration HoldingPeriod { get; set; }
+    [Description("持仓周期；无法判断时设为null")]
+    public Duration? HoldingPeriod { get; set; }
 
     [Description("风险等级")]
     public Level RiskLevel { get; set; }
+
+    [Range(0, 100)]
+    [Description("对上述策略结论的置信度百分比，0-100；依据不足或结论不确定时设为null。评分标准：" + ScoringStandards.Confidence)]
+    public float? ConfidencePercentage { get; set; }
 }

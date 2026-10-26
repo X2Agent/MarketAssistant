@@ -5,12 +5,20 @@ set -e
 # 遵循 Debian 软件包规范
 
 APP_NAME="marketassistant"
-# 优先使用 CI 注入的版本号，否则回退到默认值
-VERSION="${APP_VERSION:-1.0.0}"
 ARCH="amd64"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APP_CSProj="$PROJECT_ROOT/src/MarketAssistant.App/MarketAssistant.App.csproj"
+# 优先使用 CI 注入的版本号，其次读取最新 Git Tag，最后回退到 .csproj 中的 FallbackVersion
+if [ -z "${APP_VERSION:-}" ]; then
+    GIT_TAG=$(git -C "$PROJECT_ROOT" describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || true)
+    if [ -n "$GIT_TAG" ]; then
+        APP_VERSION="${GIT_TAG#v}"
+    else
+        APP_VERSION=$(sed -n 's/.*<FallbackVersion>\([^<]*\)<\/FallbackVersion>.*/\1/p' "$APP_CSProj" | head -n 1)
+    fi
+fi
+VERSION="${APP_VERSION:-1.0.0}"
 APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/Linux"
 PUBLISH_DIR="$BUILD_DIR/publish"
@@ -82,10 +90,10 @@ cd "$SCRIPT_DIR"
 echo -e "${YELLOW}📝 Installing desktop entry...${NC}"
 cp "$SCRIPT_DIR/marketassistant.desktop" "$DEB_DIR/$PACKAGE_NAME/usr/share/applications/"
 
-# 6. 复制图标
-if [ -f "$APP_ASSETS_DIR/logo.png" ]; then
+# 6. 复制图标（使用预生成的 256x256 图，避免把 3000x3000 母版塞进 hicolor 主题目录）
+if [ -f "$APP_ASSETS_DIR/logo_256.png" ]; then
     echo -e "${YELLOW}🎨 Installing icon...${NC}"
-    cp "$APP_ASSETS_DIR/logo.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
+    cp "$APP_ASSETS_DIR/logo_256.png" "$DEB_DIR/$PACKAGE_NAME/usr/share/icons/hicolor/256x256/apps/marketassistant.png"
 fi
 
 # 7. 创建 control 文件

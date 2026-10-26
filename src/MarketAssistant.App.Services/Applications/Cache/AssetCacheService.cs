@@ -11,27 +11,20 @@ namespace MarketAssistant.Applications.Cache;
 /// 通用资产缓存服务，通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型，
 /// 内部计算缓存前缀。合并了原 AShareAssetCacheService / CryptoAssetCacheService 两个重复实现。
 /// </summary>
-public sealed class AssetCacheService : IAssetCacheService
+public sealed class AssetCacheService(
+    [ServiceKey] MarketType marketType,
+    IMemoryCache cache,
+    ILogger<AssetCacheService> logger) : IAssetCacheService
 {
-    private readonly IMemoryCache _cache;
-    private readonly ILogger<AssetCacheService> _logger;
-    private readonly string _cacheKeyPrefix;
+    private readonly IMemoryCache _cache = cache;
+    private readonly ILogger<AssetCacheService> _logger = logger;
+    private readonly string _cacheKeyPrefix = CacheKeys.GetAssetInfoPrefix(marketType);
     private const int CacheExpirationMinutes = 5;
 
     /// <summary>
     /// 跟踪当前实例已缓存的键，用于按前缀清除，避免依赖 MemoryCache 内部反射。
     /// </summary>
     private readonly ConcurrentDictionary<string, byte> _trackedKeys = new();
-
-    public AssetCacheService(
-        [ServiceKey] MarketType marketType,
-        IMemoryCache cache,
-        ILogger<AssetCacheService> logger)
-    {
-        _cache = cache;
-        _logger = logger;
-        _cacheKeyPrefix = CacheKeys.GetAssetInfoPrefix(marketType);
-    }
 
     public Task<AssetInfo?> GetCachedAssetInfoAsync(string code)
     {

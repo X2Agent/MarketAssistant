@@ -32,6 +32,14 @@ public partial class ProgressDisplayView : UserControl
         AvaloniaProperty.Register<ProgressDisplayView, System.Collections.Generic.IEnumerable<AnalystRunItemViewModel>?>(
             nameof(AnalystRunItems));
 
+    /// <summary>运行级 Token 用量摘要文本，为空时隐藏摘要行</summary>
+    public static readonly StyledProperty<string> UsageSummaryTextProperty =
+        AvaloniaProperty.Register<ProgressDisplayView, string>(nameof(UsageSummaryText), string.Empty);
+
+    /// <summary>运行级 Token 用量明细文本（输入/输出）</summary>
+    public static readonly StyledProperty<string> UsageDetailTextProperty =
+        AvaloniaProperty.Register<ProgressDisplayView, string>(nameof(UsageDetailText), string.Empty);
+
     public string AnalysisStage
     {
         get => GetValue(AnalysisStageProperty);
@@ -69,6 +77,18 @@ public partial class ProgressDisplayView : UserControl
     {
         get => GetValue(AnalystRunItemsProperty);
         set => SetValue(AnalystRunItemsProperty, value);
+    }
+
+    public string UsageSummaryText
+    {
+        get => GetValue(UsageSummaryTextProperty);
+        set => SetValue(UsageSummaryTextProperty, value);
+    }
+
+    public string UsageDetailText
+    {
+        get => GetValue(UsageDetailTextProperty);
+        set => SetValue(UsageDetailTextProperty, value);
     }
 
     private readonly Border[] _phaseSteps;

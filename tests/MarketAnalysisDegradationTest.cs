@@ -56,19 +56,34 @@ public sealed class MarketAnalysisDegradationTest
 
                 var texts = report.AnalystMessages.Select(message => message.Text ?? string.Empty).ToList();
                 // P1-07 展示层修复：报告/侧边栏展示回填后的产物全文，内部摘要与系统指引（SystemNotice）不进入报告
-                Assert.IsTrue(texts.Any(text => text.Contains("正常的新闻事件分析结论", StringComparison.Ordinal)),
+                Assert.Contains(text => text.Contains("正常的新闻事件分析结论", StringComparison.Ordinal), texts,
                     $"存活分析师的产物全文应经回填进入报告\n--- 诊断日志 ---\n{string.Join("\n", diagnosticLogs.TakeLast(80))}");
                 Assert.IsTrue(texts.All(text => !text.Contains("结论摘要", StringComparison.Ordinal) &&
                         !text.Contains("get_analyst_artifact", StringComparison.Ordinal)),
                     "系统内部说明与结论摘要不应进入报告展示层");
-                Assert.IsTrue(texts.Any(text => AnalystFailureMessages.IsFailureMarker(text) &&
+                Assert.Contains(text => AnalystFailureMessages.IsFailureMarker(text) &&
                         text.Contains("FundamentalAnalyst", StringComparison.Ordinal) &&
-                        text.Contains(ThrowingChatClient.FailureReason, StringComparison.Ordinal)),
+                        text.Contains(ThrowingChatClient.FailureReason, StringComparison.Ordinal), texts,
                     "失败分析师的失败标记应保留在报告消息中，供侧边栏渲染失败占位卡片");
 
-                Assert.IsTrue(coordinatorRequests.Count == 1, "协调分析师应被恰好调用一次");
-                Assert.IsTrue(progressEvents.Any(args => args.FailedAnalysts.Count > 0),
+                Assert.HasCount(1, coordinatorRequests, "协调分析师应被恰好调用一次");
+                Assert.Contains(args => args.FailedAnalysts.Count > 0, progressEvents,
                     "UI 应收到分析师失败进度事件");
+
+                // 终态一致性：以终态进度事件（IsInProgress = false）的快照为准。失败分析师必须保持
+                // Failed 且同时出现在失败名单里，不能"显示已完成"与"出现在失败名单"同时成立。
+                // 断言终态事件而非"最后一条含快照的事件"：中间事件由降级回调线程并发发布，
+                // 到达顺序不保证（CI 慢机上曾出现滞后事件排在终态事件之后）。
+                var terminalEvent = progressEvents.LastOrDefault(args => !args.IsInProgress);
+                Assert.IsNotNull(terminalEvent, "应发布携带快照的终态进度事件");
+                var fundamentalSnapshot = terminalEvent.Analysts.FirstOrDefault(
+                    snapshot => snapshot.DisplayName.Contains("基本面", StringComparison.Ordinal));
+                Assert.IsNotNull(fundamentalSnapshot,
+                    $"终态事件应包含基本面分析师快照，实际: {string.Join(", ", terminalEvent.Analysts.Select(s => s.DisplayName))}");
+                Assert.AreEqual(AnalystRunStatus.Failed, fundamentalSnapshot.Status,
+                    $"失败分析师的终态应为 Failed，实际为 {fundamentalSnapshot.Status}");
+                Assert.Contains(fundamentalSnapshot.DisplayName, terminalEvent.FailedAnalysts,
+                    "终态事件的失败名单必须与该分析师快照状态一致");
                 return;
             }
             catch (FriendlyException ex) when (
@@ -185,7 +200,14 @@ public sealed class MarketAnalysisDegradationTest
             new InMemoryArtifactStore(),
             NullLogger<MarketAnalysisWorkflow>.Instance);
 
-        workflow.ProgressChanged += (_, args) => capturedProgressEvents.Add(args);
+        // 进度事件由降级回调（Executor 线程）与事件循环并发发布，收集端必须自己保证线程安全
+        workflow.ProgressChanged += (_, args) =>
+        {
+            lock (capturedProgressEvents)
+            {
+                capturedProgressEvents.Add(args);
+            }
+        };
         return workflow;
     }
 
@@ -230,7 +252,7 @@ public sealed class MarketAnalysisDegradationTest
             ConsensusAnalysis = "各分析师一致认为该公司基本面保持稳健，主营业务增长逻辑清晰，现金流质量良好，当前估值处于历史偏低区间，适合中长线投资者逢低分批布局。",
             DisagreementAnalysis = "基本面分析师对成长空间更为乐观，而技术分析师提示短期股价存在回调压力，双方对入场时点存在分歧；综合判断为先震荡筑底、后进入趋势行情。",
             Summary = "综合判断建议逢低分批建仓，中期持有",
-            KeyIndicators = Enumerable.Range(1, 6).Select(index => new KeyIndicator
+            KeyIndicators = [.. Enumerable.Range(1, 6).Select(index => new KeyIndicator
             {
                 AnalystSource = "技术分析师",
                 Category = "技术指标",
@@ -238,7 +260,7 @@ public sealed class MarketAnalysisDegradationTest
                 Value = "买入",
                 Signal = "买入",
                 Suggestion = "短期关注量能配合情况再做加减仓"
-            }).ToList(),
+            })],
             QualityMetrics = new AnalysisQualityMetrics
             {
                 DataCompletenessPercent = 80,
@@ -360,7 +382,7 @@ public sealed class MarketAnalysisDegradationTest
             ChatOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            requests.Add(messages.ToList());
+            requests.Add([.. messages]);
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, _replyJson)));
         }
 
@@ -369,7 +391,7 @@ public sealed class MarketAnalysisDegradationTest
             ChatOptions? options = null,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            requests.Add(messages.ToList());
+            requests.Add([.. messages]);
             await Task.Yield();
             yield return new ChatResponseUpdate(ChatRole.Assistant, _replyJson);
         }

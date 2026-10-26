@@ -24,7 +24,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     private IAssetInfoService AssetInfoService =>
         _marketContext.GetService<IAssetInfoService>();
 
-    public ObservableCollection<AssetItem> RecentAssets { get; } = new();
+    public ObservableCollection<AssetItem> RecentAssets { get; } = [];
 
     public event EventHandler<AssetItem>? RecentAssetSelected;
 
@@ -34,6 +34,9 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         : base(logger)
     {
         _marketContext = marketContext;
+
+        EmptyMessage = "暂无最近查看记录";
+        SetRetryCommand(() => LoadRecentAssetsAsync());
 
         SubscribeToMarketChanges(_marketContext);
 
@@ -51,7 +54,7 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task LoadRecentAssetsAsync()
     {
-        await SafeExecuteAsync(async () =>
+        await LoadAsync(async _ =>
         {
             var recentAssets = await HistoryService.GetHistoryAsync();
 
@@ -63,6 +66,8 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
             {
                 RecentAssets.Add(asset);
             }
+
+            return RecentAssets.Count > 0;
         }, "加载最近查看资产");
     }
 

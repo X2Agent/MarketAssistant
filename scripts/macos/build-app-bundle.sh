@@ -6,12 +6,20 @@ set -e
 # 构建 Universal Binary（同时支持 Apple Silicon arm64 和 Intel x64）
 
 APP_NAME="MarketAssistant"
-# 优先使用 CI 注入的版本号，否则回退到默认值
-VERSION="${APP_VERSION:-1.0.0}"
-BUNDLE_ID="xyz.haoai.market"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APP_CSProj="$PROJECT_ROOT/src/MarketAssistant.App/MarketAssistant.App.csproj"
+# 优先使用 CI 注入的版本号，其次读取最新 Git Tag，最后回退到 .csproj 中的 FallbackVersion
+if [ -z "${APP_VERSION:-}" ]; then
+    GIT_TAG=$(git -C "$PROJECT_ROOT" describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || true)
+    if [ -n "$GIT_TAG" ]; then
+        APP_VERSION="${GIT_TAG#v}"
+    else
+        APP_VERSION=$(sed -n 's/.*<FallbackVersion>\([^<]*\)<\/FallbackVersion>.*/\1/p' "$APP_CSProj" | head -n 1)
+    fi
+fi
+VERSION="${APP_VERSION:-1.0.0}"
+BUNDLE_ID="xyz.haoai.market"
 APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/macOS"
 PUBLISH_DIR_ARM64="$BUILD_DIR/publish-arm64"
@@ -132,21 +140,21 @@ sed -e "s|__APP_VERSION__|$VERSION|g" \
 if [ -f "$APP_ASSETS_DIR/MarketAssistant.icns" ]; then
     echo -e "${YELLOW}🎨 Copying icon...${NC}"
     cp "$APP_ASSETS_DIR/MarketAssistant.icns" "$APP_BUNDLE/Contents/Resources/"
-elif [ -f "$APP_ASSETS_DIR/logo.png" ]; then
+elif [ -f "$APP_ASSETS_DIR/logo_1024.png" ]; then
     echo -e "${YELLOW}🎨 Converting PNG to ICNS...${NC}"
-    # 如果只有 PNG，尝试转换（需要 imagemagick 或 sips）
+    # 使用预先裁边、抠好透明底并降采样好的 1024px 图（由 scripts/icons/generate_icons.py 生成）
     if command -v sips &> /dev/null; then
         mkdir -p /tmp/iconset.iconset
-        sips -z 16 16 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16.png
-        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
-        sips -z 32 32 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32.png
-        sips -z 64 64 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
-        sips -z 128 128 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128.png
-        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
-        sips -z 256 256 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256.png
-        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
-        sips -z 512 512 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512.png
-        sips -z 1024 1024 "$APP_ASSETS_DIR/logo.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
+        sips -z 16 16 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_16x16.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_16x16@2x.png
+        sips -z 32 32 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_32x32.png
+        sips -z 64 64 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_32x32@2x.png
+        sips -z 128 128 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_128x128.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_128x128@2x.png
+        sips -z 256 256 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_256x256.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_256x256@2x.png
+        sips -z 512 512 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_512x512.png
+        sips -z 1024 1024 "$APP_ASSETS_DIR/logo_1024.png" --out /tmp/iconset.iconset/icon_512x512@2x.png
         iconutil -c icns /tmp/iconset.iconset -o "$APP_BUNDLE/Contents/Resources/MarketAssistant.icns"
         rm -rf /tmp/iconset.iconset
     fi

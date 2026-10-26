@@ -7,15 +7,11 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 持仓 FIFO 追踪仓储（internal）：开仓、平仓、未平仓持仓查询与加权平均开仓价计算。
 /// </summary>
-internal sealed class PositionRepository : TradingRepositoryBase
+internal sealed class PositionRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public PositionRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
 
     /// <summary>
     /// 开仓：插入一条新的持仓记录

@@ -9,11 +9,14 @@ namespace MarketAssistant.Applications.AssetScreener;
 /// 雪球网股票筛选服务（基于 HTTP API）
 /// API 端点: GET https://xueqiu.com/service/screener/screen
 /// </summary>
-public sealed class StockScreenerService : IAssetScreenerService
+public sealed class StockScreenerService(
+    IHttpClientFactory httpClientFactory,
+    CookieContainer xueqiuCookieContainer,
+    ILogger<StockScreenerService> logger) : IAssetScreenerService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly CookieContainer _cookieContainer;
-    private readonly ILogger<StockScreenerService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly CookieContainer _cookieContainer = xueqiuCookieContainer ?? throw new ArgumentNullException(nameof(xueqiuCookieContainer));
+    private readonly ILogger<StockScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     private const string ScreenerEndpoint = "/service/screener/screen";
 
@@ -66,16 +69,6 @@ public sealed class StockScreenerService : IAssetScreenerService
         { IndustryType.SmallAppliances, "S3303" }
     };
 
-    public StockScreenerService(
-        IHttpClientFactory httpClientFactory,
-        CookieContainer xueqiuCookieContainer,
-        ILogger<StockScreenerService> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _cookieContainer = xueqiuCookieContainer ?? throw new ArgumentNullException(nameof(xueqiuCookieContainer));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
     public async Task<List<ScreenerAssetInfo>> ScreenAsync(object criteria, CancellationToken cancellationToken = default)
     {
         if (criteria is not StockCriteria stockCriteria)
@@ -94,7 +87,7 @@ public sealed class StockScreenerService : IAssetScreenerService
             var stocks = await FetchFromXueqiuAsync(queryParams, cancellationToken);
 
             _logger.LogInformation("雪球选股完成，结果数量: {Count}", stocks.Count);
-            return stocks.Cast<ScreenerAssetInfo>().ToList();
+            return [.. stocks.Cast<ScreenerAssetInfo>()];
         }
         catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
         {

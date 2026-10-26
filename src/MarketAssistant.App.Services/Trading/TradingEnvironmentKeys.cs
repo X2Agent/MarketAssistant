@@ -1,3 +1,5 @@
+using MarketAssistant.Trading.Models;
+
 namespace MarketAssistant.Services.Trading;
 
 /// <summary>
@@ -11,4 +13,13 @@ internal static class TradingEnvironmentKeys
     internal const string LiveFutures = "crypto-live-futures";
     internal const string FuturesTestnet = "crypto-binance-futures-testnet";
     internal const string SpotDemo = "crypto-binance-spot-demo";
+
+    /// <summary>交易模式 → 环境 key 的唯一映射（仓储与影子账本共用，避免两处漂移）。</summary>
+    internal static string FromMode(TradingMode mode) => mode switch
+    {
+        TradingMode.LiveFutures => LiveFutures,
+        TradingMode.FuturesTestnet => FuturesTestnet,
+        TradingMode.SpotDemo => SpotDemo,
+        _ => LiveSpot
+    };
 }

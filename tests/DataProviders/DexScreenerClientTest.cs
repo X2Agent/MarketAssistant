@@ -13,13 +13,11 @@ namespace TestMarketAssistant.DataProviders;
 [TestClass]
 public class DexScreenerClientTest
 {
-    private sealed class StubHandler : HttpMessageHandler
+    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder;
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responder = responder;
 
-        public List<string> RequestUrls { get; } = new();
-
-        public StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) => _responder = responder;
+        public List<string> RequestUrls { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -53,12 +51,12 @@ public class DexScreenerClientTest
         await client.GetTokenPairsAsync("binance-smart-chain", "0xpepe");
         await client.GetTokenPairsAsync("polygon-pos", "0xpepe");
 
-        CollectionAssert.AreEquivalent(new[]
-        {
+        Assert.AreSequenceEqual(
+        [
             "/token-pairs/v1/ethereum/0xpepe",
             "/token-pairs/v1/bsc/0xpepe",
             "/token-pairs/v1/polygon/0xpepe"
-        }, handler.RequestUrls);
+        ], handler.RequestUrls, Microsoft.VisualStudio.TestTools.UnitTesting.SequenceOrder.InAnyOrder);
     }
 
     [TestMethod]
@@ -109,7 +107,7 @@ public class DexScreenerClientTest
 
         var pairs = await client.SearchPairsAsync("nonexistent");
 
-        Assert.AreEqual(0, pairs.Count);
+        Assert.IsEmpty(pairs);
     }
 
     [TestMethod]

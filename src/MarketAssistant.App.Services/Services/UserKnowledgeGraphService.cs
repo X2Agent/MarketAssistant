@@ -9,12 +9,8 @@ namespace MarketAssistant.Services;
 /// 存储实体-关系三元组（subject, predicate, object），每个三元组有有效时间窗口。
 /// 参考 MemPalace 的时序知识图谱设计，适配金融投资领域。
 /// </summary>
-public class UserKnowledgeGraphService : SqliteServiceBase
+public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger) : SqliteServiceBase(logger)
 {
-    public UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger)
-        : base(logger)
-    {
-    }
 
     /// <summary>
     /// 添加一条三元组（实体-关系-实体），带有效起始时间
@@ -34,7 +30,7 @@ public class UserKnowledgeGraphService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@subject", subject);
         cmd.Parameters.AddWithValue("@predicate", predicate);
         cmd.Parameters.AddWithValue("@object", obj);
-        cmd.Parameters.AddWithValue("@validFrom", validFrom ?? DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        cmd.Parameters.AddWithValue("@validFrom", validFrom ?? DateKeys.Today());
         cmd.Parameters.AddWithValue("@metadata", (object?)metadata ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", DateTime.UtcNow.ToString("O"));
         await cmd.ExecuteNonQueryAsync(ct);
@@ -49,7 +45,7 @@ public class UserKnowledgeGraphService : SqliteServiceBase
         string entity, string? asOf = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync(InitializeDatabaseAsync);
-        var dateFilter = asOf ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var dateFilter = asOf ?? DateKeys.Today();
 
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
@@ -85,7 +81,7 @@ public class UserKnowledgeGraphService : SqliteServiceBase
         cmd.Parameters.AddWithValue("@subject", subject);
         cmd.Parameters.AddWithValue("@predicate", predicate);
         cmd.Parameters.AddWithValue("@object", obj);
-        cmd.Parameters.AddWithValue("@ended", ended ?? DateTime.UtcNow.ToString("yyyy-MM-dd"));
+        cmd.Parameters.AddWithValue("@ended", ended ?? DateKeys.Today());
         await cmd.ExecuteNonQueryAsync(ct);
 
         Logger.LogDebug("知识图谱三元组过期: {S} --[{P}]--> {O}", subject, predicate, obj);

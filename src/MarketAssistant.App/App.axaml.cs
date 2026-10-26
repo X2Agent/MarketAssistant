@@ -48,6 +48,15 @@ public partial class App : Application
         // 否则自动交易的超阈值订单会因无订阅者被静默拒绝
         ServiceProvider.GetRequiredService<MarketAssistant.Services.Trading.TradeConfirmationService>();
 
+        // 激活指标类告警评估器：同样依赖显式解析启动周期评估循环
+        ServiceProvider.GetRequiredService<MarketAssistant.Applications.PriceAlert.IndicatorAlertEvaluator>();
+
+        // 激活 AI 评级变化告警：订阅报告归档事件（ReportSaved）
+        ServiceProvider.GetRequiredService<MarketAssistant.Applications.Analysis.AnalysisRatingAlertService>();
+
+        // 激活策略限价单超时管理：周期扫描超时未成交的限价单并撤单
+        ServiceProvider.GetRequiredService<MarketAssistant.Services.Trading.PendingOrderTimeoutService>();
+
         var settingService = ServiceProvider.GetRequiredService<IUserSettingService>();
         RequestedThemeVariant = settingService.CurrentSetting.ThemeMode switch
         {

@@ -527,7 +527,7 @@
                     <TextBlock Classes="section-title" Text="风控设置"/>
                 </Expander.Header>
                 <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                           ColumnSpacing="{StaticResource DefaultSpacing}"
                           RowSpacing="{StaticResource SmallSpacing}">
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
@@ -561,6 +561,83 @@
                             <TextBlock Text="确认阈值 (USDT)" FontSize="{StaticResource LabelFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                             <TextBox Text="{Binding RiskConfig.ConfirmationThreshold}"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="合约杠杆倍数 (1-125)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <NumericUpDown Value="{Binding RiskConfig.FuturesLeverage, Mode=TwoWay}"
+                                           Minimum="1"
+                                           Maximum="125"
+                                           Increment="1"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="合约开仓前设置的杠杆倍数；越高强平风险越大"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="合约名义敞口上限 (%)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding RiskConfig.MaxFuturesNotionalPercent}"
+                                     ToolTip.Tip="Σ|持仓名义|+本单名义 占权益比例上限，0 表示不限制"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="4" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="强平距离预警 (%)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding RiskConfig.LiquidationWarnPercent}"
+                                     ToolTip.Tip="标记价距强平价小于该百分比时告警"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="4" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="强平距离紧急 (%)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding RiskConfig.LiquidationCriticalPercent}"
+                                     ToolTip.Tip="小于该百分比时发紧急告警并阻止该标的自动加仓"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                          ColumnSpacing="{StaticResource DefaultSpacing}"
+                          RowSpacing="{StaticResource SmallSpacing}"
+                          Margin="{StaticResource SmallTopMargin}">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="连续亏损熔断 (次)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <NumericUpDown Value="{Binding RiskConfig.MaxConsecutiveLosses, Mode=TwoWay}"
+                                           Minimum="0"
+                                           Maximum="50"
+                                           Increment="1"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="当日实现亏损笔数连续达到该值时停止新开仓，0 表示不限制"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="滑点告警阈值 (%)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBox Text="{Binding RiskConfig.MaxSlippagePercent}"
+                                     ToolTip.Tip="市价单成交价相对信号价偏离超过该百分比时告警"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="限价单超时撤单 (秒)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <NumericUpDown Value="{Binding RiskConfig.LimitOrderTimeoutSeconds, Mode=TwoWay}"
+                                           Minimum="0"
+                                           Maximum="3600"
+                                           Increment="30"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="策略限价单挂起超过该时长未成交则撤单并告警，0 表示不自动撤单"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="API 失败熔断 (次)" FontSize="{StaticResource LabelFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <NumericUpDown Value="{Binding RiskConfig.ApiFailureThreshold, Mode=TwoWay}"
+                                           Minimum="0"
+                                           Maximum="50"
+                                           Increment="1"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="5 分钟窗口内交易所接口失败达到该次数时拒单并告警，0 表示不限制"/>
                         </StackPanel>
                     </Grid>
 

@@ -7,7 +7,7 @@
 			 xmlns:components="using:MarketAssistant.Views.Components"
              xmlns:converts="using:MarketAssistant.Converters"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
-             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
              x:Class="MarketAssistant.Views.Pages.AssetPageView"
              x:DataType="vm:AssetPageViewModel">
 
@@ -19,259 +19,518 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <!-- 右栏区块：与 K 线卡片一致的卡片样式（区块间距由外层 StackPanel Spacing 统一管理） -->
+        <Style Selector="Border.rightSection">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+            <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        </Style>
+        <!-- 右栏行情数据指标值 -->
+        <Style Selector="TextBlock.metricValue">
+            <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+            <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <!-- 右栏区块标题 -->
+        <Style Selector="TextBlock.sectionHeader">
+            <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- 盘口背景深度条 -->
+        <Style Selector="ProgressBar.depthBar">
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- 右栏小号等宽数值 -->
+        <Style Selector="TextBlock.cellValue">
+            <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+            <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+        </Style>
+        <Style Selector="TextBlock.cellLabel">
+            <Setter Property="FontSize" Value="{StaticResource TinyFontSize}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid Margin="{StaticResource PagePadding}" RowDefinitions="Auto,*">
-        
-        <!-- 资产基本信息卡片 -->
+
+        <!-- 资产基本信息卡片：单行布局——名称+代码、价格+涨跌、操作按钮；
+             逐 bar 行情指标见 K 线图例，快照级指标见右栏「行情数据」 -->
         <controls:CardView Grid.Row="0">
-            <Grid ColumnDefinitions="*,Auto">
-                
-                <!-- 左侧：资产信息（Grid布局优化） -->
-                <Grid Grid.Column="0" ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
-                    <!-- 第一行：名称与代码 -->
-                    <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" 
-                                Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" 
-                                Margin="{StaticResource SmallBottomMargin}">
-                        <TextBlock Text="{Binding AssetName}" 
-                                   FontSize="{StaticResource LargeFontSize}"
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+
+                <!-- 名称与代码 -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource SmallSpacing}"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AssetName}"
+                               FontSize="{StaticResource LargeFontSize}"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+
+                    <Border Background="{StaticResource InfoBrush}"
+                            CornerRadius="{StaticResource TinyCornerRadius}"
+                            Padding="{StaticResource TinyPadding}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding AssetCode}"
+                                   FontFamily="{StaticResource DataFontFamily}"
+                                   FontSize="{StaticResource TinyFontSize}"
                                    FontWeight="Bold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        
-                        <Border Background="{StaticResource InfoBrush}" 
-                                CornerRadius="{StaticResource TinyCornerRadius}" 
-                                Padding="{StaticResource TinyPadding}"
-                                VerticalAlignment="Center">
-                            <TextBlock Text="{Binding AssetCode}" 
-                                       FontFamily="{StaticResource DataFontFamily}"
-                                       FontSize="{StaticResource TinyFontSize}" 
-                                       FontWeight="Bold" 
-                                       Foreground="{StaticResource TextOnEmphasisBrush}" />
-                        </Border>
-                    </StackPanel>
-                    
-                    <!-- 第二行/第三行左侧：价格 -->
-                    <TextBlock Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
-                               Text="{Binding CurrentPriceText}" 
+                                   Foreground="{StaticResource TextOnEmphasisBrush}" />
+                    </Border>
+                </StackPanel>
+
+                <!-- 价格与涨跌（紧随名称代码，一行展示） -->
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource SmallSpacing}"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="{Binding CurrentPriceText}"
                                FontFamily="{StaticResource DataFontFamily}"
                                FontSize="{StaticResource TitleFontSize}"
                                FontWeight="Bold"
                                Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"
                                LineHeight="{StaticResource TitleFontSize}"
-                               VerticalAlignment="Center"
-                               Margin="{StaticResource RightMargin}"/>
-                         
-                    <!-- 第二行右侧：涨跌幅 -->
-                    <StackPanel Grid.Row="1" Grid.Column="1" 
-                                Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" 
-                                VerticalAlignment="Bottom"
-                                Margin="{StaticResource TinyBottomMargin}">
-                         <TextBlock FontSize="{StaticResource LabelFontSize}" 
-                                    FontWeight="Bold"
-                                    FontFamily="{StaticResource DataFontFamily}"
-                                    Text="{Binding PriceChangeText}"
-                                    Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                         <TextBlock FontSize="{StaticResource LabelFontSize}" 
-                                    FontWeight="Bold"
-                                    Text="{Binding PriceChangePercent, StringFormat={}({0:F2}%)}"
-                                    Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}" />
-                    </StackPanel>
-                    
-                    <!-- 第三行右侧：标签 -->
-                    <TextBlock Grid.Row="2" Grid.Column="1"
-                               Text="较昨收" 
-                               FontSize="{StaticResource TinyFontSize}" 
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Top"/>
-                </Grid>
-                
-                <!-- 右侧：操作按钮组 -->
-                <StackPanel Grid.Column="1" 
-                            Orientation="Horizontal" 
-                            Spacing="{StaticResource SmallSpacing}"
-                            VerticalAlignment="Center">
-                    <!-- 加入/取消自选 -->
-                    <Button Classes="action-button"
-                            Command="{Binding ToggleFavoriteCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <svg:Svg Path="/Assets/Images/tab_favorites.svg" Width="16" Height="16" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- 快捷交易（仅支持交易的市场可见，A 股隐藏） -->
-                    <Button Classes="action-button"
-                            Command="{Binding NavigateToTradingCommand}"
-                            IsVisible="{Binding CanTrade}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <svg:Svg Path="/Assets/Images/icon_money.svg" Width="16" Height="16" VerticalAlignment="Center"/>
-                            <TextBlock Text="快捷交易" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- AI分析按钮 -->
-                    <Button Classes="action-button"
-                            Command="{Binding NavigateToAnalysisCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
-                            <TextBlock Text="AI分析" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    
-                    <!-- 刷新按钮 -->
-                    <Button Classes="action-button"
-                            Command="{Binding RefreshDataCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                            <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
-                            <TextBlock Text="刷新" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
+                               VerticalAlignment="Center"/>
+                    <TextBlock FontSize="{StaticResource LabelFontSize}"
+                               FontWeight="Bold"
+                               FontFamily="{StaticResource DataFontFamily}"
+                               Text="{Binding PriceChangeText}"
+                               Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock FontSize="{StaticResource LabelFontSize}"
+                               FontWeight="Bold"
+                               Text="{Binding PriceChangePercent, StringFormat={}({0:F2}%)}"
+                               Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"
+                               VerticalAlignment="Center"/>
                 </StackPanel>
-            </Grid>
-        </controls:CardView>
 
-        <!-- K线图表区域 - 只在无错误时显示 -->
-        <controls:CardView Grid.Row="1" 
-                          Margin="{StaticResource TopMargin}"
-                          IsVisible="{Binding !HasError}">
-            <Grid RowDefinitions="Auto,*">
-
-                <!-- 图表控制区域 -->
-                <Grid Grid.Row="0" 
-                      Margin="{StaticResource BottomMargin}"
-                      ColumnDefinitions="Auto,*,Auto">
-                    
-                    <!-- 图例 -->
-                    <StackPanel Grid.Column="0" 
-                                Orientation="Horizontal" 
-                                Spacing="{StaticResource DefaultSpacing}"
+                    <!-- 右侧：操作按钮组（紧随价格信息，不在卡片中间拉出空白） -->
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal"
+                                Spacing="{StaticResource SmallSpacing}"
                                 VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{StaticResource ErrorBrush}" 
-                                    Width="{StaticResource IndicatorSize}" 
-                                    Height="{StaticResource IndicatorSize}" 
-                                    CornerRadius="{StaticResource TinyCornerRadius}" />
-                            <TextBlock Text="上涨" 
-                                       FontSize="{StaticResource SmallFontSize}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <Border Background="{StaticResource SuccessBrush}" 
-                                    Width="{StaticResource IndicatorSize}" 
-                                    Height="{StaticResource IndicatorSize}" 
-                                    CornerRadius="{StaticResource TinyCornerRadius}" />
-                            <TextBlock Text="下跌" 
-                                       FontSize="{StaticResource SmallFontSize}" 
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <!-- 时间周期按钮组 -->
-                    <Border Grid.Column="2" 
-                            Background="{DynamicResource SurfaceVariantBrush}"
-                            CornerRadius="{StaticResource SmallCornerRadius}"
-                            Padding="{StaticResource TinyPadding}">
-                        <StackPanel Orientation="Horizontal" Spacing="0">
-                            <Button Content="分时" 
-                                    Classes="period-button"
-                                    Classes.selected="{Binding IsMinuteSelected}"
-                                    Command="{Binding ChangeKLineTypeCommand}" 
-                                    CommandParameter="minute" />
-
-                            <Button Content="日K" 
-                                    Classes="period-button"
-                                    Classes.selected="{Binding IsDailySelected}"
-                                    Command="{Binding ChangeKLineTypeCommand}" 
-                                    CommandParameter="daily" />
-
-                            <Button Content="周K" 
-                                    Classes="period-button"
-                                    Classes.selected="{Binding IsWeeklySelected}"
-                                    Command="{Binding ChangeKLineTypeCommand}" 
-                                    CommandParameter="weekly" />
-
-                            <Button Content="月K" 
-                                    Classes="period-button"
-                                    Classes.selected="{Binding IsMonthlySelected}"
-                                    Command="{Binding ChangeKLineTypeCommand}" 
-                                    CommandParameter="monthly" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- 图表显示区域 -->
-                <Grid Grid.Row="1">
-                    <!-- 骨架屏（加载时显示）-->
-                    <Border IsVisible="{Binding IsBusy}">
-                        <Grid RowDefinitions="Auto,*" Margin="{StaticResource DefaultMargin}">
-                            <!-- 骨架屏：周期按钮占位 -->
-                            <StackPanel Grid.Row="0" 
-                                       Orientation="Horizontal" 
-                                       Spacing="{StaticResource SmallSpacing}"
-                                       HorizontalAlignment="Center"
-                                       Margin="{StaticResource BottomMargin}">
-                                <Border Classes="skeleton" Width="60" Height="32"/>
-                                <Border Classes="skeleton" Width="60" Height="32"/>
-                                <Border Classes="skeleton" Width="60" Height="32"/>
-                                <Border Classes="skeleton" Width="60" Height="32"/>
+                        <!-- 加入/取消自选 -->
+                        <Button Classes="action-button"
+                                Command="{Binding ToggleFavoriteCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                <svg:Svg Path="/Assets/Images/tab_favorites.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center"/>
                             </StackPanel>
-                            
-                            <!-- 骨架屏：图表区域占位 -->
-                            <Grid Grid.Row="1">
-                                <Border Classes="skeleton-chart"/>
-                                
-                                <!-- 加载文字提示（叠加在骨架屏上）-->
-                                <StackPanel HorizontalAlignment="Center" 
-                                           VerticalAlignment="Center"
-                                           Spacing="{StaticResource SmallSpacing}">
-                                    <TextBlock Text="⏳" 
-                                              FontSize="{StaticResource LargeIconSize}" 
-                                              HorizontalAlignment="Center"
-                                              Opacity="0.7"/>
-                                    <TextBlock Text="正在加载K线数据..." 
-                                              FontSize="{StaticResource LabelFontSize}"
-                                              Foreground="{DynamicResource TextSecondaryBrush}"
-                                              HorizontalAlignment="Center"
-                                              Opacity="0.7"/>
+                        </Button>
+
+                        <!-- 快捷交易（仅支持交易的市场可见，A 股隐藏） -->
+                        <Button Classes="action-button"
+                                Command="{Binding NavigateToTradingCommand}"
+                                IsVisible="{Binding CanTrade}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_money.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="快捷交易" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- 价格预警 -->
+                        <Button Classes="action-button"
+                                Command="{Binding NavigateToAlertCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_warning.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="价格预警" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- AI分析按钮 -->
+                        <Button Classes="action-button"
+                                Command="{Binding NavigateToAnalysisCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="AI分析" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+        </controls:CardView>
+
+        <!-- 主图 + 右栏（行情数据 / 盘口，恒显） -->
+        <Grid Grid.Row="1" Margin="{StaticResource TopMargin}" ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+
+            <!-- K线图表区域 -->
+            <controls:CardView Grid.Column="0">
+                <Grid RowDefinitions="Auto,*">
+
+                    <!-- 图表控制区域 -->
+                    <Grid Grid.Row="0"
+                          Margin="{StaticResource BottomMargin}"
+                          ColumnDefinitions="Auto,*,Auto">
+
+                        <!-- 图例 -->
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Spacing="{StaticResource DefaultSpacing}"
+                                    VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                <Border Background="{StaticResource ErrorBrush}"
+                                        Width="{StaticResource IndicatorSize}"
+                                        Height="{StaticResource IndicatorSize}"
+                                        CornerRadius="{StaticResource TinyCornerRadius}" />
+                                <TextBlock Text="上涨"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                                <Border Background="{StaticResource SuccessBrush}"
+                                        Width="{StaticResource IndicatorSize}"
+                                        Height="{StaticResource IndicatorSize}"
+                                        CornerRadius="{StaticResource TinyCornerRadius}" />
+                                <TextBlock Text="下跌"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- 刷新中提示（已有内容时不闪骨架屏） -->
+                            <TextBlock Text="正在刷新..."
+                                       FontSize="{StaticResource TinyFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding IsRefreshing}"/>
+                        </StackPanel>
+
+                        <!-- 时间周期按钮组、指标开关与刷新 -->
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    Spacing="{StaticResource SmallSpacing}"
+                                    VerticalAlignment="Center">
+                            <!-- 指标开关：控制主图叠加（MA/BOLL）、副图（VOL/MACD/KDJ）与左上角图例显隐 -->
+                            <Button Classes="action-button"
+                                    ToolTip.Tip="指标显示开关">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                    <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="指标" VerticalAlignment="Center"/>
                                 </StackPanel>
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <StackPanel Width="160" Spacing="{StaticResource SmallSpacing}">
+                                            <TextBlock Text="主图指标"
+                                                       Classes="sectionHeader"/>
+                                            <CheckBox Content="均线 MA" IsChecked="{Binding IsMaVisible}"/>
+                                            <CheckBox Content="BOLL" IsChecked="{Binding IsBollVisible}"/>
+                                            <TextBlock Text="副图指标"
+                                                       Classes="sectionHeader"/>
+                                            <CheckBox Content="成交量 VOL" IsChecked="{Binding IsVolVisible}"/>
+                                            <CheckBox Content="MACD" IsChecked="{Binding IsMacdVisible}"/>
+                                            <CheckBox Content="KDJ" IsChecked="{Binding IsKdjVisible}"/>
+                                            <TextBlock Text="图例"
+                                                       Classes="sectionHeader"/>
+                                            <CheckBox Content="左上角行情图例" IsChecked="{Binding IsLegendVisible}"/>
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+
+                            <Button Classes="action-button"
+                                    Command="{Binding RefreshDataCommand}"
+                                    ToolTip.Tip="刷新行情数据">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                    <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="刷新" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                    CornerRadius="{StaticResource SmallCornerRadius}"
+                                    Padding="{StaticResource TinyPadding}">
+                                <StackPanel Orientation="Horizontal" Spacing="0">
+                                    <Button Content="分时"
+                                            Classes="period-button"
+                                            Classes.selected="{Binding IsMinuteSelected}"
+                                            Command="{Binding ChangeKLineTypeCommand}"
+                                            CommandParameter="minute" />
+
+                                    <Button Content="日K"
+                                            Classes="period-button"
+                                            Classes.selected="{Binding IsDailySelected}"
+                                            Command="{Binding ChangeKLineTypeCommand}"
+                                            CommandParameter="daily" />
+
+                                    <Button Content="周K"
+                                            Classes="period-button"
+                                            Classes.selected="{Binding IsWeeklySelected}"
+                                            Command="{Binding ChangeKLineTypeCommand}"
+                                            CommandParameter="weekly" />
+
+                                    <Button Content="月K"
+                                            Classes="period-button"
+                                            Classes.selected="{Binding IsMonthlySelected}"
+                                            Command="{Binding ChangeKLineTypeCommand}"
+                                            CommandParameter="monthly" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 图表显示区域 -->
+                    <Grid Grid.Row="1">
+                        <!-- 骨架屏（仅首次加载显示）-->
+                        <Border IsVisible="{Binding IsInitialLoading}">
+                            <Grid RowDefinitions="Auto,*" Margin="{StaticResource DefaultMargin}">
+                                <StackPanel Grid.Row="0"
+                                           Orientation="Horizontal"
+                                           Spacing="{StaticResource SmallSpacing}"
+                                           HorizontalAlignment="Center"
+                                           Margin="{StaticResource BottomMargin}">
+                                    <Border Classes="skeleton" Width="60" Height="32"/>
+                                    <Border Classes="skeleton" Width="60" Height="32"/>
+                                    <Border Classes="skeleton" Width="60" Height="32"/>
+                                    <Border Classes="skeleton" Width="60" Height="32"/>
+                                </StackPanel>
+
+                                <Grid Grid.Row="1">
+                                    <Border Classes="skeleton-chart"/>
+
+                                    <StackPanel HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Spacing="{StaticResource SmallSpacing}">
+                                        <TextBlock Text="⏳"
+                                                  FontSize="{StaticResource LargeIconSize}"
+                                                  HorizontalAlignment="Center"
+                                                  Opacity="0.7"/>
+                                        <TextBlock Text="正在加载K线数据..."
+                                                  FontSize="{StaticResource LabelFontSize}"
+                                                  Foreground="{DynamicResource TextSecondaryBrush}"
+                                                  HorizontalAlignment="Center"
+                                                  Opacity="0.7"/>
+                                    </StackPanel>
+                                </Grid>
                             </Grid>
-                        </Grid>
+                        </Border>
+
+                        <!-- K线图表 -->
+                        <components:KLineChartView x:Name="WebChartView"
+                                                   Data="{Binding KLineData}"
+                                                   IsMaVisible="{Binding IsMaVisible}"
+                                                   IsBollVisible="{Binding IsBollVisible}"
+                                                   IsVolVisible="{Binding IsVolVisible}"
+                                                   IsMacdVisible="{Binding IsMacdVisible}"
+                                                   IsKdjVisible="{Binding IsKdjVisible}"
+                                                   IsLegendVisible="{Binding IsLegendVisible}"
+                                                   IsVisible="{Binding IsReady}" />
+
+                        <!-- 空态 / 失败态（含重试入口） -->
+                        <controls:StateOverlayView State="{Binding OverlayState}"
+                                                   Message="{Binding OverlayMessage}"
+                                                   RetryCommand="{Binding RetryCommand}"
+                                                   RetryText="重新加载"
+                                                   ShowLoading="False"
+                                                   MinHeight="400"/>
+                    </Grid>
+                </Grid>
+            </controls:CardView>
+
+            <!-- 右侧面板：行情数据 / 盘口（恒显，不再折叠） -->
+            <ScrollViewer Grid.Column="1"
+                          Width="360"
+                          Margin="{StaticResource RightMargin}"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="{StaticResource DefaultSpacing}">
+
+                    <!-- 行情数据：快照级指标（换手率 / 量比 / 市盈率 / 市净率）。
+                         开高低收、成交量、成交额、振幅等逐 bar 指标由 K 线图左上角图例展示；
+                         ETF/基金等快照无指标数据源，整卡隐藏（SnapshotSectionVisible） -->
+                    <Border Classes="rightSection" IsVisible="{Binding SnapshotSectionVisible}">
+                        <StackPanel>
+                            <TextBlock Classes="sectionHeader" Text="行情数据"/>
+
+                            <Border Classes="skeleton skeleton-panel"
+                                    Margin="{StaticResource SmallTopMargin}"
+                                    IsVisible="{Binding SnapshotState.ShowSkeleton}"/>
+
+                            <StackPanel Orientation="Horizontal"
+                                        Spacing="{StaticResource SmallSpacing}"
+                                        Margin="{StaticResource SmallTopMargin}"
+                                        IsVisible="{Binding SnapshotState.ShowHint}">
+                                <TextBlock Text="{Binding SnapshotState.HintText}"
+                                           FontSize="{StaticResource SmallFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                                <Button Content="重试"
+                                        Classes="btn-ghost btn-sm"
+                                        IsVisible="{Binding SnapshotState.IsFailed}"
+                                        Command="{Binding RetrySectionCommand}"
+                                        CommandParameter="Snapshot"/>
+                            </StackPanel>
+
+                            <ItemsControl ItemsSource="{Binding MarketMetrics}"
+                                          Margin="{StaticResource SmallTopMargin}"
+                                          IsVisible="{Binding SnapshotState.HasData}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MarketMetricItem">
+                                        <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*" IsVisible="{Binding HasValue}">
+                                            <TextBlock Grid.Column="0" Classes="cellLabel" Text="{Binding Label}"/>
+                                            <TextBlock Grid.Column="1" Classes="metricValue" Text="{Binding Value}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </Border>
 
-                    <!-- K线图表（加载完成后显示）-->
-					<components:KLineChartView x:Name="WebChartView" 
-                                               Data="{Binding KLineData}"
-                                               IsVisible="{Binding !IsBusy}" />
-                </Grid>
-            </Grid>
-        </controls:CardView>
-        
-        <!-- 错误状态显示区域 -->
-        <controls:CardView Grid.Row="1" 
-                          Margin="{StaticResource TopMargin}"
-                          IsVisible="{Binding HasError}">
-            <StackPanel HorizontalAlignment="Center" 
-                        VerticalAlignment="Center" 
-                        Spacing="{StaticResource DefaultSpacing}">
-                <svg:Svg Path="/Assets/Images/icon_danger.svg"
-                         Width="48" Height="48"
-                         HorizontalAlignment="Center"/>
-                <TextBlock Text="数据加载失败" 
-                           FontSize="{StaticResource SubTitleFontSize}"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource ErrorBrush}"
-                           HorizontalAlignment="Center" />
-                <TextBlock Text="{Binding ErrorMessage}" 
-                           FontSize="{StaticResource LabelFontSize}"
-                           Foreground="{StaticResource ErrorBrush}"
-                           HorizontalAlignment="Center" 
-                           TextAlignment="Center"
-                           MaxWidth="{StaticResource MaxDialogWidth}"
-                           TextWrapping="Wrap" />
-            </StackPanel>
-        </controls:CardView>
+                    <!-- 盘口买卖档位（仅提供盘口数据的市场可见；币安十档，A 股数据源固定五档） -->
+                    <Border Classes="rightSection" IsVisible="{Binding SupportsOrderBook}">
+                        <StackPanel>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Classes="sectionHeader" Text="盘口"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding OrderBookSummaryText}"
+                                           FontSize="{StaticResource TinyFontSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Border Classes="skeleton skeleton-panel"
+                                    Margin="{StaticResource SmallTopMargin}"
+                                    IsVisible="{Binding OrderBookState.ShowSkeleton}"/>
+
+                            <StackPanel Orientation="Horizontal"
+                                       Spacing="{StaticResource SmallSpacing}"
+                                       Margin="{StaticResource SmallTopMargin}"
+                                       IsVisible="{Binding OrderBookState.ShowHint}">
+                                <TextBlock Text="{Binding OrderBookState.HintText}"
+                                          FontSize="{StaticResource SmallFontSize}"
+                                          Foreground="{DynamicResource TextSecondaryBrush}"
+                                          TextWrapping="Wrap"
+                                          VerticalAlignment="Center"/>
+                                <Button Content="重试"
+                                       Classes="btn-ghost btn-sm"
+                                       IsVisible="{Binding OrderBookState.IsFailed}"
+                                       Command="{Binding RetrySectionCommand}"
+                                       CommandParameter="OrderBook"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="{StaticResource SmallTopMargin}"
+                                        IsVisible="{Binding OrderBookState.HasData}">
+                                <!-- 表头 -->
+                                <Grid ColumnDefinitions="34,*,56,60" Margin="0,0,0,2">
+                                    <TextBlock Grid.Column="0" Classes="cellLabel" Text="档位"/>
+                                    <TextBlock Grid.Column="1" Classes="cellLabel" Text="价格" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="2" Classes="cellLabel" Text="数量" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="3" Classes="cellLabel" Text="金额" HorizontalAlignment="Right"/>
+                                </Grid>
+
+                                <!-- 卖盘：卖五 → 卖一 -->
+                                <ItemsControl ItemsSource="{Binding Asks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OrderBookLevelItem">
+                                            <Grid ColumnDefinitions="34,*,56,60" Height="20" Margin="0,1">
+                                                <ProgressBar Grid.ColumnSpan="4"
+                                                             Classes="depthBar"
+                                                             Value="{Binding DepthPercent}"
+                                                             Maximum="100"
+                                                             Foreground="{Binding ToneValue, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"/>
+                                                <TextBlock Grid.Column="0" Classes="cellLabel" Text="{Binding LevelLabel}"/>
+                                                <TextBlock Grid.Column="1" Classes="cellValue"
+                                                           Text="{Binding PriceText}"
+                                                           Foreground="{Binding ToneValue, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                                <TextBlock Grid.Column="2" Classes="cellValue"
+                                                           Text="{Binding QuantityText}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock Grid.Column="3" Classes="cellValue"
+                                                           Text="{Binding AmountText}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- 中间价 -->
+                                <TextBlock Text="{Binding CurrentPriceText}"
+                                           Margin="0,4"
+                                           FontFamily="{StaticResource DataFontFamily}"
+                                           FontSize="{StaticResource LabelFontSize}"
+                                           FontWeight="Bold"
+                                           Foreground="{Binding PriceChange, Converter={StaticResource PriceChangeColorConverter}}"/>
+
+                                <!-- 买盘：买一 → 买五 -->
+                                <ItemsControl ItemsSource="{Binding Bids}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OrderBookLevelItem">
+                                            <Grid ColumnDefinitions="34,*,56,60" Height="20" Margin="0,1">
+                                                <ProgressBar Grid.ColumnSpan="4"
+                                                             Classes="depthBar"
+                                                             Value="{Binding DepthPercent}"
+                                                             Maximum="100"
+                                                             Foreground="{Binding ToneValue, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"/>
+                                                <TextBlock Grid.Column="0" Classes="cellLabel" Text="{Binding LevelLabel}"/>
+                                                <TextBlock Grid.Column="1" Classes="cellValue"
+                                                           Text="{Binding PriceText}"
+                                                           Foreground="{Binding ToneValue, Converter={StaticResource PriceChangeColorConverter}}"/>
+                                                <TextBlock Grid.Column="2" Classes="cellValue"
+                                                           Text="{Binding QuantityText}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <TextBlock Grid.Column="3" Classes="cellValue"
+                                                           Text="{Binding AmountText}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- 买卖挂单占比 -->
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                                    <ProgressBar Grid.Column="0"
+                                                 Classes="depthBar"
+                                                 Height="6"
+                                                 Value="{Binding BidQuantityPercent}"
+                                                 Maximum="100"
+                                                 Foreground="{StaticResource BullishBrush}"
+                                                 Background="{StaticResource BearishBrush}"
+                                                 VerticalAlignment="Center"
+                                                 Margin="0,0,8,0"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding BidQuantityPercentText}"
+                                               FontSize="{StaticResource TinyFontSize}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                              VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 无盘口的市场给出明确说明，避免误判为加载失败 -->
+                    <Border Classes="rightSection"
+                            IsVisible="{Binding !SupportsOrderBook}">
+                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Classes="sectionHeader" Text="盘口"/>
+                            <TextBlock Text="当前市场暂无盘口数据源，已展示行情数据。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>
-
-
-

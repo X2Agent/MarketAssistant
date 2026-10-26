@@ -11,16 +11,10 @@ namespace MarketAssistant.Agents.Tools;
 /// 用户长期记忆管理工具，暴露给 Agent 用于主动保存、查询和删除记忆。
 /// Agent 应在学习到用户偏好、被纠正、发现重要结论时主动调用。
 /// </summary>
-public class MemoryManagementTools : IToolsProvider
+public class MemoryManagementTools(UserMemoryService memoryService, ILogger<MemoryManagementTools> logger) : IToolsProvider
 {
-    private readonly UserMemoryService _memoryService;
-    private readonly ILogger<MemoryManagementTools> _logger;
-
-    public MemoryManagementTools(UserMemoryService memoryService, ILogger<MemoryManagementTools> logger)
-    {
-        _memoryService = memoryService;
-        _logger = logger;
-    }
+    private readonly UserMemoryService _memoryService = memoryService;
+    private readonly ILogger<MemoryManagementTools> _logger = logger;
 
     [Description("保存一条用户记忆。当你学习到用户的投资偏好、风格习惯、被纠正的认知、或重要分析结论时，主动调用此工具。" +
                  "category 分类包括: preference(偏好)、correction(纠正)、conclusion(结论)、profile(用户画像)、other(其它)。" +

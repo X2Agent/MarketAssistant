@@ -15,16 +15,10 @@ public record ImageMetadata(string Caption, string StoredPath, Embedding<float>?
 /// <summary>
 /// 将 DocumentBlock 转换为 TextParagraph 的映射器
 /// </summary>
-public class DocumentBlockMapper
+public class DocumentBlockMapper(ITextCleaningService cleaning, ITextChunkingService chunking)
 {
-    private readonly ITextCleaningService _cleaning;
-    private readonly ITextChunkingService _chunking;
-
-    public DocumentBlockMapper(ITextCleaningService cleaning, ITextChunkingService chunking)
-    {
-        _cleaning = cleaning;
-        _chunking = chunking;
-    }
+    private readonly ITextCleaningService _cleaning = cleaning;
+    private readonly ITextChunkingService _chunking = chunking;
 
     /// <summary>
     /// 摄取前的文本归一化（只做无损处理）。

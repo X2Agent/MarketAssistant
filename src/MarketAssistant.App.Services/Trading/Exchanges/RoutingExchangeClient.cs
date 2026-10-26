@@ -7,18 +7,18 @@ namespace MarketAssistant.Services.Trading.Exchanges;
 /// 根据当前交易模式在实盘/模拟盘/Demo/合约客户端之间路由。
 /// 通过字典查找活跃客户端，新增模式只需在字典中注册，无需修改路由逻辑。
 /// </summary>
-public sealed class RoutingExchangeClient : IExchangeClient
+/// <remarks>
+/// 本类同时是交易所调用的统一埋点：所有 IExchangeClient 调用都经过这里，
+/// 因此 API 健康度（失败计数）在此记录，风控据此做 API 异常熔断。
+/// </remarks>
+public sealed class RoutingExchangeClient(
+    TradingEnvironmentService environmentService,
+    IReadOnlyDictionary<TradingMode, IExchangeClient> clients,
+    ApiHealthMonitor apiHealthMonitor) : IExchangeClient
 {
-    private readonly TradingEnvironmentService _environmentService;
-    private readonly IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> _clients;
-
-    public RoutingExchangeClient(
-        TradingEnvironmentService environmentService,
-        IReadOnlyDictionary<CryptoTradingMode, IExchangeClient> clients)
-    {
-        _environmentService = environmentService;
-        _clients = clients;
-    }
+    private readonly TradingEnvironmentService _environmentService = environmentService;
+    private readonly IReadOnlyDictionary<TradingMode, IExchangeClient> _clients = clients;
+    private readonly ApiHealthMonitor _apiHealthMonitor = apiHealthMonitor;
 
     public string ExchangeName => GetActiveClient().ExchangeName;
 
@@ -28,7 +28,7 @@ public sealed class RoutingExchangeClient : IExchangeClient
     public bool IsFutures => GetActiveClient().IsFutures;
 
     public Task<ExchangeAccountInfo> GetAccountInfoAsync(CancellationToken ct = default)
-        => GetActiveClient().GetAccountInfoAsync(ct);
+        => TrackAsync(client => client.GetAccountInfoAsync(ct), ct);
 
     public Task<ExchangeOrderResult> PlaceOrderAsync(
         string instrumentSymbol,
@@ -42,38 +42,98 @@ public sealed class RoutingExchangeClient : IExchangeClient
         decimal? stopPrice = null,
         int? trailingDelta = null,
         CancellationToken ct = default)
-        => GetActiveClient().PlaceOrderAsync(instrumentSymbol, side, type, quantity, price, clientOrderId, reduceOnly, positionSide, stopPrice, trailingDelta, ct);
+        => TrackAsync(client => client.PlaceOrderAsync(
+            instrumentSymbol, side, type, quantity, price, clientOrderId, reduceOnly,
+            positionSide, stopPrice, trailingDelta, ct), ct);
 
     public Task<ExchangeOrderResult> GetOrderAsync(
         string instrumentSymbol,
         string orderId,
         CancellationToken ct = default)
-        => GetActiveClient().GetOrderAsync(instrumentSymbol, orderId, ct);
+        => TrackAsync(client => client.GetOrderAsync(instrumentSymbol, orderId, ct), ct);
 
     public Task<ExchangeOrderResult> CancelOrderAsync(
         string instrumentSymbol,
         string orderId,
         CancellationToken ct = default)
-        => GetActiveClient().CancelOrderAsync(instrumentSymbol, orderId, ct);
+        => TrackAsync(client => client.CancelOrderAsync(instrumentSymbol, orderId, ct), ct);
 
     public Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
         string? instrumentSymbol = null,
         CancellationToken ct = default)
-        => GetActiveClient().GetOpenOrdersAsync(instrumentSymbol, ct);
+        => TrackAsync(client => client.GetOpenOrdersAsync(instrumentSymbol, ct), ct);
 
     public Task<List<ExchangePosition>> GetPositionsAsync(
         string? instrumentSymbol = null,
         CancellationToken ct = default)
-        => GetActiveClient().GetPositionsAsync(instrumentSymbol, ct);
+        => TrackAsync(client => client.GetPositionsAsync(instrumentSymbol, ct), ct);
 
     public Task SetLeverageAsync(string instrumentSymbol, int leverage, CancellationToken ct = default)
-        => GetActiveClient().SetLeverageAsync(instrumentSymbol, leverage, ct);
+        => TrackAsync(client => TrackVoidAsync(client.SetLeverageAsync(instrumentSymbol, leverage, ct)), ct);
+
+    /// <summary>把无返回值的调用包装为可埋点的 Task&lt;T&gt;。</summary>
+    private static async Task<byte> TrackVoidAsync(Task task)
+    {
+        await task.ConfigureAwait(false);
+        return 0;
+    }
 
     /// <summary>
     /// 获取当前活跃客户端的快照。下单链路（风控→杠杆→下单）必须对同一客户端实例完成，
     /// 若各步骤独立重新解析，用户在等待确认期间切换模拟盘/实盘会让订单落到错误环境。
     /// </summary>
     public IExchangeClient GetActiveClientSnapshot() => GetActiveClient();
+
+    /// <summary>
+    /// 记录一次交易所调用的成败。用户主动取消（ct.IsCancellationRequested）不算 API 故障；
+    /// 业务错误（余额不足、参数非法）同样是"API 正常工作"的证据，
+    /// 只有传输层故障（网络/超时/5xx）计入失败——把业务拒绝或主动取消也算故障会让风控误熔断。
+    /// </summary>
+    private async Task<T> TrackAsync<T>(Func<IExchangeClient, Task<T>> call, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await call(GetActiveClient()).ConfigureAwait(false);
+            _apiHealthMonitor.RecordSuccess();
+            return result;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsTransportFailure(ex, ct))
+        {
+            _apiHealthMonitor.RecordFailure();
+            throw;
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            _apiHealthMonitor.RecordSuccess();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 判定异常是否为传输层故障。交易所客户端会把 HttpRequestException 包装成
+    /// FriendlyException，必须沿 InnerException 链递归判定；调用方主动取消不计为传输故障。
+    /// </summary>
+    private static bool IsTransportFailure(Exception ex, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested)
+            return false;
+
+        for (var current = ex; current != null; current = current.InnerException)
+        {
+            if (current is System.Net.Http.HttpRequestException or TimeoutException or TaskCanceledException)
+                return true;
+        }
+
+        return false;
+    }
 
     private IExchangeClient GetActiveClient()
     {

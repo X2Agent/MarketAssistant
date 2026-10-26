@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              xmlns:models="using:MarketAssistant.Trading.Models"
+             xmlns:trading="using:MarketAssistant.Services.Trading"
              xmlns:abstractions="using:MarketAssistant.Trading.Abstractions"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
@@ -19,9 +20,58 @@
     </UserControl.Resources>
 
     <Grid>
+        <!-- ===== 首屏骨架 ===== -->
+        <StackPanel Spacing="{StaticResource DefaultSpacing}"
+                    IsVisible="{Binding IsInitialLoading}">
+            <UniformGrid Columns="4">
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96" Margin="{StaticResource TinyRightMargin}"/>
+                <Border Classes="skeleton skeleton-card" Height="96"/>
+            </UniformGrid>
+            <Grid ColumnDefinitions="*,12,*">
+                <Border Grid.Column="0" Classes="skeleton skeleton-panel" Height="240"/>
+                <Border Grid.Column="2" Classes="skeleton skeleton-panel" Height="240"/>
+            </Grid>
+            <Grid ColumnDefinitions="*,12,*">
+                <Border Grid.Column="0" Classes="skeleton skeleton-panel" Height="240"/>
+                <Border Grid.Column="2" Classes="skeleton skeleton-panel" Height="240"/>
+            </Grid>
+        </StackPanel>
+
         <!-- ===== 主内容层 ===== -->
-        <ScrollViewer>
+        <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}">
+
+                <!-- ===== 紧急停止横幅 ===== -->
+                <Border Background="{DynamicResource ErrorBackgroundBrush}"
+                        BorderBrush="{StaticResource ErrorBrush}"
+                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        CornerRadius="{StaticResource CardCornerRadius}"
+                        Padding="{StaticResource DefaultCardPadding}"
+                        IsVisible="{Binding IsTradingHalted}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="交易已紧急停止"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource ErrorBrush}"/>
+                            <TextBlock Text="{Binding HaltReasonText}"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="全部策略已暂停、新订单会被拒绝；策略需逐个重新启用后才会恢复自动交易。"
+                                       FontSize="{StaticResource SmallFontSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Content="解除紧急停止"
+                                Classes="btn-secondary"
+                                Command="{Binding ResumeTradingCommand}"
+                                VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
 
                 <!-- ===== 指标卡（四等分）+ 操作区 ===== -->
                 <Grid ColumnDefinitions="*,Auto">
@@ -87,6 +137,22 @@
                                 Command="{Binding RefreshCommand}"
                                 ToolTip.Tip="刷新数据">
                             <svg:Svg Path="/Assets/Images/refresh.svg"
+                                     Width="{StaticResource SmallIconSize}"
+                                     Height="{StaticResource SmallIconSize}"/>
+                        </Button>
+                        <Button Classes="icon-action"
+                                Command="{Binding StopStrategiesCommand}"
+                                ToolTip.Tip="紧急停止：停止全部策略并撤销本应用条件单（不平仓）"
+                                IsVisible="{Binding !IsTradingHalted}">
+                            <svg:Svg Path="/Assets/Images/tab_alert.svg"
+                                     Width="{StaticResource SmallIconSize}"
+                                     Height="{StaticResource SmallIconSize}"/>
+                        </Button>
+                        <Button Classes="icon-action"
+                                Command="{Binding StopAndCloseAllCommand}"
+                                ToolTip.Tip="紧急停止并全部平仓：市价卖出全部持仓，存在滑点风险"
+                                IsVisible="{Binding !IsTradingHalted}">
+                            <svg:Svg Path="/Assets/Images/tab_alert.svg"
                                      Width="{StaticResource SmallIconSize}"
                                      Height="{StaticResource SmallIconSize}"/>
                         </Button>
@@ -156,6 +222,65 @@
                                         </TextBlock.Text>
                                     </TextBlock>
                                 </Grid>
+
+                                <!-- 合约名义敞口 -->
+                                <Grid ColumnDefinitions="64,*,Auto">
+                                    <TextBlock Grid.Column="0" Text="名义敞口"
+                                               Classes="caption" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Classes="data-sm"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding FuturesNotionalText}"/>
+                                </Grid>
+                            </StackPanel>
+                        </controls:CardView>
+
+                        <!-- 合约强平风险（仅合约模式展示） -->
+                        <controls:CardView Grid.Row="1" Grid.Column="0"
+                                           Header="合约强平风险"
+                                           IsVisible="{Binding HasLiquidationRisks}">
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="标记价距强平价的百分比距离，距离越小风险越高；紧急级会同时阻止该标的自动加仓。"
+                                           Classes="caption"
+                                           TextWrapping="Wrap"/>
+                                <ItemsControl ItemsSource="{Binding LiquidationRisks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="trading:LiquidationRiskInfo">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="{StaticResource TinyBottomMargin}">
+                                                <TextBlock Grid.Column="0" VerticalAlignment="Center">
+                                                    <Run Text="{Binding Symbol}"/>
+                                                    <Run Text=" "/>
+                                                    <Run Text="{Binding DirectionText}"/>
+                                                </TextBlock>
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="data-sm"
+                                                           VerticalAlignment="Center"
+                                                           Margin="{StaticResource SmallLeftMargin}"
+                                                           Text="{Binding LiquidationPrice, StringFormat='强平价 {0:N4}'}"/>
+                                                <TextBlock Grid.Column="2"
+                                                           Classes="data-sm"
+                                                           VerticalAlignment="Center"
+                                                           Margin="{StaticResource SmallLeftMargin}"
+                                                           Text="{Binding DistancePercent, StringFormat='{}{0:F1}%'}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </controls:CardView>
+
+                        <!-- 策略绩效（本地统计，与交易所可用性无关） -->
+                        <controls:CardView Grid.Row="1" Grid.Column="2" Header="策略绩效">
+                            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                <TextBlock Text="{Binding OverallPerformanceText}"
+                                           Classes="data-sm"
+                                           TextWrapping="Wrap"/>
+                                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                        CornerRadius="{StaticResource TinyCornerRadius}"
+                                        Padding="{StaticResource SmallCardPadding}">
+                                    <TextBlock Text="{Binding ShadowPerformanceText}"
+                                               Classes="caption"
+                                               TextWrapping="Wrap"/>
+                                </Border>
                             </StackPanel>
                         </controls:CardView>
 
@@ -342,6 +467,13 @@
                 </Grid>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- 失败态（含重试入口）；空态由各分区自行提示，不遮挡风控指标 -->
+        <controls:StateOverlayView State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"/>
 
         <!-- 交易确认（Human-in-the-Loop）已上移至应用级 TradeConfirmationService：全局对话框弹出，
              不再依赖本页存活，此处不再渲染页内模态确认层 -->

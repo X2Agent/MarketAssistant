@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Applications.Settings;
@@ -18,7 +19,15 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 按服务商保存模型 ID，切换服务商时恢复各自选择。
     /// </summary>
-    public Dictionary<string, string> ProviderModelIds { get; set; } = new();
+    public Dictionary<string, string> ProviderModelIds { get; set; } = [];
+
+    /// <summary>
+    /// 按服务商保存"分析师角色 → 模型 ID"的分配，用于按角色分级模型
+    /// （如协调器用强模型、常规分析师用快模型）。
+    /// 结构为 providerId → 分析师类型名（如 FundamentalAnalystAgent）→ modelId；
+    /// 未配置或留空的角色回落到 <see cref="ProviderModelIds"/> 中的默认模型。
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>> ProviderAnalystModelIds { get; set; } = [];
 
     public string EmbeddingModelId { get; set; } = "jina-embeddings-v5-text-small";
 
@@ -30,13 +39,13 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 按服务商保存自定义 Endpoint，空值表示使用目录默认地址。
     /// </summary>
-    public Dictionary<string, string> ProviderEndpoints { get; set; } = new();
+    public Dictionary<string, string> ProviderEndpoints { get; set; } = [];
 
     /// <summary>
     /// 按服务商 ID 存储各自的 API Key
     /// </summary>
     [JsonIgnore]
-    public Dictionary<string, string> ProviderApiKeys { get; set; } = new();
+    public Dictionary<string, string> ProviderApiKeys { get; set; } = [];
 
     private bool _loadKnowledge;
     public bool LoadKnowledge
@@ -60,14 +69,6 @@ public class UserSetting : INotifyPropertyChanged
     /// </summary>
     public bool Notification { get; set; } = true;
 
-    /// <summary>每小时告警弹窗配额上限（Critical 不受限）。</summary>
-    private int _alertHourlyQuota = 20;
-    public int AlertHourlyQuota
-    {
-        get => _alertHourlyQuota;
-        set => SetProperty(ref _alertHourlyQuota, Math.Clamp(value, 1, 200));
-    }
-
     /// <summary>是否启用告警免打扰时段（Critical 不受免打扰限制）。</summary>
     private bool _alertQuietHoursEnabled;
     public bool AlertQuietHoursEnabled
@@ -90,6 +91,32 @@ public class UserSetting : INotifyPropertyChanged
     {
         get => _alertQuietEndHour;
         set => SetProperty(ref _alertQuietEndHour, Math.Clamp(value, 0, 23));
+    }
+
+    /// <summary>是否启用飞书告警通道（自定义机器人推送）。</summary>
+    private bool _feishuWebhookEnabled;
+    public bool FeishuWebhookEnabled
+    {
+        get => _feishuWebhookEnabled;
+        set => SetProperty(ref _feishuWebhookEnabled, value);
+    }
+
+    /// <summary>
+    /// 飞书自定义机器人 Webhook 地址（含 token，按密钥管理，不写入普通设置文件）。
+    /// </summary>
+    [JsonIgnore]
+    public string FeishuWebhookUrl { get; set; } = "";
+
+    /// <summary>飞书机器人签名校验密钥（可选，启用签名校验时必填）。</summary>
+    [JsonIgnore]
+    public string FeishuWebhookSecret { get; set; } = "";
+
+    /// <summary>飞书通道接收的最低告警级别（默认仅警告及以上）。</summary>
+    private AlertLevel _feishuMinAlertLevel = AlertLevel.Warning;
+    public AlertLevel FeishuMinAlertLevel
+    {
+        get => _feishuMinAlertLevel;
+        set => SetProperty(ref _feishuMinAlertLevel, value);
     }
 
     [JsonIgnore]
@@ -116,10 +143,17 @@ public class UserSetting : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 虚拟币交易模式
+    /// 当前交易环境模式。
     /// </summary>
-    private CryptoTradingMode _cryptoTradingMode = CryptoTradingMode.LiveSpot;
-    public CryptoTradingMode CryptoTradingMode
+    /// <remarks>
+    /// 属性名保持 <c>CryptoTradingMode</c> 不变：该字段以属性名持久化到 <c>UserSetting.json</c>，
+    /// 改名会导致既有用户的交易模式配置读不回来。枚举本身以<b>数值</b>序列化
+    /// （未启用 <c>JsonStringEnumConverter</c>），且数值未变，故类型由交易所耦合的
+    /// <c>CryptoTradingMode</c> 提升为市场无关的 <see cref="MarketAssistant.Trading.Models.TradingMode"/>
+    /// 对存量用户完全兼容。
+    /// </remarks>
+    private TradingMode _cryptoTradingMode = TradingMode.LiveSpot;
+    public TradingMode CryptoTradingMode
     {
         get => _cryptoTradingMode;
         set => SetProperty(ref _cryptoTradingMode, value);
@@ -147,6 +181,11 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// Binance Futures Testnet API Key（在 demo-fapi.binance.com 生成）
     /// </summary>
+    /// <remarks>
+    /// 属性名保持 <c>BinanceFuturesTestnet*</c> 不变：该字段以属性名（而非枚举数值）持久化到
+    /// <c>UserSetting.json</c>，改名会导致既有用户的测试网密钥读取失败。
+    /// 它是交易所品牌相关的具体凭证，与市场无关的 <c>TradingMode.FuturesTestnet</c> 是两回事。
+    /// </remarks>
     public string BinanceFuturesTestnetApiKey { get; set; } = "";
 
     /// <summary>
@@ -193,7 +232,28 @@ public class UserSetting : INotifyPropertyChanged
     /// <summary>
     /// 启用的分析师角色字典 Key: AgentName, Value: IsEnabled
     /// </summary>
-    public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = new();
+    public Dictionary<string, bool> EnabledAnalystRoles { get; set; } = [];
+
+    /// <summary>
+    /// 是否启用每日 AI 简报功能。简报是唯一"用户未主动点击也会产生模型调用与费用"
+    /// 的路径，必须由用户显式掌控。关闭后连手动生成也不可用。
+    /// </summary>
+    private bool _enableDailyBriefing = true;
+    public bool EnableDailyBriefing
+    {
+        get => _enableDailyBriefing;
+        set => SetProperty(ref _enableDailyBriefing, value);
+    }
+
+    /// <summary>
+    /// 是否在自选股 AI 综合评级变化时发送告警（评级下调为警告、上调为提示）。
+    /// </summary>
+    private bool _enableRatingChangeAlert = true;
+    public bool EnableRatingChangeAlert
+    {
+        get => _enableRatingChangeAlert;
+        set => SetProperty(ref _enableRatingChangeAlert, value);
+    }
 
     private InvestmentPreference _investmentPreference = new();
     public InvestmentPreference InvestmentPreference
@@ -218,14 +278,21 @@ public class UserSetting : INotifyPropertyChanged
             EmbeddingApiKey = EmbeddingApiKey,
             ProviderApiKeys = new Dictionary<string, string>(ProviderApiKeys, StringComparer.Ordinal),
             ProviderModelIds = new Dictionary<string, string>(ProviderModelIds, StringComparer.Ordinal),
+            ProviderAnalystModelIds = ProviderAnalystModelIds.ToDictionary(
+                entry => entry.Key,
+                entry => new Dictionary<string, string>(entry.Value, StringComparer.Ordinal),
+                StringComparer.Ordinal),
             ProviderEndpoints = new Dictionary<string, string>(ProviderEndpoints, StringComparer.Ordinal),
             LoadKnowledge = LoadKnowledge,
             KnowledgeFileDirectory = KnowledgeFileDirectory,
             Notification = Notification,
-            AlertHourlyQuota = AlertHourlyQuota,
             AlertQuietHoursEnabled = AlertQuietHoursEnabled,
             AlertQuietStartHour = AlertQuietStartHour,
             AlertQuietEndHour = AlertQuietEndHour,
+            FeishuWebhookEnabled = FeishuWebhookEnabled,
+            FeishuWebhookUrl = FeishuWebhookUrl,
+            FeishuWebhookSecret = FeishuWebhookSecret,
+            FeishuMinAlertLevel = FeishuMinAlertLevel,
             ZhiTuApiToken = ZhiTuApiToken,
             ThemeMode = ThemeMode,
             CurrentMarketType = CurrentMarketType,
@@ -240,6 +307,8 @@ public class UserSetting : INotifyPropertyChanged
             WebSearchApiKey = WebSearchApiKey,
             WebSearchProvider = WebSearchProvider,
             EnabledAnalystRoles = new Dictionary<string, bool>(EnabledAnalystRoles, StringComparer.Ordinal),
+            EnableDailyBriefing = EnableDailyBriefing,
+            EnableRatingChangeAlert = EnableRatingChangeAlert,
             InvestmentPreference = InvestmentPreference.Clone()
         };
         return clone;

@@ -1,0 +1,13 @@
+# ============================================================================
+# 换行规范化
+#
+# 索引（仓库）内统一保存 LF；检出时按文件类型还原。
+# .editorconfig 对 *.cs / *.vb 要求 end_of_line = crlf，此前只依赖 Windows
+# 开发机的 core.autocrlf=true，Linux/macOS CI（core.autocrlf=false）检出的是
+# LF，导致 `dotnet format --verify-no-changes` 全库报 ENDOFLINE/WHITESPACE。
+# 在此显式声明，保证任何平台检出后都满足格式门禁。
+# ============================================================================
+* text=auto
+
+*.cs text eol=crlf
+*.vb text eol=crlf

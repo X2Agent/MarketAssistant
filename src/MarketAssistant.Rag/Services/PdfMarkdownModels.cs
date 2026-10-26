@@ -10,7 +10,7 @@ internal sealed class DocumentInfo
     public double MaxFontSize { get; init; }
     public double MinFontSize { get; init; }
     public int TotalWords { get; init; }
-    public List<HeadingCandidate> HeadingCandidates { get; init; } = new();
+    public List<HeadingCandidate> HeadingCandidates { get; init; } = [];
     public DynamicThresholds DynamicThresholds { get; init; } = new();
 }
 
@@ -27,7 +27,7 @@ internal sealed class DynamicThresholds
     public double Level1Threshold { get; init; } = PdfTextUtility.LargeHeadingThreshold;
     public double Level2Threshold { get; init; } = PdfTextUtility.MediumHeadingThreshold;
     public double Level3Threshold { get; init; } = PdfTextUtility.SmallHeadingThreshold;
-    public List<double> FontSizeBreakpoints { get; init; } = new();
+    public List<double> FontSizeBreakpoints { get; init; } = [];
 }
 
 internal sealed class StructuredLine
@@ -46,7 +46,7 @@ internal sealed class TableInfo
     public required List<StructuredLine> Rows { get; init; }
     public int StartIndex { get; init; }
     public int EndIndex { get; init; }
-    public List<int> ActualRowIndices { get; init; } = new List<int>(); // 实际的表格行索引
+    public List<int> ActualRowIndices { get; init; } = []; // 实际的表格行索引
 }
 
 internal sealed class BoundingBox

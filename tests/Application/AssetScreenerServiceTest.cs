@@ -75,7 +75,7 @@ public sealed class AssetScreenerServiceTest
             Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 10,
-            Criteria = new List<StockScreeningCriteria>()
+            Criteria = []
         };
 
         // Act
@@ -83,8 +83,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "A股默认条件筛选应返回至少一只股票");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "A股默认条件筛选应返回至少一只股票");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
 
         Console.WriteLine($"A股默认条件筛选 - 返回股票数量: {result.Count}");
@@ -101,8 +101,8 @@ public sealed class AssetScreenerServiceTest
             Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 15,
-            Criteria = new List<StockScreeningCriteria>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "mc",
@@ -110,7 +110,7 @@ public sealed class AssetScreenerServiceTest
                     MinValue = 5000000000m,  // 50亿元
                     MaxValue = 25000000000m  // 250亿元
                 }
-            }
+            ]
         };
 
         // Act
@@ -118,8 +118,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "市值50-250亿筛选应返回至少一只股票");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "市值50-250亿筛选应返回至少一只股票");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
         Assert.IsTrue(result.All(r => r.Mc >= 5_000_000_000m && r.Mc <= 25_000_000_000m),
             $"所有返回股票的市值应在 50-250 亿区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
@@ -138,8 +138,8 @@ public sealed class AssetScreenerServiceTest
             Market = AShareType.AllAShares,
             Industry = IndustryType.All,
             Limit = 20,
-            Criteria = new List<StockScreeningCriteria>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "mc",
@@ -154,7 +154,7 @@ public sealed class AssetScreenerServiceTest
                     MinValue = 5m,
                     MaxValue = 50m
                 }
-            }
+            ]
         };
 
         // Act
@@ -162,8 +162,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "市值500亿-1万亿+PE 5-50 筛选应返回至少一只股票");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "市值500亿-1万亿+PE 5-50 筛选应返回至少一只股票");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrWhiteSpace(r.Symbol)), "所有结果应包含有效代码");
         Assert.IsTrue(result.All(r => r.Mc >= 50_000_000_000m && r.Mc <= 1_000_000_000_000m),
             $"所有返回股票的市值应在 500 亿-1 万亿区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Mc}"))}");
@@ -184,7 +184,7 @@ public sealed class AssetScreenerServiceTest
         var criteria = new CryptoCriteria
         {
             Limit = 10,
-            Criteria = new List<CryptoScreeningCondition>()
+            Criteria = []
         };
 
         // Act
@@ -192,8 +192,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "虚拟币默认条件筛选应返回至少一条记录");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "虚拟币默认条件筛选应返回至少一条记录");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
 
         Console.WriteLine($"虚拟币默认条件筛选 - 返回数量: {result.Count}");
@@ -208,15 +208,15 @@ public sealed class AssetScreenerServiceTest
         var criteria = new CryptoCriteria
         {
             Limit = 15,
-            Criteria = new List<CryptoScreeningCondition>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "market_cap",
                     MinValue = 1_000_000_000m,  // 10亿美元
                     MaxValue = 50_000_000_000m  // 500亿美元
                 }
-            }
+            ]
         };
 
         // Act
@@ -224,8 +224,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "市值10-500亿美元筛选应返回至少一条记录");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "市值10-500亿美元筛选应返回至少一条记录");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
         // CoinGecko 路径在客户端 ApplyFilters 中过滤，返回项市值应满足区间；
         // Binance 兜底路径 Mc=0，跳过市值校验
@@ -247,15 +247,15 @@ public sealed class AssetScreenerServiceTest
         var criteria = new CryptoCriteria
         {
             Limit = 20,
-            Criteria = new List<CryptoScreeningCondition>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "price_change_24h",
                     MinValue = -10m,  // 跌幅不超过10%
                     MaxValue = 50m    // 涨幅50%以下
                 }
-            }
+            ]
         };
 
         // Act
@@ -263,8 +263,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "价格变化筛选应返回至少一条记录");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "价格变化筛选应返回至少一条记录");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
         Assert.IsTrue(result.All(r => r.Pct >= -10m && r.Pct <= 50m),
             $"所有返回虚拟币的 24h 涨跌幅应在 -10% ~ +50% 区间内，实际: {string.Join(", ", result.Select(r => $"{r.Symbol}={r.Pct}%"))}");
@@ -281,8 +281,8 @@ public sealed class AssetScreenerServiceTest
         var criteria = new CryptoCriteria
         {
             Limit = 15,
-            Criteria = new List<CryptoScreeningCondition>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "market_cap",
@@ -294,7 +294,7 @@ public sealed class AssetScreenerServiceTest
                     Code = "volume_24h",
                     MinValue = 100_000_000m      // 24小时交易量1亿美元以上
                 }
-            }
+            ]
         };
 
         // Act
@@ -302,8 +302,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "市值+交易量组合筛选应返回至少一条记录");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "市值+交易量组合筛选应返回至少一条记录");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
         if (result.Any(r => r.Mc > 0))
         {
@@ -325,15 +325,15 @@ public sealed class AssetScreenerServiceTest
         var criteria = new CryptoCriteria
         {
             Limit = 10,
-            Criteria = new List<CryptoScreeningCondition>
-            {
+            Criteria =
+            [
                 new()
                 {
                     Code = "market_cap_rank",
                     MinValue = 1m,
                     MaxValue = 50m
                 }
-            }
+            ]
         };
 
         // Act
@@ -341,8 +341,8 @@ public sealed class AssetScreenerServiceTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Count > 0, "市值排名前50筛选应返回至少一条记录");
-        Assert.IsTrue(result.Count <= criteria.Limit, "返回数量不应超过 Limit");
+        Assert.IsNotEmpty(result, "市值排名前50筛选应返回至少一条记录");
+        Assert.IsLessThanOrEqualTo(criteria.Limit, result.Count, "返回数量不应超过 Limit");
         Assert.IsTrue(result.All(r => !string.IsNullOrEmpty(r.Symbol)), "所有结果应包含有效代码");
         // CoinGecko 路径返回 MarketCapRank，验证排名在 1-50；Binance 兜底路径 MarketCapRank=0，跳过校验
         var cryptoResults = result.OfType<ScreenerCryptoInfo>().ToList();
@@ -366,6 +366,44 @@ public sealed class AssetScreenerServiceTest
         // Act & Assert
         await Assert.ThrowsExactlyAsync<ArgumentException>(
             async () => await service.ScreenAsync(invalidCriteria));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void DeterminePagination_WithClientSideFilters_ShouldFetchFullCandidatePool()
+    {
+        var criteria = new CryptoCriteria
+        {
+            Limit = 5,
+            Criteria =
+            [
+                new() { Code = "market_cap", MaxValue = 1_000_000_000m }
+            ]
+        };
+
+        var (page, perPage) = CryptoScreenerService.DeterminePagination(criteria);
+
+        Assert.AreEqual(1, page);
+        Assert.AreEqual(250, perPage, "带客户端筛选条件时应拉取 250 条候选池，避免仅在前 5 名大市值币中筛选导致结果为空");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void ApplyFilters_ShouldExcludeStableCoins()
+    {
+        var markets = new List<CoinGeckoMarket>
+        {
+            new() { Symbol = "btc", Name = "Bitcoin", CurrentPrice = 65000m, MarketCap = 1_200_000_000_000m },
+            new() { Symbol = "usdt", Name = "Tether", CurrentPrice = 1.0m, MarketCap = 120_000_000_000m },
+            new() { Symbol = "usdc", Name = "USD Coin", CurrentPrice = 1.0m, MarketCap = 35_000_000_000m },
+            new() { Symbol = "eth", Name = "Ethereum", CurrentPrice = 3200m, MarketCap = 380_000_000_000m }
+        };
+        var criteria = new CryptoCriteria { Limit = 10, Criteria = [] };
+
+        var filtered = CryptoScreenerService.ApplyFilters(markets, criteria);
+
+        Assert.HasCount(2, filtered);
+        Assert.IsTrue(filtered.All(m => m.Symbol is "btc" or "eth"));
     }
 
     #endregion

@@ -16,8 +16,21 @@ namespace MarketAssistant.Agents.MarketAnalysis.Executors;
 /// 全部失败时不派发 Coordinator（由工作流终局诊断给出明确错误）——
 /// Fan-In barrier 目标执行器抛出的异常不会以 ExecutorFailedEvent 暴露，不能依赖抛错中断流程。
 /// </summary>
+/// <param name="expectedAnalystCount">期望的分析师消息总数（成功 + 失败标记）。
+/// 由工作流在构建时直接传入，避免经 Workflow State 传递带来的跨 SuperStep 时序竞态。</param>
+/// <param name="runId">本次分析 Run 的 ID（产物存储按 Run 隔离）。</param>
+/// <param name="artifactStore">分析师产物存储（P1-07：全文落盘，协调只传摘要）。</param>
+/// <param name="displayNameByAgentName">Agent ASCII Name → 中文显示名映射（用于摘要可读性），可为空字典。</param>
+/// <param name="logger">日志记录器。</param>
+/// <param name="incompleteGracePeriod">消息未收齐时的降级宽限期，超时后降级发送已有结果；为 null 时使用默认值。</param>
 [SendsMessage(typeof(List<ChatMessage>))]
-public sealed partial class AnalysisAggregatorExecutor : Executor
+public sealed partial class AnalysisAggregatorExecutor(
+    int expectedAnalystCount,
+    Guid runId,
+    IAnalystArtifactStore artifactStore,
+    IReadOnlyDictionary<string, string>? displayNameByAgentName,
+    ILogger<AnalysisAggregatorExecutor> logger,
+    TimeSpan? incompleteGracePeriod = null) : Executor(id: "AnalysisAggregator")
 {
     private const string CoordinatorExecutorId = "Coordinator";
     private const string SystemNoticeAuthorName = "SystemNotice";
@@ -25,41 +38,18 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
     /// <summary>消息未收齐时的默认降级宽限期（P0-1 缓解：避免事件流无声终止）。</summary>
     private static readonly TimeSpan DefaultIncompleteGrace = TimeSpan.FromSeconds(30);
 
-    private readonly ILogger<AnalysisAggregatorExecutor> _logger;
-    private readonly int _expectedAnalystCount;
-    private readonly Guid _runId;
-    private readonly IAnalystArtifactStore _artifactStore;
-    private readonly IReadOnlyDictionary<string, string> _displayNameByAgentName;
-    private readonly TimeSpan _incompleteGrace;
+    private readonly ILogger<AnalysisAggregatorExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly int _expectedAnalystCount = expectedAnalystCount;
+    private readonly Guid _runId = runId;
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly IReadOnlyDictionary<string, string> _displayNameByAgentName = displayNameByAgentName ?? new Dictionary<string, string>();
+    private readonly TimeSpan _incompleteGrace = incompleteGracePeriod ?? DefaultIncompleteGrace;
     private readonly object _syncRoot = new();
     private readonly List<ChatMessage> _analystMessages = [];
     private readonly List<ChatMessage> _failedMessages = [];
+    private CancellationTokenSource? _degradeCts;
     private bool _sentToCoordinator;
     private bool _degradeSendScheduled;
-
-    /// <param name="expectedAnalystCount">期望的分析师消息总数（成功 + 失败标记）。
-    /// 由工作流在构建时直接传入，避免经 Workflow State 传递带来的跨 SuperStep 时序竞态。</param>
-    /// <param name="runId">本次分析 Run 的 ID（产物存储按 Run 隔离）。</param>
-    /// <param name="artifactStore">分析师产物存储（P1-07：全文落盘，协调只传摘要）。</param>
-    /// <param name="displayNameByAgentName">Agent ASCII Name → 中文显示名映射（用于摘要可读性），可为空字典。</param>
-    /// <param name="logger">日志记录器。</param>
-    /// <param name="incompleteGracePeriod">消息未收齐时的降级宽限期，超时后降级发送已有结果；为 null 时使用默认值。</param>
-    public AnalysisAggregatorExecutor(
-        int expectedAnalystCount,
-        Guid runId,
-        IAnalystArtifactStore artifactStore,
-        IReadOnlyDictionary<string, string>? displayNameByAgentName,
-        ILogger<AnalysisAggregatorExecutor> logger,
-        TimeSpan? incompleteGracePeriod = null)
-        : base(id: "AnalysisAggregator")
-    {
-        _expectedAnalystCount = expectedAnalystCount;
-        _runId = runId;
-        _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
-        _displayNameByAgentName = displayNameByAgentName ?? new Dictionary<string, string>();
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _incompleteGrace = incompleteGracePeriod ?? DefaultIncompleteGrace;
-    }
 
     [MessageHandler]
     private async ValueTask HandleAsync(
@@ -114,9 +104,12 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
             {
                 // Fan-In barrier 缺陷缓解（P0-1）：消息未收齐时不无限静默等待，
                 // 启动有界宽限计时，到期后降级发送已有结果
-                ScheduleDegradeSend(context);
+                ScheduleDegradeSend(context, cancellationToken);
                 return;
             }
+
+            // 已收齐（含全部失败）：立即取消可能正在倒计时的降级任务
+            _degradeCts?.Cancel();
 
             if (collectedCount == 0)
             {
@@ -146,14 +139,18 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
     /// <summary>
     /// 启动一次性的降级发送计时：宽限期内若正常路径仍未收齐，
     /// 则将已收到的成功结果（附降级说明）发送给 Coordinator，避免事件流无声终止。
+    /// 计时器绑定工作流取消令牌，并在正常收齐或工作流取消时立即终止。
     /// </summary>
-    private void ScheduleDegradeSend(IWorkflowContext context)
+    private void ScheduleDegradeSend(IWorkflowContext context, CancellationToken workflowCancellationToken)
     {
+        CancellationToken degradeToken;
         lock (_syncRoot)
         {
-            if (_degradeSendScheduled || _sentToCoordinator)
+            if (_degradeSendScheduled || _sentToCoordinator || workflowCancellationToken.IsCancellationRequested)
                 return;
             _degradeSendScheduled = true;
+            _degradeCts = CancellationTokenSource.CreateLinkedTokenSource(workflowCancellationToken);
+            degradeToken = _degradeCts.Token;
         }
 
         _logger.LogWarning(
@@ -167,33 +164,37 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
         {
             try
             {
-                await Task.Delay(_incompleteGrace).ConfigureAwait(false);
+                await Task.Delay(_incompleteGrace, degradeToken).ConfigureAwait(false);
 
                 List<ChatMessage> successes;
                 List<ChatMessage> failures;
                 lock (_syncRoot)
                 {
-                    if (_sentToCoordinator || _analystMessages.Count == 0)
-                        return; // 正常路径已完成，或无任何成功结果可降级
+                    if (_sentToCoordinator || _analystMessages.Count == 0 || degradeToken.IsCancellationRequested)
+                        return; // 正常路径已完成、工作流已取消，或无任何成功结果可降级
                     _sentToCoordinator = true;
                     successes = [.. _analystMessages];
                     failures = [.. _failedMessages];
                 }
 
                 var payload = await BuildCoordinatorPayloadAsync(
-                    successes, failures, degraded: true, CancellationToken.None).ConfigureAwait(false);
+                    successes, failures, degraded: true, degradeToken).ConfigureAwait(false);
                 await context.SendMessageAsync(
-                    payload, CoordinatorExecutorId, CancellationToken.None).ConfigureAwait(false);
+                    payload, CoordinatorExecutorId, degradeToken).ConfigureAwait(false);
 
                 _logger.LogWarning(
                     "宽限期到，已降级发送：{SuccessCount} 成功 / {FailedCount} 失败 / 期望 {Expected}",
                     successes.Count, failures.Count, _expectedAnalystCount);
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogDebug("聚合器降级计时已取消（已正常收齐或工作流已取消）");
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "聚合器降级发送失败");
             }
-        });
+        }, degradeToken);
     }
 
     /// <summary>
@@ -339,8 +340,8 @@ public sealed partial class AnalysisAggregatorExecutor : Executor
 
     private string BuildMissingDimensionNote(IReadOnlyList<ChatMessage> failedMessages)
         => AnalystFailureMessages.BuildMissingDimensionNote(
-            failedMessages.Select(message =>
-                $"{message.AuthorName ?? "未知分析师"}（{AnalystFailureMessages.ExtractFailureReason(message.Text)}）").ToList());
+            [.. failedMessages.Select(message =>
+                $"{message.AuthorName ?? "未知分析师"}（{AnalystFailureMessages.ExtractFailureReason(message.Text)}）")]);
 
     private static bool IsAnalystTextMessage(ChatMessage message)
         => message.Role == ChatRole.Assistant && !string.IsNullOrWhiteSpace(message.Text);

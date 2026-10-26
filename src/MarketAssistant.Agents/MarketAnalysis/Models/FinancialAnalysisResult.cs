@@ -17,6 +17,21 @@ public sealed class FinancialAnalysisResult
 
     [Description("财务风险识别和预警，包括主要风险指标、造假风险和关注点")]
     public FinancialRiskWarning RiskWarning { get; set; } = new();
+
+    /// <summary>
+    /// 财务面对投资的综合评级；财务数据不足以支持明确评级时为 null。
+    /// 供分析师绩效统计使用的机器可读字段。
+    /// </summary>
+    [Description("财务面对投资的综合评级；财务数据不足以支持明确评级时为 null")]
+    public InvestmentRating? FinancialRating { get; set; }
+
+    /// <summary>
+    /// 对财务面综合评级的置信度百分比；财务数据不足或结论不确定时为 null。
+    /// 供分析师绩效统计（按置信度分桶校准）使用的机器可读字段。
+    /// </summary>
+    [Range(0, 100)]
+    [Description("对财务面综合评级的置信度百分比，0-100；财务数据不足或结论不确定时设为null。评分标准：" + ScoringStandards.Confidence)]
+    public float? ConfidencePercentage { get; set; }
 }
 
 [Description("财务健康状况评估")]
@@ -146,7 +161,7 @@ public sealed class FinancialRiskWarning
     [MinLength(1)]
     [MaxLength(2)]
     [Description("异常或需关注的财务指标，如高负债、现金流压力等")]
-    public List<string> KeyRiskIndicators { get; set; } = new();
+    public List<string> KeyRiskIndicators { get; set; } = [];
 
     [Description("财务造假风险等级")]
     public Level FraudRiskLevel { get; set; }
@@ -163,5 +178,5 @@ public sealed class FinancialRiskWarning
     [MinLength(1)]
     [MaxLength(2)]
     [Description("财务层面需持续关注或改善的方面")]
-    public List<string> MonitoringPoints { get; set; } = new();
+    public List<string> MonitoringPoints { get; set; } = [];
 }

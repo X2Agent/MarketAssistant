@@ -40,5 +40,51 @@
         <Setter Property="MinHeight" Value="400"/>
     </Style>
 
+    <!-- ================================================================== -->
+    <!-- 骨架屏尺寸修饰类：与 skeleton 组合使用，如 Classes="skeleton skeleton-row" -->
+    <!-- ================================================================== -->
+
+    <!-- 单行文本占位 -->
+    <Style Selector="Border.skeleton-text">
+        <Setter Property="Height" Value="12"/>
+        <Setter Property="MinWidth" Value="48"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- 标题文本占位（更粗更高） -->
+    <Style Selector="Border.skeleton-title">
+        <Setter Property="Height" Value="18"/>
+        <Setter Property="MinWidth" Value="80"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- 列表行占位 -->
+    <Style Selector="Border.skeleton-row">
+        <Setter Property="Height" Value="44"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- 卡片占位 -->
+    <Style Selector="Border.skeleton-card">
+        <Setter Property="MinHeight" Value="96"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- 右侧面板 / 区块占位 -->
+    <Style Selector="Border.skeleton-panel">
+        <Setter Property="MinHeight" Value="240"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- 圆形占位（图标 / 头像） -->
+    <Style Selector="Border.skeleton-circle">
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="CornerRadius" Value="16"/>
+    </Style>
+
 </Styles>
 

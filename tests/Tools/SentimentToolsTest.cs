@@ -93,14 +93,14 @@ public class SentimentToolsTest
 
         // Assert - 验证真实资金流向数据（关键字段非空 + 数值合理性，证明 API 真实返回而非空对象）
         Assert.IsNotNull(sentimentData, "资金流向数据不应为空");
-        Assert.IsTrue(sentimentData.Date > 0, $"日期应大于 0，实际: {sentimentData.Date}");
+        Assert.IsGreaterThan(0, sentimentData.Date, $"日期应大于 0，实际: {sentimentData.Date}");
         Assert.IsTrue(sentimentData.MainFundIn > 0 || sentimentData.MainFundOut > 0,
             $"主力流入({sentimentData.MainFundIn})或主力流出({sentimentData.MainFundOut})应至少有一个大于 0");
         Assert.IsTrue(sentimentData.MainFundDiff != 0 || sentimentData.SuperFundDiff != 0 || sentimentData.LargeFundDiff != 0,
             $"主力净流入({sentimentData.MainFundDiff})、超大单净流入({sentimentData.SuperFundDiff})、大单净流入({sentimentData.LargeFundDiff})应至少有一个非零");
         // 主力 = 特大单 + 大单，勾稽关系：MainFundDiff = SuperFundDiff + LargeFundDiff
         var expectedMainDiff = sentimentData.SuperFundDiff + sentimentData.LargeFundDiff;
-        Assert.IsTrue(Math.Abs(expectedMainDiff - sentimentData.MainFundDiff) < 1m,
+        Assert.IsLessThan(1m, Math.Abs(expectedMainDiff - sentimentData.MainFundDiff),
             $"主力净流入({sentimentData.MainFundDiff})应等于超大单({sentimentData.SuperFundDiff})+大单({sentimentData.LargeFundDiff})={expectedMainDiff}");
 
         TestContext?.WriteLine($"SH600519 日期: {sentimentData.Date}, 主力净流入: {sentimentData.MainFundDiff}, " +
@@ -126,13 +126,13 @@ public class SentimentToolsTest
         // Assert
         Assert.IsNotNull(fundingRateHistory);
         Assert.IsNotNull(fundingRateHistory.Symbol);
-        Assert.IsTrue(fundingRateHistory.Symbol.Contains("BTC"), $"期望符号包含 BTC，实际为 {fundingRateHistory.Symbol}");
-        Assert.IsTrue(fundingRateHistory.CurrentFundingTime > 0, "当前费率时间应大于 0");
-        Assert.IsTrue(fundingRateHistory.NextFundingTime > 0, "下次结算时间应大于 0");
-        Assert.IsTrue(fundingRateHistory.NextFundingTime > fundingRateHistory.CurrentFundingTime, "下次结算时间应晚于当前时间");
+        Assert.Contains("BTC", fundingRateHistory.Symbol, $"期望符号包含 BTC，实际为 {fundingRateHistory.Symbol}");
+        Assert.IsGreaterThan(0, fundingRateHistory.CurrentFundingTime, "当前费率时间应大于 0");
+        Assert.IsGreaterThan(0, fundingRateHistory.NextFundingTime, "下次结算时间应大于 0");
+        Assert.IsGreaterThan(fundingRateHistory.CurrentFundingTime, fundingRateHistory.NextFundingTime, "下次结算时间应晚于当前时间");
         Assert.IsNotNull(fundingRateHistory.History);
-        Assert.IsTrue(fundingRateHistory.History.Count > 0, "历史数据应至少有 1 条记录");
-        Assert.IsTrue(fundingRateHistory.History.Count <= 30, "历史数据不应超过请求的 limit");
+        Assert.IsNotEmpty(fundingRateHistory.History, "历史数据应至少有 1 条记录");
+        Assert.IsLessThanOrEqualTo(30, fundingRateHistory.History.Count, "历史数据不应超过请求的 limit");
 
         _logger?.LogInformation(
             "当前费率: {CurrentRate}%, 平均费率: {AverageRate}%, 历史记录数: {Count}",
@@ -153,22 +153,22 @@ public class SentimentToolsTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
-        Assert.IsTrue(result.CurrentLongRatio > 0, $"当前多头占比应 > 0，实际: {result.CurrentLongRatio}");
-        Assert.IsTrue(result.CurrentShortRatio > 0, $"当前空头占比应 > 0，实际: {result.CurrentShortRatio}");
+        Assert.Contains("BTC", result.Symbol, $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsGreaterThan(0, result.CurrentLongRatio, $"当前多头占比应 > 0，实际: {result.CurrentLongRatio}");
+        Assert.IsGreaterThan(0, result.CurrentShortRatio, $"当前空头占比应 > 0，实际: {result.CurrentShortRatio}");
         // 多头 + 空头占比应接近 100%
-        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+        Assert.IsLessThan(1m, Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m),
             $"多头({result.CurrentLongRatio}) + 空头({result.CurrentShortRatio}) 占比应接近 100%");
-        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+        Assert.IsNotEmpty(result.History, "历史数据不应为空");
 
         // 验证历史数据点的不变式：多空占比互补 + 时间戳递增有效
         foreach (var point in result.History)
         {
             Assert.IsTrue(point.LongRatio > 0 && point.ShortRatio > 0,
                 $"历史点多空占比应 > 0，Long={point.LongRatio}, Short={point.ShortRatio}");
-            Assert.IsTrue(Math.Abs(point.LongRatio + point.ShortRatio - 100m) < 1m,
+            Assert.IsLessThan(1m, Math.Abs(point.LongRatio + point.ShortRatio - 100m),
                 $"历史点多空占比应互补，Long={point.LongRatio}, Short={point.ShortRatio}");
-            Assert.IsTrue(point.Timestamp > 0, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
+            Assert.IsGreaterThan(0, point.Timestamp, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
         }
 
         _logger?.LogInformation("全球多空比: {Symbol} 当前多={Long}% 空={Short}% 比率={Ratio} 历史={Count}",
@@ -187,12 +187,12 @@ public class SentimentToolsTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.Contains("BTC", result.Symbol, $"Symbol 应包含 BTC，实际: {result.Symbol}");
         Assert.IsTrue(result.CurrentLongRatio > 0 && result.CurrentShortRatio > 0,
             $"头部账户多空占比应 > 0，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
-        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+        Assert.IsLessThan(1m, Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m),
             $"头部账户多空占比应接近 100%，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
-        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+        Assert.IsNotEmpty(result.History, "历史数据不应为空");
 
         foreach (var point in result.History)
         {
@@ -216,12 +216,12 @@ public class SentimentToolsTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.Contains("BTC", result.Symbol, $"Symbol 应包含 BTC，实际: {result.Symbol}");
         Assert.IsTrue(result.CurrentLongRatio > 0 && result.CurrentShortRatio > 0,
             $"头部持仓多空占比应 > 0，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
-        Assert.IsTrue(Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m) < 1m,
+        Assert.IsLessThan(1m, Math.Abs(result.CurrentLongRatio + result.CurrentShortRatio - 100m),
             $"头部持仓多空占比应接近 100%，多={result.CurrentLongRatio}, 空={result.CurrentShortRatio}");
-        Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
+        Assert.IsNotEmpty(result.History, "历史数据不应为空");
 
         foreach (var point in result.History)
         {
@@ -245,18 +245,18 @@ public class SentimentToolsTest
 
         // Assert
         Assert.IsNotNull(result);
-        Assert.IsTrue(result.Symbol.Contains("BTC"), $"Symbol 应包含 BTC，实际: {result.Symbol}");
-        Assert.IsTrue(result.CurrentOpenInterest > 0, $"当前持仓量应 > 0，实际: {result.CurrentOpenInterest}");
-        Assert.IsTrue(result.CurrentOpenInterestValue > 0, $"当前持仓价值应 > 0，实际: {result.CurrentOpenInterestValue}");
-        Assert.IsTrue(result.CurrentTimestamp > 0, $"当前时间戳应 > 0，实际: {result.CurrentTimestamp}");
+        Assert.Contains("BTC", result.Symbol, $"Symbol 应包含 BTC，实际: {result.Symbol}");
+        Assert.IsGreaterThan(0, result.CurrentOpenInterest, $"当前持仓量应 > 0，实际: {result.CurrentOpenInterest}");
+        Assert.IsGreaterThan(0, result.CurrentOpenInterestValue, $"当前持仓价值应 > 0，实际: {result.CurrentOpenInterestValue}");
+        Assert.IsGreaterThan(0, result.CurrentTimestamp, $"当前时间戳应 > 0，实际: {result.CurrentTimestamp}");
         Assert.IsTrue(result.History.Count > 0, "历史数据不应为空");
 
         // 验证历史数据点：持仓量与持仓价值均 > 0
         foreach (var point in result.History)
         {
-            Assert.IsTrue(point.SumOpenInterest > 0, $"历史点持仓量应 > 0，实际: {point.SumOpenInterest}");
-            Assert.IsTrue(point.SumOpenInterestValue > 0, $"历史点持仓价值应 > 0，实际: {point.SumOpenInterestValue}");
-            Assert.IsTrue(point.Timestamp > 0, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
+            Assert.IsGreaterThan(0, point.SumOpenInterest, $"历史点持仓量应 > 0，实际: {point.SumOpenInterest}");
+            Assert.IsGreaterThan(0, point.SumOpenInterestValue, $"历史点持仓价值应 > 0，实际: {point.SumOpenInterestValue}");
+            Assert.IsGreaterThan(0, point.Timestamp, $"历史点时间戳应 > 0，实际: {point.Timestamp}");
         }
 
         _logger?.LogInformation("持仓量: {Symbol} 当前={OI} 价值={Value} 历史={Count}",

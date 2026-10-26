@@ -7,16 +7,11 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 策略 CRUD 仓储（internal）：策略表的持久化与查询。
 /// </summary>
-internal sealed class TradingStrategyRepository : TradingRepositoryBase
+internal sealed class TradingStrategyRepository(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    Microsoft.Extensions.Logging.ILogger logger) : TradingRepositoryBase(schema, environment, logger)
 {
-    public TradingStrategyRepository(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        Microsoft.Extensions.Logging.ILogger logger)
-        : base(schema, environment, logger)
-    {
-    }
-
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
@@ -194,22 +189,29 @@ internal sealed class TradingStrategyRepository : TradingRepositoryBase
     }
 
     /// <summary>
-    /// 更新策略护栏位（止损/止盈价）。
+    /// 更新策略护栏位（止损/止盈价，以及按预算成交后同步写入持仓数量供交易所侧条件单挂单使用）。
     /// </summary>
     public async Task UpdateStrategyGuardrailsAsync(
-        string id, decimal? stopLossPrice, decimal? takeProfitPrice, CancellationToken ct = default)
+        string id, decimal? stopLossPrice, decimal? takeProfitPrice, decimal? quantity = null, CancellationToken ct = default)
     {
         await EnsureInitializedAsync();
         await using var conn = await OpenConnectionAsync(ct);
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            UPDATE strategies SET stop_loss_price = @stopLoss, take_profit_price = @takeProfit
-            WHERE id = @id AND environment = @environment
-            """;
+        cmd.CommandText = quantity is > 0
+            ? """
+              UPDATE strategies SET stop_loss_price = @stopLoss, take_profit_price = @takeProfit, quantity = @quantity
+              WHERE id = @id AND environment = @environment
+              """
+            : """
+              UPDATE strategies SET stop_loss_price = @stopLoss, take_profit_price = @takeProfit
+              WHERE id = @id AND environment = @environment
+              """;
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@stopLoss", ToDbNullable(stopLossPrice));
         cmd.Parameters.AddWithValue("@takeProfit", ToDbNullable(takeProfitPrice));
+        if (quantity is > 0)
+            cmd.Parameters.AddWithValue("@quantity", ToDb(quantity.Value));
         await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 

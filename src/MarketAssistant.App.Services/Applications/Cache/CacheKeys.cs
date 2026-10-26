@@ -62,6 +62,6 @@ public static class CacheKeys
     /// 生成虚拟币账户余额概览缓存键（含交易模式，避免切换模式后读到旧环境账户数据）。
     /// 供 <c>Trading.CryptoPortfolioService</c> 使用。
     /// </summary>
-    public static string GetCryptoAccountSummaryKey(CryptoTradingMode mode)
+    public static string GetCryptoAccountSummaryKey(TradingMode mode)
         => $"{CryptoAccountSummaryPrefix}_{mode}";
 }

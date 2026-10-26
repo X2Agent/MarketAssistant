@@ -35,12 +35,12 @@ public class InvestmentRecommendationRequest
     /// <summary>
     /// 偏好行业
     /// </summary>
-    public List<string> PreferredSectors { get; set; } = new();
+    public List<string> PreferredSectors { get; set; } = [];
 
     /// <summary>
     /// 排除行业
     /// </summary>
-    public List<string> ExcludedSectors { get; set; } = new();
+    public List<string> ExcludedSectors { get; set; } = [];
 
     /// <summary>
     /// 最大推荐数量

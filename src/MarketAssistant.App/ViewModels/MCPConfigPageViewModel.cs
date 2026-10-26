@@ -23,9 +23,23 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private readonly IDialogService _dialogService;
     private readonly McpService _mcpService;
     private readonly McpToolContextProvider _mcpToolProvider;
+    private readonly McpToolAuditLogger _auditLogger;
 
     [ObservableProperty]
-    private ObservableCollection<MCPServerConfig> _serverConfigs = new();
+    private ObservableCollection<MCPServerConfig> _serverConfigs = [];
+
+    /// <summary>
+    /// MCP 工具审计记录（工具加载 / 被白名单过滤），按发生顺序排列。
+    /// </summary>
+    public ObservableCollection<McpToolAuditEntry> AuditEntries { get; } = [];
+
+    /// <summary>是否存在审计记录（控制空态提示显隐）。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNoAuditEntries))]
+    private bool _hasAuditEntries;
+
+    /// <summary>无审计记录时的空态提示（取反便于编译绑定直接使用）。</summary>
+    public bool HasNoAuditEntries => !HasAuditEntries;
 
     [ObservableProperty]
     private MCPServerConfig? _selectedConfig;
@@ -87,7 +101,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     private bool _allowAllTools;
 
     [ObservableProperty]
-    private ObservableCollection<McpToolSelectionItem> _toolItems = new();
+    private ObservableCollection<McpToolSelectionItem> _toolItems = [];
 
     // 表单校验错误信息（保存/测试时触发，修正后即时清除）
     [ObservableProperty]
@@ -110,6 +124,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         IDialogService dialogService,
         McpService mcpService,
         McpToolContextProvider mcpToolProvider,
+        McpToolAuditLogger auditLogger,
         ILogger<MCPConfigPageViewModel>? logger)
         : base(logger)
     {
@@ -118,7 +133,9 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         _dialogService = dialogService;
         _mcpService = mcpService;
         _mcpToolProvider = mcpToolProvider;
+        _auditLogger = auditLogger;
         LoadServerConfigs();
+        LoadAuditEntries();
     }
 
     /// <summary>
@@ -510,7 +527,7 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
         config.ToolsSchemaVersion = MCPServerConfig.CurrentToolsSchemaVersion;
         config.AllowedTools = AllowAllTools
             ? []
-            : ToolItems.Where(item => item.IsSelected).Select(item => item.Name).ToList();
+            : [.. ToolItems.Where(item => item.IsSelected).Select(item => item.Name)];
         config.EnvironmentVariables = ParseEnvironmentVariables();
     }
 
@@ -721,5 +738,37 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
     {
         // 首次进入时加载配置；GoBack 重新激活时也刷新，确保数据最新
         LoadServerConfigs();
+
+        // 审计记录由 MCP 工具加载时写入，发生在其它页面（分析页首次对话）——
+        // 每次进入本页都重取，避免展示过期快照
+        LoadAuditEntries();
+    }
+
+    /// <summary>
+    /// 刷新 MCP 工具审计记录（工具加载 / 被白名单过滤事件）。
+    /// </summary>
+    [RelayCommand]
+    private void RefreshAudit()
+    {
+        LoadAuditEntries();
+    }
+
+    private void LoadAuditEntries()
+    {
+        try
+        {
+            var entries = _auditLogger.GetRecentEntries();
+            AuditEntries.Clear();
+            foreach (var entry in entries)
+            {
+                AuditEntries.Add(entry);
+            }
+
+            HasAuditEntries = AuditEntries.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "加载 MCP 工具审计记录失败");
+        }
     }
 }

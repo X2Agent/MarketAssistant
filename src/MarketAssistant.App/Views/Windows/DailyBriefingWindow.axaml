@@ -1,0 +1,117 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:MarketAssistant.ViewModels.Home"
+        xmlns:controls="using:MarketAssistant.Views.Controls"
+        mc:Ignorable="d" d:DesignWidth="760" d:DesignHeight="620"
+        x:Class="MarketAssistant.Views.Windows.DailyBriefingWindow"
+        x:DataType="vm:DailyBriefingViewModel"
+        Title="每日简报"
+        Width="760"
+        MinWidth="480"
+        MaxWidth="960"
+        Height="620"
+        MinHeight="320"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource PageBackgroundBrush}">
+
+    <Border Padding="{StaticResource CardPadding}">
+        <DockPanel LastChildFill="True">
+
+            <!-- 头部：标题 + 元信息（生成时间 / Token 成本）+ 操作按钮 -->
+            <Grid DockPanel.Dock="Top"
+                  ColumnDefinitions="Auto,*,Auto,Auto,Auto"
+                  Margin="{StaticResource SmallBottomMargin}">
+                <TextBlock Grid.Column="0"
+                           Text="每日简报"
+                           FontSize="{StaticResource SectionTitleFontSize}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+
+                <TextBlock Grid.Column="1"
+                           Margin="{StaticResource SmallLeftMargin}"
+                           FontSize="{StaticResource SmallFontSize}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding BriefingMetaText}"/>
+
+                <!-- 生成态：圆形 loading + 文案。只在弹窗内呈现，
+                     首页标题栏不指示简报状态，避免与快讯自身的加载混淆。 -->
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            Spacing="{StaticResource TinySpacing}"
+                            Margin="{StaticResource SmallLeftMargin}"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding IsGenerating}">
+                    <ProgressBar IsIndeterminate="True"
+                                 Width="{StaticResource SmallSpacing}"
+                                 Height="{StaticResource SmallSpacing}"/>
+                    <TextBlock Text="生成中…"
+                               FontSize="{StaticResource SmallFontSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 生成今日简报（纯手动策略：唯一会产生模型调用与费用的入口，
+                     因此显式命名并给出确认语义，不做任何后台自动生成；
+                     功能总开关关闭时禁用） -->
+                <Button Grid.Column="3"
+                        Content="生成今日简报"
+                        Classes="btn-primary"
+                        Command="{Binding RefreshCommand}"
+                        IsVisible="{Binding !IsGenerating}"
+                        IsEnabled="{Binding IsBriefingEnabled}"
+                        ToolTip.Tip="调用模型生成今日简报，会产生 Token 费用"
+                        Margin="{StaticResource SmallLeftMargin}"
+                        VerticalAlignment="Center"/>
+
+                <Button Grid.Column="4"
+                        Content="关闭"
+                        Classes="btn-secondary"
+                        Click="OnCloseClick"
+                        Margin="{StaticResource SmallLeftMargin}"
+                        VerticalAlignment="Center"/>
+            </Grid>
+
+            <!-- 底栏：近 30 天累计用量摘要（成本透明；无历史记录时隐藏） -->
+            <TextBlock DockPanel.Dock="Bottom"
+                       Margin="{StaticResource SmallTopMargin}"
+                       FontSize="{StaticResource SmallFontSize}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Text="{Binding UsageSummaryText}"
+                       IsVisible="{Binding ShowUsageSummary}"/>
+
+            <!-- 正文区：生成中骨架 / Markdown 全文 / 空态与失败态 -->
+            <Panel>
+                <!-- 生成中骨架 -->
+                <StackPanel Spacing="{StaticResource SmallSpacing}"
+                            IsVisible="{Binding IsGenerating}">
+                    <Border Classes="skeleton skeleton-row" Height="16"/>
+                    <Border Classes="skeleton skeleton-row" Height="16"/>
+                    <Border Classes="skeleton skeleton-row" Height="16"/>
+                    <Border Classes="skeleton skeleton-row" Height="16"/>
+                    <Border Classes="skeleton skeleton-row" Height="16"/>
+                </StackPanel>
+
+                <!-- 全文：Width 由 Window 固定，Markdown 控件树因此正常折行、
+                     高度自适应内容；ScrollViewer 负责超长文本的兜底滚动。
+                     使用项目既有的 RichTextBlock（Markdown.Avalonia）渲染，
+                     裸 TextBlock 只会显示 ** 与列表符等未渲染标记。 -->
+                <ScrollViewer IsVisible="{Binding HasBriefing}">
+                    <controls:RichTextBlock Text="{Binding BriefingContent}"/>
+                </ScrollViewer>
+
+                <!-- 空态 / 失败态 -->
+                <controls:StateOverlayView State="{Binding OverlayState}"
+                                           Message="{Binding OverlayMessage}"
+                                           RetryCommand="{Binding RetryCommand}"
+                                           RetryText="重新生成"
+                                           ShowLoading="False"/>
+            </Panel>
+        </DockPanel>
+    </Border>
+</Window>

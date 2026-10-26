@@ -4,7 +4,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Export;
 using MarketAssistant.Services.Market;
@@ -77,15 +79,66 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     [ObservableProperty]
     private string _analysisFailureMessage = string.Empty;
 
+    /// <summary>
+    /// 本次分析的 Token 用量摘要（如"本次共调用 9 次模型 / 128.4k tokens"），无统计时为空
+    /// </summary>
+    [ObservableProperty]
+    private string _usageSummaryText = string.Empty;
+
+    /// <summary>
+    /// 本次分析的 Token 用量明细（输入/输出分别展示），无统计时为空
+    /// </summary>
+    [ObservableProperty]
+    private string _usageDetailText = string.Empty;
+
+    /// <summary>
+    /// 是否统计到 Token 用量
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasUsage;
+
+    /// <summary>
+    /// 用量中是否包含本地估算值（此时数值不精确）
+    /// </summary>
+    [ObservableProperty]
+    private bool _usageIsEstimated;
+
     [ObservableProperty]
     private AnalysisReportViewModel _analysisReportViewModel;
 
     [ObservableProperty]
     private bool _isChatSidebarVisible;
 
+    /// <summary>
+    /// 报告区的空/失败/就绪状态：分析中或有报告时交由内容区呈现，否则区分为空态与失败态。
+    /// </summary>
+    public LoadState ReportOverlayState =>
+        IsBusy || HasActiveReport
+            ? LoadState.Idle
+            : string.IsNullOrWhiteSpace(AnalysisFailureMessage) ? LoadState.Empty : LoadState.Failed;
+
+    /// <summary>
+    /// 报告区提示正文：未分析时引导发起分析，失败/取消时展示原因。
+    /// </summary>
+    public string ReportOverlayMessage => string.IsNullOrWhiteSpace(AnalysisFailureMessage)
+        ? "请从资产详情页发起 AI 分析，分析结果将在此展示"
+        : AnalysisFailureMessage;
+
+    partial void OnHasActiveReportChanged(bool value) => NotifyReportOverlayChanged();
+
+    partial void OnAnalysisFailureMessageChanged(string value) => NotifyReportOverlayChanged();
+
+    protected override void OnBusyChanged() => NotifyReportOverlayChanged();
+
+    private void NotifyReportOverlayChanged()
+    {
+        OnPropertyChanged(nameof(ReportOverlayState));
+        OnPropertyChanged(nameof(ReportOverlayMessage));
+    }
+
     public ICommand ToggleChatSidebarCommand { get; private set; }
     public ICommand CancelAnalysisCommand { get; private set; }
-    public ICommand RetryAnalysisCommand { get; private set; }
+    public IAsyncRelayCommand RetryAnalysisCommand { get; private set; }
 
     private MarketAnalysisReport? _lastReport;
     private IStorageProvider? _storageProvider;
@@ -135,7 +188,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }
     }
 
-    private readonly ObservableCollection<ChatMessageAdapter> _emptyChatMessages = new();
+    private readonly ObservableCollection<ChatMessageAdapter> _emptyChatMessages = [];
     public ObservableCollection<ChatMessageAdapter> ChatMessages => ChatSidebarViewModel?.ChatMessages ?? _emptyChatMessages;
 
     public string UserInput
@@ -364,6 +417,17 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// <summary>
     /// 重置进度展示状态（新一次分析开始或市场切换时调用）
     /// </summary>
+    /// <summary>
+    /// 将报告携带的 Token 用量同步到进度面板与报告页；报告无用量时清空展示
+    /// </summary>
+    private void ApplyTokenUsage(AnalysisTokenUsage? usage)
+    {
+        HasUsage = usage is { HasValue: true };
+        UsageSummaryText = TokenUsageFormatter.FormatSummary(usage);
+        UsageDetailText = TokenUsageFormatter.FormatDetail(usage);
+        UsageIsEstimated = usage?.IsEstimated == true;
+    }
+
     private void ResetProgressDisplay()
     {
         _smoothedPercent = 0;
@@ -373,6 +437,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisPhase = AnalysisPhase.Preparing;
         FailedAnalystsInfo = string.Empty;
         AnalystRunItems.Clear();
+        ApplyTokenUsage(null);
     }
 
     private void CancelAnalysis()
@@ -415,17 +480,27 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
                 assetCode,
                 runId,
                 _analysisCts.Token);
+            if (_disposed || runId != _activeAnalysisRunId)
+                return;
+
             var report = result.Report;
 
             _lastReport = report;
             CanExportReport = true;
             HasActiveReport = true;
+            ApplyTokenUsage(report.Usage);
 
             if (!result.FromCache)
                 await RefreshHistoryAsync(StockCode);
 
+            if (_disposed || runId != _activeAnalysisRunId)
+                return;
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
+                if (_disposed || runId != _activeAnalysisRunId)
+                    return;
+
                 AnalysisReportViewModel.UpdateWithReport(report);
                 if (ChatSidebarViewModel != null)
                 {
@@ -487,6 +562,93 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         Logger?.LogInformation("分析报告已导出: {Path}", file.Name);
     }
 
+    /// <summary>
+    /// 导出分享卡图片（PNG）。分享卡为固定画布离屏渲染，与 PDF 视觉一致。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportShareImageAsync()
+    {
+        if (_lastReport == null || _storageProvider == null)
+            return;
+
+        var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出分享图",
+            SuggestedFileName = BuildShareCardFileName(),
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PNG 图片") { Patterns = ["*.png"] },
+            ],
+            DefaultExtension = "png"
+        });
+
+        if (file == null) return;
+
+        await using var stream = await file.OpenWriteAsync();
+        var bytes = ReportShareCardRenderer.RenderToPngBytes(BuildShareCardData(_lastReport));
+        await stream.WriteAsync(bytes);
+
+        Logger?.LogInformation("分享图已导出: {Path}", file.Name);
+    }
+
+    /// <summary>
+    /// 导出分享卡 PDF（单页，内容与分享图一致）。
+    /// </summary>
+    [RelayCommand]
+    private async Task ExportPdfAsync()
+    {
+        if (_lastReport == null || _storageProvider == null)
+            return;
+
+        var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "导出 PDF",
+            SuggestedFileName = BuildShareCardFileName(),
+            FileTypeChoices =
+            [
+                new FilePickerFileType("PDF 文档") { Patterns = ["*.pdf"] },
+            ],
+            DefaultExtension = "pdf"
+        });
+
+        if (file == null) return;
+
+        // SaveFilePicker 返回的流需先释放再交由 SkiaSharp 以文件路径写入，避免文件占用
+        await using (var warmup = await file.OpenWriteAsync())
+        {
+            await warmup.FlushAsync();
+        }
+
+        var localPath = file.TryGetLocalPath() ?? file.Name;
+        ReportShareCardRenderer.SavePdf(BuildShareCardData(_lastReport), localPath);
+
+        Logger?.LogInformation("PDF 已导出: {Path}", localPath);
+    }
+
+    private string BuildShareCardFileName()
+        => $"{_lastReport!.AssetSymbol}_分析卡片_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
+
+    /// <summary>
+    /// 从报告构建分享卡数据：亮点取前 3 条，Token 摘要直接复用展示层格式化。
+    /// </summary>
+    private static ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
+    {
+        var coordinator = report.CoordinatorResult;
+        return new ReportShareCardData
+        {
+            AssetName = report.AssetSymbol,
+            AssetSymbol = report.AssetSymbol,
+            OverallScore = coordinator.OverallScore,
+            InvestmentRating = coordinator.InvestmentRating.GetDescription(),
+            TargetPrice = coordinator.TargetPrice,
+            PriceChangeExpectation = coordinator.PriceChangeExpectation,
+            ConfidencePercentage = coordinator.ConfidencePercentage,
+            Highlights = [.. coordinator.InvestmentHighlights.Take(3)],
+            UsageSummary = TokenUsageFormatter.FormatSummary(report.Usage),
+            GeneratedAt = report.CreatedAt
+        };
+    }
+
     public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
     {
         if (!string.IsNullOrEmpty(parameter.Code))
@@ -508,6 +670,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     public void OnNavigatedFrom()
     {
         _analysisCts?.Cancel();
+        _progressSmoothTimer.Stop();
         _activeAnalysisRunId = null;
         IsChatSidebarVisible = false;
     }
@@ -537,6 +700,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             CanExportReport = true;
             HasActiveReport = true;
             AnalysisFailureMessage = string.Empty;
+            ApplyTokenUsage(report.Usage);
 
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
@@ -616,6 +780,14 @@ public partial class AnalystRunItemViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMark = string.Empty;
 
+    /// <summary>该分析师的 Token 用量文本（紧凑计数），未统计时为空</summary>
+    [ObservableProperty]
+    private string _tokensText = string.Empty;
+
+    /// <summary>是否统计到该分析师的 Token 用量</summary>
+    [ObservableProperty]
+    private bool _hasTokenUsage;
+
     public bool IsCompleted => Status == AnalystRunStatus.Completed;
 
     public bool IsFailed => Status == AnalystRunStatus.Failed;
@@ -691,6 +863,11 @@ public partial class AnalystRunItemViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(IsPending));
         OnPropertyChanged(nameof(IsLive));
+
+        HasTokenUsage = snapshot.HasTokenUsage;
+        TokensText = snapshot.HasTokenUsage
+            ? TokenUsageFormatter.FormatCount(snapshot.TotalTokens)
+            : string.Empty;
     }
 
     /// <summary>

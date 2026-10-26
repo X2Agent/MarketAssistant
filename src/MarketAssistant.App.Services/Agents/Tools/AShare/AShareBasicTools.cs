@@ -12,7 +12,11 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股基础数据工具实现
 /// </summary>
-public sealed class AShareBasicTools : IBasicDataTools
+public sealed class AShareBasicTools(
+    ClsQuoteClient clsClient,
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareBasicTools> logger) : IBasicDataTools
 {
     /// <summary>CLS 行情接口请求字段列表。</summary>
     private const string QuoteFields =
@@ -20,22 +24,10 @@ public sealed class AShareBasicTools : IBasicDataTools
         "TotalShares,mc,NetAssetPS,NonRestrictedShares,cmc,business_amount,business_balance,pe,ttm_pe,pb," +
         "secu_name,secu_code,trade_status,secu_type,preclose_px,up_price,last_px";
 
-    private readonly ClsQuoteClient _clsClient;
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareBasicTools> _logger;
-
-    public AShareBasicTools(
-        ClsQuoteClient clsClient,
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareBasicTools> logger)
-    {
-        _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareBasicTools> _logger = logger;
 
     [Description("根据股票代码获取股票基本数据，包括实时行情、价格变动、市值等信息")]
     public async Task<StockQuoteInfo> GetAssetInfoAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
@@ -49,15 +41,18 @@ public sealed class AShareBasicTools : IBasicDataTools
             // HTTP 访问与容错反序列化由 ClsQuoteClient 负责
             var raw = await _clsClient.GetStockQuoteAsync(formattedSymbol, QuoteFields, cancellationToken)
                 ?? throw new FriendlyException($"未找到股票 {assetSymbol} ({formattedSymbol}) 的数据，请检查代码是否正确。");
+            // last_px 为 null 表示停牌/暂无成交，没有有效行情可返回
+            if (raw.LastPrice is not { } lastPrice)
+                throw new FriendlyException($"股票 {assetSymbol} 当前无有效行情（可能停牌或暂无成交）。");
             return new StockQuoteInfo
             {
-                CurrentPrice = raw.LastPrice,
-                PriceChange = raw.ChangePx,
-                PercentageChange = raw.Change,
-                HighPrice = raw.HighPx,
-                LowPrice = raw.LowPx,
-                Volume = raw.BusinessAmount / 10000m,
-                Amount = raw.BusinessBalance / 100000000m,
+                CurrentPrice = lastPrice,
+                PriceChange = raw.ChangePx ?? 0m,
+                PercentageChange = raw.Change ?? 0m,
+                HighPrice = raw.HighPx ?? 0m,
+                LowPrice = raw.LowPx ?? 0m,
+                Volume = (raw.BusinessAmount ?? 0m) / 10000m,
+                Amount = (raw.BusinessBalance ?? 0m) / 100000000m,
                 TurnoverRate = raw.TurnoverRate,
                 PercentageChange3Day = raw.Change3,
                 PercentageChange5Day = raw.Change5,
@@ -67,8 +62,8 @@ public sealed class AShareBasicTools : IBasicDataTools
                 SecurityCode = raw.SecurityCode ?? string.Empty,
                 TradeStatus = raw.TradeStatus ?? string.Empty,
                 SecurityType = raw.SecurityType ?? string.Empty,
-                OpenPrice = raw.OpenPx,
-                PreviousClosePrice = raw.PreClosePx,
+                OpenPrice = raw.OpenPx ?? 0m,
+                PreviousClosePrice = raw.PreClosePx ?? 0m,
                 UpLimitPrice = raw.UpPrice,
                 DownLimitPrice = raw.DownPrice,
                 Amplitude = raw.Amplitude,
@@ -95,7 +90,7 @@ public sealed class AShareBasicTools : IBasicDataTools
     {
         try
         {
-            assetSymbol = new string(assetSymbol.Where(char.IsDigit).ToArray());
+            assetSymbol = new string([.. assetSymbol.Where(char.IsDigit)]);
 
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var info = await _zhiTuClient.GetCompanyInfoAsync<CompanyInfo>(assetSymbol, token, cancellationToken);

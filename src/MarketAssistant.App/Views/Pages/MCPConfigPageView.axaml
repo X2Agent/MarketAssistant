@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:settings="using:MarketAssistant.Applications.Settings"
+             xmlns:mcp="using:MarketAssistant.Services.Mcp"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converts="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
@@ -12,6 +13,7 @@
 
     <UserControl.Resources>
         <converts:RadioButtonEqualityConverter x:Key="RadioButtonEqualityConverter"/>
+        <converts:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
         <GridLength x:Key="ServerListWidth">280</GridLength>
         <Thickness x:Key="ChipPadding">4,0</Thickness>
     </UserControl.Resources>
@@ -30,7 +32,7 @@
                 Background="{DynamicResource ItemBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="{StaticResource RightBorderThickness}">
-            <Grid RowDefinitions="Auto,*">
+            <Grid RowDefinitions="Auto,*,Auto">
                 <!-- 顶部操作区 -->
                 <Border Grid.Row="0" 
                         Padding="{StaticResource PagePadding}" 
@@ -141,6 +143,67 @@
                                        HorizontalAlignment="Center"/>
                         </StackPanel>
                 </Grid>
+
+                <!-- 工具审计：MCP 工具加载 / 白名单过滤事件（内存态，刷新重取） -->
+                <Border Grid.Row="2"
+                        Padding="{StaticResource PagePadding}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="{StaticResource TopBorderThickness}"
+                        Background="{DynamicResource CardBackgroundBrush}">
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="工具审计"
+                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1"
+                                    Command="{Binding RefreshAuditCommand}"
+                                    Content="刷新"
+                                    Background="Transparent"
+                                    Foreground="{StaticResource PrimaryBrush}"
+                                    FontSize="{StaticResource SmallFontSize}"
+                                    Padding="{StaticResource ChipPadding}"/>
+                        </Grid>
+                        <TextBlock IsVisible="{Binding HasNoAuditEntries}"
+                                   Text="暂无审计记录。工具在会话中加载后在此显示。"
+                                   TextWrapping="Wrap"
+                                   FontSize="{StaticResource SmallFontSize}"
+                                   Foreground="{DynamicResource TextDisabledBrush}"/>
+                        <ItemsControl ItemsSource="{Binding AuditEntries}"
+                                      IsVisible="{Binding HasAuditEntries}"
+                                      MaxHeight="180">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="{StaticResource TinySpacing}"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="mcp:McpToolAuditEntry">
+                                    <StackPanel Spacing="0">
+                                        <TextBlock TextWrapping="NoWrap"
+                                                   FontSize="{StaticResource SmallFontSize}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}">
+                                            <Run Text="{Binding EventType, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                            <Run Text=" "/>
+                                            <Run Text="{Binding ServerName}"/>
+                                            <Run Text=" / "/>
+                                            <Run Text="{Binding ToolName}"/>
+                                        </TextBlock>
+                                        <TextBlock TextWrapping="NoWrap"
+                                                   FontSize="{StaticResource MiniFontSize}"
+                                                   Foreground="{DynamicResource TextDisabledBrush}">
+                                            <Run Text="{Binding Category}"/>
+                                            <Run Text=" · "/>
+                                            <Run Text="{Binding Timestamp, StringFormat='{}{0:MM-dd HH:mm}'}"/>
+                                            <Run Text=" UTC"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 

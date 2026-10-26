@@ -8,18 +8,12 @@ namespace MarketAssistant.Applications.InvestmentSelection;
 /// AI投资选择服务 - 业务逻辑层，负责对外API和业务规则
 /// 使用确定性投资选择工作流支持股票和虚拟币市场
 /// </summary>
-public class InvestmentSelectionService
+public class InvestmentSelectionService(
+    InvestmentSelectionWorkflow selectionWorkflow,
+    ILogger<InvestmentSelectionService> logger)
 {
-    private readonly InvestmentSelectionWorkflow _selectionWorkflow;
-    private readonly ILogger<InvestmentSelectionService> _logger;
-
-    public InvestmentSelectionService(
-        InvestmentSelectionWorkflow selectionWorkflow,
-        ILogger<InvestmentSelectionService> logger)
-    {
-        _selectionWorkflow = selectionWorkflow ?? throw new ArgumentNullException(nameof(selectionWorkflow));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly InvestmentSelectionWorkflow _selectionWorkflow = selectionWorkflow ?? throw new ArgumentNullException(nameof(selectionWorkflow));
+    private readonly ILogger<InvestmentSelectionService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     #region 业务API接口
 
@@ -139,8 +133,8 @@ public class InvestmentSelectionService
     /// </summary>
     private List<QuickSelectionStrategyInfo> GetStockStrategies()
     {
-        return new List<QuickSelectionStrategyInfo>
-        {
+        return
+        [
             new QuickSelectionStrategyInfo
             {
                 Strategy = QuickSelectionStrategy.ValueInvestment,
@@ -195,7 +189,7 @@ public class InvestmentSelectionService
                 Scenario = "适合追求稳定现金流的投资者",
                 RiskLevel = "低风险"
             }
-        };
+        ];
     }
 
     /// <summary>
@@ -203,8 +197,8 @@ public class InvestmentSelectionService
     /// </summary>
     private List<QuickSelectionStrategyInfo> GetCryptoStrategies()
     {
-        return new List<QuickSelectionStrategyInfo>
-        {
+        return
+        [
             new QuickSelectionStrategyInfo
             {
                 Strategy = QuickSelectionStrategy.ValueInvestment,
@@ -259,7 +253,7 @@ public class InvestmentSelectionService
                 Scenario = "适合激进型交易者，追求短期高波动收益",
                 RiskLevel = "高风险"
             }
-        };
+        ];
     }
 
     #endregion
@@ -304,15 +298,11 @@ public class InvestmentSelectionService
     {
         if (request.RiskPreference == "conservative")
         {
-            result.Recommendations = result.Recommendations
-                .Where(r => r.RiskLevel != RiskLevel.High)
-                .ToList();
+            result.Recommendations = [.. result.Recommendations.Where(r => r.RiskLevel != RiskLevel.High)];
         }
         else if (request.RiskPreference == "aggressive")
         {
-            result.Recommendations = result.Recommendations
-                .OrderByDescending(r => r.ExpectedReturn ?? 0)
-                .ToList();
+            result.Recommendations = [.. result.Recommendations.OrderByDescending(r => r.ExpectedReturn ?? 0)];
         }
 
         return result;
@@ -322,9 +312,7 @@ public class InvestmentSelectionService
     {
         if (result.Recommendations.Count > request.MaxRecommendations)
         {
-            result.Recommendations = result.Recommendations
-                .Take(request.MaxRecommendations)
-                .ToList();
+            result.Recommendations = [.. result.Recommendations.Take(request.MaxRecommendations)];
         }
 
         foreach (var recommendation in result.Recommendations)
@@ -380,7 +368,7 @@ public class InvestmentSelectionService
 
     private string NormalizeRiskPreference(string riskPreference)
     {
-        return riskPreference?.ToLower() switch
+        return riskPreference?.ToLowerInvariant() switch
         {
             "conservative" or "保守" or "低风险" => "conservative",
             "aggressive" or "激进" or "高风险" => "aggressive",

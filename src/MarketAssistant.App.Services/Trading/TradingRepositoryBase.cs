@@ -9,40 +9,27 @@ namespace MarketAssistant.Services.Trading;
 /// 交易仓储基类（internal）：封装环境 key 解析、decimal 存取辅助、连接获取与延迟初始化。
 /// 各仓储继承本类，仅关注自身的 CRUD SQL；schema 初始化统一由 <see cref="TradingSchemaInitializer"/> 负责。
 /// </summary>
-internal abstract class TradingRepositoryBase
+internal abstract class TradingRepositoryBase(
+    TradingSchemaInitializer schema,
+    TradingEnvironmentService environment,
+    ILogger logger)
 {
-    private readonly TradingSchemaInitializer _schema;
-    private readonly TradingEnvironmentService _environment;
+    private readonly TradingSchemaInitializer _schema = schema;
+    private readonly TradingEnvironmentService _environment = environment;
 
-    protected ILogger Logger { get; }
-
-    protected TradingRepositoryBase(
-        TradingSchemaInitializer schema,
-        TradingEnvironmentService environment,
-        ILogger logger)
-    {
-        _schema = schema;
-        _environment = environment;
-        Logger = logger;
-    }
+    protected ILogger Logger { get; } = logger;
 
     /// <summary>
     /// 4 种交易模式各自独立的环境 key，确保现货实盘、现货 Demo、合约实盘、合约 Testnet
     /// 的策略、交易记录、持仓、风控配置互不混淆。
     /// </summary>
-    protected string CurrentEnvironmentKey => _environment.CurrentMode switch
-    {
-        CryptoTradingMode.LiveFutures => TradingEnvironmentKeys.LiveFutures,
-        CryptoTradingMode.BinanceFuturesTestnet => TradingEnvironmentKeys.FuturesTestnet,
-        CryptoTradingMode.BinanceSpotDemo => TradingEnvironmentKeys.SpotDemo,
-        _ => TradingEnvironmentKeys.LiveSpot
-    };
+    protected string CurrentEnvironmentKey => TradingEnvironmentKeys.FromMode(_environment.CurrentMode);
 
     /// <summary>
     /// 当前是否为合约模式（合约买卖方向需结合持仓判断开平仓）
     /// </summary>
     protected bool IsFuturesMode => _environment.CurrentMode is
-        CryptoTradingMode.LiveFutures or CryptoTradingMode.BinanceFuturesTestnet;
+        TradingMode.LiveFutures or TradingMode.FuturesTestnet;
 
     protected Task EnsureInitializedAsync() => _schema.EnsureSchemaInitializedAsync();
 
@@ -74,10 +61,4 @@ internal abstract class TradingRepositoryBase
             _ => 0
         };
     }
-
-    /// <summary>
-    /// 获取今日日期字符串，用于日统计与账户快照的日期分组键。
-    /// 刻意使用本地时间（DateTime.Now）而非 UTC：交易日的切分以用户所在时区为准。
-    /// </summary>
-    protected static string GetTodayDateString() => DateTime.Now.ToString("yyyy-MM-dd");
 }

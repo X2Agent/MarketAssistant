@@ -30,7 +30,11 @@ public static class ServiceCollectionExtensions
         services.AddBusinessServices();
 
         // 注册 Avalonia 平台特定服务
-        services.AddSingleton<IDialogService, DialogService>();
+        // 对话框/窗口服务共用同一单例：IWindowService 依赖 DialogService 内的
+        // 已开窗口状态做重复打开防护，拆成两个实例会失去该状态
+        services.AddSingleton<DialogService>();
+        services.AddSingleton<IDialogService>(sp => sp.GetRequiredService<DialogService>());
+        services.AddSingleton<IWindowService>(sp => sp.GetRequiredService<DialogService>());
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<NavigationService>();
 
@@ -75,6 +79,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<HotAssetsViewModel>();
         services.AddTransient<RecentAssetsViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
+
+        // 简报为纯手动生成（构造时仅读当天缓存，不触发模型调用），Singleton 可避免
+        // 反复进出首页重复读库。其余首页子 ViewModel 无此状态，维持 Transient。
+        services.AddSingleton<DailyBriefingViewModel>();
 
         services.AddTransient<AgentAnalysisViewModel>();
         services.AddTransient<AnalysisReportViewModel>();

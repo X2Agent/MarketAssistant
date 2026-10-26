@@ -21,23 +21,16 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// - 优点：免费、稳定、无需密钥
 /// - 缺点：无法精确搜索，需在客户端按 assetSymbol 过滤标题/摘要
 /// </summary>
-public sealed class CryptoNewsTools : INewsDataTools
+public sealed class CryptoNewsTools(
+    ILogger<CryptoNewsTools> logger,
+    IHttpClientFactory httpClientFactory,
+    ICryptoAliasRegistry aliasRegistry) : INewsDataTools
 {
     private const string RssFeedUrl = "https://cointelegraph.com/rss";
 
-    private readonly ILogger<CryptoNewsTools> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ICryptoAliasRegistry _aliasRegistry;
-
-    public CryptoNewsTools(
-        ILogger<CryptoNewsTools> logger,
-        IHttpClientFactory httpClientFactory,
-        ICryptoAliasRegistry aliasRegistry)
-    {
-        _logger = logger;
-        _httpClientFactory = httpClientFactory;
-        _aliasRegistry = aliasRegistry;
-    }
+    private readonly ILogger<CryptoNewsTools> _logger = logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
 
     /// <summary>
     /// 获取虚拟币相关新闻（从 CoinTelegraph RSS 拉取并按币种过滤）
@@ -117,7 +110,7 @@ public sealed class CryptoNewsTools : INewsDataTools
         List<NewsItem> items, string symbol, int count, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(symbol))
-            return items.Take(count).ToList();
+            return [.. items.Take(count)];
 
         var aliases = await _aliasRegistry.GetAliasesAsync(symbol, cancellationToken);
 
@@ -131,7 +124,7 @@ public sealed class CryptoNewsTools : INewsDataTools
             .Take(count)
             .ToList();
 
-        return filtered.Count > 0 ? filtered : items.Take(count).ToList();
+        return filtered.Count > 0 ? filtered : [.. items.Take(count)];
     }
 
     public IEnumerable<AIFunction> GetFunctions()

@@ -10,18 +10,12 @@ namespace MarketAssistant.Services.Trading;
 /// 仅上报用户需要知晓的状态跃迁（自动暂停 / 完结 / 信号成交），tick 级过程不上报。
 /// 风控拒绝类告警由 <see cref="RiskAlertEvaluator"/> 负责，二者按拒绝原因互斥分流，不重复告警。
 /// </summary>
-public sealed class SignalAlertEvaluator
+public sealed class SignalAlertEvaluator(
+    IAlertCenterService alertCenterService,
+    ILogger<SignalAlertEvaluator> logger)
 {
-    private readonly IAlertCenterService _alertCenterService;
-    private readonly ILogger<SignalAlertEvaluator> _logger;
-
-    public SignalAlertEvaluator(
-        IAlertCenterService alertCenterService,
-        ILogger<SignalAlertEvaluator> logger)
-    {
-        _alertCenterService = alertCenterService;
-        _logger = logger;
-    }
+    private readonly IAlertCenterService _alertCenterService = alertCenterService;
+    private readonly ILogger<SignalAlertEvaluator> _logger = logger;
 
     /// <summary>
     /// 策略因触发被拒而自动暂停。风控拒绝已由 RiskAlertEvaluator 上报（其内容含暂停说明），

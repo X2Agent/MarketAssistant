@@ -10,7 +10,9 @@ using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Applications.Home;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.Applications.News;
+using MarketAssistant.Applications.Technical;
 using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Services.Trading.Exchanges;
@@ -58,6 +60,12 @@ public sealed class CryptoMarketModule : IMarketModule
         services.AddKeyedSingleton<IKLineService, CryptoKLineService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetCacheService, AssetCacheService>(MarketType.Crypto);
         services.AddKeyedSingleton<IAssetScreenerService, CryptoScreenerService>(MarketType.Crypto);
+
+        // 资产页行情数据（盘口 / 逐笔来自币安）
+        services.AddKeyedSingleton<IMarketSnapshotService, CryptoMarketSnapshotService>(MarketType.Crypto);
+        services.AddKeyedSingleton<IOrderBookService, CryptoOrderBookService>(MarketType.Crypto);
+        services.AddKeyedSingleton<ITickTradeService, CryptoTickTradeService>(MarketType.Crypto);
+        services.AddTechnicalIndicatorService(MarketType.Crypto);
 
         // 顶栏行情条：全网总市值+涨跌幅、BTC 主导率（CoinGecko /global）与恐惧贪婪指数（alternative.me）
         services.AddKeyedSingleton<IIndexQuoteService, CryptoIndexQuoteService>(MarketType.Crypto);

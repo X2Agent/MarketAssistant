@@ -5,7 +5,7 @@ namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class FinancialCardParser : BaseAdaptiveCardParser<FinancialAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "HealthAssessment", "ProfitQuality", "CashFlow" };
+    protected override string[] RequiredKeys => ["HealthAssessment", "ProfitQuality", "CashFlow"];
 
     protected override bool IsValid(FinancialAnalysisResult model)
     {

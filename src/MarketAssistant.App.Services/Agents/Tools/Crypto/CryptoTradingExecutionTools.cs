@@ -14,27 +14,20 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// <summary>
 /// 虚拟币交易执行工具实现，供 TradingAgent 使用。下单委托给 TradeExecutor 统一入口。
 /// </summary>
-public class CryptoTradingExecutionTools : ITradingExecutionTools
+public class CryptoTradingExecutionTools(
+    CryptoPortfolioService portfolioService,
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    BinanceMarketDataService marketDataService,
+    TradeExecutor tradeExecutor,
+    ILogger<CryptoTradingExecutionTools> logger,
+    TradingHaltState? haltState = null) : ITradingExecutionTools
 {
-    private readonly CryptoPortfolioService _portfolioService;
-    private readonly IExchangeClient _exchangeClient;
-    private readonly BinanceMarketDataService _marketDataService;
-    private readonly TradeExecutor _tradeExecutor;
-    private readonly ILogger<CryptoTradingExecutionTools> _logger;
-
-    public CryptoTradingExecutionTools(
-        CryptoPortfolioService portfolioService,
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        BinanceMarketDataService marketDataService,
-        TradeExecutor tradeExecutor,
-        ILogger<CryptoTradingExecutionTools> logger)
-    {
-        _portfolioService = portfolioService;
-        _exchangeClient = exchangeClient;
-        _marketDataService = marketDataService;
-        _tradeExecutor = tradeExecutor;
-        _logger = logger;
-    }
+    private readonly CryptoPortfolioService _portfolioService = portfolioService;
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly BinanceMarketDataService _marketDataService = marketDataService;
+    private readonly TradeExecutor _tradeExecutor = tradeExecutor;
+    private readonly TradingHaltState? _haltState = haltState;
+    private readonly ILogger<CryptoTradingExecutionTools> _logger = logger;
 
     [Description("查询Binance账户余额，返回总资产价值(USDT)和各币种余额明细")]
     public async Task<AccountBalanceSummary> GetAccountBalanceAsync(CancellationToken cancellationToken = default)
@@ -57,6 +50,7 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         [Description("限价单价格，市价单可不填")] decimal? price = null,
         CancellationToken cancellationToken = default)
     {
+        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
         var effectivePrice = price ?? 0;
         if (type == OrderType.Market && effectivePrice == 0)
         {
@@ -89,14 +83,20 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
         [Description("Binance订单ID")] long orderId,
         CancellationToken cancellationToken = default)
     {
+        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
         var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString(), cancellationToken);
+        var executedPrice = order.AveragePrice > 0
+            ? order.AveragePrice
+            : (order.CumulativeQuoteQty > 0 && order.ExecutedQty > 0
+                ? order.CumulativeQuoteQty / order.ExecutedQty
+                : order.Price);
         return new OrderStatusInfo
         {
             OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
             Symbol = order.Symbol,
             Status = order.Status,
             ExecutedQty = order.ExecutedQty,
-            ExecutedPrice = order.Price
+            ExecutedPrice = executedPrice
         };
     }
 
@@ -108,6 +108,17 @@ public class CryptoTradingExecutionTools : ITradingExecutionTools
     {
         try
         {
+            symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+            if (_haltState != null)
+            {
+                await _haltState.EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
+                if (_haltState.IsHalted)
+                {
+                    _logger.LogWarning("交易处于紧急停止状态，拒绝 Agent 撤单请求: {Symbol} {OrderId}", symbol, orderId);
+                    return false;
+                }
+            }
+
             await _exchangeClient.CancelOrderAsync(symbol, orderId.ToString(), cancellationToken);
             return true;
         }

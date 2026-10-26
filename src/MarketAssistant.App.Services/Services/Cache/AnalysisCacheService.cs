@@ -1,5 +1,6 @@
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Applications.Cache;
+using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Settings;
@@ -12,25 +13,17 @@ namespace MarketAssistant.Services.Cache;
 /// 分析结果缓存服务（彻底重构版）
 /// 缓存完整的 MarketAnalysisReport，更符合业务逻辑
 /// </summary>
-public class AnalysisCacheService : IAnalysisCacheService
+public class AnalysisCacheService(
+    ILogger<AnalysisCacheService> logger,
+    IMemoryCache memoryCache,
+    MarketContext marketContext,
+    IUserSettingService userSettingService) : IAnalysisCacheService
 {
-    private readonly ILogger<AnalysisCacheService> _logger;
-    private readonly IMemoryCache _memoryCache;
-    private readonly MarketContext _marketContext;
-    private readonly IUserSettingService _userSettingService;
+    private readonly ILogger<AnalysisCacheService> _logger = logger;
+    private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly MarketContext _marketContext = marketContext;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly TimeSpan _cacheExpiration = TimeSpan.FromHours(2);
-
-    public AnalysisCacheService(
-        ILogger<AnalysisCacheService> logger,
-        IMemoryCache memoryCache,
-        MarketContext marketContext,
-        IUserSettingService userSettingService)
-    {
-        _logger = logger;
-        _memoryCache = memoryCache;
-        _marketContext = marketContext;
-        _userSettingService = userSettingService;
-    }
 
     /// <summary>
     /// 获取缓存的市场分析报告。
@@ -122,8 +115,8 @@ public class AnalysisCacheService : IAnalysisCacheService
     }
 
     /// <summary>
-    /// 生成配置指纹：ModelId + 启用的分析师角色排序后的 JSON。
-    /// 任一配置变更后指纹不同，缓存自动失效。
+    /// 生成配置指纹：默认 ModelId + 角色级模型分配 + 启用的分析师角色排序后的字符串。
+    /// 任一配置变更后指纹不同，缓存自动失效（角色级模型变更同样会使旧报告失效）。
     /// </summary>
     private string GetConfigFingerprint()
     {
@@ -133,7 +126,8 @@ public class AnalysisCacheService : IAnalysisCacheService
             .Select(kv => kv.Key)
             .OrderBy(s => s);
         var activeModelId = setting.ProviderModelIds.GetValueOrDefault(setting.ProviderId, string.Empty);
-        return $"{activeModelId}|{string.Join(",", enabledRoles)}";
+        var roleAssignments = AnalystModelAssignment.GetAssignmentFingerprint(setting, setting.ProviderId);
+        return $"{activeModelId}|{roleAssignments}|{string.Join(",", enabledRoles)}";
     }
 
     /// <summary>
@@ -144,5 +138,6 @@ public class AnalysisCacheService : IAnalysisCacheService
     public void Dispose()
     {
         // IMemoryCache 由 DI 容器管理，无需手动释放
+        GC.SuppressFinalize(this);
     }
 }

@@ -11,18 +11,12 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// 虚拟币市场情绪工具实现
 /// https://developers.binance.com/docs/zh-CN/derivatives/usds-margined-futures/general-info
 /// </summary>
-public sealed class CryptoSentimentTools : ISentimentTools
+public sealed class CryptoSentimentTools(
+    ILogger<CryptoSentimentTools> logger,
+    BinanceMarketDataService binanceService) : ISentimentTools
 {
-    private readonly ILogger<CryptoSentimentTools> _logger;
-    private readonly BinanceMarketDataService _binanceService;
-
-    public CryptoSentimentTools(
-        ILogger<CryptoSentimentTools> logger,
-        BinanceMarketDataService binanceService)
-    {
-        _logger = logger;
-        _binanceService = binanceService;
-    }
+    private readonly ILogger<CryptoSentimentTools> _logger = logger;
+    private readonly BinanceMarketDataService _binanceService = binanceService;
 
     public async Task<FundingRateHistory> GetFundingRateAsync(string symbol, CancellationToken cancellationToken = default)
     {

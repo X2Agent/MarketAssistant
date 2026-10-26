@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Tools.Models;
 using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.DataProviders;
 using Microsoft.Extensions.AI;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json.Nodes;
+using CryptoOrderBookLevel = MarketAssistant.Agents.Tools.Models.Crypto.OrderBookLevel;
 
 namespace MarketAssistant.Agents.Tools.Crypto;
 
@@ -21,24 +23,20 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 /// 职责：提供市场深度数据、综合市场指标和衍生计算指标
 /// 数据源：币安（市场深度）、CoinGecko（市场指标、交易量分布）
 /// </remarks>
-public sealed class CryptoMetricsTools : IFinancialTools
+public sealed class CryptoMetricsTools(
+    BinanceMarketDataService binanceService,
+    CoinGeckoApiService coinGeckoService,
+    [FromKeyedServices(MarketType.Crypto)] IKLineService klineService,
+    [FromKeyedServices(MarketType.Crypto)] IOrderBookService orderBookService,
+    [FromKeyedServices(MarketType.Crypto)] ITickTradeService tickTradeService,
+    ILogger<CryptoMetricsTools> logger) : IFinancialTools
 {
-    private readonly BinanceMarketDataService _binanceService;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly IKLineService _klineService;
-    private readonly ILogger<CryptoMetricsTools> _logger;
-
-    public CryptoMetricsTools(
-        BinanceMarketDataService binanceService,
-        CoinGeckoApiService coinGeckoService,
-        [FromKeyedServices(MarketType.Crypto)] IKLineService klineService,
-        ILogger<CryptoMetricsTools> logger)
-    {
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly IKLineService _klineService = klineService ?? throw new ArgumentNullException(nameof(klineService));
+    private readonly IOrderBookService _orderBookService = orderBookService ?? throw new ArgumentNullException(nameof(orderBookService));
+    private readonly ITickTradeService _tickTradeService = tickTradeService ?? throw new ArgumentNullException(nameof(tickTradeService));
+    private readonly ILogger<CryptoMetricsTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // ==================== 市场深度数据（币安） ====================
 
@@ -50,10 +48,9 @@ public sealed class CryptoMetricsTools : IFinancialTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            // 当无自定义时间范围时，复用 IKLineService 与 CryptoTechnicalTools 共享同一数据路径
-            if (startTime is null && endTime is null)
+            // 当无自定义时间范围且周期受 IKLineService 支持时，复用 IKLineService 与 CryptoTechnicalTools 共享同一数据路径
+            if (startTime is null && endTime is null && TryToKLineType(interval, out var klineType))
             {
-                var klineType = ToKLineType(interval);
                 var klineData = await _klineService.GetKLineDataAsync(symbol, klineType, Math.Min(limit, 1000));
 
                 if (klineData is not { Count: > 0 })
@@ -64,7 +61,7 @@ public sealed class CryptoMetricsTools : IFinancialTools
                 {
                     Symbol = binanceSymbol,
                     Interval = intervalStr,
-                    Candles = klineData.Select(k => new OHLCVCandle
+                    Candles = [.. klineData.Select(k => new OHLCVCandle
                     {
                         OpenTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds(),
                         CloseTime = new DateTimeOffset(k.Timestamp).ToUnixTimeMilliseconds() + intervalMs - 1,
@@ -74,11 +71,11 @@ public sealed class CryptoMetricsTools : IFinancialTools
                         Close = k.Close,
                         Volume = k.Volume,
                         QuoteVolume = k.Amount
-                    }).ToList()
+                    })]
                 };
             }
 
-            // 有自定义时间范围时直接调用 Binance API
+            // 有自定义时间范围或 IKLineService 不支持的周期（如 1h/4h/30m）时直接调用 Binance API
             var response = await _binanceService.GetKlinesAsync(binanceSymbol, intervalStr, limit, startTime, endTime, cancellationToken);
             if (response == null || response.Count == 0)
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的K线数据，请确认代码是否正确");
@@ -121,14 +118,30 @@ public sealed class CryptoMetricsTools : IFinancialTools
         }
     }
 
-    private static KLineType ToKLineType(MarketInterval interval) => interval switch
+    private static bool TryToKLineType(MarketInterval interval, out KLineType klineType)
     {
-        MarketInterval.FiveMinutes => KLineType.Minute5,
-        MarketInterval.FifteenMinutes => KLineType.Minute15,
-        MarketInterval.OneWeek => KLineType.Weekly,
-        MarketInterval.OneMonth => KLineType.Monthly,
-        _ => KLineType.Daily
-    };
+        switch (interval)
+        {
+            case MarketInterval.FiveMinutes:
+                klineType = KLineType.Minute5;
+                return true;
+            case MarketInterval.FifteenMinutes:
+                klineType = KLineType.Minute15;
+                return true;
+            case MarketInterval.OneDay:
+                klineType = KLineType.Daily;
+                return true;
+            case MarketInterval.OneWeek:
+                klineType = KLineType.Weekly;
+                return true;
+            case MarketInterval.OneMonth:
+                klineType = KLineType.Monthly;
+                return true;
+            default:
+                klineType = default;
+                return false;
+        }
+    }
 
     private static string ToBinanceInterval(MarketInterval interval)
     {
@@ -185,51 +198,18 @@ public sealed class CryptoMetricsTools : IFinancialTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            var response = await _binanceService.GetDepthAsync(binanceSymbol, limit, cancellationToken);
-            if (response == null)
+            var snapshot = await _orderBookService.GetOrderBookAsync(binanceSymbol, limit, cancellationToken);
+            if (snapshot == null)
             {
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的深度数据，请确认代码是否正确。");
-            }
-
-            var bids = new List<OrderBookLevel>();
-            var asks = new List<OrderBookLevel>();
-
-            if (response["bids"] is JsonArray bidsArray)
-            {
-                foreach (var bid in bidsArray)
-                {
-                    if (bid is JsonArray bidArr && bidArr.Count >= 2)
-                    {
-                        bids.Add(new OrderBookLevel
-                        {
-                            Price = decimal.Parse(bidArr[0]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                            Quantity = decimal.Parse(bidArr[1]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture)
-                        });
-                    }
-                }
-            }
-
-            if (response["asks"] is JsonArray asksArray)
-            {
-                foreach (var ask in asksArray)
-                {
-                    if (ask is JsonArray askArr && askArr.Count >= 2)
-                    {
-                        asks.Add(new OrderBookLevel
-                        {
-                            Price = decimal.Parse(askArr[0]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                            Quantity = decimal.Parse(askArr[1]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture)
-                        });
-                    }
-                }
             }
 
             return new CryptoOrderBookDepth
             {
                 Symbol = binanceSymbol,
-                LastUpdateId = response["lastUpdateId"]?.GetValue<long>() ?? 0,
-                Bids = bids,
-                Asks = asks
+                LastUpdateId = snapshot.LastUpdateId,
+                Bids = [.. snapshot.Bids.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })],
+                Asks = [.. snapshot.Asks.Select(level => new CryptoOrderBookLevel { Price = level.Price, Quantity = level.Quantity })]
             };
         }
         catch (OperationCanceledException)
@@ -251,40 +231,28 @@ public sealed class CryptoMetricsTools : IFinancialTools
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            var response = await _binanceService.GetRecentTradesAsync(binanceSymbol, limit, cancellationToken);
-            if (response == null || response.Count == 0)
+            var recentTrades = await _tickTradeService.GetRecentTradesAsync(binanceSymbol, limit, cancellationToken);
+            if (recentTrades.Count == 0)
             {
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的成交数据，请确认代码是否正确。");
             }
 
-            var trades = new List<CryptoTrade>();
-            decimal buyVolume = 0;
-            decimal sellVolume = 0;
-
-            foreach (var item in response)
-            {
-                if (item is not JsonObject obj) continue;
-
-                var price = decimal.Parse(obj["price"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
-                var qty = decimal.Parse(obj["qty"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture);
-                var isBuyerMaker = obj["isBuyerMaker"]?.GetValue<bool>() ?? false;
-
-                trades.Add(new CryptoTrade
+            // ITickTradeService 按最新在前返回；工具契约保持数据源的升序顺序，避免改变既有输出
+            var trades = recentTrades
+                .Reverse()
+                .Select(trade => new CryptoTrade
                 {
-                    TradeId = obj["id"]?.GetValue<long>() ?? 0,
-                    Price = price,
-                    Quantity = qty,
-                    QuoteQuantity = decimal.Parse(obj["quoteQty"]?.GetValue<string>() ?? "0", CultureInfo.InvariantCulture),
-                    Timestamp = obj["time"]?.GetValue<long>() ?? 0,
-                    IsBuyerMaker = isBuyerMaker
-                });
+                    TradeId = trade.TradeId,
+                    Price = trade.Price,
+                    Quantity = trade.Quantity,
+                    QuoteQuantity = trade.Amount,
+                    Timestamp = new DateTimeOffset(trade.Timestamp).ToUnixTimeMilliseconds(),
+                    IsBuyerMaker = trade.IsBuyerMaker
+                })
+                .ToList();
 
-                if (isBuyerMaker)
-                    sellVolume += qty;  // Buyer是maker表示主动卖出
-                else
-                    buyVolume += qty;   // Buyer是taker表示主动买入
-            }
-
+            var buyVolume = trades.Where(trade => !trade.IsBuyerMaker).Sum(trade => trade.Quantity);
+            var sellVolume = trades.Where(trade => trade.IsBuyerMaker).Sum(trade => trade.Quantity);
             var totalVolume = buyVolume + sellVolume;
 
             return new CryptoRecentTrades
@@ -389,15 +357,14 @@ public sealed class CryptoMetricsTools : IFinancialTools
             var totalVolume = exchangeVolumes.Sum(x => x.Volume);
             if (totalVolume == 0) return [];
 
-            return exchangeVolumes
+            return [.. exchangeVolumes
                 .Select(x => new VolumeDistribution
                 {
                     Exchange = x.Exchange,
                     Volume = (decimal)x.Volume,
                     Percentage = (decimal)(x.Volume / totalVolume * 100),
                     PairCount = x.PairCount
-                })
-                .ToList();
+                })];
         }
         catch (OperationCanceledException)
         {
@@ -558,7 +525,13 @@ public sealed class CryptoMetricsTools : IFinancialTools
             var cleanSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
             var searchSymbol = CryptoSymbolConverter.ExtractBaseCurrency(cleanSymbol);
 
-            // 2. 搜索 CoinGecko
+            // 2. 优先查询内置静态映射，避免消耗 CoinGecko 搜索接口限流配额
+            if (CryptoSymbolConverter.TryGetCoinGeckoId(searchSymbol, out var mappedId))
+            {
+                return mappedId;
+            }
+
+            // 3. 搜索 CoinGecko
             var response = await _coinGeckoService.SearchCoinsAsync(searchSymbol, cancellationToken);
 
             var coin = response?.Coins?.FirstOrDefault(c =>
@@ -569,14 +542,18 @@ public sealed class CryptoMetricsTools : IFinancialTools
                 return coin.Id;
             }
 
-            // 3. Fallback: 使用提取后的符号小写
-            _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用小写symbol作为fallback", symbol, searchSymbol);
-            return searchSymbol.ToLowerInvariant();
+            // 4. Fallback: 使用提取后的符号转 CoinGecko ID
+            _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用静态规则作为fallback", symbol, searchSymbol);
+            return CryptoSymbolConverter.ToCoinGeckoId(searchSymbol);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "搜索CoinGecko ID失败: {Symbol}", symbol);
-            return symbol.ToLowerInvariant().Replace("/", "");
+            return CryptoSymbolConverter.ToCoinGeckoId(symbol);
         }
     }
 }

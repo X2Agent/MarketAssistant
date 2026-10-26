@@ -35,19 +35,19 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
 #### （一）自然风光图片
 
-![文档图片3](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image3.png)
+![文档图片3](images/doc_image3.png)
 
 这张图片展示了雄伟壮观的山脉景色。
 
 #### （二）城市建筑图片
 
-![文档图片2](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image2.png)
+![文档图片2](images/doc_image2.png)
 
 此图片聚焦于现代化的城市建筑。
 
 #### （三）动物生活图片
 
-![文档图片1](file:///C:/Users/mayue/Documents/MarketAssistant/Images/doc_image1.png)
+![文档图片1](images/doc_image1.png)
 
 图片中的动物十分可爱。
 
@@ -95,11 +95,11 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
         // Assert
         Assert.IsNotNull(blocks);
-        Assert.IsTrue(blocksList.Count > 0, "应该提取到至少一个块");
+        Assert.IsNotEmpty(blocksList, "应该提取到至少一个块");
 
         // 查找图片块
         var imageBlocks = blocksList.OfType<ImageBlock>().ToList();
-        Assert.IsTrue(imageBlocks.Count > 0, "应该提取到至少一个图片块");
+        Assert.IsNotEmpty(imageBlocks, "应该提取到至少一个图片块");
 
         // 验证图片块的内容
         foreach (var imageBlock in imageBlocks)
@@ -108,20 +108,20 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
             Assert.IsTrue(!string.IsNullOrEmpty(imageBlock.Description), "图片描述不应为空");
 
             // 验证图片块的序号
-            Assert.IsTrue(imageBlock.Order >= 0, "图片块应该有有效的序号");
+            Assert.IsGreaterThanOrEqualTo(0, imageBlock.Order, "图片块应该有有效的序号");
 
             // 打印调试信息
             System.Diagnostics.Debug.WriteLine($"发现图片块: Order={imageBlock.Order}, Description='{imageBlock.Description}', Caption='{imageBlock.Caption}', ImageBytes.Length={imageBlock.ImageBytes?.Length ?? 0}");
         }
 
         // 验证具体的图片数量（应该3张图片）
-        Assert.AreEqual(3, imageBlocks.Count, $"应该提取3个图片块，实际提取到{imageBlocks.Count}个");
+        Assert.HasCount(3, imageBlocks, $"应该提取3个图片块，实际提取到{imageBlocks.Count}个");
 
         // 验证图片描述
         var descriptions = imageBlocks.Select(img => img.Description).ToList();
-        Assert.IsTrue(descriptions.Contains("文档图片1"), "应该包含'文档图片1'");
-        Assert.IsTrue(descriptions.Contains("文档图片2"), "应该包含'文档图片2'");
-        Assert.IsTrue(descriptions.Contains("文档图片3"), "应该包含'文档图片3'");
+        Assert.Contains("文档图片1", descriptions, "应该包含'文档图片1'");
+        Assert.Contains("文档图片2", descriptions, "应该包含'文档图片2'");
+        Assert.Contains("文档图片3", descriptions, "应该包含'文档图片3'");
     }
 
     [TestMethod]
@@ -134,7 +134,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
         // Assert - 验证标题�?
         var headingBlocks = blocksList.OfType<HeadingBlock>().ToList();
-        Assert.IsTrue(headingBlocks.Count > 0, "应该提取到至少一个标题块");
+        Assert.IsNotEmpty(headingBlocks, "应该提取到至少一个标题块");
 
         // 查找特定标题
         var testDocHeading = headingBlocks.FirstOrDefault(h => h.Text.Contains("测试文档"));
@@ -152,11 +152,11 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
         // Assert - 验证表格�?
         var tableBlocks = blocksList.OfType<TableBlock>().ToList();
-        Assert.IsTrue(tableBlocks.Count > 0, "应该提取到至少一个表格块");
+        Assert.IsNotEmpty(tableBlocks, "应该提取到至少一个表格块");
 
         var tableBlock = tableBlocks.First();
         Assert.IsNotNull(tableBlock.Rows, "表格应该有行数据");
-        Assert.IsTrue(tableBlock.Rows.Count > 0, "表格应该至少有一行数据");
+        Assert.IsNotEmpty(tableBlock.Rows, "表格应该至少有一行数据");
     }
 
     [TestMethod]
@@ -169,12 +169,12 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
         // Assert - 验证列表块
         var listBlocks = blocksList.OfType<ListBlock>().ToList();
-        Assert.IsTrue(listBlocks.Count > 0, "应该提取到至少一个列表块");
+        Assert.IsNotEmpty(listBlocks, "应该提取到至少一个列表块");
 
         var listBlock = listBlocks.First();
         Assert.AreEqual(ListType.Ordered, listBlock.ListType, "应该是有序列表");
-        Assert.IsTrue(listBlock.Items.Count >= 3, "列表应该至少有3个项目");
-        Assert.IsTrue(listBlock.Items.Any(item => item.Contains("列表1")), "应该包含'列表1'");
+        Assert.IsGreaterThanOrEqualTo(3, listBlock.Items.Count, "列表应该至少有3个项目");
+        Assert.Contains(item => item.Contains("列表1"), listBlock.Items, "应该包含'列表1'");
     }
 
     [TestMethod]
@@ -187,7 +187,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
 
         // Assert - 验证文本块
         var textBlocks = blocksList.OfType<TextBlock>().ToList();
-        Assert.IsTrue(textBlocks.Count > 0, "应该提取到至少一个文本块");
+        Assert.IsNotEmpty(textBlocks, "应该提取到至少一个文本块");
 
         // 查找特定文本
         var introText = textBlocks.FirstOrDefault(t => t.Text.Contains("数字化信息爆炸"));
@@ -205,7 +205,7 @@ public class MarkdownDocumentBlockReaderTest : BaseAgentTest
         // Assert - 验证块的顺序
         for (int i = 0; i < blocksList.Count - 1; i++)
         {
-            Assert.IsTrue(blocksList[i].Order <= blocksList[i + 1].Order,
+            Assert.IsLessThanOrEqualTo(blocksList[i + 1].Order, blocksList[i].Order,
                 $"块的顺序应该是递增的，但发现 Order[{i}]={blocksList[i].Order} > Order[{i + 1}]={blocksList[i + 1].Order}");
         }
     }

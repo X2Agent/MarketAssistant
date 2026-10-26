@@ -1,11 +1,11 @@
-﻿using AdaptiveCards;
+using AdaptiveCards;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 
 namespace MarketAssistant.Infrastructure.AdaptiveCards.Parsers;
 
 public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisResult>
 {
-    protected override string[] RequiredKeys => new[] { "BasicInfo", "Fundamentals", "Competition" };
+    protected override string[] RequiredKeys => ["BasicInfo", "Fundamentals", "Competition"];
 
     protected override bool IsValid(FundamentalAnalysisResult model)
     {
@@ -96,7 +96,7 @@ public class FundamentalCardParser : BaseAdaptiveCardParser<FundamentalAnalysisR
         if (model.GrowthValue != null)
         {
             var rating = GetEnumDescription(model.GrowthValue.InvestmentRating);
-            var color = rating.Contains("买入") ? AdaptiveTextColor.Good : AdaptiveTextColor.Default;
+            var color = rating.Contains("买入", StringComparison.Ordinal) ? AdaptiveTextColor.Good : AdaptiveTextColor.Default;
 
             var facts = new AdaptiveFactSet();
             facts.Facts.Add(new AdaptiveFact("增长持续性", model.GrowthValue.GrowthSustainabilityScore.ToString("F1")));

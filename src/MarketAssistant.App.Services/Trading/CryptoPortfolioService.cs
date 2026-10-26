@@ -12,7 +12,13 @@ namespace MarketAssistant.Services.Trading;
 /// <summary>
 /// 统一封装虚拟币账户资产估值与持仓快照，避免在多个调用点重复拼装账户视图。
 /// </summary>
-public class CryptoPortfolioService
+public class CryptoPortfolioService(
+    [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
+    BinanceMarketDataService marketDataService,
+    TradingDataService tradingDataService,
+    TradingEnvironmentService environmentService,
+    IMemoryCache memoryCache,
+    ILogger<CryptoPortfolioService> logger)
 {
     /// <summary>
     /// 账户概览缓存时长。仅供 UI 展示复用；风控与 AI 仓位封顶等资金安全路径
@@ -20,28 +26,12 @@ public class CryptoPortfolioService
     /// </summary>
     private static readonly TimeSpan AccountSummaryCacheTtl = TimeSpan.FromSeconds(3);
 
-    private readonly IExchangeClient _exchangeClient;
-    private readonly BinanceMarketDataService _marketDataService;
-    private readonly TradingDataService _tradingDataService;
-    private readonly TradingEnvironmentService _environmentService;
-    private readonly IMemoryCache _memoryCache;
-    private readonly ILogger<CryptoPortfolioService> _logger;
-
-    public CryptoPortfolioService(
-        [FromKeyedServices(MarketType.Crypto)] IExchangeClient exchangeClient,
-        BinanceMarketDataService marketDataService,
-        TradingDataService tradingDataService,
-        TradingEnvironmentService environmentService,
-        IMemoryCache memoryCache,
-        ILogger<CryptoPortfolioService> logger)
-    {
-        _exchangeClient = exchangeClient;
-        _marketDataService = marketDataService;
-        _tradingDataService = tradingDataService;
-        _environmentService = environmentService;
-        _memoryCache = memoryCache;
-        _logger = logger;
-    }
+    private readonly IExchangeClient _exchangeClient = exchangeClient;
+    private readonly BinanceMarketDataService _marketDataService = marketDataService;
+    private readonly TradingDataService _tradingDataService = tradingDataService;
+    private readonly TradingEnvironmentService _environmentService = environmentService;
+    private readonly IMemoryCache _memoryCache = memoryCache;
+    private readonly ILogger<CryptoPortfolioService> _logger = logger;
 
     /// <summary>
     /// 获取账户估值概览。
@@ -74,17 +64,8 @@ public class CryptoPortfolioService
     private async Task<List<PositionInfo>> GetFuturesPositionsAsync(CancellationToken ct)
     {
         var positions = new List<PositionInfo>();
-
-        List<ExchangePosition> exchangePositions;
-        try
-        {
-            exchangePositions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "查询合约持仓失败，返回空持仓视图");
-            return positions;
-        }
+        // 禁止把异常吞为空列表：紧急全部平仓与 AI 硬性边界依赖异常区分"接口故障"与"真无持仓"
+        var exchangePositions = await _exchangeClient.GetPositionsAsync(null, ct).ConfigureAwait(false);
 
         foreach (var exchangePosition in exchangePositions)
         {
@@ -98,6 +79,7 @@ public class CryptoPortfolioService
                 Quantity = quantity,
                 EntryPrice = exchangePosition.EntryPrice,
                 CurrentPrice = exchangePosition.MarkPrice > 0 ? exchangePosition.MarkPrice : exchangePosition.EntryPrice,
+                IsShort = exchangePosition.PositionAmt < 0
             };
 
             if (position.EntryPrice > 0 && position.CurrentPrice > 0)
@@ -141,10 +123,9 @@ public class CryptoPortfolioService
             var position = new PositionInfo
             {
                 Symbol = symbol,
-                Quantity = quantity
+                Quantity = quantity,
+                CurrentPrice = ticker.LastPrice
             };
-
-            position.CurrentPrice = ticker.LastPrice;
 
             // 只按未平仓的 FIFO 持仓计算均价，避免已平仓记录污染浮盈显示
             var avgEntry = await _tradingDataService.GetOpenPositionAvgEntryPriceAsync(position.Symbol, ct);
@@ -160,6 +141,15 @@ public class CryptoPortfolioService
         }
 
         return positions;
+    }
+
+    /// <summary>
+    /// 获取指定交易对的最新成交价（供 UI 策略配置生成参考区间等使用）。
+    /// </summary>
+    public virtual async Task<decimal?> GetLatestPriceAsync(string symbol, CancellationToken ct = default)
+    {
+        var ticker = await TryGetTickerAsync(symbol, ct).ConfigureAwait(false);
+        return ticker?.LastPrice;
     }
 
     private async Task<Binance24hrTicker?> TryGetTickerAsync(string symbol, CancellationToken ct)

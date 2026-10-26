@@ -122,8 +122,9 @@
       </div>
     </div>
 
+    <script>/* __KLINECHARTS_BUNDLE__ */</script>
     <script>
-      // CDN地址配置
+      // CDN地址配置（当内置脚本未注入时的兜底回退）
       const cdnUrls = [
         'https://unpkg.com/klinecharts@9.6.0/dist/klinecharts.min.js',
         'https://cdn.jsdelivr.net/npm/klinecharts@9.6.0/dist/klinecharts.min.js'
@@ -146,8 +147,14 @@
         });
       }
 
-      // 尝试加载KLineChart库
+      // 尝试加载KLineChart库（优先使用内置本地脚本，离线/内网无需访问外网CDN）
       async function loadKLineCharts() {
+        if (typeof klinecharts !== 'undefined') {
+          console.log('KLineChart库已通过本地内置资源加载');
+          initializeChart();
+          return;
+        }
+
         for (let i = 0; i < cdnUrls.length; i++) {
           try {
             await loadScript(cdnUrls[i]);
@@ -176,6 +183,161 @@
        let chart = null;
        let currentTheme = 'light'; // 'light' | 'dark'，由 C# 宿主通过 setTheme 切换
 
+       // 副图（VOL / MACD / KDJ）高度随容器高度自适应，主图占剩余空间
+       function getSubPaneHeight() {
+         const containerHeight = document.getElementById('chart-container').offsetHeight || 400;
+         return Math.max(56, Math.min(90, Math.round(containerHeight * 0.11)));
+       }
+
+       // 大数字格式改为万/亿（库默认为 K/M/B），符合国内行情习惯
+       function formatBigNumberCn(value) {
+         if (value === null || value === undefined || value === '') {
+           return '--';
+         }
+         const numberValue = Number(value);
+         if (!isFinite(numberValue)) {
+           return '--';
+         }
+         const absoluteValue = Math.abs(numberValue);
+         if (absoluteValue >= 1e8) {
+           return `${trimDecimalZeros((numberValue / 1e8).toFixed(2))}亿`;
+         }
+         if (absoluteValue >= 1e4) {
+           return `${trimDecimalZeros((numberValue / 1e4).toFixed(2))}万`;
+         }
+         return String(numberValue);
+       }
+
+       // 去掉小数位末尾多余的 0（2.00 -> 2，203.60 -> 203.6），整数不受影响
+       function trimDecimalZeros(text) {
+         if (!text.includes('.')) {
+           return text;
+         }
+         return text.replace(/0+$/, '').replace(/\.$/, '');
+       }
+
+       // 日期格式：固定按图表时区 Asia/Shanghai（UTC+8，中国无夏令时）展示；
+       // 日/周/月 K 的 bar 时间为 00:00，图例中去掉无意义的时间部分
+       const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+       const FORMAT_DATE_TYPE_TOOLTIP = 0;
+
+       function formatDateCn(dateTimeFormat, timestamp, format, type) {
+         const shifted = new Date(Number(timestamp) + SHANGHAI_OFFSET_MS);
+         const parts = {
+           YYYY: String(shifted.getUTCFullYear()),
+           MM: String(shifted.getUTCMonth() + 1).padStart(2, '0'),
+           DD: String(shifted.getUTCDate()).padStart(2, '0'),
+           HH: String(shifted.getUTCHours()).padStart(2, '0'),
+           mm: String(shifted.getUTCMinutes()).padStart(2, '0'),
+           ss: String(shifted.getUTCSeconds()).padStart(2, '0'),
+         };
+         let result = format.replace(/YYYY|MM|DD|HH|mm|ss/g, (key) => parts[key]);
+         if (type === FORMAT_DATE_TYPE_TOOLTIP && parts.HH === '00' && parts.mm === '00') {
+           result = result.replace(/\s*HH:mm(?::ss)?/, '');
+         }
+         return result;
+       }
+
+       // 主图左上角图例（币安式行情信息条）：逐 bar 展示 时间/开/高/低/收/涨跌幅/振幅/成交量/成交额。
+       // 库会对 {time}/{open} 等占位符自动替换，{change} 自动按涨跌着色；
+       // 振幅与成交额无对应占位符，由回调自行计算（振幅按上一 bar 收盘价，成交额取 amount）。
+       function buildCandleTooltip() {
+         return {
+           showRule: 'always',
+           showType: 'standard',
+           defaultValue: '--',
+           custom: (data) => {
+             const current = data.current;
+             if (!current) {
+               return [];
+             }
+             const prevClose = data.prev ? data.prev.close : current.close;
+             const amplitude = prevClose > 0 ? ((current.high - current.low) / prevClose) * 100 : 0;
+             return [
+               { title: '时间', value: '{time}' },
+               { title: '开', value: '{open}' },
+               { title: '高', value: '{high}' },
+               { title: '低', value: '{low}' },
+               { title: '收', value: '{close}' },
+               { title: '涨跌幅', value: '{change}' },
+               { title: '振幅', value: `${amplitude.toFixed(2)}%` },
+               { title: '成交量', value: '{volume}' },
+               { title: '成交额', value: current.turnover ? formatBigNumberCn(current.turnover) : '--' },
+             ];
+           },
+         };
+       }
+
+       // 价格小数位自适应：取数据中的最大小数位并约束在 [2, 8]，
+       // 避免小市值币种（如 0.00001234）在图例与坐标轴上显示为 0.00
+       function detectPricePrecision(dataList) {
+         let precision = 2;
+         for (const item of dataList) {
+           for (const key of ['open', 'high', 'low', 'close']) {
+             const text = String(item[key] ?? '');
+             const dotIndex = text.indexOf('.');
+             if (dotIndex >= 0) {
+               precision = Math.max(precision, Math.min(text.length - dotIndex - 1, 8));
+             }
+           }
+         }
+         return precision;
+       }
+
+       // 可开关指标配置：stack=true 为副图（独立面板），false 为主图叠加。
+       // MA 需显式带上 calcParams——内置默认为 [5,10,30,60]（无 MA20）。
+       const INDICATOR_CONFIGS = {
+         MA: { stack: false, create: () => ({ name: 'MA', calcParams: [5, 10, 20, 30, 60] }) },
+         BOLL: { stack: false, create: () => ({ name: 'BOLL' }) },
+         VOL: { stack: true, create: () => ({ name: 'VOL' }) },
+         MACD: { stack: true, create: () => ({ name: 'MACD' }) },
+         KDJ: { stack: true, create: () => ({ name: 'KDJ' }) },
+       };
+
+       // 各指标当前可见性（C# 宿主经 setIndicatorVisibility 同步）
+       const indicatorVisibility = { MA: true, BOLL: true, VOL: true, MACD: true, KDJ: true };
+       let legendVisible = true;
+
+       // 查找指标所在面板 id：主图指标在 'candle_pane'，副图面板 id 由库生成，需遍历定位
+       function findPaneIdByIndicator(name) {
+         if (!chart) return null;
+         const panes = chart.getIndicatorByPaneId();
+         if (!panes) return null;
+         for (const [paneId, indicators] of panes) {
+           if (indicators.has(name)) return paneId;
+         }
+         return null;
+       }
+
+       // 单个指标显隐：不可见且已存在则移除（副表面板被库自动回收），可见且不存在则重建
+       function setIndicatorVisible(name, visible) {
+         indicatorVisibility[name] = visible;
+         if (!chart) return;
+         const paneId = findPaneIdByIndicator(name);
+         if (visible && paneId === null) {
+           const config = INDICATOR_CONFIGS[name];
+           if (config) {
+             chart.createIndicator(
+               config.create(),
+               config.stack,
+               config.stack ? { height: getSubPaneHeight() } : undefined,
+             );
+           }
+         } else if (!visible && paneId !== null) {
+           chart.removeIndicator(paneId, name);
+         }
+       }
+
+       // 左上角图例显隐：同时切换 K 线信息条与各指标图例（setStyles 深合并，不动 custom 回调）
+       function applyLegendVisibility() {
+         if (!chart) return;
+         const rule = legendVisible ? 'always' : 'none';
+         chart.setStyles({
+           candle: { tooltip: { showRule: rule } },
+           indicator: { tooltip: { showRule: rule } },
+         });
+       }
+
        // 初始化图表
        function initializeChart() {
          if (typeof klinecharts === 'undefined') {
@@ -184,12 +346,33 @@
          }
 
          try {
-           // 初始化图表
+           // 初始化图表：主图叠加 MA(5/10/20/30/60) 与 BOLL，下方依次堆叠 VOL / MACD / KDJ 副图。
+           // 指标走初始化 layout 配置——createIndicator(isStack=false) 再次创建时会清空同面板已有指标，
+           // 无法通过连续调用叠加多个主图指标；副图固定高度，主图自动占剩余空间。
            chart = klinecharts.init(document.getElementById('chart-container'), {
         // 设置时区
         timezone: 'Asia/Shanghai',
         // 设置语言
         locale: 'zh-CN',
+        // 面板布局：主图（K线 + 覆盖指标）与副图（堆叠指标）
+        layout: [
+          {
+            type: 'candle',
+            content: [
+              { name: 'MA', calcParams: [5, 10, 20, 30, 60] },
+              { name: 'BOLL' },
+            ],
+          },
+          { type: 'indicator', content: ['VOL'], options: { height: getSubPaneHeight() } },
+          { type: 'indicator', content: ['MACD'], options: { height: getSubPaneHeight() } },
+          { type: 'indicator', content: ['KDJ'], options: { height: getSubPaneHeight() } },
+        ],
+      });
+
+      // 大数字格式（万/亿）与日期格式（去掉午夜 bar 的 00:00）覆盖库默认实现
+      chart.setCustomApi({
+        formatBigNumber: formatBigNumberCn,
+        formatDate: formatDateCn,
       });
 
       // 浅色主题样式（对齐设计系统令牌）— 深色差异覆盖见下方 DARK_STYLES
@@ -222,13 +405,7 @@
             downWickColor: '#4CAF50',
             noChangeWickColor: '#98A2B3',
           },
-          tooltip: {
-            showRule: 'always',
-            showType: 'standard',
-            labels: ['时间', '开盘', '收盘', '最高', '最低', '成交量'],
-            values: null,
-            defaultValue: '-',
-          },
+          tooltip: buildCandleTooltip(),
           priceMark: {
             show: true,
             high: {
@@ -418,22 +595,7 @@
       // 按当前主题初始化图表样式
       chart.setStyles(currentTheme === 'dark' ? DARK_STYLES : LIGHT_STYLES);
 
-      // 创建主图指标
-      chart.createIndicator('MA', false, {
-        size: 2,
-        precision: 2,
-        params: [5, 10, 20, 60],
-      });
-
-      // 创建副图指标
-      chart.createIndicator('VOL', true, {
-        size: 2,
-        precision: 0,
-      });
-      chart.createIndicator('MACD', true, {
-        size: 2,
-        precision: 2,
-      });
+      // 指标（主图 MA/BOLL，副图 VOL/MACD/KDJ）已在初始化 layout 中配置，无需再次创建
 
       // 定义与C#交互的接口
       window.stockChartInterface = {
@@ -459,6 +621,7 @@
               low: item.low,
               close: item.close,
               volume: item.volume,
+              turnover: item.amount,
               preClose: item.pre_close,
             }));
             
@@ -467,7 +630,8 @@
               console.log('第一条K线数据:', klineData[0]);
             }
 
-            // 设置数据
+            // 价格小数位按数据自适应后设置数据
+            chart.setPriceVolumePrecision(detectPricePrecision(klineData), 0);
             chart.applyNewData(klineData);
             console.log('图表数据已应用');
 
@@ -497,6 +661,22 @@
         // 切换主题（'light' | 'dark'），由 C# 宿主调用
         setTheme: function (theme) {
           applyTheme(theme);
+        },
+
+        // 同步指标/图例可见性（C# 属性变更与初始化完成时调用）。
+        // state: { ma, boll, vol, macd, kdj, legend }，字段缺省视为不变更
+        setIndicatorVisibility: function (state) {
+          if (!state) return;
+          if (state.legend !== undefined && state.legend !== legendVisible) {
+            legendVisible = state.legend;
+            applyLegendVisibility();
+          }
+          const nameByKey = { ma: 'MA', boll: 'BOLL', vol: 'VOL', macd: 'MACD', kdj: 'KDJ' };
+          for (const [key, name] of Object.entries(nameByKey)) {
+            if (state[key] !== undefined && state[key] !== indicatorVisibility[name]) {
+              setIndicatorVisible(name, state[key]);
+            }
+          }
         },
       };
 

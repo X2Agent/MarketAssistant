@@ -33,7 +33,7 @@ public sealed class ExchangeConditionOrderServiceTest
         Mock<TradingStrategyService> Strategies,
         Mock<TradingDataService> Data) CreateContext(bool futures)
     {
-        var mode = futures ? CryptoTradingMode.BinanceFuturesTestnet : CryptoTradingMode.BinanceSpotDemo;
+        var mode = futures ? TradingMode.FuturesTestnet : TradingMode.SpotDemo;
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(s => s.CurrentSetting).Returns(new UserSetting { CryptoTradingMode = mode });
 
@@ -47,12 +47,13 @@ public sealed class ExchangeConditionOrderServiceTest
 
         var router = new RoutingExchangeClient(
             environment,
-            new Dictionary<CryptoTradingMode, IExchangeClient> { [mode] = client.Object });
+            new Dictionary<TradingMode, IExchangeClient> { [mode] = client.Object },
+            new ApiHealthMonitor());
 
         var data = new Mock<TradingDataService>(environment, NullLogger<TradingDataService>.Instance);
         var strategies = new Mock<TradingStrategyService>(data.Object);
         var executor = new Mock<TradeExecutor>(
-            client.Object, null!, data.Object, NullLogger<TradeExecutor>.Instance, environment, null!)
+            client.Object, null!, data.Object, NullLogger<TradeExecutor>.Instance, environment, null!, null!)
         { CallBase = true };
 
         var service = new ExchangeConditionOrderService(
@@ -77,7 +78,7 @@ public sealed class ExchangeConditionOrderServiceTest
     {
         Symbol = Symbol,
         OrderId = "999",
-        ClientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategyId),
+        ClientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategyId, ConditionOrderLeg.Stop),
         Status = "NEW",
         Type = "STOP_MARKET",
         StopPrice = stopPrice,
@@ -98,17 +99,17 @@ public sealed class ExchangeConditionOrderServiceTest
             .ReturnsAsync([]);
         var placedRecord = new TradeRecord { ExchangeOrderId = 777, Status = TradeRecordStatus.Pending };
         ctx.Executor
-            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()))
+            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TradeResult { Success = true, Record = placedRecord });
 
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(strategy, It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<CancellationToken>()),
             Times.Once, "缺失的保护策略条件单应补挂");
         ctx.Data.Verify(
             d => d.UpdateStrategyConditionOrderFingerprintAsync(
-                strategy.Id, ExchangeConditionOrderService.BuildFingerprint(strategy), It.IsAny<CancellationToken>()),
+                strategy.Id, ExchangeConditionOrderService.BuildFingerprint(strategy, ConditionOrderLeg.Stop), It.IsAny<CancellationToken>()),
             Times.Once, "挂单成功后应回写参数指纹");
         Assert.IsTrue(ctx.Service.HasLiveOrder(strategy.Id), "挂单成功后在途映射应可见");
     }
@@ -140,7 +141,7 @@ public sealed class ExchangeConditionOrderServiceTest
     {
         var ctx = CreateContext(futures: true);
         var strategy = CreateStopLossStrategy();
-        strategy.ConditionOrderFingerprint = ExchangeConditionOrderService.BuildFingerprint(strategy);
+        strategy.ConditionOrderFingerprint = ExchangeConditionOrderService.BuildFingerprint(strategy, ConditionOrderLeg.Stop);
         var managedOrder = CreateManagedOrder(strategy.Id);
         ctx.Strategies
             .Setup(s => s.GetStrategiesByStatusAsync(StrategyStatus.Active, It.IsAny<CancellationToken>()))
@@ -152,7 +153,7 @@ public sealed class ExchangeConditionOrderServiceTest
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
             Times.Never, "挂单在位且指纹一致时不应重复挂单");
         ctx.Client.Verify(
             c => c.CancelOrderAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -175,7 +176,7 @@ public sealed class ExchangeConditionOrderServiceTest
             .Setup(c => c.GetOpenOrdersAsync(null, It.IsAny<CancellationToken>()))
             .ReturnsAsync([managedOrder]);
         ctx.Executor
-            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()))
+            .Setup(e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TradeResult { Success = true, Record = new TradeRecord { ExchangeOrderId = 888 } });
 
         await ctx.Service.ReconcileAsync(CancellationToken.None);
@@ -184,7 +185,7 @@ public sealed class ExchangeConditionOrderServiceTest
             c => c.CancelOrderAsync(Symbol, managedOrder.OrderId, It.IsAny<CancellationToken>()),
             Times.Once, "参数漂移时应撤销旧条件单");
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(strategy, It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop, It.IsAny<CancellationToken>()),
             Times.Once, "参数漂移撤旧后应按新参数重挂");
         ctx.Data.Verify(
             d => d.UpdateStrategyConditionOrderFingerprintAsync(
@@ -217,7 +218,7 @@ public sealed class ExchangeConditionOrderServiceTest
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
             Times.Never, "追踪未激活时提前挂交易所追踪单会过早止损，不应挂单");
     }
 
@@ -233,7 +234,7 @@ public sealed class ExchangeConditionOrderServiceTest
         await ctx.Service.ReconcileAsync(CancellationToken.None);
 
         ctx.Executor.Verify(
-            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()),
+            e => e.PlaceConditionOrderAsync(It.IsAny<TradingStrategy>(), It.IsAny<ConditionOrderLeg>(), It.IsAny<CancellationToken>()),
             Times.Never, "现货无条件单语义，退出型策略由客户端评估兜底");
         ctx.Client.Verify(
             c => c.GetOpenOrdersAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()),
@@ -249,11 +250,11 @@ public sealed class ExchangeConditionOrderServiceTest
         ctx.Client
             .Setup(c => c.PlaceOrderAsync(
                 Symbol, OrderSide.Sell, OrderType.StopMarket, 1m,
-                null, TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id),
+                null, TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.Stop),
                 true, null, 90m, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ExchangeOrderResult { OrderId = "123", Status = "NEW" });
 
-        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy);
+        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop);
 
         Assert.IsTrue(result.Success, "止损策略应成功挂出 StopMarket 条件单");
         Assert.IsNotNull(result.Record);
@@ -275,7 +276,7 @@ public sealed class ExchangeConditionOrderServiceTest
         strategy.Type = StrategyType.TakeProfit;
         strategy.Side = OrderSide.Buy;
 
-        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy);
+        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop);
 
         Assert.IsFalse(result.Success, "止盈 Buy 侧为限价建仓语义，不属于保护性条件单");
         ctx.Client.Verify(
@@ -294,7 +295,7 @@ public sealed class ExchangeConditionOrderServiceTest
         var strategy = CreateStopLossStrategy();
         strategy.TriggerPrice = 0;
 
-        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy);
+        var result = await ctx.Executor.Object.PlaceConditionOrderAsync(strategy, ConditionOrderLeg.Stop);
 
         Assert.IsFalse(result.Success, "缺少触发价的止损策略无法挂条件单");
         ctx.Client.Verify(

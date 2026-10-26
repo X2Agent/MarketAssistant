@@ -6,26 +6,19 @@ using MarketAssistant.Applications.Cache;
 
 namespace MarketAssistant.Applications.Settings;
 
-public class GitHubReleaseService : IReleaseService
+public class GitHubReleaseService(
+    IHttpClientFactory httpClientFactory,
+    IMemoryCache memoryCache,
+    ILogger<GitHubReleaseService> logger) : IReleaseService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IMemoryCache _memoryCache;
-    private readonly ILogger<GitHubReleaseService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IMemoryCache _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
+    private readonly ILogger<GitHubReleaseService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     private readonly string _githubApiBaseUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases";
     private readonly string _githubApiLatestUrl = $"{AppInfo.GitHubApiBaseUrl}/repos/{AppInfo.GitHubOwner}/{AppInfo.GitHubRepo}/releases/latest";
 
     private static readonly TimeSpan CacheExpiration = TimeSpan.FromMinutes(10);
     private RateLimitInfo? _rateLimitInfo;
-
-    public GitHubReleaseService(
-        IHttpClientFactory httpClientFactory,
-        IMemoryCache memoryCache,
-        ILogger<GitHubReleaseService> logger)
-    {
-        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-        _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<UpdateCheckResult> CheckForUpdateAsync(string currentVersion, bool includePrerelease = true)
     {
@@ -497,18 +490,11 @@ public class GitHubReleaseService : IReleaseService
     }
 }
 
-internal class RateLimitInfo
+internal class RateLimitInfo(int limit, int remaining, DateTime resetTime)
 {
-    public int Limit { get; }
-    public int Remaining { get; }
-    public DateTime ResetTime { get; }
-
-    public RateLimitInfo(int limit, int remaining, DateTime resetTime)
-    {
-        Limit = limit;
-        Remaining = remaining;
-        ResetTime = resetTime;
-    }
+    public int Limit { get; } = limit;
+    public int Remaining { get; } = remaining;
+    public DateTime ResetTime { get; } = resetTime;
 
     public bool IsExpired()
     {

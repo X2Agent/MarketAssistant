@@ -2,6 +2,7 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using MarketAssistant.Applications.AlertCenter.Channels;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
@@ -12,6 +13,7 @@ using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
@@ -32,6 +34,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
     private readonly IMarketMonitorProvider _marketMonitorProvider;
     private readonly IDialogService _dialogService;
     private readonly DocumentVectorizationService _documentVectorizationService;
+    private readonly FeishuWebhookClient _feishuWebhookClient;
     private IStorageProvider? _storageProvider;
     private bool _isInitializingProvider;
     private CancellationTokenSource? _modelFetchCancellationTokenSource;
@@ -83,13 +86,13 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public List<string> WebSearchProviders { get; } = new List<string> { "Bing", "Brave", "Tavily" };
+    public List<string> WebSearchProviders { get; } = ["Bing", "Brave", "Tavily"];
 
-    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = Enum.GetValues<RiskToleranceLevel>().ToList();
+    public List<RiskToleranceLevel> RiskToleranceOptions { get; } = [.. Enum.GetValues<RiskToleranceLevel>()];
 
-    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = Enum.GetValues<InvestmentHorizonType>().ToList();
+    public List<InvestmentHorizonType> InvestmentHorizonOptions { get; } = [.. Enum.GetValues<InvestmentHorizonType>()];
 
-    public List<CryptoTradingMode> CryptoTradingModes { get; } = Enum.GetValues<CryptoTradingMode>().ToList();
+    public List<TradingMode> CryptoTradingModes { get; } = [.. Enum.GetValues<TradingMode>()];
 
     public string ZhiTuApiUrl { get; } = "https://www.zhituapi.com/gettoken.html";
     public string CoinGeckoApiUrl { get; } = "https://www.coingecko.com/en/api";
@@ -175,16 +178,16 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveSpot;
+    public bool IsLiveSpotTradingMode => UserSetting.CryptoTradingMode == TradingMode.LiveSpot;
 
     /// <summary>
     /// 是否为实盘模式（现货或合约，共用同一套 API Key）
     /// </summary>
     public bool IsLiveTradingMode => IsLiveSpotTradingMode || IsLiveFuturesTradingMode;
 
-    public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.LiveFutures;
+    public bool IsLiveFuturesTradingMode => UserSetting.CryptoTradingMode == TradingMode.LiveFutures;
 
-    public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == CryptoTradingMode.BinanceFuturesTestnet;
+    public bool IsFuturesTestnetTradingMode => UserSetting.CryptoTradingMode == TradingMode.FuturesTestnet;
 
     public bool IsFuturesTradingMode => IsLiveFuturesTradingMode || IsFuturesTestnetTradingMode;
 
@@ -227,6 +230,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         IMarketMonitorProvider marketMonitorProvider,
         IDialogService dialogService,
         DocumentVectorizationService documentVectorizationService,
+        FeishuWebhookClient feishuWebhookClient,
         ILogger<SettingsPageViewModel> logger) : base(logger)
     {
         _notificationService = notificationService;
@@ -237,7 +241,20 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _marketMonitorProvider = marketMonitorProvider;
         _dialogService = dialogService;
         _documentVectorizationService = documentVectorizationService;
-        _ = SafeExecuteAsync(InitializeAsync, "初始化设置页");
+        _feishuWebhookClient = feishuWebhookClient;
+
+        SetRetryCommand(() => LoadSettingsAsync());
+        _ = LoadSettingsAsync();
+    }
+
+    /// <summary>首屏加载：读取用户设置草稿并同步本地状态；模型目录在后台拉取，不阻塞首屏。</summary>
+    private async Task LoadSettingsAsync()
+    {
+        await LoadAsync(async _ =>
+        {
+            await InitializeAsync();
+            return true;
+        }, "初始化设置页");
     }
 
     /// <summary>
@@ -248,7 +265,7 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
         _storageProvider = storageProvider;
     }
 
-    private async Task InitializeAsync()
+    private Task InitializeAsync()
     {
         // 加载用户设置为独立草稿副本（OnUserSettingChanged 会自动订阅 PropertyChanged）。
         // 不能直接绑定 CurrentSetting 本体：页面上的每次编辑都会立刻生效于全进程，
@@ -268,17 +285,21 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             _isInitializingProvider = false;
         }
 
-        // 模型列表鉴权与具体模型调用鉴权彼此独立。
-        var currentKey = UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
-        if (SelectedProvider?.CanListModels(currentKey) == true)
-        {
-            await FetchModels();
-        }
-
         // 同步市场类型到MarketContext
         _marketContext.SwitchMarket(UserSetting.CurrentMarketType);
         LoadAnalystRoles();
         ApplyTheme(UserSetting.ThemeMode);
+
+        // 模型目录是网络慢依赖：首屏只等本地同步，目录在后台拉取。
+        // 角色卡片与「模型 ID」框共用 Models 集合，目录到达后自动填充，无需额外刷新；
+        // 命中 ModelDiscoveryService 会话级缓存时近乎瞬时。
+        var currentKey = UserSetting.ProviderApiKeys.TryGetValue(UserSetting.ProviderId, out var key) ? key : "";
+        if (SelectedProvider?.CanListModels(currentKey) == true)
+        {
+            _ = FetchModelsCore(forceRefresh: false);
+        }
+
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -289,6 +310,11 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
             foreach (var role in AnalystRoles)
             {
                 UserSetting.EnabledAnalystRoles[role.Id] = role.IsEnabled;
+                AnalystModelAssignment.SetAssignedModelId(
+                    UserSetting,
+                    UserSetting.ProviderId,
+                    role.Id,
+                    role.ModelIdOverride);
             }
 
             // 监控运行中切换到实盘会使后续订单进入真实账户，必须二次确认。

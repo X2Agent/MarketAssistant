@@ -17,7 +17,7 @@ public class ListInfo
 /// DOCX到Markdown转换器
 /// 重新实现，准确处理文档中的各级标题、文本段落、表格、图片和列表元素
 /// </summary>
-public class DocxMarkdownConverter : IMarkdownConverter
+public class DocxMarkdownConverter(IImageStorageService imageStorageService) : IMarkdownConverter
 {
     /// <summary>
     /// 单次转换的上下文状态：编号定义、图片引用、列表计数器等仅在本次转换内有效，
@@ -25,18 +25,13 @@ public class DocxMarkdownConverter : IMarkdownConverter
     /// </summary>
     private sealed class ConversionContext
     {
-        public readonly Dictionary<int, ListInfo> NumberingFormats = new();
+        public readonly Dictionary<int, ListInfo> NumberingFormats = [];
         public readonly Dictionary<string, string> ImageReferences = new(StringComparer.Ordinal);
-        public readonly Dictionary<int, int> ListItemCounters = new();
+        public readonly Dictionary<int, int> ListItemCounters = [];
         public int ImageCounter;
     }
 
-    private readonly IImageStorageService _imageStorageService;
-
-    public DocxMarkdownConverter(IImageStorageService imageStorageService)
-    {
-        _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
-    }
+    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
 
     public bool CanConvert(string filePath) =>
         filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
@@ -180,9 +175,9 @@ public class DocxMarkdownConverter : IMarkdownConverter
 
         var styleLower = style.ToLowerInvariant();
 
-        if (styleLower.StartsWith("heading"))
+        if (styleLower.StartsWith("heading", StringComparison.Ordinal))
         {
-            var levelStr = styleLower.Replace("heading", "");
+            var levelStr = styleLower.Replace("heading", "", StringComparison.Ordinal);
             if (int.TryParse(levelStr, out var level) && level >= 1 && level <= 6)
                 return level;
         }
@@ -254,7 +249,7 @@ public class DocxMarkdownConverter : IMarkdownConverter
             if (!string.IsNullOrWhiteSpace(formattedText))
             {
                 if (cellContent.Length > 0)
-                    cellContent.Append(" ");
+                    cellContent.Append(' ');
                 cellContent.Append(formattedText);
             }
         }

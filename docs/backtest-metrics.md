@@ -1,0 +1,119 @@
+# M3 策略回测与分析师绩效：统计口径设计
+
+> **文档定位**：在编码 M3（roadmap 方向 B）之前固定"信号如何变成统计量"的口径。
+> 没有口径就没有可信的胜率——同一份数据用不同窗口/基准/样本规则能得出相反的结论。
+> 本文只定义口径与数据契约，不涉及实现。
+>
+> **v1.1 修订（2026-09-24）**：采集字段缺口已补齐（报告级 `MarketType`、分析师级 `Confidence`/`Horizon`、`reports.market_type`/`rating` 列），相应更新数据契约与实现顺序；明确置信度/周期口径**只统计字段上线后的样本**。
+
+## 一、数据基础
+
+| 数据 | 来源 | 说明 |
+|------|------|------|
+| 单次分析的结构化结论 | `MarketAnalysisReport.CoordinatorResult`（`InvestmentRating`/`OverallScore`/`ConfidencePercentage`/`TargetPriceValue`/`ExpectedChangePercent`/`Duration`） | 协调分析师最终评级，机器可读 |
+| 报告所属市场 | `MarketAnalysisReport.MarketType`（v1.1 新增，可空） | 基准选择的前提；**历史报告为 null，必须按"未知"处理，禁止从 `asset_code` 反推市场** |
+| 各分析师方向信号 | `MarketAnalysisReport.AnalystSignals`（`AnalystSignalSnapshot`：评级/操作/目标价区间/止损/**置信度 `Confidence`（0-100）**/**结论周期 `Horizon`（`Duration?`）**） | 报告生成时从各分析师 JSON 提取，缺失维度保持 null；置信度越界值按 0-100 夹取 |
+| 历史报告 | `reports` 表（`market.db`，`ReportArchiveService`）：`asset_code` / `market_type` / `rating` / `score` / `created_at` / `report_json` | 全量 JSON 持久化 + 三个可索引列（`market_type`/`rating` 为 v1.1 新增，旧行 NULL） |
+| 行情 | `IKLineService`（日 K，双市场）+ `TechnicalIndicatorService` | 回测的"未来价格"唯一来源 |
+
+**缺口（M3 编码前仍需补）**：`reports` 表已有可索引的 `market_type`/`rating` 列，但**信号粒度**仍只能反序列化 `report_json`（一条报告含多位分析师的多条信号）。样本量变大后需要建 `signals` 旁表，只存扁平信号字段（symbol/market/date/analyst/rating/confidence/horizon/target/stop），并保留 `report_id` 外键回查原文。
+
+## 二、信号事件定义（Signal Event）
+
+一次信号事件 = 一条可被未来价格检验的断言：
+
+```
+SignalEvent {
+  Symbol, MarketType,   // MarketType 取报告级字段，为 null 的信号直接排除
+  SignalDate,           // report.CreatedAt 所在本地日期
+  Rating,               // InvestmentRating
+  Confidence,           // 0-100；报告级取 CoordinatorResult，分析师级取 AnalystSignalSnapshot.Confidence
+  Horizon,              // Duration: 短期/中期/长期 → 持有期映射；null 时回落报告级 Duration
+  TargetPrice?,         // CoordinatorResult.TargetPriceValue
+  ExpectedChangePct?,   // CoordinatorResult.ExpectedChangePercent
+  PatchAt,              // 生成时刻价格（report_json 内 CoordinatorResult 无现价字段时取 K 线当日收盘）
+  MatchedAt?            // 目标价首次触达日期（回测时计算）
+}
+```
+
+- **只统计可判定的信号**：评级为 `Hold` 且无目标价、无预期涨跌幅的信号不进样本（没有可检验命题）。
+- **置信度与周期为可选维度**：`Confidence == null` 的信号仍计入方向准确率，但不进置信度分桶；`Horizon == null` 时持有期回落到报告级 `Duration`，两者皆空则用默认中期（20 交易日）并在结果中标注"周期缺失"。
+- **市场维度缺失即排除**：`MarketType == null` 的历史报告不进任何需要基准的统计（无法确定用沪深300 还是 BTC 做对照）。
+- **同一标的当天多次报告取最后一条**（合并窗口内评分更新只认终值），避免自相关的重复计数。
+- 分析师级事件同样从 `AnalystSignals` 构建，用于方向准确率；分析师没有目标价时只用方向判定。
+
+## 三、回测口径
+
+### 3.1 时间对齐（防未来数据）
+
+| 规则 | 取值 | 理由 |
+|------|------|------|
+| 信号生效时点 | `SignalDate` 的**下一个交易日开盘价** | 报告在盘后/盘中生成，当日剩余时间不可交易；T+1 开盘是保守且可复现的假设 |
+| 持有期 | 短期=5 交易日，中期=20 交易日，长期=60 交易日（或评级自带目标价触达即止盈） | 与 `Duration` 枚举对齐；目标价触达优先于持有期到期 |
+| 价格序列 | 后复权日 K | 除权除息日用未复权价会产生假亏损 |
+
+### 3.2 成交假设
+
+- **A 股**：信号次日一字涨停/跌停无法成交 → 该信号标记 `Untradeable`，**不计入胜率分母**（单独披露"不可成交占比"）。
+- **Crypto**：7×24，按信号生效时点价格直接成交；手续费固定 0.1%（binance taker），滑点按名义金额 0.05% 计入。
+- 止损先于目标价触达时，以**先触发者**结算（`stopLossPrice` 存在时纳入）。
+
+### 3.3 收益与胜率
+
+```
+单笔净收益 = 多空方向 × (出场价 − 入场价) / 入场价 − 手续费率
+胜率 = 净收益 > 0 的事件数 / 可成交事件数
+目标价达成率 = TargetPrice 在持有期内触及的事件数 / 有目标价的事件数
+```
+
+- 多空方向由评级映射：`StrongBuy/Buy → 多`，`Reduce/Sell/StrongSell → 空`，`Hold → 剔除`。
+- **样本量下限**：结论成立至少需要 30 个可成交事件；不足时报告只展示原始计数，不展示百分比（小样本百分比是噪声放大器）。
+- 胜率同时给 Wilson 95% 置信区间，区间宽度大于 20 个百分点时标注"证据不足"。
+
+## 四、基准（Benchmark，缺了它胜率无意义）
+
+每个统计必须同时给出**相对基准的超额收益**，否则"AI 选股 55% 胜率"可能只是 Beta：
+
+| 市场 | 默认基准 | 备用 |
+|------|----------|------|
+| A 股 | 沪深300 全收益（同持有期） | 中证500 全收益 |
+| Crypto | BTC Buy&Hold（同持有期） | 等权自选组合 |
+
+- 统计指标：`胜率差`（个股胜率 − 基准胜率）、`平均超额收益`、`最大回撤差`。
+- 报告展示口径固定为："近 N 次信号，胜率 x%（CI [a, b]），同期基准 y%，超额 z%"。
+
+## 五、分析师绩效
+
+1. **方向准确率**：分析师评级方向（多/空/中性）与持有期实际收益方向是否一致；`Hold` 不计入。
+2. **评级校准**：按 `Confidence` 分桶（0-59/60-79/80-100），比较各桶准确率——高置信桶准确率应显著高于低置信桶，否则置信度是装饰。**仅统计置信度字段上线（v1.1）后的样本**，`Confidence == null` 的历史信号不入桶；单个桶样本 < 30 时只展示计数与区间，不展示桶准确率。
+3. **相对协调者的一致性**：分析师方向与 `CoordinatorResult` 最终评级的一致率（解释"谁在拖后腿"）。
+4. **衰减与漂移**：滚动 30 信号窗口的准确率曲线；准确率连续低于 40% 的分析师在 UI 标记"建议调低权重或停用"（只建议，不自动改 `EnabledAnalystRoles`）。
+5. **完整性指标**：评级字段缺失（`Rating == null`）的信号不进该分析师样本，且该次报告在完整性指标中记为缺失；同理分别统计 `Confidence`/`Horizon` 的缺失率——缺失率高说明提示词与结构化 schema 未对齐，属可修的工程问题而非统计噪声。
+
+## 六、MVP 范围与验收（M3）
+
+**做**：
+- 单标的回测视图：某标的历史信号列表 + 每条信号的持有期收益 + 目标价是否达成。
+- 分析师绩效页：每位分析师的方向准确率、置信度分桶校准、近 30 信号滚动曲线。
+- 报告页引用："该策略过去 N 次信号胜率 x%，同期基准 y%"（满足样本下限才展示百分比）。
+
+**不做（明确排除）**：
+- 自动策略优化/参数搜索（数据量与过拟合风险不匹配当前阶段）。
+- 分钟级回测（信号粒度是日线结论）。
+- 把绩效直接用于自动调整分析师生效名单（只做人工确认的建议）。
+
+**验收标准**：
+1. 同一标的回测结果可复现（固定输入 → 固定输出，无随机/无时间依赖）。
+2. 全部统计同时声明样本量与基准；样本 < 30 时不呈现百分比。
+3. 未来数据泄漏防护有用例覆盖：信号生成日期之后的数据不得进入信号构建（用 `SignalDate` 之后的 K 线构造"当时可见数据"的测试）。
+4. 冷启动口径正确：`Confidence`/`Horizon` 为 null 的历史样本只进方向准确率、不进置信度分桶与周期统计；`MarketType` 为 null 的报告不出现在任何含基准的统计中。
+
+## 七、实现顺序建议
+
+1. 数据层：
+   1. 采集字段（**v1.1 已完成**）：报告级 `MarketType`、分析师级 `Confidence`/`Horizon`、`reports.market_type`/`rating` 列 + 旧库 `ALTER TABLE` 迁移。
+   2. `SignalEvent` 构建器（复用 `AnalystSignalParser`），先只读 `report_json`。
+   3. 当信号量或查询延迟成为问题时，再建 `signals` 旁表并回填历史（回填只填 `market_type`/`rating` 等可从 JSON 恢复的字段，`Confidence`/`Horizon` 缺失即留 null，不做推断）。
+2. 回测引擎：纯静态类（对齐/成交/收益规则集中在一处，便于单测），行情经既有 `IKLineService` 注入。
+3. 统计层：胜率/Wilson 区间/基准对比（纯函数）。
+4. UI：单标的信号历史 + 分析师绩效页，复用现有卡片与 `StateOverlayView` 规范。

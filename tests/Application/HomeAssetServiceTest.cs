@@ -83,7 +83,7 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.IsTrue(results.Count > 0, "搜索'贵州茅台'应返回至少一条结果");
+        Assert.IsNotEmpty(results, "搜索'贵州茅台'应返回至少一条结果");
         var first = results[0];
         Assert.IsFalse(string.IsNullOrWhiteSpace(first.Code), "返回结果应包含有效的股票代码");
         Assert.IsFalse(string.IsNullOrWhiteSpace(first.Name), "返回结果应包含有效的股票名称");
@@ -102,7 +102,7 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(hotAssets);
-        Assert.IsTrue(hotAssets.Count > 0, "热门资产列表不应为空");
+        Assert.IsNotEmpty(hotAssets, "热门资产列表不应为空");
         Assert.IsTrue(hotAssets.All(h => !string.IsNullOrWhiteSpace(h.Code)), "所有热门资产应包含有效代码");
         Assert.IsTrue(hotAssets.All(h => !string.IsNullOrWhiteSpace(h.Name)), "所有热门资产应包含有效名称");
     }
@@ -123,8 +123,8 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(recentAssets);
-        Assert.IsTrue(recentAssets.Count > 0, "添加后最近资产列表不应为空");
-        Assert.IsTrue(recentAssets.Any(a => a.Code == "SH600519"), "最近资产应包含刚添加的贵州茅台");
+        Assert.IsNotEmpty(recentAssets, "添加后最近资产列表不应为空");
+        Assert.Contains(a => a.Code == "SH600519", recentAssets, "最近资产应包含刚添加的贵州茅台");
     }
 
     [TestMethod]
@@ -145,9 +145,9 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(recentAssets);
-        Assert.IsTrue(recentAssets.Count >= 2, "添加两个资产后最近列表应至少包含两条记录");
-        Assert.IsTrue(recentAssets.Any(a => a.Code == "SH600519"), "应包含贵州茅台");
-        Assert.IsTrue(recentAssets.Any(a => a.Code == "SH600036"), "应包含招商银行");
+        Assert.IsGreaterThanOrEqualTo(2, recentAssets.Count, "添加两个资产后最近列表应至少包含两条记录");
+        Assert.Contains(a => a.Code == "SH600519", recentAssets, "应包含贵州茅台");
+        Assert.Contains(a => a.Code == "SH600036", recentAssets, "应包含招商银行");
     }
 
     [TestMethod]
@@ -163,9 +163,9 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(results);
-        Assert.IsTrue(results.Count > 0, "搜索'BTC'应返回至少一条结果");
+        Assert.IsNotEmpty(results, "搜索'BTC'应返回至少一条结果");
         Assert.IsTrue(results.All(r => !string.IsNullOrWhiteSpace(r.Code)), "所有结果应包含有效代码");
-        Assert.IsTrue(results.Any(r => r.Code.Contains("BTC")), "结果中应包含 BTC 相关资产");
+        Assert.Contains(r => r.Code.Contains("BTC"), results, "结果中应包含 BTC 相关资产");
     }
 
     [TestMethod]
@@ -181,7 +181,7 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(hotAssets);
-        Assert.IsTrue(hotAssets.Count > 0, "虚拟币热门资产列表不应为空");
+        Assert.IsNotEmpty(hotAssets, "虚拟币热门资产列表不应为空");
         Assert.IsTrue(hotAssets.All(h => !string.IsNullOrWhiteSpace(h.Code)), "所有热门资产应包含有效代码");
     }
 
@@ -201,7 +201,7 @@ public class HomeAssetServiceTest
 
         // Assert
         Assert.IsNotNull(recentAssets);
-        Assert.IsTrue(recentAssets.Count > 0, "添加后最近资产列表不应为空");
-        Assert.IsTrue(recentAssets.Any(a => a.Code == "BTCUSDT"), "最近资产应包含刚添加的 BTCUSDT");
+        Assert.IsNotEmpty(recentAssets, "添加后最近资产列表不应为空");
+        Assert.Contains(a => a.Code == "BTCUSDT", recentAssets, "最近资产应包含刚添加的 BTCUSDT");
     }
 }

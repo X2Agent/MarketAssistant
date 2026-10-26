@@ -13,21 +13,14 @@ namespace MarketAssistant.Agents.Tools.AShare;
 /// <summary>
 /// A股技术分析工具实现
 /// </summary>
-public sealed class AShareTechnicalTools : ITechnicalDataTools
+public sealed class AShareTechnicalTools(
+    ZhiTuMarketClient zhiTuClient,
+    IUserSettingService userSettingService,
+    ILogger<AShareTechnicalTools> logger) : ITechnicalDataTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient;
-    private readonly IUserSettingService _userSettingService;
-    private readonly ILogger<AShareTechnicalTools> _logger;
-
-    public AShareTechnicalTools(
-        ZhiTuMarketClient zhiTuClient,
-        IUserSettingService userSettingService,
-        ILogger<AShareTechnicalTools> logger)
-    {
-        _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-        _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-        _logger = logger;
-    }
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
+    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ILogger<AShareTechnicalTools> _logger = logger;
 
     private async Task<T> GetIndicatorAsync<T>(string indicator, string assetSymbol, CancellationToken cancellationToken = default)
     {
@@ -38,7 +31,7 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
             var items = await _zhiTuClient.GetIndicatorListAsync<T>(indicator, formattedSymbol, token, cancellationToken);
 
             if (items.Count == 0)
-                throw new FriendlyException($"获取 {indicator.ToUpper()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
+                throw new FriendlyException($"获取 {indicator.ToUpperInvariant()} 数据失败: 返回数据为空或无有效数据 (代码: {formattedSymbol})");
 
             return items.Last();
         }
@@ -100,11 +93,20 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
             if (items.Count == 0)
                 throw new FriendlyException($"K线数据为空 (代码: {formattedSymbol})");
 
-            return items
+            // OHLC 为 null 的 bar 是上游缺失的无效数据，跳过；缺失成交量按 0 计
+            return [.. items
+                .Where(x => x.O.HasValue && x.H.HasValue && x.L.HasValue && x.C.HasValue)
                 .OrderBy(x => x.T)
                 .TakeLast(clampedCount)
-                .Select(x => new OhlcvBar { T = x.T, O = x.O, H = x.H, L = x.L, C = x.C, V = x.V })
-                .ToList();
+                .Select(x => new OhlcvBar
+                {
+                    T = x.T,
+                    O = x.O!.Value,
+                    H = x.H!.Value,
+                    L = x.L!.Value,
+                    C = x.C!.Value,
+                    V = x.V ?? 0m
+                })];
         }
         catch (Exception ex) when (ex is not FriendlyException)
         {
@@ -122,13 +124,16 @@ public sealed class AShareTechnicalTools : ITechnicalDataTools
         yield return AIFunctionFactory.Create(GetKLinesAsync);
     }
 
+    /// <summary>
+    /// 智兔 K 线条目。OHLC 缺失（null）的 bar 为无效数据，映射时跳过；成交量缺失按 0 计。
+    /// </summary>
     private sealed class ZhiTuKLineBar
     {
         [JsonPropertyName("t")] public string T { get; init; } = "";
-        [JsonPropertyName("o")] public decimal O { get; init; }
-        [JsonPropertyName("h")] public decimal H { get; init; }
-        [JsonPropertyName("l")] public decimal L { get; init; }
-        [JsonPropertyName("c")] public decimal C { get; init; }
-        [JsonPropertyName("v")] public decimal V { get; init; }
+        [JsonPropertyName("o")] public decimal? O { get; init; }
+        [JsonPropertyName("h")] public decimal? H { get; init; }
+        [JsonPropertyName("l")] public decimal? L { get; init; }
+        [JsonPropertyName("c")] public decimal? C { get; init; }
+        [JsonPropertyName("v")] public decimal? V { get; init; }
     }
 }

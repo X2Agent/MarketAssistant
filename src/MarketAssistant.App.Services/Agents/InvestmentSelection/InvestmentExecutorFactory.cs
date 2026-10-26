@@ -7,14 +7,9 @@ namespace MarketAssistant.Agents.InvestmentSelection;
 /// <summary>
 /// 基于 DI 容器的投资选择 Executor 工厂实现，每次调用解析新的 Transient 实例。
 /// </summary>
-public sealed class InvestmentExecutorFactory : IInvestmentExecutorFactory
+public sealed class InvestmentExecutorFactory(IServiceProvider serviceProvider) : IInvestmentExecutorFactory
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public InvestmentExecutorFactory(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     public GenerateCriteriaExecutor<StockCriteria> CreateStockCriteriaExecutor()
         => _serviceProvider.GetRequiredService<GenerateCriteriaExecutor<StockCriteria>>();

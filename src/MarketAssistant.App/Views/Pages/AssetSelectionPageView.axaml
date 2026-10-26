@@ -93,7 +93,7 @@
             </Border>
         </Border>
 
-        <ScrollViewer Grid.Row="1">
+        <ScrollViewer Grid.Row="1" IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
                 <!-- 页面标题已在顶栏显示，页面内不再重复 -->
 
@@ -418,5 +418,33 @@
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
+
+        <!-- 首屏骨架：三模式卡 + 输入区 + 结果列表行 -->
+        <ScrollViewer Grid.Row="1"
+                      IsVisible="{Binding IsInitialLoading}"
+                      Background="{DynamicResource CardBackgroundBrush}">
+            <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
+                <UniformGrid Columns="3">
+                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
+                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
+                    <Border Classes="skeleton skeleton-card" Height="112"/>
+                </UniformGrid>
+                <Border Classes="skeleton skeleton-panel" Height="200"/>
+                <StackPanel Spacing="{StaticResource SmallSpacing}">
+                    <Border Classes="skeleton skeleton-row" Height="88"/>
+                    <Border Classes="skeleton skeleton-row" Height="88"/>
+                    <Border Classes="skeleton skeleton-row" Height="88"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 失败态（含重试入口）；空态由页面内各分区自行提示 -->
+        <controls:StateOverlayView Grid.Row="1"
+                                   State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"
+                                   ZIndex="999"/>
     </Grid>
 </UserControl>

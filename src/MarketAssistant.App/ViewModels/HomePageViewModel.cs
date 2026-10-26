@@ -15,17 +15,21 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
 
     public TelegraphNewsViewModel News { get; }
 
+    public DailyBriefingViewModel Briefing { get; }
+
     public HomePageViewModel(
         HomeSearchViewModel searchViewModel,
         HotAssetsViewModel hotAssetsViewModel,
         RecentAssetsViewModel recentAssetsViewModel,
         TelegraphNewsViewModel newsViewModel,
+        DailyBriefingViewModel briefingViewModel,
         ILogger<HomePageViewModel> logger) : base(logger)
     {
         Search = searchViewModel;
         HotAssets = hotAssetsViewModel;
         RecentAssets = recentAssetsViewModel;
         News = newsViewModel;
+        Briefing = briefingViewModel;
 
         Search.AssetSelected += OnAssetSelected;
         HotAssets.HotAssetSelected += OnHotAssetSelected;
@@ -40,8 +44,8 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
     private void OnHotAssetSelected(object? sender, HotAsset asset)
     {
         var assetCode = asset.MarketType == Infrastructure.Core.MarketType.Crypto
-            ? asset.Code.ToLower()
-            : $"{asset.Market}{asset.Code}".ToLower();
+            ? asset.Code.ToLowerInvariant()
+            : $"{asset.Market}{asset.Code}".ToLowerInvariant();
 
         decimal? currentPrice = decimal.TryParse(asset.CurrentPrice, out var price) ? price : null;
         decimal? changePercent = decimal.TryParse(asset.ChangePercentage?.TrimEnd('%'), out var percent) ? percent : null;
@@ -86,11 +90,15 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         HotAssets.HotAssetSelected -= OnHotAssetSelected;
         RecentAssets.RecentAssetSelected -= OnRecentAssetSelected;
 
+        // 以下子 ViewModel 与本页面同为 Transient，生命周期归页面所有。
         Search.Dispose();
         HotAssets.Dispose();
         RecentAssets.Dispose();
         News.Dispose();
 
+        // Briefing 为单例（跨导航复用，避免重复计费生成），生命周期由容器拥有。
+        // 此处不得释放：否则离开首页会把它置为 _disposed，
+        // 再次进入首页时该单例将永久失效（加载与市场切换响应全部短路）。
         GC.SuppressFinalize(this);
     }
 }

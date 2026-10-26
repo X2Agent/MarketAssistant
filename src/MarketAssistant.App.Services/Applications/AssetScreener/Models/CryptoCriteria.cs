@@ -14,7 +14,7 @@ public class CryptoCriteria : IScreeningCriteria
     /// <summary>
     /// 筛选条件列表
     /// </summary>
-    public List<CryptoScreeningCondition> Criteria { get; set; } = new();
+    public List<CryptoScreeningCondition> Criteria { get; set; } = [];
 
     /// <summary>
     /// 返回结果数量限制

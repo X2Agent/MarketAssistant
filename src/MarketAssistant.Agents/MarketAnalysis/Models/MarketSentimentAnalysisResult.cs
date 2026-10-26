@@ -154,6 +154,10 @@ public sealed class ShortTermInsight
     [Description("操作建议")]
     public OperationRecommendation OperationRecommendation { get; set; }
 
+    [Range(0, 100)]
+    [Description("对操作建议的置信度百分比，0-100；依据不足或结论不确定时设为null。评分标准：" + ScoringStandards.Confidence)]
+    public float? ConfidencePercentage { get; set; }
+
     [Description("仓位建议")]
     public PositionRecommendation PositionRecommendation { get; set; }
 

@@ -8,7 +8,7 @@
 
 ```
 MarketAssistant.Trading/
-├── TradingEnums.cs           ← 跨层共享枚举（StrategyType / OrderSide / CryptoTradingMode 等）
+├── TradingEnums.cs           ← 跨层共享枚举（StrategyType / OrderSide / TradingMode 等）
 ├── TradingStrategy.cs        ← 交易策略配置（持久化模型）
 ├── TradeRecord.cs            ← 交易执行记录（持久化模型）
 ├── RiskModels.cs             ← RiskConfig / RiskCheckResult / DailyStats
@@ -29,6 +29,14 @@ MarketAssistant.Trading/
 | `ExchangeAccountInfo` | 账户信息：`CanTrade`、`Balances` |
 | `ExchangeBalance` | 资产余额：`Asset`、`Free`、`Locked` |
 | `ExchangeOrderResult` | 订单结果：`OrderId`、`Status`、`ExecutedQty`、`Price` |
+| `ExchangePosition` | 合约持仓：含 `LiquidationPrice`（强平价，缺失为 0，调用方不得把 0 当真实强平价） |
+
+## 跨层共享模型要点
+
+- `PositionInfo` 增加 `IsShort`：数量为绝对值、方向由该字段表达，紧急平仓等场景必须据此决定买卖方向。
+- `TradeRecord` 增加 `SlippagePercent`（成交滑点）与 `RealizedPnl`（已实现盈亏，绩效统计数据基础）；开仓成交为 0。
+- `DailyStats` 增加 `ConsecutiveLosses`（当日连续亏损笔数，只计已实现盈亏，开仓不参与）。
+- `RiskConfig` 除账户级限额外，新增：`FuturesLeverage`、`MaxSlippagePercent`、`LimitOrderTimeoutSeconds`、`MaxConsecutiveLosses`、`MaxFuturesNotionalPercent`、`ApiFailureThreshold`、`LiquidationWarnPercent`、`LiquidationCriticalPercent`（JSON 持久化，新增字段无需迁移）。
 
 ---
 

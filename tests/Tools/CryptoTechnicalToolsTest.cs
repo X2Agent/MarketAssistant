@@ -1,6 +1,7 @@
 using MarketAssistant.Agents.Tools.Crypto;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
+using MarketAssistant.Applications.Technical;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,13 +16,11 @@ public class CryptoTechnicalToolsTest
     [TestCategory("Unit")]
     public async Task TechnicalIndicators_ShouldReturnStructuredValues()
     {
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton<IKLineService, FakeKLineService>(MarketType.Crypto);
-
-        using var serviceProvider = services.BuildServiceProvider();
+        var kLineService = new FakeKLineService();
         var tools = new CryptoTechnicalTools(
             NullLogger<CryptoTechnicalTools>.Instance,
-            serviceProvider);
+            kLineService,
+            new TechnicalIndicatorService(kLineService, NullLogger<TechnicalIndicatorService>.Instance));
 
         var kdj = await tools.GetKDJAsync("BTC");
         var macd = await tools.GetMACDAsync("BTC");

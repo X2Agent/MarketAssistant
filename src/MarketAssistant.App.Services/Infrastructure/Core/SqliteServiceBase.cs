@@ -30,19 +30,30 @@ public abstract class SqliteServiceBase
     protected ILogger Logger { get; }
 
     /// <summary>
-    /// 构造函数，使用统一数据库文件 market.db 构建连接字符串并创建数据目录。
+    /// 构造函数，使用统一数据库文件 market.db（或测试指定的路径）构建连接字符串并创建数据目录。
     /// </summary>
     /// <param name="logger">日志记录器</param>
-    protected SqliteServiceBase(ILogger logger)
+    /// <param name="dbPath">可选的数据库文件完整路径（为空时使用默认 AppData/market.db，供单元测试隔离使用）</param>
+    protected SqliteServiceBase(ILogger logger, string? dbPath = null)
     {
         Logger = logger;
 
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            AppInfo.AppName);
-        Directory.CreateDirectory(appDataDir);
+        if (string.IsNullOrWhiteSpace(dbPath))
+        {
+            var appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                AppInfo.AppName);
+            Directory.CreateDirectory(appDataDir);
 
-        var dbPath = Path.Combine(appDataDir, UnifiedDbFileName);
+            dbPath = Path.Combine(appDataDir, UnifiedDbFileName);
+        }
+        else
+        {
+            var dir = Path.GetDirectoryName(dbPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+        }
+
         // 统一使用 Data Source={dbPath}，不指定 Mode=ReadWriteCreate
         // 文件不存在时由 SqliteConnection.OpenAsync 自动创建
         ConnectionString = $"Data Source={dbPath}";

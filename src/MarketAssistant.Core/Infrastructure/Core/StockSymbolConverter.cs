@@ -16,7 +16,7 @@ public static class StockSymbolConverter
         string normalized = stockCode.ToUpperInvariant().Replace("/", "").Replace("-", "").Replace(" ", "");
 
         // 如果已经是 SHxxxxxx 或 SZxxxxxx 格式（且后续全是数字）
-        if ((normalized.StartsWith("SH") || normalized.StartsWith("SZ")) &&
+        if ((normalized.StartsWith("SH", StringComparison.Ordinal) || normalized.StartsWith("SZ", StringComparison.Ordinal)) &&
              normalized.Length > 2 &&
              normalized.Skip(2).All(char.IsDigit))
         {
@@ -47,10 +47,10 @@ public static class StockSymbolConverter
         }
 
         // 2. 处理 SH600519 / SZ000001 前缀格式
-        if (cleanCode.StartsWith("SH") || cleanCode.StartsWith("SZ"))
+        if (cleanCode.StartsWith("SH", StringComparison.Ordinal) || cleanCode.StartsWith("SZ", StringComparison.Ordinal))
         {
             string code = cleanCode.Substring(2);
-            string market = cleanCode.StartsWith("SZ") ? "SZ" : "SH";
+            string market = cleanCode.StartsWith("SZ", StringComparison.Ordinal) ? "SZ" : "SH";
             // 确保剩余部分是纯数字才转换
             if (code.All(char.IsDigit))
             {
@@ -59,13 +59,13 @@ public static class StockSymbolConverter
         }
 
         // 3. 处理 600519SH / 000001SZ 后缀格式
-        if (cleanCode.EndsWith("SH") || cleanCode.EndsWith("SZ"))
+        if (cleanCode.EndsWith("SH", StringComparison.Ordinal) || cleanCode.EndsWith("SZ", StringComparison.Ordinal))
         {
             // 长度检查，避免 SH / SZ 本身
             if (cleanCode.Length > 2)
             {
                 string code = cleanCode.Substring(0, cleanCode.Length - 2);
-                string market = cleanCode.EndsWith("SZ") ? "SZ" : "SH";
+                string market = cleanCode.EndsWith("SZ", StringComparison.Ordinal) ? "SZ" : "SH";
                 if (code.All(char.IsDigit))
                 {
                     return $"{code}.{market}";
@@ -90,7 +90,45 @@ public static class StockSymbolConverter
     /// </summary>
     private static string ExtractDigits(string stockCode)
     {
-        return new string(stockCode.Where(char.IsDigit).ToArray());
+        return new string([.. stockCode.Where(char.IsDigit)]);
+    }
+
+    /// <summary>
+    /// 已知交易所前缀（沪深京），统一的大写标识编码。大小写不敏感匹配，输出恒为大写。
+    /// </summary>
+    private static readonly string[] KnownExchangePrefixes = ["SH", "SZ", "BJ"];
+
+    /// <summary>
+    /// 拆分交易所前缀（如 <c>SH600519</c> / <c>sh600519</c>）为（交易所, 代码）：
+    /// 识别到已知前缀时交易所返回大写前缀、代码返回剥离前缀后的部分；
+    /// 未识别时交易所返回空串、代码返回原值——由调用方按各自约定处置，
+    /// <b>不做「未知默认上海」的猜测</b>（猜错等于把标的标到错误的交易所，
+    /// 进而路由到错误市场的数据源与下单通道）。
+    /// </summary>
+    /// <remarks>
+    /// 本方法是「带前缀符号 → 市场 + 代码」的统一入口；
+    /// 裸数字代码的交易所推断走 <see cref="ResolveExchange"/>（经各格式转换方法间接复用）。
+    /// 两者互补：前者解析显式标识，后者按代码段规则推断。
+    /// </remarks>
+    public static (string Market, string Code) SplitExchangePrefix(string? symbol)
+    {
+        if (string.IsNullOrWhiteSpace(symbol))
+            return (string.Empty, string.Empty);
+
+        var trimmed = symbol.Trim();
+        if (trimmed.Length <= 2)
+            return (string.Empty, trimmed);
+
+        var prefix = trimmed[..2];
+        foreach (var known in KnownExchangePrefixes)
+        {
+            if (string.Equals(prefix, known, StringComparison.OrdinalIgnoreCase))
+            {
+                return (known, trimmed[2..]);
+            }
+        }
+
+        return (string.Empty, trimmed);
     }
 
     /// <summary>
@@ -103,12 +141,12 @@ public static class StockSymbolConverter
     private static string ResolveExchange(string digits)
     {
         // 北交所：8 开头（83/87/88 等）、43/92 开头
-        if (digits.StartsWith("8") || digits.StartsWith("43") || digits.StartsWith("92"))
+        if (digits.StartsWith('8') || digits.StartsWith("43", StringComparison.Ordinal) || digits.StartsWith("92", StringComparison.Ordinal))
             return "BJ";
 
         // 深圳证券交易所：0/3 开头（主板/创业板）、12 开头（可转债）、15/16 开头（ETF/LOF）
-        if (digits.StartsWith("0") || digits.StartsWith("3") ||
-            digits.StartsWith("12") || digits.StartsWith("15") || digits.StartsWith("16"))
+        if (digits.StartsWith('0') || digits.StartsWith('3') ||
+            digits.StartsWith("12", StringComparison.Ordinal) || digits.StartsWith("15", StringComparison.Ordinal) || digits.StartsWith("16", StringComparison.Ordinal))
             return "SZ";
 
         // 其余默认上海证券交易所：6 开头（主板/科创板）、5 开头（ETF/LOF）、11 开头（可转债）、9 开头（B股）

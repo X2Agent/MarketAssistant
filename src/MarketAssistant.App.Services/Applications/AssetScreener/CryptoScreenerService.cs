@@ -7,25 +7,25 @@ namespace MarketAssistant.Applications.AssetScreener;
 /// <summary>
 /// 虚拟币筛选服务实现（基于CoinGecko免费API + 币安API补充）
 /// </summary>
-public sealed class CryptoScreenerService : IAssetScreenerService
+public sealed class CryptoScreenerService(
+    ILogger<CryptoScreenerService> logger,
+    CoinGeckoApiService coinGeckoService,
+    BinanceMarketDataService binanceService) : IAssetScreenerService
 {
-    private readonly ILogger<CryptoScreenerService> _logger;
-    private readonly CoinGeckoApiService _coinGeckoService;
-    private readonly BinanceMarketDataService _binanceService;
+    private readonly ILogger<CryptoScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
 
     // CoinGecko API 限制
     private const int COINGECKO_MAX_PER_PAGE = 250;
-    private const int COINGECKO_DEFAULT_PAGE_SIZE = 100;
 
-    public CryptoScreenerService(
-        ILogger<CryptoScreenerService> logger,
-        CoinGeckoApiService coinGeckoService,
-        BinanceMarketDataService binanceService)
+    /// <summary>
+    /// 常见稳定币集合：选币推荐与行情分析面向波动性标的，稳定币一旦入选会在后续转交易对时拼出 USDTUSDT 等无效代码。
+    /// </summary>
+    private static readonly HashSet<string> StableCoinSymbols = new(StringComparer.OrdinalIgnoreCase)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-        _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    }
+        "USDT", "USDC", "DAI", "TUSD", "BUSD", "FDUSD", "USDP", "USDE", "PYUSD", "FRAX"
+    };
 
     /// <summary>
     /// 根据筛选条件筛选虚拟币
@@ -108,11 +108,11 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     }
 
     /// <summary>
-    /// 应用本地筛选条件
+    /// 应用本地筛选条件（同时排除稳定币）
     /// </summary>
-    private List<CoinGeckoMarket> ApplyFilters(List<CoinGeckoMarket> markets, CryptoCriteria criteria)
+    internal static List<CoinGeckoMarket> ApplyFilters(List<CoinGeckoMarket> markets, CryptoCriteria criteria)
     {
-        var filtered = markets.AsEnumerable();
+        var filtered = markets.Where(m => !IsStableCoin(m.Symbol));
 
         foreach (var condition in criteria.Criteria)
         {
@@ -151,12 +151,12 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             };
         }
 
-        return filtered.ToList();
+        return [.. filtered];
     }
 
     private List<ScreenerAssetInfo> ConvertToScreenerInfo(List<CoinGeckoMarket> markets)
     {
-        return markets.Select(m => (ScreenerAssetInfo)new ScreenerCryptoInfo
+        return [.. markets.Select(m => (ScreenerAssetInfo)new ScreenerCryptoInfo
         {
             Name = m.Name,
             Symbol = m.Symbol.ToUpperInvariant(),
@@ -172,7 +172,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             CirculatingSupply = m.CirculatingSupply ?? 0,
             TotalSupply = m.TotalSupply ?? 0,
             MaxSupply = m.MaxSupply
-        }).ToList();
+        })];
     }
 
     /// <summary>
@@ -229,16 +229,21 @@ public sealed class CryptoScreenerService : IAssetScreenerService
             };
         }
 
-        return filtered.ToList();
+        return [.. filtered];
     }
+
+    /// <summary>
+    /// 判断是否为稳定币基础代码（排除 USDT、USDC、DAI 等）
+    /// </summary>
+    internal static bool IsStableCoin(string? symbol)
+        => !string.IsNullOrWhiteSpace(symbol) && StableCoinSymbols.Contains(symbol.Trim());
 
     /// <summary>
     /// 判断是否为稳定币交易对（排除 USDCUSDT、DAIUSDT 等）
     /// </summary>
     private static bool IsStableCoinPair(string symbol)
     {
-        var stableCoins = new[] { "USDC", "DAI", "TUSD", "BUSD", "FDUSD", "USDP" };
-        return stableCoins.Any(sc => symbol.StartsWith(sc + "USDT", StringComparison.OrdinalIgnoreCase));
+        return StableCoinSymbols.Any(sc => symbol.StartsWith(sc + "USDT", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -246,7 +251,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
     /// </summary>
     private List<ScreenerAssetInfo> ConvertBinanceToScreenerInfo(List<Binance24hrTicker> tickers)
     {
-        return tickers.Select(t =>
+        return [.. tickers.Select(t =>
         {
             // BTCUSDT → BTC
             var baseAsset = t.Symbol.EndsWith("USDT", StringComparison.OrdinalIgnoreCase)
@@ -269,7 +274,7 @@ public sealed class CryptoScreenerService : IAssetScreenerService
                 CirculatingSupply = 0,
                 TotalSupply = 0
             };
-        }).ToList();
+        })];
     }
 
     #region 辅助方法
@@ -292,24 +297,40 @@ public sealed class CryptoScreenerService : IAssetScreenerService
         return "market_cap_desc";
     }
 
-    private (int page, int perPage) DeterminePagination(CryptoCriteria criteria)
+    internal static (int page, int perPage) DeterminePagination(CryptoCriteria criteria)
     {
         var rankFilter = criteria.Criteria.FirstOrDefault(c =>
             c.Code.Equals("market_cap_rank", StringComparison.OrdinalIgnoreCase));
 
         if (rankFilter != null)
         {
-            var minRank = (int)(rankFilter.MinValue ?? 1);
-            var maxRank = (int)(rankFilter.MaxValue ?? COINGECKO_DEFAULT_PAGE_SIZE);
+            var minRank = Math.Max(1, (int)(rankFilter.MinValue ?? 1));
+            var maxRank = Math.Max(minRank, (int)(rankFilter.MaxValue ?? COINGECKO_MAX_PER_PAGE));
 
-            // 计算需要的页数
-            var page = (minRank - 1) / COINGECKO_DEFAULT_PAGE_SIZE + 1;
-            var perPage = Math.Min(maxRank - minRank + 1, COINGECKO_MAX_PER_PAGE);
+            // CoinGecko 分页偏移量为 (page - 1) * perPage：
+            // 当起止排名均在单页上限 (250) 内时直接拉取第 1 页并覆盖到 maxRank（有其他客户端过滤条件时拉满 250），
+            // 避免改变 perPage 导致页偏移错位；超出 250 时固定 perPage=250 按页对齐。
+            if (minRank <= COINGECKO_MAX_PER_PAGE)
+            {
+                var hasOtherFilters = criteria.Criteria.Count > 1;
+                var targetSize = hasOtherFilters
+                    ? COINGECKO_MAX_PER_PAGE
+                    : Math.Clamp(maxRank + 10, 20, COINGECKO_MAX_PER_PAGE);
+                return (1, targetSize);
+            }
 
-            return (page, perPage);
+            var page = (minRank - 1) / COINGECKO_MAX_PER_PAGE + 1;
+            return (page, COINGECKO_MAX_PER_PAGE);
         }
 
-        return (1, Math.Min(criteria.Limit, COINGECKO_MAX_PER_PAGE));
+        // 存在客户端过滤条件（市值/成交量/涨跌幅/价格等）时，需拉取完整候选池 (250) 供本地筛选后再 Take(Limit)；
+        // 无过滤条件时预留稳定币剔除余量即可。
+        if (criteria.Criteria.Count > 0)
+        {
+            return (1, COINGECKO_MAX_PER_PAGE);
+        }
+
+        return (1, Math.Clamp(criteria.Limit + 10, 20, COINGECKO_MAX_PER_PAGE));
     }
 
     private string? GetCategoryFilter(CryptoCriteria criteria)

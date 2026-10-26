@@ -64,28 +64,6 @@ public static class LlmJsonExtractor
             $"LLM 返回文本无法解析为 JSON。原始文本前 500 字符: {preview}", lastException);
     }
 
-    /// <summary>
-    /// 仅提取 JSON 文本片段（不反序列化）。供需要自行反序列化的调用方使用。
-    /// </summary>
-    /// <returns>提取到的 JSON 文本；若所有策略均失败则返回 null。</returns>
-    public static string? ExtractJsonString(string? rawText)
-    {
-        if (string.IsNullOrWhiteSpace(rawText))
-            return rawText;
-
-        if (IsValidJson(rawText))
-            return rawText;
-
-        var stripped = StripMarkdownCodeFence(rawText);
-        if (!ReferenceEquals(stripped, rawText) && IsValidJson(stripped))
-            return stripped;
-
-        if (TryExtractJsonWithReader(rawText, out var jsonText))
-            return jsonText;
-
-        return null;
-    }
-
     private static bool TryDeserialize<T>(
         string text, JsonSerializerOptions options,
         out T? result, out Exception? exception)
@@ -105,12 +83,69 @@ public static class LlmJsonExtractor
     }
 
     /// <summary>
+    /// 从 LLM 返回文本中定位并取出首个完整 JSON 文本（不做类型反序列化）。
+    /// 与 <see cref="Deserialize{T}"/> 共用同一套三层兜底，供"字段是否存在"这类结构判定复用，
+    /// 避免调用方各自实现一遍 JSON 边界识别。
+    /// </summary>
+    /// <param name="rawText">LLM 返回的原始文本</param>
+    /// <param name="json">成功时为可直接解析的 JSON 文本</param>
+    /// <returns>找到可解析的 JSON 时返回 true</returns>
+    public static bool TryExtractJson(string? rawText, out string json)
+    {
+        json = string.Empty;
+        if (string.IsNullOrWhiteSpace(rawText))
+            return false;
+
+        if (IsParsableJson(rawText))
+        {
+            json = rawText;
+            return true;
+        }
+
+        var stripped = StripMarkdownCodeFence(rawText);
+        if (IsParsableJson(stripped))
+        {
+            json = stripped;
+            return true;
+        }
+
+        if (TryExtractJsonWithReader(rawText, out var bounded) && IsParsableJson(bounded))
+        {
+            json = bounded;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>语法层面判断文本是否为完整 JSON 值。</summary>
+    private static bool IsParsableJson(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+            return document.RootElement.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 剥离 markdown 代码块标记。若文本不包含代码块则原样返回（引用相等）。
     /// </summary>
     private static string StripMarkdownCodeFence(string text)
     {
         var span = text.AsSpan().Trim();
-        if (!span.StartsWith("```"))
+        if (!span.StartsWith("```", StringComparison.Ordinal))
             return text;
 
         var firstNewline = span.IndexOf('\n');
@@ -158,17 +193,10 @@ public static class LlmJsonExtractor
             var depth = 0;
             do
             {
-                switch (reader.TokenType)
-                {
-                    case JsonTokenType.StartObject:
-                    case JsonTokenType.StartArray:
-                        depth++;
-                        break;
-                    case JsonTokenType.EndObject:
-                    case JsonTokenType.EndArray:
-                        depth--;
-                        break;
-                }
+                if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+                    depth++;
+                else if (reader.TokenType is JsonTokenType.EndObject or JsonTokenType.EndArray)
+                    depth--;
 
                 if (depth == 0)
                     break;
@@ -179,19 +207,6 @@ public static class LlmJsonExtractor
 
             // 直接从已转换的子串字节中截取 JSON 部分，无需再次编码完整文本
             json = Encoding.UTF8.GetString(jsonBytes, 0, (int)reader.BytesConsumed);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsValidJson(string text)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(text);
             return true;
         }
         catch (JsonException)

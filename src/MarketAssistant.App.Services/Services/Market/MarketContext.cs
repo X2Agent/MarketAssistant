@@ -9,19 +9,13 @@ namespace MarketAssistant.Services.Market;
 /// <summary>
 /// 市场切换事件参数
 /// </summary>
-public class MarketChangedEventArgs : EventArgs
+public class MarketChangedEventArgs(MarketType previousMarket, MarketType newMarket) : EventArgs
 {
     /// <summary>切换前的市场</summary>
-    public MarketType PreviousMarket { get; }
+    public MarketType PreviousMarket { get; } = previousMarket;
 
     /// <summary>切换后的市场</summary>
-    public MarketType NewMarket { get; }
-
-    public MarketChangedEventArgs(MarketType previousMarket, MarketType newMarket)
-    {
-        PreviousMarket = previousMarket;
-        NewMarket = newMarket;
-    }
+    public MarketType NewMarket { get; } = newMarket;
 }
 
 /// <summary>

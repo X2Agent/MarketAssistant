@@ -1,0 +1,76 @@
+using Avalonia;
+using Avalonia.Media.Imaging;
+using MarketAssistant.ViewModels;
+using MarketAssistant.Views.Components;
+using SkiaSharp;
+
+namespace MarketAssistant.Services.Export;
+
+/// <summary>
+/// 报告分享卡渲染器：把 <see cref="ReportShareCardData"/> 离屏渲染为图片或 PDF。
+/// 渲染走 Avalonia 视觉树（中文与应用字体由宿主保证），PDF 由渲染位图经 SkiaSharp 封装，
+/// 与分享图视觉一致，不引入第二套排版实现。
+/// 必须在 UI 线程调用（RenderTargetBitmap 要求）。
+/// </summary>
+public static class ReportShareCardRenderer
+{
+    public const int CardWidth = 1080;
+
+    public const int CardHeight = 1350;
+
+    private static readonly PixelSize CardPixelSize = new(CardWidth, CardHeight);
+
+    /// <summary>
+    /// 显式指定 PNG 编码参数以走非过时重载：<c>Save(Stream, int?)</c> 缺少编码器类型，
+    /// 在无扩展名的 <see cref="MemoryStream"/> 上格式判定不够显式。
+    /// </summary>
+    private static readonly BitmapEncoderOptions PngEncoderOptions = new PngBitmapEncoderOptions();
+
+    /// <summary>渲染分享卡为 PNG 字节。</summary>
+    public static byte[] RenderToPngBytes(ReportShareCardData data)
+    {
+        var view = CreateCard(data);
+        using var bitmap = Render(view);
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, PngEncoderOptions);
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// 渲染分享卡并封装为 PDF 文件（单页，页面尺寸即卡片像素尺寸）。
+    /// </summary>
+    public static void SavePdf(ReportShareCardData data, string filePath)
+    {
+        var view = CreateCard(data);
+        using var bitmap = Render(view);
+
+        using var pngStream = new MemoryStream();
+        bitmap.Save(pngStream, PngEncoderOptions);
+        pngStream.Position = 0;
+
+        using var input = SKBitmap.Decode(pngStream);
+        using var document = SKDocument.CreatePdf(filePath);
+        using var canvas = document.BeginPage(CardWidth, CardHeight);
+        canvas.Clear(SKColors.White);
+        // 卡片按 1:1 像素尺寸贴入整页，使用 Nearest 采样避免重采样插值模糊
+        canvas.DrawBitmap(
+            input,
+            new SKRect(0, 0, CardWidth, CardHeight),
+            new SKSamplingOptions(SKFilterMode.Nearest),
+            null);
+        document.EndPage();
+    }
+
+    private static ReportShareCardView CreateCard(ReportShareCardData data)
+        => new(data) { Width = CardWidth, Height = CardHeight };
+
+    private static RenderTargetBitmap Render(ReportShareCardView view)
+    {
+        view.Measure(new Size(CardWidth, CardHeight));
+        view.Arrange(new Rect(0, 0, CardWidth, CardHeight));
+
+        var bitmap = new RenderTargetBitmap(CardPixelSize, new Vector(96, 96));
+        bitmap.Render(view);
+        return bitmap;
+    }
+}

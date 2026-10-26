@@ -12,17 +12,12 @@ namespace MarketAssistant.Agents.Trading;
 [RequiresTools(typeof(IStrategyTools))]
 [RequiresTools(typeof(IBasicDataTools))]
 [RequiresTools(typeof(ITechnicalDataTools))]
-public class TradingAgent : DelegatingAIAgent
+public class TradingAgent(
+    IChatClient chatClient,
+    IList<AITool> tools) : DelegatingAIAgent(CreateInnerAgent(chatClient, tools))
 {
     private const string AgentName = "TradingAgent";
     private const string AgentDescription = "虚拟币自主交易助手，能分析市场数据并执行交易决策";
-
-    public TradingAgent(
-        IChatClient chatClient,
-        IList<AITool> tools)
-        : base(CreateInnerAgent(chatClient, tools))
-    {
-    }
 
     private static AIAgent CreateInnerAgent(IChatClient chatClient, IList<AITool> tools)
     {

@@ -13,7 +13,12 @@ namespace TestMarketAssistant.Application;
 /// <summary>
 /// IFavoriteService 接口测试（覆盖 A股 和 虚拟币 实现）
 /// </summary>
+/// <remarks>
+/// 该类所有方法共用同一份 SQLite 收藏库文件，方法级并行会相互清空数据，
+/// 因此必须整体串行执行。
+/// </remarks>
 [TestClass]
+[DoNotParallelize]
 public class FavoriteServiceTest
 {
     private ServiceProvider? _serviceProvider;
@@ -101,7 +106,7 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favorites);
-        Assert.AreEqual(2, favorites.Count);
+        Assert.HasCount(2, favorites);
     }
 
     [TestMethod]
@@ -117,8 +122,9 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favoritesWithData);
-        Assert.IsTrue(favoritesWithData.Count > 0);
-        Assert.IsTrue(favoritesWithData.Any(f => f.Code == "SH600519"));
+        Assert.IsNotEmpty(favoritesWithData);
+        // 存储与返回均为归一化后的代码（A股剥离 SH/SZ 前缀）
+        Assert.Contains(f => f.Code == "600519", favoritesWithData);
     }
 
     [TestMethod]
@@ -136,7 +142,7 @@ public class FavoriteServiceTest
 
         // Assert
         Assert.IsNotNull(favorites);
-        Assert.AreEqual(0, favorites.Count);
+        Assert.IsEmpty(favorites);
     }
 
     [TestMethod]
@@ -155,9 +161,45 @@ public class FavoriteServiceTest
         var cryptoFavorites = await cryptoService.GetFavoritesCodesAsync();
 
         // Assert
-        Assert.AreEqual(1, aShareFavorites.Count);
-        Assert.AreEqual(1, cryptoFavorites.Count);
-        Assert.AreEqual("SH600519", aShareFavorites[0].Code);
+        Assert.HasCount(1, aShareFavorites);
+        Assert.HasCount(1, cryptoFavorites);
+        Assert.AreEqual("600519", aShareFavorites[0].Code);
         Assert.AreEqual("BTCUSDT", cryptoFavorites[0].Code);
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task FavoriteCode_ShouldNormalizeAcrossWriteAndQueryPaths()
+    {
+        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
+
+        // 写入端：大小写与交易所前缀均被归一化
+        await service.AddFavoriteAsync("sh600519", "SH");
+        var favorites = await service.GetFavoritesCodesAsync();
+        Assert.HasCount(1, favorites);
+        Assert.AreEqual("600519", favorites[0].Code);
+
+        // 查询端：无论传入原始代码还是归一化代码，都必须判定为已收藏
+        Assert.IsTrue(await service.IsFavoriteAsync("600519", "SH"));
+        Assert.IsTrue(await service.IsFavoriteAsync("SH600519", "SH"));
+        Assert.IsTrue(await service.IsFavoriteAsync("sh600519", "SH"));
+
+        // 重复写入归一化后的同一资产不应产生第二条记录
+        await service.AddFavoriteAsync("SH600519", "SH");
+        Assert.HasCount(1, await service.GetFavoritesCodesAsync());
+
+        // 移除端同样归一化，且原始代码调用也能命中
+        await service.RemoveFavoriteAsync("sh600519", "SH");
+        Assert.IsFalse(await service.IsFavoriteAsync("600519", "SH"));
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task IsFavorite_BlankCode_ShouldReturnFalseWithoutThrowing()
+    {
+        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
+
+        Assert.IsFalse(await service.IsFavoriteAsync("", "SH"));
+        Assert.IsFalse(await service.IsFavoriteAsync("   ", "SH"));
     }
 }
