@@ -307,8 +307,10 @@ public class TradeExecutor(
 
         // 风控校验和人工确认在 symbol 锁外完成，防止 ConfirmationCallback 等待期间
         // 持有 SemaphoreSlim，导致同一标的后续所有交易永久阻塞。
+        // 退出型触发（止损/止盈/网格破网/AI 硬边界）透传 requireClose：风控据此放行减仓单，
+        // 避免熔断期间止损被拒绝、持仓失去保护
         var riskCheck = await _riskManager.ValidateOrderAsync(
-            instrumentSymbol, side, quantity, currentPrice, type, strategyId, ct);
+            instrumentSymbol, side, quantity, currentPrice, type, strategyId, requireClose, ct);
 
         if (riskCheck.NeedsConfirmation)
         {
@@ -646,17 +648,24 @@ public class TradeExecutor(
                 CompletedAt = response.Status == "FILLED" ? DateTime.UtcNow : null
             };
 
-            await _dataService.SaveTradeRecordAsync(record, ct);
-
             // 成交滑点检测：市价单无法事前限制滑点，只能事后发现并提示。
             // 限价单的滑点由用户设定的 SlippageTolerance 事前约束，不重复判定。
+            // 必须在落库前赋值：仓库层只在 INSERT 写该列，后续 UPDATE 不覆盖，
+            // 落在保存之后会导致 slippage_percent 恒为空
+            decimal? slippagePercent = null;
             if (type == OrderType.Market && currentPrice > 0 && record.ExecutedPrice > 0)
             {
-                var slippagePercent = Math.Abs(record.ExecutedPrice - currentPrice) / currentPrice * 100m;
+                slippagePercent = Math.Abs(record.ExecutedPrice - currentPrice) / currentPrice * 100m;
                 record.SlippagePercent = slippagePercent;
+            }
 
+            await _dataService.SaveTradeRecordAsync(record, ct);
+
+            // 告警在落库之后：告警链路失败不得影响已完成的成交记录
+            if (slippagePercent.HasValue)
+            {
                 await ReportSlippageAsync(
-                    instrumentSymbol, slippagePercent, record.ExecutedPrice, currentPrice, ct)
+                    instrumentSymbol, slippagePercent.Value, record.ExecutedPrice, currentPrice, ct)
                     .ConfigureAwait(false);
             }
 

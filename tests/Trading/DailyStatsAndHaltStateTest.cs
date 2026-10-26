@@ -230,6 +230,84 @@ public sealed class DailyStatsAndHaltStateTest
         Assert.IsTrue(confirmResult.NeedsConfirmation);
     }
 
+    /// <summary>
+    /// 退出单（止损/止盈/网格破网等减仓意图）必须绕过自动熔断闸门：
+    /// 熔断期间拒绝止损会让持仓失去保护，与熔断"停止新开仓"的初衷相反。
+    /// 停机是用户显式总闸，仍然全拒（离场走"全部平仓"专用通道）。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task RiskManager_ExitOrder_ShouldBypassCircuitBreakersButNotHalt()
+    {
+        var exchangeClient = new Mock<IExchangeClient>();
+        exchangeClient.SetupGet(c => c.IsFutures).Returns(false);
+
+        var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
+        portfolioService
+            .Setup(s => s.GetAccountBalanceSummaryAsync(It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .ReturnsAsync(new AccountBalanceSummary
+            {
+                TotalValueUSDT = 1000m,
+                Assets = [new AssetBalance { Asset = "USDT", Free = 1000m, Locked = 0m, ValueUSDT = 1000m }]
+            });
+
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        dataService
+            .Setup(s => s.LoadTradingHaltAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync((false, string.Empty, (DateTime?)null));
+        dataService
+            .Setup(s => s.SaveTradingHaltAsync(It.IsAny<bool>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        dataService
+            .Setup(s => s.SaveAccountSnapshotAsync(It.IsAny<decimal>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        // 熔断全面生效：连亏达限 + 交易次数达限 + 回撤超限
+        dataService
+            .Setup(s => s.LoadRiskConfigAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RiskConfig
+            {
+                MaxConsecutiveLosses = 3,
+                MaxDailyTrades = 2,
+                MaxDrawdownPercent = 20m,
+                MaxDailyLossPercent = 5m,
+                MaxSingleOrderPercent = 10m
+            });
+        dataService
+            .Setup(s => s.GetTodayStatsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DailyStats { ConsecutiveLosses = 5, TradeCount = 9, TotalPnl = -300m });
+        dataService
+            .Setup(s => s.GetPeakAccountValueAsync(It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1600m);
+        dataService
+            .Setup(s => s.GetOpenPositionsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new Position { Symbol = "BTCUSDT", Side = PositionSide.Long, Quantity = 2m, ClosedQuantity = 0m }]);
+
+        var haltState = new TradingHaltState(dataService.Object, NullLogger<TradingHaltState>.Instance);
+        var riskManager = new RiskManager(
+            dataService.Object,
+            portfolioService.Object,
+            exchangeClient.Object,
+            haltState,
+            new ApiHealthMonitor(),
+            NullLogger<RiskManager>.Instance);
+
+        // 1. 开仓单被熔断拒绝
+        var openResult = await riskManager.ValidateOrderAsync("BTCUSDT", OrderSide.Buy, 1m, 100m, OrderType.Limit);
+        Assert.IsFalse(openResult.Passed, "熔断生效期间开仓必须被拒绝");
+
+        // 2. 同参数下的退出单放行：止损不能被熔断拦住
+        var exitResult = await riskManager.ValidateOrderAsync(
+            "BTCUSDT", OrderSide.Sell, 1m, 100m, OrderType.Limit, strategyId: null, isExitOrder: true);
+        Assert.IsTrue(exitResult.Passed, $"退出单应绕过熔断闸门，实际拒绝原因: {exitResult.Reason}");
+
+        // 3. 停机是全局冻结：退出单同样被拒，并提示走全部平仓
+        await haltState.HaltAsync("单元测试停机");
+        var haltedExit = await riskManager.ValidateOrderAsync(
+            "BTCUSDT", OrderSide.Sell, 1m, 100m, OrderType.Limit, strategyId: null, isExitOrder: true);
+        Assert.IsFalse(haltedExit.Passed, "停机期间退出单仍应被拒绝（离场走全部平仓专用通道）");
+        Assert.IsTrue((haltedExit.Reason ?? string.Empty).Contains("紧急停止", StringComparison.Ordinal));
+    }
+
     [TestMethod]
     [TestCategory("Unit")]
     public async Task ReconcileTradeRecordAsync_WhenSellOrderFills_ShouldPersistRealizedPnlToDatabase()

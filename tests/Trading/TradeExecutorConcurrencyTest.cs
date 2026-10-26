@@ -39,7 +39,7 @@ public sealed class TradeExecutorConcurrencyTest
             .Setup(manager => manager.ValidateOrderAsync(
                 It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<decimal>(),
                 It.IsAny<decimal>(), It.IsAny<OrderType>(), It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<bool>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(RiskCheckResult.Pass());
 
         // 锁内复检读取的本地 FIFO 持仓：第一次 1.0（首单放行），第二次 0.4（首单已消耗 0.6）
@@ -196,6 +196,76 @@ public sealed class TradeExecutorConcurrencyTest
             "ETHUSDT", OrderSide.Buy, 0.1m, 2900m, OrderType.Limit);
 
         Assert.IsTrue(closeShortResult.Passed, "买入平空减小敞口时不应被名义敞口上限拒绝");
+    }
+
+    /// <summary>
+    /// 市价单滑点必须在落库前赋值：仓库层只在 INSERT 写 slippage_percent，
+    /// 后续 UPDATE 不覆盖该列，赋值晚于保存会让该列恒为空。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task ExecuteOrderAsync_MarketOrder_ShouldPersistSlippagePercent()
+    {
+        var exchangeClient = new Mock<IExchangeClient>();
+        exchangeClient.Setup(client => client.IsFutures).Returns(false);
+        exchangeClient
+            .Setup(client => client.PlaceOrderAsync(
+                It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<OrderType>(), It.IsAny<decimal>(),
+                It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>(),
+                It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ExchangeOrderResult
+            {
+                OrderId = "2001",
+                Status = "FILLED",
+                ExecutedQty = 0.5m,
+                RequestedQty = 0.5m,
+                // 信号价 100、成交价 101 → 滑点应为 1%
+                Price = 101m
+            });
+
+        var riskManager = new Mock<RiskManager>(null!, null!, null!, null!, null!, NullLogger<RiskManager>.Instance);
+        riskManager
+            .Setup(manager => manager.ValidateOrderAsync(
+                It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<decimal>(),
+                It.IsAny<decimal>(), It.IsAny<OrderType>(), It.IsAny<string?>(),
+                It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(RiskCheckResult.Pass());
+
+        TradeRecord? persisted = null;
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        dataService
+            .Setup(service => service.GetOpenPositionsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([CreatePosition(1m)]);
+        dataService
+            .Setup(service => service.SaveTradeRecordAsync(It.IsAny<TradeRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<TradeRecord, CancellationToken>((record, _) => persisted = record)
+            .Returns(Task.CompletedTask);
+        dataService
+            .Setup(service => service.ClosePositionFifoAsync(
+                It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
+                It.IsAny<CancellationToken>(), It.IsAny<PositionSide>()))
+            .ReturnsAsync(0m);
+        dataService
+            .Setup(service => service.UpdateDailyStatsAsync(
+                It.IsAny<decimal>(), It.IsAny<decimal>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        dataService
+            .Setup(service => service.LoadRiskConfigAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RiskConfig());
+
+        using var executor = new TradeExecutor(
+            exchangeClient.Object,
+            riskManager.Object,
+            dataService.Object,
+            NullLogger<TradeExecutor>.Instance);
+
+        var result = await executor.ExecuteOrderAsync(
+            "BTCUSDT", OrderSide.Sell, OrderType.Market, 0.5m, 100m);
+
+        Assert.IsTrue(result.Success, "市价卖出应成交成功");
+        Assert.IsNotNull(persisted, "成交记录必须落库");
+        Assert.IsNotNull(persisted.SlippagePercent, "滑点必须在保存记录前写入，否则 slippage_percent 列恒为空");
+        Assert.AreEqual(1m, persisted.SlippagePercent!.Value, 0.0001m, "成交价 101 相对信号价 100 的滑点应为 1%");
     }
 
     private static Position CreatePosition(decimal remainingQuantity)
