@@ -120,7 +120,10 @@ public class CryptoAssetInfoService(
                 MarketType = MarketType.Crypto,
                 Market = "Binance",
                 CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
-                ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
+                // 批量接口使用 type=MINI，不返回 priceChangePercent，需回退按 openPrice/lastPrice 计算
+                ChangePercentage = ticker.PriceChangePercent.HasValue
+                    ? FormatPercentage(ticker.PriceChangePercent)
+                    : FormatOpenClosePercentage(ticker.OpenPrice, ticker.LastPrice),
                 Volume24h = FormatVolume(ticker.Volume)
             };
         })];

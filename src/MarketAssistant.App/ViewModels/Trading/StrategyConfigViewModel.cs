@@ -217,7 +217,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             ValidationError = string.Empty;
-            var symbol = NewSymbol.ToUpperInvariant().Trim();
+            var symbol = CryptoSymbolConverter.ToBinanceFormat(NewSymbol);
 
             TradingStrategy? strategy = SelectedScenario switch
             {
@@ -393,7 +393,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         await SafeExecuteAsync(async () =>
         {
             ValidationError = string.Empty;
-            var symbol = NewSymbol.ToUpperInvariant().Trim();
+            var symbol = CryptoSymbolConverter.ToBinanceFormat(NewSymbol);
             var lastPrice = await _portfolioService.GetLatestPriceAsync(symbol);
             if (lastPrice is not > 0)
             {

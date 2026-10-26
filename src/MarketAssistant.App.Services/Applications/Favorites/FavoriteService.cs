@@ -58,6 +58,39 @@ public sealed class FavoriteService(
             WHERE market_type = 0 AND SUBSTR(code, 1, 2) IN ('SH', 'SZ', 'BJ');
             """;
         await migrateCmd.ExecuteNonQueryAsync();
+
+        // 虚拟币存量数据归一化迁移（幂等）：将历史遗留的基础币种（如 BTC）统一转为币安交易对格式（如 BTCUSDT）
+        var cryptoRows = new List<(long Id, string Code)>();
+        await using (var selectCryptoCmd = conn.CreateCommand())
+        {
+            selectCryptoCmd.CommandText = "SELECT id, code FROM favorite_assets WHERE market_type = 1 ORDER BY id";
+            await using var reader = await selectCryptoCmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                cryptoRows.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+        }
+
+        var seenCryptoCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (id, rawCode) in cryptoRows)
+        {
+            var normalizedCode = FavoriteCodeNormalizer.Normalize(rawCode, MarketType.Crypto);
+            if (!seenCryptoCodes.Add(normalizedCode))
+            {
+                await using var delCmd = conn.CreateCommand();
+                delCmd.CommandText = "DELETE FROM favorite_assets WHERE id = @id";
+                delCmd.Parameters.AddWithValue("@id", id);
+                await delCmd.ExecuteNonQueryAsync();
+            }
+            else if (!string.Equals(rawCode, normalizedCode, StringComparison.Ordinal))
+            {
+                await using var updCmd = conn.CreateCommand();
+                updCmd.CommandText = "UPDATE favorite_assets SET code = @code WHERE id = @id";
+                updCmd.Parameters.AddWithValue("@code", normalizedCode);
+                updCmd.Parameters.AddWithValue("@id", id);
+                await updCmd.ExecuteNonQueryAsync();
+            }
+        }
     }
 
     public async Task AddFavoriteAsync(string code, string market, CancellationToken cancellationToken = default)
@@ -187,21 +220,26 @@ public sealed class FavoriteService(
         if (favoritesCodes.Count == 0)
             return [];
 
-        var tasks = favoritesCodes.Select(async favorite =>
+        try
         {
-            try
+            var fetched = await _assetInfoService.GetAssetInfosAsync(favoritesCodes, cancellationToken);
+            var results = new List<AssetInfo>(favoritesCodes.Count);
+            for (var i = 0; i < favoritesCodes.Count; i++)
             {
-                return await _assetInfoService.GetAssetInfoAsync(favorite.Code, favorite.Market, cancellationToken);
+                var info = i < fetched.Count ? fetched[i] : null;
+                results.Add(info ?? CreateFallbackAssetInfo(favoritesCodes[i]));
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "获取{Market} {Code} 最新数据时出错: {Message}", _marketLabel, favorite.Code, ex.Message);
-                return CreateFallbackAssetInfo(favorite);
-            }
-        });
-
-        var results = await Task.WhenAll(tasks);
-        return [.. results.Where(result => result != null)];
+            return results;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "批量获取{Market}收藏最新数据时出错: {Message}", _marketLabel, ex.Message);
+            return [.. favoritesCodes.Select(CreateFallbackAssetInfo)];
+        }
     }
 
     public async Task ClearFavoritesAsync(CancellationToken cancellationToken = default)

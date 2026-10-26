@@ -368,6 +368,44 @@ public sealed class AssetScreenerServiceTest
             async () => await service.ScreenAsync(invalidCriteria));
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void DeterminePagination_WithClientSideFilters_ShouldFetchFullCandidatePool()
+    {
+        var criteria = new CryptoCriteria
+        {
+            Limit = 5,
+            Criteria =
+            [
+                new() { Code = "market_cap", MaxValue = 1_000_000_000m }
+            ]
+        };
+
+        var (page, perPage) = CryptoScreenerService.DeterminePagination(criteria);
+
+        Assert.AreEqual(1, page);
+        Assert.AreEqual(250, perPage, "带客户端筛选条件时应拉取 250 条候选池，避免仅在前 5 名大市值币中筛选导致结果为空");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void ApplyFilters_ShouldExcludeStableCoins()
+    {
+        var markets = new List<CoinGeckoMarket>
+        {
+            new() { Symbol = "btc", Name = "Bitcoin", CurrentPrice = 65000m, MarketCap = 1_200_000_000_000m },
+            new() { Symbol = "usdt", Name = "Tether", CurrentPrice = 1.0m, MarketCap = 120_000_000_000m },
+            new() { Symbol = "usdc", Name = "USD Coin", CurrentPrice = 1.0m, MarketCap = 35_000_000_000m },
+            new() { Symbol = "eth", Name = "Ethereum", CurrentPrice = 3200m, MarketCap = 380_000_000_000m }
+        };
+        var criteria = new CryptoCriteria { Limit = 10, Criteria = [] };
+
+        var filtered = CryptoScreenerService.ApplyFilters(markets, criteria);
+
+        Assert.HasCount(2, filtered);
+        Assert.IsTrue(filtered.All(m => m.Symbol is "btc" or "eth"));
+    }
+
     #endregion
 }
 

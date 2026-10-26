@@ -1,3 +1,4 @@
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Models;
 
 namespace MarketAssistant.Services.Trading;
@@ -23,6 +24,11 @@ public class TradingStrategyService(TradingDataService dataService)
 
     public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(strategy.Symbol))
+        {
+            strategy.Symbol = CryptoSymbolConverter.ToBinanceFormat(strategy.Symbol);
+        }
+
         await _dataService.SaveStrategyAsync(strategy, ct).ConfigureAwait(false);
         RaiseStrategiesChanged();
     }

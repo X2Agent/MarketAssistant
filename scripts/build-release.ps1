@@ -5,12 +5,29 @@
 param(
     [string]$Platform = "Windows",  # Windows, macOS, Linux, All
     [string]$Configuration = "Release",
+    [string]$Version = "",
     [switch]$CreateInstaller = $false
 )
 
 $startTime = Get-Date
 
-Write-Host "🚀 Building MarketAssistant - Platform: $Platform" -ForegroundColor Green
+# 自动解析版本号：命令行参数 > 最新 Git Tag > MarketAssistant.App.csproj
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $gitTag = git describe --tags --abbrev=0 --match "v[0-9]*" 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($gitTag)) {
+        $Version = $gitTag.Trim().TrimStart('v')
+    }
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    [xml]$csproj = Get-Content "src/MarketAssistant.App/MarketAssistant.App.csproj"
+    $Version = ($csproj.Project.PropertyGroup | ForEach-Object { $_.FallbackVersion, $_.Version } | Where-Object { $_ -and $_ -notlike '$*' } | Select-Object -First 1)
+}
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = "1.0.0"
+}
+$env:APP_VERSION = $Version
+
+Write-Host "🚀 Building MarketAssistant v$Version - Platform: $Platform" -ForegroundColor Green
 
 # 检查 .NET SDK
 try {
@@ -50,6 +67,8 @@ function Build-Windows {
         -p:UseAppHost=true `
         -p:DebugType=None `
         -p:DebugSymbols=false `
+        -p:Version=$Version `
+        -p:InformationalVersion=$Version `
         --verbosity quiet `
         -o $publishDir
         
@@ -135,6 +154,8 @@ function Build-macOS {
             -p:UseAppHost=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
+            -p:Version=$Version `
+            -p:InformationalVersion=$Version `
             --verbosity quiet `
             -o $publishDir
             
@@ -214,6 +235,8 @@ function Build-Linux {
             -p:UseAppHost=true `
             -p:DebugType=None `
             -p:DebugSymbols=false `
+            -p:Version=$Version `
+            -p:InformationalVersion=$Version `
             --verbosity quiet `
             -o $publishDir
             

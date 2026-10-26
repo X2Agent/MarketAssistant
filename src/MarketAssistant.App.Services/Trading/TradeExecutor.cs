@@ -294,6 +294,11 @@ public class TradeExecutor(
         bool requireClose = false,
         CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(instrumentSymbol))
+        {
+            instrumentSymbol = CryptoSymbolConverter.ToBinanceFormat(instrumentSymbol);
+        }
+
         // 环境快照：一次下单的判断（IsFutures/持仓/杠杆/下单）必须全部落在同一个客户端上。
         // RoutingExchangeClient 每次调用独立解析活跃客户端，若无快照，用户在风控/确认等待期间
         // 切换模拟盘/实盘会让这笔订单落到错误环境（真金白银场景下不可接受）。

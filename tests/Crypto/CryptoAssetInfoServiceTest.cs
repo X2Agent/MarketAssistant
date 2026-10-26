@@ -67,5 +67,8 @@ public class CryptoAssetInfoServiceTest
         Assert.IsNotNull(results[1]);
         Assert.IsNotNull(results[2]);
         Assert.IsNull(results[0]!.MarketCap);
+        // 批量 MINI ticker 下三个主流币种不应全部恒为 0.00%
+        Assert.IsTrue(results.Any(r => r != null && r.ChangePercentage != "0.00%"),
+            "批量行情返回的涨跌幅不应全部恒为 0.00%");
     }
 }

@@ -50,6 +50,7 @@ public class CryptoTradingExecutionTools(
         [Description("限价单价格，市价单可不填")] decimal? price = null,
         CancellationToken cancellationToken = default)
     {
+        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
         var effectivePrice = price ?? 0;
         if (type == OrderType.Market && effectivePrice == 0)
         {
@@ -82,14 +83,20 @@ public class CryptoTradingExecutionTools(
         [Description("Binance订单ID")] long orderId,
         CancellationToken cancellationToken = default)
     {
+        symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
         var order = await _exchangeClient.GetOrderAsync(symbol, orderId.ToString(), cancellationToken);
+        var executedPrice = order.AveragePrice > 0
+            ? order.AveragePrice
+            : (order.CumulativeQuoteQty > 0 && order.ExecutedQty > 0
+                ? order.CumulativeQuoteQty / order.ExecutedQty
+                : order.Price);
         return new OrderStatusInfo
         {
             OrderId = long.TryParse(order.OrderId, out var parsedOrderId) ? parsedOrderId : 0,
             Symbol = order.Symbol,
             Status = order.Status,
             ExecutedQty = order.ExecutedQty,
-            ExecutedPrice = order.Price
+            ExecutedPrice = executedPrice
         };
     }
 
@@ -101,6 +108,7 @@ public class CryptoTradingExecutionTools(
     {
         try
         {
+            symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
             if (_haltState != null)
             {
                 await _haltState.EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);

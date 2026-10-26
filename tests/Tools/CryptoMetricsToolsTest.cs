@@ -122,6 +122,23 @@ public class CryptoMetricsToolsTest
 
     [TestMethod]
     [TestCategory("Integration")]
+    public async Task GetOHLCVAsync_OneHour_ShouldReturnHourlyCandlesNotDaily()
+    {
+        var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);
+
+        var result = await service.GetOHLCVAsync("BTCUSDT", interval: MarketInterval.OneHour, limit: 5);
+
+        Assert.IsNotNull(result);
+        Assert.AreEqual("BTCUSDT", result.Symbol);
+        Assert.AreEqual("1h", result.Interval);
+        Assert.IsTrue(result.Candles.Count >= 2);
+        // 相邻两根 1h K 线的 OpenTime 间隔应为 3,600,000 ms（1小时），而非 86,400,000 ms（1天）
+        var deltaMs = result.Candles[1].OpenTime - result.Candles[0].OpenTime;
+        Assert.AreEqual(3_600_000L, deltaMs, $"1h K线相邻间隔应为 3600000ms，实际: {deltaMs}ms");
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
     public async Task GetOrderBookDepthAsync_ShouldReturnValidData()
     {
         var service = (CryptoMetricsTools)_serviceProvider!.GetRequiredKeyedService<IFinancialTools>(MarketType.Crypto);

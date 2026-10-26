@@ -48,10 +48,9 @@ public sealed class CryptoMetricsTools(
         {
             var binanceSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
 
-            // 当无自定义时间范围时，复用 IKLineService 与 CryptoTechnicalTools 共享同一数据路径
-            if (startTime is null && endTime is null)
+            // 当无自定义时间范围且周期受 IKLineService 支持时，复用 IKLineService 与 CryptoTechnicalTools 共享同一数据路径
+            if (startTime is null && endTime is null && TryToKLineType(interval, out var klineType))
             {
-                var klineType = ToKLineType(interval);
                 var klineData = await _klineService.GetKLineDataAsync(symbol, klineType, Math.Min(limit, 1000));
 
                 if (klineData is not { Count: > 0 })
@@ -76,7 +75,7 @@ public sealed class CryptoMetricsTools(
                 };
             }
 
-            // 有自定义时间范围时直接调用 Binance API
+            // 有自定义时间范围或 IKLineService 不支持的周期（如 1h/4h/30m）时直接调用 Binance API
             var response = await _binanceService.GetKlinesAsync(binanceSymbol, intervalStr, limit, startTime, endTime, cancellationToken);
             if (response == null || response.Count == 0)
                 throw new FriendlyException($"未找到交易对 {binanceSymbol} 的K线数据，请确认代码是否正确");
@@ -119,14 +118,30 @@ public sealed class CryptoMetricsTools(
         }
     }
 
-    private static KLineType ToKLineType(MarketInterval interval) => interval switch
+    private static bool TryToKLineType(MarketInterval interval, out KLineType klineType)
     {
-        MarketInterval.FiveMinutes => KLineType.Minute5,
-        MarketInterval.FifteenMinutes => KLineType.Minute15,
-        MarketInterval.OneWeek => KLineType.Weekly,
-        MarketInterval.OneMonth => KLineType.Monthly,
-        _ => KLineType.Daily
-    };
+        switch (interval)
+        {
+            case MarketInterval.FiveMinutes:
+                klineType = KLineType.Minute5;
+                return true;
+            case MarketInterval.FifteenMinutes:
+                klineType = KLineType.Minute15;
+                return true;
+            case MarketInterval.OneDay:
+                klineType = KLineType.Daily;
+                return true;
+            case MarketInterval.OneWeek:
+                klineType = KLineType.Weekly;
+                return true;
+            case MarketInterval.OneMonth:
+                klineType = KLineType.Monthly;
+                return true;
+            default:
+                klineType = default;
+                return false;
+        }
+    }
 
     private static string ToBinanceInterval(MarketInterval interval)
     {
@@ -510,7 +525,13 @@ public sealed class CryptoMetricsTools(
             var cleanSymbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
             var searchSymbol = CryptoSymbolConverter.ExtractBaseCurrency(cleanSymbol);
 
-            // 2. 搜索 CoinGecko
+            // 2. 优先查询内置静态映射，避免消耗 CoinGecko 搜索接口限流配额
+            if (CryptoSymbolConverter.TryGetCoinGeckoId(searchSymbol, out var mappedId))
+            {
+                return mappedId;
+            }
+
+            // 3. 搜索 CoinGecko
             var response = await _coinGeckoService.SearchCoinsAsync(searchSymbol, cancellationToken);
 
             var coin = response?.Coins?.FirstOrDefault(c =>
@@ -521,14 +542,18 @@ public sealed class CryptoMetricsTools(
                 return coin.Id;
             }
 
-            // 3. Fallback: 使用提取后的符号小写
-            _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用小写symbol作为fallback", symbol, searchSymbol);
-            return searchSymbol.ToLowerInvariant();
+            // 4. Fallback: 使用提取后的符号转 CoinGecko ID
+            _logger.LogWarning("未找到代币 {Symbol} ({SearchSymbol}) 的CoinGecko ID，使用静态规则作为fallback", symbol, searchSymbol);
+            return CryptoSymbolConverter.ToCoinGeckoId(searchSymbol);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "搜索CoinGecko ID失败: {Symbol}", symbol);
-            return symbol.ToLowerInvariant().Replace("/", "");
+            return CryptoSymbolConverter.ToCoinGeckoId(symbol);
         }
     }
 }

@@ -31,15 +31,19 @@ public sealed class FavoriteCodeNormalizerTest
     }
 
     /// <summary>
-    /// 虚拟币交易对保持原样（仅统一大写）：交易所前缀规则只属于 A 股，
-    /// 把 "BTCUSDT" 之类按两字符前缀剥离会直接毁掉标的。
+    /// 虚拟币统一收敛为币安交易对格式（大写且补齐计价货币后缀，如 BTC → BTCUSDT）：
+    /// 交易所前缀剥离规则只属于 A 股，把 "SHIBUSDT" 之类按两字符前缀剥离会毁掉标的；
+    /// 同时从选币页传入基础币种（如 "BTC"）时也必须与详情页 "BTCUSDT" 归一化为同一键。
     /// </summary>
     [TestMethod]
     [TestCategory("Unit")]
     [DataRow("btcusdt", "BTCUSDT")]
     [DataRow("BTCUSDT", "BTCUSDT")]
     [DataRow("shibusdt", "SHIBUSDT")]
-    public void Normalize_Crypto_ShouldOnlyUppercase(string input, string expected)
+    [DataRow("btc", "BTCUSDT")]
+    [DataRow("BTC/USDT", "BTCUSDT")]
+    [DataRow("wbtc", "WBTCUSDT")]
+    public void Normalize_Crypto_ShouldConvertToBinanceFormat(string input, string expected)
     {
         Assert.AreEqual(expected, FavoriteCodeNormalizer.Normalize(input, MarketType.Crypto));
     }

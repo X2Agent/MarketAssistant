@@ -29,6 +29,13 @@ public static class FavoriteCodeNormalizer
             return StockSymbolConverter.SplitExchangePrefix(normalized).Code;
         }
 
+        // 虚拟币统一收敛为币安交易对格式（如 BTC → BTCUSDT、BTC/USDT → BTCUSDT），
+        // 保证从选币页（基础币种）或详情页（交易对）添加自选时代码格式一致
+        if (marketType == MarketType.Crypto)
+        {
+            return CryptoSymbolConverter.ToBinanceFormat(normalized);
+        }
+
         return normalized;
     }
 }

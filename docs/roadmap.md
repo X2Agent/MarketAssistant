@@ -49,7 +49,7 @@
 | P0-3 | **稳定性降级**：10 个页面首屏骨架屏 + 统一 `StateOverlayView`（加载/空/失败+重试）；"无结果"与"数据源不可用"在 UI 可区分；AssetPage 单区块重试 | `b9aa710` |
 | P1-4 | **报告导出**：Markdown（既有）+ 分享图 PNG + PDF 三通道；1080×1350 固定画布离屏渲染，PDF 由同一位图经 SkiaSharp 封装，与分享图视觉一致 | `453fe00` / `ReportShareCardRenderer` |
 | P1-5 | **每日 AI 简报**（留存钩子 v1）：首页卡片 + 弹窗，**纯手动触发**（构造仅读缓存）；自选按异动优先纳入，要闻取 100 条带 28~29h 覆盖，Token 预算硬边界；当天按市场缓存复用 SQLite `briefings` 表；`DailyBriefingWindow` 弹窗独立窗口化（在途） | `40f8021` / `DailyBriefingService` |
-| 工程 | **版本号失配（已知问题，未修）**：`MarketAssistant.App.csproj` 的 `<Version>` 仍为 `1.0.0-beta1`，而最新 tag 已是 `v1.0.0-beta2` —— 运行时 `AppInfo.Version` 显示错误版本。下次发版前必须同步 | csproj vs tag |
+| 工程 | **版本号自动对齐（已修复）**：`MarketAssistant.App.csproj` 新增 `ResolveVersionFromGitTag` 编译期自动读取最新 Git Tag，`release.yml` 发版后自动回写 `<FallbackVersion>`，本地打包脚本统一自动解析版本 | `MarketAssistant.App.csproj` / `release.yml` |
 | S1 | **信号采集字段补齐**：分析师级置信度 / 结论周期、报告级 `MarketType`、`reports` 新增 `market_type`/`rating` 可索引列 + 旧库迁移 | `2c89dd2` / `AnalystSignalSnapshot` |
 | S3 | **后台 LLM 用量归集**：简报按 `UsageContent` / `TokenEstimator` 双口径采集，落库 `briefings` 三列；首页卡片展示单次消耗 + 近 30 天累计；设置页总开关 | `DailyBriefingService` |
 | S4 | **默认价格表（已移除）**：`DefaultModelPriceCatalog` 曾内置 13 条参考价并在空表时自动填充、绝不覆盖用户数据；2026-10 随货币成本估算一并移除（`Services/Cost`、`UserSetting.ModelPrices`、设置页价格表分区全删），旧配置 JSON 的 `ModelPrices` 字段反序列化时忽略、无需迁移 | — |

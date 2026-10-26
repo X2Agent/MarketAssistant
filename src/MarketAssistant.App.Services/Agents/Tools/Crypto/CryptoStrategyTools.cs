@@ -14,10 +14,12 @@ namespace MarketAssistant.Agents.Tools.Crypto;
 public class CryptoStrategyTools(
     TradingStrategyService strategyService,
     TradingDataService dataService,
-    ILogger<CryptoStrategyTools> logger) : IStrategyTools
+    ILogger<CryptoStrategyTools> logger,
+    CryptoPortfolioService? portfolioService = null) : IStrategyTools
 {
     private readonly TradingStrategyService _strategyService = strategyService;
     private readonly TradingDataService _dataService = dataService;
+    private readonly CryptoPortfolioService? _portfolioService = portfolioService;
     private readonly ILogger<CryptoStrategyTools> _logger = logger;
 
     [Description("获取所有活跃状态的交易策略列表")]
@@ -77,11 +79,41 @@ public class CryptoStrategyTools(
     {
         try
         {
-            symbol = symbol.ToUpperInvariant().Trim();
-            var positions = await _dataService.GetOpenPositionsAsync(symbol, cancellationToken);
-            var totalQty = positions.Sum(p => p.Quantity - p.ClosedQuantity);
+            symbol = CryptoSymbolConverter.ToBinanceFormat(symbol);
+            decimal totalQty = 0;
+            var exitSide = OrderSide.Sell;
+
+            if (_portfolioService != null)
+            {
+                try
+                {
+                    var currentPositions = await _portfolioService.GetCurrentPositionsAsync(cancellationToken);
+                    var currentPosition = currentPositions.FirstOrDefault(p =>
+                        p.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase) && Math.Abs(p.Quantity) > 0);
+                    if (currentPosition != null)
+                    {
+                        totalQty = Math.Abs(currentPosition.Quantity);
+                        exitSide = currentPosition.IsShort ? OrderSide.Buy : OrderSide.Sell;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex, "从账户服务获取 {Symbol} 持仓失败，回退至本地持仓记录", symbol);
+                }
+            }
+
             if (totalQty <= 0)
-                return $"无法创建护栏：{symbol} 当前无本地持仓记录。";
+            {
+                var positions = await _dataService.GetOpenPositionsAsync(symbol, cancellationToken);
+                totalQty = positions.Sum(p => p.Quantity - p.ClosedQuantity);
+                if (positions.FirstOrDefault()?.Side == PositionSide.Short)
+                {
+                    exitSide = OrderSide.Buy;
+                }
+            }
+
+            if (totalQty <= 0)
+                return $"无法创建护栏：{symbol} 当前无持仓记录。";
 
             var created = new List<string>();
 
@@ -92,7 +124,7 @@ public class CryptoStrategyTools(
                     Symbol = symbol,
                     Type = StrategyType.StopLoss,
                     Status = StrategyStatus.Active,
-                    Side = OrderSide.Sell,
+                    Side = exitSide,
                     TriggerPrice = stopLossPrice.Value,
                     Quantity = totalQty,
                     MaxExecutions = 1
@@ -108,7 +140,7 @@ public class CryptoStrategyTools(
                     Symbol = symbol,
                     Type = StrategyType.TakeProfit,
                     Status = StrategyStatus.Active,
-                    Side = OrderSide.Sell,
+                    Side = exitSide,
                     TriggerPrice = takeProfitPrice.Value,
                     Quantity = totalQty,
                     MaxExecutions = 1
@@ -124,7 +156,7 @@ public class CryptoStrategyTools(
                     Symbol = symbol,
                     Type = StrategyType.TrailingStop,
                     Status = StrategyStatus.Active,
-                    Side = OrderSide.Sell,
+                    Side = exitSide,
                     Quantity = totalQty,
                     MaxExecutions = 1,
                     CustomParams = System.Text.Json.JsonSerializer.Serialize(new

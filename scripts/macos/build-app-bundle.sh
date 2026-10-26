@@ -6,12 +6,20 @@ set -e
 # 构建 Universal Binary（同时支持 Apple Silicon arm64 和 Intel x64）
 
 APP_NAME="MarketAssistant"
-# 优先使用 CI 注入的版本号，否则回退到默认值
-VERSION="${APP_VERSION:-1.0.0}"
-BUNDLE_ID="xyz.haoai.market"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 APP_CSProj="$PROJECT_ROOT/src/MarketAssistant.App/MarketAssistant.App.csproj"
+# 优先使用 CI 注入的版本号，其次读取最新 Git Tag，最后回退到 .csproj 中的 FallbackVersion
+if [ -z "${APP_VERSION:-}" ]; then
+    GIT_TAG=$(git -C "$PROJECT_ROOT" describe --tags --abbrev=0 --match "v[0-9]*" 2>/dev/null || true)
+    if [ -n "$GIT_TAG" ]; then
+        APP_VERSION="${GIT_TAG#v}"
+    else
+        APP_VERSION=$(sed -n 's/.*<FallbackVersion>\([^<]*\)<\/FallbackVersion>.*/\1/p' "$APP_CSProj" | head -n 1)
+    fi
+fi
+VERSION="${APP_VERSION:-1.0.0}"
+BUNDLE_ID="xyz.haoai.market"
 APP_ASSETS_DIR="$PROJECT_ROOT/src/MarketAssistant.App/Assets"
 BUILD_DIR="$PROJECT_ROOT/Release/macOS"
 PUBLISH_DIR_ARM64="$BUILD_DIR/publish-arm64"
