@@ -2,12 +2,17 @@ using MarketAssistant.Applications.Settings;
 using MarketAssistant.Services.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
+using TestMarketAssistant.Infrastructure;
 
 namespace TestMarketAssistant;
 
 [TestClass]
-public sealed class McpServiceRuntimeTest
+public sealed class McpServiceRuntimeTest : IDisposable
 {
+    private readonly TemporaryDirectory _directory = new();
+
+    public void Dispose() => _directory.Dispose();
+
     [TestMethod]
     [TestCategory("Integration")]
     public void ComputeConfigurationFingerprint_IgnoresPolicyOnlyFields()
@@ -127,12 +132,12 @@ public sealed class McpServiceRuntimeTest
             () => service.GetAIToolsAsync([config]));
     }
 
-    private static McpService CreateService(IMcpClientSessionFactory factory)
+    private McpService CreateService(IMcpClientSessionFactory factory)
     {
         return new McpService(
             NullLogger<McpService>.Instance,
             new McpToolAuditLogger(NullLogger<McpToolAuditLogger>.Instance),
-            new MCPServerConfigService(),
+            TestConfigServices.CreateMcpServerConfigService(_directory),
             factory);
     }
 

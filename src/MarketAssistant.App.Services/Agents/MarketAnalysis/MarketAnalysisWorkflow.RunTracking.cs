@@ -53,24 +53,43 @@ public partial class MarketAnalysisWorkflow
     }
 
     /// <summary>
-    /// 单个分析师的运行状态（Run 局部，非线程安全：仅工作流事件循环与降级回调写入）。
+    /// 单个分析师的运行状态。工作流事件循环与降级隔离回调处于不同线程，
+    /// 所有状态迁移与读取都在 <see cref="_sync"/> 下完成；失败是终态，
+    /// 一旦置位不会被随后到达的完成事件覆盖。
     /// </summary>
     private sealed class AnalystRunState(string displayName)
     {
+        private readonly object _sync = new();
+        private AnalystRunStatus _status = AnalystRunStatus.Pending;
+        private long? _startedAtTimestamp;
+        private TimeSpan _lastElapsed;
+
         public string DisplayName { get; } = displayName;
 
-        public AnalystRunStatus Status { get; private set; } = AnalystRunStatus.Pending;
-
-        /// <summary>真实执行（TurnToken）阶段开始的时间戳，完成/失败后清空。</summary>
-        private long? StartedAtTimestamp { get; set; }
-
-        /// <summary>终态耗时（完成或失败时定格）。</summary>
-        private TimeSpan LastElapsed { get; set; }
+        public AnalystRunStatus Status
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    return _status;
+                }
+            }
+        }
 
         public void MarkRunning()
         {
-            Status = AnalystRunStatus.Running;
-            StartedAtTimestamp = Stopwatch.GetTimestamp();
+            lock (_sync)
+            {
+                // 失败是终态，不可回退：失败隔离回调在 Executor 内部同步执行，而事件循环消费
+                // ExecutorInvokedEvent 可能滞后。迟到的"开始"事件若把 Failed 改回 Running，
+                // 随后的完成事件就会把状态洗成 Completed，与失败名单自相矛盾。
+                if (_status == AnalystRunStatus.Failed)
+                    return;
+
+                _status = AnalystRunStatus.Running;
+                _startedAtTimestamp = Stopwatch.GetTimestamp();
+            }
         }
 
         /// <summary>
@@ -79,22 +98,29 @@ public partial class MarketAnalysisWorkflow
         /// </summary>
         public void MarkSucceeded(TimeSpan elapsed)
         {
-            if (Status == AnalystRunStatus.Failed)
-                return;
+            lock (_sync)
+            {
+                if (_status == AnalystRunStatus.Failed)
+                    return;
 
-            Status = AnalystRunStatus.Completed;
-            StartedAtTimestamp = null;
-            LastElapsed = elapsed;
+                _status = AnalystRunStatus.Completed;
+                _startedAtTimestamp = null;
+                _lastElapsed = elapsed;
+            }
         }
 
         public void MarkFailed()
         {
-            if (Status == AnalystRunStatus.Running && StartedAtTimestamp.HasValue)
+            lock (_sync)
             {
-                LastElapsed = Stopwatch.GetElapsedTime(StartedAtTimestamp.Value);
+                if (_status == AnalystRunStatus.Running && _startedAtTimestamp.HasValue)
+                {
+                    _lastElapsed = Stopwatch.GetElapsedTime(_startedAtTimestamp.Value);
+                }
+
+                _status = AnalystRunStatus.Failed;
+                _startedAtTimestamp = null;
             }
-            Status = AnalystRunStatus.Failed;
-            StartedAtTimestamp = null;
         }
 
         /// <summary>
@@ -102,20 +128,27 @@ public partial class MarketAnalysisWorkflow
         /// </summary>
         public void MarkSucceededAsStale()
         {
-            if (Status == AnalystRunStatus.Running && StartedAtTimestamp.HasValue)
+            lock (_sync)
             {
-                LastElapsed = Stopwatch.GetElapsedTime(StartedAtTimestamp.Value);
-                Status = AnalystRunStatus.Completed;
+                if (_status == AnalystRunStatus.Running && _startedAtTimestamp.HasValue)
+                {
+                    _lastElapsed = Stopwatch.GetElapsedTime(_startedAtTimestamp.Value);
+                    _status = AnalystRunStatus.Completed;
+                }
+
+                _startedAtTimestamp = null;
             }
-            StartedAtTimestamp = null;
         }
 
         public AnalystRunSnapshot CreateSnapshot(long inputTokens = 0, long outputTokens = 0)
         {
-            var elapsed = Status == AnalystRunStatus.Running && StartedAtTimestamp.HasValue
-                ? Stopwatch.GetElapsedTime(StartedAtTimestamp.Value)
-                : LastElapsed;
-            return new AnalystRunSnapshot(DisplayName, Status, elapsed, inputTokens, outputTokens);
+            lock (_sync)
+            {
+                var elapsed = _status == AnalystRunStatus.Running && _startedAtTimestamp.HasValue
+                    ? Stopwatch.GetElapsedTime(_startedAtTimestamp.Value)
+                    : _lastElapsed;
+                return new AnalystRunSnapshot(DisplayName, _status, elapsed, inputTokens, outputTokens);
+            }
         }
     }
 

@@ -70,19 +70,20 @@ public sealed class MarketAnalysisDegradationTest
                 Assert.Contains(args => args.FailedAnalysts.Count > 0, progressEvents,
                     "UI 应收到分析师失败进度事件");
 
-                // 终态一致性：失败分析师在最终快照里必须保持 Failed，
-                // 不能被随后到达的"完成事件"覆盖成 Completed（否则同一次运行既显示完成又在失败名单）
-                var fundamentalSnapshots = progressEvents
-                    .SelectMany(args => args.Analysts)
-                    .Where(snapshot => snapshot.DisplayName.Contains("基本面", StringComparison.Ordinal))
-                    .ToList();
-                Assert.IsTrue(fundamentalSnapshots.Count > 0, "进度事件应包含逐分析师状态快照");
-                Assert.AreEqual(AnalystRunStatus.Failed, fundamentalSnapshots[^1].Status,
-                    $"失败分析师的终态应为 Failed，实际为 {fundamentalSnapshots[^1].Status}");
-                Assert.Contains(
-                    args => args.FailedAnalysts.Any(name => name.Contains("基本面", StringComparison.Ordinal)),
-                    progressEvents,
-                    "最终进度事件的失败名单必须与该分析师状态一致");
+                // 终态一致性：以终态进度事件（IsInProgress = false）的快照为准。失败分析师必须保持
+                // Failed 且同时出现在失败名单里，不能"显示已完成"与"出现在失败名单"同时成立。
+                // 断言终态事件而非"最后一条含快照的事件"：中间事件由降级回调线程并发发布，
+                // 到达顺序不保证（CI 慢机上曾出现滞后事件排在终态事件之后）。
+                var terminalEvent = progressEvents.LastOrDefault(args => !args.IsInProgress);
+                Assert.IsNotNull(terminalEvent, "应发布携带快照的终态进度事件");
+                var fundamentalSnapshot = terminalEvent.Analysts.FirstOrDefault(
+                    snapshot => snapshot.DisplayName.Contains("基本面", StringComparison.Ordinal));
+                Assert.IsNotNull(fundamentalSnapshot,
+                    $"终态事件应包含基本面分析师快照，实际: {string.Join(", ", terminalEvent.Analysts.Select(s => s.DisplayName))}");
+                Assert.AreEqual(AnalystRunStatus.Failed, fundamentalSnapshot.Status,
+                    $"失败分析师的终态应为 Failed，实际为 {fundamentalSnapshot.Status}");
+                Assert.Contains(fundamentalSnapshot.DisplayName, terminalEvent.FailedAnalysts,
+                    "终态事件的失败名单必须与该分析师快照状态一致");
                 return;
             }
             catch (FriendlyException ex) when (
@@ -199,7 +200,14 @@ public sealed class MarketAnalysisDegradationTest
             new InMemoryArtifactStore(),
             NullLogger<MarketAnalysisWorkflow>.Instance);
 
-        workflow.ProgressChanged += (_, args) => capturedProgressEvents.Add(args);
+        // 进度事件由降级回调（Executor 线程）与事件循环并发发布，收集端必须自己保证线程安全
+        workflow.ProgressChanged += (_, args) =>
+        {
+            lock (capturedProgressEvents)
+            {
+                capturedProgressEvents.Add(args);
+            }
+        };
         return workflow;
     }
 

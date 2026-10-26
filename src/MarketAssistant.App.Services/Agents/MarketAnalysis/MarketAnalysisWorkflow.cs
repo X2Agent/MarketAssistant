@@ -250,13 +250,21 @@ public partial class MarketAnalysisWorkflow(
             activity?.SetTag("gen_ai.usage.output_tokens", finalReport.Usage.OutputTokens);
             activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
 
+            // 终态失败名单必须合并两类来源：创建期失败（failedAnalystNames）与运行期降级
+            // （degradedAnalysts）。否则终态事件里会出现"快照为 Failed、失败名单却没有它"的自相矛盾
+            List<string> terminalFailedAnalysts;
+            lock (degradationGate)
+            {
+                terminalFailedAnalysts = [.. failedAnalystNames.Concat(degradedAnalysts).Distinct(StringComparer.Ordinal)];
+            }
+
             OnProgressChanged(runId, assetSymbol, new AnalysisProgressEventArgs
             {
                 StageDescription = "分析完成",
                 IsInProgress = false,
                 Phase = AnalysisPhase.Completed,
                 Analysts = analystSnapshots,
-                FailedAnalysts = [.. failedAnalystNames]
+                FailedAnalysts = terminalFailedAnalysts
             });
 
             return finalReport;
