@@ -69,6 +69,20 @@ public sealed class MarketAnalysisDegradationTest
                 Assert.HasCount(1, coordinatorRequests, "协调分析师应被恰好调用一次");
                 Assert.Contains(args => args.FailedAnalysts.Count > 0, progressEvents,
                     "UI 应收到分析师失败进度事件");
+
+                // 终态一致性：失败分析师在最终快照里必须保持 Failed，
+                // 不能被随后到达的"完成事件"覆盖成 Completed（否则同一次运行既显示完成又在失败名单）
+                var fundamentalSnapshots = progressEvents
+                    .SelectMany(args => args.Analysts)
+                    .Where(snapshot => snapshot.DisplayName.Contains("基本面", StringComparison.Ordinal))
+                    .ToList();
+                Assert.IsTrue(fundamentalSnapshots.Count > 0, "进度事件应包含逐分析师状态快照");
+                Assert.AreEqual(AnalystRunStatus.Failed, fundamentalSnapshots[^1].Status,
+                    $"失败分析师的终态应为 Failed，实际为 {fundamentalSnapshots[^1].Status}");
+                Assert.Contains(
+                    args => args.FailedAnalysts.Any(name => name.Contains("基本面", StringComparison.Ordinal)),
+                    progressEvents,
+                    "最终进度事件的失败名单必须与该分析师状态一致");
                 return;
             }
             catch (FriendlyException ex) when (

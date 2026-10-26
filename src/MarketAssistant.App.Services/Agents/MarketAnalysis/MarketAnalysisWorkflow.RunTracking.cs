@@ -73,8 +73,15 @@ public partial class MarketAnalysisWorkflow
             StartedAtTimestamp = Stopwatch.GetTimestamp();
         }
 
+        /// <summary>
+        /// 标记完成。失败终态不被覆盖：失败被隔离成"失败标记消息"后工作流仍会收到该
+        /// executor 的完成事件，无条件改写会让"显示已完成"与"出现在失败名单"同时成立。
+        /// </summary>
         public void MarkSucceeded(TimeSpan elapsed)
         {
+            if (Status == AnalystRunStatus.Failed)
+                return;
+
             Status = AnalystRunStatus.Completed;
             StartedAtTimestamp = null;
             LastElapsed = elapsed;

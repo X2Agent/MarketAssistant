@@ -49,6 +49,40 @@ public sealed class AnalystSignalParserTest
         }
         """;
 
+    /// <summary>模型省略非空枚举字段时的原始输出（其余可用字段保留，用于验证"只丢一个维度"）。</summary>
+    private const string TechnicalJsonWithoutRating = """
+        {
+          "strategy": {
+            "targetPriceLow": 45.5,
+            "confidencePercentage": 70
+          }
+        }
+        """;
+
+    private const string FundamentalJsonWithoutRatingField = """
+        {
+          "growthValue": {
+            "confidencePercentage": 65
+          }
+        }
+        """;
+
+    private const string SentimentJsonWithoutOperation = """
+        {
+          "shortTermStrategy": {
+            "confidencePercentage": 60
+          }
+        }
+        """;
+
+    private const string NewsJsonWithoutEventNature = """
+        {
+          "eventAnalysis": {
+            "confidencePercentage": 80
+          }
+        }
+        """;
+
     private const string NewsJson = """
         {
           "eventAnalysis": {
@@ -132,6 +166,33 @@ public sealed class AnalystSignalParserTest
 
         Assert.IsNotNull(snapshot, "可解析的 JSON 即使缺少评级也应产出快照条目");
         Assert.IsNull(snapshot.Rating, "缺失评级必须保持 null，禁止推断填充");
+    }
+
+    /// <summary>
+    /// 技术面/基本面/情绪面/新闻面的评级字段都是非空枚举，缺省值恰为 StrongBuy / Buy / MajorPositive。
+    /// 模型漏输出时不能把枚举默认值当成真实结论，否则回测与绩效统计会被"清一色强烈买入"污染。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void Parse_MissingEnumFields_ShouldKeepNullInsteadOfEnumDefault()
+    {
+        var technical = AnalystSignalParser.Parse(AnalystNames.Technical, TechnicalJsonWithoutRating);
+        Assert.IsNotNull(technical);
+        Assert.IsNull(technical.Rating, "技术面缺 technicalRating 时不得写成枚举默认值 StrongBuy");
+        Assert.IsNull(technical.Operation, "技术面缺 operationDirection 时不得写成枚举默认值 Buy");
+        Assert.AreEqual(45.5m, technical.TargetPriceLow, "缺失评级不应影响其余字段的正常映射");
+
+        var fundamental = AnalystSignalParser.Parse(AnalystNames.Fundamental, FundamentalJsonWithoutRatingField);
+        Assert.IsNotNull(fundamental);
+        Assert.IsNull(fundamental.Rating, "基本面缺 investmentRating 时不得写成枚举默认值 StrongBuy");
+
+        var sentiment = AnalystSignalParser.Parse(AnalystNames.Sentiment, SentimentJsonWithoutOperation);
+        Assert.IsNotNull(sentiment);
+        Assert.IsNull(sentiment.Operation, "情绪面缺 operationRecommendation 时不得写成枚举默认值 Buy");
+
+        var news = AnalystSignalParser.Parse(AnalystNames.News, NewsJsonWithoutEventNature);
+        Assert.IsNotNull(news);
+        Assert.IsNull(news.Rating, "新闻面缺 eventNature 时不得兜底成 Hold");
     }
 
     [TestMethod]

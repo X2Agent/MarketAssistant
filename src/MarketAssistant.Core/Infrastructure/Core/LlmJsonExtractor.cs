@@ -83,6 +83,63 @@ public static class LlmJsonExtractor
     }
 
     /// <summary>
+    /// 从 LLM 返回文本中定位并取出首个完整 JSON 文本（不做类型反序列化）。
+    /// 与 <see cref="Deserialize{T}"/> 共用同一套三层兜底，供"字段是否存在"这类结构判定复用，
+    /// 避免调用方各自实现一遍 JSON 边界识别。
+    /// </summary>
+    /// <param name="rawText">LLM 返回的原始文本</param>
+    /// <param name="json">成功时为可直接解析的 JSON 文本</param>
+    /// <returns>找到可解析的 JSON 时返回 true</returns>
+    public static bool TryExtractJson(string? rawText, out string json)
+    {
+        json = string.Empty;
+        if (string.IsNullOrWhiteSpace(rawText))
+            return false;
+
+        if (IsParsableJson(rawText))
+        {
+            json = rawText;
+            return true;
+        }
+
+        var stripped = StripMarkdownCodeFence(rawText);
+        if (IsParsableJson(stripped))
+        {
+            json = stripped;
+            return true;
+        }
+
+        if (TryExtractJsonWithReader(rawText, out var bounded) && IsParsableJson(bounded))
+        {
+            json = bounded;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>语法层面判断文本是否为完整 JSON 值。</summary>
+    private static bool IsParsableJson(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+            return document.RootElement.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 剥离 markdown 代码块标记。若文本不包含代码块则原样返回（引用相等）。
     /// </summary>
     private static string StripMarkdownCodeFence(string text)

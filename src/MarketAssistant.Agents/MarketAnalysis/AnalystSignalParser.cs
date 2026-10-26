@@ -74,11 +74,14 @@ public static class AnalystSignalParser
             return null;
         }
 
+        using var root = TryParseRoot(content);
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = result.Strategy?.TechnicalRating,
-            Operation = result.Strategy?.OperationDirection,
+            // 源字段是非空枚举（缺省即 0 = StrongBuy / Buy），必须"JSON 里确实给出"才映射，
+            // 否则模型漏字段会被伪造成最强看多信号
+            Rating = HasJsonPath(root, "strategy", "technicalRating") ? result.Strategy?.TechnicalRating : null,
+            Operation = HasJsonPath(root, "strategy", "operationDirection") ? result.Strategy?.OperationDirection : null,
             TargetPriceLow = result.Strategy?.TargetPriceLow,
             TargetPriceHigh = result.Strategy?.TargetPriceHigh,
             StopLossPrice = result.Strategy?.StopLossPrice,
@@ -95,10 +98,11 @@ public static class AnalystSignalParser
             return null;
         }
 
+        using var root = TryParseRoot(content);
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = result.GrowthValue?.InvestmentRating,
+            Rating = HasJsonPath(root, "growthValue", "investmentRating") ? result.GrowthValue?.InvestmentRating : null,
             Confidence = NormalizeConfidence(result.GrowthValue?.ConfidencePercentage)
         };
     }
@@ -127,10 +131,13 @@ public static class AnalystSignalParser
             return null;
         }
 
+        using var root = TryParseRoot(content);
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Operation = result.ShortTermStrategy?.OperationRecommendation,
+            Operation = HasJsonPath(root, "shortTermStrategy", "operationRecommendation")
+                ? result.ShortTermStrategy?.OperationRecommendation
+                : null,
             Confidence = NormalizeConfidence(result.ShortTermStrategy?.ConfidencePercentage)
         };
     }
@@ -143,10 +150,15 @@ public static class AnalystSignalParser
             return null;
         }
 
+        using var root = TryParseRoot(content);
         return new AnalystSignalSnapshot
         {
             AnalystName = analystName,
-            Rating = MapEventNatureToRating(result.EventAnalysis?.EventNature ?? EventNature.Neutral),
+            // 事件性质缺省为 0 = MajorPositive；未给出时保持 null，
+            // 不能用 Neutral 兜底成 Hold（"没有判断"不等于"中性"）
+            Rating = HasJsonPath(root, "eventAnalysis", "eventNature") && result.EventAnalysis is { } eventAnalysis
+                ? MapEventNatureToRating(eventAnalysis.EventNature)
+                : null,
             Confidence = NormalizeConfidence(result.EventAnalysis?.ConfidencePercentage),
             Horizon = result.ImpactEvaluation?.ImpactDuration
         };
@@ -173,6 +185,65 @@ public static class AnalystSignalParser
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// 解析原始消息的 JSON 结构（不做类型绑定），用于判定"模型是否真的给出了某个字段"。
+    /// 非空枚举源字段的缺省值是有效枚举值，只能靠"字段存在性"区分"未提供"与"给了默认值"。
+    /// </summary>
+    private static JsonDocument? TryParseRoot(string content)
+    {
+        if (!LlmJsonExtractor.TryExtractJson(content, out var json))
+            return null;
+
+        try
+        {
+            return JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 按路径（大小写不敏感）判断 JSON 中是否存在该字段；任一层缺失即为不存在。
+    /// </summary>
+    private static bool HasJsonPath(JsonDocument? document, params string[] path)
+    {
+        if (document is null)
+            return false;
+
+        var current = document.RootElement;
+        foreach (var segment in path)
+        {
+            if (current.ValueKind != JsonValueKind.Object || !TryGetProperty(current, segment, out var next))
+                return false;
+
+            current = next;
+        }
+
+        return true;
+    }
+
+    /// <summary>大小写不敏感地查找属性（模型常把 schema 字段名写成 camelCase 或 PascalCase）。</summary>
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     /// <summary>
