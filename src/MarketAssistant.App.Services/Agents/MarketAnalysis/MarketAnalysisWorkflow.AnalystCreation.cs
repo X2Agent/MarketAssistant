@@ -87,8 +87,13 @@ public partial class MarketAnalysisWorkflow
                 // 角色级模型分配：该角色单独配置了模型时使用独立 Runtime，
                 // 未配置则复用默认 Runtime（避免无谓占用 MaxCachedRuntimes 配额）
                 var agentRuntime = ResolveRuntimeForRole(type, runtime);
-                var agent = _analystAgentFactory.CreateAnalyst(type, agentRuntime, sharedProviders)
-                    .WithFailureIsolation(exception => onAnalystDegraded?.Invoke(type, exception));
+                // 失败隔离由工厂统一附加（中间件顺序契约见 AnalystAgentFactory.CreateAnalyst）：
+                // 这里只传降级回调，保证 Token 熔断等内层异常被转换为失败标记消息而非中断工作流。
+                var agent = _analystAgentFactory.CreateAnalyst(
+                    type,
+                    agentRuntime,
+                    sharedProviders,
+                    onAnalysisFailed: exception => onAnalystDegraded?.Invoke(type, exception));
                 createdAgents.Add(agent);
 
                 // 创建时即建立 Name → DisplayName 映射。

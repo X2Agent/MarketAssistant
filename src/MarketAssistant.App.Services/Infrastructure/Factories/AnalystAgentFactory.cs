@@ -24,11 +24,16 @@ public interface IAnalystAgentFactory
     /// <param name="runtime">聊天运行时。</param>
     /// <param name="additionalProviders">附加上下文提供者。</param>
     /// <param name="extraTools">额外追加的工具（如协调器的产物读取工具），可为 null。</param>
+    /// <param name="onAnalysisFailed">
+    /// 分析师运行失败的降级回调。传入时返回的 Agent 会附加失败隔离包装
+    /// （内层异常 / 空输出转换为失败标记消息）；传 null 则不附加隔离（如协调器，其失败应向上传播）。
+    /// </param>
     AIAgent CreateAnalyst(
         Type agentType,
         ChatClientRuntime runtime,
         AIContextProvider[]? additionalProviders = null,
-        IEnumerable<AITool>? extraTools = null);
+        IEnumerable<AITool>? extraTools = null,
+        Action<Exception>? onAnalysisFailed = null);
 }
 
 /// <summary>
@@ -51,7 +56,8 @@ public class AnalystAgentFactory(
         Type agentType,
         ChatClientRuntime runtime,
         AIContextProvider[]? additionalProviders = null,
-        IEnumerable<AITool>? extraTools = null)
+        IEnumerable<AITool>? extraTools = null,
+        Action<Exception>? onAnalysisFailed = null)
     {
         try
         {
@@ -106,13 +112,21 @@ public class AnalystAgentFactory(
 
             var agent = (AIAgent)ActivatorUtilities.CreateInstance(ServiceProvider, agentType, [.. parameters]);
 
+            // 中间件组合顺序的唯一入口（顺序契约）：
+            // ChatClientAgent → TokenTracking → FailureIsolation（最外层）。
+            // 失败隔离必须在 TokenTracking 的外层：Token 熔断等内层抛出的异常才能在此
+            // 被转换为失败标记消息（Fan-In 聚合器仍能收到该分析师的消息，降级继续），
+            // 而不是使整个分析工作流中断。新增中间件时保持失败隔离最外层不变。
             var middlewareAgent = WrapWithTokenTracking(agent);
+            var finalAgent = onAnalysisFailed is null
+                ? middlewareAgent
+                : middlewareAgent.WithFailureIsolation(onAnalysisFailed);
 
             Logger.LogInformation(
-                "成功创建分析师代理: {AgentType} (市场: {Market}，已附加中间件)",
-                agentType.Name, currentMarket);
+                "成功创建分析师代理: {AgentType} (市场: {Market}，已附加中间件，失败隔离: {HasFailureIsolation})",
+                agentType.Name, currentMarket, onAnalysisFailed is not null);
 
-            return middlewareAgent;
+            return finalAgent;
         }
         catch (Exception ex)
         {

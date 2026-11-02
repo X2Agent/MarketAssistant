@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Agents.Middleware;
 
+// MAAI001：Compaction 系列类型均为实验性 API，当前无稳定替代（升级 MAF 时复核）。
+#pragma warning disable MAAI001
+
 /// <summary>
 /// 为每个聊天会话创建独立的 MAF Compaction Provider。
 /// 官方 Provider 按原子消息组处理历史，保证 Function Call 与 Function Result 不被拆分。
@@ -38,3 +41,5 @@ public sealed class ConversationCompactionProviderFactory(ILoggerFactory loggerF
         return new CompactionProvider(strategy, StateKey, _loggerFactory);
     }
 }
+
+#pragma warning restore MAAI001

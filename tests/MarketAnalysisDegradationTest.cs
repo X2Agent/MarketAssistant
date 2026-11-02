@@ -168,20 +168,23 @@ public sealed class MarketAnalysisDegradationTest
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "FundamentalAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) =>
-                CreateAnalystAgent("FundamentalAnalyst", fundamentalFails, "正常的基本面分析结论"));
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>(),
+                It.IsAny<Action<Exception>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _, Action<Exception>? onAnalysisFailed) =>
+                CreateAnalystAgent("FundamentalAnalyst", fundamentalFails, "正常的基本面分析结论", onAnalysisFailed));
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "NewsEventAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) =>
-                CreateAnalystAgent("NewsEventAnalyst", newsEventFails, "正常的新闻事件分析结论"));
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>(),
+                It.IsAny<Action<Exception>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _, Action<Exception>? onAnalysisFailed) =>
+                CreateAnalystAgent("NewsEventAnalyst", newsEventFails, "正常的新闻事件分析结论", onAnalysisFailed));
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "CoordinatorAnalystAgent"),
                 It.IsAny<ChatClientRuntime>(),
-                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _) => new ChatClientAgent(
+                It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>(),
+                It.IsAny<Action<Exception>?>()))
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _, Action<Exception>? _) => new ChatClientAgent(
                 coordinatorClient,
                 new ChatClientAgentOptions
                 {
@@ -211,17 +214,19 @@ public sealed class MarketAnalysisDegradationTest
         return workflow;
     }
 
-    private static AIAgent CreateAnalystAgent(string name, bool fails, string replyText)
+    private static AIAgent CreateAnalystAgent(string name, bool fails, string replyText, Action<Exception>? onAnalysisFailed)
     {
+        // 与真实 AnalystAgentFactory 行为对齐：传入失败回调的分析师附带失败隔离包装，
+        // 内层异常被转换为失败标记消息并触发降级回调
         IChatClient client = fails ? new ThrowingChatClient() : new StubChatClient(replyText);
         return new ChatClientAgent(client, new ChatClientAgentOptions
         {
             Name = name,
             ChatOptions = new ChatOptions()
-        });
+        }).WithFailureIsolation(onAnalysisFailed);
     }
 
-    private static string CreateCoordinatorResultJson()
+    internal static string CreateCoordinatorResultJson()
     {
         var result = new CoordinatorResult
         {

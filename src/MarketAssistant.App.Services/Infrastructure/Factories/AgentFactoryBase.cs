@@ -1,4 +1,5 @@
 using System.Reflection;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.Analysts.Attributes;
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Tools.Abstractions;
@@ -82,6 +83,11 @@ public abstract class AgentFactoryBase(
     /// 通过 MAF Builder 模式附加 Token 追踪中间件，返回包装后的 Agent。
     /// 子类可链式追加更多中间件。
     /// </summary>
+    /// <remarks>
+    /// 管道顺序契约：TokenTracking 必须位于失败隔离（<see cref="AIAgentFailureIsolation"/>）的
+    /// 内层——Token 熔断抛出的异常要被外层失败隔离转换为失败标记消息，实现"熔断 → 降级"而非
+    /// "熔断 → 中断整次分析"。禁止在本方法之后再包一层会吞掉或重抛异常的中间件。
+    /// </remarks>
     protected AIAgent WrapWithTokenTracking(AIAgent agent)
     {
         return agent

@@ -370,6 +370,10 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<ConversationCompactionProviderFactory>();
 
         services.AddSingleton(sp =>
+            // 审批全部关闭的安全前提：skills 目录位于应用安装目录（AppContext.BaseDirectory/skills），
+            // 内容随构建分发，普通用户对安装目录通常无写权限，故免审批自动加载/读取/执行可接受。
+            // 若未来支持用户可写位置的自定义 skill 目录，必须恢复对应审批开关，否则存在
+            // skill 内容被替换后脚本被自动执行的攻击面。
             new AgentSkillsProvider(
                 skillPath: Path.Combine(AppContext.BaseDirectory, "skills"),
                 options: new AgentSkillsProviderOptions

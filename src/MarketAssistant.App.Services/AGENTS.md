@@ -112,7 +112,28 @@ MarketAssistant.App.Services/
 
 - 分析师实现放在 `Agents/Analysts/`，统一通过 `IAnalystAgentFactory` 创建。
 - 工作流实现放在 `Agents/*Workflow*/`，执行器放在 `Executors/`。
-- 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 `FileAgentSkillsProvider` 加载，不在这里重复存放一份。
+- 通用知识型 Skill 资源保留在 `MarketAssistant.App/skills/` 作为内容文件输出，本项目通过 MAF 内置 `AgentSkillsProvider` 加载，不在这里重复存放一份。
+
+### 分析师中间件顺序契约
+
+`AnalystAgentFactory.CreateAnalyst` 是分析师中间件组合的**唯一入口**，顺序固定为：
+`ChatClientAgent → TokenTracking（`WrapWithTokenTracking`）→ FailureIsolation（最外层，传入 onAnalysisFailed 回调时附加）`。
+失败隔离必须在最外层：Token 熔断等内层异常要被它转换为失败标记消息（Fan-In 聚合器仍能收齐消息），而非中断整次分析。**不要在工厂之外对分析师再单独包装中间件**。回归测试：`tests/AnalystAgentFactoryMiddlewareOrderTest.cs`。
+
+### MAF 升级复核清单
+
+以下 6 处代码依赖 MAF 框架内部行为（非稳定契约），升级 `Microsoft.Agents.AI` 版本时必须人工复核并跑 `tests/MarketAnalysisWorkflowMafContractTest.cs`：
+
+| 依赖点 | 位置 | 失效表象 | 护栏 |
+|--------|------|---------|------|
+| AIAgent 两阶段调用（ChatMessage 转发 → TurnToken 真实执行），进度只统计 TurnToken 阶段 | `MarketAnalysisWorkflow.ExecuteWorkflowAsync` 的 `executingAnalysts` | 进度条瞬间冲满 / 分析师永不标记完成（无异常） | 契约测试（进度不变量断言） |
+| ExecutorId 由 ASCII Name 经 `GetDescriptiveId` 派生，名称→显示名按前缀回查 | `MarketAnalysisWorkflow` 的 `NameToDisplayName` / `GetExecutorNamePrefix` | 显示名错乱、Token 归属"未知" | 契约测试（ExecutorId 前缀断言） |
+| `WithOutputFrom` auto-yield 在流式路径的时序缺陷 → Coordinator 显式 `YieldOutputAsync` | `CoordinatorExecutor.HandleAsync` | 报告丢失（抛"未收到输出"友好错误） | 契约测试（成功返回报告即守护） |
+| Fan-In barrier 目标执行器异常不以 `ExecutorFailedEvent` 暴露 + 偶发消息路由丢失 | `AnalysisAggregatorExecutor` 宽限降级 | 事件流无声终止 / 降级发送失效 | `MarketAnalysisDegradationTest` |
+| 默认 workflow state scope 跨 Executor 不可见（issue #2162）→ 显式 scope | `AnalysisDispatcherExecutor.QueueStateUpdateAsync` | Coordinator 取不到标的代码，抛错（显性） | 现有构建与降级测试 |
+| `Microsoft.Agents.AI.Compaction` 实验性 API（MAAI001） | `ConversationCompressionMiddleware`（类型级 scoped 抑制） | 编译错误（显性） | 编译 |
+
+**幂等规避**（框架修复后代码照常工作，无需专项测试）：显式 `YieldOutputAsync`、显式 state scope、宽限降级——升级时确认即可，不必改动。
 
 ### 分析师结构化信号落库
 

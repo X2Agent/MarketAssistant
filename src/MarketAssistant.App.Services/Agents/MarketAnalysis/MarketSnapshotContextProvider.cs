@@ -5,8 +5,9 @@ using Microsoft.Extensions.AI;
 namespace MarketAssistant.Agents.MarketAnalysis;
 
 /// <summary>
-/// 市场快照共享状态，通过 MAF AIContextProvider 模式在分析师之间共享市场数据。
-/// 避免每位分析师重复获取同一市场数据（如当前价格、成交量等）。
+/// 运行级共享元数据上下文：通过 MAF AIContextProvider 模式向本次 Run 的
+/// 所有分析师注入公共信息（分析标的、分析时间）。
+/// 注意：本类不预加载任何行情数据；行情仍由各分析师通过工具按需获取。
 /// </summary>
 public class MarketSnapshotContextProvider : MessageAIContextProvider
 {
@@ -21,8 +22,8 @@ public class MarketSnapshotContextProvider : MessageAIContextProvider
             return new ValueTask<IEnumerable<ChatMessage>>([]);
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("## 市场快照（共享数据）");
-        sb.AppendLine("以下市场快照数据由协调器预加载，所有分析师共享，无需重复获取：");
+        sb.AppendLine("## 本次分析公共信息");
+        sb.AppendLine("以下信息由工作流注入，本次运行中的所有分析师共享：");
         sb.AppendLine();
 
         foreach (var (key, value) in _sharedData)

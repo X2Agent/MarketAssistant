@@ -10,6 +10,11 @@
     <PackageReference Include="Moq" />
     <PackageReference Include="MSTest" />
     <PackageReference Include="Microsoft.Agents.AI" />
+    <!-- Executor 子类需要源生成器生成 ConfigureProtocol（[MessageHandler] 协议） -->
+    <PackageReference Include="Microsoft.Agents.AI.Workflows.Generators">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation" />
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
   </ItemGroup>

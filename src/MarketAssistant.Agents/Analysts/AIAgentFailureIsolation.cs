@@ -12,6 +12,12 @@ namespace MarketAssistant.Agents.Analysts;
 /// 「单分析师失败不拖垮整次分析」的降级语义。
 /// 调用方取消（外部 CancellationToken）不被拦截，原样向上传播。
 /// </summary>
+/// <remarks>
+/// 管道顺序契约：失败隔离必须是<strong>最外层</strong>的包装（最后调用本扩展）。
+/// Token 追踪等内层中间件抛出的异常（如 Token 熔断）依赖本层转换为失败标记消息；
+/// 若失败隔离被包在内层，熔断异常将直接中断整次分析工作流。
+/// 组装入口在 <c>AnalystAgentFactory.CreateAnalyst</c>，不要在工厂之外单独追加包装。
+/// </remarks>
 public static class AIAgentFailureIsolation
 {
     /// <summary>
