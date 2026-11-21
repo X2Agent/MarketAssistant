@@ -464,13 +464,25 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
 
                 foreach (var (rule, symbol) in evaluations)
                 {
-                    var quote = await GetAShareLatestQuoteAsync(symbol, cancellationToken);
-                    if (quote is not null)
+                    try
                     {
-                        if (rule.Scope == AlertScope.Watchlist)
-                            EvaluateScopedPriceRule(rule, symbol, quote.Value.Price, quote.Value.ChangePercent);
-                        else
-                            UpdateRuleQuoteAndEvaluate(rule.Id, quote.Value.Price, quote.Value.ChangePercent);
+                        var quote = await GetAShareLatestQuoteAsync(symbol, cancellationToken);
+                        if (quote is not null)
+                        {
+                            if (rule.Scope == AlertScope.Watchlist)
+                                EvaluateScopedPriceRule(rule, symbol, quote.Value.Price, quote.Value.ChangePercent);
+                            else
+                                UpdateRuleQuoteAndEvaluate(rule.Id, quote.Value.Price, quote.Value.ChangePercent);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        // 行情获取失败按标的隔离：跳过该标的本轮评估，不影响其它标的与后续轮次
+                        Logger.LogWarning(ex, "获取 {Symbol} 行情失败，本轮跳过该标的的预警评估", symbol);
                     }
                 }
             }
@@ -509,12 +521,12 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
         }
         catch (OperationCanceledException)
         {
-            return null;
+            throw;
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "获取A股价格失败: {AssetCode}", assetCode);
-            return null;
+            // 数据源故障上抛，由调用方按标的隔离；与上方停牌/无报价的 null 语义区分
+            throw new FriendlyException($"获取 {assetCode} A股行情失败", ex);
         }
     }
 
@@ -539,9 +551,6 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
     public Task EvaluateIndicatorRuleAsync(
         PriceAlertRule rule, string symbol, AlertRuleMetric metric, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(rule);
-        ArgumentNullException.ThrowIfNull(metric);
-
         var scoped = ResolveScopedRule(rule, symbol);
         if (scoped == null)
             return Task.CompletedTask;
@@ -825,54 +834,44 @@ public sealed class PriceAlertService : SqliteServiceBase, IDisposable, IAsyncDi
 
     private async Task LoadRulesAsync(CancellationToken cancellationToken = default)
     {
-        try
+        // 加载失败向上传播：由 App 启动路径统一记录并通知用户，不得清空规则伪装成「零条规则」
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, asset_code, asset_name, market_type, condition, target_price, is_one_time, triggered, enabled, created_at, max_trigger_count, confirm_ticks, confirm_seconds, cooldown_minutes, trading_impact, scope, kline_type
+            FROM price_alert_rules
+            """;
+
+        var allRules = new List<PriceAlertRule>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                SELECT id, asset_code, asset_name, market_type, condition, target_price, is_one_time, triggered, enabled, created_at, max_trigger_count, confirm_ticks, confirm_seconds, cooldown_minutes, trading_impact, scope, kline_type
-                FROM price_alert_rules
-                """;
-
-            var allRules = new List<PriceAlertRule>();
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            allRules.Add(new PriceAlertRule
             {
-                allRules.Add(new PriceAlertRule
-                {
-                    Id = reader.GetString(0),
-                    AssetCode = reader.GetString(1),
-                    AssetName = reader.GetString(2),
-                    MarketType = (MarketType)reader.GetInt32(3),
-                    Condition = (AlertCondition)reader.GetInt32(4),
-                    TargetPrice = (decimal)reader.GetDouble(5),
-                    IsOneTime = reader.GetInt32(6) != 0,
-                    Triggered = false,
-                    Enabled = reader.GetInt32(8) != 0,
-                    CreatedAt = DateTime.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                    MaxTriggerCount = reader.GetInt32(10),
-                    ConfirmTicks = reader.GetInt32(11),
-                    ConfirmSeconds = reader.GetInt32(12),
-                    CooldownMinutes = reader.GetInt32(13),
-                    TradingImpact = (AlertTradingImpact)reader.GetInt32(14),
-                    Scope = (AlertScope)reader.GetInt32(15),
-                    KLineType = (KLineType)reader.GetInt32(16)
-                });
-            }
-
-            lock (_syncRoot)
-            {
-                _rules = allRules;
-            }
+                Id = reader.GetString(0),
+                AssetCode = reader.GetString(1),
+                AssetName = reader.GetString(2),
+                MarketType = (MarketType)reader.GetInt32(3),
+                Condition = (AlertCondition)reader.GetInt32(4),
+                TargetPrice = (decimal)reader.GetDouble(5),
+                IsOneTime = reader.GetInt32(6) != 0,
+                Triggered = false,
+                Enabled = reader.GetInt32(8) != 0,
+                CreatedAt = DateTime.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                MaxTriggerCount = reader.GetInt32(10),
+                ConfirmTicks = reader.GetInt32(11),
+                ConfirmSeconds = reader.GetInt32(12),
+                CooldownMinutes = reader.GetInt32(13),
+                TradingImpact = (AlertTradingImpact)reader.GetInt32(14),
+                Scope = (AlertScope)reader.GetInt32(15),
+                KLineType = (KLineType)reader.GetInt32(16)
+            });
         }
-        catch (Exception ex)
+
+        lock (_syncRoot)
         {
-            Logger.LogWarning(ex, "加载价格预警规则失败");
-            lock (_syncRoot)
-            {
-                _rules = [];
-            }
+            _rules = allRules;
         }
     }
 

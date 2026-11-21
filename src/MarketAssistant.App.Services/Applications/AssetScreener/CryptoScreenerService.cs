@@ -12,9 +12,9 @@ public sealed class CryptoScreenerService(
     CoinGeckoApiService coinGeckoService,
     BinanceMarketDataService binanceService) : IAssetScreenerService
 {
-    private readonly ILogger<CryptoScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
+    private readonly ILogger<CryptoScreenerService> _logger = logger;
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService;
+    private readonly BinanceMarketDataService _binanceService = binanceService;
 
     // CoinGecko API 限制
     private const int COINGECKO_MAX_PER_PAGE = 250;

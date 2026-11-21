@@ -36,14 +36,14 @@ public partial class MarketAnalysisWorkflow(
     ILogger<MarketAnalysisWorkflow> logger,
     ITokenUsageRecorder? tokenUsageRecorder = null)
 {
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
-    private readonly IAnalystAgentFactory _analystAgentFactory = analystAgentFactory ?? throw new ArgumentNullException(nameof(analystAgentFactory));
-    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-    private readonly ILoggerFactory _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
-    private readonly ILogger<MarketAnalysisWorkflow> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly AnalysisReportCache _reportCache = reportCache ?? throw new ArgumentNullException(nameof(reportCache));
-    private readonly MarketContext _marketContext = marketContext ?? throw new ArgumentNullException(nameof(marketContext));
-    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly IUserSettingService _userSettingService = userSettingService;
+    private readonly IAnalystAgentFactory _analystAgentFactory = analystAgentFactory;
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
+    private readonly ILogger<MarketAnalysisWorkflow> _logger = logger;
+    private readonly AnalysisReportCache _reportCache = reportCache;
+    private readonly MarketContext _marketContext = marketContext;
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore;
     private readonly ITokenUsageRecorder _tokenUsageRecorder = tokenUsageRecorder ?? new TokenUsageRecorder();
 
     /// <summary>
@@ -89,8 +89,8 @@ public partial class MarketAnalysisWorkflow(
         activity?.SetTag("marketassistant.run.id", runId.ToString("N"));
         activity?.SetTag("marketassistant.asset.symbol", assetSymbol);
 
-        // 运行级 Token 用量作用域：分析工作流的 Agent 以 session: null 调用，
-        // 会话级累计不生效，故由作用域承接中间件的用量上报（含并发分析师与协调器重试）
+        // 运行级 Token 用量作用域：分析师由 MAF 工作流宿主托管（会话由宿主持有），协调分析师显式以
+        // session: null 调用，会话累计无法覆盖整次分析，故由作用域承接中间件的用量上报（含并发分析师与协调器重试）
         using var tokenUsageScope = _tokenUsageRecorder.BeginScope(runId);
 
         // 本次 Run 的市场归属在开始时捕获一次：分析期间用户切换市场不应改变本报告的归属
@@ -132,8 +132,10 @@ public partial class MarketAnalysisWorkflow(
             activity?.SetTag("marketassistant.analyst.requested_count", enabledAnalysts.Count);
 
             // 运行期降级记录：失败隔离包装器在分析师运行失败时回调，
-            // 这里维护已降级名单并向 UI 发布进度事件（与聚合器的失败计数相互独立）
+            // 这里维护已降级名单并向 UI 发布进度事件（与聚合器的失败计数相互独立）。
+            // 同步收集每位分析师的单行失败原因，终局"全员失败"报错附带去重后的原因。
             var degradedAnalysts = new List<string>();
+            var degradedReasons = new Dictionary<string, string>();
             var degradationGate = new object();
             var totalForProgress = 0;
 
@@ -148,7 +150,13 @@ public partial class MarketAnalysisWorkflow(
                     lock (degradationGate)
                     {
                         if (!degradedAnalysts.Contains(displayName))
+                        {
                             degradedAnalysts.Add(displayName);
+                            degradedReasons[displayName] = AnalystFailureMessages.NormalizeReason(
+                                ErrorMessageMapper.TryGetProviderErrorMessage(exception, out var providerMessage)
+                                    ? providerMessage
+                                    : exception.Message);
+                        }
                         failedSnapshot = [.. degradedAnalysts];
                     }
 
@@ -236,6 +244,7 @@ public partial class MarketAnalysisWorkflow(
                 createdAgents.Count,
                 agentNameToDisplayName,
                 degradedAnalysts,
+                degradedReasons,
                 analystRunStates,
                 tokenUsageScope,
                 cancellationToken);
@@ -318,6 +327,7 @@ public partial class MarketAnalysisWorkflow(
         int analystCount,
         IReadOnlyDictionary<string, string> agentNameToDisplayName,
         List<string> degradedAnalysts,
+        Dictionary<string, string> degradedReasons,
         Dictionary<string, AnalystRunState> analystRunStates,
         ITokenUsageScope tokenUsageScope,
         CancellationToken cancellationToken)
@@ -469,7 +479,14 @@ public partial class MarketAnalysisWorkflow(
                     case ExecutorFailedEvent executorFailed:
                         activeExecutors.Remove(executorFailed.ExecutorId);
                         var failedDisplayName = GetDisplayNameForExecutorId(executorFailed.ExecutorId, agentNameToDisplayName);
-                        var errorDetail = executorFailed.Data?.Message ?? "未知错误";
+                        // 供应商错误（限流、模型下线等）用映射后的可读文案，其余异常保留原始 Message
+                        var errorDetail = executorFailed.Data switch
+                        {
+                            null => "未知错误",
+                            var failure when ErrorMessageMapper.TryGetProviderErrorMessage(failure, out var providerMessage)
+                                => providerMessage,
+                            var failure => failure.Message
+                        };
                         _logger.LogError(executorFailed.Data,
                             "步骤失败: {ExecutorId} ({DisplayName}), 错误: {Error}",
                             executorFailed.ExecutorId, failedDisplayName, errorDetail);
@@ -562,7 +579,8 @@ public partial class MarketAnalysisWorkflow(
                 string.Join(", ", degradedAnalysts));
 
             throw new FriendlyException(
-                $"所有分析师均执行失败，无法生成综合报告: {string.Join("；", degradedAnalysts)}");
+                $"所有分析师均执行失败，无法生成综合报告: {string.Join("；", degradedAnalysts)}。" +
+                $"失败原因: {string.Join("；", degradedReasons.Values.Distinct())}");
         }
 
         // 工作流正常结束但未收到 WorkflowOutputEvent，构建详细诊断信息

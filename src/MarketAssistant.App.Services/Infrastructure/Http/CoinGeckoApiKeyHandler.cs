@@ -11,7 +11,7 @@ namespace MarketAssistant.Infrastructure.Http;
 /// </summary>
 public sealed class CoinGeckoApiKeyHandler(IUserSettingService userSettingService) : DelegatingHandler
 {
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly IUserSettingService _userSettingService = userSettingService;
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {

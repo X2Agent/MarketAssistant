@@ -18,7 +18,6 @@ public class PdfMarkdownConverter : IMarkdownConverter
 
     public PdfMarkdownConverter(IImageStorageService imageStorageService)
     {
-        ArgumentNullException.ThrowIfNull(imageStorageService);
         _pdfImageProcessor = new PdfImageProcessor(imageStorageService);
     }
 

@@ -38,10 +38,10 @@ public sealed partial class AnalysisAggregatorExecutor(
     /// <summary>消息未收齐时的默认降级宽限期（P0-1 缓解：避免事件流无声终止）。</summary>
     private static readonly TimeSpan DefaultIncompleteGrace = TimeSpan.FromSeconds(30);
 
-    private readonly ILogger<AnalysisAggregatorExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ILogger<AnalysisAggregatorExecutor> _logger = logger;
     private readonly int _expectedAnalystCount = expectedAnalystCount;
     private readonly Guid _runId = runId;
-    private readonly IAnalystArtifactStore _artifactStore = artifactStore ?? throw new ArgumentNullException(nameof(artifactStore));
+    private readonly IAnalystArtifactStore _artifactStore = artifactStore;
     private readonly IReadOnlyDictionary<string, string> _displayNameByAgentName = displayNameByAgentName ?? new Dictionary<string, string>();
     private readonly TimeSpan _incompleteGrace = incompleteGracePeriod ?? DefaultIncompleteGrace;
     private readonly object _syncRoot = new();
@@ -57,8 +57,6 @@ public sealed partial class AnalysisAggregatorExecutor(
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(messages);
-
         var expectedCount = _expectedAnalystCount;
 
         List<ChatMessage>? readySuccesses = null;
@@ -286,11 +284,7 @@ public sealed partial class AnalysisAggregatorExecutor(
                 .ConfigureAwait(false);
             return true;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // 落盘失败时回退为全文传递，保证协调阶段仍有完整信息可用
             _logger.LogError(ex, "产物落盘失败: Run: {RunId}, Analyst: {Analyst}，将回退为全文注入",

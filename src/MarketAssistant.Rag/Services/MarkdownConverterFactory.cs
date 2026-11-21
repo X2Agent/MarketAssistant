@@ -8,7 +8,7 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class MarkdownConverterFactory(IEnumerable<IMarkdownConverter> converters)
 {
-    private readonly IEnumerable<IMarkdownConverter> _converters = converters ?? throw new ArgumentNullException(nameof(converters));
+    private readonly IEnumerable<IMarkdownConverter> _converters = converters;
 
     public IMarkdownConverter? GetConverter(string filePath)
     {

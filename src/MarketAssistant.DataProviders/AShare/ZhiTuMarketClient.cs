@@ -10,7 +10,7 @@ namespace MarketAssistant.DataProviders.AShare;
 /// </summary>
 public sealed class ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 获取财务报表类列表数据（<c>/hs/fin/{endpoint}/{code}</c>）。
@@ -48,13 +48,16 @@ public sealed class ZhiTuMarketClient(IHttpClientFactory httpClientFactory)
     }
 
     /// <summary>
-    /// 获取个股资金流向历史（<c>/hs/history/transaction/{code}?lt=20</c>）。
+    /// 获取个股资金流向历史（<c>/hs/history/transaction/{code}</c>，查询参数 st、et）。
+    /// 该接口不带 st/et 时只返回最近 1 个交易日（lt 无效），多日必须同时传两者：
+    /// 格式 yyyyMMdd，单次最多 365 个自然日，仅传一侧返回 422。
     /// </summary>
     /// <typeparam name="T">资金流向 DTO 类型。</typeparam>
     public async Task<List<T>> GetTransactionHistoryAsync<T>(
-        string digitsCode, string token, CancellationToken cancellationToken = default)
+        string digitsCode, string token,
+        string startDate, string endDate, CancellationToken cancellationToken = default)
     {
-        var path = $"/hs/history/transaction/{Uri.EscapeDataString(digitsCode)}?token={Uri.EscapeDataString(token)}&lt=20";
+        var path = $"/hs/history/transaction/{Uri.EscapeDataString(digitsCode)}?token={Uri.EscapeDataString(token)}&st={Uri.EscapeDataString(startDate)}&et={Uri.EscapeDataString(endDate)}";
         return await GetListAsync<T>(path, cancellationToken);
     }
 

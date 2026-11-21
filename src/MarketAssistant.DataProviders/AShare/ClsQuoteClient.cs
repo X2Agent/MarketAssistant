@@ -8,7 +8,7 @@ namespace MarketAssistant.DataProviders.AShare;
 /// </summary>
 public sealed class ClsQuoteClient(IHttpClientFactory httpClientFactory)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 获取股票基础行情（<c>/quote/stock/basic</c>）。

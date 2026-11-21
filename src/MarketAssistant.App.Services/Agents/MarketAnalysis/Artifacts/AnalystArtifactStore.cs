@@ -24,15 +24,15 @@ public sealed class FileAnalystArtifactStore : IAnalystArtifactStore
 
     public FileAnalystArtifactStore(string rootDirectory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
         _rootDirectory = rootDirectory;
     }
 
     public async Task SaveAsync(Guid runId, string analystName, string content, CancellationToken cancellationToken = default)
     {
         var path = GetPath(runId, analystName);
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, content ?? string.Empty, Encoding.UTF8, cancellationToken);
+        // GetPath 恒为 _rootDirectory/<runId>/name.md 结构，目录段必然存在
+        Directory.CreateDirectory(Path.GetDirectoryName(path) ?? throw new System.Diagnostics.UnreachableException());
+        await File.WriteAllTextAsync(path, content, Encoding.UTF8, cancellationToken);
     }
 
     public async Task<string?> GetAsync(Guid runId, string analystName, CancellationToken cancellationToken = default)

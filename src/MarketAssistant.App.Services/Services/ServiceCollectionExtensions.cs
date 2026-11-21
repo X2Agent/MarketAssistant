@@ -54,6 +54,7 @@ using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 using Polly.RateLimiting;
+using Polly;
 using Serilog;
 using System.Threading.RateLimiting;
 
@@ -80,7 +81,7 @@ public static class BusinessServiceCollectionExtensions
         services.AddTradingServices();
         services.AddWorkflowServices();
         services.AddMarketModules();
-        services.AddSingleton<IReleaseService, GitHubReleaseService>();
+        services.AddSingleton<GitHubReleaseService>();
         services.AddSingleton<Agents.MarketAnalysis.Artifacts.IAnalystArtifactStore>(_ => new Agents.MarketAnalysis.Artifacts.FileAnalystArtifactStore(
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -157,12 +158,20 @@ public static class BusinessServiceCollectionExtensions
         services.AddHttpClient("ZhiTu", client =>
         {
             client.BaseAddress = new Uri("https://api.zhituapi.com");
-            client.Timeout = TimeSpan.FromSeconds(60);
+            client.Timeout = TimeSpan.FromSeconds(25);
         }).AddStandardResilienceHandler(options =>
         {
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(20);
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(60);
-            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
+            // 智兔对不覆盖的标的返回 503（"redis history miss"）与 404 语义相同——是「没有数据」而非瞬时抖动。
+            // 默认 3 次指数退避（1s/3s/7s）会把一次确定失败放大成 15 秒等待，故只重试 1 次且用固定短退避：
+            // 真实网络抖动仍有一次补救，确定失败约 1.3 秒内交给兜底数据源（新浪）。
+            options.Retry.MaxRetryAttempts = 1;
+            options.Retry.BackoffType = DelayBackoffType.Constant;
+            options.Retry.UseJitter = false;
+            options.Retry.Delay = TimeSpan.FromMilliseconds(500);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+            // 总超时必须覆盖一次完整尝试 + 退避 + 重试尝试
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(25);
+            options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(25);
         });
 
         services.AddHttpClient("Cls", client =>
@@ -356,7 +365,6 @@ public static class BusinessServiceCollectionExtensions
     {
         services.AddSingleton<IEmbeddingFactory, EmbeddingFactory>();
         services.AddSingleton<IModelDiscoveryService, ModelDiscoveryService>();
-        services.AddSingleton<Infrastructure.Providers.IRagInfrastructureProvider, Infrastructure.Providers.RagInfrastructureProvider>();
         services.AddSingleton<Infrastructure.Providers.DocumentVectorizationService>();
         services.AddSingleton<IWebSearchService, WebSearchService>();
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
@@ -487,6 +495,8 @@ public static class BusinessServiceCollectionExtensions
         services.AddSingleton<OrderStateSyncService>();
         services.AddSingleton<TradeExecutor>();
         services.AddSingleton<ExchangeConditionOrderService>();
+        // 持仓对账：以交易所为真相校准本地 FIFO 账本（外部成交/漏单造成的漂移）
+        services.AddSingleton<PositionReconciliationService>();
         services.AddSingleton<EmergencyStopService>();
         services.AddSingleton<LiquidationRiskEvaluator>();
         // 策略限价单超时撤单（自启动周期扫描）
@@ -510,7 +520,6 @@ public static class BusinessServiceCollectionExtensions
         // 避免 Singleton Executor 在并发分析间共享可变状态和模型引用。
         services.AddTransient<ScreenInvestmentTargetsExecutor>();
         services.AddTransient<AnalyzeAssetsExecutor>();
-        services.AddSingleton<IInvestmentExecutorFactory, InvestmentExecutorFactory>();
         services.AddSingleton<InvestmentSelectionWorkflow>();
         services.AddSingleton<InvestmentSelectionService>();
 

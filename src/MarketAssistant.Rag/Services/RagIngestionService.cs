@@ -41,7 +41,7 @@ public class RagIngestionService(
     private readonly DocumentBlockReaderFactory _readerFactory = readerFactory;
     private readonly IImageEmbeddingService _imageEmbeddingService = imageEmbeddingService;
     private readonly DocumentBlockMapper _blockMapper = new DocumentBlockMapper(cleaning, chunking);
-    private readonly IRagDocumentCatalog _documentCatalog = documentCatalog ?? throw new ArgumentNullException(nameof(documentCatalog));
+    private readonly IRagDocumentCatalog _documentCatalog = documentCatalog;
 
     /// <summary>
     /// 处理并写入指定文件内容到向量集合，返回结构化摄取结果。
@@ -57,8 +57,6 @@ public class RagIngestionService(
         IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
-
         var blockReader = _readerFactory.GetReader(filePath);
         if (blockReader == null)
         {

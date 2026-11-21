@@ -14,9 +14,9 @@ public sealed class StockScreenerService(
     CookieContainer xueqiuCookieContainer,
     ILogger<StockScreenerService> logger) : IAssetScreenerService
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly CookieContainer _cookieContainer = xueqiuCookieContainer ?? throw new ArgumentNullException(nameof(xueqiuCookieContainer));
-    private readonly ILogger<StockScreenerService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly CookieContainer _cookieContainer = xueqiuCookieContainer;
+    private readonly ILogger<StockScreenerService> _logger = logger;
 
     private const string ScreenerEndpoint = "/service/screener/screen";
 

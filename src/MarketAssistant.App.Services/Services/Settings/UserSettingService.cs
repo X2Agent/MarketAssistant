@@ -33,8 +33,6 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
         ILogger<UserSettingService>? logger = null)
         : base(settingsFilePath)
     {
-        ArgumentNullException.ThrowIfNull(secretStore);
-
         _secretStore = secretStore;
         _logger = logger ?? NullLogger<UserSettingService>.Instance;
         LoadSettings();
@@ -50,6 +48,7 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
             try
             {
                 string? legacyJson = ReadRawJson();
+                // JSON 根为 null（文件空壳/全新用户）与解析成功视同全新默认设置；非法 JSON 由 ParseJson 抛出
                 _currentSetting = legacyJson is null
                     ? new UserSetting()
                     : ParseJson(legacyJson) ?? new UserSetting();
@@ -86,18 +85,10 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
     {
         lock (FileLock)
         {
-            try
-            {
-                // 先写安全存储，成功后再写不含 Secret 的普通设置，避免界面显示"已保存"但密钥丢失。
-                _secretStore.Write(UserSecrets.From(_currentSetting));
+            // 先写安全存储，成功后再写不含 Secret 的普通设置，避免界面显示"已保存"但密钥丢失。
+            _secretStore.Write(UserSecrets.From(_currentSetting));
 
-                SaveAtomic(_currentSetting);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "保存设置时出错");
-                throw;
-            }
+            SaveAtomic(_currentSetting);
         }
     }
 
@@ -107,8 +98,6 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
     /// <param name="setting">新的用户设置</param>
     public void UpdateSettings(UserSetting setting)
     {
-        ArgumentNullException.ThrowIfNull(setting);
-
         lock (FileLock)
         {
             _currentSetting = setting;
@@ -119,8 +108,6 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
     /// <inheritdoc />
     public void UpdateSetting(Action<UserSetting> mutate)
     {
-        ArgumentNullException.ThrowIfNull(mutate);
-
         // Monitor 对同一线程可重入：变更与保存共用 FileLock，
         // 保证跨线程变更不会与序列化/文件替换交错
         lock (FileLock)
@@ -151,7 +138,11 @@ public class UserSettingService : JsonFileConfigStore<UserSetting>, IUserSetting
         if (!containsLegacySecrets)
             return false;
 
-        legacySecrets!.ApplyTo(setting);
+        // containsLegacySecrets 为 true 蕴含 legacySecrets 非空；直接收窄避免 null-forgiving
+        if (legacySecrets?.HasAnyValue() is not true)
+            return false;
+
+        legacySecrets.ApplyTo(setting);
         _logger.LogInformation("检测到旧版明文 Secret，正在迁移到操作系统安全存储");
         return true;
     }

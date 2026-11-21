@@ -35,8 +35,6 @@ public class MCPServerConfigService : JsonFileConfigStore<List<MCPServerConfig>>
     internal MCPServerConfigService(string configFilePath, ISecureSettingsStore secretStore)
         : base(configFilePath)
     {
-        ArgumentNullException.ThrowIfNull(secretStore);
-
         _secretStore = secretStore;
         LoadConfigs();
     }
@@ -57,12 +55,12 @@ public class MCPServerConfigService : JsonFileConfigStore<List<MCPServerConfig>>
             var legacyConfigs = string.IsNullOrWhiteSpace(legacyJson)
                 ? []
                 : JsonSerializer.Deserialize<List<LegacyMcpServerSecrets>>(legacyJson) ?? [];
-            var migratedSecrets = legacyConfigs
-                .Where(config => config.EnvironmentVariables is { Count: > 0 })
-                .ToDictionary(
-                    config => config.Id,
-                    config => new Dictionary<string, string?>(config.EnvironmentVariables!),
-                    StringComparer.Ordinal);
+            var migratedSecrets = new Dictionary<string, Dictionary<string, string?>>(StringComparer.Ordinal);
+            foreach (var config in legacyConfigs)
+            {
+                if (config.EnvironmentVariables is { Count: > 0 } envVars)
+                    migratedSecrets.Add(config.Id, new Dictionary<string, string?>(envVars));
+            }
 
             if (_secretStore.Read<Dictionary<string, Dictionary<string, string?>>>() is { } storedEnvironmentVariables)
             {

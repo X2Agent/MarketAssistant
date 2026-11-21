@@ -1,5 +1,7 @@
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Rag;
 using MarketAssistant.Rag.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.VectorData;
 
@@ -24,7 +26,7 @@ public sealed record VectorizationResult(
 /// 进度通过 <see cref="IProgress{T}"/> 回调上报，结果以 <see cref="VectorizationResult"/> 返回，由调用方（ViewModel）负责 UI 反馈。
 /// </summary>
 public sealed class DocumentVectorizationService(
-    IRagInfrastructureProvider ragInfrastructureProvider,
+    IServiceProvider serviceProvider,
     ILogger<DocumentVectorizationService> logger)
 {
     public static readonly string[] SupportedExtensions = [".pdf", ".docx", ".md"];
@@ -32,7 +34,8 @@ public sealed class DocumentVectorizationService(
     // 向量化在途守卫必须跨服务实例生效（与 ViewModel 生命周期的并发向量化场景一致）
     private static int _activeVectorizations;
 
-    private readonly IRagInfrastructureProvider _ragInfrastructureProvider = ragInfrastructureProvider;
+    // 嵌入/向量存储/摄取链路在实际向量化时才从容器解析，避免浏览设置页触发其同步构造
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly ILogger<DocumentVectorizationService> _logger = logger;
 
     /// <summary>
@@ -64,13 +67,13 @@ public sealed class DocumentVectorizationService(
             return null;
 
         // 创建嵌入生成器（只在实际需要时创建）
-        var embeddingGenerator = _ragInfrastructureProvider.GetEmbeddingFactory().Create();
+        var embeddingGenerator = _serviceProvider.GetRequiredService<IEmbeddingFactory>().Create();
 
-        var collection = _ragInfrastructureProvider.GetVectorStore().GetCollection<string, TextParagraph>(collectionName);
+        var collection = _serviceProvider.GetRequiredService<VectorStore>().GetCollection<string, TextParagraph>(collectionName);
         await collection.EnsureCollectionExistsAsync();
         _logger.LogInformation("使用向量集合: {CollectionName}", collectionName);
 
-        var ragIngestionService = _ragInfrastructureProvider.GetIngestionService();
+        var ragIngestionService = _serviceProvider.GetRequiredService<IRagIngestionService>();
         var totalFiles = files.Count;
         _logger.LogInformation("找到 {Count} 个文档需要向量化", totalFiles);
 

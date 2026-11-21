@@ -76,6 +76,43 @@ dotnet run --project src/MarketAssistant.App/MarketAssistant.App.csproj -c Debug
 
 ---
 
+## 简化优先的设计规范（强制）
+
+目标：代码只做必要的事。新增与重构都按下列四条执行，评审时以此为准。
+
+### 1. 防过度防御
+
+- 默认**不为"理论上更稳"添加防御代码**（null/空值/边界检查、并发锁、重试、降级分支）。
+- 几乎不会发生的边界或并发问题，先向用户说明**触发场景、发生概率、不加的后果**，经用户确认后再加；严禁私自膨胀代码。
+- 以下属于架构上有意的防御，**不算过度防御，必须保留**：
+  - 资金安全链、紧急停止（kill switch）、风控拒单（交易模块）。
+  - 分析师失败隔离、`AnalysisAggregatorExecutor` 降级、`ResolveRuntimeForRole` 回退。
+  - 告警通道、MCP 服务器、批量接口的**逐项隔离**；后台循环（轮询、WebSocket、新闻更新）的**单次失败隔离**。
+  - RAG 向量与模型调用降级（见 `MarketAssistant.Rag/AGENTS.md`）。
+  - 不可信文件解析（PDF/DOCX）、`Dispose` 清理、`GlobalExceptionHandler` 与应用启动/退出处理。
+
+### 2. 入口单次校验
+
+- 外部数据（用户输入、LLM Tool 参数、HTTP/WS 响应、文件、JSON）**只在边界校验一次**并转成强类型，内部靠类型系统与可空注解（`Nullable` 已启用，`TreatWarningsAsErrors=true`）流转。
+- 禁止：DI 构造函数 `?? throw new ArgumentNullException`；内部方法对非可空参数 `ThrowIfNull` / `IsNullOrWhiteSpace`；多层重复 `Normalize` / `Trim` / 同一标的重复校验。
+
+### 3. 拒绝提前抽象
+
+- 仅使用一次的逻辑**就近内联**；只转发调用的 helper、wrapper、Provider、Factory 不要建。
+- 同一模式出现 **3 次及以上**且语义一致，才提取为共享组件；不为单一实现新增接口，除非需要 Keyed 市场变体或测试替身。
+
+### 4. 控制复杂度
+
+- 非必要不用 `try/catch`，让异常自然向上传播，只在统一落点处理：
+  - Tool 方法 → `ToolExecutor.ExecuteAsync`
+  - ViewModel 加载 → `ViewModelBase.LoadAsync`；ViewModel 命令 → `SafeExecuteAsync`
+  - 后台循环 → 循环体一处 `catch`
+  - 业务服务 → 不捕获，直接向上传播
+- 禁止"只记日志后原样 `throw`"，禁止"吞异常后返回空集合 / `false` / `null`"（与 App.Services 的「空」与「失败」必须可区分一致）。
+- 能在单个函数内清晰完成的逻辑不要硬拆。
+
+---
+
 ## 避免重复造轮子
 
 - 新增基础能力前，先检索项目内现有抽象、服务和已引入 NuGet 依赖，优先复用，不要在业务层重新实现一套。

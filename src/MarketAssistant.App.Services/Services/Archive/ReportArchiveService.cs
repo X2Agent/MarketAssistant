@@ -23,32 +23,22 @@ public class ReportArchiveService(ILogger<ReportArchiveService> logger) : Sqlite
     /// </summary>
     public async Task SaveAsync(MarketAnalysisReport report, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(report);
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO reports (asset_code, market_type, rating, score, created_at, report_json)
+            VALUES (@code, @market, @rating, @score, @time, @json)
+            """;
+        cmd.Parameters.AddWithValue("@code", report.AssetSymbol);
+        cmd.Parameters.AddWithValue("@market", report.MarketType.HasValue ? (int)report.MarketType.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("@rating", (int)report.CoordinatorResult.InvestmentRating);
+        cmd.Parameters.AddWithValue("@score", report.CoordinatorResult.OverallScore);
+        cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
 
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                INSERT INTO reports (asset_code, market_type, rating, score, created_at, report_json)
-                VALUES (@code, @market, @rating, @score, @time, @json)
-                """;
-            cmd.Parameters.AddWithValue("@code", report.AssetSymbol);
-            cmd.Parameters.AddWithValue("@market", report.MarketType.HasValue ? (int)report.MarketType.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@rating", (int)report.CoordinatorResult.InvestmentRating);
-            cmd.Parameters.AddWithValue("@score", report.CoordinatorResult.OverallScore);
-            cmd.Parameters.AddWithValue("@time", report.CreatedAt.ToString("O"));
-            cmd.Parameters.AddWithValue("@json", JsonSerializer.Serialize(report));
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-
-            ReportSaved?.Invoke(report);
-        }
-        catch (Exception ex)
-        {
-            // 抛出异常而非吞并，让调用方感知归档失败（避免幽灵报告）
-            throw new InvalidOperationException($"保存分析报告失败: {report.AssetSymbol}", ex);
-        }
+        ReportSaved?.Invoke(report);
     }
 
     /// <summary>
@@ -63,127 +53,82 @@ public class ReportArchiveService(ILogger<ReportArchiveService> logger) : Sqlite
         CancellationToken cancellationToken = default,
         MarketType? marketType = null)
     {
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, asset_code, market_type, rating, score, created_at, report_json
+            FROM reports WHERE asset_code = @code AND (@market IS NULL OR market_type = @market)
+            ORDER BY created_at DESC LIMIT @limit
+            """;
+        cmd.Parameters.AddWithValue("@code", assetCode);
+        cmd.Parameters.AddWithValue("@market", marketType.HasValue ? (int)marketType.Value : DBNull.Value);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
         var results = new List<ReportSummary>();
-        try
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                SELECT id, asset_code, market_type, rating, score, created_at, report_json
-                FROM reports WHERE asset_code = @code AND (@market IS NULL OR market_type = @market)
-                ORDER BY created_at DESC LIMIT @limit
-                """;
-            cmd.Parameters.AddWithValue("@code", assetCode);
-            cmd.Parameters.AddWithValue("@market", marketType.HasValue ? (int)marketType.Value : DBNull.Value);
-            cmd.Parameters.AddWithValue("@limit", limit);
-
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            results.Add(new ReportSummary
             {
-                results.Add(new ReportSummary
-                {
-                    Id = reader.GetInt64(0),
-                    AssetCode = reader.GetString(1),
-                    MarketType = reader.IsDBNull(2) ? null : (MarketType)reader.GetInt32(2),
-                    Rating = reader.IsDBNull(3) ? null : (InvestmentRating)reader.GetInt32(3),
-                    Score = reader.GetDouble(4),
-                    CreatedAt = DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
-                });
+                Id = reader.GetInt64(0),
+                AssetCode = reader.GetString(1),
+                MarketType = reader.IsDBNull(2) ? null : (MarketType)reader.GetInt32(2),
+                Rating = reader.IsDBNull(3) ? null : (InvestmentRating)reader.GetInt32(3),
+                Score = reader.GetDouble(4),
+                CreatedAt = DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+            });
 
-                if (!reader.IsDBNull(6))
-                {
-                    TryFillDimensionScores(results[^1], reader.GetString(6));
-                }
+            if (!reader.IsDBNull(6))
+            {
+                TryFillDimensionScores(results[^1], reader.GetString(6));
             }
+        }
 
-            ApplyTimelineDeltas(results);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "查询报告摘要失败: {Asset}", assetCode);
-        }
+        ApplyTimelineDeltas(results);
         return results;
     }
 
     /// <summary>
-    /// 根据 ID 加载完整报告
+    /// 根据 ID 加载完整报告；报告不存在时返回 null，读取或反序列化失败时抛出异常。
     /// </summary>
     public async Task<MarketAnalysisReport?> LoadAsync(long id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT report_json FROM reports WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", id);
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT report_json FROM reports WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
 
-            var json = await cmd.ExecuteScalarAsync(cancellationToken) as string;
-            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<MarketAnalysisReport>(json);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "加载报告失败: id={Id}", id);
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// 删除指定报告
-    /// </summary>
-    public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM reports WHERE id = @id";
-            cmd.Parameters.AddWithValue("@id", id);
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "删除报告失败: id={Id}", id);
-        }
+        var json = await cmd.ExecuteScalarAsync(cancellationToken) as string;
+        return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<MarketAnalysisReport>(json);
     }
 
     protected override async Task InitializeDatabaseAsync()
     {
-        try
-        {
-            await using var conn = await OpenConnectionAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS reports (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    asset_code TEXT NOT NULL,
-                    market_type INTEGER,
-                    rating INTEGER,
-                    score REAL NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL,
-                    report_json TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_reports_asset ON reports(asset_code);
-                CREATE INDEX IF NOT EXISTS idx_reports_time ON reports(created_at);
-                """;
-            await cmd.ExecuteNonQueryAsync();
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asset_code TEXT NOT NULL,
+                market_type INTEGER,
+                rating INTEGER,
+                score REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                report_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_reports_asset ON reports(asset_code);
+            CREATE INDEX IF NOT EXISTS idx_reports_time ON reports(created_at);
+            """;
+        await cmd.ExecuteNonQueryAsync();
 
-            await EnsureMarketColumnsAsync(conn);
+        await EnsureMarketColumnsAsync(conn);
 
-            await using var indexCmd = conn.CreateCommand();
-            indexCmd.CommandText =
-                "CREATE INDEX IF NOT EXISTS idx_reports_market ON reports(market_type, created_at);";
-            await indexCmd.ExecuteNonQueryAsync();
-        }
-        catch (Exception ex)
-        {
-            // 记录异常并重新抛出：让 _initializeTask 处于 Faulted 状态，
-            // 后续 await _initializeTask 会抛出异常，调用方能感知数据库不可用
-            Logger.LogError(ex, "初始化报告数据库失败");
-            throw;
-        }
+        await using var indexCmd = conn.CreateCommand();
+        indexCmd.CommandText =
+            "CREATE INDEX IF NOT EXISTS idx_reports_market ON reports(market_type, created_at);";
+        await indexCmd.ExecuteNonQueryAsync();
     }
 
     /// <summary>

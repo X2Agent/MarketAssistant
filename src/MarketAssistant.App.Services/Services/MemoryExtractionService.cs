@@ -106,8 +106,7 @@ public class MemoryExtractionService(
                 ResponseFormat = StructuredOutputOptions.CreateResponseFormat(
                     typeof(ExtractedMemories),
                     runtime.StructuredOutputMode),
-                Temperature = 0.1f,
-                MaxOutputTokens = 500
+                Temperature = 0.1f
             },
             ct);
 

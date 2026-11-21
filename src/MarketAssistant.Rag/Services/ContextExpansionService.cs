@@ -14,9 +14,6 @@ public sealed class ContextExpansionService : IContextExpansionService
         int window = 1,
         int maxNeighborChars = 300)
     {
-        ArgumentNullException.ThrowIfNull(selected);
-        ArgumentNullException.ThrowIfNull(pool);
-
         if (window <= 0)
             return selected.Record.Text;
 

@@ -16,9 +16,6 @@ public static class IndicatorMetricCalculator
     public static AlertRuleMetric Calculate(
         IReadOnlyList<KLineData> kLineData, TechnicalIndicatorSnapshot indicator)
     {
-        ArgumentNullException.ThrowIfNull(kLineData);
-        ArgumentNullException.ThrowIfNull(indicator);
-
         return new AlertRuleMetric(
             VolumeRatio: CalculateVolumeRatio(kLineData),
             MacdDiff: indicator.MacdDiff,
@@ -39,15 +36,12 @@ public static class IndicatorMetricCalculator
     /// </summary>
     public static decimal? CalculateVolumeRatio(IReadOnlyList<KLineData> kLineData)
     {
-        ArgumentNullException.ThrowIfNull(kLineData);
         if (kLineData.Count < 2)
             return null;
 
         var ordered = kLineData.OrderBy(item => item.Timestamp).ToList();
         var latestVolume = ordered[^1].Volume;
         var previous = ordered.Take(ordered.Count - 1).TakeLast(VolumeAverageBars).ToList();
-        if (previous.Count == 0)
-            return null;
 
         var averageVolume = previous.Average(item => item.Volume);
         return averageVolume <= 0 ? null : latestVolume / averageVolume;

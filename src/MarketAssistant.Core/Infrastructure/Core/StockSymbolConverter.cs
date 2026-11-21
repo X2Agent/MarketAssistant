@@ -23,7 +23,7 @@ public static class StockSymbolConverter
             return normalized.ToLowerInvariant();
         }
 
-        string digits = ExtractDigits(stockCode);
+        string digits = ToDigitsOnly(stockCode);
         if (string.IsNullOrEmpty(digits)) return stockCode; // 无法提取数字则返回原值
 
         string prefix = ResolveExchange(digits);
@@ -86,11 +86,31 @@ public static class StockSymbolConverter
     }
 
     /// <summary>
-    /// 提取股票代码中的所有数字字符
+    /// 提取股票代码中的所有数字字符（如 sh600519 → 600519；无数字返回空串）。
+    /// 各 A 股工具的"纯数字代码"归一化统一入口，不要在调用点手写 Where(char.IsDigit)。
     /// </summary>
-    private static string ExtractDigits(string stockCode)
+    public static string ToDigitsOnly(string stockCode)
     {
         return new string([.. stockCode.Where(char.IsDigit)]);
+    }
+
+    /// <summary>
+    /// 判定代码是否属于基金 / ETF / LOF 代码段（沪市 5 开头、深市 15/16 开头）。
+    /// 这类标的智兔 K 线接口不覆盖（实测 503 "redis history miss" 或 404），
+    /// 调用方据此优先走新浪数据源，省掉一次必然失败的请求与其退避等待。
+    /// 可转债（11/12 开头）不在此列：它们是债券，语义与基金不同，仍按正常路径取数。
+    /// </summary>
+    public static bool IsFundOrEtf(string? stockCode)
+    {
+        var digits = ToDigitsOnly(stockCode ?? string.Empty);
+
+        // A 股代码恒为 6 位；位数不符说明不是标准 A 股代码，不做猜测
+        if (digits.Length != 6)
+            return false;
+
+        return digits[0] == '5' ||
+               digits.StartsWith("15", StringComparison.Ordinal) ||
+               digits.StartsWith("16", StringComparison.Ordinal);
     }
 
     /// <summary>

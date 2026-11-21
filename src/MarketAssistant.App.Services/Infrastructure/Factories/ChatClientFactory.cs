@@ -1,5 +1,4 @@
 using System.ClientModel;
-using System.ClientModel.Primitives;
 using System.Security.Cryptography;
 using System.Text;
 using MarketAssistant.Infrastructure.Core;
@@ -7,6 +6,7 @@ using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using OllamaSharp;
 using OpenAI;
 using Polly;
@@ -50,14 +50,12 @@ public sealed record ChatClientRuntime(
 /// </summary>
 public class ChatClientFactory(
     IUserSettingService userSettingService,
-    IHttpClientFactory httpClientFactory) : IChatClientFactory
+    IHttpClientFactory httpClientFactory,
+    ILogger<ChatClientFactory>? logger = null) : IChatClientFactory
 {
-    // 按角色分配模型后，同一次分析可能同时持有默认 Runtime + 若干角色 Runtime，
-    // 故上限需覆盖"默认 + 全部可分配角色"（当前分析师角色约 8 个），16 已不够用。
-    protected const int MaxCachedRuntimes = 32;
-
     private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<ChatClientFactory>? _logger = logger;
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
 
@@ -121,13 +119,6 @@ public class ChatClientFactory(
                 {
                     throw new FriendlyException(
                         $"AI 功能未配置：服务商 {provider.DisplayName} 的模型 {modelId} 需要 API Key，请先在设置页面配置");
-                }
-
-                if (_clients.Count >= MaxCachedRuntimes)
-                {
-                    throw new FriendlyException(
-                        $"本次应用运行已使用 {MaxCachedRuntimes} 组不同的模型配置。" +
-                        "为避免释放仍被会话引用的客户端，请重启应用后再切换新配置");
                 }
 
                 var client = CreateClient(provider, modelId, apiKey, endpoint);
@@ -199,8 +190,8 @@ public class ChatClientFactory(
         {
             Endpoint = new Uri(endpoint),
             NetworkTimeout = TimeSpan.FromMinutes(3),
-            // 显式对齐 Ollama 路径的 3 次重试，不依赖 SDK 默认值
-            RetryPolicy = new ClientRetryPolicy(3)
+            // 显式对齐 Ollama 路径的 3 次重试，不依赖 SDK 默认值；429 的日配额与分钟级限流区别对待
+            RetryPolicy = new RateLimitAwareRetryPolicy(3, _logger)
         };
 
         if (string.IsNullOrWhiteSpace(apiKey))

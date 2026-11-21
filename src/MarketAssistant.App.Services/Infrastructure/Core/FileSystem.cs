@@ -27,101 +27,57 @@ public static class FileSystem
 
     private static string GetAppDataDirectory()
     {
-        try
+        string appDataPath;
+
+        if (OperatingSystem.IsWindows())
         {
-            string appDataPath;
-
-            if (OperatingSystem.IsWindows())
-            {
-                appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "Library", "Application Support");
-            }
-            else // Linux和其他Unix系统
-            {
-                appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".config");
-            }
-
-            var appDataDir = Path.Combine(appDataPath, _appName);
-
-            // 确保目录存在
-            Directory.CreateDirectory(appDataDir);
-            return appDataDir;
+            appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         }
-        catch (Exception ex)
+        else if (OperatingSystem.IsMacOS())
         {
-            System.Diagnostics.Debug.WriteLine($"获取AppDataDirectory时出错: {ex.Message}");
-
-            // 备用方案：使用当前目录
-            var fallbackDir = Path.Combine(Directory.GetCurrentDirectory(), "AppData");
-            Directory.CreateDirectory(fallbackDir);
-            return fallbackDir;
+            appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Application Support");
         }
+        else // Linux和其他Unix系统
+        {
+            appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config");
+        }
+
+        var appDataDir = Path.Combine(appDataPath, _appName);
+
+        // 确保目录存在
+        Directory.CreateDirectory(appDataDir);
+        return appDataDir;
     }
 
     private static string GetCacheDirectory()
     {
-        try
+        string cachePath;
+
+        if (OperatingSystem.IsWindows())
         {
-            string cachePath;
-
-            if (OperatingSystem.IsWindows())
-            {
-                cachePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            }
-            else if (OperatingSystem.IsMacOS())
-            {
-                cachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "Library", "Caches");
-            }
-            else // Linux和其他Unix系统
-            {
-                cachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    ".cache");
-            }
-
-            var cacheDir = Path.Combine(cachePath, _appName, AppInfo.CacheDirectoryName);
-
-            // 确保目录存在
-            Directory.CreateDirectory(cacheDir);
-            return cacheDir;
+            cachePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         }
-        catch (Exception ex)
+        else if (OperatingSystem.IsMacOS())
         {
-            System.Diagnostics.Debug.WriteLine($"获取CacheDirectory时出错: {ex.Message}");
-
-            // 备用方案：使用AppData目录下的Cache子目录
-            var fallbackDir = Path.Combine(AppDataDirectory, AppInfo.CacheDirectoryName);
-            Directory.CreateDirectory(fallbackDir);
-            return fallbackDir;
+            cachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Caches");
         }
+        else // Linux和其他Unix系统
+        {
+            cachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".cache");
+        }
+
+        var cacheDir = Path.Combine(cachePath, _appName, AppInfo.CacheDirectoryName);
+
+        // 确保目录存在
+        Directory.CreateDirectory(cacheDir);
+        return cacheDir;
     }
 
-    private static string GetAppPackageDirectory()
-    {
-        try
-        {
-            // 对于Avalonia应用，使用应用程序所在目录
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-
-            // 检查目录是否存在且可访问
-            if (Directory.Exists(baseDir))
-            {
-                return baseDir;
-            }
-
-            // 备用方案：使用当前工作目录
-            return Directory.GetCurrentDirectory();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"获取AppPackageDirectory时出错: {ex.Message}");
-            return Directory.GetCurrentDirectory();
-        }
-    }
+    // Avalonia 应用使用应用程序所在目录
+    private static string GetAppPackageDirectory() => AppDomain.CurrentDomain.BaseDirectory;
 }
 

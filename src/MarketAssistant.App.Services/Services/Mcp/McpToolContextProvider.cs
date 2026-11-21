@@ -14,8 +14,8 @@ public sealed class McpToolContextProvider(
     McpService mcpService,
     ILogger<McpToolContextProvider> logger) : AIContextProvider
 {
-    private readonly McpService _mcpService = mcpService ?? throw new ArgumentNullException(nameof(mcpService));
-    private readonly ILogger<McpToolContextProvider> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly McpService _mcpService = mcpService;
+    private readonly ILogger<McpToolContextProvider> _logger = logger;
     private readonly SemaphoreSlim _initLock = new(1, 1);
 
     private List<AITool>? _cachedTools;
@@ -65,9 +65,11 @@ public sealed class McpToolContextProvider(
 
             if (_invalidated)
             {
-                // 仅使活动连接映射失效。旧 Agent 工具仍持有底层 Client，不能在刷新时立即释放。
+                // 仅使活动连接映射失效。旧 Agent 工具仍持有底层 Client，不能在刷新时立即释放，
+                // 但缓存必须一并作废：连接已重置，旧工具集不可继续对外提供
                 await _mcpService.ResetConnectionsAsync(cancellationToken);
                 _invalidated = false;
+                _cachedTools = null;
             }
 
             var enabledConfigs = _mcpService.GetEnabledConfigs();
@@ -86,12 +88,6 @@ public sealed class McpToolContextProvider(
             _cachedTools = await _mcpService.GetAIToolsAsync(chatConfigs);
             _logger.LogInformation("McpToolContextProvider 加载了 {Count} 个 MCP 工具", _cachedTools.Count);
 
-            return _cachedTools;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "McpToolContextProvider 加载 MCP 工具失败");
-            _cachedTools ??= [];
             return _cachedTools;
         }
         finally

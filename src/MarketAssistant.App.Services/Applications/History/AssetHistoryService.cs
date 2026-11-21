@@ -40,113 +40,91 @@ public sealed class AssetHistoryService([ServiceKey] MarketType marketType, ILog
 
     public async Task AddHistoryAsync(AssetItem asset, CancellationToken cancellationToken = default)
     {
-        if (asset == null || string.IsNullOrWhiteSpace(asset.Code))
+        if (string.IsNullOrWhiteSpace(asset.Code))
             return;
 
-        try
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+
+        // 移除同 code 的旧记录，再插入新记录
+        await using (var delCmd = conn.CreateCommand())
         {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-
-            // 移除同 code 的旧记录，再插入新记录
-            await using (var delCmd = conn.CreateCommand())
-            {
-                delCmd.CommandText = "DELETE FROM recent_assets WHERE code = @code AND market_type = @marketType";
-                delCmd.Parameters.AddWithValue("@code", asset.Code);
-                delCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
-                await delCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            await using (var insCmd = conn.CreateCommand())
-            {
-                insCmd.CommandText = """
-                    INSERT INTO recent_assets (code, name, market_type, viewed_at)
-                    VALUES (@code, @name, @marketType, @viewedAt)
-                    """;
-                insCmd.Parameters.AddWithValue("@code", asset.Code);
-                insCmd.Parameters.AddWithValue("@name", asset.Name);
-                insCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
-                insCmd.Parameters.AddWithValue("@viewedAt", DateTime.UtcNow.ToString("O"));
-                await insCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            // 截断：只保留最新的 MaxHistoryCount 条
-            await using (var trimCmd = conn.CreateCommand())
-            {
-                trimCmd.CommandText = """
-                    DELETE FROM recent_assets
-                    WHERE market_type = @marketType
-                      AND id NOT IN (
-                          SELECT id FROM recent_assets
-                          WHERE market_type = @marketType
-                          ORDER BY viewed_at DESC
-                          LIMIT @maxCount
-                      )
-                    """;
-                trimCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
-                trimCmd.Parameters.AddWithValue("@maxCount", MaxHistoryCount);
-                await trimCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            _logger.LogInformation("已添加{Market}到历史记录: {Code}", _marketLabel, asset.Code);
+            delCmd.CommandText = "DELETE FROM recent_assets WHERE code = @code AND market_type = @marketType";
+            delCmd.Parameters.AddWithValue("@code", asset.Code);
+            delCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            await delCmd.ExecuteNonQueryAsync(cancellationToken);
         }
-        catch (Exception ex)
+
+        await using (var insCmd = conn.CreateCommand())
         {
-            _logger.LogError(ex, "保存历史记录时出错: {Message}", ex.Message);
+            insCmd.CommandText = """
+                INSERT INTO recent_assets (code, name, market_type, viewed_at)
+                VALUES (@code, @name, @marketType, @viewedAt)
+                """;
+            insCmd.Parameters.AddWithValue("@code", asset.Code);
+            insCmd.Parameters.AddWithValue("@name", asset.Name);
+            insCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            insCmd.Parameters.AddWithValue("@viewedAt", DateTime.UtcNow.ToString("O"));
+            await insCmd.ExecuteNonQueryAsync(cancellationToken);
         }
+
+        // 截断：只保留最新的 MaxHistoryCount 条
+        await using (var trimCmd = conn.CreateCommand())
+        {
+            trimCmd.CommandText = """
+                DELETE FROM recent_assets
+                WHERE market_type = @marketType
+                  AND id NOT IN (
+                      SELECT id FROM recent_assets
+                      WHERE market_type = @marketType
+                      ORDER BY viewed_at DESC
+                      LIMIT @maxCount
+                  )
+                """;
+            trimCmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+            trimCmd.Parameters.AddWithValue("@maxCount", MaxHistoryCount);
+            await trimCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        _logger.LogInformation("已添加{Market}到历史记录: {Code}", _marketLabel, asset.Code);
     }
 
     public async Task<List<AssetItem>> GetHistoryAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                SELECT code, name FROM recent_assets
-                WHERE market_type = @marketType
-                ORDER BY viewed_at DESC
-                LIMIT @maxCount
-                """;
-            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
-            cmd.Parameters.AddWithValue("@maxCount", MaxHistoryCount);
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT code, name FROM recent_assets
+            WHERE market_type = @marketType
+            ORDER BY viewed_at DESC
+            LIMIT @maxCount
+            """;
+        cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+        cmd.Parameters.AddWithValue("@maxCount", MaxHistoryCount);
 
-            var list = new List<AssetItem>();
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                list.Add(new AssetItem
-                {
-                    Code = reader.GetString(0),
-                    Name = reader.GetString(1)
-                });
-            }
-            return list;
-        }
-        catch (Exception ex)
+        var list = new List<AssetItem>();
+        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            _logger.LogError(ex, "获取历史记录时出错: {Message}", ex.Message);
-            return [];
+            list.Add(new AssetItem
+            {
+                Code = reader.GetString(0),
+                Name = reader.GetString(1)
+            });
         }
+        return list;
     }
 
     public async Task ClearHistoryAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await EnsureInitializedAsync(InitializeDatabaseAsync);
-            await using var conn = await OpenConnectionAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "DELETE FROM recent_assets WHERE market_type = @marketType";
-            cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
+        await EnsureInitializedAsync(InitializeDatabaseAsync);
+        await using var conn = await OpenConnectionAsync(cancellationToken);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM recent_assets WHERE market_type = @marketType";
+        cmd.Parameters.AddWithValue("@marketType", (int)_marketType);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
 
-            _logger.LogInformation("已清空{Market}历史记录", _marketLabel);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "清空历史记录时出错: {Message}", ex.Message);
-        }
+        _logger.LogInformation("已清空{Market}历史记录", _marketLabel);
     }
 }

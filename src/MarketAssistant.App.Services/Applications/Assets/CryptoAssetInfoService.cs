@@ -23,8 +23,8 @@ public class CryptoAssetInfoService(
     /// <summary>币安批量 24hr ticker 单次请求的最大交易对数（API 上限 100）</summary>
     private const int BinanceTickerBatchSize = 100;
 
-    private readonly BinanceMarketDataService _binanceService = binanceService ?? throw new ArgumentNullException(nameof(binanceService));
-    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService ?? throw new ArgumentNullException(nameof(coinGeckoService));
+    private readonly BinanceMarketDataService _binanceService = binanceService;
+    private readonly CoinGeckoApiService _coinGeckoService = coinGeckoService;
     private readonly ICryptoAliasRegistry _aliasRegistry = aliasRegistry;
     private readonly ILogger<CryptoAssetInfoService> _logger = logger;
     private readonly IMemoryCache _memoryCache = memoryCache;
@@ -98,9 +98,17 @@ public class CryptoAssetInfoService(
         var tickers = new Dictionary<string, Binance24hrTicker>(StringComparer.OrdinalIgnoreCase);
         foreach (var chunk in symbols.Chunk(BinanceTickerBatchSize))
         {
-            foreach (var ticker in await _binanceService.Get24hrTickersAsync([.. chunk], cancellationToken))
+            try
             {
-                tickers[ticker.Symbol] = ticker;
+                foreach (var ticker in await _binanceService.Get24hrTickersAsync([.. chunk], cancellationToken))
+                {
+                    tickers[ticker.Symbol] = ticker;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // 批量接口逐项隔离：单分片失败不拖垮整批，缺失项走下方兜底展示
+                _logger.LogWarning(ex, "批量行情分片请求失败，跳过 {Count} 个符号", chunk.Length);
             }
         }
 

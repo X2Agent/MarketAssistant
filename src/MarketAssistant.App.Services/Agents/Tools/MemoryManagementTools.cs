@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -27,15 +28,18 @@ public class MemoryManagementTools(UserMemoryService memoryService, ILogger<Memo
         if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
             return "参数不能为空。";
 
-        var (success, error) = await _memoryService.SaveMemoryAsync(category, key, value);
-        if (!success)
+        return await ToolExecutor.ExecuteAsync("保存用户记忆", $"{category}:{key}", _logger, async _ =>
         {
-            _logger.LogWarning("保存记忆失败: {Error}", error);
-            return $"保存失败: {error}";
-        }
+            var (success, error) = await _memoryService.SaveMemoryAsync(category, key, value);
+            if (!success)
+            {
+                _logger.LogWarning("保存记忆失败: {Error}", error);
+                return $"保存失败: {error}";
+            }
 
-        _logger.LogInformation("Agent 保存记忆 [{Category}] {Key}", category, key);
-        return $"已保存记忆: [{category}] {key}";
+            _logger.LogInformation("Agent 保存记忆 [{Category}] {Key}", category, key);
+            return $"已保存记忆: [{category}] {key}";
+        });
     }
 
     [Description("删除一条过时或错误的用户记忆。当用户偏好变更、之前的结论不再适用时调用。")]
@@ -46,49 +50,55 @@ public class MemoryManagementTools(UserMemoryService memoryService, ILogger<Memo
         if (string.IsNullOrWhiteSpace(category) || string.IsNullOrWhiteSpace(key))
             return "参数不能为空。";
 
-        await _memoryService.DeleteMemoryAsync(category, key);
-        _logger.LogInformation("Agent 删除记忆 [{Category}] {Key}", category, key);
-        return $"已删除记忆: [{category}] {key}";
+        return await ToolExecutor.ExecuteAsync("删除用户记忆", $"{category}:{key}", _logger, async _ =>
+        {
+            await _memoryService.DeleteMemoryAsync(category, key);
+            _logger.LogInformation("Agent 删除记忆 [{Category}] {Key}", category, key);
+            return $"已删除记忆: [{category}] {key}";
+        });
     }
 
     [Description("查询当前保存的用户记忆。可指定分类查询，或不传分类查询全部。用于确认已有记忆、避免重复保存。")]
-    public async Task<string> GetMemoriesAsync(
+    public Task<string> GetMemoriesAsync(
         [Description("可选的记忆分类筛选，为空则返回全部")] string? category = null)
     {
-        var sb = new StringBuilder();
-
-        if (!string.IsNullOrWhiteSpace(category))
+        return ToolExecutor.ExecuteAsync("查询用户记忆", category ?? "全部", _logger, async _ =>
         {
-            var memories = await _memoryService.GetMemoriesAsync(category);
-            if (memories.Count == 0)
-                return $"分类 [{category}] 下没有记忆条目。";
+            var sb = new StringBuilder();
 
-            sb.AppendLine($"## [{category}] 分类记忆 ({memories.Count} 条)");
-            foreach (var (k, v) in memories)
-                sb.AppendLine($"- **{k}**: {v}");
-        }
-        else
-        {
-            var allMemories = await _memoryService.GetAllMemoriesAsync();
-            if (allMemories.Count == 0)
-                return "当前没有任何记忆条目。";
-
-            var usage = await _memoryService.GetUsageAsync();
-            sb.AppendLine($"## 用户记忆 ({usage.EntryCount}/{usage.MaxEntryCount} 条, {usage.TotalChars}/{usage.MaxTotalChars} 字符)");
-
-            string? currentCategory = null;
-            foreach (var (cat, k, v) in allMemories)
+            if (!string.IsNullOrWhiteSpace(category))
             {
-                if (currentCategory != cat)
-                {
-                    currentCategory = cat;
-                    sb.AppendLine($"### {cat}");
-                }
-                sb.AppendLine($"- **{k}**: {v}");
-            }
-        }
+                var memories = await _memoryService.GetMemoriesAsync(category);
+                if (memories.Count == 0)
+                    return $"分类 [{category}] 下没有记忆条目。";
 
-        return sb.ToString();
+                sb.AppendLine($"## [{category}] 分类记忆 ({memories.Count} 条)");
+                foreach (var (k, v) in memories)
+                    sb.AppendLine($"- **{k}**: {v}");
+            }
+            else
+            {
+                var allMemories = await _memoryService.GetAllMemoriesAsync();
+                if (allMemories.Count == 0)
+                    return "当前没有任何记忆条目。";
+
+                var usage = await _memoryService.GetUsageAsync();
+                sb.AppendLine($"## 用户记忆 ({usage.EntryCount}/{usage.MaxEntryCount} 条, {usage.TotalChars}/{usage.MaxTotalChars} 字符)");
+
+                string? currentCategory = null;
+                foreach (var (cat, k, v) in allMemories)
+                {
+                    if (currentCategory != cat)
+                    {
+                        currentCategory = cat;
+                        sb.AppendLine($"### {cat}");
+                    }
+                    sb.AppendLine($"- **{k}**: {v}");
+                }
+            }
+
+            return sb.ToString();
+        });
     }
 
     [Description("设置一条记忆的优先级。高优先级(>=1)的记忆会始终加载到上下文中（L1层），确保你始终记住最重要的信息。")]
@@ -102,13 +112,16 @@ public class MemoryManagementTools(UserMemoryService memoryService, ILogger<Memo
 
         if (priority < 0) priority = 0;
 
-        var exists = await _memoryService.GetMemoriesAsync(category);
-        if (!exists.ContainsKey(key))
-            return $"记忆条目 [{category}] {key} 不存在。";
+        return await ToolExecutor.ExecuteAsync("设置记忆优先级", $"{category}:{key}", _logger, async _ =>
+        {
+            var exists = await _memoryService.GetMemoriesAsync(category);
+            if (!exists.ContainsKey(key))
+                return $"记忆条目 [{category}] {key} 不存在。";
 
-        await _memoryService.SetPriorityAsync(category, key, priority);
-        _logger.LogInformation("Agent 设置记忆优先级 [{Category}] {Key} → {Priority}", category, key, priority);
-        return $"已设置 [{category}] {key} 优先级为 {priority}" + (priority >= 1 ? "（始终加载）" : "（普通）");
+            await _memoryService.SetPriorityAsync(category, key, priority);
+            _logger.LogInformation("Agent 设置记忆优先级 [{Category}] {Key} → {Priority}", category, key, priority);
+            return $"已设置 [{category}] {key} 优先级为 {priority}" + (priority >= 1 ? "（始终加载）" : "（普通）");
+        });
     }
 
     public IEnumerable<AIFunction> GetFunctions()

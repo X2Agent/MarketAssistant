@@ -2,10 +2,12 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Tools.AShare;
@@ -18,38 +20,44 @@ public sealed class AShareSentimentTools(
     IUserSettingService userSettingService,
     ILogger<AShareSentimentTools> logger) : ISentimentTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly ILogger<AShareSentimentTools> _logger = logger;
+
+    /// <summary>资金流区间回看的自然日数：覆盖含春节/国庆长假在内的 20 个交易日。</summary>
+    private const int FlowLookbackNaturalDays = 45;
 
     [Description("根据股票代码获取资金流向数据")]
     public async Task<FundFlow> GetFundFlowAsync([Description("股票代码")] string assetSymbol, CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取资金流向数据", assetSymbol, _logger, async _ =>
         {
-            var stockCode = new string([.. assetSymbol.Where(char.IsDigit)]);
+            var stockCode = StockSymbolConverter.ToDigitsOnly(assetSymbol);
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
 
-            var dailyFlows = await _zhiTuClient.GetTransactionHistoryAsync<ZhiTuFundFlowData>(stockCode, token, cancellationToken);
+            // 智兔该接口不带 st/et 只返回最近 1 个交易日，多日汇总必须传区间
+            var today = DateTime.Now;
+            var dailyFlows = await _zhiTuClient.GetTransactionHistoryAsync<ZhiTuFundFlowData>(
+                stockCode, token,
+                today.AddDays(-FlowLookbackNaturalDays).ToString("yyyyMMdd"), today.ToString("yyyyMMdd"),
+                cancellationToken);
 
             if (dailyFlows.Count == 0)
                 throw new FriendlyException($"获取资金流向数据为空: {assetSymbol}");
 
             return MapToFundFlow(dailyFlows);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取资金流向失败: {Symbol}", assetSymbol);
-            throw new FriendlyException($"获取资金流向数据时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     private static FundFlow MapToFundFlow(List<ZhiTuFundFlowData> dailyFlows)
     {
-        // ZhiTu API 返回顺序不保证，按日期降序排列确保 [0] 为最新交易日
-        dailyFlows.Sort((a, b) => b.T.CompareTo(a.T));
+        // ZhiTu API 返回顺序不保证，按日期降序排列确保 [0] 为最新交易日；
+        // t 为定长零填充的 "yyyy-MM-dd HH:mm:ss"，字典序即时间序
+        dailyFlows.Sort((a, b) => string.CompareOrdinal(b.T, a.T));
 
         var latest = dailyFlows[0];
+        // 对外契约保持 YYYYMMDD 整数；上游格式再漂移时在此响亮失败，而不是静默给出错误日期
+        var tradeDate = DateTime.Parse(latest.T, CultureInfo.InvariantCulture);
 
         // 资金流向标准定义：净流入 = 主动买入成交额 − 主动卖出成交额（缺失成分按 0 计入）
         var superDiff = OrZero(latest.ZmbtdCje) - OrZero(latest.ZmstdCje);
@@ -64,7 +72,7 @@ public sealed class AShareSentimentTools(
 
         return new FundFlow
         {
-            Date = latest.T,
+            Date = tradeDate.Year * 10000 + tradeDate.Month * 100 + tradeDate.Day,
             MainFundIn = mainIn,
             MainFundOut = mainOut,
             MainFundDiff = mainDiff,
@@ -105,8 +113,8 @@ public sealed class AShareSentimentTools(
 /// </summary>
 internal sealed class ZhiTuFundFlowData
 {
-    /// <summary>交易日期 (YYYYMMDD)</summary>
-    [JsonPropertyName("t")] public int T { get; set; }
+    /// <summary>交易日期；上游为字符串 "yyyy-MM-dd HH:mm:ss"（官方文档 t: string），不是 YYYYMMDD 数字</summary>
+    [JsonPropertyName("t")] public string T { get; set; } = "";
 
     // ── 主动买入(zmb)成交额 ──
 

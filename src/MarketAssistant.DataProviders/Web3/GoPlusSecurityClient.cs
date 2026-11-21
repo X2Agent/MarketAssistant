@@ -10,8 +10,8 @@ namespace MarketAssistant.DataProviders.Web3;
 /// </summary>
 public sealed class GoPlusSecurityClient(IHttpClientFactory httpClientFactory, ILogger<GoPlusSecurityClient> logger)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly ILogger<GoPlusSecurityClient> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<GoPlusSecurityClient> _logger = logger;
 
     /// <summary>可选 API Key，由上层（如用户设置服务）在运行时注入。</summary>
     public string? ApiKey { get; set; }

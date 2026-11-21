@@ -8,15 +8,13 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class PdfBlockReader(MarkdownDocumentBlockReader markdownReader) : IDocumentBlockReader
 {
-    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
+    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader;
 
     public bool CanRead(string filePath) =>
         filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IEnumerable<DocumentBlock>> ReadBlocksAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(filePath);
-
         // 直接委托给 MarkdownDocumentBlockReader 处理
         return await _markdownReader.ReadBlocksAsync(filePath, cancellationToken);
     }

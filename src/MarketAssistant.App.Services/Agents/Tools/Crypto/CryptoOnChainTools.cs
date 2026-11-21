@@ -3,6 +3,7 @@ using MarketAssistant.Agents.Tools.Models.Crypto;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.DataProviders.Web3;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
@@ -21,10 +22,10 @@ public sealed class CryptoOnChainTools(
     GoPlusSecurityClient goPlusClient,
     IAlertCenterService alertCenterService) : IOnChainTools
 {
-    private readonly ILogger<CryptoOnChainTools> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly DexScreenerClient _dexScreenerClient = dexScreenerClient ?? throw new ArgumentNullException(nameof(dexScreenerClient));
-    private readonly GoPlusSecurityClient _goPlusClient = goPlusClient ?? throw new ArgumentNullException(nameof(goPlusClient));
-    private readonly IAlertCenterService _alertCenterService = alertCenterService ?? throw new ArgumentNullException(nameof(alertCenterService));
+    private readonly ILogger<CryptoOnChainTools> _logger = logger;
+    private readonly DexScreenerClient _dexScreenerClient = dexScreenerClient;
+    private readonly GoPlusSecurityClient _goPlusClient = goPlusClient;
+    private readonly IAlertCenterService _alertCenterService = alertCenterService;
 
     /// <summary>
     /// 按关键字搜索链上热门交易对（DexScreener）。
@@ -34,9 +35,8 @@ public sealed class CryptoOnChainTools(
         [Description("搜索关键字（代币符号、名称或合约地址）")] string query,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("搜索链上交易对", query, _logger, async _ =>
         {
-            _logger.LogInformation("正在搜索链上热门交易对: {Query}", query);
             var pairs = await _dexScreenerClient.SearchPairsAsync(query, cancellationToken);
             var result = pairs
                 .Where(p => p.BaseToken is not null)
@@ -47,12 +47,7 @@ public sealed class CryptoOnChainTools(
 
             _logger.LogInformation("搜索到 {Count} 个链上交易对: {Query}", result.Count, query);
             return result;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "搜索链上交易对时发生错误: {Query}", query);
-            throw new FriendlyException($"搜索链上交易对时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -63,9 +58,8 @@ public sealed class CryptoOnChainTools(
         [Description("代币符号或名称（如 PEPE、Arbitrum）")] string query,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("解析代币链上身份", query, _logger, async _ =>
         {
-            _logger.LogInformation("正在解析代币链上身份: {Query}", query);
             var pairs = await _dexScreenerClient.SearchPairsAsync(query, cancellationToken);
             var result = pairs
                 .Where(p => p.BaseToken is not null)
@@ -76,12 +70,7 @@ public sealed class CryptoOnChainTools(
 
             _logger.LogInformation("解析到 {Count} 个候选交易对: {Query}", result.Count, query);
             return result;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "解析代币链上身份时发生错误: {Query}", query);
-            throw new FriendlyException($"解析代币链上身份时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -93,9 +82,8 @@ public sealed class CryptoOnChainTools(
         [Description("代币合约地址")] string tokenAddress,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("获取链上交易对", $"{chainId}:{tokenAddress}", _logger, async _ =>
         {
-            _logger.LogInformation("正在获取链上交易对: {ChainId} {TokenAddress}", chainId, tokenAddress);
             var pairs = await _dexScreenerClient.GetTokenPairsAsync(chainId, tokenAddress, cancellationToken);
             var result = pairs
                 .OrderByDescending(p => p.Liquidity?.Usd ?? 0)
@@ -105,12 +93,7 @@ public sealed class CryptoOnChainTools(
 
             _logger.LogInformation("获取到 {Count} 个链上交易对: {ChainId} {TokenAddress}", result.Count, chainId, tokenAddress);
             return result;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取链上交易对时发生错误: {ChainId} {TokenAddress}", chainId, tokenAddress);
-            throw new FriendlyException($"获取链上交易对时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -122,9 +105,8 @@ public sealed class CryptoOnChainTools(
         [Description("代币合约地址")] string tokenAddress,
         CancellationToken cancellationToken = default)
     {
-        try
+        return await ToolExecutor.ExecuteAsync("代币安全审计", $"{chainId}:{tokenAddress}", _logger, async _ =>
         {
-            _logger.LogInformation("正在进行代币安全审计: {ChainId} {TokenAddress}", chainId, tokenAddress);
             var security = await _goPlusClient.GetTokenSecurityAsync(chainId, tokenAddress, cancellationToken);
             if (security is null)
                 throw new FriendlyException("未找到该代币的安全审计数据，请确认合约地址与链 ID 是否正确");
@@ -135,12 +117,7 @@ public sealed class CryptoOnChainTools(
                 "代币安全审计完成: {Symbol} 风险等级 {RiskLevel} 蜜罐 {IsHoneypot}",
                 report.Symbol, report.RiskLevel, report.IsHoneypot);
             return report;
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "代币安全审计时发生错误: {ChainId} {TokenAddress}", chainId, tokenAddress);
-            throw new FriendlyException($"代币安全审计时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     /// <summary>

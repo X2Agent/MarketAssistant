@@ -25,9 +25,9 @@ public sealed class AShareMarketSnapshotService(
         "secu_name,secu_code,last_px,change,open_px,high_px,low_px,preclose_px," +
         "business_amount,business_balance,tr,amp,qrr,pe,pb";
 
-    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-    private readonly SinaStockQuoteClient _sinaClient = sinaClient ?? throw new ArgumentNullException(nameof(sinaClient));
-    private readonly ILogger<AShareMarketSnapshotService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly ClsQuoteClient _clsClient = clsClient;
+    private readonly SinaStockQuoteClient _sinaClient = sinaClient;
+    private readonly ILogger<AShareMarketSnapshotService> _logger = logger;
 
     public async Task<MarketSnapshot?> GetSnapshotAsync(string code, CancellationToken cancellationToken = default)
     {

@@ -8,7 +8,7 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class DocxBlockReader(MarkdownDocumentBlockReader markdownReader) : IDocumentBlockReader
 {
-    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader ?? throw new ArgumentNullException(nameof(markdownReader));
+    private readonly MarkdownDocumentBlockReader _markdownReader = markdownReader;
 
     public bool CanRead(string filePath) => filePath.EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 

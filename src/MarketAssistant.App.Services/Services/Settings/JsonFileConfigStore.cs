@@ -33,8 +33,6 @@ public abstract class JsonFileConfigStore<T>
 
     protected JsonFileConfigStore(string filePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
-
         // 规范化路径：同一文件的相对/绝对/不同大小写形式必须落到同一把锁上
         FilePath = Path.GetFullPath(filePath);
         FileLock = FileLocks.GetOrAdd(FilePath, static _ => new object());

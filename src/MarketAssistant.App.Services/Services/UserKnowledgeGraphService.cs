@@ -130,34 +130,26 @@ public class UserKnowledgeGraphService(ILogger<UserKnowledgeGraphService> logger
 
     protected override async Task InitializeDatabaseAsync()
     {
-        try
-        {
-            await using var conn = await OpenConnectionAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = """
-                CREATE TABLE IF NOT EXISTS triples (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    subject TEXT NOT NULL,
-                    predicate TEXT NOT NULL,
-                    object TEXT NOT NULL,
-                    valid_from TEXT NOT NULL,
-                    valid_to TEXT,
-                    metadata TEXT,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
-                CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
-                CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate);
-                CREATE INDEX IF NOT EXISTS idx_triples_validity ON triples(valid_from, valid_to);
-                """;
-            await cmd.ExecuteNonQueryAsync();
-            Logger.LogInformation("知识图谱数据库初始化完成");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "初始化知识图谱数据库失败");
-            throw;
-        }
+        await using var conn = await OpenConnectionAsync();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            CREATE TABLE IF NOT EXISTS triples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject TEXT NOT NULL,
+                predicate TEXT NOT NULL,
+                object TEXT NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT,
+                metadata TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
+            CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
+            CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate);
+            CREATE INDEX IF NOT EXISTS idx_triples_validity ON triples(valid_from, valid_to);
+            """;
+        await cmd.ExecuteNonQueryAsync();
+        Logger.LogInformation("知识图谱数据库初始化完成");
     }
 }
 

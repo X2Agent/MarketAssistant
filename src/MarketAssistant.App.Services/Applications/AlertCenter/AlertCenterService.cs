@@ -54,7 +54,6 @@ public sealed class AlertCenterService(
     /// <inheritdoc />
     public async Task RaiseAlertAsync(AlertEvent alert, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(alert);
         await EnsureInitializedAsync(InitializeDatabaseAsync);
 
         var settings = _userSettingService.CurrentSetting;

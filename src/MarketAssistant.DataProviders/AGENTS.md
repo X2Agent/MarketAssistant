@@ -51,7 +51,7 @@ MarketAssistant.DataProviders/
 | **Binance** | `api.binance.com` / `fapi.binance.com` | 部分地区受限，需 VPN/代理 |
 | **CoinGecko** | `api.coingecko.com` | 免费版有频率限制（~24 req/min），`CoinGeckoApiService` 内置限流 |
 | **财联社 (Cls)** | `x-quote.cls.cn` / `www.cls.cn` | 命名 HttpClient `Cls`；行情无需签名 |
-| **智兔 (ZhiTu)** | `api.zhituapi.com` | 命名 HttpClient `ZhiTu`；Token 由调用方传入，禁止硬编码；`/hs/history` K 线不覆盖基金/ETF（返回 404），由 `SinaKLineClient` 兜底 |
+| **智兔 (ZhiTu)** | `api.zhituapi.com` | 命名 HttpClient `ZhiTu`；Token 由调用方传入，禁止硬编码；`/hs/history` K 线不覆盖基金/ETF（返回 404），由 `SinaKLineClient` 兜底；资金流 `/hs/history/transaction` 的 `t` 是字符串 `yyyy-MM-dd HH:mm:ss`（非数字），且不带 `st`+`et`（`yyyyMMdd`，须成对、≤365 天，单侧返回 422）只返回最近 1 个交易日，`lt` 对其无效 |
 | **新浪行情 (Sina)** | `hq.sinajs.cn` / `quotes.sina.cn` | 命名 HttpClient `SinaHq`（个股五档，强制 Referer、GBK 响应）与 `SinaKLine`（K 线历史，实测无需 Referer、无限流）；`quotes.sina.cn` datalen 上限 1900、传 0 返回全历史，无效代码/周期返回 JSON `null` |
 | **东方财富** | `search-api-web.eastmoney.com` | 命名 HttpClient `EastMoneySearch`；返回 JSONP 需剥离 |
 | **DexScreener** | `api.dexscreener.com` | 命名 HttpClient `DexScreener`；免费公开接口无需 Key，限速 300 req/min；`token-pairs` 端点要求链全名（ethereum/bsc...），错误写法会**静默返回空数组** |

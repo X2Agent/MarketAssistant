@@ -14,8 +14,8 @@ using System.Globalization;
 namespace MarketAssistant.Applications.Briefing;
 
 /// <summary>
-/// 每日 AI 简报服务实现：单次 LLM 调用生成，严格 Token 预算（自选/要闻各取前 N 条、
-/// 内容截断、输出上限），按本地日期缓存。
+/// 每日 AI 简报服务实现：单次 LLM 调用生成，输入侧严格限量（自选/要闻各取前 N 条、
+/// 内容截断），按本地日期缓存。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型。
 /// </summary>
 public sealed class DailyBriefingService(
@@ -44,11 +44,6 @@ public sealed class DailyBriefingService(
     /// 配合 40 条总量可把要闻输入控制在约 2100 token。
     /// </summary>
     public const int MaxNewsContentLength = 50;
-
-    /// <summary>简报正文字数上限（超出截断，防止单次响应膨胀）。</summary>
-    public const int MaxBriefingLength = 1200;
-
-    private const int MaxOutputTokens = 800;
 
     private readonly MarketType _marketType = marketType;
     private readonly IFavoriteService _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
@@ -148,25 +143,32 @@ public sealed class DailyBriefingService(
         var runtime = _chatClientFactory.CreateRuntime();
         var prompt = BuildPrompt(favorites, news);
 
+        // 刻意不设 MaxOutputTokens：推理模型的思考 Token 与正文共用输出额度，固定上限无法保证够用，
+        // 用尽即得到"已计费却没有正文"的空响应；输出长度交给服务商按模型设定的默认值。
         var requestMessage = new ChatMessage(ChatRole.User, prompt);
         var response = await runtime.Client.GetResponseAsync(
             [requestMessage],
-            new ChatOptions
-            {
-                Temperature = 0.3f,
-                MaxOutputTokens = MaxOutputTokens
-            },
+            new ChatOptions { Temperature = 0.3f },
             cancellationToken);
 
         var content = response.Text?.Trim() ?? string.Empty;
         if (content.Length == 0)
         {
-            throw new InvalidOperationException("简报生成失败：模型未返回有效内容");
-        }
+            // 空正文有多种成因（思考耗尽输出额度 / 上游错误 / 内容被拦截），
+            // 结束原因与用量是区分它们的唯一线索；用 FriendlyException 才能让界面原样展示，
+            // InvalidOperationException 会被 ErrorMessageMapper 映射成与真因无关的"操作无效"。
+            var usageText = response.Usage is { OutputTokenCount: { } reportedOutput } reportedUsage
+                ? $"输出 {reportedOutput} tokens"
+                    + (reportedUsage.ReasoningTokenCount is { } reportedReasoning
+                        ? $"，其中推理 {reportedReasoning} tokens"
+                        : string.Empty)
+                : "服务商未返回用量";
+            var hint = response.FinishReason == ChatFinishReason.Length
+                ? "输出额度（含推理模型的思考过程）已用尽，请在设置中改用非推理模型后重试"
+                : "可能是上游服务报错、限流或内容被拦截，请稍后重试或更换模型";
 
-        if (content.Length > MaxBriefingLength)
-        {
-            content = content[..MaxBriefingLength];
+            throw new FriendlyException(
+                $"模型 {runtime.ModelId} 未返回正文（结束原因：{response.FinishReason?.Value ?? "未知"}；{usageText}）。{hint}");
         }
 
         var (inputTokens, outputTokens, isPreciseUsage) = MeasureUsage(requestMessage, response);

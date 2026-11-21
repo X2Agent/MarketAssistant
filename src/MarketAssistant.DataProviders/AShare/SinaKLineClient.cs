@@ -43,8 +43,7 @@ public sealed class SinaKLineClient(IHttpClientFactory httpClientFactory)
     /// <summary>datalen 上限：超过该值接口返回空（实测 1900 正常、2000 为空）。</summary>
     public const int MaxBarCount = 1900;
 
-    private readonly IHttpClientFactory _httpClientFactory =
-        httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 拉取 K 线历史（按时间升序由上游保证，调用方仍需自行排序防御）。

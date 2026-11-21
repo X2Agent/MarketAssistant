@@ -2,6 +2,7 @@ using MarketAssistant.Agents.Tools.Abstractions;
 using MarketAssistant.Agents.Tools.Models.AShare;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -17,30 +18,25 @@ public sealed class AShareFinancialTools(
     IUserSettingService userSettingService,
     ILogger<AShareFinancialTools> logger) : IFinancialTools
 {
-    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-    private readonly IUserSettingService _userSettingService = userSettingService ?? throw new ArgumentNullException(nameof(userSettingService));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient;
+    private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly ILogger<AShareFinancialTools> _logger = logger;
 
     /// <summary>
     /// 通用财务数据获取方法（HTTP 与容错反序列化由 ZhiTuMarketClient 负责）
     /// </summary>
-    private async Task<List<T>> GetFinancialDataAsync<T>(string endpoint, string assetSymbol, int years = 2, CancellationToken cancellationToken = default)
+    private Task<List<T>> GetFinancialDataAsync<T>(string endpoint, string assetSymbol, int years = 2, CancellationToken cancellationToken = default)
     {
-        try
+        return ToolExecutor.ExecuteAsync($"获取财务数据({endpoint})", assetSymbol, _logger, _ =>
         {
             var stockCode = StockSymbolConverter.ToZhiTuFormat(assetSymbol);
             var token = _userSettingService.CurrentSetting.ZhiTuApiToken;
             var endDate = DateTime.Now.ToString("yyyyMMdd");
             var startDate = DateTime.Now.AddYears(-years).ToString("yyyyMMdd");
 
-            return await _zhiTuClient.GetFinancialListAsync<T>(
+            return _zhiTuClient.GetFinancialListAsync<T>(
                 endpoint, stockCode, token, startDate, endDate, cancellationToken);
-        }
-        catch (Exception ex) when (ex is not FriendlyException)
-        {
-            _logger.LogError(ex, "获取财务数据失败: {Endpoint} {Symbol}", endpoint, assetSymbol);
-            throw new FriendlyException($"获取财务数据({endpoint})时发生错误: {ex.Message}", ex);
-        }
+        }, cancellationToken);
     }
 
     [Description("获取上市公司资产负债表，默认返回最近2年的数据")]

@@ -51,8 +51,6 @@ public static class AnalystSignalParser
     /// </summary>
     public static List<AnalystSignalSnapshot> ExtractSignals(IEnumerable<ChatMessage> messages)
     {
-        ArgumentNullException.ThrowIfNull(messages);
-
         var snapshots = new List<AnalystSignalSnapshot>();
         foreach (var message in messages)
         {
@@ -248,13 +246,15 @@ public static class AnalystSignalParser
 
     /// <summary>
     /// 事件性质到投资评级的等价映射（用于绩效统计时统一方向口径）。
+    /// 中性事件与未知枚举值不产出方向性评级——Hold 是一种持仓建议，
+    /// 会污染绩效统计（与「缺失保持 null」约定一致）。
     /// </summary>
-    private static InvestmentRating MapEventNatureToRating(EventNature eventNature) => eventNature switch
+    private static InvestmentRating? MapEventNatureToRating(EventNature eventNature) => eventNature switch
     {
         EventNature.MajorPositive => InvestmentRating.StrongBuy,
         EventNature.Positive => InvestmentRating.Buy,
         EventNature.Negative => InvestmentRating.Reduce,
         EventNature.MajorNegative => InvestmentRating.StrongSell,
-        _ => InvestmentRating.Hold
+        _ => null
     };
 }

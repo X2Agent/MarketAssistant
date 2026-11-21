@@ -165,12 +165,11 @@ public static class MarkdownReportExporter
             var author = string.IsNullOrWhiteSpace(message.AuthorName)
                 ? GetRoleDisplayName(message.Role)
                 : message.AuthorName;
-            var text = message.Text ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(text)) continue;
+            if (string.IsNullOrWhiteSpace(message.Text)) continue;
 
             sb.AppendLine($"### {EscapeInline(author)}");
             sb.AppendLine();
-            sb.AppendLine(EscapeInline(text));
+            sb.AppendLine(EscapeInline(message.Text));
             sb.AppendLine();
         }
     }

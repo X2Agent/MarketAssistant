@@ -12,7 +12,7 @@ namespace MarketAssistant.Services.Mcp;
 /// MCP（Model Context Protocol）服务。
 /// 按连接配置指纹复用客户端，并保留已向 Agent 暴露过工具的旧客户端，直至应用退出。
 /// </summary>
-public sealed class McpService : IAsyncDisposable
+public class McpService : IAsyncDisposable
 {
     private const int MaxRetainedRuntimes = 32;
 
@@ -52,23 +52,23 @@ public sealed class McpService : IAsyncDisposable
         MCPServerConfigService configService,
         IMcpClientSessionFactory clientFactory)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
-        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
-        _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
+        _logger = logger;
+        _auditLogger = auditLogger;
+        _configService = configService;
+        _clientFactory = clientFactory;
     }
 
     /// <summary>
     /// 获取 MCP 工具作为 AITool 列表。
     /// 相同连接配置复用已建立的客户端；工具白名单在每次读取时重新应用。
     /// </summary>
-    public async Task<List<AITool>> GetAIToolsAsync(
+    /// <remarks>virtual 供配置页连接状态测试替换。</remarks>
+    public virtual async Task<List<AITool>> GetAIToolsAsync(
         IEnumerable<MCPServerConfig> configs,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(configs);
-
         var tools = new List<AITool>();
+        var toolOwners = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var config in configs)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -81,7 +81,7 @@ public sealed class McpService : IAsyncDisposable
             {
                 var runtime = await GetOrCreateRuntimeAsync(config, cancellationToken)
                     .ConfigureAwait(false);
-                var loadedForServer = AddAllowedTools(config, runtime.Tools, tools);
+                var loadedForServer = AddAllowedTools(config, runtime.Tools, tools, toolOwners);
                 activity?.SetTag("marketassistant.mcp.tools.available_count", runtime.Tools.Count);
                 activity?.SetTag("marketassistant.mcp.tools.loaded_count", loadedForServer);
                 activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
@@ -126,12 +126,11 @@ public sealed class McpService : IAsyncDisposable
     /// 枚举指定服务器提供的全部工具（名称与描述），供配置页勾选工具白名单使用。
     /// 相同连接配置复用已建立的客户端。
     /// </summary>
-    public async Task<IReadOnlyList<(string Name, string Description)>> GetServerToolsAsync(
+    /// <remarks>virtual 供配置页工具加载状态测试替换。</remarks>
+    public virtual async Task<IReadOnlyList<(string Name, string Description)>> GetServerToolsAsync(
         MCPServerConfig config,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(config);
-
         var runtime = await GetOrCreateRuntimeAsync(config, cancellationToken)
             .ConfigureAwait(false);
         return [.. runtime.Tools.Select(tool => (tool.Name, tool.Description))];
@@ -142,8 +141,6 @@ public sealed class McpService : IAsyncDisposable
     /// </summary>
     public static IClientTransport CreateClientTransport(MCPServerConfig config)
     {
-        ArgumentNullException.ThrowIfNull(config);
-
         return config.TransportType.ToLowerInvariant() switch
         {
             "stdio" => CreateStdioTransport(config),
@@ -215,8 +212,6 @@ public sealed class McpService : IAsyncDisposable
 
     internal static string ComputeConfigurationFingerprint(MCPServerConfig config)
     {
-        ArgumentNullException.ThrowIfNull(config);
-
         var canonical = new StringBuilder()
             .Append(config.Name.Trim()).Append('\n')
             .Append(config.TransportType.Trim().ToLowerInvariant()).Append('\n')
@@ -290,10 +285,16 @@ public sealed class McpService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 按白名单把服务器的工具并入合并列表。跨服务器重名时保留先出现的，后到的跳过：
+    /// 模型与 FunctionInvokingChatClient 都按名字解析工具，同名会让调用路由到错误的服务器，
+    /// 部分提供商还会因重复函数名拒绝整个请求。<paramref name="toolOwners"/> 记录工具名归属的服务器。
+    /// </summary>
     private int AddAllowedTools(
         MCPServerConfig config,
         IReadOnlyList<AITool> availableTools,
-        List<AITool> destination)
+        List<AITool> destination,
+        Dictionary<string, string> toolOwners)
     {
         // 最小暴露原则：空白名单默认不暴露任何工具，只有显式 AllowAllTools 才放行全部
         if (!config.AllowAllTools && config.AllowedTools.Count == 0)
@@ -321,6 +322,14 @@ public sealed class McpService : IAsyncDisposable
                 continue;
             }
 
+            if (toolOwners.TryGetValue(toolName, out var ownerServer))
+            {
+                _auditLogger.LogToolFiltered(
+                    config.Name, toolName, $"与服务器 {ownerServer} 的同名工具冲突，模型无法区分，已跳过");
+                continue;
+            }
+
+            toolOwners.Add(toolName, config.Name);
             _auditLogger.LogToolLoaded(config.Name, toolName, config.Category);
             destination.Add(tool);
             loadedCount++;

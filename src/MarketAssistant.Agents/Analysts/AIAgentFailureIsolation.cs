@@ -20,6 +20,8 @@ namespace MarketAssistant.Agents.Analysts;
 /// </remarks>
 public static class AIAgentFailureIsolation
 {
+    private const string EmptyOutputMessage = "模型未返回任何文本结论";
+
     /// <summary>
     /// 包装分析师 Agent。失败时触发 <paramref name="onAnalysisFailed"/> 回调并返回失败标记消息。
     /// </summary>
@@ -27,8 +29,6 @@ public static class AIAgentFailureIsolation
         this AIAgent agent,
         Action<Exception>? onAnalysisFailed = null)
     {
-        ArgumentNullException.ThrowIfNull(agent);
-
         var agentName = agent.Name ?? "UnknownAnalyst";
         return agent
             .AsBuilder()
@@ -49,22 +49,25 @@ public static class AIAgentFailureIsolation
         AIAgent innerAgent,
         CancellationToken cancellationToken)
     {
+        AgentResponse response;
         try
         {
-            var response = await innerAgent.RunAsync(messages, session, options, cancellationToken)
+            response = await innerAgent.RunAsync(messages, session, options, cancellationToken)
                 .ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(response.Text))
-                return response;
-
-            // 空输出与异常同等对待：没有结论的分析师不能假装分析成功
-            throw new InvalidOperationException("模型未返回任何文本结论");
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             onAnalysisFailed?.Invoke(ex);
             return new AgentResponse(CreateFailureMessage(agentName, ex));
         }
+
+        if (!string.IsNullOrWhiteSpace(response.Text))
+            return response;
+
+        // 空输出与异常同等对待：没有结论的分析师不能假装分析成功
+        var error = new InvalidOperationException(EmptyOutputMessage);
+        onAnalysisFailed?.Invoke(error);
+        return new AgentResponse(CreateFailureMessage(agentName, error));
     }
 
     private static async IAsyncEnumerable<AgentResponseUpdate> RunStreamingGuarded(
@@ -102,7 +105,7 @@ public static class AIAgentFailureIsolation
 
         if (accumulatedText.Length == 0)
         {
-            var error = new InvalidOperationException("模型未返回任何文本结论");
+            var error = new InvalidOperationException(EmptyOutputMessage);
             onAnalysisFailed?.Invoke(error);
             yield return CreateFailureUpdate(agentName, error);
         }

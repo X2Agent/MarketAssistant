@@ -16,8 +16,8 @@ namespace MarketAssistant.Rag.Services;
 /// </summary>
 public class MarkdownDocumentBlockReader(MarkdownConverterFactory converterFactory, IImageStorageService imageStorageService) : IDocumentBlockReader
 {
-    private readonly MarkdownConverterFactory _converterFactory = converterFactory ?? throw new ArgumentNullException(nameof(converterFactory));
-    private readonly IImageStorageService _imageStorageService = imageStorageService ?? throw new ArgumentNullException(nameof(imageStorageService));
+    private readonly MarkdownConverterFactory _converterFactory = converterFactory;
+    private readonly IImageStorageService _imageStorageService = imageStorageService;
     private static readonly Regex ImagePattern = new(@"!\[([^\]]*)\]\(([^)]+)\)", RegexOptions.Compiled);
 
     public bool CanRead(string filePath)

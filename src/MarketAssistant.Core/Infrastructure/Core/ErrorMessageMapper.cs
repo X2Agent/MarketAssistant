@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -70,7 +71,6 @@ public static class ErrorMessageMapper
                 => "数据库错误，数据可能已损坏",
 
             InvalidCastException => "数据类型转换失败",
-            NullReferenceException => "数据访问错误，请刷新后重试",
 
             _ => "操作失败，请稍后重试"
         };
@@ -80,6 +80,23 @@ public static class ErrorMessageMapper
     {
         var baseMessage = GetUserFriendlyMessage(exception);
         return $"{operationName}失败：{baseMessage}";
+    }
+
+    /// <summary>
+    /// 仅当异常为 LLM 供应商错误（ClientResultException）时给出可展示的文案。
+    /// 供需要保留其他异常原始 Message 的调用方使用：<see cref="GetUserFriendlyMessage"/>
+    /// 会把 InvalidOperationException 等一律替换成与真因无关的泛化文案。
+    /// </summary>
+    public static bool TryGetProviderErrorMessage(Exception exception, [NotNullWhen(true)] out string? message)
+    {
+        if (IsClientResultException(exception, out var serviceMessage))
+        {
+            message = BuildServiceErrorMessage(serviceMessage);
+            return true;
+        }
+
+        message = null;
+        return false;
     }
 
     /// <summary>
@@ -123,9 +140,17 @@ public static class ErrorMessageMapper
     /// 实测形态：Message 为多行，首行仅是状态码（"HTTP 404 (: )"），
     /// 真正有用的说明在后续行（"This model is unavailable for free ... use this slug
     /// instead: minimax/minimax-m3"）。若只取首行，用户依旧看不到可操作信息。
+    /// 例外：OpenRouter 免费模型日配额（free-models-per-day）的原文是英文且没有重置时间，
+    /// 改写为含重置时间与处理建议的中文说明。
     /// </remarks>
     private static string BuildServiceErrorMessage(string serviceMessage)
     {
+        if (serviceMessage.Contains("free-models-per-day", StringComparison.Ordinal))
+        {
+            return "模型服务返回错误：免费模型今日请求额度已用完，UTC 零点（北京时间 08:00）重置；" +
+                "可在 OpenRouter 充值提升额度，或在设置中改用付费模型";
+        }
+
         var lines = serviceMessage
             .Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())

@@ -6,18 +6,21 @@ using Microsoft.Extensions.Logging;
 namespace MarketAssistant.Applications.Assets;
 
 /// <summary>
-/// A股资产信息服务实现
+/// A股资产信息服务实现。
+/// 详情以财联社为主数据源，财联社不覆盖的标的（基金/ETF 等，实测返回全 null）回退新浪个股行情。
 /// </summary>
 public class AShareAssetInfoService(
     ClsQuoteClient clsClient,
+    SinaStockQuoteClient sinaStockQuoteClient,
     SinaFundFlowClient sinaFundFlowClient,
     ILogger<AShareAssetInfoService> logger) : IAssetInfoService
 {
     /// <summary>首页热门资产展示条数（2 列 × 5 行）</summary>
     private const int HotAssetCount = 10;
 
-    private readonly ClsQuoteClient _clsClient = clsClient ?? throw new ArgumentNullException(nameof(clsClient));
-    private readonly SinaFundFlowClient _sinaFundFlowClient = sinaFundFlowClient ?? throw new ArgumentNullException(nameof(sinaFundFlowClient));
+    private readonly ClsQuoteClient _clsClient = clsClient;
+    private readonly SinaStockQuoteClient _sinaStockQuoteClient = sinaStockQuoteClient;
+    private readonly SinaFundFlowClient _sinaFundFlowClient = sinaFundFlowClient;
     private readonly ILogger<AShareAssetInfoService> _logger = logger;
 
     public async Task<List<(string Name, string Code)>> SearchAsync(string keyword, CancellationToken cancellationToken = default)
@@ -41,12 +44,15 @@ public class AShareAssetInfoService(
         }
     }
 
+    /// <summary>数据源正常但查无该资产时的名称占位（见 <see cref="IAssetInfoService.GetAssetInfoAsync"/>）。</summary>
+    private const string UnknownStockName = "未知股票";
+
     public async Task<AssetInfo> GetAssetInfoAsync(string code, string market = "", CancellationToken cancellationToken = default)
     {
         var assetInfo = new AssetInfo
         {
             Code = code,
-            Name = "未知股票",
+            Name = UnknownStockName,
             Market = market,
             MarketType = MarketType.AShare
         };
@@ -76,7 +82,11 @@ public class AShareAssetInfoService(
                 assetInfo.Market = prefixMarket;
             }
 
-            assetInfo.Code = prefixCode;
+            // 财联社未返回代码时保留调用方传入的代码，避免卡片连代码都空掉
+            if (prefixCode.Length > 0)
+            {
+                assetInfo.Code = prefixCode;
+            }
 
             // 当前价格（CLS 对停牌/无成交返回 null，保留默认空串表示「未提供」，不伪造 0）
             if (data.LastPrice is { } lastPrice)
@@ -94,6 +104,13 @@ public class AShareAssetInfoService(
             {
                 assetInfo.ChangePercentage = PercentFormatter.Format(changeRatio * 100);
             }
+
+            // 财联社对基金/ETF 等标的不覆盖（实测 secu_name 与行情字段全为 null），回退新浪个股行情。
+            // 只在名称缺失时兜底：财联社有名称但无最新价属停牌，不能拿新浪的旧价伪装成实时行情。
+            if (assetInfo.Name == UnknownStockName)
+            {
+                await FillFromSinaAsync(assetInfo, clsCode, cancellationToken);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -107,6 +124,28 @@ public class AShareAssetInfoService(
         }
 
         return assetInfo;
+    }
+
+    /// <summary>
+    /// 新浪兜底：补名称、最新价与按昨收派生的涨跌幅。
+    /// 新浪不返回涨跌幅，但返回昨收，故与详情页 K 线口径一致地现算。
+    /// </summary>
+    private async Task FillFromSinaAsync(AssetInfo assetInfo, string sinaCode, CancellationToken cancellationToken)
+    {
+        var quote = await _sinaStockQuoteClient.GetStockQuoteAsync(sinaCode, cancellationToken);
+        if (quote is null)
+        {
+            _logger.LogInformation("财联社与新浪均未返回 {Code} 的资产详情", sinaCode);
+            return;
+        }
+
+        assetInfo.Name = quote.Name;
+        assetInfo.CurrentPrice = PriceFormatter.Format(quote.CurrentPrice);
+
+        if (quote.PreClose is { } preClose && preClose > 0m)
+        {
+            assetInfo.ChangePercentage = PercentFormatter.Format((quote.CurrentPrice - preClose) / preClose * 100m);
+        }
     }
 
     public async Task<List<HotAsset>> GetHotAssetsAsync()

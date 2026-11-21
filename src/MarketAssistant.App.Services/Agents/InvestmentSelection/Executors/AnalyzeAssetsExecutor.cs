@@ -21,9 +21,9 @@ public sealed partial class AnalyzeAssetsExecutor(
     IServiceProvider serviceProvider,
     ILogger<AnalyzeAssetsExecutor> logger) : Executor("AnalyzeAssets")
 {
-    private readonly IChatClientFactory _chatClientFactory = chatClientFactory ?? throw new ArgumentNullException(nameof(chatClientFactory));
-    private readonly IServiceProvider _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-    private readonly ILogger<AnalyzeAssetsExecutor> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IChatClientFactory _chatClientFactory = chatClientFactory;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly ILogger<AnalyzeAssetsExecutor> _logger = logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions(JsonSerializerOptions.Web)
     {
@@ -36,12 +36,8 @@ public sealed partial class AnalyzeAssetsExecutor(
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
     {
-        var originalRequest = input.OriginalRequest;
-        if (originalRequest == null)
-        {
-            _logger.LogError("[步骤3/3] 缺少原始请求信息");
-            return CreateDefaultResult("分析失败：缺少原始请求信息");
-        }
+        var originalRequest = input.OriginalRequest
+            ?? throw new InvalidOperationException("[步骤3/3] 缺少原始请求信息：上游工作流状态不一致");
 
         _logger.LogInformation("[步骤3/3-{MarketType}] 对筛选结果进行AI分析", originalRequest.MarketType);
 
@@ -76,8 +72,7 @@ public sealed partial class AnalyzeAssetsExecutor(
                     typeof(InvestmentSelectionResult),
                     runtime.StructuredOutputMode,
                     JsonOptions),
-                Temperature = 0.2f,
-                MaxOutputTokens = 8000
+                Temperature = 0.2f
             };
             var response = await runtime.Client.GetResponseAsync(
                     [
@@ -92,32 +87,23 @@ public sealed partial class AnalyzeAssetsExecutor(
                 originalRequest.MarketType,
                 response.Text?.Length ?? 0);
 
-            var result = LlmJsonExtractor.Deserialize<InvestmentSelectionResult>(response.Text, JsonOptions);
+            var result = LlmJsonExtractor.Deserialize<InvestmentSelectionResult>(response.Text, JsonOptions)
+                ?? throw new FriendlyException(
+                    $"AI 响应反序列化失败，无法提取投资建议（响应长度 {response.Text?.Length ?? 0}）");
 
-            if (result == null)
+            var validationErrors = ValidateResult(result, input, originalRequest);
+            if (validationErrors.Count > 0)
+            {
+                throw new FriendlyException(
+                    $"AI 分析失败: AI 返回的数据不符合约束: {string.Join("; ", validationErrors)}");
+            }
+
+            if (result.Recommendations.Count == 0)
             {
                 _logger.LogWarning(
-                    "[步骤3/3-{MarketType}] 响应反序列化失败，响应长度: {ResponseLength}",
+                    "[步骤3/3-{MarketType}] AI 未生成任何推荐，响应长度: {ResponseLength}",
                     originalRequest.MarketType,
                     response.Text?.Length ?? 0);
-                result = CreateDefaultResult("解析分析结果失败");
-            }
-            else
-            {
-                var validationErrors = ValidateResult(result, input, originalRequest);
-                if (validationErrors.Count > 0)
-                {
-                    throw new InvalidOperationException(
-                        $"AI 返回的数据不符合约束: {string.Join("; ", validationErrors)}");
-                }
-
-                if (result.Recommendations.Count == 0)
-                {
-                    _logger.LogWarning(
-                        "[步骤3/3-{MarketType}] AI 未生成任何推荐，响应长度: {ResponseLength}",
-                        originalRequest.MarketType,
-                        response.Text?.Length ?? 0);
-                }
             }
 
             _logger.LogInformation("[步骤3/3-{MarketType}] 分析完成，推荐 {Count} 个资产，置信度: {Score}",
@@ -125,17 +111,8 @@ public sealed partial class AnalyzeAssetsExecutor(
 
             return result;
         }
-        catch (OperationCanceledException)
-        {
-            // 用户主动取消必须向上传播，不得伪装成"分析失败"的默认结果
-            throw;
-        }
-        catch (FriendlyException)
-        {
-            // 校验失败等业务异常已包含用户友好信息，向上抛出让工作流以错误呈现
-            throw;
-        }
-        catch (Exception ex)
+        // 取消与已带用户友好信息的 FriendlyException 原样上抛，不二次包装
+        catch (Exception ex) when (ex is not (OperationCanceledException or FriendlyException))
         {
             _logger.LogError(ex, "[步骤3/3-{MarketType}] AI分析失败", originalRequest.MarketType);
             throw new FriendlyException($"AI 分析失败: {ex.Message}", ex);

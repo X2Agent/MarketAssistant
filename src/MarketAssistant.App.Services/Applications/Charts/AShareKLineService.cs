@@ -16,8 +16,9 @@ namespace MarketAssistant.Applications.Charts;
 /// </summary>
 /// <remarks>
 /// 数据源级联：智兔优先（股票侧数据更全：成交额/昨收/复权类型）；
-/// 智兔不覆盖基金/ETF（实测 404 {"error":"not found"}）或异常/返回空时，
-/// 回退新浪 K 线（对股票/ETF/LOF/货币基金均覆盖，实测稳定无限流）。
+/// 智兔不覆盖基金/ETF（实测 404 {"error":"not found"} 或 503 "redis history miss"），
+/// 这类代码段（<see cref="StockSymbolConverter.IsFundOrEtf"/>）直接走新浪，不先撞一次必然失败的请求；
+/// 其余标的在智兔异常/返回空时回退新浪 K 线（对股票/ETF/LOF/货币基金均覆盖，实测稳定无限流）。
 /// 双源均无数据时抛出面向用户的友好异常，原始错误进日志。
 /// </remarks>
 public class AShareKLineService(
@@ -26,8 +27,8 @@ public class AShareKLineService(
     ILogger<AShareKLineService> logger,
     IUserSettingService userSettingService) : IKLineService
 {
-    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient ?? throw new ArgumentNullException(nameof(zhiTuClient));
-    private readonly SinaKLineClient _sinaKLineClient = sinaKLineClient ?? throw new ArgumentNullException(nameof(sinaKLineClient));
+    private readonly ZhiTuMarketClient _zhiTuClient = zhiTuClient;
+    private readonly SinaKLineClient _sinaKLineClient = sinaKLineClient;
     private readonly IUserSettingService _userSettingService = userSettingService;
     private readonly ILogger<AShareKLineService> _logger = logger;
 
@@ -52,20 +53,28 @@ public class AShareKLineService(
             _ => ("d", "日K线", 240) // 默认日K线
         };
 
-        try
+        // 基金/ETF 代码段智兔 K 线接口不覆盖，直接走新浪，省掉一次必然失败的请求与它的重试退避
+        if (StockSymbolConverter.IsFundOrEtf(code))
         {
-            var dataset = await GetKLineDataInternalAsync(code, interval, dataTypeName, count: count);
-            if (dataset.Data.Count > 0)
-            {
-                return dataset.Data;
-            }
-
-            _logger.LogInformation("智兔未返回 {Code} 的{DataType}，回退新浪 K 线数据源", code, dataTypeName);
+            _logger.LogDebug("{Code} 属于基金/ETF 代码段，跳过智兔直接走新浪 K 线", code);
         }
-        catch (Exception ex)
+        else
         {
-            // 智兔不覆盖基金/ETF（404）或令牌/网络异常时静默回退，原始错误进日志
-            _logger.LogInformation(ex, "智兔获取 {Code} 的{DataType}失败，回退新浪 K 线数据源", code, dataTypeName);
+            try
+            {
+                var dataset = await GetKLineDataInternalAsync(code, interval, dataTypeName, count: count);
+                if (dataset.Data.Count > 0)
+                {
+                    return dataset.Data;
+                }
+
+                _logger.LogInformation("智兔未返回 {Code} 的{DataType}，回退新浪 K 线数据源", code, dataTypeName);
+            }
+            catch (Exception ex)
+            {
+                // 智兔不覆盖基金/ETF（404）或令牌/网络异常时静默回退，原始错误进日志
+                _logger.LogInformation(ex, "智兔获取 {Code} 的{DataType}失败，回退新浪 K 线数据源", code, dataTypeName);
+            }
         }
 
         var sinaData = await GetSinaKLineDataAsync(code, sinaScale, count);

@@ -79,7 +79,11 @@ public static class AnalystFailureMessages
         return markerText[(markerIndex + FailureMarkerPrefix.Length)..].TrimStart();
     }
 
-    private static string NormalizeReason(string reason)
+    /// <summary>
+    /// 规整失败原因：压成单行并截断，防止异常堆栈污染工作流消息与终局报错。
+    /// 供失败标记构建与工作流终局报错的失败原因收集共用。
+    /// </summary>
+    public static string NormalizeReason(string reason)
     {
         var normalized = reason.ReplaceLineEndings(" ").Trim();
         return normalized.Length > 200 ? normalized[..200] : normalized;

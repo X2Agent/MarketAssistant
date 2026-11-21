@@ -47,7 +47,6 @@ public sealed class ModelDiscoveryService(IHttpClientFactory httpClientFactory) 
         CancellationToken cancellationToken = default,
         bool forceRefresh = false)
     {
-        ArgumentNullException.ThrowIfNull(provider);
         if (!provider.SupportsModelListing)
             return [];
 

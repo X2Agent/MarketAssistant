@@ -30,7 +30,7 @@ MarketAssistant.Core/
 |------|------|
 | `MarketType` | 多市场 Keyed Services 的 key，贯穿整个架构 |
 | `FriendlyException` | 抛出后消息直接展示给用户，不要用于非用户可见的内部错误 |
-| `ErrorMessageMapper` | 静态方法 `GetUserFriendlyMessage(Exception)` |
+| `ErrorMessageMapper` | 静态方法 `GetUserFriendlyMessage(Exception)`；`TryGetProviderErrorMessage(Exception, out string?)` 仅对 LLM 供应商异常（按类型名匹配 `ClientResultException`）给出可读文案，调用方需保留其他异常原始 `Message` 时使用 |
 | `StockSymbolConverter` / `CryptoSymbolConverter` | 不同 API 间的代码格式转换 |
 | `LlmJsonExtractor` | LLM 返回文本的 JSON 稳健提取与反序列化（多层兜底：直接解析→剥离 markdown→Utf8JsonReader 精确定位） |
 

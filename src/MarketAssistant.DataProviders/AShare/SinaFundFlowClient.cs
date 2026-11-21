@@ -12,7 +12,7 @@ public sealed class SinaFundFlowClient(IHttpClientFactory httpClientFactory)
     private const string TopNetInflowPath =
         "/quotes_service/api/json_v2.php/MoneyFlow.ssl_bkzj_ssggzj?page=1&num={0}&sort=netamount&asc=0";
 
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     /// <summary>
     /// 获取个股资金流排行（按净流入降序）。

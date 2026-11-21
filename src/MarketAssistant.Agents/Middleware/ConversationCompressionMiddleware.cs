@@ -29,7 +29,6 @@ public sealed class ConversationCompactionProviderFactory(ILoggerFactory loggerF
         int maxTokens = DefaultMaxTokens,
         int minimumPreservedGroups = DefaultMinimumPreservedGroups)
     {
-        ArgumentNullException.ThrowIfNull(chatClient);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTokens);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(minimumPreservedGroups);
 

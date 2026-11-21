@@ -165,7 +165,7 @@ public sealed class BinanceAuthService(
         }
 
         // 同步服务器时间（仅一个线程执行，其他线程等待并复用结果）
-        await SynchronizeServerTimeAsync(cancellationToken);
+        await SynchronizeServerTimeAsync(_httpClientFactory, _httpClientName, _timeEndpoint, cancellationToken);
         return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + Interlocked.Read(ref _serverTimeOffsetMs);
     }
 
@@ -173,7 +173,11 @@ public sealed class BinanceAuthService(
     /// 调用币安 /api/v3/time 或 /fapi/v1/time 端点，计算服务器时间相对本地时间的偏移量。
     /// 同步失败不抛异常，降级到偏移量 0（本地时间），避免阻塞签名流程。
     /// </summary>
-    private async Task SynchronizeServerTimeAsync(CancellationToken cancellationToken)
+    private async Task SynchronizeServerTimeAsync(
+        IHttpClientFactory httpClientFactory,
+        string httpClientName,
+        string timeEndpoint,
+        CancellationToken cancellationToken)
     {
         // 双检锁：进入锁后再检查一次，避免多个等待线程重复同步
         if (DateTime.UtcNow - _lastSyncTime < ServerTimeSyncInterval && _lastSyncTime != DateTime.MinValue)
@@ -189,10 +193,10 @@ public sealed class BinanceAuthService(
                 return;
             }
 
-            using var httpClient = _httpClientFactory!.CreateClient(_httpClientName!);
+            using var httpClient = httpClientFactory.CreateClient(httpClientName);
             // 在请求前后各取一次本地时间，取中点抵消网络往返耗时
             var localBefore = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var response = await httpClient.GetAsync(_timeEndpoint!, cancellationToken);
+            var response = await httpClient.GetAsync(timeEndpoint, cancellationToken);
             var localAfter = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             if (!response.IsSuccessStatusCode)

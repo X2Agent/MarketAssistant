@@ -1,4 +1,5 @@
 using MarketAssistant.Agents.Tools.Abstractions;
+using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -28,33 +29,35 @@ public class SessionSearchTools(ChatSessionPersistenceService persistenceService
         if (limit <= 0) limit = 5;
         if (limit > 15) limit = 15;
 
-        var results = await _persistenceService.SearchSessionsAsync(query, limit);
-
-        if (results.Count == 0)
-            return $"未找到与 \"{query}\" 相关的历史对话。";
-
-        var sb = new StringBuilder();
-        sb.AppendLine($"## 历史对话搜索结果 ({results.Count} 条匹配)");
-        sb.AppendLine();
-
-        string? currentSession = null;
-        foreach (var r in results)
+        return await ToolExecutor.ExecuteAsync("搜索历史会话", query, _logger, async _ =>
         {
-            if (currentSession != r.SessionId)
+            var results = await _persistenceService.SearchSessionsAsync(query, limit);
+
+            if (results.Count == 0)
+                return $"未找到与 \"{query}\" 相关的历史对话。";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"## 历史对话搜索结果 ({results.Count} 条匹配)");
+            sb.AppendLine();
+
+            string? currentSession = null;
+            foreach (var r in results)
             {
-                currentSession = r.SessionId;
-                var stockInfo = string.IsNullOrEmpty(r.StockCode) ? "" : $" | 标的: {r.StockCode}";
-                sb.AppendLine($"### {r.SessionTitle}{stockInfo} ({r.UpdatedAt:yyyy-MM-dd})");
+                if (currentSession != r.SessionId)
+                {
+                    currentSession = r.SessionId;
+                    var stockInfo = string.IsNullOrEmpty(r.StockCode) ? "" : $" | 标的: {r.StockCode}";
+                    sb.AppendLine($"### {r.SessionTitle}{stockInfo} ({r.UpdatedAt:yyyy-MM-dd})");
+                }
+
+                var role = r.Role == "user" ? "用户" : (r.AuthorName ?? "助手");
+                var content = r.Content.Length > 300 ? r.Content[..300] + "..." : r.Content;
+                sb.AppendLine($"**{role}**: {content}");
+                sb.AppendLine();
             }
 
-            var role = r.Role == "user" ? "用户" : (r.AuthorName ?? "助手");
-            var content = r.Content.Length > 300 ? r.Content[..300] + "..." : r.Content;
-            sb.AppendLine($"**{role}**: {content}");
-            sb.AppendLine();
-        }
-
-        _logger.LogInformation("历史会话搜索: {Query} → {Count} 条结果", query, results.Count);
-        return sb.ToString();
+            return sb.ToString();
+        });
     }
 
     public IEnumerable<AIFunction> GetFunctions()

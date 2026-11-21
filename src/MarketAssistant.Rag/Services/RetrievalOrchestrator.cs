@@ -24,7 +24,7 @@ public class RetrievalOrchestrator(
 {
     private readonly IQueryRewriteService _queryRewrite = queryRewrite;
     private readonly IRerankerService _reranker = reranker;
-    private readonly IContextExpansionService _contextExpansion = contextExpansion ?? throw new ArgumentNullException(nameof(contextExpansion));
+    private readonly IContextExpansionService _contextExpansion = contextExpansion;
     private readonly VectorStore _vectorStore = vectorStore;
     private readonly IEmbeddingFactory _embeddingFactory = embeddingFactory;
     private readonly ILogger<RetrievalOrchestrator> _logger = logger;
@@ -61,6 +61,11 @@ public class RetrievalOrchestrator(
         try
         {
             queryEmbeddings = await embeddingGenerator.GenerateAsync(distinctQueries, cancellationToken: cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消必须向上传播，不得当作检索失败吞掉
+            throw;
         }
         catch (Exception ex)
         {
@@ -109,6 +114,11 @@ public class RetrievalOrchestrator(
                     var distance = (double)(searchResult.Score ?? 0f);
                     merged.Add(new RagSearchCandidate(searchResult.Record, distance, q));
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // 取消必须向上传播，不得当作子查询失败吞掉
+                throw;
             }
             catch (Exception ex)
             {
