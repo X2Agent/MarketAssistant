@@ -12,6 +12,6 @@
   <line x1="24" y1="36" x2="34" y2="36" stroke="#C0C0C0" stroke-width="1.5" stroke-linecap="round"/>
   
   <!-- 空状态指示器 -->
-  <circle cx="32" cy="42" r="3" fill="#FFB74D" opacity="0.6"/>
+  <circle cx="32" cy="42" r="3" fill="#8A93A0" opacity="0.6"/>
   <text x="32" y="45" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#FFFFFF">?</text>
 </svg>

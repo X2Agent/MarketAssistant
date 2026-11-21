@@ -1,0 +1,135 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:MarketAssistant.Views.Controls">
+
+    <!-- ================================================================== -->
+    <!-- MarketAssistant Design System v3.0 — ToggleSwitch                    -->
+    <!--                                                                     -->
+    <!-- 替换 Fluent 默认开关，只改两件事：                                     -->
+    <!--  1. 配色回到本项目令牌（中性色阶 + 单一强调色），不再用 Fluent 的灰度；  -->
+    <!--  2. 圆点带"动量"：位移途中拉成胶囊，到点后回落成圆形（性格 D）。         -->
+    <!--                                                                     -->
+    <!-- 几何必须与 Fluent 模板契约一致，否则基类算错位移：                      -->
+    <!--    轨道 40×20 / PART_SwitchKnob 宽 20 / PART_MovingKnobs 20×20。       -->
+    <!--    ToggleSwitch.cs 用 PART_SwitchKnob.Bounds.Width 计算 Canvas.Left。  -->
+    <!--                                                                     -->
+    <!-- 放在 Application.Resources（而非 Application.Styles）：               -->
+    <!--    资源查找先看 Application.Resources 再看 Application.Styles，       -->
+    <!--    这是让 {x:Type ToggleSwitch} 覆盖 FluentTheme 同名主题的干净途径。   -->
+    <!--                                                                     -->
+    <!-- 未提供 OnContent / OffContent 插槽：仓库内零使用点，且 Fluent 默认值    -->
+    <!-- 是 "Off" / "On"，会把英文贴在开关右侧（Width=48 的行内开关还会被压扁）。 -->
+    <!-- 需要时再按 Fluent 模板补回两个 ContentPresenter 即可。                 -->
+    <!-- ================================================================== -->
+
+    <ControlTheme x:Key="{x:Type ToggleSwitch}" TargetType="ToggleSwitch">
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Cursor" Value="Hand"/>
+
+        <!-- 位移只做位置插值，不做位置过冲（否则圆点会跑出 40px 轨道）。
+             "回弹"落在圆点形体上，见 KnobPill。 -->
+        <Setter Property="KnobTransitions">
+            <Transitions>
+                <DoubleTransition Property="Canvas.Left" Duration="0:0:0.22" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid Background="{TemplateBinding Background}" RowDefinitions="Auto,Auto">
+
+                    <!-- Content 在开关上方（Fluent 原样）：策略配置页带说明文字的开关依赖此布局 -->
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                                      Grid.Row="0"
+                                      VerticalAlignment="Top"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      Margin="0,0,0,6"/>
+
+                    <Grid Grid.Row="1"
+                          Width="40"
+                          Height="20"
+                          HorizontalAlignment="Left"
+                          VerticalAlignment="Center"
+                          TemplatedControl.IsTemplateFocusTarget="True">
+
+                        <Border x:Name="SwitchTrack"
+                                CornerRadius="10"
+                                Background="{DynamicResource SwitchTrackOffBrush}"/>
+
+                        <Canvas x:Name="PART_SwitchKnob"
+                                Width="20"
+                                Height="20"
+                                HorizontalAlignment="Left">
+                            <Panel x:Name="PART_MovingKnobs"
+                                   Width="20"
+                                   Height="20">
+                                <controls:KnobPill x:Name="KnobPill"
+                                                   Width="16"
+                                                   Height="16"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   IsOn="{TemplateBinding IsChecked}"/>
+                            </Panel>
+                        </Canvas>
+                    </Grid>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+
+        <!-- ===== 圆点 ===== -->
+        <!-- 明暗两套都用同一个近白色圆点：轨道色承担"开/关"语义（与 iOS 一致），
+             圆点只负责"可拖动的实体"。这样暗色下不会出现"黑洞"观感。 -->
+        <Style Selector="^ /template/ controls|KnobPill">
+            <Setter Property="Background" Value="{StaticResource TextOnEmphasisBrush}"/>
+        </Style>
+
+        <!-- 无 Content 时不占那 6px 顶距：否则行内开关会凭空高出 6px，
+             与同一行 40 高的图标按钮对不齐。 -->
+        <Style Selector="^ /template/ ContentPresenter#PART_ContentPresenter:empty">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+
+        <!-- ===== 轨道：基础（关） ===== -->
+        <Style Selector="^ /template/ Border#SwitchTrack">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <!-- ===== 轨道：开 ===== -->
+        <Style Selector="^:checked /template/ Border#SwitchTrack">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        </Style>
+
+        <!-- ===== hover / pressed：只进一档色阶，不放大、不位移 ===== -->
+        <Style Selector="^:pointerover /template/ Border#SwitchTrack">
+            <Setter Property="Background" Value="{DynamicResource SwitchTrackOffHoverBrush}"/>
+        </Style>
+        <Style Selector="^:pointerover:checked /template/ Border#SwitchTrack">
+            <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+        </Style>
+        <Style Selector="^:pressed:checked /template/ Border#SwitchTrack">
+            <Setter Property="Background" Value="{StaticResource AccentPressedBrush}"/>
+        </Style>
+
+        <!-- ===== 键盘焦点：沿用 FocusRing 双环（与输入框同一几何） ===== -->
+        <Style Selector="^:focus-visible /template/ Border#SwitchTrack">
+            <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+        </Style>
+
+        <!-- ===== disabled ===== -->
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+    </ControlTheme>
+
+</ResourceDictionary>

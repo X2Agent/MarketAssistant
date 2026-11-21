@@ -7,7 +7,7 @@
              x:Class="MarketAssistant.Views.Components.ReportShareCardView"
              x:DataType="vm:ReportShareCardData"
              Width="1080" Height="1350"
-             Background="{DynamicResource AppBackgroundBrush}">
+             Background="{DynamicResource PageBackgroundBrush}">
     <!-- 分享卡：固定画布离屏渲染，禁止依赖外部布局测量 -->
     <Border Padding="64">
         <Grid RowDefinitions="Auto,Auto,*,Auto">
@@ -16,7 +16,7 @@
                 <StackPanel Grid.Column="0" Spacing="8">
                     <TextBlock Text="{Binding AssetName}"
                                FontSize="48"
-                               FontWeight="Bold"
+                               FontWeight="{DynamicResource WeightTitle}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                     <TextBlock Text="{Binding AssetSymbol}"
                                FontSize="28"
@@ -27,13 +27,12 @@
                         VerticalAlignment="Center"
                         CornerRadius="16"
                         Padding="28,12"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1">
+                        Background="{DynamicResource AccentSubtleBrush}"
+                        BorderThickness="0">
                     <TextBlock Text="{Binding InvestmentRating}"
                                FontSize="36"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                               FontWeight="{DynamicResource WeightTitle}"
+                               Foreground="{StaticResource AccentBrush}"/>
                 </Border>
             </Grid>
 
@@ -46,7 +45,7 @@
                                VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding ScoreText}"
                                FontSize="96"
-                               FontWeight="Bold"
+                               FontWeight="{DynamicResource WeightTitle}"
                                FontFamily="{StaticResource DataFontFamily}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                     <TextBlock Text="/ 10"
@@ -74,7 +73,7 @@
 
             <!-- 亮点区 -->
             <StackPanel Grid.Row="2" Spacing="16" Margin="0,48,0,0">
-                <TextBlock Text="核心观点" FontSize="28" FontWeight="SemiBold"
+                <TextBlock Text="核心观点" FontSize="28" FontWeight="{DynamicResource WeightTitle}"
                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                 <ItemsControl ItemsSource="{Binding Highlights}">
                     <ItemsControl.ItemTemplate>

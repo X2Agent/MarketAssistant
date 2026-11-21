@@ -1,7 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         x:Class="MarketAssistant.Views.Windows.NotificationWindow"
         Width="{StaticResource NotificationWidth}"
         Height="{StaticResource NotificationHeight}"
@@ -13,27 +11,27 @@
         Topmost="True"
         WindowStartupLocation="Manual">
 
+    <!-- 悬浮通知：v3 唯一允许用重阴影的场景之一；无边框，靠表面色阶与阴影浮起 -->
     <Border Name="NotificationBorder"
             Background="{StaticResource NotificationDarkBackgroundBrush}"
-            BorderBrush="{StaticResource NotificationDarkBorderBrush}"
-            BorderThickness="{StaticResource DefaultBorderThickness}"
+            BorderThickness="{StaticResource NoBorderThickness}"
             CornerRadius="{StaticResource CardCornerRadius}"
             Padding="{StaticResource DefaultCardPadding}"
             Margin="{StaticResource SmallMargin}"
-            BoxShadow="{StaticResource NotificationBoxShadow}">
+            BoxShadow="{StaticResource ShadowModal}">
 
         <Grid ColumnDefinitions="Auto,*,Auto">
 
-            <!-- 图标区域：圆形语义色底，尺寸与标题字号协调 -->
+            <!-- 图标区域：语义色圆角块，尺寸与标题字号协调 -->
             <Border Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
                     CornerRadius="{StaticResource NotificationIconCornerRadius}"
-                    Background="{StaticResource NotificationIconSuccessBrush}"
+                    Background="{DynamicResource SuccessBrush}"
                     VerticalAlignment="Center">
                 <TextBlock Text="✓"
-                           FontSize="{StaticResource SectionTitleFontSize}"
-                           FontWeight="Bold"
+                           FontSize="{StaticResource BodyFontSize}"
+                           FontWeight="{DynamicResource WeightEmphasis}"
                            Foreground="{StaticResource TextOnEmphasisBrush}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"/>
@@ -48,11 +46,11 @@
                               HorizontalScrollBarVisibility="Disabled">
                     <TextBlock Name="MessageText"
                                Text="操作成功"
-                               FontSize="{StaticResource LabelFontSize}"
-                               FontWeight="Medium"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"
                                Foreground="{StaticResource NotificationTextLightBrush}"
                                TextWrapping="Wrap"
-                               LineHeight="{StaticResource CompactLineHeight}"/>
+                               LineHeight="{StaticResource CaptionLineHeight}"/>
                 </ScrollViewer>
             </StackPanel>
 
@@ -62,13 +60,13 @@
                     Content="✕"
                     Width="{StaticResource DefaultIconSize}"
                     Height="{StaticResource DefaultIconSize}"
-                    FontSize="{StaticResource MediumFontSize}"
+                    FontSize="{StaticResource CaptionFontSize}"
                     Foreground="{StaticResource NotificationTextSecondaryBrush}"
                     Background="Transparent"
                     BorderThickness="{StaticResource NoBorderThickness}"
                     VerticalAlignment="Center"
                     Padding="{StaticResource NoPadding}"
-                    CornerRadius="{StaticResource DefaultCornerRadius}"
+                    CornerRadius="{StaticResource TinyCornerRadius}"
                     HorizontalContentAlignment="Center"
                     VerticalContentAlignment="Center"
                     Cursor="Hand">

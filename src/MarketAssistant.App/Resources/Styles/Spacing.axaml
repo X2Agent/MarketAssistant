@@ -1,40 +1,125 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- ========== 间距定义 - 使用4的倍数，最大值16 ========== -->
-    
-    <!-- Padding 定义 -->
-    <Thickness x:Key="PagePadding">16,8</Thickness>
-    <Thickness x:Key="CardPadding">16</Thickness>
-    <Thickness x:Key="DefaultCardPadding">12</Thickness>
-    <Thickness x:Key="CompactCardPadding">8</Thickness>
+    <!-- ================================================================== -->
+    <!-- MarketAssistant Design System v3.0 — Spacing & Type Scale            -->
+    <!--                                                                     -->
+    <!-- 间距：4 的倍数，允许 16 / 20 / 24 三档呼吸（页面级用 24）。            -->
+    <!-- 字号：全局只有 4 档。新增页面禁止再引入第 5 档。                       -->
+    <!-- ================================================================== -->
+
+    <!-- ========== 字号（唯一 4 档） ========== -->
+    <!-- Display 32：大数字、资产现价、余额等"一眼要看到"的数值（等宽）          -->
+    <!-- Title   24：页面标题、弹窗标题                                        -->
+    <!-- Body    16：阅读型正文（聊天、报告、说明）                             -->
+    <!-- BodySm  14：密集数据界面正文（表格、卡片、表单、按钮），主力字号         -->
+    <!-- Caption 12：辅助说明、时间戳、单位、表头                              -->
+    <x:Double x:Key="DisplayFontSize">32</x:Double>
+    <x:Double x:Key="TitleFontSize">24</x:Double>
+    <x:Double x:Key="BodyFontSize">16</x:Double>
+    <x:Double x:Key="BodySmFontSize">14</x:Double>
+    <x:Double x:Key="CaptionFontSize">12</x:Double>
+
+    <!-- ========== 行高（与字号档位一一对应，均为 1.5 上下） ========== -->
+    <x:Double x:Key="DisplayLineHeight">40</x:Double>
+    <x:Double x:Key="TitleLineHeight">32</x:Double>
+    <x:Double x:Key="BodyLineHeight">24</x:Double>
+    <x:Double x:Key="BodySmLineHeight">21</x:Double>
+    <x:Double x:Key="CaptionLineHeight">18</x:Double>
+
+    <!-- 字号、字重见上方 5 个语义令牌（Display/Title/Body/BodySm/Caption）。 -->
+
+    <!-- ================================================================== -->
+    <!-- 字重：主题感知                                                       -->
+    <!--                                                                     -->
+    <!-- 暗色模式的文字天生显粗（浅色字在深底上会"溢出"），故暗色整体降一档：     -->
+    <!--   Light: Title=SemiBold(600) Body=Normal(400) Emph=Medium(500)      -->
+    <!--   Dark : Title=Medium(500)   Body=Normal(400) Emph=Normal(400)      -->
+    <!-- 用这些键而不是硬写 FontWeight="{DynamicResource WeightTitle}"，才能自动跟随主题切换。           -->
+    <!-- ================================================================== -->
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <FontWeight x:Key="WeightTitle">SemiBold</FontWeight>
+            <FontWeight x:Key="WeightBody">Normal</FontWeight>
+            <FontWeight x:Key="WeightEmphasis">Medium</FontWeight>
+            <FontWeight x:Key="WeightNumber">SemiBold</FontWeight>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <FontWeight x:Key="WeightTitle">Medium</FontWeight>
+            <FontWeight x:Key="WeightBody">Normal</FontWeight>
+            <FontWeight x:Key="WeightEmphasis">Normal</FontWeight>
+            <FontWeight x:Key="WeightNumber">Medium</FontWeight>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- ========== 字体族 ========== -->
+    <!-- Inter 无中文字形，必须显式给出中文回退链，否则中文会落到兜底字体导致字重与字面不一致。 -->
+    <FontFamily x:Key="UiFontFamily">Inter, Microsoft YaHei UI, PingFang SC, Noto Sans SC, Source Han Sans SC, sans-serif</FontFamily>
+    <!-- 等宽只留给数值（价格/涨跌/计数），禁止用于正文或代码块以外的场景 -->
+    <FontFamily x:Key="DataFontFamily">JetBrains Mono, SF Mono, Consolas, Cascadia Mono, Menlo, monospace</FontFamily>
+
+    <!-- ========== 圆角 ========== -->
+    <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
+    <CornerRadius x:Key="DefaultCornerRadius">12</CornerRadius>
+    <CornerRadius x:Key="MediumCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="SmallCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="TinyCornerRadius">6</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadius">999</CornerRadius>
+    <CornerRadius x:Key="FABCornerRadius">28</CornerRadius>
+
+    <!-- ========== 间距阶梯 ========== -->
+    <!-- 语义令牌（Tiny/Small/Default/Large/Section）；不要再用 Space1..6 这类序号别名，
+         两套并存会让同一间距出现两种写法。 -->
+    <x:Double x:Key="TinySpacing">4</x:Double>
+    <x:Double x:Key="CompactSpacing">4</x:Double>
+    <x:Double x:Key="SmallSpacing">8</x:Double>
+    <x:Double x:Key="DefaultSpacing">12</x:Double>
+    <x:Double x:Key="LargeSpacing">16</x:Double>
+    <x:Double x:Key="SectionSpacing">24</x:Double>
+
+    <!-- ========== Padding ========== -->
+    <!-- 页面统一 24；卡片 16–20；紧凑元素 8–12 -->
+    <Thickness x:Key="PagePadding">24</Thickness>
+    <Thickness x:Key="PagePaddingCompact">16</Thickness>
+    <Thickness x:Key="CardPadding">20</Thickness>
+    <Thickness x:Key="DefaultCardPadding">16</Thickness>
+    <Thickness x:Key="CompactCardPadding">12</Thickness>
     <Thickness x:Key="SmallCardPadding">8</Thickness>
-    <Thickness x:Key="TagPadding">4,2</Thickness>
+    <Thickness x:Key="TagPadding">6,2</Thickness>
     <Thickness x:Key="TinyPadding">4</Thickness>
     <Thickness x:Key="SmallPadding">8</Thickness>
     <Thickness x:Key="DefaultPadding">12</Thickness>
     <Thickness x:Key="NoPadding">0</Thickness>
     <Thickness x:Key="SmallHorizontalPadding">8,0</Thickness>
-    <Thickness x:Key="ListItemPadding">8,4</Thickness>
-    <Thickness x:Key="SegmentButtonPadding">12,4</Thickness>
-    
-    <!-- Margin 定义 -->
+    <Thickness x:Key="ListItemPadding">12,10</Thickness>
+    <Thickness x:Key="SegmentButtonPadding">12,6</Thickness>
+    <Thickness x:Key="ChipPadding">8,2</Thickness>
+    <Thickness x:Key="CompactButtonPadding">12,4</Thickness>
+    <Thickness x:Key="ProgressDialogPadding">32,24</Thickness>
+    <Thickness x:Key="FABMargin">0,0,24,24</Thickness>
+    <!-- 手风琴（Expander.section-card）内容内边距：壳本身不留边距，由页面用该令牌给内容留白 -->
+    <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
+
+    <!-- ========== Margin ========== -->
     <Thickness x:Key="DefaultMargin">12</Thickness>
     <Thickness x:Key="SmallMargin">8</Thickness>
     <Thickness x:Key="TinyMargin">4</Thickness>
+    <Thickness x:Key="LargeMargin">24</Thickness>
     <Thickness x:Key="NoMargin">0</Thickness>
     <Thickness x:Key="DefaultVerticalMargin">0,12</Thickness>
-    <Thickness x:Key="StatusDotMargin">0,4,8,0</Thickness>
-    <Thickness x:Key="SectionTitleMargin">8,4,8,4</Thickness>
-    <Thickness x:Key="CardGridMargin">0,0,12,12</Thickness>
+    <Thickness x:Key="StatusDotMargin">0,0,8,0</Thickness>
+    <Thickness x:Key="CardGridMargin">0,0,16,16</Thickness>
     <Thickness x:Key="SmallCardGridMargin">0,0,8,8</Thickness>
-    
-    <!-- 特定方向的 Margin -->
+
+    <!-- 自选卡片宽度：与骨架屏共用同一令牌，避免两处各写一个字面量而漂移 -->
+    <x:Double x:Key="FavCardWidth">300</x:Double>
+
     <Thickness x:Key="BottomMargin">0,0,0,12</Thickness>
     <Thickness x:Key="SmallBottomMargin">0,0,0,8</Thickness>
     <Thickness x:Key="TinyBottomMargin">0,0,0,4</Thickness>
     <Thickness x:Key="TopMargin">0,12,0,0</Thickness>
     <Thickness x:Key="SmallTopMargin">0,8,0,0</Thickness>
+    <Thickness x:Key="TinyTopMargin">0,4,0,0</Thickness>
     <Thickness x:Key="RightMargin">0,0,12,0</Thickness>
     <Thickness x:Key="SmallRightMargin">0,0,8,0</Thickness>
     <Thickness x:Key="TinyRightMargin">0,0,4,0</Thickness>
@@ -43,172 +128,97 @@
     <Thickness x:Key="TinyLeftMargin">4,0,0,0</Thickness>
     <Thickness x:Key="HorizontalMargin">16,0</Thickness>
     <Thickness x:Key="SmallHorizontalMargin">8,0</Thickness>
-    <Thickness x:Key="TinyHorizontalMargin">4,0</Thickness>
     <Thickness x:Key="TinyVerticalMargin">0,4</Thickness>
-    <Thickness x:Key="TinyTopMargin">0,4,0,0</Thickness>
-    <Thickness x:Key="LogoTopMargin">0,20,0,0</Thickness>
-    <Thickness x:Key="LogoBottomMargin">0,0,0,24</Thickness>
-    <Thickness x:Key="NavBarBottomBorder">0,0,0,1</Thickness>
-    <Thickness x:Key="ProgressDialogPadding">32,24</Thickness>
-    <Thickness x:Key="FABMargin">0,0,16,16</Thickness>
-    
-    <!-- ========== 字体大小定义 ========== -->
-    <x:Double x:Key="ExtraLargeFontSize">28</x:Double>
-    <x:Double x:Key="TitleFontSize">22</x:Double>
-    <x:Double x:Key="LargeFontSize">18</x:Double>
-    <x:Double x:Key="SubTitleFontSize">18</x:Double>
-    <x:Double x:Key="SectionTitleFontSize">16</x:Double>
-    <x:Double x:Key="MediumFontSize">14</x:Double>
-    <x:Double x:Key="LabelFontSize">14</x:Double>
-    <x:Double x:Key="BodyFontSize">13</x:Double>
-    <x:Double x:Key="SmallFontSize">12</x:Double>
-    <x:Double x:Key="TinyFontSize">11</x:Double>
-    <x:Double x:Key="MiniFontSize">10</x:Double>
+    <!-- 二级页面返回条：内容区顶部内嵌窄条，根页面折叠为零高度 -->
+    <Thickness x:Key="BackBarMargin">24,8,24,0</Thickness>
+    <Thickness x:Key="LogoTopMargin">0,24,0,0</Thickness>
 
-    <!-- 数据字体（金融数据等宽对齐） -->
-    <FontFamily x:Key="DataFontFamily">JetBrains Mono, SF Mono, Consolas, Cascadia Mono</FontFamily>
-    
-    <!-- ========== 控件尺寸定义 ========== -->
-    
-    <!-- 按钮尺寸 -->
-    <x:Double x:Key="ButtonHeight">32</x:Double>
-    <x:Double x:Key="LargeButtonHeight">40</x:Double>
-    <x:Double x:Key="SmallButtonHeight">28</x:Double>
-    <x:Double x:Key="IconButtonSize">44</x:Double>
-    <x:Double x:Key="SmallIconButtonSize">36</x:Double>
-    <x:Double x:Key="TinyIconButtonSize">28</x:Double>
-    
-    <!-- 输入控件尺寸 -->
+    <!-- ========== 控件尺寸 ========== -->
+    <x:Double x:Key="ButtonHeight">36</x:Double>
+    <x:Double x:Key="SmallButtonHeight">30</x:Double>
+    <x:Double x:Key="IconButtonSize">40</x:Double>
+    <x:Double x:Key="SmallIconButtonSize">32</x:Double>
+    <x:Double x:Key="TinyIconButtonSize">26</x:Double>
+
     <x:Double x:Key="InputHeight">40</x:Double>
-    <x:Double x:Key="SmallInputHeight">32</x:Double>
-    
-    <!-- 圆角半径 -->
-    <CornerRadius x:Key="DefaultCornerRadius">12</CornerRadius>
-    <CornerRadius x:Key="MediumCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
-    <CornerRadius x:Key="SmallCornerRadius">6</CornerRadius>
-    <CornerRadius x:Key="TinyCornerRadius">4</CornerRadius>
-    <CornerRadius x:Key="FABCornerRadius">28</CornerRadius>
-    
-    <!-- 聊天气泡圆角 -->
-    <CornerRadius x:Key="ChatBubbleUserCornerRadius">18,18,4,18</CornerRadius>
-    <CornerRadius x:Key="ChatBubbleAssistantCornerRadius">18,18,18,4</CornerRadius>
-    
-    <!-- 边框厚度 -->
-    <Thickness x:Key="DefaultBorderThickness">1</Thickness>
-    <Thickness x:Key="ThickBorderThickness">2</Thickness>
+    <x:Double x:Key="TextAreaHeight">150</x:Double>
+    <x:Double x:Key="CompactTextAreaHeight">120</x:Double>
+    <x:Double x:Key="ModeSelectionHeight">80</x:Double>
+
+    <!-- ========== 边框厚度 ========== -->
+    <!-- v3 只有一个：无边框。厚度为 1px 的底/顶分隔令牌也一并删除——
+         全库已改用表面色阶分区，留着"给某块加一条线"的令牌只会被误用。
+         DataGrid 的行间分隔由 GridLinesVisibility + SubtleBorderBrush 表达，不用厚度令牌。 -->
     <Thickness x:Key="NoBorderThickness">0</Thickness>
-    <Thickness x:Key="RightBorderThickness">0,0,1,0</Thickness>
-    <Thickness x:Key="LeftBorderThickness">1,0,0,0</Thickness>
-    <Thickness x:Key="TopBorderThickness">0,1,0,0</Thickness>
-    <Thickness x:Key="BottomBorderThickness">0,0,0,1</Thickness>
-    
-    <!-- ========== Spacing 定义（用于 StackPanel 等） ========== -->
-    <x:Double x:Key="LargeSpacing">16</x:Double>
-    <x:Double x:Key="DefaultSpacing">12</x:Double>
-    <x:Double x:Key="SmallSpacing">8</x:Double>
-    <x:Double x:Key="TinySpacing">4</x:Double>
-    <x:Double x:Key="CompactSpacing">2</x:Double>
-    
-    <!-- ========== 图标尺寸定义 ========== -->
-    <x:Double x:Key="ExtraLargeIconSize">64</x:Double>
+
+    <!-- ========== 图标 ========== -->
     <x:Double x:Key="LargeIconSize">48</x:Double>
     <x:Double x:Key="MediumIconSize">32</x:Double>
     <x:Double x:Key="DefaultIconSize">24</x:Double>
     <x:Double x:Key="SmallIconSize">20</x:Double>
     <x:Double x:Key="TinyIconSize">16</x:Double>
     <x:Double x:Key="MiniIconSize">14</x:Double>
-    <x:Double x:Key="MicroIconSize">12</x:Double>
     <x:Double x:Key="DotIconSize">6</x:Double>
-    
-    <!-- ========== 其他尺寸定义 ========== -->
-    <x:Double x:Key="HeaderHeight">56</x:Double>
+
+    <!-- ========== 布局尺寸 ========== -->
+    <x:Double x:Key="HeaderHeight">64</x:Double>
     <Thickness x:Key="FooterPadding">16</Thickness>
     <x:Double x:Key="DividerHeight">1</x:Double>
-    <x:Double x:Key="ProgressBarHeight">8</x:Double>
+    <x:Double x:Key="ProgressBarHeight">6</x:Double>
     <x:Double x:Key="IndicatorSize">12</x:Double>
-    
-    <!-- 最大宽度约束 -->
-    <x:Double x:Key="MaxDialogWidth">600</x:Double>
-    <x:Double x:Key="MaxChatBubbleWidth">800</x:Double>
-    <x:Double x:Key="MaxInputHeight">120</x:Double>
-    
-    <!-- ========== 特殊容器尺寸 ========== -->
-    <x:Double x:Key="SidebarDefaultWidth">560</x:Double>
-    <x:Double x:Key="SidebarMinWidth">420</x:Double>
-    <x:Double x:Key="SidebarMaxWidth">800</x:Double>
-    <x:Double x:Key="NotificationWidth">440</x:Double>
-    <x:Double x:Key="NotificationHeight">88</x:Double>
-    <!-- 通知正文最大高度：88 高度 - 上下 Padding 24 - 边框 2，可容纳 3 行（3 × CompactLineHeight 20） -->
-    <x:Double x:Key="NotificationMessageMaxHeight">60</x:Double>
-    <CornerRadius x:Key="NotificationIconCornerRadius">16</CornerRadius>
-    <x:Double x:Key="DialogWidth">400</x:Double>
-    <x:Double x:Key="DialogHeight">200</x:Double>
+
+    <x:Double x:Key="MaxDialogWidth">560</x:Double>
+    <x:Double x:Key="DialogCardWidth">440</x:Double>
+    <x:Double x:Key="MaxChatBubbleWidth">760</x:Double>
+    <x:Double x:Key="MaxInputHeight">160</x:Double>
+    <x:Double x:Key="InputAreaMinWidth">320</x:Double>
+    <x:Double x:Key="InputAreaMaxWidth">880</x:Double>
+    <x:Double x:Key="MessageMaxWidth">280</x:Double>
+
+    <!-- ========== 导航 ========== -->
+    <!-- v3：240px 文字导航（图标 + 标签 + 分组标题），窄窗收敛为 72px 图标轨 -->
+    <GridLength x:Key="NavRailWidth">240</GridLength>
+    <GridLength x:Key="NavRailCollapsedWidth">72</GridLength>
+    <x:Double x:Key="NavItemHeight">40</x:Double>
+    <Thickness x:Key="NavHeaderPadding">20,20,20,0</Thickness>
+    <Thickness x:Key="NavItemInnerMargin">12,0</Thickness>
+    <Thickness x:Key="NavGroupMargin">12,16,12,6</Thickness>
+    <Thickness x:Key="NavHolderPadding">12,20,12,0</Thickness>
+    <Thickness x:Key="NavHolderCompactPadding">12,16,12,0</Thickness>
+    <Thickness x:Key="NavFooterPadding">12,8,12,16</Thickness>
+
+    <!-- ========== 栅格 ========== -->
+    <x:Double x:Key="GridGutter">16</x:Double>
+
+    <!-- ========== 窗口 ========== -->
+    <!-- 最小宽 720：必须低于 CompactWindowBreakpoint(1024)，否则窄窗收起逻辑永远不可达。
+         720 时导航收起为 72px，内容区仍有 648px，足够单列布局。 -->
+    <x:Double x:Key="MainWindowMinWidth">720</x:Double>
+    <x:Double x:Key="MainWindowMinHeight">600</x:Double>
+    <x:Double x:Key="CompactWindowBreakpoint">1024</x:Double>
+
+    <!-- ========== 其他 ========== -->
     <x:Double x:Key="LogoSize">80</x:Double>
-    <x:Double x:Key="AppLogoSize">48</x:Double>
+    <x:Double x:Key="AppLogoSize">40</x:Double>
     <x:Double x:Key="FABSize">56</x:Double>
-    <x:Double x:Key="ProgressCircleSize">100</x:Double>
-    <x:Double x:Key="ProgressCircleInnerSize">80</x:Double>
     <x:Double x:Key="ProgressBarWidth">300</x:Double>
-    
-    <!-- ========== 按钮最小宽度 ========== -->
-    <x:Double x:Key="ButtonMinWidth">120</x:Double>
     <x:Double x:Key="MediumButtonMinWidth">100</x:Double>
     <x:Double x:Key="SmallButtonMinWidth">80</x:Double>
-    
-    <!-- ========== 文本区域高度 ========== -->
-    <x:Double x:Key="TextAreaHeight">150</x:Double>
-    <x:Double x:Key="CompactTextAreaHeight">120</x:Double>
-    <x:Double x:Key="ModeSelectionHeight">80</x:Double>
-    
-    <!-- ========== 下拉菜单和滚动区域 ========== -->
     <x:Double x:Key="DropDownMaxHeight">400</x:Double>
-    <x:Double x:Key="ScrollViewMaxHeight">600</x:Double>
-    
-    <!-- ========== 行高定义 ========== -->
-    <x:Double x:Key="DefaultLineHeight">22</x:Double>
-    <x:Double x:Key="CompactLineHeight">20</x:Double>
-    
-    <!-- ========== 对话框和进度显示 ========== -->
-    <x:Double x:Key="ProgressDialogWidth">420</x:Double>
-    <x:Double x:Key="ProgressDetailMaxWidth">350</x:Double>
-    <x:Double x:Key="StandardDialogWidth">400</x:Double>
+    <x:Double x:Key="ProgressDialogWidth">440</x:Double>
     <x:Double x:Key="SmallDialogHeight">200</x:Double>
-    
-    <!-- ========== 输入区域约束 ========== -->
-    <x:Double x:Key="InputAreaMinWidth">320</x:Double>
-    <x:Double x:Key="InputAreaMaxWidth">400</x:Double>
-    <x:Double x:Key="MessageMaxWidth">280</x:Double>
-    
-    <!-- ========== 按钮尺寸（AboutPage特定） ========== -->
     <x:Double x:Key="UpdateButtonWidth">100</x:Double>
     <x:Double x:Key="UpdateButtonHeight">36</x:Double>
-    
-    <!-- ========== 其他特定尺寸 ========== -->
-    <x:Double x:Key="SettingsComboBoxWidth">150</x:Double>
-    <x:Double x:Key="MCPServerButtonWidth">120</x:Double>
-    
-    <!-- ========== 窗口尺寸约束 ========== -->
-    <x:Double x:Key="MainWindowMinWidth">800</x:Double>
-    <x:Double x:Key="MainWindowMinHeight">600</x:Double>
 
-    <!-- ========== 导航栏尺寸 ========== -->
-    <GridLength x:Key="NavRailWidth">72</GridLength>
-    <!-- 导航项点击区域与图标：design.md Phase 2.5 收敛（56/48 → 44×44，图标 24 → 22px） -->
-    <x:Double x:Key="NavItemSize">44</x:Double>
-    <x:Double x:Key="NavIconSize">22</x:Double>
-    <Thickness x:Key="MarketLabelMargin">0,4,0,8</Thickness>
-    
-    <!-- ========== 动画时长定义 ========== -->
-    <x:Double x:Key="FastAnimationSeconds">0.15</x:Double>
-    <x:Double x:Key="MediumAnimationSeconds">0.3</x:Double>
-    <x:Double x:Key="SlowAnimationSeconds">0.6</x:Double>
-    <x:Double x:Key="PulseAnimationSeconds">1.5</x:Double>
-    <!-- 注：Transition.Duration 为 TimeSpan 类型，Avalonia XAML 不支持 TimeSpan 资源 Token，
-         各样式中的 Duration 字面量统一收敛至阶梯值 0:0:0.15 / 0:0:0.3 / 0:0:0.6（150/300/600ms） -->
+    <!-- ========== 聊天/侧栏 ========== -->
+    <x:Double x:Key="SidebarDefaultWidth">360</x:Double>
+    <x:Double x:Key="SidebarMinWidth">300</x:Double>
+    <x:Double x:Key="SidebarMaxWidth">480</x:Double>
 
-    <!-- ========== 动画变换 ========== -->
-    <TranslateTransform x:Key="HoverLiftTransform" Y="-2"/>
+    <!-- ========== 通知 ========== -->
+    <x:Double x:Key="NotificationWidth">420</x:Double>
+    <x:Double x:Key="NotificationHeight">84</x:Double>
+    <x:Double x:Key="NotificationMessageMaxHeight">56</x:Double>
+    <CornerRadius x:Key="NotificationIconCornerRadius">12</CornerRadius>
 
 </ResourceDictionary>
-

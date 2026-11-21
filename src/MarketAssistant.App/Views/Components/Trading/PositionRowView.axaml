@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="using:MarketAssistant.Converters"
+             xmlns:models="using:MarketAssistant.Trading.Models"
+             mc:Ignorable="d" d:DesignWidth="600"
+             x:Class="MarketAssistant.Views.Components.Trading.PositionRowView"
+             x:DataType="models:PositionInfo">
+
+    <!-- 持仓行：实时监控页与余额详情页共用。
+         数据源为交易所持仓快照（PositionInfo），方向由 IsShort 表达、数量为绝对值。 -->
+    <UserControl.Resources>
+        <converters:PriceChangeColorConverter x:Key="PnlColorConverter"/>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource TinyCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource TinyBottomMargin}">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+
+            <!-- 符号 + 方向标签（多空互斥，各自独立 Border 以免选中样式泄漏） -->
+            <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Symbol}"
+                           FontSize="{StaticResource BodySmFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"/>
+                <Border Background="{DynamicResource SelectedBackgroundBrush}"
+                        CornerRadius="{StaticResource TinyCornerRadius}"
+                        Padding="{StaticResource TagPadding}"
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding !IsShort}">
+                    <TextBlock Text="多"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"
+                               Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+                <Border Background="{DynamicResource SelectedBackgroundBrush}"
+                        CornerRadius="{StaticResource TinyCornerRadius}"
+                        Padding="{StaticResource TagPadding}"
+                        HorizontalAlignment="Left"
+                        IsVisible="{Binding IsShort}">
+                    <TextBlock Text="空"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </Border>
+            </StackPanel>
+
+            <!-- 数量 / 开仓价 / 标记价 / 强平价 / 杠杆 -->
+            <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
+                <TextBlock Classes="num-sm" Foreground="{DynamicResource TextSecondaryBrush}">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="数量 {0:F6} · 开仓 {1} · 标记 {2}">
+                            <Binding Path="Quantity"/>
+                            <Binding Path="EntryPrice"/>
+                            <Binding Path="CurrentPrice"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+                <!-- 强平价与杠杆：现货（0）自动隐藏，不展示无意义的 0 -->
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}"
+                            IsVisible="{Binding IsLeveraged}">
+                    <TextBlock Classes="num-sm"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               IsVisible="{Binding HasLiquidationPrice}"
+                               Text="{Binding LiquidationPrice, StringFormat='强平 {0:N4}'}"/>
+                    <TextBlock Classes="num-sm"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding Leverage, StringFormat='{}{0:F0}x'}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 未实现盈亏（百分比为含杠杆 ROE） -->
+            <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}"
+                        VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock Classes="num"
+                           HorizontalAlignment="Right"
+                           Foreground="{Binding UnrealizedPnl, Converter={StaticResource PnlColorConverter}}"
+                           Text="{Binding UnrealizedPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"/>
+                <TextBlock Classes="num-sm"
+                           HorizontalAlignment="Right"
+                           Foreground="{Binding UnrealizedPnlPercent, Converter={StaticResource PnlColorConverter}}"
+                           Text="{Binding UnrealizedPnlPercent, StringFormat={}{0:+0.00;-0.00;0.00}%}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -100,12 +100,23 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     /// <summary>当前是否选中历史标签页。</summary>
     public bool IsHistoryTabSelected => SelectedTabIndex == 1;
 
+    /// <summary>当前是否选中规则标签页。</summary>
+    public bool IsRulesTabSelected => SelectedTabIndex == 0;
+
+    [RelayCommand]
+    private void SelectTab(string tabIndex)
+    {
+        if (int.TryParse(tabIndex, out var index))
+            SelectedTabIndex = index;
+    }
+
     /// <summary>告警历史子 ViewModel。</summary>
     public AlertHistoryViewModel AlertHistory { get; }
 
     partial void OnSelectedTabIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsHistoryTabSelected));
+        OnPropertyChanged(nameof(IsRulesTabSelected));
 
         // 进入历史标签页即视为已阅：清除未读徽标（MainWindowViewModel 经 AlertsChanged 刷新）
         if (value == 1)

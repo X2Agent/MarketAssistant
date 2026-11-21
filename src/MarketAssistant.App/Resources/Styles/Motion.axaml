@@ -1,0 +1,69 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================================================================== -->
+    <!-- MarketAssistant Design System v3.0 — Motion Tokens                   -->
+    <!--                                                                     -->
+    <!-- 动效分四种性格，不要混用：                                            -->
+    <!--                                                                     -->
+    <!--  A. 响应（交互反馈）：hover / press / focus                           -->
+    <!--     150–200ms，EaseOut，只改颜色与不透明度，不改尺寸。                 -->
+    <!--     铁律：按钮 hover 仅加深阴影/色阶，禁止放大。                       -->
+    <!--                                                                     -->
+    <!--  B. 入场（内容出现）：卡片加载、列表填充、页面切换                     -->
+    <!--     200–320ms，EaseOut，只做 opacity + 极小位移（≤4px）。              -->
+    <!--     禁止整块缩放，禁止 stagger 超过 6 项（后续项直接显示）。           -->
+    <!--                                                                     -->
+    <!--  C. 性格（表达情绪）：点赞/复制/收藏                                 -->
+    <!--     用 BackEase 回弹，过冲 10%–20%，时长 240–320ms。                  -->
+    <!--     只允许用在"用户主动触发且结果可逆"的动作上。                       -->
+    <!--                                                                     -->
+    <!--  D. 物理（形体与动量）：开关圆点、收藏烟花                            -->
+    <!--     只作用于"形体/粒子"，不与 A 的色阶过渡叠加：                      -->
+    <!--       · 开关圆点在位移途中拉伸成胶囊（90ms），到点后回落（200ms，      -->
+    <!--         BackEase 过冲 ≈12%）；位移本身不做位置过冲，否则会跑出轨道。    -->
+    <!--       · 收藏烟花为一次性粒子扩散（≤520ms，过冲 ≤15%）。               -->
+    <!--     禁止把 D 用回按钮 hover/press —— 那是 A 的地盘，放大即抖动。       -->
+    <!--                                                                     -->
+    <!-- 拖拽：0ms 瞬时到位，不做补间。Avalonia 资源不支持 TimeSpan 类型令牌，   -->
+    <!-- 故在样式里统一写字面量 0:0:0.15 / 0:0:0.2 / 0:0:0.32。                -->
+    <!-- ================================================================== -->
+
+    <!-- ========== 流式打字 ========== -->
+    <!-- 相邻字错开 35ms（规范 30–50ms 区间内取中），单字模糊消退 220ms。 -->
+    <!-- 这两个值由 StreamingTextReveal 控件在 C# 侧读取，保证 XAML 与代码同源。 -->
+    <x:Double x:Key="StreamStaggerMs">35</x:Double>
+    <x:Double x:Key="StreamRevealMs">220</x:Double>
+    <x:Double x:Key="StreamBlurFromRadius">4</x:Double>
+
+    <!-- 复制成功对勾停留时长：2.5s 后自动淡出 -->
+    <x:Double x:Key="CopyFeedbackHoldMs">2500</x:Double>
+    <x:Double x:Key="CopyFeedbackFadeMs">180</x:Double>
+
+    <!-- ========== 物理反馈（性格 D） ========== -->
+    <!-- 开关圆点：位移 220ms（Canvas.Left 过渡，不做过冲；时长直接写在 ToggleSwitchStyles
+         的 DoubleTransition 里——Avalonia 资源不支持 TimeSpan 令牌，见文末说明）；
+         位移途中拉伸 90ms；到点后回落 200ms（BackEaseOut ≈12% 过冲，即"弹一下再落回圆形"）。 -->
+    <x:Double x:Key="SwitchStretchMs">90</x:Double>
+    <x:Double x:Key="SwitchSettleMs">200</x:Double>
+    <!-- 拉伸幅度：16px 圆点横向拉到 20px 正好填满 20px 的圆点行程格
+         （16 × 1.25 = 20），所以不需要给轨道加裁剪也不会溢出。
+         纵向压到 0.90，形成"被拖着走"的胶囊感。 -->
+    <x:Double x:Key="KnobStretchScaleX">1.25</x:Double>
+    <x:Double x:Key="KnobStretchScaleY">0.90</x:Double>
+    <!-- 收藏烟花：总时长与粒子数。粒子数刻意小，桌面端"点一下"不需要庆典感 -->
+    <x:Double x:Key="BurstDurationMs">520</x:Double>
+    <x:Double x:Key="BurstParticleCount">12</x:Double>
+
+    <!-- ========== 缓动 ========== -->
+    <!-- 注意：EasingFunction 是抽象类型，无法作为资源实例持有。
+         CubicEaseOut / BackEaseOut 一律在 Style 的 Animation 里内联声明，
+         这里的常量仅作为命名约定记录，供编写动画时对照：
+           EaseOutStandard -> CubicEaseOut
+           EaseInStandard  -> CubicEaseIn
+           EaseSpring      -> BackEaseOut（振幅 0.15 ≈ 12% 过冲） -->
+
+    <!-- 位移：v3 取消 hover lift，也没有拖拽排序，故不提供位移令牌。
+         入场如果需要极小位移，在具体动画里直接写内联 KeyFrame。 -->
+
+</ResourceDictionary>

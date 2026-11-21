@@ -4,11 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="450"
              x:Class="MarketAssistant.Views.Components.AdaptiveCardView">
-    <Border Background="{DynamicResource CardBackgroundBrush}"
-            BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="{StaticResource DefaultBorderThickness}"
-            CornerRadius="{StaticResource CardCornerRadius}"
-            Padding="{StaticResource DefaultPadding}">
+    <!-- 自适应卡片嵌在聊天气泡/报告卡片内部，用次级表面与外部白色卡片区分，
+         否则同色叠加会让卡片边界消失 -->
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource SmallCornerRadius}"
+            Padding="{StaticResource DefaultCardPadding}">
         <StackPanel x:Name="CardContainer" Spacing="{StaticResource SmallSpacing}" />
     </Border>
 </UserControl>

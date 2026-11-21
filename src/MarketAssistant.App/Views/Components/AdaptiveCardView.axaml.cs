@@ -3,19 +3,21 @@ using AdaptiveCards;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
-using Avalonia.Media;
-
 using Avalonia.Markup.Xaml.MarkupExtensions;
+using Avalonia.Media;
 
 namespace MarketAssistant.Views.Components;
 
 public partial class AdaptiveCardView : UserControl
 {
+    // Adaptive Card 的字号档位映射到应用的五档（12/14/16/24/32）。
+    // 卡片标准里的 20 与 24 在应用内没有对应档，就近落到 Title(24) 与 Display(32)，
+    // 避免外部卡片把第六、第七档字号带进界面。
     private const int SmallFontSize = 12;
     private const int DefaultFontSize = 14;
     private const int MediumFontSize = 16;
-    private const int LargeFontSize = 20;
-    private const int ExtraLargeFontSize = 24;
+    private const int LargeFontSize = 24;
+    private const int ExtraLargeFontSize = 32;
     private const int ContainerSpacing = 8;
     private const int ContainerPadding = 12;
     private const int ContainerCornerRadius = 6;
@@ -87,15 +89,14 @@ public partial class AdaptiveCardView : UserControl
                 AdaptiveTextSize.ExtraLarge => ExtraLargeFontSize,
                 _ => DefaultFontSize
             },
+        };
 
-            // Weight
-            FontWeight = textBlock.Weight switch
-            {
-                AdaptiveTextWeight.Lighter => FontWeight.Light,
-                AdaptiveTextWeight.Default => FontWeight.Normal,
-                AdaptiveTextWeight.Bolder => FontWeight.Bold,
-                _ => FontWeight.Normal
-            }
+        // Weight 走主题令牌：卡片里的 Bolder 只是"相对更重"，不是 Bold 字面量，
+        // 否则暗色模式下会白字发粗（design.md 3.2 要求字重随主题降档）
+        tb[!TextBlock.FontWeightProperty] = textBlock.Weight switch
+        {
+            AdaptiveTextWeight.Bolder => new DynamicResourceExtension("WeightTitle"),
+            _ => new DynamicResourceExtension("WeightBody"),
         };
 
         // Color — 对齐到项目真实主题资源（不再依赖幽灵 SystemControl* 画刷）
@@ -145,17 +146,16 @@ public partial class AdaptiveCardView : UserControl
             CornerRadius = new CornerRadius(ContainerCornerRadius)
         };
 
-        // Style based on container style —— 两种容器风格一致，仅靠颜色区分语义
+        // Style based on container style —— 两种容器风格一致，仅靠颜色区分语义。
+        // 卡片外壳是次级表面（SurfaceVariantBrush），Emphasis 容器因此取卡片白，
+        // 用"灰面上的白块"表达强调；同色叠加会完全看不见。
         if (container.Style == AdaptiveContainerStyle.Emphasis)
         {
-            border[!Border.BackgroundProperty] = new DynamicResourceExtension("SurfaceVariantBrush");
+            border[!Border.BackgroundProperty] = new DynamicResourceExtension("CardBackgroundBrush");
         }
         else if (container.Style == AdaptiveContainerStyle.Attention)
         {
             border[!Border.BackgroundProperty] = new DynamicResourceExtension("DangerPanelBackgroundBrush");
-            border[!Border.BorderBrushProperty] = new DynamicResourceExtension("DangerPanelBorderBrush");
-            border.BorderThickness = new Thickness(3, 0, 0, 0);
-            border.CornerRadius = new CornerRadius(ContainerCornerRadius, 0, 0, ContainerCornerRadius);
         }
 
         return border;
@@ -233,9 +233,9 @@ public partial class AdaptiveCardView : UserControl
             var title = new TextBlock
             {
                 Text = fact.Title,
-                FontWeight = FontWeight.Medium,
                 Margin = new Thickness(0, 0, 0, 6)
             };
+            title[!TextBlock.FontWeightProperty] = new DynamicResourceExtension("WeightEmphasis");
             title[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
 
             Grid.SetRow(title, i);
@@ -282,9 +282,9 @@ public partial class AdaptiveCardView : UserControl
         {
             Text = "Image: " + image.Url,
             VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            FontSize = 10
+            HorizontalAlignment = HorizontalAlignment.Center
         };
+        textBlock[!TextBlock.FontSizeProperty] = new DynamicResourceExtension("CaptionFontSize");
         textBlock[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
 
         var border = new Border

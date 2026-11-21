@@ -31,10 +31,4 @@ public static class AnalystDisplayNameMapper
         => !string.IsNullOrEmpty(asciiName) && NameToDisplayName.TryGetValue(asciiName, out var displayName)
             ? displayName
             : asciiName ?? string.Empty;
-
-    /// <summary>
-    /// 判断给定名称是否为已登记的分析师/协调者 ASCII 名
-    /// </summary>
-    public static bool IsKnownAnalystName(string? asciiName)
-        => !string.IsNullOrEmpty(asciiName) && NameToDisplayName.ContainsKey(asciiName);
 }

@@ -49,6 +49,9 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     /// <summary>当前绑定事件的实时行情服务。导航参数携带的市场与当前绑定不一致时重新绑定。</summary>
     private IRealtimeQuoteService? _quoteService;
 
+    /// <summary>骨架延迟计时（首屏加载 300ms 后才显示骨架，避免快数据源闪烁）。</summary>
+    private CancellationTokenSource? _skeletonDelayCts;
+
     [ObservableProperty]
     private KLineType _currentKLineType = KLineType.Daily;
 
@@ -80,7 +83,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     /// <summary>行情数据区块是否可见：有指标数据、首屏骨架或加载失败（可重试）时渲染；ETF/基金等快照无指标时整卡隐藏。</summary>
     public bool SnapshotSectionVisible =>
-        SnapshotState.HasData || SnapshotState.ShowSkeleton || SnapshotState.IsFailed;
+        SnapshotState.HasData || SnapshotSkeletonVisible || SnapshotState.IsFailed;
 
     /// <summary>卖盘各档，按「卖 N → 卖一」展示，使卖一紧邻中间价。</summary>
     [ObservableProperty]
@@ -141,7 +144,25 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     /// <summary>当前市场是否提供盘口深度（A 股无公开五档数据源）。</summary>
     public bool SupportsOrderBook => _marketContext.CurrentCapability.SupportsOrderBook;
 
-    partial void OnSnapshotStateChanged(SectionState value) => OnPropertyChanged(nameof(SnapshotSectionVisible));
+    /// <summary>
+    /// 盘口区块骨架是否可见：与行情数据同一延迟信号，避免快数据源下右侧两卡各闪一下灰块。
+    /// </summary>
+    public bool OrderBookSkeletonVisible => OrderBookState.ShowSkeleton && IsSkeletonVisible;
+
+    partial void OnSnapshotStateChanged(SectionState value)
+    {
+        OnPropertyChanged(nameof(SnapshotSectionVisible));
+        OnPropertyChanged(nameof(SnapshotSkeletonVisible));
+    }
+
+    partial void OnOrderBookStateChanged(SectionState value) => OnPropertyChanged(nameof(OrderBookSkeletonVisible));
+
+    /// <summary>
+    /// 行情数据区块骨架是否可见：区块在加载中、尚无数据，且首屏延迟已到。
+    /// <see cref="SectionState.ShowSkeleton"/> 只看区块自身状态，快数据源下会闪一下，
+    /// 故再叠加 <see cref="IsSkeletonVisible"/> 这个统一的延迟信号。
+    /// </summary>
+    public bool SnapshotSkeletonVisible => SnapshotState.ShowSkeleton && IsSkeletonVisible;
 
     /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
     public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
@@ -155,6 +176,73 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
     /// <summary>刷新中但已有内容：主图不闪骨架屏，仅提示正在刷新。</summary>
     public bool IsRefreshing => IsBusy && !IsInitialLoading;
+
+    /// <summary>
+    /// 骨架屏延迟窗口。数据源快的时候（虚拟币批量行情、ETF 走新浪约 180ms）骨架屏只会闪一两帧，
+    /// 比不显示更刺眼；超过该时长才认为"确实在等"，此时才展示骨架。
+    /// </summary>
+    private static readonly TimeSpan SkeletonDelay = TimeSpan.FromMilliseconds(300);
+
+    private bool _isSkeletonVisible;
+
+    /// <summary>
+    /// 首屏骨架是否可见：加载已持续超过 <see cref="SkeletonDelay"/>。
+    /// K 线主图与右栏各区块共用同一信号——它们在同一次页面加载里并行拉取，
+    /// 若只有主图延迟、右栏不延迟，快数据源下右栏仍会闪一下骨架（ETF 尤其明显：
+    /// 快照只有开高低收、没有任何快照级指标，数据一到整张卡片直接隐藏）。
+    /// </summary>
+    public bool IsSkeletonVisible
+    {
+        get => _isSkeletonVisible;
+        private set
+        {
+            if (!SetProperty(ref _isSkeletonVisible, value))
+                return;
+
+            OnPropertyChanged(nameof(SnapshotSkeletonVisible));
+            OnPropertyChanged(nameof(OrderBookSkeletonVisible));
+        }
+    }
+
+    /// <summary>
+    /// 跟踪本次首屏加载的延迟骨架计时。加载结束后由 <see cref="StopSkeletonDelay"/> 取消，
+    /// 保证骨架不会在数据到达后才冒出来。
+    /// </summary>
+    private void StartSkeletonDelay()
+    {
+        StopSkeletonDelay();
+        _skeletonDelayCts = new CancellationTokenSource();
+        _ = ShowSkeletonAfterDelayAsync(_skeletonDelayCts.Token);
+    }
+
+    private async Task ShowSkeletonAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SkeletonDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        // 延迟期间加载可能已完成（State 已离开 Loading），此时不得再亮骨架
+        if (IsLoading)
+            IsSkeletonVisible = true;
+    }
+
+    private void StopSkeletonDelay()
+    {
+        IsSkeletonVisible = false;
+
+        var cts = _skeletonDelayCts;
+        _skeletonDelayCts = null;
+        if (cts == null)
+            return;
+
+        cts.Cancel();
+        cts.Dispose();
+    }
 
     public bool IsMinuteSelected => CurrentKLineType == KLineType.Minute15;
     public bool IsDailySelected => CurrentKLineType == KLineType.Daily;
@@ -307,7 +395,8 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         if (string.IsNullOrEmpty(AssetCode))
             return;
 
-        try
+        // 不走 SafeExecuteAsync：它会切换 IsBusy，而 IsBusy 由页面加载流程独占
+        await GlobalExceptionHandler.SafeExecuteAsync(async () =>
         {
             var favoriteService = _marketContext.GetService<IFavoriteService>();
             var code = NormalizeFavoriteCode(out var market);
@@ -323,11 +412,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
             // 以数据库真实状态回显，避免本地取反与持久化状态漂移
             await RefreshFavoriteStateAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "切换资产 {AssetCode} 收藏状态失败", AssetCode);
-        }
+        }, operationName: "切换收藏", logger: Logger);
     }
 
     private void ChangeKLineTypeAsync(string? type)
@@ -368,26 +453,34 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         IsBusy = true;
 
+        // 首屏（尚无内容）才需要骨架；刷新/切换周期时已有内容，由 IsRefreshing 提示
+        if (!HasLoadedContent)
+            StartSkeletonDelay();
+
         try
         {
             var kLineTask = LoadKLineSectionAsync(assetCode, cancellationToken);
             var snapshotTask = LoadSnapshotSectionAsync(assetCode, cancellationToken);
             var orderBookTask = LoadOrderBookSectionAsync(assetCode, cancellationToken);
 
+            // LoadAsync 与各区块均自行处理异常，此处只负责等待并行区块全部结束
             await LoadAsync(_ => kLineTask, "加载K线数据", cancellationToken);
 
-            // 各区块自行捕获异常，此处仅兜底，防止某个区块的异常逃逸成未观察任务
+            // K 线一就绪就撤骨架：此时图表控件要开始绘制，
+            // 骨架若等到右栏也加载完（含盘口轮询首轮）才撤，会盖在新画出来的图上
+            if (generation == _pageLoadGeneration)
+                StopSkeletonDelay();
+
             await Task.WhenAll(snapshotTask, orderBookTask);
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "加载资产 {AssetCode} 的行情区块时发生错误", assetCode);
         }
         finally
         {
             // 过期调用不得清除忙碌态，否则会提前关掉新加载的刷新提示
             if (generation == _pageLoadGeneration)
+            {
                 IsBusy = false;
+                StopSkeletonDelay();
+            }
         }
     }
 
@@ -815,6 +908,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void OnNavigatedFrom()
     {
         _loadingCancellationTokenSource?.Cancel();
+        StopSkeletonDelay();
         DetachRealtimeQuoteService();
         StopOrderBookPolling();
     }
@@ -822,6 +916,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     public void Dispose()
     {
         _loadingCancellationTokenSource?.Cancel();
+        StopSkeletonDelay();
         DetachRealtimeQuoteService();
         StopOrderBookPolling();
         GC.SuppressFinalize(this);

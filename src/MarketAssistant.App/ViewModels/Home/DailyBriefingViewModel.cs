@@ -53,6 +53,9 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     /// <summary>累计摘要是否有内容可展示。</summary>
     public bool ShowUsageSummary => !string.IsNullOrEmpty(UsageSummaryText);
 
+    /// <summary>缓存首屏加载或手动生成时展示正文骨架。</summary>
+    public bool ShowBriefingSkeleton => IsGenerating || IsInitialLoading;
+
     /// <summary>
     /// 打开简报弹窗。窗口的创建、owner 选择与重复打开防护统一由窗口服务处理；
     /// 打开前先刷新一次缓存与开关快照，保证弹窗展示的是最新状态。
@@ -73,7 +76,6 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
         _marketContext = marketContext;
         _windowService = windowService;
         EmptyMessage = "今日简报尚未生成。生成会产生模型调用与费用，确认后点击「生成今日简报」。";
-        SetRetryCommand(() => RetryAsync());
         SubscribeToMarketChanges(_marketContext);
 
         // 纯手动策略：此处只读取当天缓存，绝不自动触发生成。
@@ -101,8 +103,7 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
         await GenerateAsync(force: true);
     }
 
-    /// <summary>失败态重试：重新生成当天简报。</summary>
-    [RelayCommand]
+    /// <summary>生成失败后的重试：重新生成当天简报。</summary>
     private async Task RetryAsync()
     {
         await GenerateAsync(force: true);
@@ -119,32 +120,24 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
     /// </remarks>
     private async Task LoadCachedAsync()
     {
-        await SafeExecuteAsync(async () =>
+        SetRetryCommand(() => LoadCachedAsync());
+        await LoadAsync(async ct =>
         {
-            IsBriefingEnabled = BriefingService.IsEnabled;
+            var briefingService = BriefingService;
+            IsBriefingEnabled = briefingService.IsEnabled;
 
-            var cached = await BriefingService.GetTodayAsync();
+            var cached = await briefingService.GetTodayAsync(ct);
             if (_disposed)
-                return;
+                return cached != null;
 
-            if (cached != null)
-            {
-                ApplyBriefing(cached);
-            }
-
+            ApplyBriefing(cached);
             await RefreshUsageSummaryAsync();
 
-            // 缓存未命中：进入空态，等用户显式点击「生成今日简报」。
-            // 功能总开关关闭时需给出不同文案——两种情况用户的下一步动作不同。
-            if (cached != null)
-            {
-                return;
-            }
-
-            EmptyMessage = BriefingService.IsEnabled
+            // 缓存未命中只进入空态；重试也只重读缓存，不产生模型费用。
+            EmptyMessage = briefingService.IsEnabled
                 ? "今日简报尚未生成。生成会产生模型调用与费用，确认后点击「生成今日简报」。"
                 : "每日简报功能已关闭，可在设置中重新开启";
-            SetEmpty();
+            return cached != null;
         }, "加载每日简报");
     }
 
@@ -163,6 +156,7 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        SetRetryCommand(() => RetryAsync());
         IsGenerating = true;
         try
         {
@@ -188,7 +182,6 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
 
             Logger?.LogWarning(ex, "生成每日简报失败");
             SetFailed(ErrorMessageMapper.GetUserFriendlyMessageWithContext(ex, "生成每日简报"));
-            SetRetryCommand(() => RetryAsync());
         }
         finally
         {
@@ -281,6 +274,11 @@ public partial class DailyBriefingViewModel : ViewModelBase, IDisposable
         if (e.PropertyName == nameof(UsageSummaryText))
         {
             OnPropertyChanged(nameof(ShowUsageSummary));
+        }
+
+        if (e.PropertyName is nameof(IsGenerating) or nameof(IsInitialLoading))
+        {
+            OnPropertyChanged(nameof(ShowBriefingSkeleton));
         }
     }
 }

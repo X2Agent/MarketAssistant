@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:abstractions="using:MarketAssistant.Trading.Abstractions"
+             mc:Ignorable="d" d:DesignWidth="600"
+             x:Class="MarketAssistant.Views.Components.Trading.OrderRowView"
+             x:DataType="abstractions:ExchangeOrderResult">
+
+    <!-- 未完成订单行：实时监控页与余额详情页共用。
+         成交进度 = 已成交 / 请求量，部分成交会直接体现为进度未满，
+         避免"已触发"被误读成"已完全退出"。 -->
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource TinyCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource TinyBottomMargin}">
+        <StackPanel Spacing="{StaticResource TinySpacing}">
+
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Symbol}"
+                           FontSize="{StaticResource BodySmFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"
+                           VerticalAlignment="Center"/>
+                <Border Grid.Column="1"
+                        Background="{DynamicResource SelectedBackgroundBrush}"
+                        CornerRadius="{StaticResource TinyCornerRadius}"
+                        Padding="{StaticResource TagPadding}"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Side}"
+                               FontSize="{StaticResource CaptionFontSize}"
+                               FontWeight="{DynamicResource WeightEmphasis}"
+                               Foreground="{StaticResource AccentBrush}"/>
+                </Border>
+                <TextBlock Grid.Column="2"
+                           Classes="num-sm"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="委托 {0} · 成交 {1}">
+                            <Binding Path="RequestedQty"/>
+                            <Binding Path="ExecutedQty"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+                <TextBlock Grid.Column="3"
+                           Classes="caption"
+                           VerticalAlignment="Center"
+                           Text="{Binding Type}"/>
+            </Grid>
+
+            <!-- 成交进度：满格即已完全成交，未满说明仍有剩余量在交易所挂单中 -->
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SmallSpacing}">
+                <ProgressBar Grid.Column="0"
+                             Minimum="0" Maximum="100"
+                             Value="{Binding FillProgressPercent}"
+                             Height="{StaticResource ProgressBarHeight}"
+                             VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1"
+                           Classes="num-sm"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"
+                           Text="{Binding FillProgressPercent, StringFormat={}{0:F0}%}"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

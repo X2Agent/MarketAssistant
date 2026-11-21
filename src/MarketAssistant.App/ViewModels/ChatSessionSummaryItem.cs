@@ -10,8 +10,6 @@ public partial class ChatSessionSummaryItem : ObservableObject
 {
     public ChatSessionSummaryItem(ChatSessionSummary summary)
     {
-        ArgumentNullException.ThrowIfNull(summary);
-
         Id = summary.Id;
         Title = summary.Title;
         StockCode = summary.StockCode;

@@ -277,6 +277,23 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         }
     }
 
+    private static readonly string[] BullishKeywords = ["买入", "做多", "利好"];
+    private static readonly string[] BearishKeywords = ["卖出", "减持", "做空", "利空"];
+
+    /// <summary>
+    /// 多空文字取色，遵循 A 股「红涨绿跌」约定（docs/design.md 2.5）。
+    /// Adaptive Card 调色板没有涨跌语义，这里借用 Attention（渲染为红）表示看多、Good（渲染为绿）表示看空；
+    /// 各 parser 一律走此方法，不要再手写 Good / Attention 判断。
+    /// </summary>
+    protected static AdaptiveTextColor DirectionColor(string text, AdaptiveTextColor neutral = AdaptiveTextColor.Default)
+    {
+        if (BullishKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal)))
+            return AdaptiveTextColor.Attention;
+        if (BearishKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal)))
+            return AdaptiveTextColor.Good;
+        return neutral;
+    }
+
     /// <summary>
     /// 枚举的描述文本；为 null 时返回 <paramref name="fallback"/>（模型未给出该字段）。
     /// </summary>

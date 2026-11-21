@@ -46,26 +46,19 @@
                   ClipToBounds="True"
                   RowDefinitions="Auto,*">
 
-                <!-- 顶部工具栏：包含更多操作菜单按钮 -->
+                <!-- 顶部工具栏：只保留「更多操作」。页面标题已由主窗口返回条承担，
+                     不再在报告区重复一遍（避免一屏两标题）。 -->
                 <Border Grid.Row="0"
-                        Height="48"
                         Background="Transparent"
-                        BorderBrush="{DynamicResource DividerBrush}"
-                        BorderThickness="{StaticResource BottomBorderThickness}"
-                        Padding="{StaticResource SmallHorizontalPadding}">
+                        BorderThickness="{StaticResource NoBorderThickness}"
+                        Padding="{StaticResource SmallHorizontalPadding}"
+                        Margin="{StaticResource TinyVerticalMargin}">
                     <Button HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Width="{StaticResource SmallIconButtonSize}"
-                            Height="{StaticResource SmallIconButtonSize}"
-                            CornerRadius="{StaticResource SmallCornerRadius}"
-                            Background="Transparent"
-                            BorderThickness="{StaticResource NoBorderThickness}"
-                            Padding="{StaticResource NoPadding}"
-                            FontSize="{StaticResource LargeFontSize}"
+                            Classes="btn-icon-sm"
+                            FontSize="{StaticResource TitleFontSize}"
                             Content="⋮"
                             Foreground="{DynamicResource TextPrimaryBrush}"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
                             ToolTip.Tip="更多操作">
                         <Button.Styles>
                             <Style Selector="Button:pointerover /template/ ContentPresenter">
@@ -81,6 +74,12 @@
                                     <StackPanel>
                                         <StackPanel.Styles>
                                             <Style Selector="Button">
+                                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+                                                <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
+                                                <Setter Property="Margin" Value="{StaticResource TinyBottomMargin}"/>
                                                 <Setter Property="Transitions">
                                                     <Transitions>
                                                         <BrushTransition Property="Background" Duration="0:0:0.15"/>
@@ -95,70 +94,58 @@
                                             </Style>
                                         </StackPanel.Styles>
 
+                                        <!-- 重新分析：报告已经展示时也需要重跑入口，
+                                             否则唯一的入口只剩空态/失败浮层里的按钮 -->
+                                        <Button Command="{Binding RetryAnalysisCommand}"
+                                                IsEnabled="{Binding !IsBusy}">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
+                                                <svg:Svg Path="/Assets/Images/icon_refresh.svg"
+                                                         Width="{StaticResource BodySmFontSize}"
+                                                         Height="{StaticResource BodySmFontSize}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Text="重新分析" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
                                         <!-- 导出报告 -->
-                                        <Button HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Left"
-                                                Background="Transparent"
-                                                BorderThickness="{StaticResource NoBorderThickness}"
-                                                Padding="{StaticResource CompactCardPadding}"
-                                                Margin="{StaticResource TinyBottomMargin}"
-                                                Command="{Binding ExportReportCommand}"
+                                        <Button Command="{Binding ExportReportCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                                 <svg:Svg Path="/Assets/Images/icon_document.svg"
-                                                         Width="{StaticResource LabelFontSize}"
-                                                         Height="{StaticResource LabelFontSize}"
+                                                         Width="{StaticResource BodySmFontSize}"
+                                                         Height="{StaticResource BodySmFontSize}"
                                                          VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 Markdown 报告" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
                                         <!-- 导出分享图 / PDF -->
-                                        <Button HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Left"
-                                                Background="Transparent"
-                                                BorderThickness="{StaticResource NoBorderThickness}"
-                                                Padding="{StaticResource CompactCardPadding}"
-                                                Margin="{StaticResource TinyBottomMargin}"
-                                                Command="{Binding ExportShareImageCommand}"
+                                        <Button Command="{Binding ExportShareImageCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                                 <svg:Svg Path="/Assets/Images/icon_chart.svg"
-                                                         Width="{StaticResource LabelFontSize}"
-                                                         Height="{StaticResource LabelFontSize}"
+                                                         Width="{StaticResource BodySmFontSize}"
+                                                         Height="{StaticResource BodySmFontSize}"
                                                          VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出分享图（PNG）" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
-                                        <Button HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Left"
-                                                Background="Transparent"
-                                                BorderThickness="{StaticResource NoBorderThickness}"
-                                                Padding="{StaticResource CompactCardPadding}"
-                                                Margin="{StaticResource TinyBottomMargin}"
-                                                Command="{Binding ExportPdfCommand}"
+                                        <Button Command="{Binding ExportPdfCommand}"
                                                 IsEnabled="{Binding CanExportReport}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                                 <svg:Svg Path="/Assets/Images/icon_document.svg"
-                                                         Width="{StaticResource LabelFontSize}"
-                                                         Height="{StaticResource LabelFontSize}"
+                                                         Width="{StaticResource BodySmFontSize}"
+                                                         Height="{StaticResource BodySmFontSize}"
                                                          VerticalAlignment="Center"/>
                                                 <TextBlock Text="导出 PDF" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
 
-                                        <!-- 分隔线 -->
-                                        <Border Height="{StaticResource DividerHeight}"
-                                                Background="{DynamicResource DividerBrush}"
-                                                Margin="{StaticResource TinyVerticalMargin}"
-                                                IsVisible="{Binding HasReportHistory}"/>
-
-                                        <!-- 历史报告标题 -->
+                                        <!-- 历史报告标题：用色阶与上方的操作区分组，不画分隔线 -->
                                         <TextBlock Text="历史报告"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                                   Margin="{StaticResource SectionTitleMargin}"
+                                                   Classes="caption"
+                                                   FontWeight="{DynamicResource WeightTitle}"
+                                                   Margin="{StaticResource SmallTopMargin}"
                                                    IsVisible="{Binding HasReportHistory}"/>
 
                                         <!-- 历史报告列表（可滚动） -->
@@ -169,24 +156,18 @@
                                             <ItemsControl ItemsSource="{Binding ReportHistory}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="models:ReportSummary">
-                                                        <Button HorizontalAlignment="Stretch"
-                                                                HorizontalContentAlignment="Left"
-                                                                Background="Transparent"
-                                                                BorderThickness="{StaticResource NoBorderThickness}"
-                                                                Padding="{StaticResource ListItemPadding}"
-                                                                Margin="{StaticResource TinyBottomMargin}"
-                                                                Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
+                                                        <Button Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
                                                                 CommandParameter="{Binding}">
                                                             <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                                 <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
-                                                                           FontSize="{StaticResource SmallFontSize}"
-                                                                           FontWeight="SemiBold"/>
+                                                                           Classes="caption"
+                                                                           FontFamily="{StaticResource DataFontFamily}"
+                                                                           FontWeight="{DynamicResource WeightTitle}"
+                                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                                 <TextBlock Text="{Binding ScoreTrendText}"
-                                                                           FontSize="{StaticResource TinyFontSize}"
-                                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                           Classes="caption"/>
                                                                 <TextBlock Text="{Binding KeyScoreChangeText}"
-                                                                           FontSize="{StaticResource TinyFontSize}"
-                                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                           Classes="caption"/>
                                                             </StackPanel>
                                                         </Button>
                                                     </DataTemplate>
@@ -196,8 +177,7 @@
 
                                         <!-- 无历史报告占位 -->
                                         <TextBlock Text="暂无历史报告"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Classes="caption"
                                                    HorizontalAlignment="Center"
                                                    Margin="{StaticResource DefaultVerticalMargin}"
                                                    IsVisible="{Binding !HasReportHistory}"/>
@@ -225,23 +205,21 @@
                         Text="数据来源网络，仅供参考。投资有风险，入市需谨慎！" 
                         OpacityValue="0.15" 
                         Angle="-30" 
-                        FontSize="{StaticResource ExtraLargeFontSize}" 
+                        FontSize="{StaticResource DisplayFontSize}" 
                         HorizontalRepeatCount="2" 
                         VerticalRepeatCount="4" 
                         ZIndex="999" 
                         IsHitTestVisible="False"/>
 
                     <!-- 智能助手 FAB（伴侣侧边栏打开时隐藏） -->
-                    <Button Margin="{StaticResource FABMargin}"
+                    <Button Classes="btn-primary"
+                            Margin="{StaticResource FABMargin}"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Bottom"
                             ZIndex="1000"
                             Width="{StaticResource FABSize}"
                             Height="{StaticResource FABSize}"
                             CornerRadius="{StaticResource FABCornerRadius}"
-                            Background="{StaticResource PrimaryBrush}"
-                            Foreground="{StaticResource TextOnEmphasisBrush}"
-                            BorderThickness="{StaticResource NoBorderThickness}"
                             Padding="{StaticResource NoPadding}"
                             Command="{Binding ToggleChatSidebarCommand}"
                             IsVisible="{Binding !IsChatSidebarVisible}"
@@ -249,17 +227,10 @@
                             HorizontalContentAlignment="Center"
                             VerticalContentAlignment="Center">
                         <svg:Svg Path="/Assets/Images/icon_chat.svg"
-                                 Width="24" Height="24"
+                                 Width="{StaticResource DefaultIconSize}"
+                                 Height="{StaticResource DefaultIconSize}"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"/>
-                        <Button.Styles>
-                            <Style Selector="Button:pointerover /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
-                            </Style>
-                            <Style Selector="Button:pressed /template/ ContentPresenter">
-                                <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
-                            </Style>
-                        </Button.Styles>
                     </Button>
                 </Grid>
 
@@ -273,15 +244,18 @@
                                            ZIndex="1"/>
             </Grid>
 
-            <!-- 右侧：并列常驻/展开的 AI 伴侣助手侧边栏 (无遮罩，边看研报边提问) -->
+            <!-- 右侧：并列常驻/展开的 AI 伴侣助手侧边栏 (无遮罩，边看研报边提问)。
+                 独立圆角面板：用卡片表面与页面底色分层，不靠左描边割裂。 -->
             <Border Grid.Column="1"
                     IsVisible="{Binding IsChatSidebarVisible}"
                     Width="{StaticResource SidebarDefaultWidth}"
                     MinWidth="{StaticResource SidebarMinWidth}"
                     MaxWidth="{StaticResource SidebarMaxWidth}"
                     Background="{DynamicResource CardBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="{StaticResource LeftBorderThickness}">
+                    BorderThickness="{StaticResource NoBorderThickness}"
+                    Margin="{StaticResource LeftMargin}"
+                    CornerRadius="{StaticResource CardCornerRadius}"
+                    ClipToBounds="True">
                 <ContentControl Content="{Binding ChatSidebarViewModel}">
                     <ContentControl.ContentTemplate>
                         <DataTemplate x:DataType="vm:ChatSidebarViewModel">

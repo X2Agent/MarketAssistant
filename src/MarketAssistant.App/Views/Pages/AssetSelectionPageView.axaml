@@ -21,33 +21,37 @@
         <converts:NullableVisibilityConverter x:Key="NullableVisibilityConverter"/>
     </UserControl.Resources>
 
-    <!-- 快捷策略/推荐卡片等局部样式（对齐原型 q-card / rst-card） -->
+    <!-- 快捷策略/推荐卡片等局部样式（对齐原型 q-card / rst-card）
+         v3：无边框。hover 只加深表面色阶，选中态用 AccentRing 阴影环，
+         不能再用 BorderBrush 换色——DefaultBorderThickness 已归零，换色不可见。 -->
     <UserControl.Styles>
         <Style Selector="Border.q-card">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
             <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
             <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                    <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Border.q-card:pointerover">
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        </Style>
+        <Style Selector="Border.q-card:focus-visible">
+            <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
         </Style>
         <Style Selector="Border.rst-card">
             <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+            <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
             <Setter Property="CornerRadius" Value="{StaticResource MediumCornerRadius}"/>
             <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         </Style>
         <Style Selector="Border.score-badge">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
             <Setter Property="Padding" Value="10,4"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -60,43 +64,11 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- 加载指示器（覆盖层） -->
-        <Border Grid.Row="0" Grid.RowSpan="2"
-                Background="{DynamicResource DarkOverlayBrush}"
-                IsVisible="{Binding IsBusy}"
-                ZIndex="1000">
-            <Border Background="{DynamicResource CardBackgroundBrush}"
-                    CornerRadius="{StaticResource DefaultCornerRadius}"
-                    Padding="{StaticResource ProgressDialogPadding}"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    MinWidth="{StaticResource InputAreaMinWidth}"
-                    MaxWidth="{StaticResource InputAreaMaxWidth}"
-                    BoxShadow="{StaticResource ElevatedBoxShadow}">
-                <StackPanel Spacing="{StaticResource LargeSpacing}">
-                    <controls:LoadingDots/>
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="正在分析中"
-                                   FontSize="{StaticResource LargeFontSize}"
-                                   FontWeight="SemiBold"
-                                   HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding LoadingText}"
-                                   FontSize="{StaticResource LabelFontSize}"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center"
-                                   TextWrapping="Wrap"
-                                   TextAlignment="Center"
-                                   MaxWidth="{StaticResource MessageMaxWidth}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
-
-        <ScrollViewer Grid.Row="1" IsVisible="{Binding !IsInitialLoading}">
+    <!-- 根用 Panel 叠放：两个 ScrollViewer（内容 / 骨架）互斥显示，
+         分析中遮罩排在最后，天然浮在最上层，无需 RowSpan + ZIndex。 -->
+    <Panel Background="{DynamicResource PageBackgroundBrush}">
+        <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
             <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
-                <!-- 页面标题已在顶栏显示，页面内不再重复 -->
-
                 <!-- 选币模式：等宽三卡（图标 + 名称 + 描述，对齐原型 mode-card） -->
                 <ItemsControl ItemsSource="{Binding SelectionModes}">
                     <ItemsControl.ItemsPanel>
@@ -108,7 +80,7 @@
                         <DataTemplate x:DataType="vm:SelectionModeItem">
                             <Border Classes.mode-card="True"
                                     Classes.selected="{Binding IsSelected}"
-                                    Margin="{StaticResource TinyRightMargin}"
+                                    Margin="{StaticResource TinyMargin}"
                                     Focusable="True"
                                     KeyDown="OnCardKeyDown"
                                     AutomationProperties.Name="{Binding Name}">
@@ -118,12 +90,12 @@
                                              Height="{StaticResource DefaultIconSize}"
                                              HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding Name}"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               FontWeight="SemiBold"
+                                               FontSize="{StaticResource BodySmFontSize}"
+                                               FontWeight="{DynamicResource WeightTitle}"
                                                Classes="mode-name"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding Description}"
-                                               FontSize="{StaticResource MiniFontSize}"
+                                               FontSize="{StaticResource CaptionFontSize}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
@@ -134,19 +106,19 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- 验证提示消息 -->
+                <!-- 验证提示消息：语义底 + 语义字，无描边 -->
                 <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
-                        BorderBrush="{DynamicResource WarningPanelBorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
+                        BorderThickness="{StaticResource NoBorderThickness}"
                         CornerRadius="{StaticResource CardCornerRadius}"
                         Padding="{StaticResource DefaultCardPadding}"
                         IsVisible="{Binding HasValidationMessage}">
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="ℹ️"
-                                   FontSize="{StaticResource SectionTitleFontSize}"
-                                   VerticalAlignment="Center"/>
+                        <svg:Svg Path="/Assets/Images/icon_warning.svg"
+                                 Width="{StaticResource TinyIconSize}"
+                                 Height="{StaticResource TinyIconSize}"
+                                 VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding ValidationMessage}"
-                                   FontSize="{StaticResource LabelFontSize}"
+                                   Classes="body-sm"
                                    Foreground="{DynamicResource WarningPanelTextBrush}"
                                    TextWrapping="Wrap"
                                    VerticalAlignment="Center"/>
@@ -164,8 +136,7 @@
                         <Button Content="{Binding CurrentButtonText}"
                                 Command="{Binding ExecuteAnalysisCommand}"
                                 IsEnabled="{Binding !IsBusy}"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="{StaticResource TextOnEmphasisBrush}"
+                                Classes="btn-primary"
                                 MinWidth="{StaticResource MediumButtonMinWidth}"/>
                         <Button Content="清除"
                                 Command="{Binding ClearContentCommand}"
@@ -177,8 +148,8 @@
                 <StackPanel Spacing="{StaticResource SmallSpacing}"
                             IsVisible="{Binding IsQuickStrategyAreaVisible}">
                     <TextBlock Text="{Binding QuickStrategyTitle}"
-                               FontSize="{StaticResource LabelFontSize}"
-                               FontWeight="SemiBold"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <ItemsControl ItemsSource="{Binding QuickStrategies}">
                         <ItemsControl.ItemsPanel>
@@ -209,10 +180,10 @@
                                         </Border>
                                         <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Name}"
-                                                       FontSize="{StaticResource LabelFontSize}"
-                                                       FontWeight="SemiBold"/>
+                                                       FontSize="{StaticResource BodySmFontSize}"
+                                                       FontWeight="{DynamicResource WeightTitle}"/>
                                             <TextBlock Text="{Binding Description}"
-                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       FontSize="{StaticResource CaptionFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        TextWrapping="Wrap"/>
                                         </StackPanel>
@@ -227,20 +198,16 @@
                     <!-- 摘要行：匹配数量 · 置信度 + 进度条 + 清除 -->
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                            <TextBlock Text="匹配"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="匹配" Classes="form-label"/>
                             <TextBlock Text="{Binding RecommendedStocks.Count}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PrimaryBrush}"/>
-                            <TextBlock Text="只标的 · AI 置信度"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                       FontSize="{StaticResource BodySmFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"
+                                       Foreground="{StaticResource AccentBrush}"/>
+                            <TextBlock Text="只标的 · AI 置信度" Classes="form-label"/>
                             <TextBlock Text="{Binding SelectionResult.ConfidenceScore, StringFormat={}{0:F0}%}"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PrimaryBrush}"/>
+                                       FontSize="{StaticResource BodySmFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"
+                                       Foreground="{StaticResource AccentBrush}"/>
                         </StackPanel>
                         <ProgressBar Grid.Column="1"
                                      Value="{Binding SelectionResult.ConfidenceScore}"
@@ -270,17 +237,17 @@
                                         <Grid ColumnDefinitions="*,Auto">
                                             <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
                                                 <TextBlock Text="{Binding Name}"
-                                                           FontSize="{StaticResource MediumFontSize}"
-                                                           FontWeight="Bold"/>
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"/>
                                                 <TextBlock Text="{Binding Symbol}"
                                                            FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource TinyFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </StackPanel>
                                             <Border Grid.Column="1" Classes="score-badge">
                                                 <TextBlock Text="{Binding RecommendationScore, StringFormat={}{0:F0}}"
-                                                           FontSize="{StaticResource MediumFontSize}"
-                                                           FontWeight="Bold"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{StaticResource TextOnEmphasisBrush}"
                                                            HorizontalAlignment="Center"/>
                                             </Border>
@@ -288,8 +255,8 @@
 
                                         <!-- 匹配理由 -->
                                         <TextBlock Text="{Binding Reason}"
-                                                   FontSize="{StaticResource LabelFontSize}"
-                                                   LineHeight="{StaticResource CompactLineHeight}"
+                                                   FontSize="{StaticResource BodySmFontSize}"
+                                                   LineHeight="{StaticResource CaptionLineHeight}"
                                                    TextWrapping="Wrap"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
 
@@ -297,32 +264,32 @@
                                         <Grid ColumnDefinitions="*,*,*">
                                             <StackPanel Grid.Column="0" Spacing="{StaticResource CompactSpacing}">
                                                 <TextBlock Text="目标价"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                 <TextBlock Text="{Binding TargetPrice, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}|待定}"
                                                            FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{StaticResource BullishBrush}"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="{StaticResource CompactSpacing}">
                                                 <TextBlock Text="预期收益"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                 <TextBlock Text="{Binding ExpectedReturn, Converter={StaticResource NullableValueConverter}, ConverterParameter=+{0:F1}%|待定}"
                                                            FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{StaticResource BullishBrush}"/>
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Spacing="{StaticResource CompactSpacing}">
                                                 <TextBlock Text="止损价"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                 <TextBlock Text="{Binding StopLoss, Converter={StaticResource NullableValueConverter}, ConverterParameter={}{0:F2}|待定}"
                                                            FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           FontWeight="SemiBold"
+                                                           FontSize="{StaticResource BodySmFontSize}"
+                                                           FontWeight="{DynamicResource WeightTitle}"
                                                            Foreground="{StaticResource BearishBrush}"/>
                                             </StackPanel>
                                         </Grid>
@@ -331,19 +298,19 @@
                                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                             <Border Classes="meta-pill">
                                                 <TextBlock Text="{Binding RiskLevel}"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </Border>
                                             <Border Classes="meta-pill"
                                                     IsVisible="{Binding RecommendedHoldingPeriod, Converter={StaticResource NullableVisibilityConverter}}">
                                                 <TextBlock Text="{Binding RecommendedHoldingPeriod, StringFormat=建议持有 {0} 天}"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </Border>
                                             <Border Classes="meta-pill"
                                                     IsVisible="{Binding RecommendedPosition, Converter={StaticResource NullableVisibilityConverter}}">
                                                 <TextBlock Text="{Binding RecommendedPosition, StringFormat=建议仓位 {0}%}"
-                                                           FontSize="{StaticResource MiniFontSize}"
+                                                           FontSize="{StaticResource CaptionFontSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </Border>
                                         </StackPanel>
@@ -358,12 +325,12 @@
                             Padding="{StaticResource CardPadding}">
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="分析摘要"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"/>
+                                       FontSize="{StaticResource BodySmFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"/>
                             <TextBlock Text="{Binding SelectionResult.AnalysisSummary}"
-                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontSize="{StaticResource BodySmFontSize}"
                                        TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
+                                       LineHeight="{StaticResource BodySmLineHeight}"/>
                         </StackPanel>
                     </Border>
 
@@ -373,78 +340,164 @@
                             Padding="{StaticResource CardPadding}">
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="市场环境分析"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"/>
+                                       FontSize="{StaticResource BodySmFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"/>
                             <TextBlock Text="{Binding SelectionResult.MarketEnvironmentAnalysis}"
-                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontSize="{StaticResource BodySmFontSize}"
                                        TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
+                                       LineHeight="{StaticResource BodySmLineHeight}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- 投资建议 -->
+                    <!-- 投资建议：v3 语义面板只靠低透明度色块分层，不描边 -->
                     <Border Background="{DynamicResource InfoPanelBackgroundBrush}"
-                            BorderBrush="{DynamicResource InfoPanelBorderBrush}"
-                            BorderThickness="{StaticResource ThickBorderThickness}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
                             CornerRadius="{StaticResource CardCornerRadius}"
                             Padding="{StaticResource CardPadding}">
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <TextBlock Text="投资建议"
-                                       FontSize="{StaticResource MediumFontSize}"
-                                       FontWeight="Bold"
+                                       FontSize="{StaticResource BodySmFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"
                                        Foreground="{DynamicResource InfoPanelTextBrush}"/>
                             <TextBlock Text="{Binding SelectionResult.InvestmentAdvice}"
-                                       FontSize="{StaticResource LabelFontSize}"
+                                       FontSize="{StaticResource BodySmFontSize}"
                                        Foreground="{DynamicResource InfoPanelTextBrush}"
                                        TextWrapping="Wrap"
-                                       LineHeight="{StaticResource DefaultLineHeight}"/>
+                                       LineHeight="{StaticResource BodySmLineHeight}"/>
                         </StackPanel>
                     </Border>
 
-                    <!-- 风险提示（对齐原型 warn-strip） -->
-                    <Border Background="{StaticResource WarningBackgroundAltBrush}"
-                            BorderBrush="{StaticResource WarningBorderAltBrush}"
-                            BorderThickness="{StaticResource ThickBorderThickness}"
+                    <!-- 风险提示（对齐原型 warn-strip）：v3 无描边 -->
+                    <Border Background="{DynamicResource WarningBackgroundAltBrush}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
                             CornerRadius="{StaticResource CardCornerRadius}"
                             Padding="{StaticResource CardPadding}"
                             IsVisible="{Binding HasRiskWarnings}">
                         <TextBlock Text="{Binding FormattedRiskWarnings}"
-                                   FontSize="{StaticResource LabelFontSize}"
+                                   FontSize="{StaticResource BodySmFontSize}"
                                    Foreground="{DynamicResource WarningPanelTextBrush}"
                                    TextWrapping="Wrap"
-                                   LineHeight="{StaticResource DefaultLineHeight}"/>
+                                   LineHeight="{StaticResource BodySmLineHeight}"/>
                     </Border>
 
                 </StackPanel>
             </StackPanel>
         </ScrollViewer>
 
-        <!-- 首屏骨架：三模式卡 + 输入区 + 结果列表行 -->
-        <ScrollViewer Grid.Row="1"
-                      IsVisible="{Binding IsInitialLoading}"
-                      Background="{DynamicResource CardBackgroundBrush}">
+        <!-- 首屏骨架：三模式卡 + 输入区 + 结果列表行。
+             三张模式卡是 mode-card 的结构克隆（同 20 内边距、同
+             「图标 24 / 名称 21 / 描述 2 行 36」+ 4 间距）；结果行是 rst-card 的克隆
+             （同 16 内边距 + 头部两行 + 三列指标）。 -->
+        <ScrollViewer IsVisible="{Binding IsInitialLoading}">
             <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
-                <UniformGrid Columns="3">
-                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
-                    <Border Classes="skeleton skeleton-card" Height="112" Margin="{StaticResource TinyRightMargin}"/>
-                    <Border Classes="skeleton skeleton-card" Height="112"/>
-                </UniformGrid>
-                <Border Classes="skeleton skeleton-panel" Height="200"/>
+                <!-- 三模式卡：三列网格 + 图标占位 -->
+                <controls:SkeletonList Count="3">
+                    <controls:SkeletonList.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3"/>
+                        </ItemsPanelTemplate>
+                    </controls:SkeletonList.ItemsPanel>
+                    <controls:SkeletonList.ItemTemplate>
+                        <DataTemplate>
+                            <!-- 与真实 mode-card 对齐：白卡表面 + 20 内边距（Variant=Tile 默认是
+                                 次级表面 16 内边距，这里按真实卡片覆写） -->
+                            <controls:SkeletonCard Variant="Tile"
+                                                   Background="{DynamicResource CardBackgroundBrush}"
+                                                   Padding="{StaticResource CardPadding}"
+                                                   Margin="{StaticResource TinyMargin}"
+                                                   HorizontalContentAlignment="Center">
+                                <StackPanel Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
+                                    <Border Classes="skeleton"
+                                            Width="{StaticResource DefaultIconSize}"
+                                            Height="{StaticResource DefaultIconSize}"
+                                            CornerRadius="{StaticResource SmallCornerRadius}"/>
+                                    <controls:SkeletonLines Row="BodySm" LineWidths="72" Margin="0,4,0,0"/>
+                                    <controls:SkeletonLines Row="Caption" LineWidths="128,96" Spacing="0"/>
+                                </StackPanel>
+                            </controls:SkeletonCard>
+                        </DataTemplate>
+                    </controls:SkeletonList.ItemTemplate>
+                </controls:SkeletonList>
+
+                <!-- 输入区：占位高度与真实 TextBox(64) + 按钮行(36) + 8 间距一致 -->
                 <StackPanel Spacing="{StaticResource SmallSpacing}">
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
-                    <Border Classes="skeleton skeleton-row" Height="88"/>
+                    <Border Classes="skeleton"
+                            Height="64"
+                            CornerRadius="{StaticResource SmallCornerRadius}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}"
+                                HorizontalAlignment="Right">
+                        <Border Classes="skeleton" Width="{StaticResource MediumButtonMinWidth}"
+                                Height="{StaticResource ButtonHeight}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"/>
+                        <Border Classes="skeleton" Width="{StaticResource SmallButtonMinWidth}"
+                                Height="{StaticResource ButtonHeight}"
+                                CornerRadius="{StaticResource SmallCornerRadius}"/>
+                    </StackPanel>
                 </StackPanel>
+
+                <!-- 结果列表：三条 rst-card 克隆。含评分徽标与三列指标。 -->
+                <controls:SkeletonList Count="3" Spacing="{StaticResource DefaultSpacing}">
+                    <controls:SkeletonList.ItemTemplate>
+                        <DataTemplate>
+                            <controls:SkeletonCard Variant="Row"
+                                                   CornerRadius="{StaticResource MediumCornerRadius}">
+                                <StackPanel Spacing="{StaticResource SmallSpacing}">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <controls:SkeletonLines Grid.Column="0" Row="BodySm" LineWidths="96"/>
+                                        <controls:SkeletonLines Grid.Column="0" Row="Caption" LineWidths="64"
+                                                                VerticalAlignment="Bottom"/>
+                                        <Border Grid.Column="1" Classes="skeleton"
+                                                Width="36" Height="36"
+                                                CornerRadius="{StaticResource SmallCornerRadius}"/>
+                                    </Grid>
+                                    <controls:SkeletonLines Row="Caption" LineWidths="*"/>
+                                    <Grid ColumnDefinitions="*,*,*">
+                                        <controls:SkeletonLines Grid.Column="0" Row="BodySm" LineCount="2" LineWidths="40,56"/>
+                                        <controls:SkeletonLines Grid.Column="1" Row="BodySm" LineCount="2" LineWidths="48,52"/>
+                                        <controls:SkeletonLines Grid.Column="2" Row="BodySm" LineCount="2" LineWidths="40,56"/>
+                                    </Grid>
+                                    <controls:SkeletonLines Row="Caption" LineWidths="160"/>
+                                </StackPanel>
+                            </controls:SkeletonCard>
+                        </DataTemplate>
+                    </controls:SkeletonList.ItemTemplate>
+                </controls:SkeletonList>
             </StackPanel>
         </ScrollViewer>
 
         <!-- 失败态（含重试入口）；空态由页面内各分区自行提示 -->
-        <controls:StateOverlayView Grid.Row="1"
-                                   State="{Binding OverlayState}"
+        <controls:StateOverlayView State="{Binding OverlayState}"
                                    Message="{Binding OverlayMessage}"
                                    RetryCommand="{Binding RetryCommand}"
                                    RetryText="重新加载"
-                                   ShowLoading="False"
-                                   ZIndex="999"/>
-    </Grid>
+                                   ShowLoading="False"/>
+
+        <!-- 分析中遮罩：放最后即置顶；任务进行中语义，不用加载态浮层 -->
+        <Border Background="{DynamicResource DarkOverlayBrush}"
+                IsVisible="{Binding IsBusy}">
+            <Border Background="{DynamicResource CardBackgroundBrush}"
+                    CornerRadius="{StaticResource DefaultCornerRadius}"
+                    Padding="{StaticResource ProgressDialogPadding}"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MinWidth="{StaticResource InputAreaMinWidth}"
+                    MaxWidth="{StaticResource InputAreaMaxWidth}"
+                    BoxShadow="{StaticResource ShadowModal}">
+                <StackPanel Spacing="{StaticResource LargeSpacing}">
+                    <controls:LoadingDots/>
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="正在分析中"
+                                   FontSize="{StaticResource TitleFontSize}"
+                                   FontWeight="{DynamicResource WeightTitle}"
+                                   HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding LoadingText}" Classes="form-label"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="{StaticResource MessageMaxWidth}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Panel>
 </UserControl>

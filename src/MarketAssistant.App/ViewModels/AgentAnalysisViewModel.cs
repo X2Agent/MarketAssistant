@@ -776,10 +776,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
     [ObservableProperty]
     private string _elapsedText = "--:--";
 
-    /// <summary>状态徽标文本（完成 ✓ / 失败 ✗ / 其他为空）</summary>
-    [ObservableProperty]
-    private string _statusMark = string.Empty;
-
     /// <summary>该分析师的 Token 用量文本（紧凑计数），未统计时为空</summary>
     [ObservableProperty]
     private string _tokensText = string.Empty;
@@ -796,9 +792,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
 
     /// <summary>等待执行的灰色静默点</summary>
     public bool IsPending => Status == AnalystRunStatus.Pending;
-
-    /// <summary>终态（完成/失败）则不再需要呼吸动画</summary>
-    public bool IsLive => IsRunning;
 
     public static AnalystRunItemViewModel From(AnalystRunSnapshot snapshot)
     {
@@ -840,12 +833,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
             // 避免 Stopwatch.GetElapsedTime(0) 把进程运行时长误算为耗时
             _runningStartedTimestamp = Stopwatch.GetTimestamp();
         }
-        StatusMark = snapshot.Status switch
-        {
-            AnalystRunStatus.Completed => "✓",
-            AnalystRunStatus.Failed => "✗",
-            _ => string.Empty
-        };
         if (snapshot.Status == AnalystRunStatus.Running)
         {
             ElapsedText = FormatElapsed(Stopwatch.GetElapsedTime(_runningStartedTimestamp));
@@ -862,7 +849,6 @@ public partial class AnalystRunItemViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFailed));
         OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(IsPending));
-        OnPropertyChanged(nameof(IsLive));
 
         HasTokenUsage = snapshot.HasTokenUsage;
         TokensText = snapshot.HasTokenUsage

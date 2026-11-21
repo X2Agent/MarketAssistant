@@ -2,137 +2,162 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ================================================================== -->
-    <!-- 表单控件样式 (Form Controls)                                         -->
-    <!-- 输入框 / 下拉框 / 复选框 / 单选按钮 / 搜索框                          -->
+    <!-- MarketAssistant Design System v3.0 — Form Controls                   -->
+    <!--                                                                     -->
+    <!-- 输入框规则：                                                          -->
+    <!--  - 无边框。未聚焦时用极浅的表面色阶（SunkenBackgroundBrush）表示"可输入"。 -->
+    <!--  - 聚焦用【双环阴影】表达：内 1px 实色贴边 + 外 3px 半透明扩散。        -->
+    <!--    不画亮线、不换边框颜色，避免布局位移。                              -->
+    <!--  - 错误态同样用双环，只换色语义，尺寸不变。                            -->
     <!-- ================================================================== -->
 
-    <!-- ===== TextBox 基础样式 ===== -->
+    <!-- ===== TextBox ===== -->
     <Style Selector="TextBox">
-        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource SunkenBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
+        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource SelectedBackgroundBrush}"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
-    <!-- 单行输入框垂直居中，多行(AcceptsReturn=True)保持默认顶部对齐 -->
+
     <Style Selector="TextBox[AcceptsReturn=False]">
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    <Style Selector="TextBox:focus">
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
-    </Style>
-    <Style Selector="TextBox:disabled">
-        <Setter Property="Opacity" Value="0.5"/>
+
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
     </Style>
 
-    <!-- TextBox 错误态 -->
-    <Style Selector="TextBox.input-error">
-        <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}"/>
+    <!-- 聚焦：双环。BoxShadow 只存在于 Border / ContentPresenter 上，
+         故必须打在模板内部 Border 上，不能直接写 TextBox.BoxShadow。 -->
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+
+    <Style Selector="TextBox:disabled">
+        <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+
+    <!-- 去掉 Fluent 模板自带的边框，避免与双环叠加出双层描边 -->
+    <Style Selector="TextBox /template/ Border#PART_BorderElement">
+        <Setter Property="BorderThickness" Value="0"/>
     </Style>
 
     <!-- ===== 搜索框 ===== -->
     <Style Selector="TextBox.search-input">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="Background" Value="{DynamicResource SunkenBackgroundBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
         <Setter Property="Padding" Value="12,8"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
     </Style>
 
     <!-- ===== AutoCompleteBox ===== -->
     <Style Selector="AutoCompleteBox">
-        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource SunkenBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="12,0"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
     </Style>
 
-    <!-- ===== ComboBox 样式 ===== -->
+    <!-- ===== ComboBox ===== -->
     <Style Selector="ComboBox">
-        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource SunkenBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="12,0"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
     </Style>
-    <Style Selector="ComboBox:pointerover">
-        <Setter Property="BorderBrush" Value="{DynamicResource TextSecondaryBrush}"/>
+    <Style Selector="ComboBox:pointerover /template/ Border#Background">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+    </Style>
+    <Style Selector="ComboBox:focus /template/ Border#Background, ComboBox:open /template/ Border#Background">
+        <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
     </Style>
 
-    <!-- ===== CheckBox 样式 ===== -->
+    <!-- ===== CheckBox / RadioButton / ToggleSwitch ===== -->
     <Style Selector="CheckBox">
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
 
-    <!-- ===== RadioButton 样式 ===== -->
     <Style Selector="RadioButton">
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
 
-    <!-- ===== ToggleSwitch 样式 ===== -->
     <Style Selector="ToggleSwitch">
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
 
-    <!-- ===== NumericUpDown 样式 ===== -->
+    <!-- ===== NumericUpDown ===== -->
     <Style Selector="NumericUpDown">
-        <Setter Property="FontSize" Value="{StaticResource BodyFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource SunkenBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    <!-- 内部文本框：水平垂直居中，避免窄宽度下数字被步进按钮遮挡裁切 -->
     <Style Selector="NumericUpDown /template/ TextBox#PART_TextBox">
         <Setter Property="TextAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="NumericUpDown:focus-within /template/ Border#PART_BorderElement">
+        <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
     </Style>
     <Style Selector="NumericUpDown:disabled">
-        <Setter Property="Opacity" Value="0.5"/>
+        <Setter Property="Opacity" Value="0.45"/>
     </Style>
 
-    <!-- ===== 表单标签 ===== -->
+    <!-- ================================================================== -->
+    <!-- 表单文本                                                             -->
+    <!-- ================================================================== -->
+
     <Style Selector="TextBlock.form-label">
-        <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
-        <Setter Property="FontWeight" Value="Medium"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Margin" Value="{StaticResource TinyBottomMargin}"/>
     </Style>
 
-    <!-- ===== 表单辅助文本 ===== -->
     <Style Selector="TextBlock.form-hint">
-        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 
-    <!-- ===== 表单错误文本 ===== -->
     <Style Selector="TextBlock.form-error">
-        <Setter Property="FontSize" Value="{StaticResource SmallFontSize}"/>
-        <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
     </Style>
 

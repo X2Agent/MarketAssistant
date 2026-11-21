@@ -10,26 +10,8 @@ public class NullableVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value == null)
-            return false;
-
-        if (value is string str && string.IsNullOrWhiteSpace(str))
-            return false;
-
-        var type = value.GetType();
-
-        // 处理 Nullable<T> 类型
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-        {
-            var hasValueProperty = type.GetProperty("HasValue");
-            if (hasValueProperty != null)
-            {
-                var hasValue = (bool)(hasValueProperty.GetValue(value) ?? false);
-                return hasValue;
-            }
-        }
-
-        return true;
+        // 装箱后的 Nullable<T> 要么是 null 要么是 T，无需单独处理
+        return value is not null && !(value is string text && string.IsNullOrWhiteSpace(text));
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

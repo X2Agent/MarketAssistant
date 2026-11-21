@@ -6,6 +6,7 @@
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:converters="using:MarketAssistant.Converters"
              xmlns:models="using:MarketAssistant.Trading.Models"
+             xmlns:trading="using:MarketAssistant.Views.Components.Trading"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.StrategyConfigView"
@@ -14,43 +15,27 @@
     <UserControl.Resources>
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
         <converters:PriceTextConverter x:Key="PriceTextConverter"/>
-        <Thickness x:Key="CompactButtonPadding">12,4</Thickness>
-        <x:Double x:Key="FormFieldMinWidth">200</x:Double>
-        <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
+        <!-- 新建策略从栏宽度：MinWidth 保证表单字段不被压扁，MaxWidth 保证主列表有足够空间 -->
+        <x:Double x:Key="StrategyDrawerWidth">320</x:Double>
+        <!-- 从栏内容滚动上限：避免表单过长把页面撑出视口 -->
+        <x:Double x:Key="StrategyDrawerMaxHeight">560</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- 分组手风琴卡片（对齐原型 section-card） -->
-        <Style Selector="Expander.section-card">
-            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Padding" Value="0"/>
-        </Style>
-        <Style Selector="Expander.section-card TextBlock.section-title">
-            <Setter Property="FontSize" Value="{StaticResource LabelFontSize}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        </Style>
-        <!-- 场景卡片单选：无默认圆点，选中态为主色描边 + 右上角对勾 -->
+        <!-- 手风琴卡片壳由全局 CardStyles.axaml 提供，页面只给内容内边距 -->
+        <!-- 场景卡片单选：无默认圆点，v3 无描边——未选中靠表面色阶，选中改浅强调底 + 右上角对勾 -->
         <Style Selector="RadioButton.scenario-card">
-            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Padding" Value="{StaticResource ListItemPadding}"/>
             <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Root"
                             Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
+                            BorderThickness="{StaticResource NoBorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Padding="{TemplateBinding Padding}">
                         <Panel>
@@ -61,10 +46,10 @@
                                               VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
                             <PathIcon x:Name="CheckMark"
                                       Data="M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z"
-                                      Width="16" Height="16"
+                                      Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"
                                       HorizontalAlignment="Right"
                                       VerticalAlignment="Top"
-                                      Foreground="{StaticResource PrimaryBrush}"
+                                      Foreground="{StaticResource AccentBrush}"
                                       IsVisible="False"/>
                         </Panel>
                     </Border>
@@ -72,20 +57,18 @@
             </Setter>
         </Style>
         <Style Selector="RadioButton.scenario-card:pointerover /template/ Border#Root">
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         </Style>
         <Style Selector="RadioButton.scenario-card:checked /template/ Border#Root">
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
         </Style>
         <Style Selector="RadioButton.scenario-card:checked /template/ PathIcon#CheckMark">
             <Setter Property="IsVisible" Value="True"/>
         </Style>
         <!-- 风险档案分段选择胶囊 -->
         <Style Selector="RadioButton.profile-chip">
-            <Setter Property="Padding" Value="12,5"/>
-            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="{StaticResource SegmentButtonPadding}"/>
+            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
             <Setter Property="Template">
@@ -105,55 +88,78 @@
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         </Style>
         <Style Selector="RadioButton.profile-chip:checked">
-            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
         </Style>
     </UserControl.Styles>
 
     <ScrollViewer>
-        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+        <StackPanel>
+
+            <!-- 页签内标题：父级「交易终端」已是页面级标题，这里用小一级的卡片标题 -->
+            <StackPanel Spacing="{StaticResource TinySpacing}" Margin="{StaticResource BottomMargin}">
+                <TextBlock Classes="card-title" Text="策略配置"/>
+                <TextBlock Classes="caption" Text="选择策略类型与风险档案，设定交易对与开仓预算"/>
+            </StackPanel>
+
+            <!-- 首屏骨架：结构与下方"策略列表 + 新建栏"一致 -->
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsInitialLoading}">
+                <controls:SkeletonList Grid.Column="0" Count="3" Spacing="{StaticResource SmallSpacing}">
+                    <controls:SkeletonList.ItemTemplate>
+                        <DataTemplate>
+                            <controls:SkeletonCard Variant="Row">
+                                <StackPanel Spacing="{StaticResource TinySpacing}">
+                                    <controls:SkeletonLines Row="BodySm" LineWidths="96"/>
+                                    <controls:SkeletonLines Row="Caption" LineWidths="260"/>
+                                </StackPanel>
+                            </controls:SkeletonCard>
+                        </DataTemplate>
+                    </controls:SkeletonList.ItemTemplate>
+                </controls:SkeletonList>
+                <controls:SkeletonCard Grid.Column="1" Width="{StaticResource StrategyDrawerWidth}"
+                                       Margin="{StaticResource LeftMargin}">
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <controls:SkeletonLines Row="Body" LineWidths="88"/>
+                        <controls:SkeletonLines Row="BodySm" LineCount="3" LineWidths="*"/>
+                    </StackPanel>
+                </controls:SkeletonCard>
+            </Grid>
 
     <!-- 策略列表（主） / 新建策略（从，创建时浮出右栏） -->
-    <Grid ColumnDefinitions="*,Auto">
+    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsInitialLoading}">
             <controls:CardView>
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
                         <StackPanel Grid.Column="0" Orientation="Horizontal"
                                     Spacing="{StaticResource SmallSpacing}"
                                     VerticalAlignment="Center">
-                            <TextBlock Text="策略列表"
-                                       FontSize="{StaticResource SectionTitleFontSize}"
-                                       FontWeight="Bold"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                            <TextBlock Text="策略列表" Classes="card-title"
                                        VerticalAlignment="Center"/>
-                            <!-- 监控运行状态指示 -->
-                            <Border Background="{StaticResource SuccessBrush}"
-                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                    Padding="{StaticResource TagPadding}"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding IsMonitorRunning}">
-                                <TextBlock Text="● 监控运行中"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{StaticResource TextOnEmphasisBrush}"/>
-                            </Border>
-                            <Border Background="{StaticResource WarningBrush}"
-                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                    Padding="{StaticResource TagPadding}"
-                                    VerticalAlignment="Center"
-                                    IsVisible="{Binding !IsMonitorRunning}">
-                                <TextBlock Text="○ 监控未启动"
-                                           FontSize="{StaticResource SmallFontSize}"
-                                           Foreground="{StaticResource TextOnEmphasisBrush}"/>
-                            </Border>
+                            <!-- 监控运行状态：中性标签，状态圆点表达运行中/未启动 -->
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}"
+                                        VerticalAlignment="Center">
+                                <Ellipse Width="{StaticResource DotIconSize}"
+                                         Height="{StaticResource DotIconSize}"
+                                         VerticalAlignment="Center"
+                                         Fill="{StaticResource SuccessBrush}"
+                                         IsVisible="{Binding IsMonitorRunning}"/>
+                                <Ellipse Width="{StaticResource DotIconSize}"
+                                         Height="{StaticResource DotIconSize}"
+                                         VerticalAlignment="Center"
+                                         Fill="{DynamicResource TextDisabledBrush}"
+                                         IsVisible="{Binding !IsMonitorRunning}"/>
+                                <TextBlock Classes="caption" VerticalAlignment="Center"
+                                           Text="监控运行中" IsVisible="{Binding IsMonitorRunning}"/>
+                                <TextBlock Classes="caption" VerticalAlignment="Center"
+                                           Text="监控未启动" IsVisible="{Binding !IsMonitorRunning}"/>
+                            </StackPanel>
                         </StackPanel>
                         <Button Grid.Column="1"
+                                Classes="btn-primary"
                                 Command="{Binding ToggleCreateFormCommand}"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="{StaticResource TextOnEmphasisBrush}"
-                                VerticalAlignment="Center"
-                                Padding="{StaticResource CompactButtonPadding}">
+                                VerticalAlignment="Center">
                             <Panel>
-                                <TextBlock Text="+ 新建策略" IsVisible="{Binding !IsCreating}"/>
+                                <TextBlock Text="新建策略" IsVisible="{Binding !IsCreating}"/>
                                 <TextBlock Text="取消" IsVisible="{Binding IsCreating}"/>
                             </Panel>
                         </Button>
@@ -161,61 +167,18 @@
                 </controls:CardView.Header>
                 <StackPanel Spacing="{StaticResource SmallSpacing}">
 
-                    <TextBlock Text="暂无策略"
+                    <TextBlock Text="暂无策略，点击右上角「新建策略」开始"
                                IsVisible="{Binding !Strategies.Count}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="{StaticResource LabelFontSize}"
+                               Classes="caption"
                                HorizontalAlignment="Center"
                                Margin="{StaticResource DefaultMargin}"/>
 
                     <ItemsControl ItemsSource="{Binding Strategies}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="models:TradingStrategy">
-                                <Border Background="{DynamicResource CardBackgroundBrush}"
-                                        CornerRadius="{StaticResource SmallCornerRadius}"
-                                        Padding="{StaticResource DefaultCardPadding}"
-                                        Margin="{StaticResource TinyBottomMargin}">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                                <TextBlock Text="{Binding Symbol}"
-                                                           FontWeight="Bold"
-                                                           FontSize="{StaticResource SectionTitleFontSize}"/>
-                                                <Border Background="{StaticResource PrimaryLightBrush}"
-                                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource TagPadding}">
-                                                    <TextBlock Text="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}"
-                                                               FontSize="{StaticResource SmallFontSize}"/>
-                                                </Border>
-                                                <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                                        Padding="{StaticResource TagPadding}">
-                                                    <TextBlock Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
-                                                               FontSize="{StaticResource SmallFontSize}"/>
-                                                </Border>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}" FontFamily="{StaticResource DataFontFamily}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}">
-                                                    <TextBlock.Text>
-                                                        <MultiBinding StringFormat="方向: {0} | 触发价: {1} | {2}">
-                                                            <Binding Path="Side" Converter="{StaticResource EnumDescriptionConverter}"/>
-                                                            <Binding Path="TriggerPrice" Converter="{StaticResource PriceTextConverter}"/>
-                                                            <Binding Path="QuantityLabel"/>
-                                                        </MultiBinding>
-                                                    </TextBlock.Text>
-                                                </TextBlock>
-                                                <TextBlock FontSize="{StaticResource SmallFontSize}" FontFamily="{StaticResource DataFontFamily}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}">
-                                                    <TextBlock.Text>
-                                                        <MultiBinding StringFormat="已执行: {0}次">
-                                                            <Binding Path="ExecutionCount"/>
-                                                        </MultiBinding>
-                                                    </TextBlock.Text>
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            <DataTemplate x:DataType="models:TradingStrategy">
+                                <trading:StrategyRowView>
+                                    <trading:StrategyRowView.Actions>
+                                        <StackPanel Orientation="Horizontal"
                                                     Spacing="{StaticResource TinySpacing}"
                                                     VerticalAlignment="Center">
                                             <!-- Active 状态：显示「暂停」操作 -->
@@ -245,67 +208,70 @@
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ViewHistoryCommand}"
                                                     CommandParameter="{Binding}"/>
                                             <Button Content="删除"
-                                                    Foreground="{StaticResource ErrorBrush}"
+                                                    Classes="btn-danger"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).DeleteStrategyCommand}"
                                                     CommandParameter="{Binding}"/>
                                         </StackPanel>
-                                    </Grid>
-                                </Border>
+                                    </trading:StrategyRowView.Actions>
+                                </trading:StrategyRowView>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
             </controls:CardView>
 
-                <!-- 新建策略（从栏）：仅在创建时展示 -->
-                <controls:CardView Grid.Column="1" Width="360"
+                <!-- 新建策略（从栏）：仅在创建时展示。
+                     用 MaxWidth 而非固定 Width：窄窗下让出空间给主栏，避免横向溢出 -->
+                <controls:CardView Grid.Column="1" Width="{StaticResource StrategyDrawerWidth}"
+                                   MaxWidth="{StaticResource StrategyDrawerWidth}"
                                    Margin="{StaticResource LeftMargin}"
                                    VerticalAlignment="Top"
                                    IsVisible="{Binding IsCreating}">
                     <controls:CardView.Header>
-                        <TextBlock Text="新建策略" FontSize="{StaticResource SectionTitleFontSize}" FontWeight="SemiBold"/>
+                        <TextBlock Text="新建策略" Classes="card-title"/>
                     </controls:CardView.Header>
-                    <ScrollViewer MaxHeight="560" HorizontalScrollBarVisibility="Disabled">
+                    <ScrollViewer MaxHeight="{StaticResource StrategyDrawerMaxHeight}"
+                                  HorizontalScrollBarVisibility="Disabled">
                     <!-- 新建表单（三场景卡片向导） -->
                     <StackPanel Spacing="{StaticResource SmallSpacing}">
 
                         <!-- 场景卡片：唯一创建入口 -->
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsAISmartScenario}" Classes="scenario-card">
-                            <StackPanel Spacing="2">
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                     <svg:Svg Path="/Assets/Images/icon_ai.svg"
-                                             Width="18" Height="18"
+                                             Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"
                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="智能策略（AI）" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="智能策略（AI）" FontWeight="{DynamicResource WeightTitle}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="AI 结构化决策，自动附加止盈止损护栏"
-                                           FontSize="{StaticResource SmallFontSize}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsDCAScenario}" Classes="scenario-card">
-                            <StackPanel Spacing="2">
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                     <svg:Svg Path="/Assets/Images/icon_money.svg"
-                                             Width="18" Height="18"
+                                             Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"
                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="省心定投" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="省心定投" FontWeight="{DynamicResource WeightTitle}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="定期买入，止盈自动卖出、止损自动暂停"
-                                           FontSize="{StaticResource SmallFontSize}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsGridScenario}" Classes="scenario-card">
-                            <StackPanel Spacing="2">
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                     <svg:Svg Path="/Assets/Images/icon_grid.svg"
-                                             Width="18" Height="18"
+                                             Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"
                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="区间网格" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="区间网格" FontWeight="{DynamicResource WeightTitle}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <TextBlock Text="震荡区间低买高卖，破网自动护栏"
-                                           FontSize="{StaticResource SmallFontSize}"
+                                           FontSize="{StaticResource CaptionFontSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                             </StackPanel>
                         </RadioButton>
@@ -313,29 +279,27 @@
                         <!-- 风险档案：驱动参数预填与引擎兜底护栏，分段胶囊样式 -->
                         <StackPanel Spacing="{StaticResource TinySpacing}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="风险档案" VerticalAlignment="Center"
-                                           FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="风险档案" VerticalAlignment="Center" Classes="form-label"/>
                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                         CornerRadius="{StaticResource SmallCornerRadius}"
-                                        Padding="3"
+                                        Padding="{StaticResource TinyPadding}"
                                         VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                         <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsConservativeProfile}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_shield.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <svg:Svg Path="/Assets/Images/icon_shield.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
                                                 <TextBlock Text="保守" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </RadioButton>
                                         <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsBalancedProfile}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_scale.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <svg:Svg Path="/Assets/Images/icon_scale.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
                                                 <TextBlock Text="稳健" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </RadioButton>
                                         <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsAggressiveProfile}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_rocket.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <svg:Svg Path="/Assets/Images/icon_rocket.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
                                                 <TextBlock Text="进取" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </RadioButton>
@@ -343,53 +307,44 @@
                                 </Border>
                             </StackPanel>
                             <TextBlock Text="影响各场景参数预填与引擎兜底护栏（创建后可在高级参数中手动调整）"
-                                       FontSize="{StaticResource SmallFontSize}"
+                                       FontSize="{StaticResource CaptionFontSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
                         </StackPanel>
 
                         <!-- 共用字段 -->
                         <StackPanel Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="交易对" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="交易对" Classes="form-label"/>
                             <TextBox Text="{Binding NewSymbol}" PlaceholderText="如 BTCUSDT"/>
                         </StackPanel>
                         <!-- 智能策略参数 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsAISmartScenario}">
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="单次开仓预算 (USDT)" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="单次开仓预算 (USDT)" Classes="form-label"/>
                                 <TextBox Text="{Binding AiBudgetUsdt}" PlaceholderText="如 100"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="入场方向（现货默认买入）" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                <ComboBox ItemsSource="{Binding OrderSides}"
-                                          SelectedItem="{Binding AiSide}"
-                                          HorizontalAlignment="Stretch"/>
+                                <TextBlock Text="方向" Classes="form-label"/>
+                                <TextBlock Classes="caption" TextWrapping="Wrap"
+                                           Text="由 AI 决策驱动：合约可开多或开空，现货仅做多（SELL 决策视为离场）。"/>
                             </StackPanel>
                             <TextBlock Text="止盈止损位由 AI 决策给出；置信度不足自动 HOLD，下单量随置信度浮动，仓位上限由系统强制执行。"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                                       Classes="caption" TextWrapping="Wrap"/>
                             <Expander Header="高级参数（已按风险档案预填）" HorizontalAlignment="Stretch">
                                 <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="分析间隔 (秒)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="分析间隔 (秒)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiIntervalSeconds}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="置信度门槛 (0-100)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="置信度门槛 (0-100)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiConfidenceThreshold}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="仓位上限 (% 账户总值)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="仓位上限 (% 账户总值)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiMaxPositionPercent}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="出场方式" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="出场方式" Classes="form-label"/>
                                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                                             <RadioButton GroupName="AiExitStyle" Content="固定止盈止损"
                                                          IsChecked="{Binding !IsAiTrailingExit}"/>
@@ -398,121 +353,105 @@
                                         </StackPanel>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="兜底止损 (%)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="兜底止损 (%)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiStopLossPercent}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="兜底止盈 (%)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="兜底止盈 (%)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiTakeProfitPercent}"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}" IsVisible="{Binding IsAiTrailingExit}">
-                                        <TextBlock Text="追踪回调 (%)" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="追踪回调 (%)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiTrailingPercent}"/>
                                     </StackPanel>
-                                    <ToggleSwitch IsChecked="{Binding AiShadowMode}"
-                                                  Content="影子模式（仅决策不下单）"/>
+                                    <!-- 草稿表单字段：点「创建策略」才提交，属延迟提交 → 复选框（见 design.md 7.12） -->
+                                    <CheckBox IsChecked="{Binding AiShadowMode}"
+                                              Content="影子模式（仅决策不下单）"/>
+                                    <CheckBox IsChecked="{Binding AiMakerFirst}"
+                                              Content="maker 优先（先挂 post-only 限价，拒单立即回退市价；未成交余量按限价单超时撤单）"/>
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
                         <!-- 网格参数 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsGridScenario}">
-                            <TextBlock Text="网格参数" FontWeight="SemiBold"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="网格参数" FontWeight="{DynamicResource WeightTitle}" Classes="form-label"/>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="每格数量" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="每格数量" Classes="form-label"/>
                                 <TextBox Text="{Binding GridQuantityPerGrid}" PlaceholderText="代币数量"/>
                             </StackPanel>
                             <Button Command="{Binding GenerateGridRangeCommand}"
                                     HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_bolt.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                                    <svg:Svg Path="/Assets/Images/icon_bolt.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
                                     <TextBlock Text="按当前价 × 风险档案生成区间" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="上界价格" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="上界价格" Classes="form-label"/>
                                 <TextBox Text="{Binding GridUpperPrice}" PlaceholderText="价格上限"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="下界价格" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="下界价格" Classes="form-label"/>
                                 <TextBox Text="{Binding GridLowerPrice}" PlaceholderText="价格下限"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="网格数量" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="网格数量" Classes="form-label"/>
                                 <TextBox Text="{Binding GridCount}" PlaceholderText="如 10"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="破网止损价（可选，留空自动按档案生成）" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="破网止损价（可选，留空自动按档案生成）" Classes="form-label"/>
                                 <TextBox Text="{Binding GridStopLossPrice}" PlaceholderText="跌破此价清仓"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="破网止盈价（可选，留空自动按档案生成）" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="破网止盈价（可选，留空自动按档案生成）" Classes="form-label"/>
                                 <TextBox Text="{Binding GridTakeProfitPrice}" PlaceholderText="涨破此价清仓"/>
                             </StackPanel>
                         </StackPanel>
                         <!-- DCA 定投参数 -->
                         <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsDCAScenario}">
-                            <TextBlock Text="定投参数" FontWeight="SemiBold"
-                                       FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="定投参数" FontWeight="{DynamicResource WeightTitle}" Classes="form-label"/>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="每次定投金额 (USDT)" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="每次定投金额 (USDT)" Classes="form-label"/>
                                 <TextBox Text="{Binding DcaAmountPerInterval}" PlaceholderText="如 100"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="定投间隔 (秒)" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="定投间隔 (秒)" Classes="form-label"/>
                                 <TextBox Text="{Binding DcaIntervalSeconds}" PlaceholderText="86400 = 每天"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="止盈线 (% 持仓均价)" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="止盈线 (% 持仓均价)" Classes="form-label"/>
                                 <TextBox Text="{Binding DcaTakeProfitPercent}" PlaceholderText="达到后自动全部卖出"/>
                             </StackPanel>
                             <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="止损线 (% 持仓均价)" FontSize="{StaticResource LabelFontSize}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="止损线 (% 持仓均价)" Classes="form-label"/>
                                 <TextBox Text="{Binding DcaStopLossPercent}" PlaceholderText="达到后暂停定投或清仓"/>
                             </StackPanel>
                             <Expander Header="高级参数" HorizontalAlignment="Stretch">
                                 <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="最高买入价（可选）" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="最高买入价（可选）" Classes="form-label"/>
                                         <TextBox Text="{Binding DcaMaxBuyPrice}" PlaceholderText="超过此价不买"/>
                                     </StackPanel>
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="低于此价双倍定投（可选）" FontSize="{StaticResource LabelFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <TextBlock Text="低于此价双倍定投（可选）" Classes="form-label"/>
                                         <TextBox Text="{Binding DcaDoubleBuyBelowPrice}" PlaceholderText="低于此价双倍"/>
                                     </StackPanel>
-                                    <ToggleSwitch IsChecked="{Binding DcaStopLossSellOut}"
-                                                  Content="触发止损线时清仓卖出（关闭则仅暂停定投）"/>
+                                    <!-- 草稿表单字段：点「创建策略」才提交，属延迟提交 → 复选框（见 design.md 7.12） -->
+                                    <CheckBox IsChecked="{Binding DcaStopLossSellOut}"
+                                              Content="触发止损线时清仓卖出（关闭则仅暂停定投）"/>
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
                         <!-- 校验错误提示 -->
                         <TextBlock Text="{Binding ValidationError}"
                                    IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Foreground="{StaticResource ErrorBrush}"
-                                   FontSize="{StaticResource LabelFontSize}"
+                                   Foreground="{DynamicResource ErrorBrush}"
+                                   FontSize="{StaticResource BodySmFontSize}"
                                    TextWrapping="Wrap"/>
 
                         <Button Content="创建策略"
                                 Command="{Binding CreateStrategyCommand}"
-                                Background="{StaticResource PrimaryBrush}"
-                                Foreground="{StaticResource TextOnEmphasisBrush}"
+                                Classes="btn-primary"
                                 HorizontalAlignment="Stretch"
                                 Margin="{StaticResource TinyTopMargin}"/>
                     </StackPanel>
@@ -524,48 +463,41 @@
             <!-- 风控设置：默认折叠 -->
             <Expander Classes="section-card">
                 <Expander.Header>
-                    <TextBlock Classes="section-title" Text="风控设置"/>
+                    <TextBlock Classes="card-title" Text="风控设置"/>
                 </Expander.Header>
                 <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                           ColumnSpacing="{StaticResource DefaultSpacing}"
                           RowSpacing="{StaticResource SmallSpacing}">
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="单笔最大仓位 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="单笔最大仓位 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxSingleOrderPercent}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="日最大亏损 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="日最大亏损 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxDailyLossPercent}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="总仓位上限 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="总仓位上限 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxTotalPositionPercent}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="日最大交易次数" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="日最大交易次数" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxDailyTrades}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="最小下单金额 (USDT)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="最小下单金额 (USDT)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MinOrderAmount}"/>
                         </StackPanel>
                         <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="确认阈值 (USDT)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="确认阈值 (USDT)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.ConfirmationThreshold}"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="3" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="合约杠杆倍数 (1-125)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="合约杠杆倍数 (1-125)" Classes="form-label"/>
                             <NumericUpDown Value="{Binding RiskConfig.FuturesLeverage, Mode=TwoWay}"
                                            Minimum="1"
                                            Maximum="125"
@@ -575,33 +507,29 @@
                                            ToolTip.Tip="合约开仓前设置的杠杆倍数；越高强平风险越大"/>
                         </StackPanel>
                         <StackPanel Grid.Row="3" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="合约名义敞口上限 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="合约名义敞口上限 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxFuturesNotionalPercent}"
                                      ToolTip.Tip="Σ|持仓名义|+本单名义 占权益比例上限，0 表示不限制"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="4" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="强平距离预警 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="强平距离预警 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.LiquidationWarnPercent}"
                                      ToolTip.Tip="标记价距强平价小于该百分比时告警"/>
                         </StackPanel>
                         <StackPanel Grid.Row="4" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="强平距离紧急 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="强平距离紧急 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.LiquidationCriticalPercent}"
                                      ToolTip.Tip="小于该百分比时发紧急告警并阻止该标的自动加仓"/>
                         </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                           ColumnSpacing="{StaticResource DefaultSpacing}"
                           RowSpacing="{StaticResource SmallSpacing}"
                           Margin="{StaticResource SmallTopMargin}">
                         <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="连续亏损熔断 (次)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="连续亏损熔断 (次)" Classes="form-label"/>
                             <NumericUpDown Value="{Binding RiskConfig.MaxConsecutiveLosses, Mode=TwoWay}"
                                            Minimum="0"
                                            Maximum="50"
@@ -611,15 +539,13 @@
                                            ToolTip.Tip="当日实现亏损笔数连续达到该值时停止新开仓，0 表示不限制"/>
                         </StackPanel>
                         <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="滑点告警阈值 (%)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="滑点告警阈值 (%)" Classes="form-label"/>
                             <TextBox Text="{Binding RiskConfig.MaxSlippagePercent}"
                                      ToolTip.Tip="市价单成交价相对信号价偏离超过该百分比时告警"/>
                         </StackPanel>
 
                         <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="限价单超时撤单 (秒)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="限价单超时撤单 (秒)" Classes="form-label"/>
                             <NumericUpDown Value="{Binding RiskConfig.LimitOrderTimeoutSeconds, Mode=TwoWay}"
                                            Minimum="0"
                                            Maximum="3600"
@@ -629,8 +555,7 @@
                                            ToolTip.Tip="策略限价单挂起超过该时长未成交则撤单并告警，0 表示不自动撤单"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="API 失败熔断 (次)" FontSize="{StaticResource LabelFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="API 失败熔断 (次)" Classes="form-label"/>
                             <NumericUpDown Value="{Binding RiskConfig.ApiFailureThreshold, Mode=TwoWay}"
                                            Minimum="0"
                                            Maximum="50"
@@ -639,16 +564,51 @@
                                            HorizontalAlignment="Stretch"
                                            ToolTip.Tip="5 分钟窗口内交易所接口失败达到该次数时拒单并告警，0 表示不限制"/>
                         </StackPanel>
+
+                        <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="同时持仓标的上限 (个)" Classes="form-label"/>
+                            <NumericUpDown Value="{Binding RiskConfig.MaxConcurrentPositions, Mode=TwoWay}"
+                                           Minimum="0"
+                                           Maximum="50"
+                                           Increment="1"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="限制同时持有的不同标的数量，防止多标的同时同向开仓把相关性风险叠成一笔大杠杆；0 表示不限制"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                            <TextBlock Text="资金费护栏 (分钟)" Classes="form-label"/>
+                            <NumericUpDown Value="{Binding RiskConfig.FundingRateGuardMinutes, Mode=TwoWay}"
+                                           Minimum="0"
+                                           Maximum="60"
+                                           Increment="5"
+                                           ShowButtonSpinner="False"
+                                           HorizontalAlignment="Stretch"
+                                           ToolTip.Tip="距下次资金结算少于该分钟数且费率对本方向不利时推迟开仓；0 表示不限制"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="{StaticResource TinySpacing}">
+                            <!-- 风险策略收紧开关：有保存按钮 → 复选框（design.md 7.12） -->
+                            <CheckBox IsChecked="{Binding RiskConfig.RequireLivePromotion, Mode=TwoWay}"
+                                      Content="要求策略通过影子验证才允许实盘自动开仓"/>
+                            <TextBlock Classes="caption" TextWrapping="Wrap"
+                                       Text="开启后，AI/定投/网格策略需积累至少 30 笔影子平仓、累计盈亏转正、盈亏比不低于 1.1 且回撤不超过累计盈利，才允许在实盘下单。已持仓的止损离场不受影响。"/>
+                        </StackPanel>
                     </Grid>
 
                     <Button Content="保存风控设置"
                             Command="{Binding SaveRiskConfigCommand}"
-                            Background="{StaticResource PrimaryBrush}"
-                            Foreground="{StaticResource TextOnEmphasisBrush}"
+                            Classes="btn-primary"
                             HorizontalAlignment="Left"
                             Margin="{StaticResource TinyTopMargin}"/>
                 </StackPanel>
             </Expander>
+
+            <!-- 失败态：浮层只负责失败重试（空列表不算无数据页，新建表单必须可操作） -->
+            <controls:StateOverlayView State="{Binding OverlayState}"
+                                       Message="{Binding OverlayMessage}"
+                                       RetryCommand="{Binding RetryCommand}"
+                                       RetryText="重新加载"
+                                       ShowLoading="False"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

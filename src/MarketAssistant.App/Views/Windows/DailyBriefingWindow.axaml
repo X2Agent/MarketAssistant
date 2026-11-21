@@ -27,13 +27,13 @@
                   Margin="{StaticResource SmallBottomMargin}">
                 <TextBlock Grid.Column="0"
                            Text="每日简报"
-                           FontSize="{StaticResource SectionTitleFontSize}"
-                           FontWeight="SemiBold"
+                           FontSize="{StaticResource BodyFontSize}"
+                           FontWeight="{DynamicResource WeightTitle}"
                            VerticalAlignment="Center"/>
 
                 <TextBlock Grid.Column="1"
                            Margin="{StaticResource SmallLeftMargin}"
-                           FontSize="{StaticResource SmallFontSize}"
+                           FontSize="{StaticResource CaptionFontSize}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis"
@@ -51,7 +51,7 @@
                                  Width="{StaticResource SmallSpacing}"
                                  Height="{StaticResource SmallSpacing}"/>
                     <TextBlock Text="生成中…"
-                               FontSize="{StaticResource SmallFontSize}"
+                               FontSize="{StaticResource CaptionFontSize}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -80,22 +80,21 @@
             <!-- 底栏：近 30 天累计用量摘要（成本透明；无历史记录时隐藏） -->
             <TextBlock DockPanel.Dock="Bottom"
                        Margin="{StaticResource SmallTopMargin}"
-                       FontSize="{StaticResource SmallFontSize}"
+                       FontSize="{StaticResource CaptionFontSize}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Text="{Binding UsageSummaryText}"
                        IsVisible="{Binding ShowUsageSummary}"/>
 
             <!-- 正文区：生成中骨架 / Markdown 全文 / 空态与失败态 -->
             <Panel>
-                <!-- 生成中骨架 -->
-                <StackPanel Spacing="{StaticResource SmallSpacing}"
-                            IsVisible="{Binding IsGenerating}">
-                    <Border Classes="skeleton skeleton-row" Height="16"/>
-                    <Border Classes="skeleton skeleton-row" Height="16"/>
-                    <Border Classes="skeleton skeleton-row" Height="16"/>
-                    <Border Classes="skeleton skeleton-row" Height="16"/>
-                    <Border Classes="skeleton skeleton-row" Height="16"/>
-                </StackPanel>
+                <!-- 生成中骨架：按 RichTextBlock 正文行高（24 / 行）排布，
+                     与生成完成后的 Markdown 段落同高，正文出现时不塌陷。
+                     行宽刻意参差，读起来是"一段文字即将出现"而不是"表格在加载"。 -->
+                <controls:SkeletonLines IsVisible="{Binding ShowBriefingSkeleton}"
+                                        Row="Body"
+                                        LineCount="10"
+                                        LineWidths="*,*,420,*,*,*,360,*,*,280"
+                                        Spacing="{StaticResource SmallSpacing}"/>
 
                 <!-- 全文：Width 由 Window 固定，Markdown 控件树因此正常折行、
                      高度自适应内容；ScrollViewer 负责超长文本的兜底滚动。
@@ -109,7 +108,7 @@
                 <controls:StateOverlayView State="{Binding OverlayState}"
                                            Message="{Binding OverlayMessage}"
                                            RetryCommand="{Binding RetryCommand}"
-                                           RetryText="重新生成"
+                                           RetryText="重试"
                                            ShowLoading="False"/>
             </Panel>
         </DockPanel>

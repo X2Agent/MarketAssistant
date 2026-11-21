@@ -1,90 +1,121 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Views.Controls">
 
     <!-- ================================================================== -->
-    <!-- 骨架屏样式 (Skeleton Loading) -->
+    <!-- MarketAssistant Design System v3.0 — Skeletons                       -->
+    <!--                                                                     -->
+    <!-- 骨架屏规则：                                                          -->
+    <!--  - 只用色阶，不用渐变扫光（扫光在暗色下会像"发光"，违反 v3 规范）。     -->
+    <!--  - 呼吸动画 1.6s，幅度 0.55→0.95 透明度，缓慢、低对比。                  -->
+    <!--  - 尺寸必须与真实内容对齐，避免加载完成时布局跳动。                     -->
+    <!--                                                                     -->
+    <!-- 怎么对齐（唯一正确做法）：把骨架写成真实卡片的"结构克隆"——同容器、      -->
+    <!-- 同 Padding、同 Spacing，只把文字换成 skeleton-line-* 等高灰条。         -->
+    <!-- 禁止再用 MinHeight 猜一个高度：真实内容高度由"内边距 + 行高 + 间距"决定， -->
+    <!-- 猜出来的值永远对不上，数据到达时整块塌陷或撑开。                        -->
     <!-- ================================================================== -->
-    
-    <!-- 基础骨架屏元素 -->
+
     <Style Selector="Border.skeleton">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
         <Setter Property="Transitions">
             <Transitions>
                 <DoubleTransition Property="Opacity" Duration="0:0:0.6"/>
             </Transitions>
         </Setter>
-    </Style>
-    
-    <!-- 骨架屏呼吸动画 -->
-    <Style Selector="Border.skeleton">
         <Style.Animations>
-            <Animation Duration="0:0:1.5" IterationCount="Infinite">
+            <Animation Duration="0:0:1.6" IterationCount="Infinite">
                 <KeyFrame Cue="0%">
-                    <Setter Property="Opacity" Value="0.6"/>
+                    <Setter Property="Opacity" Value="0.55"/>
                 </KeyFrame>
                 <KeyFrame Cue="50%">
-                    <Setter Property="Opacity" Value="1.0"/>
+                    <Setter Property="Opacity" Value="0.95"/>
                 </KeyFrame>
                 <KeyFrame Cue="100%">
-                    <Setter Property="Opacity" Value="0.6"/>
+                    <Setter Property="Opacity" Value="0.55"/>
                 </KeyFrame>
             </Animation>
         </Style.Animations>
     </Style>
-    
-    <!-- 骨架屏图表区域 -->
-    <Style Selector="Border.skeleton-chart">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="MinHeight" Value="400"/>
-    </Style>
 
-    <!-- ================================================================== -->
-    <!-- 骨架屏尺寸修饰类：与 skeleton 组合使用，如 Classes="skeleton skeleton-row" -->
-    <!-- ================================================================== -->
-
-    <!-- 单行文本占位 -->
-    <Style Selector="Border.skeleton-text">
-        <Setter Property="Height" Value="12"/>
-        <Setter Property="MinWidth" Value="48"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
-    <!-- 标题文本占位（更粗更高） -->
-    <Style Selector="Border.skeleton-title">
-        <Setter Property="Height" Value="18"/>
-        <Setter Property="MinWidth" Value="80"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-
-    <!-- 列表行占位 -->
-    <Style Selector="Border.skeleton-row">
-        <Setter Property="Height" Value="44"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="HorizontalAlignment" Value="Stretch"/>
-    </Style>
-
-    <!-- 卡片占位 -->
-    <Style Selector="Border.skeleton-card">
-        <Setter Property="MinHeight" Value="96"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="HorizontalAlignment" Value="Stretch"/>
-    </Style>
-
-    <!-- 右侧面板 / 区块占位 -->
-    <Style Selector="Border.skeleton-panel">
-        <Setter Property="MinHeight" Value="240"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="HorizontalAlignment" Value="Stretch"/>
-    </Style>
-
-    <!-- 圆形占位（图标 / 头像） -->
     <Style Selector="Border.skeleton-circle">
         <Setter Property="Width" Value="32"/>
         <Setter Property="Height" Value="32"/>
         <Setter Property="CornerRadius" Value="16"/>
     </Style>
 
-</Styles>
+    <!-- ===== 行高对齐基元（结构克隆用） =====
+         高度直接取 Spacing.axaml 的行高令牌，与真实文字的 TextBlock 同高。
+         用法：<Border Classes="skeleton skeleton-line-body-sm" Width="180"/>
+         一个 21px 的灰条替代一行 14px 正文，宽度按真实文本的视觉宽度给；
+         多行文本就放多个灰条，行间不加 Spacing（行高已含行距）。
 
+         旧的 skeleton-text / skeleton-title / skeleton-row / skeleton-card /
+         skeleton-panel 已随"结构克隆"改造全部下线：靠 MinHeight 猜高度的写法
+         与真实内容永远对不上，保留只会诱使后来者继续用它。 -->
+    <Style Selector="Border.skeleton-line-caption">
+        <Setter Property="Height" Value="{StaticResource CaptionLineHeight}"/>
+        <Setter Property="MinWidth" Value="32"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <Style Selector="Border.skeleton-line-body-sm">
+        <Setter Property="Height" Value="{StaticResource BodySmLineHeight}"/>
+        <Setter Property="MinWidth" Value="48"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <Style Selector="Border.skeleton-line-body">
+        <Setter Property="Height" Value="{StaticResource BodyLineHeight}"/>
+        <Setter Property="MinWidth" Value="48"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <Style Selector="Border.skeleton-line-title">
+        <Setter Property="Height" Value="{StaticResource TitleLineHeight}"/>
+        <Setter Property="MinWidth" Value="96"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <!-- ===== SkeletonLines 灰条组 =====
+         行内容由控件在 C# 侧生成（行数、宽度是数据，不该写成 XAML 重复块）。
+         本控件只表达"同一行高的一段"；多段不同字号请纵向放多个本控件。 -->
+    <Style Selector="controls|SkeletonLines">
+        <Setter Property="Orientation" Value="Vertical"/>
+    </Style>
+
+    <!-- ===== SkeletonCard 卡片壳 =====
+         四个形态的 Padding / CornerRadius 必须与真实卡片保持一致：
+           variant-card  == CardView（卡片底色 20 / 圆角 12）
+           variant-tile  == Border.hot-stock-card（次级表面 16 / 圆角 12）
+           variant-row   == 列表行与新闻行（卡片底色 16 / 圆角 8）
+           variant-bare  == 无表面，仅用于"骨架块即灰条"的场合 -->
+    <Style Selector="controls|SkeletonCard.variant-card">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="controls|SkeletonCard.variant-tile">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="controls|SkeletonCard.variant-row">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="controls|SkeletonCard.variant-bare">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="{StaticResource NoPadding}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+
+</Styles>

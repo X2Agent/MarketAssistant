@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 
 namespace MarketAssistant.Views.Windows;
@@ -17,12 +18,6 @@ public partial class NotificationWindow : Window
     private const int MaximumDisplayDuration = 12000;
     private const double MarginFromEdge = 16;
     private const double StackGap = 8;
-
-    // 图标底色对齐设计系统语义色（Colors.axaml 中 Success/Error/Warning/Info）
-    private static readonly Color SuccessColor = Color.Parse("#10B981");
-    private static readonly Color ErrorColor = Color.Parse("#EF4444");
-    private static readonly Color WarningColor = Color.Parse("#F59E0B");
-    private static readonly Color InfoColor = Color.Parse("#3B82F6");
 
     // 堆叠槽位（0 = 底部基准位，向上依次偏移），由 NotificationService 分配
     private int _slot;
@@ -83,19 +78,19 @@ public partial class NotificationWindow : Window
                 switch (type)
                 {
                     case NotificationType.Success:
-                        iconBorder.Background = new SolidColorBrush(SuccessColor);
+                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("SuccessBrush");
                         iconText.Text = "✓";
                         break;
                     case NotificationType.Error:
-                        iconBorder.Background = new SolidColorBrush(ErrorColor);
+                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("ErrorBrush");
                         iconText.Text = "✕";
                         break;
                     case NotificationType.Warning:
-                        iconBorder.Background = new SolidColorBrush(WarningColor);
+                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("WarningBrush");
                         iconText.Text = "!";
                         break;
                     case NotificationType.Info:
-                        iconBorder.Background = new SolidColorBrush(InfoColor);
+                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("AccentBrush");
                         iconText.Text = "i";
                         break;
                 }

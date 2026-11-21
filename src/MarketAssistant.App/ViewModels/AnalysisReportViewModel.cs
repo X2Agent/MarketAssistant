@@ -1,10 +1,13 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
+// 本类有同名的 InvestmentRating 字符串属性，直接写枚举名会解析成属性
+using Rating = MarketAssistant.Agents.MarketAnalysis.Models.InvestmentRating;
 
 namespace MarketAssistant.ViewModels;
 
@@ -13,13 +16,18 @@ namespace MarketAssistant.ViewModels;
 /// 负责展示 MarketAnalysisReport 中的 CoordinatorResult 结构化数据
 /// </summary>
 public partial class AnalysisReportViewModel(
-    ILogger<AnalysisReportViewModel> logger) : ViewModelBase(logger)
+    ILogger<AnalysisReportViewModel> logger,
+    AdaptiveCardConverter adaptiveCardConverter) : ViewModelBase(logger)
 {
     [ObservableProperty]
     private bool _isReportVisible;
 
     [ObservableProperty]
     private string _stockSymbol = string.Empty;
+
+    /// <summary>报告生成时间（本地时区，精确到分钟），空值时不展示</summary>
+    [ObservableProperty]
+    private string _reportCreatedAtText = string.Empty;
 
     [ObservableProperty]
     private string _coordinatorSummary = string.Empty;
@@ -31,6 +39,15 @@ public partial class AnalysisReportViewModel(
 
     [ObservableProperty]
     private string _investmentRating = string.Empty;
+
+    [ObservableProperty]
+    private bool _isRatingPositive;
+
+    [ObservableProperty]
+    private bool _isRatingNeutral;
+
+    [ObservableProperty]
+    private bool _isRatingNegative;
 
     [ObservableProperty]
     private string _targetPrice = string.Empty;
@@ -47,8 +64,18 @@ public partial class AnalysisReportViewModel(
     [ObservableProperty]
     private float _confidencePercentage;
 
-    [ObservableProperty]
-    private string _scorePercentage = "0/10";
+    /// <summary>置信度文本（如 "78%"），供 hero 区与目标价同排展示</summary>
+    public string ConfidenceText => $"{ConfidencePercentage:F0}%";
+
+    public bool HasConfidence => ConfidencePercentage > 0;
+    public bool HasTargetPrice => !string.IsNullOrWhiteSpace(TargetPrice);
+    public bool HasPriceChangeExpectation => !string.IsNullOrWhiteSpace(PriceChangeExpectation);
+    public bool HasTimeHorizon => !string.IsNullOrWhiteSpace(TimeHorizon);
+    public bool HasRiskLevel => !string.IsNullOrWhiteSpace(RiskLevel);
+
+    /// <summary>报告头部是否展示标的信息行（标的代码或生成时间任一存在即可）</summary>
+    public bool HasReportHeader
+        => !string.IsNullOrWhiteSpace(StockSymbol) || !string.IsNullOrWhiteSpace(ReportCreatedAtText);
 
     // === 聚合的列表数据 ===
 
@@ -109,14 +136,45 @@ public partial class AnalysisReportViewModel(
 
     public ObservableCollection<string> MissingDataDimensions { get; } = [];
 
+    /// <summary>是否存在缺失数据维度（控制该区块显隐，避免 XAML 依赖 Count→bool 隐式转换）</summary>
+    public bool HasMissingDataDimensions => MissingDataDimensions.Count > 0;
+
     // === 各分析师的消息 ===
 
-    public ObservableCollection<ChatMessage> AnalystMessages { get; } = [];
+    /// <summary>
+    /// 分析师完整结论（消息适配器，含结构化卡片解析结果），报告页"分析师明细"区块的数据源。
+    /// 与聊天侧栏共用 <see cref="ChatMessageAdapter"/>，保证同类内容两处渲染一致。
+    /// </summary>
+    public ObservableCollection<ChatMessageAdapter> AnalystMessages { get; } = [];
+
+    /// <summary>是否存在可展示的分析师明细</summary>
+    public bool HasAnalystMessages => AnalystMessages.Count > 0;
 
     partial void OnOverallScoreChanged(float value)
     {
-        ScorePercentage = $"{value:F1}/10";
+        OnPropertyChanged(nameof(ScorePercentage));
     }
+
+    /// <summary>评分文本（"8.5/10"），供 hero 区展示</summary>
+    public string ScorePercentage => $"{OverallScore:F1}/10";
+
+    partial void OnConfidencePercentageChanged(float value)
+    {
+        OnPropertyChanged(nameof(ConfidenceText));
+        OnPropertyChanged(nameof(HasConfidence));
+    }
+
+    partial void OnStockSymbolChanged(string value) => OnPropertyChanged(nameof(HasReportHeader));
+
+    partial void OnReportCreatedAtTextChanged(string value) => OnPropertyChanged(nameof(HasReportHeader));
+
+    partial void OnTargetPriceChanged(string value) => OnPropertyChanged(nameof(HasTargetPrice));
+
+    partial void OnPriceChangeExpectationChanged(string value) => OnPropertyChanged(nameof(HasPriceChangeExpectation));
+
+    partial void OnTimeHorizonChanged(string value) => OnPropertyChanged(nameof(HasTimeHorizon));
+
+    partial void OnRiskLevelChanged(string value) => OnPropertyChanged(nameof(HasRiskLevel));
 
     /// <summary>
     /// 使用完整的市场分析报告更新视图模型
@@ -125,94 +183,101 @@ public partial class AnalysisReportViewModel(
     /// </summary>
     public void UpdateWithReport(MarketAnalysisReport report)
     {
-        ArgumentNullException.ThrowIfNull(report);
-
         ClearAllData();
 
-        try
+        StockSymbol = report.AssetSymbol;
+        ReportCreatedAtText = report.CreatedAt == default
+            ? string.Empty
+            : report.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+
+        HasTokenUsage = report.Usage is { HasValue: true };
+        TokenUsageSummary = TokenUsageFormatter.FormatSummary(report.Usage);
+        TokenUsageDetail = TokenUsageFormatter.FormatDetail(report.Usage);
+        TokenUsageIsEstimated = report.Usage?.IsEstimated == true;
+
+        var coordinatorResult = report.CoordinatorResult;
+
+        // 绑定 Coordinator 的结构化数据（无需 null 判断，CoordinatorResult 的属性都有默认值）
+        OverallScore = coordinatorResult.OverallScore;
+        InvestmentRating = coordinatorResult.InvestmentRating.GetDescription();
+        var rating = coordinatorResult.InvestmentRating;
+        IsRatingPositive = rating is Rating.StrongBuy or Rating.Buy;
+        IsRatingNegative = rating is Rating.Reduce or Rating.Sell or Rating.StrongSell;
+        IsRatingNeutral = !IsRatingPositive && !IsRatingNegative;
+        TargetPrice = coordinatorResult.TargetPrice;
+        PriceChangeExpectation = coordinatorResult.PriceChangeExpectation;
+        TimeHorizon = coordinatorResult.TimeHorizon.GetDescription() +
+                      (string.IsNullOrWhiteSpace(coordinatorResult.TimeHorizonDescription) ? "" : $" ({coordinatorResult.TimeHorizonDescription})");
+        RiskLevel = coordinatorResult.RiskLevel.GetDescription();
+        ConfidencePercentage = coordinatorResult.ConfidencePercentage;
+
+        // 将强类型数据转换为列表供 UI 绑定
+        DimensionScores.Clear();
+        DimensionScores.Add(new ScoreItem { Name = "基本面", Score = coordinatorResult.DimensionScores.Fundamental });
+        DimensionScores.Add(new ScoreItem { Name = "技术面", Score = coordinatorResult.DimensionScores.Technical });
+        DimensionScores.Add(new ScoreItem { Name = "财务面", Score = coordinatorResult.DimensionScores.Financial });
+        DimensionScores.Add(new ScoreItem { Name = "市场情绪", Score = coordinatorResult.DimensionScores.Sentiment });
+        DimensionScores.Add(new ScoreItem { Name = "新闻事件", Score = coordinatorResult.DimensionScores.News });
+
+        foreach (var highlight in coordinatorResult.InvestmentHighlights)
         {
-            StockSymbol = report.AssetSymbol;
-
-            HasTokenUsage = report.Usage is { HasValue: true };
-            TokenUsageSummary = TokenUsageFormatter.FormatSummary(report.Usage);
-            TokenUsageDetail = TokenUsageFormatter.FormatDetail(report.Usage);
-            TokenUsageIsEstimated = report.Usage?.IsEstimated == true;
-
-            var coordinatorResult = report.CoordinatorResult;
-
-            // 绑定 Coordinator 的结构化数据（无需 null 判断，CoordinatorResult 的属性都有默认值）
-            OverallScore = coordinatorResult.OverallScore;
-            InvestmentRating = coordinatorResult.InvestmentRating.GetDescription();
-            TargetPrice = coordinatorResult.TargetPrice;
-            PriceChangeExpectation = coordinatorResult.PriceChangeExpectation;
-            TimeHorizon = coordinatorResult.TimeHorizon.GetDescription() +
-                          (string.IsNullOrWhiteSpace(coordinatorResult.TimeHorizonDescription) ? "" : $" ({coordinatorResult.TimeHorizonDescription})");
-            RiskLevel = coordinatorResult.RiskLevel.GetDescription();
-            ConfidencePercentage = coordinatorResult.ConfidencePercentage;
-
-            // 将强类型数据转换为列表供 UI 绑定
-            DimensionScores.Clear();
-            DimensionScores.Add(new ScoreItem { Name = "基本面", Score = coordinatorResult.DimensionScores.Fundamental });
-            DimensionScores.Add(new ScoreItem { Name = "技术面", Score = coordinatorResult.DimensionScores.Technical });
-            DimensionScores.Add(new ScoreItem { Name = "财务面", Score = coordinatorResult.DimensionScores.Financial });
-            DimensionScores.Add(new ScoreItem { Name = "市场情绪", Score = coordinatorResult.DimensionScores.Sentiment });
-            DimensionScores.Add(new ScoreItem { Name = "新闻事件", Score = coordinatorResult.DimensionScores.News });
-
-            foreach (var highlight in coordinatorResult.InvestmentHighlights)
-            {
-                InvestmentHighlights.Add(highlight);
-            }
-
-            foreach (var risk in coordinatorResult.RiskFactors)
-            {
-                RiskFactors.Add(risk);
-            }
-
-            foreach (var suggestion in coordinatorResult.OperationSuggestions)
-            {
-                OperationSuggestions.Add(suggestion);
-            }
-
-            ConsensusAnalysis = coordinatorResult.ConsensusAnalysis;
-            DisagreementAnalysis = coordinatorResult.DisagreementAnalysis;
-            HasConsensusAnalysis = !string.IsNullOrWhiteSpace(ConsensusAnalysis);
-            HasDisagreementAnalysis = !string.IsNullOrWhiteSpace(DisagreementAnalysis);
-
-            CoordinatorSummary = coordinatorResult.Summary;
-
-            var qm = coordinatorResult.QualityMetrics;
-            DataCompletenessPercent = qm.DataCompletenessPercent;
-            AnalystConsensusPercent = qm.AnalystConsensusPercent;
-            LimitationsNote = qm.LimitationsNote;
-            QualityLevelText = qm.OverallQualityLevel switch
-            {
-                Agents.MarketAnalysis.Models.AnalysisQualityLevel.High => "高",
-                Agents.MarketAnalysis.Models.AnalysisQualityLevel.Medium => "中",
-                Agents.MarketAnalysis.Models.AnalysisQualityLevel.Low => "低",
-                _ => "未知"
-            };
-            MissingDataDimensions.Clear();
-            foreach (var dim in qm.MissingDataDimensions)
-                MissingDataDimensions.Add(dim);
-            HasQualityMetrics = qm.DataCompletenessPercent > 0 || qm.AnalystConsensusPercent > 0;
-
-            // 添加各专业分析师的自然语言分析（无结构化数据）
-            foreach (var message in report.AnalystMessages)
-            {
-                AnalystMessages.Add(message);
-            }
-
-            IsReportVisible = true;
-
-            Logger?.LogInformation(
-                "报告视图已更新：股票 {StockSymbol}，综合评分 {Score}，最终评级 {Rating}",
-                StockSymbol, OverallScore, InvestmentRating);
+            InvestmentHighlights.Add(highlight);
         }
-        catch (Exception ex)
+
+        foreach (var risk in coordinatorResult.RiskFactors)
         {
-            Logger?.LogError(ex, "更新报告视图时发生错误");
-            throw;
+            RiskFactors.Add(risk);
         }
+
+        foreach (var suggestion in coordinatorResult.OperationSuggestions)
+        {
+            OperationSuggestions.Add(suggestion);
+        }
+
+        ConsensusAnalysis = coordinatorResult.ConsensusAnalysis;
+        DisagreementAnalysis = coordinatorResult.DisagreementAnalysis;
+        HasConsensusAnalysis = !string.IsNullOrWhiteSpace(ConsensusAnalysis);
+        HasDisagreementAnalysis = !string.IsNullOrWhiteSpace(DisagreementAnalysis);
+
+        CoordinatorSummary = coordinatorResult.Summary;
+
+        var qm = coordinatorResult.QualityMetrics;
+        DataCompletenessPercent = qm.DataCompletenessPercent;
+        AnalystConsensusPercent = qm.AnalystConsensusPercent;
+        LimitationsNote = qm.LimitationsNote;
+        QualityLevelText = qm.OverallQualityLevel switch
+        {
+            Agents.MarketAnalysis.Models.AnalysisQualityLevel.High => "高",
+            Agents.MarketAnalysis.Models.AnalysisQualityLevel.Medium => "中",
+            Agents.MarketAnalysis.Models.AnalysisQualityLevel.Low => "低",
+            _ => "未知"
+        };
+        MissingDataDimensions.Clear();
+        foreach (var dim in qm.MissingDataDimensions)
+            MissingDataDimensions.Add(dim);
+        HasQualityMetrics = qm.DataCompletenessPercent > 0 || qm.AnalystConsensusPercent > 0;
+        OnPropertyChanged(nameof(HasMissingDataDimensions));
+
+        // 添加各专业分析师的自然语言分析（结构化数据由卡片解析器从 JSON 产物中提取）。
+        // 协调分析师的产物就是本页报告本身，再列一遍只会重复信息，故排除。
+        foreach (var message in report.AnalystMessages)
+        {
+            if (message.Role == ChatRole.System)
+                continue;
+
+            if (string.Equals(message.AuthorName, "CoordinatorAnalyst", StringComparison.Ordinal)
+                || string.Equals(message.AuthorName, "Coordinator", StringComparison.Ordinal))
+                continue;
+
+            AnalystMessages.Add(new ChatMessageAdapter(message, adaptiveCardConverter));
+        }
+        OnPropertyChanged(nameof(HasAnalystMessages));
+
+        IsReportVisible = true;
+
+        Logger?.LogInformation(
+            "报告视图已更新：股票 {StockSymbol}，综合评分 {Score}，最终评级 {Rating}",
+            StockSymbol, OverallScore, InvestmentRating);
     }
 
     private void ClearAllData()
@@ -225,10 +290,14 @@ public partial class AnalysisReportViewModel(
         MissingDataDimensions.Clear();
 
         StockSymbol = string.Empty;
+        ReportCreatedAtText = string.Empty;
         CoordinatorSummary = string.Empty;
         OverallScore = 0f;
         ConfidencePercentage = 0f;
         InvestmentRating = string.Empty;
+        IsRatingPositive = false;
+        IsRatingNeutral = false;
+        IsRatingNegative = false;
         TargetPrice = string.Empty;
         PriceChangeExpectation = string.Empty;
         TimeHorizon = string.Empty;
@@ -246,6 +315,8 @@ public partial class AnalysisReportViewModel(
         TokenUsageSummary = string.Empty;
         TokenUsageDetail = string.Empty;
         TokenUsageIsEstimated = false;
+        OnPropertyChanged(nameof(HasAnalystMessages));
+        OnPropertyChanged(nameof(HasMissingDataDimensions));
     }
 }
 

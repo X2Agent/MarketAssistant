@@ -5,105 +5,136 @@
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:models="using:MarketAssistant.Trading.Models"
              xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:converters="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradeHistoryView"
              x:DataType="vm:TradeHistoryViewModel">
 
     <UserControl.Resources>
-        <x:Double x:Key="FilterComboWidth">220</x:Double>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+        <converters:PriceChangeColorConverter x:Key="PnlColorConverter"/>
+        <!-- 交易对筛选框宽度：比输入框默认宽度窄，避免挤压右侧统计摘要 -->
+        <x:Double x:Key="FilterSymbolWidth">220</x:Double>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*">
-        <!-- 筛选工具栏 -->
-        <Border Grid.Row="0"
-                Background="{DynamicResource CardBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="{StaticResource DefaultBorderThickness}"
-                CornerRadius="{StaticResource SmallCornerRadius}"
-                Padding="{StaticResource SmallPadding}"
-                Margin="{StaticResource SmallBottomMargin}">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*">
+
+        <!-- 页签内标题：与其余两个页签同一结构（card-title + caption） -->
+        <StackPanel Grid.Row="0" Spacing="{StaticResource TinySpacing}">
+            <TextBlock Classes="card-title" Text="交易历史"/>
+            <TextBlock Classes="caption" Text="已成交订单记录 · 可按交易对与时间范围筛选"/>
+        </StackPanel>
+
+        <!-- 筛选工具栏：与其余页签同用 CardView（圆角 12），不再单独用 8 圆角的裸 Border -->
+        <controls:CardView Grid.Row="1" Margin="{StaticResource DefaultVerticalMargin}">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto"
+                  ColumnSpacing="{StaticResource SmallSpacing}"
+                  VerticalAlignment="Center">
                 <TextBox Grid.Column="0"
                          Text="{Binding FilterSymbol}"
-                         PlaceholderText="按交易对筛选（如 BTCUSDT）"
-                         Width="{StaticResource FilterComboWidth}"/>
+                         PlaceholderText="交易对（如 BTCUSDT）"
+                         Width="{StaticResource FilterSymbolWidth}"/>
                 <Button Grid.Column="1"
                         Content="筛选"
                         Command="{Binding FilterCommand}"
-                        Classes="btn-primary"
-                        Margin="{StaticResource SmallLeftMargin}"/>
+                        Classes="btn-primary"/>
                 <Button Grid.Column="2"
                         Content="清除"
                         Command="{Binding ClearFilterCommand}"
-                        Margin="{StaticResource TinyLeftMargin}"/>
-                <TextBlock Grid.Column="4"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           FontSize="{StaticResource SmallFontSize}">
-                    <TextBlock.Text>
-                        <MultiBinding StringFormat="今日: {0}笔 | 盈亏: {1:F2} USDT">
-                            <Binding Path="TodayStats.TradeCount"/>
-                            <Binding Path="TodayStats.TotalPnl"/>
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
+                        Classes="btn-secondary"/>
+
+                <!-- 今日摘要：数值用 num-sm，标签用 caption，与监控页指标一致 -->
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="{StaticResource SectionSpacing}"
+                            VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Classes="caption" Text="今日成交" VerticalAlignment="Center"/>
+                        <TextBlock Classes="num" Text="{Binding TodayStats.TradeCount}" VerticalAlignment="Center"/>
+                        <TextBlock Classes="caption" Text="笔" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Classes="caption" Text="今日盈亏" VerticalAlignment="Center"/>
+                        <TextBlock Classes="num"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding TodayStats.TotalPnl, Converter={StaticResource PnlColorConverter}}"
+                                   Text="{Binding TodayStats.TotalPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"/>
+                    </StackPanel>
+                </StackPanel>
             </Grid>
-        </Border>
+        </controls:CardView>
 
         <!-- 记录列表 -->
-        <Panel Grid.Row="1">
-            <!-- 首屏骨架：5 行记录占位 -->
-            <StackPanel Spacing="{StaticResource TinySpacing}"
-                        IsVisible="{Binding IsInitialLoading}">
-                <Border Classes="skeleton skeleton-row" Height="88"/>
-                <Border Classes="skeleton skeleton-row" Height="88"/>
-                <Border Classes="skeleton skeleton-row" Height="88"/>
-                <Border Classes="skeleton skeleton-row" Height="88"/>
-                <Border Classes="skeleton skeleton-row" Height="88"/>
-            </StackPanel>
+        <Panel Grid.Row="2">
+            <!-- 首屏骨架：5 条记录卡。头部 14 / 明细 12，两段字号不同。 -->
+            <controls:SkeletonList Count="5"
+                                   Spacing="{StaticResource TinySpacing}"
+                                   IsVisible="{Binding IsInitialLoading}">
+                <controls:SkeletonList.ItemTemplate>
+                    <DataTemplate>
+                        <controls:SkeletonCard Variant="Row">
+                            <StackPanel Spacing="{StaticResource TinySpacing}">
+                                <controls:SkeletonLines Row="BodySm" LineWidths="96"/>
+                                <controls:SkeletonLines Row="Caption" LineWidths="320"/>
+                            </StackPanel>
+                        </controls:SkeletonCard>
+                    </DataTemplate>
+                </controls:SkeletonList.ItemTemplate>
+            </controls:SkeletonList>
 
             <ScrollViewer IsVisible="{Binding !IsInitialLoading}">
                 <ItemsControl ItemsSource="{Binding Records}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="models:TradeRecord">
-                            <Border Background="{DynamicResource CardBackgroundBrush}"
-                                    CornerRadius="{StaticResource SmallCornerRadius}"
-                                    Padding="{StaticResource DefaultCardPadding}"
-                                    Margin="{StaticResource TinyBottomMargin}">
-                                <StackPanel Spacing="{StaticResource TinySpacing}">
-                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <DataTemplate x:DataType="models:TradeRecord">
+                            <controls:CardView Margin="{StaticResource TinyBottomMargin}">
+                                <StackPanel Spacing="{StaticResource SmallSpacing}">
+
+                                    <!-- 头部：符号 + 方向 + 状态 ... 成交时间 -->
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          ColumnSpacing="{StaticResource DefaultSpacing}">
                                         <StackPanel Grid.Column="0" Orientation="Horizontal"
                                                     Spacing="{StaticResource SmallSpacing}">
                                             <TextBlock Text="{Binding Symbol}"
-                                                       FontWeight="Bold"
-                                                       FontSize="{StaticResource SectionTitleFontSize}"/>
-                                            <Border CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TagPadding}">
+                                                       FontSize="{StaticResource BodySmFontSize}"
+                                                       FontWeight="{DynamicResource WeightTitle}"
+                                                       VerticalAlignment="Center"/>
+                                            <Border Background="{DynamicResource SelectedBackgroundBrush}"
+                                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                                    Padding="{StaticResource TagPadding}"
+                                                    VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Side}"
-                                                           FontSize="{StaticResource SmallFontSize}"/>
+                                                           FontSize="{StaticResource CaptionFontSize}"
+                                                           FontWeight="{DynamicResource WeightEmphasis}"
+                                                           Foreground="{StaticResource AccentBrush}"/>
                                             </Border>
-                                            <Border CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TagPadding}">
+                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                                    Padding="{StaticResource TagPadding}"
+                                                    VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Status}"
-                                                           FontSize="{StaticResource SmallFontSize}"/>
+                                                           FontSize="{StaticResource CaptionFontSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             </Border>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="2"
+
+                                        <!-- 已实现盈亏是该行最重要的数字，单独右对齐 -->
+                                        <TextBlock Grid.Column="1"
+                                                   Classes="num"
+                                                   HorizontalAlignment="Right"
                                                    VerticalAlignment="Center"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}">
-                                            <TextBlock.Text>
-                                                <MultiBinding StringFormat="{}{0:yyyy-MM-dd HH:mm:ss}">
-                                                    <Binding Path="CreatedAt"/>
-                                                </MultiBinding>
-                                            </TextBlock.Text>
-                                        </TextBlock>
+                                                   Foreground="{Binding RealizedPnl, Converter={StaticResource PnlColorConverter}}"
+                                                   Text="{Binding RealizedPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"
+                                                   IsVisible="{Binding HasRealizedPnl}"/>
+
+                                        <TextBlock Grid.Column="2"
+                                                   Classes="caption"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
                                     </Grid>
 
-                                    <TextBlock FontSize="{StaticResource SmallFontSize}"
+                                    <!-- 明细：请求 / 成交 / 均价 / 手续费 / 滑点 -->
+                                    <TextBlock Classes="num-sm"
                                                Foreground="{DynamicResource TextSecondaryBrush}">
                                         <TextBlock.Text>
-                                            <MultiBinding StringFormat="请求: {0:F6} | 成交: {1:F6} @ {2:F4} | 手续费: {3:F6} {4}">
+                                            <MultiBinding StringFormat="请求 {0:F6} · 成交 {1:F6} @ {2} · 手续费 {3:F4} {4}">
                                                 <Binding Path="RequestedQty"/>
                                                 <Binding Path="ExecutedQty"/>
                                                 <Binding Path="ExecutedPrice"/>
@@ -113,18 +144,23 @@
                                         </TextBlock.Text>
                                     </TextBlock>
 
-                                    <!-- AI 推理展开 -->
+                                    <TextBlock Classes="num-sm"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               IsVisible="{Binding HasSlippage}"
+                                               Text="{Binding SlippagePercent, StringFormat='滑点 {0:F3}%'}"/>
+
+                                    <!-- AI 决策推理：默认折叠，不占列表高度 -->
                                     <Expander Header="AI 决策推理"
                                               IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                              HorizontalAlignment="Stretch"
                                               Padding="{StaticResource NoPadding}">
                                         <TextBlock Text="{Binding AIReasoning}"
                                                    TextWrapping="Wrap"
-                                                   FontSize="{StaticResource SmallFontSize}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Classes="caption"
                                                    Margin="{StaticResource SmallCardPadding}"/>
                                     </Expander>
                                 </StackPanel>
-                            </Border>
+                            </controls:CardView>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

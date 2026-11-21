@@ -13,12 +13,12 @@ namespace MarketAssistant.Converters;
 /// </summary>
 public class PriceChangeColorConverter : IValueConverter
 {
-    private const string BullishFallback = "#F44336";
-    private const string BearishFallback = "#4CAF50";
-    private const string NeutralFallback = "#9E9E9E";
-    private const string BullishTagFallback = "#1FF44336";
-    private const string BearishTagFallback = "#1F4CAF50";
-    private const string NeutralTagFallback = "#149E9E9E";
+    private const string BullishFallback = "#E5484D";
+    private const string BearishFallback = "#16A34A";
+    private const string NeutralFallback = "#8A93A0";
+    private const string BullishTagFallback = "#1FE5484D";
+    private const string BearishTagFallback = "#1F16A34A";
+    private const string NeutralTagFallback = "#148A93A0";
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

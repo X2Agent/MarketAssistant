@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:converters="using:MarketAssistant.Converters"
+             xmlns:models="using:MarketAssistant.Trading.Models"
+             mc:Ignorable="d" d:DesignWidth="600"
+             x:Class="MarketAssistant.Views.Components.Trading.StrategyRowView"
+             x:Name="Root"
+             x:DataType="models:TradingStrategy">
+
+    <!-- 策略行：策略配置页与实时监控页共用同一份标记。
+         DataContext 即 TradingStrategy；操作按钮由宿主页经 Actions 注入，
+         因此行内命令仍可用 $parent[ItemsControl] 绑定到宿主 ViewModel。 -->
+    <UserControl.Resources>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
+    </UserControl.Resources>
+
+    <Border Background="{DynamicResource SurfaceVariantBrush}"
+            BorderThickness="{StaticResource NoBorderThickness}"
+            CornerRadius="{StaticResource TinyCornerRadius}"
+            Padding="{StaticResource SmallCardPadding}"
+            Margin="{StaticResource TinyBottomMargin}">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
+
+            <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                <!-- 标识：符号 + 类型 + 状态 -->
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                    <TextBlock Text="{Binding Symbol}"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
+                               VerticalAlignment="Center"/>
+                    <Border Background="{DynamicResource SelectedBackgroundBrush}"
+                            CornerRadius="{StaticResource TinyCornerRadius}"
+                            Padding="{StaticResource TagPadding}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}"
+                                   FontSize="{StaticResource CaptionFontSize}"
+                                   FontWeight="{DynamicResource WeightEmphasis}"
+                                   Foreground="{StaticResource AccentBrush}"/>
+                    </Border>
+                    <Border Background="{DynamicResource CardBackgroundBrush}"
+                            CornerRadius="{StaticResource TinyCornerRadius}"
+                            Padding="{StaticResource TagPadding}"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
+                                   FontSize="{StaticResource CaptionFontSize}"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- 参数明细：方向 / 触发价 / 数量 / 已执行 -->
+                <TextBlock Classes="num-sm"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="方向 {0} · 触发 {1} · {2} · 已执行 {3} 次">
+                            <Binding Path="Side" Converter="{StaticResource EnumDescriptionConverter}"/>
+                            <Binding Path="TriggerPrice" Converter="{StaticResource PriceTextConverter}"/>
+                            <Binding Path="QuantityLabel"/>
+                            <Binding Path="ExecutionCount"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
+
+            <!-- 操作区：由宿主页经 Actions 注入，只读场景留空。用 ElementName 绕开行级 DataContext。 -->
+            <ContentPresenter Grid.Column="1"
+                              Content="{Binding #Root.Actions}"
+                              IsVisible="{Binding #Root.Actions, Converter={x:Static ObjectConverters.IsNotNull}}"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Right"/>
+        </Grid>
+    </Border>
+</UserControl>

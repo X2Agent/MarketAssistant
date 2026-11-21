@@ -3,7 +3,6 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
-             xmlns:converts="using:MarketAssistant.Converters"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:components="using:MarketAssistant.Views.Components"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
@@ -13,27 +12,17 @@
              x:Name="Root">
 
     <UserControl.Resources>
-        <!-- 图标路径定义 -->
         <StreamGeometry x:Key="IconClose">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
         <StreamGeometry x:Key="IconSend">M2.01 21L23 12 2.01 3 2 10l15 2-15 2z</StreamGeometry>
         <StreamGeometry x:Key="IconRobot">M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H18A2,2 0 0,1 20,9V18A2,2 0 0,1 18,20H6A2,2 0 0,1 4,18V9A2,2 0 0,1 6,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M6,9V18H18V9H6M15,14A1,1 0 0,0 14,15A1,1 0 0,0 15,16A1,1 0 0,0 16,15A1,1 0 0,0 15,14M9,14A1,1 0 0,0 8,15A1,1 0 0,0 9,16A1,1 0 0,0 10,15A1,1 0 0,0 9,14Z</StreamGeometry>
         <StreamGeometry x:Key="IconUser">M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z</StreamGeometry>
-        <StreamGeometry x:Key="IconChat">M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M20,16H6L4,18V4H20</StreamGeometry>
+        <!-- 历史会话用时钟图标：对话气泡图标已被标题占用，重复使用会把"历史"读成"新对话" -->
+        <StreamGeometry x:Key="IconHistory">M13,3A9,9 0 0,0 4,12H1L4.89,15.89L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,19.99 10.51,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3M12,8V13L16.28,15.54L17,14.33L13.5,12.25V8H12Z</StreamGeometry>
 
-        <!-- 局部尺寸定义（仅定义全局资源中不存在的键，HeaderHeight/IconButtonSize/DefaultBorderThickness 等引用全局 Spacing） -->
         <x:Double x:Key="AvatarSize">36</x:Double>
         <x:Double x:Key="AvatarIconSize">20</x:Double>
         <x:Double x:Key="HeaderIconSize">20</x:Double>
-        <x:Double x:Key="CloseButtonSize">32</x:Double>
-        <x:Double x:Key="CloseIconSize">12</x:Double>
         <x:Double x:Key="SendIconSize">18</x:Double>
-        <x:Double x:Key="InputAreaMinHeight">48</x:Double>
-        <CornerRadius x:Key="AvatarCornerRadius">18</CornerRadius>
-        <CornerRadius x:Key="InputAreaCornerRadius">24</CornerRadius>
-        <CornerRadius x:Key="CloseButtonCornerRadius">16</CornerRadius>
-        <CornerRadius x:Key="SendButtonCornerRadius">22</CornerRadius>
-        <CornerRadius x:Key="BubbleLeftCornerRadius">0,16,16,16</CornerRadius>
-        <CornerRadius x:Key="BubbleRightCornerRadius">16,0,16,16</CornerRadius>
         <Thickness x:Key="HeaderPadding">16,0</Thickness>
         <Thickness x:Key="HeaderIconMargin">0,0,12,0</Thickness>
         <Thickness x:Key="CloseButtonMargin">0,0,12,0</Thickness>
@@ -42,135 +31,88 @@
         <Thickness x:Key="AvatarLeftMargin">0,0,12,0</Thickness>
         <Thickness x:Key="AvatarRightMargin">12,0,0,0</Thickness>
         <Thickness x:Key="BubbleHeaderMargin">4,0,0,4</Thickness>
-        <Thickness x:Key="BubbleTimeMargin">8,0,0,0</Thickness>
         <Thickness x:Key="BubbleRightHeaderMargin">0,0,4,4</Thickness>
         <Thickness x:Key="BubbleRightTimeMargin">0,0,8,0</Thickness>
         <Thickness x:Key="ThinkingMargin">0,0,0,8</Thickness>
         <Thickness x:Key="InputAreaPadding">16,12</Thickness>
-        <Thickness x:Key="InputBoxMargin">12,4</Thickness>
+        <Thickness x:Key="InputBoxPadding">12,8</Thickness>
         <Thickness x:Key="SendButtonMargin">12,0,0,0</Thickness>
         <Thickness x:Key="SendIconMargin">4,0,0,0</Thickness>
     </UserControl.Resources>
 
-    <DockPanel Background="{DynamicResource PageBackgroundBrush}">
-        
-        <!-- 1. 标题栏 -->
-        <Border DockPanel.Dock="Top" 
-                Height="{StaticResource HeaderHeight}" 
-                Background="{DynamicResource CardBackgroundBrush}" 
-                BorderBrush="{DynamicResource DividerBrush}" 
-                BorderThickness="{StaticResource BottomBorderThickness}">
+    <!-- 面板本身（圆角 + 表面色）由宿主页面提供，这里不再铺底色，
+         否则会在宿主面板上再压一层同色面，圆角边界反而消失 -->
+    <DockPanel Background="Transparent">
+
+        <!-- 1. 标题栏：与消息区同为一个表面，不再单独铺底色（铺了会在宿主白卡上叠一条同色带） -->
+        <Border DockPanel.Dock="Top"
+                Height="{StaticResource HeaderHeight}"
+                Background="Transparent">
             <Grid ColumnDefinitions="*,Auto,Auto">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="{StaticResource HeaderPadding}">
-                    <PathIcon Data="{StaticResource IconChat}" 
-                              Foreground="{StaticResource PrimaryBrush}" 
-                              Width="{StaticResource HeaderIconSize}" Height="{StaticResource HeaderIconSize}" 
+                    <PathIcon Data="{StaticResource IconRobot}"
+                              Foreground="{StaticResource AccentBrush}"
+                              Width="{StaticResource HeaderIconSize}" Height="{StaticResource HeaderIconSize}"
                               Margin="{StaticResource HeaderIconMargin}"/>
-                    <TextBlock Text="智能助手" 
-                               FontSize="{StaticResource SubTitleFontSize}" 
-                               FontWeight="SemiBold" 
+                    <TextBlock Text="智能助手"
+                               FontSize="{StaticResource BodyFontSize}"
+                               FontWeight="{DynamicResource WeightTitle}"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>
-                
+
                 <!-- 历史会话入口：展开覆盖层列出持久化的会话（恢复/删除/新建） -->
-                <Button Grid.Column="1" 
+                <Button Grid.Column="1"
+                        Classes="btn-ghost btn-icon-sm"
                         Command="{Binding ToggleSessionHistoryCommand}"
-                        Background="Transparent"
-                        Width="{StaticResource CloseButtonSize}" Height="{StaticResource CloseButtonSize}"
-                        CornerRadius="{StaticResource CloseButtonCornerRadius}"
                         Margin="{StaticResource CloseButtonMargin}"
-                        Padding="{StaticResource NoPadding}"
                         ToolTip.Tip="历史会话">
-                    <PathIcon Data="{StaticResource IconChat}" 
-                              Width="{StaticResource CloseIconSize}" Height="{StaticResource CloseIconSize}" 
-                              Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-                        </Style>
-                    </Button.Styles>
+                    <PathIcon Data="{StaticResource IconHistory}"
+                              Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"/>
                 </Button>
-                
-                <Button Grid.Column="2" 
+
+                <Button Grid.Column="2"
+                        Classes="btn-ghost btn-icon-sm"
                         Command="{Binding #Root.CloseCommand}"
-                        Background="Transparent"
-                        Width="{StaticResource CloseButtonSize}" Height="{StaticResource CloseButtonSize}"
-                        CornerRadius="{StaticResource CloseButtonCornerRadius}"
                         Margin="{StaticResource CloseButtonMargin}"
-                        Padding="{StaticResource NoPadding}">
-                    <PathIcon Data="{StaticResource IconClose}" 
-                              Width="{StaticResource CloseIconSize}" Height="{StaticResource CloseIconSize}" 
-                              Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-                        </Style>
-                    </Button.Styles>
+                        ToolTip.Tip="关闭助手">
+                    <PathIcon Data="{StaticResource IconClose}"
+                              Width="{StaticResource TinyIconSize}" Height="{StaticResource TinyIconSize}"/>
                 </Button>
             </Grid>
         </Border>
 
-        <!-- 3. 输入区域 -->
-        <Border DockPanel.Dock="Bottom" 
-                Background="{DynamicResource CardBackgroundBrush}" 
-                BorderBrush="{DynamicResource DividerBrush}" 
-                BorderThickness="{StaticResource TopBorderThickness}"
-                Padding="{StaticResource InputAreaPadding}"
-                BoxShadow="{StaticResource InputAreaBoxShadow}">
+        <!-- 3. 输入区域：与消息区同面，靠输入框自身的凹陷面分层 -->
+        <Border DockPanel.Dock="Bottom"
+                Background="Transparent"
+                BorderThickness="{StaticResource NoBorderThickness}"
+                Padding="{StaticResource InputAreaPadding}">
             <Grid ColumnDefinitions="*,Auto">
-                <Border Grid.Column="0" 
-                        Background="{DynamicResource PageBackgroundBrush}" 
-                        CornerRadius="{StaticResource InputAreaCornerRadius}" 
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="{StaticResource DefaultBorderThickness}"
-                        MinHeight="{StaticResource InputAreaMinHeight}">
-                    <TextBox x:Name="MessageEntry"
-                             Text="{Binding UserInput}" 
-                             PlaceholderText="输入您的问题..."
-                             BorderThickness="{StaticResource NoBorderThickness}" 
-                             Background="Transparent"
-                             Margin="{StaticResource InputBoxMargin}"
-                             FontSize="{StaticResource LabelFontSize}"
-                             VerticalContentAlignment="Center"
-                             AcceptsReturn="True"
-                             MaxHeight="{StaticResource MaxInputHeight}"
-                             IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}">
-                        <TextBox.Styles>
-                            <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderThickness" Value="0"/>
-                            </Style>
-                            <Style Selector="TextBox:disabled /template/ Border#PART_BorderElement">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderThickness" Value="0"/>
-                            </Style>
-                        </TextBox.Styles>
-                    </TextBox>
-                </Border>
-                
-                <Button Grid.Column="1" 
+                <!-- 输入框本身就是凹陷面：7.2 规定未聚焦用 SunkenBackgroundBrush、
+                     聚焦换成 CardBackgroundBrush + 双环。不再套一层 Border，
+                     否则双环被打在容器内侧，视觉上像是"框里有框"。 -->
+                <TextBox x:Name="MessageEntry"
+                         Text="{Binding UserInput}"
+                         PlaceholderText="输入您的问题..."
+                         Background="{DynamicResource SunkenBackgroundBrush}"
+                         CornerRadius="{StaticResource SmallCornerRadius}"
+                         Padding="{StaticResource InputBoxPadding}"
+                         FontSize="{StaticResource BodyFontSize}"
+                         MinHeight="{StaticResource InputHeight}"
+                         VerticalContentAlignment="Center"
+                         AcceptsReturn="True"
+                         MaxHeight="{StaticResource MaxInputHeight}"
+                         IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}"/>
+
+                <Button Grid.Column="1"
+                        Classes="btn-primary btn-icon"
                         Command="{Binding SendMessageCommand}"
-                        Width="{StaticResource IconButtonSize}" Height="{StaticResource IconButtonSize}" 
-                        CornerRadius="{StaticResource SendButtonCornerRadius}" 
-                        Background="{StaticResource PrimaryBrush}"
                         Margin="{StaticResource SendButtonMargin}"
-                        Padding="{StaticResource NoPadding}"
-                        IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}">
-                    <PathIcon Data="{StaticResource IconSend}" 
-                              Foreground="{StaticResource TextOnEmphasisBrush}" 
+                        IsEnabled="{Binding IsProcessing, Converter={x:Static BoolConverters.Not}}"
+                        ToolTip.Tip="发送（Enter）">
+                    <PathIcon Data="{StaticResource IconSend}"
+                              Foreground="{StaticResource TextOnEmphasisBrush}"
                               Width="{StaticResource SendIconSize}" Height="{StaticResource SendIconSize}"
-                              Margin="{StaticResource SendIconMargin}"/> <!-- 微调图标位置使其视觉居中 -->
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
-                        </Style>
-                        <Style Selector="Button:pressed /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
-                        </Style>
-                        <Style Selector="Button:disabled /template/ ContentPresenter">
-                            <Setter Property="Background" Value="{DynamicResource TextDisabledBrush}"/>
-                        </Style>
-                    </Button.Styles>
+                              Margin="{StaticResource SendIconMargin}"/>
                 </Button>
             </Grid>
         </Border>
@@ -178,252 +120,301 @@
         <!-- 2. 消息列表 + 历史会话覆盖层 -->
         <Grid>
             <ListBox x:Name="ChatListBox"
-                 ItemsSource="{Binding ChatMessages}" 
-                 Background="Transparent" 
-                 Margin="{StaticResource NoMargin}"
-                 Padding="{StaticResource ChatListPadding}"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                 ScrollViewer.VerticalScrollBarVisibility="Visible">
-            <!-- 关闭虚拟化：聊天条目高度差异大，虚拟化估算高度会导致滚动跳变；消息量级小，无性能压力 -->
-            <ListBox.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <StackPanel/>
-                </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-            <ListBox.Styles>
-                <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="0"/>
-                    <Setter Property="Margin" Value="0"/>
-                    <Setter Property="Background" Value="Transparent"/>
-                    <Setter Property="Template">
-                        <ControlTemplate>
-                            <ContentPresenter Name="PART_ContentPresenter"
-                                              Background="{TemplateBinding Background}"
-                                              BorderBrush="{TemplateBinding BorderBrush}"
-                                              BorderThickness="{TemplateBinding BorderThickness}"
-                                              CornerRadius="{TemplateBinding CornerRadius}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              Content="{TemplateBinding Content}"
-                                              Padding="{TemplateBinding Padding}"
-                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
-                        </ControlTemplate>
-                    </Setter>
-                </Style>
-                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                    <Setter Property="Background" Value="Transparent"/>
-                </Style>
-                <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                    <Setter Property="Background" Value="Transparent"/>
-                </Style>
-            </ListBox.Styles>
-            
-            <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:ChatMessageAdapter">
-                    <Panel Margin="{StaticResource MessageItemMargin}">
-                        <!-- AI 消息布局 (左侧) -->
-                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding !IsUser}">
-                            <!-- 头像 -->
-                            <Border Grid.Column="0" 
-                                    Width="{StaticResource AvatarSize}" Height="{StaticResource AvatarSize}" 
-                                    CornerRadius="{StaticResource AvatarCornerRadius}" 
-                                    Background="{StaticResource PrimaryLightBrush}"
-                                    VerticalAlignment="Top"
-                                    Margin="{StaticResource AvatarLeftMargin}"
-                                    BoxShadow="{StaticResource SmallBoxShadow}">
-                                <PathIcon Data="{StaticResource IconRobot}" Foreground="{StaticResource TextOnEmphasisBrush}" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
-                            </Border>
-                            
-                            <!-- 气泡内容 -->
-                            <StackPanel Grid.Column="1" HorizontalAlignment="Left" MaxWidth="{StaticResource MaxChatBubbleWidth}">
-                                <StackPanel Orientation="Horizontal" Margin="{StaticResource BubbleHeaderMargin}">
-                                    <TextBlock Text="{Binding DisplaySender}" FontSize="{StaticResource SmallFontSize}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <TextBlock Text="{Binding FormattedTime}" FontSize="{StaticResource MiniFontSize}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource BubbleTimeMargin}" VerticalAlignment="Bottom"/>
-                                </StackPanel>
-                                
-                                <Border Background="{DynamicResource CardBackgroundBrush}"
-                                        CornerRadius="{StaticResource BubbleLeftCornerRadius}"
-                                        Padding="{StaticResource CardPadding}"
-                                        BoxShadow="{StaticResource SubtleBoxShadow}"
-                                        BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="{StaticResource DefaultBorderThickness}">
+                     ItemsSource="{Binding ChatMessages}"
+                     Background="Transparent"
+                     Margin="{StaticResource NoMargin}"
+                     Padding="{StaticResource ChatListPadding}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Visible">
+                <!-- 关闭虚拟化：聊天条目高度差异大，虚拟化估算高度会导致滚动跳变；消息量级小，无性能压力 -->
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Template">
+                            <ControlTemplate>
+                                <ContentPresenter Name="PART_ContentPresenter"
+                                                  Background="{TemplateBinding Background}"
+                                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                                  CornerRadius="{TemplateBinding CornerRadius}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  Content="{TemplateBinding Content}"
+                                                  Padding="{TemplateBinding Padding}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                            </ControlTemplate>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent"/>
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                        <Setter Property="Background" Value="Transparent"/>
+                    </Style>
+                </ListBox.Styles>
+
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChatMessageAdapter">
+                        <Panel Margin="{StaticResource MessageItemMargin}">
+
+                            <!-- 系统提示：对话边界说明，居中窄条，不带头像与气泡 -->
+                            <TextBlock Text="{Binding Content}"
+                                       Classes="caption"
+                                       IsVisible="{Binding IsSystemNotice}"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       MaxWidth="{StaticResource MaxChatBubbleWidth}"
+                                       Margin="{StaticResource TopMargin}"/>
+
+                            <!-- AI 消息布局 (左侧) -->
+                            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowAssistantBubble}">
+                                <!-- 头像 -->
+                                <Border Grid.Column="0"
+                                        Width="{StaticResource AvatarSize}" Height="{StaticResource AvatarSize}"
+                                        CornerRadius="{StaticResource PillCornerRadius}"
+                                        Background="{StaticResource AccentSubtleBrush}"
+                                        VerticalAlignment="Top"
+                                        Margin="{StaticResource AvatarLeftMargin}">
+                                    <PathIcon Data="{StaticResource IconRobot}"
+                                              Foreground="{StaticResource AccentBrush}"
+                                              Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
+                                </Border>
+
+                                <!-- 气泡内容 -->
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Left" MaxWidth="{StaticResource MaxChatBubbleWidth}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource BubbleHeaderMargin}">
+                                        <TextBlock Text="{Binding DisplaySender}" Classes="caption" FontWeight="{DynamicResource WeightEmphasis}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding FormattedTime}" Classes="caption" VerticalAlignment="Bottom"/>
+                                    </StackPanel>
+
                                     <StackPanel>
-                                        <!-- 思考状态 -->
-                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding IsThinking}" Margin="{StaticResource ThinkingMargin}">
-                                            <ProgressBar IsIndeterminate="True" Width="{StaticResource LargeSpacing}" Height="{StaticResource LargeSpacing}"/>
-                                            <TextBlock Text="思考中..." FontSize="{StaticResource BodyFontSize}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                        <!-- 思考状态：三点波浪（全库统一加载指示器），不用小尺寸转圈 -->
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="{StaticResource SmallSpacing}"
+                                                    IsVisible="{Binding IsThinking}"
+                                                    Margin="{StaticResource ThinkingMargin}">
+                                            <controls:LoadingDots DotSize="{StaticResource DotIconSize}"
+                                                                  DotSpacing="{StaticResource TinySpacing}"
+                                                                  VerticalAlignment="Center"/>
+                                            <TextBlock Text="思考中..."
+                                                       Classes="caption"
+                                                       VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        
-                                        <!-- 分析师失败占位卡片：灰色提示条 -->
-                                        <Border Background="{DynamicResource SecondaryLightBrush}"
-                                                CornerRadius="8"
-                                                Padding="{StaticResource CardPadding}"
+
+                                        <!-- 分析师失败占位卡片：与进度页同一危险语义底，无边框 -->
+                                        <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
+                                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                                Padding="{StaticResource DefaultCardPadding}"
                                                 IsVisible="{Binding IsAnalystFailure}">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                                <svg:Svg Path="avares://MarketAssistant/Assets/Images/icon_warning.svg"
+                                                <svg:Svg Path="/Assets/Images/icon_warning.svg"
                                                          Width="{StaticResource TinyIconSize}"
                                                          Height="{StaticResource TinyIconSize}"
                                                          VerticalAlignment="Top"/>
                                                 <TextBlock Text="{Binding FailureNoticeText}"
+                                                           Classes="body-sm"
                                                            TextWrapping="Wrap"
-                                                           FontSize="{StaticResource LabelFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                           Foreground="{DynamicResource DangerPanelTextBrush}"/>
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- 分析师结构化结果卡片 -->
-                                        <components:AnalystResultCardView Card="{Binding AnalystCard}" IsVisible="{Binding IsAnalystCard}"/>
-                                        
-                                        <!-- 富文本内容（卡片与 Adaptive Card 均未命中时回退展示） -->
-                                        <controls:RichTextBlock Text="{Binding Content}" IsVisible="{Binding ShowRichText}"/>
-                                        
-                                        <!-- Adaptive Card -->
-                                        <components:AdaptiveCardView Card="{Binding AdaptiveCard}" IsVisible="{Binding IsAdaptiveCard}"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
+                                        <!-- 气泡：只有纯文本/富文本才需要气泡底色。
+                                             结构化卡片自带表面与内边距，再套气泡会让卡片内的
+                                             chip、进度条轨道与气泡同色而不可见。 -->
+                                        <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                                CornerRadius="{StaticResource SmallCornerRadius}"
+                                                Padding="{StaticResource DefaultCardPadding}"
+                                                BorderThickness="{StaticResource NoBorderThickness}"
+                                                IsVisible="{Binding ShowRichText}">
+                                            <StackPanel>
+                                                <!-- 纯文本内容：流式期间逐字"模糊→清晰"揭示。
+                                                     Markdown 不走这里（全量重解析下逐字开销会成倍放大），
+                                                     两者判定统一收敛在 ContentFormatDetector。 -->
+                                                <controls:StreamingTextReveal Text="{Binding Content}"
+                                                                              IsVisible="{Binding ShowPlainText}"
+                                                                              FontSize="{StaticResource BodyFontSize}"
+                                                                              LineHeight="{StaticResource BodyLineHeight}"
+                                                                              FontWeight="{DynamicResource WeightBody}"
+                                                                              Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                              TextWrapping="Wrap"/>
 
-                        <!-- 用户消息布局 (右侧) -->
-                        <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsUser}">
-                            <!-- 气泡内容 -->
-                            <StackPanel Grid.Column="0" HorizontalAlignment="Right" MaxWidth="{StaticResource MaxChatBubbleWidth}">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource BubbleRightHeaderMargin}">
-                                    <TextBlock Text="{Binding FormattedTime}" FontSize="{StaticResource MiniFontSize}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource BubbleRightTimeMargin}" VerticalAlignment="Bottom"/>
-                                    <TextBlock Text="{Binding Sender}" FontSize="{StaticResource SmallFontSize}" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                <!-- 富文本兜底：含 Markdown 语法或无法判定格式的内容 -->
+                                                <controls:RichTextBlock Text="{Binding Content}" IsVisible="{Binding ShowRichTextFallback}"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Adaptive Card（分析师结构化结果） -->
+                                        <components:AdaptiveCardView Card="{Binding AdaptiveCard}" IsVisible="{Binding IsAdaptiveCard}"/>
+
+                                        <!-- 消息操作行：复制（终态才出现）+ 复制成功对勾 -->
+                                        <Panel Margin="{StaticResource BubbleHeaderMargin}" IsVisible="{Binding CanCopy}">
+                                            <Button Classes="btn-ghost btn-sm"
+                                                    Command="{Binding $parent[UserControl].((vm:ChatSidebarViewModel)DataContext).CopyMessageCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    HorizontalAlignment="Left"
+                                                    ToolTip.Tip="复制这条回复">
+                                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                    <svg:Svg Path="/Assets/Images/icon_clipboard.svg"
+                                                             Width="{StaticResource MiniIconSize}"
+                                                             Height="{StaticResource MiniIconSize}"
+                                                             VerticalAlignment="Center"/>
+                                                    <TextBlock Text="复制" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- 复制成功：Q 弹对勾，2.5s 自动淡出。
+                                                 绝对定位在左下角，避免插入/移除撑动气泡高度。 -->
+                                            <controls:CopyFeedback Trigger="{Binding CopyFeedbackTrigger}"
+                                                                   Background="{StaticResource AccentBrush}"
+                                                                   HorizontalAlignment="Left"
+                                                                   VerticalAlignment="Center"
+                                                                   IsHitTestVisible="False"/>
+                                        </Panel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- 用户消息布局 (右侧)：强调色只留给发送按钮与主操作，
+                                 用户气泡用"选中态浅底"，与页面里其它选中项保持一致 -->
+                            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsUser}">
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Right" MaxWidth="{StaticResource MaxChatBubbleWidth}">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource BubbleRightHeaderMargin}">
+                                        <TextBlock Text="{Binding FormattedTime}" Classes="caption" Margin="{StaticResource BubbleRightTimeMargin}" VerticalAlignment="Bottom"/>
+                                        <TextBlock Text="{Binding Sender}" Classes="caption" FontWeight="{DynamicResource WeightTitle}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </StackPanel>
+
+                                    <Border Background="{DynamicResource SelectedBackgroundBrush}"
+                                            CornerRadius="{StaticResource SmallCornerRadius}"
+                                            Padding="{StaticResource DefaultCardPadding}">
+                                        <TextBlock Text="{Binding Content}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   TextWrapping="Wrap"
+                                                   FontSize="{StaticResource BodyFontSize}"
+                                                   LineHeight="{StaticResource BodyLineHeight}"/>
+                                    </Border>
                                 </StackPanel>
 
-                                <Border Background="{StaticResource PrimaryBrush}"
-                                        CornerRadius="{StaticResource BubbleRightCornerRadius}"
-                                        Padding="{StaticResource DefaultCardPadding}"
-                                        BoxShadow="{StaticResource UserBubbleBoxShadow}">
-                                    <TextBlock Text="{Binding Content}" 
-                                               Foreground="{StaticResource TextOnEmphasisBrush}" 
-                                               TextWrapping="Wrap"
-                                               FontSize="{StaticResource LabelFontSize}"
-                                               LineHeight="{StaticResource CompactLineHeight}"/>
+                                <Border Grid.Column="1"
+                                        Width="{StaticResource AvatarSize}" Height="{StaticResource AvatarSize}"
+                                        CornerRadius="{StaticResource PillCornerRadius}"
+                                        Background="{DynamicResource SurfaceVariantBrush}"
+                                        VerticalAlignment="Top"
+                                        Margin="{StaticResource AvatarRightMargin}">
+                                    <PathIcon Data="{StaticResource IconUser}"
+                                              Foreground="{DynamicResource TextSecondaryBrush}"
+                                              Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
                                 </Border>
-                            </StackPanel>
+                            </Grid>
+                        </Panel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
 
-                            <!-- 头像 -->
-                            <Border Grid.Column="1" 
-                                    Width="{StaticResource AvatarSize}" Height="{StaticResource AvatarSize}" 
-                                    CornerRadius="{StaticResource AvatarCornerRadius}" 
-                                    Background="{StaticResource SecondaryLightBrush}"
-                                    VerticalAlignment="Top"
-                                    Margin="{StaticResource AvatarRightMargin}"
-                                    BoxShadow="{StaticResource SmallBoxShadow}">
-                                <PathIcon Data="{StaticResource IconUser}" Foreground="{StaticResource TextOnEmphasisBrush}" Width="{StaticResource AvatarIconSize}" Height="{StaticResource AvatarIconSize}"/>
-                            </Border>
+            <!-- 历史会话面板：覆盖消息列表。数据来自持久化层（每次对话结束自动保存），
+                 在此完成恢复 / 删除 / 新建，补齐「会话历史管理」入口 -->
+            <Border IsVisible="{Binding IsSessionHistoryOpen}"
+                    Background="{DynamicResource PageBackgroundBrush}"
+                    ZIndex="10">
+                <DockPanel>
+                    <!-- 面板标题栏：靠表面色阶区分，不画分隔线 -->
+                    <Border DockPanel.Dock="Top"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            Padding="{StaticResource HeaderPadding}">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock Grid.Column="0" Text="历史会话"
+                                       FontSize="{StaticResource BodyFontSize}"
+                                       FontWeight="{DynamicResource WeightTitle}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button Grid.Column="1"
+                                    Classes="btn-ghost btn-sm"
+                                    Command="{Binding RefreshSessionHistoryCommand}"
+                                    Content="刷新"
+                                    Margin="{StaticResource CloseButtonMargin}"
+                                    VerticalAlignment="Center"/>
+                            <Button Grid.Column="2"
+                                    Classes="btn-ghost btn-sm"
+                                    Command="{Binding ToggleSessionHistoryCommand}"
+                                    Content="关闭"
+                                    VerticalAlignment="Center"/>
                         </Grid>
-                    </Panel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+                    </Border>
 
-        <!-- 历史会话面板：覆盖消息列表。数据来自持久化层（每次对话结束自动保存），
-             在此完成恢复 / 删除 / 新建，补齐「会话历史管理」入口 -->
-        <Border IsVisible="{Binding IsSessionHistoryOpen}"
-                Background="{DynamicResource PageBackgroundBrush}"
-                ZIndex="10">
-            <DockPanel>
-                <!-- 面板标题栏 -->
-                <Border DockPanel.Dock="Top"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource DividerBrush}"
-                        BorderThickness="{StaticResource BottomBorderThickness}"
-                        Padding="{StaticResource HeaderPadding}">
-                    <Grid ColumnDefinitions="*,Auto,Auto">
-                        <TextBlock Grid.Column="0" Text="历史会话"
-                                   FontSize="{StaticResource SubTitleFontSize}"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"
-                                   VerticalAlignment="Center"/>
-                        <Button Grid.Column="1"
-                                Command="{Binding RefreshSessionHistoryCommand}"
-                                Background="Transparent"
-                                Content="刷新"
-                                Foreground="{StaticResource PrimaryBrush}"
-                                Margin="{StaticResource CloseButtonMargin}"
-                                VerticalAlignment="Center"/>
-                        <Button Grid.Column="2"
-                                Command="{Binding ToggleSessionHistoryCommand}"
-                                Background="Transparent"
-                                Content="关闭"
-                                Foreground="{DynamicResource TextSecondaryBrush}"
-                                Margin="{StaticResource CloseButtonMargin}"
-                                VerticalAlignment="Center"/>
-                    </Grid>
-                </Border>
+                    <!-- 新建会话 -->
+                    <Button DockPanel.Dock="Top"
+                            Classes="btn-secondary"
+                            Command="{Binding NewSessionCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Margin="{StaticResource HeaderPadding}"
+                            Content="新建会话"/>
 
-                <!-- 新建会话 -->
-                <Button DockPanel.Dock="Top"
-                        Command="{Binding NewSessionCommand}"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Margin="{StaticResource HeaderPadding}"
-                        Content="＋ 新建会话"/>
-
-                <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="{StaticResource TinySpacing}" Margin="{StaticResource ChatListPadding}">
-                        <TextBlock IsVisible="{Binding HasNoSessionHistory}"
-                                   Text="暂无历史会话。开始新对话后，会话会自动保存在这里。"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,24,0,0"/>
-                        <ItemsControl ItemsSource="{Binding SessionHistory}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ChatSessionSummaryItem">
-                                    <Grid Margin="{StaticResource MessageItemMargin}">
-                                        <!-- 常驻卡片 -->
-                                        <Border Background="{DynamicResource CardBackgroundBrush}"
-                                                BorderBrush="{DynamicResource BorderBrush}"
-                                                BorderThickness="{StaticResource DefaultBorderThickness}"
-                                                CornerRadius="8"
-                                                Padding="{StaticResource CardPadding}">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                                                    <TextBlock Text="{Binding Title}"
-                                                               TextTrimming="CharacterEllipsis"
-                                                               FontSize="{StaticResource LabelFontSize}"
-                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                                    <TextBlock TextWrapping="NoWrap"
-                                                               FontSize="{StaticResource SmallFontSize}"
-                                                               Foreground="{DynamicResource TextSecondaryBrush}">
-                                                        <Run Text="{Binding StockCode}"/>
-                                                        <Run Text=" · "/>
-                                                        <Run Text="{Binding UpdatedAtText}"/>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <Button Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).RestoreSessionCommand}"
-                                                            CommandParameter="{Binding}"
-                                                            Content="打开"
-                                                            Background="Transparent"
-                                                            Foreground="{StaticResource PrimaryBrush}"/>
-                                                    <Button Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).DeleteSessionCommand}"
-                                                            CommandParameter="{Binding}"
-                                                            Content="删除"
-                                                            Background="Transparent"
-                                                            Foreground="{StaticResource ErrorBrush}"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                        <!-- 当前会话高亮描边：不拦截命中，按钮与选中仍可操作 -->
-                                        <Border IsVisible="{Binding IsActive}"
-                                                IsHitTestVisible="False"
-                                                BorderBrush="{StaticResource PrimaryBrush}"
-                                                BorderThickness="1.5"
-                                                CornerRadius="8"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </ScrollViewer>
-            </DockPanel>
-        </Border>
+                    <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="{StaticResource TinySpacing}" Margin="{StaticResource ChatListPadding}">
+                            <TextBlock IsVisible="{Binding HasNoSessionHistory}"
+                                       Text="暂无历史会话。开始新对话后，会话会自动保存在这里。"
+                                       Classes="caption"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Margin="{StaticResource LargeMargin}"/>
+                            <ItemsControl ItemsSource="{Binding SessionHistory}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ChatSessionSummaryItem">
+                                        <Grid Margin="{StaticResource MessageItemMargin}">
+                                            <!-- 常驻卡片 -->
+                                            <Border Background="{DynamicResource CardBackgroundBrush}"
+                                                    BorderThickness="{StaticResource NoBorderThickness}"
+                                                    CornerRadius="{StaticResource SmallCornerRadius}"
+                                                    Padding="{StaticResource DefaultCardPadding}">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                                        <TextBlock Text="{Binding Title}"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Classes="body-sm"/>
+                                                        <TextBlock TextWrapping="NoWrap"
+                                                                   Classes="caption">
+                                                            <Run Text="{Binding StockCode}"/>
+                                                            <Run Text=" · "/>
+                                                            <Run Text="{Binding UpdatedAtText}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1"
+                                                                Orientation="Horizontal"
+                                                                Spacing="{StaticResource TinySpacing}"
+                                                                VerticalAlignment="Center">
+                                                        <Button Classes="btn-ghost btn-sm"
+                                                                Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).RestoreSessionCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Content="打开"/>
+                                                        <Button Classes="btn-danger btn-sm"
+                                                                Command="{Binding $parent[ItemsControl].((vm:ChatSidebarViewModel)DataContext).DeleteSessionCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                Content="删除"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                            <!-- 当前会话高亮：v3 用强调色浅底分层，不描边，不拦截命中，按钮与选中仍可操作 -->
+                                            <Border IsVisible="{Binding IsActive}"
+                                                    IsHitTestVisible="False"
+                                                    Background="{DynamicResource AccentSubtleBrush}"
+                                                    CornerRadius="{StaticResource SmallCornerRadius}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
         </Grid>
     </DockPanel>
 </UserControl>

@@ -206,9 +206,9 @@ public class KLineChartView : UserControl
         var loadingText = new TextBlock
         {
             Text = "正在加载图表...",
-            FontSize = 14,
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        loadingText[!TextBlock.FontSizeProperty] = new DynamicResourceExtension("BodySmFontSize");
         loadingText[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
         _loadingPanel.Children.Add(loadingDots);
         _loadingPanel.Children.Add(loadingText);
@@ -223,19 +223,19 @@ public class KLineChartView : UserControl
         var errorTitle = new TextBlock
         {
             Text = "图表加载失败",
-            FontSize = 14,
-            FontWeight = FontWeight.SemiBold,
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        errorTitle[!TextBlock.FontSizeProperty] = new DynamicResourceExtension("BodySmFontSize");
+        errorTitle[!TextBlock.FontWeightProperty] = new DynamicResourceExtension("WeightTitle");
         errorTitle[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("DangerPanelTextBrush");
         _errorPanel.Children.Add(errorTitle);
 
         _errorText = new TextBlock
         {
-            FontSize = 12,
             HorizontalAlignment = HorizontalAlignment.Center,
             TextWrapping = TextWrapping.Wrap
         };
+        _errorText[!TextBlock.FontSizeProperty] = new DynamicResourceExtension("CaptionFontSize");
         _errorText[!TextBlock.ForegroundProperty] = new DynamicResourceExtension("TextSecondaryBrush");
         _errorPanel.Children.Add(_errorText);
 
@@ -387,9 +387,9 @@ public class KLineChartView : UserControl
     <!-- 仓库未内置 ECharts 本地资源，此处回退到 CDN -->
     <script src=""https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js""></script>
     <style>
-        body { margin: 0; padding: 10px; font-family: Arial, sans-serif; background-color: #0A0E17; color: #E4EAF5; }
+        body { margin: 0; padding: 10px; font-family: Arial, sans-serif; background-color: #161616; color: #EDEDED; }
         #chartContainer { width: 100%; height: 400px; }
-        .loading { text-align: center; padding: 20px; color: #8894A8; }
+        .loading { text-align: center; padding: 20px; color: #A0A0A0; }
     </style>
 </head>
 <body>
@@ -404,13 +404,13 @@ public class KLineChartView : UserControl
                     tooltip: { trigger: 'axis' },
                     xAxis: { type: 'category', data: [] },
                     yAxis: { type: 'value' },
-                    series: [{ type: 'candlestick', data: [] }]
+                    series: [{ type: 'candlestick', data: [], itemStyle: { color: '#E5484D', color0: '#16A34A', borderColor: '#E5484D', borderColor0: '#16A34A' } }]
                 });
             },
             setLoading: function(loading) {
                 if (!this.chart) return;
                 if (loading) {
-                    this.chart.showLoading('default', { text: '正在加载...', color: '#1976D2', textColor: '#8894A8', maskColor: 'rgba(10, 14, 23, 0.8)' });
+                    this.chart.showLoading('default', { text: '正在加载...', color: '#0066FF', textColor: '#A0A0A0', maskColor: 'rgba(22, 22, 22, 0.8)' });
                 } else {
                     this.chart.hideLoading();
                 }
@@ -428,7 +428,7 @@ public class KLineChartView : UserControl
             },
             setError: function(hasError, message) {
                 if (hasError) {
-                    document.getElementById('chartContainer').innerHTML = '<div class=""loading"" style=""color: #EF4444;"">加载失败: ' + message + '</div>';
+                    document.getElementById('chartContainer').innerHTML = '<div class=""loading"" style=""color: #F87171;"">加载失败: ' + message + '</div>';
                 }
             }
         };

@@ -8,59 +8,63 @@
              x:Class="MarketAssistant.Views.Pages.Trading.BalanceDetailPageView"
              x:DataType="vm:BalanceDetailPageViewModel">
 
-    <ScrollViewer Padding="{StaticResource PagePadding}">
+    <Grid>
+        <ScrollViewer Padding="{StaticResource PagePadding}"
+                      IsVisible="{Binding !IsInitialLoading}">
         <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- ===== 汇总栏 ===== -->
-            <controls:CardView>
-                <Grid ColumnDefinitions="*,*,*,*">
+            <!-- 页签内标题：父级「交易终端」已是页面级标题，这里用小一级的卡片标题 -->
+            <StackPanel Spacing="{StaticResource TinySpacing}">
+                <TextBlock Classes="card-title" Text="资产明细"/>
+                <TextBlock Classes="caption" Text="现货账户余额与持仓估值"/>
+            </StackPanel>
 
+            <!-- ===== 汇总栏 =====
+                 用 WrapPanel + 固定单元格宽度：宽屏一行四列，窄窗自动折两行，
+                 避免 *,*,*,* 在 768px 下每列仅 160px 导致数字挤压换行 -->
+            <controls:CardView>
+                <WrapPanel>
                     <!-- 总资产 -->
-                    <StackPanel Grid.Column="0">
+                    <StackPanel Width="200" Margin="0,0,16,12">
                         <TextBlock Text="总资产" Classes="caption"/>
-                        <TextBlock Classes="data-lg" Margin="{StaticResource TinyTopMargin}"
+                        <TextBlock Classes="num-lg" Margin="{StaticResource TinyTopMargin}"
                                    Text="{Binding TotalValueUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 可用 USDT -->
-                    <StackPanel Grid.Column="1"
-                                Margin="{StaticResource LeftMargin}">
+                    <StackPanel Width="200" Margin="0,0,16,12">
                         <TextBlock Text="可用 USDT" Classes="caption"/>
-                        <TextBlock Classes="data" Margin="{StaticResource TinyTopMargin}"
+                        <TextBlock Classes="num" Margin="{StaticResource TinyTopMargin}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{Binding AvailableUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 冻结资产 -->
-                    <StackPanel Grid.Column="2"
-                                Margin="{StaticResource LeftMargin}">
+                    <StackPanel Width="200" Margin="0,0,16,12">
                         <TextBlock Text="冻结资产" Classes="caption"/>
-                        <TextBlock Classes="data" Margin="{StaticResource TinyTopMargin}"
+                        <TextBlock Classes="num" Margin="{StaticResource TinyTopMargin}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Text="{Binding LockedValueUSDT, StringFormat={}{0:F2} USDT}"/>
                     </StackPanel>
 
                     <!-- 持仓占比 -->
-                    <StackPanel Grid.Column="3"
-                                Margin="{StaticResource LeftMargin}">
+                    <StackPanel Width="200" Margin="0,0,16,12">
                         <TextBlock Text="持仓占比" Classes="caption"/>
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource TinyTopMargin}">
-                            <TextBlock Classes="data"
+                            <TextBlock Classes="num"
                                        Text="{Binding PositionValueUSDT, StringFormat={}{0:F2} USDT}"/>
-                            <TextBlock VerticalAlignment="Bottom"
-                                       FontSize="{StaticResource SmallFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                            <TextBlock Classes="caption" VerticalAlignment="Bottom"
                                        Text="{Binding PositionPercent, StringFormat={}{0:F1}%}"/>
                         </StackPanel>
                     </StackPanel>
-                </Grid>
+                </WrapPanel>
             </controls:CardView>
 
             <!-- ===== 余额明细 ===== -->
             <controls:CardView>
                 <controls:CardView.Header>
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="余额明细" Classes="h6"/>
+                        <TextBlock Text="余额明细" Classes="card-title"/>
                         <TextBlock Classes="caption" VerticalAlignment="Center"
                                    Text="{Binding Balances.Count, StringFormat={}{0} 个币种}"/>
                         <Panel/>
@@ -71,12 +75,6 @@
                 </controls:CardView.Header>
 
                 <StackPanel Spacing="{StaticResource TinySpacing}">
-                    <TextBlock Text="未配置 Binance API 或暂无余额数据"
-                               IsVisible="{Binding !HasData}"
-                               Classes="caption"
-                               HorizontalAlignment="Center"
-                               Margin="{StaticResource DefaultMargin}"/>
-
                     <!-- 表头 -->
                     <Grid ColumnDefinitions="80,*,*,*,Auto"
                           IsVisible="{Binding HasData}"
@@ -101,35 +99,35 @@
                                     <Grid ColumnDefinitions="80,*,*,*,Auto">
                                         <!-- 币种 -->
                                         <TextBlock Grid.Column="0" Text="{Binding Asset}"
-                                                   FontWeight="Bold"
-                                                   FontSize="{StaticResource SmallFontSize}"
+                                                   FontWeight="{DynamicResource WeightTitle}"
+                                                   FontSize="{StaticResource CaptionFontSize}"
                                                    VerticalAlignment="Center"/>
 
                                         <!-- 可用 -->
                                         <TextBlock Grid.Column="1"
-                                                   Classes="data-sm"
+                                                   Classes="num-sm"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"
                                                    Text="{Binding Free, StringFormat={}{0:F8}}"/>
 
                                         <!-- 冻结 -->
                                         <TextBlock Grid.Column="2"
-                                                   Classes="data-sm"
+                                                   Classes="num-sm"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"
                                                    Text="{Binding Locked, StringFormat={}{0:F8}}"/>
 
                                         <!-- USDT 估值 -->
                                         <TextBlock Grid.Column="3"
-                                                   Classes="data-sm"
-                                                   FontWeight="Bold"
+                                                   Classes="num-sm"
+                                                   FontWeight="{DynamicResource WeightTitle}"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Right"
                                                    Text="{Binding ValueUSDT, StringFormat={}{0:F2} USDT}"/>
 
                                         <!-- 占比 -->
                                         <TextBlock Grid.Column="4"
-                                                   Classes="caption-sm"
+                                                   Classes="caption"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Right"
                                                    Margin="{StaticResource SmallLeftMargin}"
@@ -143,4 +141,35 @@
             </controls:CardView>
         </StackPanel>
     </ScrollViewer>
+
+        <!-- 首屏骨架：标题 + 汇总卡 + 四条余额行，与真实内容结构一致。 -->
+        <Border Padding="{StaticResource PagePadding}"
+                IsVisible="{Binding IsInitialLoading}">
+            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <controls:SkeletonLines Row="BodySm" LineWidths="72"/>
+                    <controls:SkeletonLines Row="Caption" LineWidths="180"/>
+                </StackPanel>
+                <controls:SkeletonCard Variant="Card">
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <controls:SkeletonLines Row="Caption" LineWidths="96"/>
+                        <controls:SkeletonLines Row="Title" LineWidths="240"/>
+                    </StackPanel>
+                </controls:SkeletonCard>
+                <controls:SkeletonList Count="4" Spacing="{StaticResource TinySpacing}">
+                    <controls:SkeletonList.ItemTemplate>
+                        <DataTemplate>
+                            <controls:SkeletonCard Variant="Row" Row="BodySm" LineWidths="*"/>
+                        </DataTemplate>
+                    </controls:SkeletonList.ItemTemplate>
+                </controls:SkeletonList>
+            </StackPanel>
+        </Border>
+
+        <controls:StateOverlayView State="{Binding OverlayState}"
+                                   Message="{Binding OverlayMessage}"
+                                   RetryCommand="{Binding RetryCommand}"
+                                   RetryText="重新加载"
+                                   ShowLoading="False"/>
+    </Grid>
 </UserControl>

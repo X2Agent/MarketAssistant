@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IJsonToAdaptiveCardParser, SentimentCardParser>();
         services.AddSingleton<IJsonToAdaptiveCardParser, NewsCardParser>();
         services.AddSingleton<IJsonToAdaptiveCardParser, TechnicalCardParser>();
+        services.AddSingleton<IJsonToAdaptiveCardParser, CryptoMetricsCardParser>();
 
         // AdaptiveCard 转换器（依赖上方注册的解析器责任链）
         services.AddSingleton<AdaptiveCardConverter>();
@@ -79,6 +80,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<HotAssetsViewModel>();
         services.AddTransient<RecentAssetsViewModel>();
         services.AddTransient<TelegraphNewsViewModel>();
+        services.AddTransient<IndexTickerBarViewModel>();
 
         // 简报为纯手动生成（构造时仅读当天缓存，不触发模型调用），Singleton 可避免
         // 反复进出首页重复读库。其余首页子 ViewModel 无此状态，维持 Transient。

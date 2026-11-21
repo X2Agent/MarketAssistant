@@ -17,12 +17,16 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
 
     public DailyBriefingViewModel Briefing { get; }
 
+    /// <summary>首页行情条（v3 顶栏移除后归属首页头部）。</summary>
+    public IndexTickerBarViewModel Tickers { get; }
+
     public HomePageViewModel(
         HomeSearchViewModel searchViewModel,
         HotAssetsViewModel hotAssetsViewModel,
         RecentAssetsViewModel recentAssetsViewModel,
         TelegraphNewsViewModel newsViewModel,
         DailyBriefingViewModel briefingViewModel,
+        IndexTickerBarViewModel indexTickerBarViewModel,
         ILogger<HomePageViewModel> logger) : base(logger)
     {
         Search = searchViewModel;
@@ -30,6 +34,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         RecentAssets = recentAssetsViewModel;
         News = newsViewModel;
         Briefing = briefingViewModel;
+        Tickers = indexTickerBarViewModel;
 
         Search.AssetSelected += OnAssetSelected;
         HotAssets.HotAssetSelected += OnHotAssetSelected;
@@ -95,6 +100,7 @@ public partial class HomePageViewModel : ViewModelBase, IDisposable
         HotAssets.Dispose();
         RecentAssets.Dispose();
         News.Dispose();
+        Tickers.Dispose();
 
         // Briefing 为单例（跨导航复用，避免重复计费生成），生命周期由容器拥有。
         // 此处不得释放：否则离开首页会把它置为 _disposed，

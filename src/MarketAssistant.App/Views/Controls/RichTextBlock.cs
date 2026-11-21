@@ -214,41 +214,12 @@ public class RichTextBlock : UserControl
 
         var trimmedContent = content.Trim();
 
-        // 检测Markdown（常见语法）
-        if (IsMarkdownContent(trimmedContent))
+        // 检测 Markdown（常见语法）。判定逻辑收敛到 ContentFormatDetector，
+        // 避免此处与"选择渲染器"的调用方各持一套正则而产生分歧。
+        if (ContentFormatDetector.IsMarkdown(trimmedContent))
             return ContentFormat.Markdown;
 
         return ContentFormat.PlainText;
-    }
-
-    /// <summary>
-    /// 判断是否为Markdown内容
-    /// </summary>
-    private bool IsMarkdownContent(string content)
-    {
-        // 检查常见的Markdown语法
-        var markdownPatterns = new[]
-        {
-            @"^#{1,6}\s+",           // 标题
-            @"\*\*[^*]+\*\*",        // 粗体
-            @"__[^_]+__",            // 粗体
-            @"\*[^*]+\*",            // 斜体
-            @"_[^_]+_",              // 斜体
-            @"^\s*[-*+]\s+",         // 无序列表
-            @"^\s*\d+\.\s+",         // 有序列表
-            @"`[^`]+`",              // 内联代码
-            @"```",                  // 代码块
-            @"^\s*>",                // 引用
-            @"\[([^\]]+)\]\(([^)]+)\)" // 链接
-        };
-
-        foreach (var pattern in markdownPatterns)
-        {
-            if (Regex.IsMatch(content, pattern, RegexOptions.Multiline))
-                return true;
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -349,12 +320,13 @@ public class RichTextBlock : UserControl
         if (_markdownEngine is null)
         {
             _markdownEngine = new MdaMarkdown();
-            // 裸引擎不自带 MarkdownScrollViewer 的默认观感（反射确认其默认为 Standard 样式、
-            // 默认引擎即 Markdown.Avalonia.Markdown），补挂同款 Standard 样式保证观感一致，
-            // 挂在本控件 Styles 上即可命中引擎产出并挂入本控件子树的全部元素
+            // 用 FluentTheme 样式集而不是 Standard：Standard 把前景/代码块底色写死成
+            // Black / DarkBlue / #ffeeeeee / #fffafafa，暗色模式下正文直接变成黑字压深底，
+            // 代码块也会闪一块亮白。FluentTheme 版本全部经 DynamicResource 取
+            // Fluent 主题资源（如 TextControlForegroundFocused），随主题切换自动重算。
             if (!_markdownStyleAdded)
             {
-                Styles.Add(new global::Markdown.Avalonia.StyleCollections.MarkdownStyleStandard());
+                Styles.Add(new global::Markdown.Avalonia.StyleCollections.MarkdownStyleFluentTheme());
                 _markdownStyleAdded = true;
             }
         }
@@ -375,6 +347,12 @@ public class RichTextBlock : UserControl
             {
                 TextWrapping = TextWrapping.Wrap
             };
+            // 正文走令牌前景色：Markdown 样式集会自己上色，纯文本分支必须同样跟随主题，
+            // 否则暗色下会继承到 Fluent 默认的深色前景
+            _textBlock[!TextBlock.ForegroundProperty] =
+                new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("TextPrimaryBrush");
+            _textBlock[!TextBlock.FontSizeProperty] =
+                new Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("BodyFontSize");
             _contentContainer!.Content = _textBlock;
         }
 

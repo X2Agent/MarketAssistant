@@ -85,10 +85,6 @@ public partial class HomeSearchViewModel(
             // 防抖或请求被取消，正常情况，不记录日志
             Logger?.LogDebug("搜索被取消，查询：{Query}", value);
         }
-        catch (Exception ex)
-        {
-            Logger?.LogError(ex, "搜索资产时发生错误，查询：{Query}", value);
-        }
     }
 
     private async Task SearchAsync(string query, CancellationToken cancellationToken)

@@ -10,16 +10,18 @@
         --chart-bg: #FFFFFF;
         --overlay-bg: rgba(255, 255, 255, 0.9);
         --spinner-ring: rgba(0, 0, 0, 0.1);
-        --spinner-accent: #1976D2;
-        --error-color: #EF4444;
-        --error-bg: rgba(239, 68, 68, 0.1);
+        --spinner-accent: #0066FF;
+        --error-color: #DC2626;
+        --error-bg: rgba(220, 38, 38, 0.1);
       }
       body.theme-dark {
-        /* 深色主题 — 对齐设计系统 v2.4（bg-surface / border-default / text-secondary / brand-blue-light） */
-        --chart-bg: #111722;
-        --overlay-bg: rgba(17, 23, 34, 0.92);
-        --spinner-ring: rgba(228, 234, 245, 0.15);
-        --spinner-accent: #42A5F5;
+        /* v3 纯中性暗色表面 + 唯一强调色 */
+        --chart-bg: #161616;
+        --overlay-bg: rgba(22, 22, 22, 0.92);
+        --spinner-ring: rgba(237, 237, 237, 0.15);
+        --spinner-accent: #0066FF;
+        --error-color: #F87171;
+        --error-bg: rgba(248, 113, 113, 0.12);
       }
       body {
         margin: 0;
@@ -382,51 +384,51 @@
           horizontal: {
             show: true,
             size: 1,
-            color: '#E6E9EF',
+            color: '#EEF0F3',
             style: 'dashed',
           },
           vertical: {
             show: true,
             size: 1,
-            color: '#E6E9EF',
+            color: '#EEF0F3',
             style: 'dashed',
           },
         },
         candle: {
           type: 'candle_solid',
           bar: {
-            upColor: '#F44336',
-            downColor: '#4CAF50',
-            noChangeColor: '#98A2B3',
-            upBorderColor: '#F44336',
-            downBorderColor: '#4CAF50',
-            noChangeBorderColor: '#98A2B3',
-            upWickColor: '#F44336',
-            downWickColor: '#4CAF50',
-            noChangeWickColor: '#98A2B3',
+            upColor: '#E5484D',
+            downColor: '#16A34A',
+            noChangeColor: '#8A93A0',
+            upBorderColor: '#E5484D',
+            downBorderColor: '#16A34A',
+            noChangeBorderColor: '#8A93A0',
+            upWickColor: '#E5484D',
+            downWickColor: '#16A34A',
+            noChangeWickColor: '#8A93A0',
           },
           tooltip: buildCandleTooltip(),
           priceMark: {
             show: true,
             high: {
               show: true,
-              color: '#667085',
+              color: '#5C6470',
               textSize: 12,
               textFamily: 'Consolas',
               textWeight: 'normal',
             },
             low: {
               show: true,
-              color: '#667085',
+              color: '#5C6470',
               textSize: 12,
               textFamily: 'Consolas',
               textWeight: 'normal',
             },
             last: {
               show: true,
-              upColor: '#F44336',
-              downColor: '#4CAF50',
-              noChangeColor: '#98A2B3',
+              upColor: '#E5484D',
+              downColor: '#16A34A',
+              noChangeColor: '#8A93A0',
               line: {
                 show: true,
                 style: 'dashed',
@@ -448,12 +450,12 @@
           show: true,
           axisLine: {
             show: true,
-            color: '#D0D5DD',
+            color: '#E4E7ED',
             size: 1,
           },
           tickText: {
             show: true,
-            color: '#667085',
+            color: '#5C6470',
             family: 'Consolas',
             weight: 'normal',
             size: 12,
@@ -462,7 +464,7 @@
             show: true,
             size: 1,
             length: 3,
-            color: '#D0D5DD',
+            color: '#E4E7ED',
           },
         },
         yAxis: {
@@ -472,12 +474,12 @@
           inside: false,
           axisLine: {
             show: true,
-            color: '#D0D5DD',
+            color: '#E4E7ED',
             size: 1,
           },
           tickText: {
             show: true,
-            color: '#667085',
+            color: '#5C6470',
             family: 'Consolas',
             weight: 'normal',
             size: 12,
@@ -486,14 +488,14 @@
             show: true,
             size: 1,
             length: 3,
-            color: '#D0D5DD',
+            color: '#E4E7ED',
           },
         },
         separator: {
           size: 1,
-          color: '#E6E9EF',
+          color: '#EEF0F3',
           fill: false,
-          activeBackgroundColor: 'rgba(25, 118, 210, 0.06)',
+          activeBackgroundColor: 'rgba(0, 102, 255, 0.06)',
         },
         crosshair: {
           show: true,
@@ -502,7 +504,7 @@
             line: {
               show: true,
               style: 'dashed',
-              color: '#98A2B3',
+              color: '#8A93A0',
               size: 1,
             },
             text: {
@@ -511,7 +513,7 @@
               size: 12,
               family: 'Consolas',
               weight: 'normal',
-              backgroundColor: '#98A2B3',
+              backgroundColor: '#8A93A0',
             },
           },
           vertical: {
@@ -519,7 +521,7 @@
             line: {
               show: true,
               style: 'dashed',
-              color: '#98A2B3',
+              color: '#8A93A0',
               size: 1,
             },
             text: {
@@ -528,7 +530,7 @@
               size: 12,
               family: 'Consolas',
               weight: 'normal',
-              backgroundColor: '#98A2B3',
+              backgroundColor: '#8A93A0',
             },
           },
         },
@@ -537,43 +539,43 @@
       // 深色主题差异覆盖（klinecharts setStyles 为深合并，仅需给出与 LIGHT_STYLES 的差异项）
       const DARK_STYLES = {
         grid: {
-          horizontal: { color: '#1E2636' },
-          vertical: { color: '#1E2636' },
+          horizontal: { color: '#262626' },
+          vertical: { color: '#262626' },
         },
         candle: {
           bar: {
-            noChangeColor: '#5A6680',
-            noChangeBorderColor: '#5A6680',
-            noChangeWickColor: '#5A6680',
+            noChangeColor: '#6E6E6E',
+            noChangeBorderColor: '#6E6E6E',
+            noChangeWickColor: '#6E6E6E',
           },
           priceMark: {
-            high: { color: '#8894A8' },
-            low: { color: '#8894A8' },
-            last: { noChangeColor: '#5A6680' },
+            high: { color: '#A0A0A0' },
+            low: { color: '#A0A0A0' },
+            last: { noChangeColor: '#6E6E6E' },
           },
         },
         xAxis: {
-          axisLine: { color: '#1E2636' },
-          tickText: { color: '#8894A8' },
-          tickLine: { color: '#1E2636' },
+          axisLine: { color: '#262626' },
+          tickText: { color: '#A0A0A0' },
+          tickLine: { color: '#262626' },
         },
         yAxis: {
-          axisLine: { color: '#1E2636' },
-          tickText: { color: '#8894A8' },
-          tickLine: { color: '#1E2636' },
+          axisLine: { color: '#262626' },
+          tickText: { color: '#A0A0A0' },
+          tickLine: { color: '#262626' },
         },
         separator: {
-          color: '#1E2636',
-          activeBackgroundColor: 'rgba(25, 118, 210, 0.15)',
+          color: '#262626',
+          activeBackgroundColor: 'rgba(0, 102, 255, 0.15)',
         },
         crosshair: {
           horizontal: {
-            line: { color: '#5A6680' },
-            text: { backgroundColor: '#42A5F5' },
+            line: { color: '#6E6E6E' },
+            text: { backgroundColor: '#0066FF' },
           },
           vertical: {
-            line: { color: '#5A6680' },
-            text: { backgroundColor: '#42A5F5' },
+            line: { color: '#6E6E6E' },
+            text: { backgroundColor: '#0066FF' },
           },
         },
       };

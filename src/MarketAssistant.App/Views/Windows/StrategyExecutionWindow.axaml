@@ -30,23 +30,23 @@
                 <StackPanel Spacing="{StaticResource TinySpacing}">
                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                         <TextBlock Name="SymbolText"
-                                   FontWeight="Bold"
-                                   FontSize="{StaticResource SectionTitleFontSize}"/>
-                        <Border Background="{StaticResource PrimaryLightBrush}"
+                                   FontWeight="{DynamicResource WeightTitle}"
+                                   FontSize="{StaticResource BodyFontSize}"/>
+                        <Border Background="{StaticResource AccentHoverBrush}"
                                 CornerRadius="{StaticResource TinyCornerRadius}"
                                 Padding="{StaticResource TagPadding}">
                             <TextBlock Name="TypeText"
-                                       FontSize="{StaticResource SmallFontSize}"/>
+                                       FontSize="{StaticResource CaptionFontSize}"/>
                         </Border>
                         <Border Name="StatusBorder"
                                 CornerRadius="{StaticResource TinyCornerRadius}"
                                 Padding="{StaticResource TagPadding}">
                             <TextBlock Name="StatusText"
-                                       FontSize="{StaticResource SmallFontSize}"/>
+                                       FontSize="{StaticResource CaptionFontSize}"/>
                         </Border>
                     </StackPanel>
                     <TextBlock Name="SummaryText"
-                               FontSize="{StaticResource SmallFontSize}"
+                               FontSize="{StaticResource CaptionFontSize}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                TextWrapping="Wrap"/>
                 </StackPanel>
@@ -59,7 +59,7 @@
                                Text="该策略暂无执行记录"
                                IsVisible="True"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               FontSize="{StaticResource LabelFontSize}"
+                               FontSize="{StaticResource BodySmFontSize}"
                                HorizontalAlignment="Center"
                                Margin="{StaticResource DefaultMargin}"/>
                     <ItemsControl Name="RecordsItemsControl">
@@ -76,16 +76,16 @@
                                                 <Border CornerRadius="{StaticResource TinyCornerRadius}"
                                                         Padding="{StaticResource TagPadding}">
                                                     <TextBlock Text="{Binding Side, Converter={StaticResource EnumDescriptionConverter}}"
-                                                               FontSize="{StaticResource SmallFontSize}"/>
+                                                               FontSize="{StaticResource CaptionFontSize}"/>
                                                 </Border>
                                                 <Border CornerRadius="{StaticResource TinyCornerRadius}"
                                                         Padding="{StaticResource TagPadding}">
                                                     <TextBlock Text="{Binding Status, Converter={StaticResource EnumDescriptionConverter}}"
-                                                               FontSize="{StaticResource SmallFontSize}"/>
+                                                               FontSize="{StaticResource CaptionFontSize}"/>
                                                 </Border>
                                             </StackPanel>
                                             <TextBlock Grid.Column="2" VerticalAlignment="Center"
-                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       FontSize="{StaticResource CaptionFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}">
                                                 <TextBlock.Text>
                                                     <MultiBinding StringFormat="{}{0:yyyy-MM-dd HH:mm:ss}">
@@ -94,7 +94,7 @@
                                                 </TextBlock.Text>
                                             </TextBlock>
                                         </Grid>
-                                        <TextBlock FontSize="{StaticResource SmallFontSize}"
+                                        <TextBlock FontSize="{StaticResource CaptionFontSize}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}">
                                             <TextBlock.Text>
                                                 <MultiBinding StringFormat="请求: {0:F6} | 成交: {1:F6} @ {2:F4} | 手续费: {3:F6} {4}">
@@ -110,7 +110,7 @@
                                                   IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                   Padding="{StaticResource NoPadding}">
                                             <TextBlock Text="{Binding AIReasoning}" TextWrapping="Wrap"
-                                                       FontSize="{StaticResource SmallFontSize}"
+                                                       FontSize="{StaticResource CaptionFontSize}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Margin="{StaticResource SmallCardPadding}"/>
                                         </Expander>

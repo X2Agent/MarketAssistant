@@ -14,9 +14,6 @@ namespace MarketAssistant.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    /// <summary>首页导航项标题：行情条仅在该根页面常驻。</summary>
-    private const string HomeNavigationTitle = "首页";
-
     // 页面 ViewModel 由工厂在导航项点击时才实例化，避免构造主窗口时实例化全部页面
     private readonly IPageViewModelFactory _pageViewModelFactory;
     private readonly NavigationService _navigationService;
@@ -50,44 +47,6 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<NavigationItemViewModel> MainNavigationItems { get; }
 
     public ObservableCollection<NavigationItemViewModel> BottomNavigationItems { get; }
-
-    /// <summary>
-    /// 顶栏行情条（市场级聚合指标：A 股三大指数 / Crypto 总市值·主导率·恐惧贪婪）
-    /// </summary>
-    public ObservableCollection<IndexTickerItemViewModel> IndexTickers { get; }
-
-    /// <summary>行情条定时刷新器（30s），构造时创建并启动。</summary>
-    private Avalonia.Threading.DispatcherTimer? _tickerTimer;
-
-    /// <summary>
-    /// 行情条刷新请求代数：每次发起刷新自增，仅最新一代结果落地。
-    /// 替代 bool 防重入——切市场时若旧请求在飞，新请求不会被丢弃，旧结果落地前被淘汰，
-    /// 消除"切市场后行情条残留上一个市场数据"的竞态。
-    /// </summary>
-    private int _tickerRequestId;
-
-    /// <summary>
-    /// 行情条是否有数据（无数据时整段隐藏，对齐设计系统裁决 #6）。
-    /// </summary>
-    public bool HasIndexTickers => IndexTickers.Count > 0;
-
-    /// <summary>
-    /// 行情条是否可见：仅在首页根页面常驻——行情条是首页盯盘的背景信息，
-    /// 自选/告警/设置等其余根页面与二级详情页一律隐藏，避免与页面无关的市场指数分散注意力；
-    /// 无数据时整段隐藏。
-    /// </summary>
-    public bool ShowIndexTickers => HasIndexTickers && IsOnHomeRootPage;
-
-    /// <summary>当前是否处于首页根页面（行情条的唯一常驻页面）。</summary>
-    private bool IsOnHomeRootPage =>
-        _navigationService.CurrentRootNavigationItemTitle == HomeNavigationTitle && !_navigationService.CanGoBack;
-
-    /// <summary>
-    /// 顶栏是否可见：只在有内容时出现——首页（行情条）或二级页面（返回 + 标题）。
-    /// 其余根页面顶栏仅剩市场切换器（已移入导航栏），整条隐藏避免空白带；
-    /// 行情条无数据时首页顶栏同样不渲染。
-    /// </summary>
-    public bool ShowTopBar => ShowIndexTickers || CanGoBack;
 
     /// <summary>
     /// 当前市场类型显示文本
@@ -126,9 +85,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         MainNavigationItems = [];
         BottomNavigationItems = [];
-        IndexTickers = [];
         RebuildNavigationItems();
-        _ = RefreshIndexTickersAsync();
 
         _navigationService.PropertyChanged += OnNavigationServicePropertyChanged;
 
@@ -139,7 +96,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SubscribeToMarketChanges(_marketContext);
 
         // 默认导航到首页。选中项的变更回调负责实际导航，避免重复入栈。
-        // 导航事件会经 OnNavigationServicePropertyChanged 启动行情条定时刷新（仅首页常驻）。
         SelectedMainNavigationItem = MainNavigationItems[0];
     }
 
@@ -174,7 +130,6 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsAShareMarket));
         OnPropertyChanged(nameof(IsCryptoMarket));
         RebuildNavigationItems();
-        _ = RefreshIndexTickersAsync();
 
         // 导航集合重建后徽标状态被重置，按当前未读数回填
         _ = RefreshUnreadAlertCountAsync();
@@ -232,77 +187,6 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 按当前市场拉取市场级聚合指标填充顶栏行情条。
-    /// 通过 Keyed 解析 <see cref="IIndexQuoteService"/>（A 股=三大指数，Crypto=总市值/主导率/恐惧贪婪）；
-    /// 无数据或失败时保持为空，顶栏随 <see cref="HasIndexTickers"/> 自动隐藏。
-    /// 并发策略：允许并发刷新，落地前校验请求代数，仅最新一代结果生效。
-    /// </summary>
-    private async Task RefreshIndexTickersAsync()
-    {
-        // 发起即自增代数：切市场/定时刷新并发时，只有最新一代的结果落地
-        var requestId = Interlocked.Increment(ref _tickerRequestId);
-
-        try
-        {
-            var market = _marketContext.CurrentMarket;
-            var items = await _marketContext.GetService<IIndexQuoteService>(market).GetLatestAsync();
-
-            // 拉取期间已发起过更新的刷新或已切市场，丢弃过期结果
-            if (requestId != Volatile.Read(ref _tickerRequestId) || market != _marketContext.CurrentMarket)
-                return;
-
-            IndexTickers.Clear();
-            foreach (var item in items)
-            {
-                IndexTickers.Add(IndexTickerItemViewModel.FromTrend(item.Name, item.Value, item.ChangeText, item.Trend));
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger?.LogWarning(ex, "刷新顶栏行情条失败");
-        }
-        finally
-        {
-            OnPropertyChanged(nameof(HasIndexTickers));
-            OnPropertyChanged(nameof(ShowIndexTickers));
-            OnPropertyChanged(nameof(ShowTopBar));
-        }
-    }
-
-    /// <summary>启动行情条 30s 定时刷新（惰性创建于 UI 线程）。</summary>
-    private void StartTickerTimer()
-    {
-        _tickerTimer ??= new Avalonia.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(30),
-        };
-        _tickerTimer.Tick -= OnTickerTimerTick;
-        _tickerTimer.Tick += OnTickerTimerTick;
-        _tickerTimer.Start();
-    }
-
-    /// <summary>
-    /// 按当前页面维护行情条定时刷新：仅在首页根页面运行，
-    /// 离开即暂停（省去无谓的指数请求），回到首页立即补刷一次避免展示陈旧数据。
-    /// </summary>
-    private void UpdateTickerTimer()
-    {
-        if (!IsOnHomeRootPage)
-        {
-            _tickerTimer?.Stop();
-            return;
-        }
-
-        if (_tickerTimer?.IsEnabled != true)
-        {
-            StartTickerTimer();
-            _ = RefreshIndexTickersAsync();
-        }
-    }
-
-    private void OnTickerTimerTick(object? sender, EventArgs e) => _ = RefreshIndexTickersAsync();
-
-    /// <summary>
     /// 交易导航可见性：仅当前市场支持交易时可见（如虚拟币）；A 股始终不可见。
     /// </summary>
     private bool IsTradingVisible()
@@ -314,28 +198,15 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(CurrentPage));
             OnPropertyChanged(nameof(CurrentPageTitle));
-            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CanGoBack))
         {
             OnPropertyChanged(nameof(CanGoBack));
-            OnTickerPageChanged();
         }
         else if (e.PropertyName == nameof(NavigationService.CurrentRootNavigationItemTitle))
         {
             SyncNavigationSelectionToRootTitle();
-            OnTickerPageChanged();
         }
-    }
-
-    /// <summary>
-    /// 页面/导航栈变化后刷新行情条可见性，并按页面启停定时刷新。
-    /// </summary>
-    private void OnTickerPageChanged()
-    {
-        OnPropertyChanged(nameof(ShowIndexTickers));
-        OnPropertyChanged(nameof(ShowTopBar));
-        UpdateTickerTimer();
     }
 
     [RelayCommand]

@@ -2,162 +2,156 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ================================================================== -->
-    <!-- 手风琴分组卡片（section-card）头部交互：手型光标，悬浮/按下不变色   -->
+    <!-- MarketAssistant Design System v3.0 — Cards & Surfaces                -->
+    <!--                                                                     -->
+    <!-- 卡片规则：                                                            -->
+    <!--  - 无边框、默认无阴影。靠 CardBackground(#FFF) 与 Page(#F5F7FA) 的       -->
+    <!--    2%–3% 色差分层；暗色下靠 #161616 与 #0D0D0D 的差。                  -->
+    <!--  - hover 不放大、不位移，只把表面色阶加深一档。                         -->
+    <!--  - 可点击卡片才给 hover 反馈；纯展示卡片保持静止。                      -->
     <!-- ================================================================== -->
+
+    <!-- 可点击卡片的 hover 由各页面按自身语义定义（如 fav-card / hot-stock-card），
+         不再提供通用 card-interactive：它会把 Cursor=Hand 塞给任何卡片，
+         让只读卡片看起来可点。 -->
+
+    <!-- ===== 手风琴分组卡片 ===== -->
+    <Style Selector="Expander.section-card">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Padding" Value="0"/>
+        <!-- 内容内边距由页面自己给（ExpanderContentPadding），壳不再预留高度 -->
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader">
         <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="20,16"/>
     </Style>
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pointerover">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pressed">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
     </Style>
+    <!-- 展开箭头在两种状态下都保持低调，不做蓝底高亮 -->
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pointerover /template/ Border#ExpandCollapseChevronBorder">
-        <Setter Property="Background" Value="{DynamicResource ExpanderChevronBackground}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ExpanderChevronBorderBrush}"/>
-    </Style>
-    <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pointerover /template/ Path#ExpandCollapseChevron">
-        <Setter Property="Stroke" Value="{DynamicResource ExpanderChevronForeground}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pressed /template/ Border#ExpandCollapseChevronBorder">
-        <Setter Property="Background" Value="{DynamicResource ExpanderChevronBackground}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource ExpanderChevronBorderBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
-    <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pressed /template/ Path#ExpandCollapseChevron">
-        <Setter Property="Stroke" Value="{DynamicResource ExpanderChevronForeground}"/>
-    </Style>
+    <!-- 卡片内标题统一用 card-title（16px + WeightTitle）；
+         不再提供 section-card 专属的 section-title 类——它会和 card-title 抢同一层级。 -->
 
-
-    <!-- ================================================================== -->
-    <!-- 热门资产卡片样式 -->
-    <!-- ================================================================== -->
+    <!-- ===== 热门资产瓦片 ===== -->
     <Style Selector="Border.hot-stock-card">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
         <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
-                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
-                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
-        <Setter Property="RenderTransform" Value="{StaticResource HoverLiftTransform}"/>
-    </Style>
-    <Style Selector="Border.hot-stock-card:focus">
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
-        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
     <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
         <Setter Property="Opacity" Value="1"/>
         <Setter Property="IsHitTestVisible" Value="True"/>
     </Style>
 
-    <!-- ================================================================== -->
-    <!-- 选股模式卡片样式 (独立定义，因样式差异较大) -->
-    <!-- ================================================================== -->
+    <!-- ===== 选股模式卡片 ===== -->
+    <!-- 底色必须用卡片白：页面底色已是 Page(#F5F7FA)，若卡片再用 SurfaceVariant(#F0F2F5)
+         两者差不到 1%，未选中的两张卡几乎不可见，只有选中卡带环看着像"边框没画全"。 -->
     <Style Selector="Border.mode-card">
-        <Setter Property="Padding" Value="{StaticResource PagePadding}"/>
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
         <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
                 <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
     <Style Selector="Border.mode-card:pointerover">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryLightBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
-    <Style Selector="Border.mode-card:focus">
-        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
-        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
-    </Style>
+    <!-- 选中态：强调色浅底 + AccentRing 环标记，不用描边 -->
     <Style Selector="Border.mode-card.selected">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
-        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
+        <Setter Property="BoxShadow" Value="{StaticResource AccentRing}"/>
     </Style>
     <Style Selector="Border.mode-card TextBlock.mode-name">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="Border.mode-card.selected TextBlock.mode-name">
-        <Setter Property="Foreground" Value="{DynamicResource ModeCardSelectedTextBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
     </Style>
 
-    <!-- 新闻卡片样式 -->
+    <!-- ===== 新闻卡片：去掉边框与卡片底色，改成"可悬停的行"，与快讯流一致 ===== -->
     <Style Selector="Border.news-card">
-        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
-                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
     <Style Selector="Border.news-card:pointerover">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
-        <Setter Property="BoxShadow" Value="{StaticResource SmallBoxShadow}"/>
-    </Style>
-    <Style Selector="Border.news-card:focus">
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderActiveBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource ThickBorderThickness}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
     <Style Selector="Border.news-card TextBlock">
         <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
-    <!-- 功能项样式 -->
+    <!-- ===== 功能项 ===== -->
     <Style Selector="Border.feature-item">
-        <Setter Property="Background" Value="{DynamicResource ItemBackgroundBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
         <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="{StaticResource DefaultBorderThickness}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
+        <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="Transitions">
             <Transitions>
-                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
     </Style>
-
     <Style Selector="Border.feature-item:pointerover">
-        <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
 
     <Style Selector="Border.feature-icon">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="Padding" Value="{StaticResource CompactCardPadding}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
     </Style>
-    
+
     <Style Selector="TextBlock.feature-title">
-        <Setter Property="FontSize" Value="{StaticResource MediumFontSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
     </Style>
 
-</Styles>
+    <!-- 说明：语义面板（panel-success/warning/danger/info）与通用 tag 类已下线。
+         仓库内每个面板都自带具体底色与内边距，通用类零使用；
+         留着会让人以为"语义面板有一套统一外观"，实际改它不影响任何页面。
+         需要新面板时直接给 Background 绑定对应的 XxxPanelBackgroundBrush 令牌。 -->
 
+</Styles>
