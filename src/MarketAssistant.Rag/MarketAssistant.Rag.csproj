@@ -14,8 +14,8 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.ML.Tokenizers" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="Microsoft.SemanticKernel.Abstractions" />
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.SqliteVec" />
-    <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" />
     <PackageReference Include="PdfPig" />
     <PackageReference Include="SkiaSharp" />
   </ItemGroup>

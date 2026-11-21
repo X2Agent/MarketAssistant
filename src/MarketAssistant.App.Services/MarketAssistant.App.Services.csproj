@@ -49,7 +49,6 @@
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Skender.Stock.Indicators" />
-    <PackageReference Include="SmartReader" />
     <!-- Added for CLIP ONNX embedding support -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
     <PackageReference Include="YamlDotNet" />
