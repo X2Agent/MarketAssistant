@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 using MarketAssistant.Services.Trading.Exchanges;
@@ -48,6 +49,17 @@ public class StrategyEngine
     private List<TradingStrategy>? _activeStrategiesCache;
     private DateTime _activeStrategiesCacheAtUtc;
 
+    /// <summary>
+    /// DCA 出场检查节流间隔。出场评估要读本地持仓账本，逐 tick（约 1Hz/标的）查询是纯开销；
+    /// DCA 出场是"均价 × 百分比"的慢变量阈值，10s 粒度足够。
+    /// StopLoss/TakeProfit/TrailingStop 策略是纯价格比较，保持逐 tick 不受此节流影响。
+    /// </summary>
+    private static readonly TimeSpan DcaExitCheckInterval = TimeSpan.FromSeconds(10);
+    private readonly ConcurrentDictionary<string, DateTime> _dcaExitCheckTimes = new(StringComparer.Ordinal);
+
+    /// <summary>CustomParams 解析缓存（解析器与缓存机制见 <see cref="StrategyParamsCache"/>）。</summary>
+    private readonly StrategyParamsCache _paramsCache = new();
+
     public StrategyEngine(
         TradingDataService dataService,
         TradingStrategyService strategyService,
@@ -69,6 +81,10 @@ public class StrategyEngine
     {
         lock (_strategiesCacheLock)
             _activeStrategiesCache = null;
+        _dcaExitCheckTimes.Clear();
+        // 策略编辑/删除/状态变化（含完结）都会经 StrategiesChanged 广播，此处一并清空参数缓存；
+        // 运行时自更新（网格索引、DCA 加倍计数）不广播，走 StrategyParamsCache.Refresh 就地刷新
+        _paramsCache.Clear();
     }
 
     /// <summary>
@@ -205,22 +221,10 @@ public class StrategyEngine
     {
         try
         {
-            decimal trailingPercent = 0;
-            decimal activationPrice = 0;
-
-            if (!string.IsNullOrEmpty(strategy.CustomParams))
-            {
-                using var doc = JsonDocument.Parse(strategy.CustomParams);
-                var root = doc.RootElement;
-
-                if (root.TryGetProperty("trailingPercent", out var trailingPercentEl)
-                    && trailingPercentEl.TryGetDecimal(out var parsedPercent))
-                    trailingPercent = parsedPercent;
-
-                if (root.TryGetProperty("activationPrice", out var activationPriceEl)
-                    && activationPriceEl.TryGetDecimal(out var parsedActivation))
-                    activationPrice = parsedActivation;
-            }
+            var trailingParams = _paramsCache.GetOrCreate(
+                strategy.Id, strategy.CustomParams, StrategyParamsParsers.TrailingStop);
+            decimal trailingPercent = trailingParams?.TrailingPercent ?? 0;
+            decimal activationPrice = trailingParams?.ActivationPrice ?? 0;
 
             if (trailingPercent <= 0)
             {
@@ -282,9 +286,9 @@ public class StrategyEngine
     /// <summary>
     /// 解析策略的风险档案：优先读取 CustomParams.riskProfile，缺失时回退稳健档。
     /// </summary>
-    private static RiskProfile ResolveRiskProfile(TradingStrategy strategy)
+    private RiskProfile ResolveRiskProfile(TradingStrategy strategy)
     {
-        var aiParams = AISignalParams.FromJson(strategy.CustomParams);
+        var aiParams = _paramsCache.GetOrCreate(strategy.Id, strategy.CustomParams, StrategyParamsParsers.AiSignal);
         return aiParams?.ParsedRiskProfile ?? RiskProfile.Balanced;
     }
 
@@ -301,7 +305,7 @@ public class StrategyEngine
         TradingStrategy strategy, CancellationToken ct)
     {
         var intervalSeconds = DefaultAISignalIntervalSeconds;
-        var aiParams = AISignalParams.FromJson(strategy.CustomParams);
+        var aiParams = _paramsCache.GetOrCreate(strategy.Id, strategy.CustomParams, StrategyParamsParsers.AiSignal);
         if (aiParams is { AnalysisIntervalSeconds: > 0 })
             intervalSeconds = aiParams.AnalysisIntervalSeconds;
 
@@ -334,7 +338,7 @@ public class StrategyEngine
 
         try
         {
-            var gridParams = JsonSerializer.Deserialize<GridTradingParams>(strategy.CustomParams);
+            var gridParams = _paramsCache.GetOrCreate(strategy.Id, strategy.CustomParams, StrategyParamsParsers.Grid);
             if (gridParams == null || gridParams.GridCount <= 1 || gridParams.UpperPrice <= gridParams.LowerPrice)
                 return (false, strategy.Side, strategy.Quantity);
 
@@ -375,6 +379,7 @@ public class StrategyEngine
                 // 首次评估：仅记录基准网格线并立即落库，不触发交易
                 gridParams.LastTriggeredIndex = currentIndex;
                 strategy.CustomParams = JsonSerializer.Serialize(gridParams);
+                _paramsCache.Refresh(strategy.Id, strategy.CustomParams, gridParams);
                 await _dataService.UpdateStrategyCustomParamsAsync(strategy.Id, strategy.CustomParams, ct);
                 _logger.LogInformation(
                     "网格基准初始化: {StrategyId} 基准网格 {Index}，价格: {Price}",
@@ -389,6 +394,7 @@ public class StrategyEngine
 
             gridParams.LastTriggeredIndex = currentIndex;
             strategy.CustomParams = JsonSerializer.Serialize(gridParams);
+            _paramsCache.Refresh(strategy.Id, strategy.CustomParams, gridParams);
 
             _logger.LogInformation(
                 "网格交易触发: {StrategyId} 网格 {Index} → {Side}，价格: {Price}",
@@ -414,7 +420,7 @@ public class StrategyEngine
 
         try
         {
-            var dcaParams = JsonSerializer.Deserialize<DCAParams>(strategy.CustomParams);
+            var dcaParams = _paramsCache.GetOrCreate(strategy.Id, strategy.CustomParams, StrategyParamsParsers.Dca);
             if (dcaParams == null || dcaParams.AmountPerInterval <= 0)
                 return (false, strategy.Side, strategy.Quantity);
 
@@ -462,6 +468,7 @@ public class StrategyEngine
                     dcaParams.DoubleBuyCount++;
                     dcaParams.LastDoubleBuyAt = DateTime.UtcNow.ToString("O");
                     strategy.CustomParams = JsonSerializer.Serialize(dcaParams);
+                    _paramsCache.Refresh(strategy.Id, strategy.CustomParams, dcaParams);
                     // 立即持久化加倍计数，防止重启后上限失效
                     await _dataService.UpdateStrategyCustomParamsAsync(strategy.Id, strategy.CustomParams, ct);
                     _logger.LogInformation("DCA 低价加倍: {StrategyId} 价格 {Price} < {Threshold}，加倍买入（第 {Count} 次）",
@@ -493,13 +500,32 @@ public class StrategyEngine
         if (dcaParams.TakeProfitPercent <= 0 && dcaParams.StopLossPercent <= 0)
             return null;
 
+        // 节流见 DcaExitCheckInterval：未到间隔直接跳过本轮出场评估（含无持仓时的空查询）
+        var now = DateTime.UtcNow;
+        if (_dcaExitCheckTimes.TryGetValue(strategy.Id, out var lastCheck)
+            && now - lastCheck < DcaExitCheckInterval)
+            return null;
+        _dcaExitCheckTimes[strategy.Id] = now;
+
         var positions = await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct).ConfigureAwait(false);
         var totalQty = positions.Sum(p => p.Quantity - p.ClosedQuantity);
         if (totalQty <= 0)
             return null;
 
-        var avgEntry = await _dataService.GetOpenPositionAvgEntryPriceAsync(strategy.Symbol, ct)
-            .ConfigureAwait(false);
+        // 均价口径与独立均价查询一致：仅多头未平仓部分加权平均。
+        // 持仓行已含全部所需字段，一条连接取回后本地计算，
+        // 替代原先的第二条均价查询（原先每 tick 两条 SQLite 连接 → 一条）
+        var longOpenQty = 0m;
+        var longCost = 0m;
+        foreach (var position in positions)
+        {
+            if (position.Side != PositionSide.Long)
+                continue;
+            var open = position.Quantity - position.ClosedQuantity;
+            longOpenQty += open;
+            longCost += open * position.EntryPrice;
+        }
+        var avgEntry = longOpenQty > 0 ? longCost / longOpenQty : 0m;
         if (avgEntry <= 0)
             return null;
 

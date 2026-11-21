@@ -67,6 +67,43 @@ public class RiskConfig
     /// 交易所 API 失败熔断阈值（次）：滑动窗口内失败达到该值时拒单并告警，0 表示不限制。
     /// </summary>
     public int ApiFailureThreshold { get; set; } = 5;
+
+    /// <summary>
+    /// 资金费率护栏（仅合约开仓生效）：距下次资金结算少于该分钟数，
+    /// 且费率对本次开仓方向不利时，推迟开仓。0 表示不启用。
+    /// </summary>
+    /// <remarks>
+    /// 资金费每 8 小时结算一次，持仓跨结算点会被收费。正费率时多头付费、空头收费；
+    /// 负费率相反。刚进场就跨结算点、且费率对己方不利，等于开局先亏一笔，
+    /// 与入场时机无关但完全吃掉薄利策略的边际。建议开启后设 5 分钟：只挡"马上就要结算"的仓位，
+    /// 不干扰正常交易节奏。默认 0（关闭）：这是新增的收紧性约束，存量用户不应在升级后被静默限单
+    /// ——与 <see cref="RequireLivePromotion"/> 的默认策略一致。
+    /// </remarks>
+    public int FundingRateGuardMinutes { get; set; }
+
+    /// <summary>
+    /// 不利资金费率的容忍阈值（每 8 小时结算周期的费率百分比）：绝对值低于该值视为噪声，不拦单。
+    /// 默认 0.03%（即万三），略高于常见的 0.01%~0.02% 基准费率。仅在 GuardMinutes 大于 0 时生效。
+    /// </summary>
+    public decimal FundingRateTolerancePercent { get; set; } = 0.03m;
+
+    /// <summary>
+    /// 最大同时持仓标的数（0 表示不限制）。
+    /// 单标的仓位上限管不住"相关性"：5 个山寨币同时开多，实际等于一个 5 倍的 BTC 多头，
+    /// 回撤会同步发生。限制持仓标的数是这条风险最易落地的代理约束。
+    /// 默认 0（不限制）：与 <see cref="RequireLivePromotion"/> 同理，新增的收紧性约束
+    /// 不应静默改变存量用户的交易行为，由用户显式开启。
+    /// </summary>
+    public int MaxConcurrentPositions { get; set; }
+
+    /// <summary>
+    /// 是否要求策略通过影子验证才允许在实盘自动开仓。
+    /// 默认关闭——开启后未积累足够影子样本的已有策略会立即停止实盘交易，
+    /// 这属于用户显式选择的风险策略收紧，不由程序代替用户决定默认值。
+    /// 规则见 <c>LivePromotionGate</c>：≥30 笔影子平仓、累计盈亏转正、
+    /// 盈亏比 ≥1.1、回撤不超过累计盈利。
+    /// </summary>
+    public bool RequireLivePromotion { get; set; }
 }
 
 /// <summary>

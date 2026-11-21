@@ -54,4 +54,13 @@ public class TradeRecord
     /// </summary>
     [Description("已实现盈亏")]
     public decimal RealizedPnl { get; set; }
+
+    /// <summary>
+    /// 是否为平仓成交（有已实现盈亏）。开仓成交为 0 盈亏，展示层据此隐藏"盈亏 0.00"，
+    /// 避免把"尚未结算"误读成"打平"。
+    /// </summary>
+    public bool HasRealizedPnl => RealizedPnl != 0;
+
+    /// <summary>是否有滑点数据（市价单成交后才有）。</summary>
+    public bool HasSlippage => SlippagePercent.HasValue;
 }

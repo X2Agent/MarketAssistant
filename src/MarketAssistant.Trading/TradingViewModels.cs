@@ -48,6 +48,31 @@ public class PositionInfo
     /// </summary>
     [Description("是否空头持仓")]
     public bool IsShort { get; set; }
+
+    /// <summary>标记价（合约）。现货为 0，展示层不得把 0 当真实标记价。</summary>
+    [Description("标记价")]
+    public decimal MarkPrice { get; set; }
+
+    /// <summary>
+    /// 强平价（合约）。交易所未返回（全仓低风险等）或现货场景为 0，
+    /// 展示层必须按 0 隐藏，不得把 0 当真实强平价。
+    /// </summary>
+    [Description("强平价")]
+    public decimal LiquidationPrice { get; set; }
+
+    /// <summary>杠杆倍数（合约）。现货为 0。</summary>
+    [Description("杠杆倍数")]
+    public decimal Leverage { get; set; }
+
+    /// <summary>所属策略 ID（本地账本关联；手动开仓为空）。</summary>
+    [Description("所属策略")]
+    public string? StrategyId { get; set; }
+
+    /// <summary>是否有可展示的强平价（0 表示交易所未返回或现货）。</summary>
+    public bool HasLiquidationPrice => LiquidationPrice > 0;
+
+    /// <summary>是否为杠杆持仓（合约）。现货为 false，用于隐藏杠杆与强平价字段。</summary>
+    public bool IsLeveraged => Leverage > 0;
 }
 
 [Description("交易执行结果")]
@@ -64,6 +89,19 @@ public class TradeResult
     /// 拒绝类（风控/用户）重试无意义，应暂停策略并通知用户。
     /// </summary>
     [Description("失败类别")]
+    public TradeFailureCategory FailureCategory { get; set; } = TradeFailureCategory.None;
+}
+
+/// <summary>
+/// 现货 OCO 保护单挂单结果：成功时携带两腿各自的 Pending 交易记录
+/// （对账与成交回写按腿独立处理）。
+/// </summary>
+public class OcoPlacementResult
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public TradeRecord? StopRecord { get; set; }
+    public TradeRecord? TakeProfitRecord { get; set; }
     public TradeFailureCategory FailureCategory { get; set; } = TradeFailureCategory.None;
 }
 
@@ -86,6 +124,12 @@ public enum TradeFailureCategory
     /// </summary>
     [Description("交易被拒绝")]
     Rejected,
+
+    /// <summary>
+    /// 下单请求可能已落地，但收敛查询失败，订单状态未知；禁止自动重试或改下其他订单。
+    /// </summary>
+    [Description("订单状态未知")]
+    OrderStateUnknown,
 
     [Description("其他失败")]
     Other
@@ -136,17 +180,3 @@ public class OrderStatusInfo
 }
 
 #endregion
-
-/// <summary>
-/// 交易上下文，用于在 Agent 工具调用链中传递当前策略 ID
-/// </summary>
-public static class TradingContext
-{
-    private static readonly AsyncLocal<string?> _strategyId = new();
-
-    public static string? CurrentStrategyId
-    {
-        get => _strategyId.Value;
-        set => _strategyId.Value = value;
-    }
-}

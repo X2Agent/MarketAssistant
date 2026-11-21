@@ -178,6 +178,158 @@ internal sealed class PositionRepository(
         return 0;
     }
 
+    /// <summary>
+    /// 按交易所实际持仓校准本地账本：把某标的某方向的未平量直接改写为交易所的未平量。
+    ///
+    /// 用于 <c>PositionReconciliationService</c>——外部手动成交、漏单、断线期间成交都会让
+    /// 本地 FIFO 与交易所产生漂移，而本地账本是 DCA 均价、PnL 与风控可用量的计算基础。
+    /// 这里不重算 PnL（历史盈亏已在当时的成交里结算），只对齐"还剩多少仓位、均价多少"。
+    /// </summary>
+    /// <param name="targetRemainingQty">交易所的未平量（绝对值）。为 0 时把本地记录全部平掉。</param>
+    /// <param name="exchangeEntryPrice">交易所的开仓均价；&lt;= 0 时保留本地均价。</param>
+    public async Task ReconcileOpenPositionAsync(
+        string symbol, PositionSide side, decimal targetRemainingQty, decimal exchangeEntryPrice,
+        CancellationToken ct = default)
+    {
+        if (targetRemainingQty < 0)
+            targetRemainingQty = 0;
+
+        await EnsureInitializedAsync();
+        await using var conn = await OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await using var selectCmd = conn.CreateCommand();
+            selectCmd.Transaction = (SqliteTransaction)tx;
+            selectCmd.CommandText = """
+                SELECT id, quantity, closed_quantity
+                FROM positions
+                WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+                ORDER BY opened_at ASC
+                """;
+            selectCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+            selectCmd.Parameters.AddWithValue("@symbol", symbol);
+            selectCmd.Parameters.AddWithValue("@side", (int)side);
+
+            var rows = new List<(string Id, decimal Remaining)>();
+            await using (var reader = await selectCmd.ExecuteReaderAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    var id = reader.GetString(0);
+                    var qty = ReadDecimal(reader, 1);
+                    var closed = ReadDecimal(reader, 2);
+                    rows.Add((id, qty - closed));
+                }
+            }
+
+            // 交易所已无仓位：本地记录全部标记为已平（保留历史行，不删除）
+            if (targetRemainingQty <= 0)
+            {
+                foreach (var (id, remaining) in rows)
+                    await SetClosedQuantityAsync(conn, (SqliteTransaction)tx, id, remaining, ct).ConfigureAwait(false);
+                await tx.CommitAsync(ct).ConfigureAwait(false);
+                return;
+            }
+
+            var localTotal = rows.Sum(row => row.Remaining);
+
+            if (localTotal <= 0)
+            {
+                // 本地无记录但交易所仍有仓位（外部开仓）：补一条账本行，使风控与均价有据可依
+                await using var insertCmd = conn.CreateCommand();
+                insertCmd.Transaction = (SqliteTransaction)tx;
+                insertCmd.CommandText = """
+                    INSERT INTO positions (id, environment, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
+                    VALUES (@id, @environment, @symbol, @side, @qty, @entry, 0, NULL, @openedAt)
+                    """;
+                insertCmd.Parameters.AddWithValue("@id", Guid.NewGuid().ToString("N"));
+                insertCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+                insertCmd.Parameters.AddWithValue("@symbol", symbol);
+                insertCmd.Parameters.AddWithValue("@side", (int)side);
+                insertCmd.Parameters.AddWithValue("@qty", ToDb(targetRemainingQty));
+                insertCmd.Parameters.AddWithValue("@entry", ToDb(exchangeEntryPrice > 0 ? exchangeEntryPrice : 0));
+                insertCmd.Parameters.AddWithValue("@openedAt", DateTime.UtcNow.ToString("O"));
+                await insertCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                await tx.CommitAsync(ct).ConfigureAwait(false);
+                return;
+            }
+
+            // 按 FIFO 调整未平量：少了就从最早的行平掉差额，多了就补到最新一行
+            var delta = targetRemainingQty - localTotal;
+            if (delta < 0)
+            {
+                var toClose = -delta;
+                foreach (var (id, remaining) in rows)
+                {
+                    if (toClose <= 0)
+                        break;
+
+                    var closeThis = Math.Min(toClose, remaining);
+                    await SetClosedQuantityAsync(conn, (SqliteTransaction)tx, id, closeThis, ct, addToExisting: true)
+                        .ConfigureAwait(false);
+                    toClose -= closeThis;
+                }
+            }
+            else if (delta > 0)
+            {
+                await using var addCmd = conn.CreateCommand();
+                addCmd.Transaction = (SqliteTransaction)tx;
+                addCmd.CommandText = """
+                    INSERT INTO positions (id, environment, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
+                    VALUES (@id, @environment, @symbol, @side, @qty, @entry, 0, NULL, @openedAt)
+                    """;
+                addCmd.Parameters.AddWithValue("@id", Guid.NewGuid().ToString("N"));
+                addCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+                addCmd.Parameters.AddWithValue("@symbol", symbol);
+                addCmd.Parameters.AddWithValue("@side", (int)side);
+                addCmd.Parameters.AddWithValue("@qty", ToDb(delta));
+                addCmd.Parameters.AddWithValue("@entry", ToDb(exchangeEntryPrice > 0 ? exchangeEntryPrice : 0));
+                addCmd.Parameters.AddWithValue("@openedAt", DateTime.UtcNow.ToString("O"));
+                await addCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+
+            // 交易所开仓均价是仓位真实成本：本地均价与它不一致时以交易所为准
+            if (exchangeEntryPrice > 0)
+            {
+                await using var priceCmd = conn.CreateCommand();
+                priceCmd.Transaction = (SqliteTransaction)tx;
+                priceCmd.CommandText = """
+                    UPDATE positions SET entry_price = @entry
+                    WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+                    """;
+                priceCmd.Parameters.AddWithValue("@entry", ToDb(exchangeEntryPrice));
+                priceCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+                priceCmd.Parameters.AddWithValue("@symbol", symbol);
+                priceCmd.Parameters.AddWithValue("@side", (int)side);
+                await priceCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            }
+
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private async Task SetClosedQuantityAsync(
+        SqliteConnection conn, SqliteTransaction tx, string positionId, decimal closeQty,
+        CancellationToken ct, bool addToExisting = false)
+    {
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = addToExisting
+            ? "UPDATE positions SET closed_quantity = closed_quantity + @close WHERE id = @id"
+            : "UPDATE positions SET closed_quantity = quantity WHERE id = @id";
+        if (addToExisting)
+            cmd.Parameters.AddWithValue("@close", ToDb(closeQty));
+        cmd.Parameters.AddWithValue("@id", positionId);
+        await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
     private static Position ReadPosition(SqliteDataReader reader)
     {
         var position = new Position

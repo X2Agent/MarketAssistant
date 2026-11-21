@@ -42,6 +42,15 @@ public interface IExchangeClient
         string instrumentSymbol, string orderId, CancellationToken ct = default);
 
     /// <summary>
+    /// 按客户端订单 ID 查询订单。用于网络异常后的收敛查询：
+    /// 下单请求超时并不代表未落地，必须按同一个 clientOrderId 回查，
+    /// 才能区分"确实没下成"与"下成了但响应丢失"，避免重试造成重复下单。
+    /// 交易所回查不到该 ID 时抛异常（币安 -2013）。
+    /// </summary>
+    Task<ExchangeOrderResult> GetOrderByClientOrderIdAsync(
+        string instrumentSymbol, string clientOrderId, CancellationToken ct = default);
+
+    /// <summary>
     /// 取消订单
     /// </summary>
     Task<ExchangeOrderResult> CancelOrderAsync(
@@ -52,6 +61,24 @@ public interface IExchangeClient
     /// </summary>
     Task<List<ExchangeOrderResult>> GetOpenOrdersAsync(
         string? instrumentSymbol = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// 现货保护性 OCO（一单撤一）：同一数量同时挂出止盈与止损两腿，任一腿触发成交后
+    /// 交易所自动撤销另一腿。两腿共享同一数量，只锁定一次基础资产——
+    /// 现货若分开挂两张全量卖单，第二张必然因余额被第一张锁定而被拒单。
+    /// 撤销任一成员单即撤销整个 orderList（币安现货 API 行为）。
+    /// 仅现货实现；合约双腿为 reduceOnly 条件单，由 OCO 语义由客户端撤兄弟腿实现。
+    /// </summary>
+    /// <param name="stopClientOrderId">止损腿客户端订单 ID（对账按前缀+策略+腿匹配）</param>
+    /// <param name="stopPrice">止损触发价</param>
+    /// <param name="takeProfitClientOrderId">止盈腿客户端订单 ID</param>
+    /// <param name="takeProfitPrice">止盈触发价</param>
+    /// <returns>两腿各自的订单结果（顺序：止损腿、止盈腿）</returns>
+    Task<IReadOnlyList<ExchangeOrderResult>> PlaceSpotOcoAsync(
+        string instrumentSymbol, OrderSide side, decimal quantity,
+        string? stopClientOrderId, decimal stopPrice,
+        string? takeProfitClientOrderId, decimal takeProfitPrice,
+        CancellationToken ct = default);
 
     /// <summary>
     /// 查询当前持仓（合约专用，现货返回空列表）
@@ -124,6 +151,16 @@ public class ExchangeOrderResult
     /// 手续费币种（如 BNB、USDT、BTC）。交易所未返回时为空。
     /// </summary>
     public string? CommissionAsset { get; set; }
+
+    /// <summary>未成交数量（请求量 − 已成交量）。已完全成交时为 0。</summary>
+    public decimal RemainingQty => Math.Max(0, RequestedQty - ExecutedQty);
+
+    /// <summary>
+    /// 成交进度百分比（0-100），供挂单行进度条直接绑定。
+    /// 请求量为 0（交易所未返回）时返回 0，避免除零。
+    /// </summary>
+    public decimal FillProgressPercent =>
+        RequestedQty > 0 ? Math.Clamp(ExecutedQty / RequestedQty * 100m, 0m, 100m) : 0m;
 }
 
 /// <summary>

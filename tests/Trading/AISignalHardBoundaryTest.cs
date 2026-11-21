@@ -1,3 +1,4 @@
+using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Market;
@@ -92,13 +93,80 @@ public sealed class AISignalHardBoundaryTest
             "平仓失败时策略保持 Active，留待下个冷却期重试");
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task StopLoss_PositionSnapshotFails_ShouldFailWithoutCompletingOrOrdering()
+    {
+        var tradeExecutor = new Mock<TradeExecutor>(
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null!, null!, null!);
+        var strategyService = new Mock<TradingStrategyService>(null!);
+        var (executor, strategy) = CreateExecutor(
+            tradeExecutor, strategyService.Object, hasPosition: true,
+            closeSuccess: true, out _, out _, new HttpRequestException("network down"));
+
+        var result = await executor.ExecuteAsync(strategy, currentPrice: 8.5m);
+
+        Assert.AreEqual(AISignalOutcome.Failed, result.Outcome);
+        tradeExecutor.Verify(
+            executorMock => executorMock.ExecuteTradeAsync(
+                It.IsAny<TradingStrategy>(), It.IsAny<decimal>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        strategyService.Verify(
+            service => service.UpdateStrategyStatusAsync(It.IsAny<string>(), It.IsAny<StrategyStatus>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("{broken", DisplayName = "Malformed JSON")]
+    [DataRow(null, DisplayName = "Missing parameters")]
+    public async Task ExecuteAsync_InvalidParameters_ShouldPauseAlertOnce_AndNotTouchExchange(string? customParams)
+    {
+        var tradeExecutor = new Mock<TradeExecutor>(
+            null!, null!, null!, NullLogger<TradeExecutor>.Instance, null!, null!, null!);
+        var strategyService = new Mock<TradingStrategyService>(null!);
+        var raisedAlerts = new List<AlertEvent>();
+        var alertCenter = new Mock<IAlertCenterService>();
+        alertCenter
+            .Setup(center => center.RaiseAlertAsync(It.IsAny<AlertEvent>(), It.IsAny<CancellationToken>()))
+            .Callback<AlertEvent, CancellationToken>((alert, _) => raisedAlerts.Add(alert))
+            .Returns(Task.CompletedTask);
+        var (executor, strategy) = CreateExecutor(
+            tradeExecutor, strategyService.Object, hasPosition: true,
+            closeSuccess: true, out _, out _,
+            alertEvaluator: new SignalAlertEvaluator(
+                alertCenter.Object, NullLogger<SignalAlertEvaluator>.Instance));
+        strategy.CustomParams = customParams;
+
+        var result = await executor.ExecuteAsync(strategy, currentPrice: 8.5m);
+
+        Assert.AreEqual(AISignalOutcome.ConfigurationFailed, result.Outcome,
+            "配置无效是确定性失败，必须与普通网络/执行失败区分");
+        Assert.AreEqual(TradeFailureCategory.Rejected, result.TradeResult?.FailureCategory,
+            "配置失败结果需可被上层按拒绝类处理，防止意外落入普通冷却");
+        tradeExecutor.Verify(
+            executorMock => executorMock.ExecuteTradeAsync(
+                It.IsAny<TradingStrategy>(), It.IsAny<decimal>(), It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Never, "配置无效时不得触达交易所");
+        strategyService.Verify(
+            service => service.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Paused, It.IsAny<CancellationToken>()),
+            Times.Once, "配置无效策略必须暂停，不能周期性重复执行");
+        Assert.HasCount(1, raisedAlerts, "配置无效必须产生一次用户可见告警");
+        Assert.AreEqual(AlertSource.Signal, raisedAlerts[0].Source);
+        Assert.AreEqual(AlertLevel.Warning, raisedAlerts[0].Level);
+    }
+
     private static (AISignalStrategyExecutor Executor, TradingStrategy Strategy) CreateExecutor(
         Mock<TradeExecutor> tradeExecutor,
         TradingStrategyService strategyService,
         bool hasPosition,
         bool closeSuccess,
         out List<OrderSide> capturedSides,
-        out List<bool> capturedRequireClose)
+        out List<bool> capturedRequireClose,
+        Exception? positionQueryError = null,
+        SignalAlertEvaluator? alertEvaluator = null)
     {
         capturedSides = [];
         capturedRequireClose = [];
@@ -114,15 +182,23 @@ public sealed class AISignalHardBoundaryTest
             Quantity = 1m,
             Status = StrategyStatus.Active,
             ExecutionCount = 1,
-            StopLossPrice = 9m
+            StopLossPrice = 9m,
+            CustomParams = "{}"
         };
 
         var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
-        portfolioService
-            .Setup(service => service.GetCurrentPositionsAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(hasPosition
+        var positionsSetup = portfolioService
+            .Setup(service => service.GetCurrentPositionsAsync(It.IsAny<CancellationToken>()));
+        if (positionQueryError != null)
+        {
+            positionsSetup.ThrowsAsync(positionQueryError);
+        }
+        else
+        {
+            positionsSetup.ReturnsAsync(hasPosition
                 ? [new PositionInfo { Symbol = "BTCUSDT", Quantity = 1m }]
                 : []);
+        }
 
         tradeExecutor
             .Setup(executorMock => executorMock.ExecuteTradeAsync(
@@ -146,9 +222,18 @@ public sealed class AISignalHardBoundaryTest
         var settingService = new Mock<IUserSettingService>();
         settingService.SetupGet(service => service.CurrentSetting).Returns(new UserSetting());
 
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        // 方向解析走本地账本（ResolveIsLongPositionAsync）：有持仓时必须提供带 StrategyId 的多头行，
+        // 否则方向回退到 strategy.Side；无持仓时返回空列表走 Side 兜底
+        dataService
+            .Setup(service => service.GetOpenPositionsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(hasPosition
+                ? [new Position { Symbol = "BTCUSDT", Side = PositionSide.Long, Quantity = 1m, StrategyId = strategy.Id }]
+                : []);
+
         var executor = new AISignalStrategyExecutor(
             Mock.Of<ITradingAgentFactory>(),
-            new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance).Object,
+            dataService.Object,
             strategyService,
             portfolioService.Object,
             new AnalysisReportCache(new MarketContext(settingService.Object, Mock.Of<IServiceProvider>())),
@@ -156,6 +241,8 @@ public sealed class AISignalHardBoundaryTest
             new ShadowTradingService(
                 new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance).Object,
                 NullLogger<ShadowTradingService>.Instance),
+            alertEvaluator ?? new SignalAlertEvaluator(
+                Mock.Of<IAlertCenterService>(), NullLogger<SignalAlertEvaluator>.Instance),
             NullLogger<AISignalStrategyExecutor>.Instance);
 
         return (executor, strategy);

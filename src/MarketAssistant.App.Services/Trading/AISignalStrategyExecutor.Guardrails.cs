@@ -14,12 +14,19 @@ public sealed partial class AISignalStrategyExecutor
     private async Task<AISignalExecutionResult> RecordShadowExitAsync(
         TradingStrategy strategy, decimal currentPrice, string reasoning, CancellationToken ct)
     {
-        var openEntries = await _shadowTradingService
-            .LoadOpenPositionsAsync(strategy.Id, strategy.Symbol, strategy.Side, ct)
+        // 影子账本按方向分列（AI 决策可开空，入场方向不再与 strategy.Side 一致）：
+        // 多头行卖出结算、空头行买入结算，两个方向都处理后才算清账
+        var longEntries = await _shadowTradingService
+            .LoadOpenPositionsAsync(strategy.Id, strategy.Symbol, OrderSide.Buy, ct)
             .ConfigureAwait(false);
-        var openQuantity = openEntries.Sum(row => row.Quantity - row.ClosedQuantity);
+        var shortEntries = await _shadowTradingService
+            .LoadOpenPositionsAsync(strategy.Id, strategy.Symbol, OrderSide.Sell, ct)
+            .ConfigureAwait(false);
 
-        if (openQuantity <= 0)
+        var longQuantity = longEntries.Sum(row => row.Quantity - row.ClosedQuantity);
+        var shortQuantity = shortEntries.Sum(row => row.Quantity - row.ClosedQuantity);
+
+        if (longQuantity <= 0 && shortQuantity <= 0)
         {
             _logger.LogInformation(
                 "影子硬性边界触发但无未平持仓，直接完结策略: {StrategyId} {Symbol}", strategy.Id, strategy.Symbol);
@@ -28,15 +35,25 @@ public sealed partial class AISignalStrategyExecutor
             return AISignalExecutionResult.NoTrade;
         }
 
-        // 多头入场 → 卖出离场；空头入场 → 买入离场
-        var exitSide = strategy.Side == OrderSide.Buy ? OrderSide.Sell : OrderSide.Buy;
-        var pnl = await _shadowTradingService
-            .RecordAsync(strategy.Id, strategy.Symbol, exitSide, openQuantity, currentPrice, ct: ct)
-            .ConfigureAwait(false);
+        if (longQuantity > 0)
+        {
+            var pnl = await _shadowTradingService
+                .RecordAsync(strategy.Id, strategy.Symbol, OrderSide.Sell, longQuantity, currentPrice, ct: ct)
+                .ConfigureAwait(false);
+            _logger.LogInformation(
+                "影子硬性边界平仓结算（多头）: {StrategyId} {Symbol} 数量 {Qty} 价 {Price} 盈亏 {Pnl} 原因 {Reason}",
+                strategy.Id, strategy.Symbol, longQuantity, currentPrice, pnl, reasoning);
+        }
 
-        _logger.LogInformation(
-            "影子硬性边界平仓结算: {StrategyId} {Symbol} 数量 {Qty} 价 {Price} 盈亏 {Pnl} 原因 {Reason}",
-            strategy.Id, strategy.Symbol, openQuantity, currentPrice, pnl, reasoning);
+        if (shortQuantity > 0)
+        {
+            var pnl = await _shadowTradingService
+                .RecordAsync(strategy.Id, strategy.Symbol, OrderSide.Buy, shortQuantity, currentPrice, ct: ct)
+                .ConfigureAwait(false);
+            _logger.LogInformation(
+                "影子硬性边界平仓结算（空头）: {StrategyId} {Symbol} 数量 {Qty} 价 {Price} 盈亏 {Pnl} 原因 {Reason}",
+                strategy.Id, strategy.Symbol, shortQuantity, currentPrice, pnl, reasoning);
+        }
 
         await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, ct)
             .ConfigureAwait(false);
@@ -101,6 +118,21 @@ public sealed partial class AISignalStrategyExecutor
     {
         var isLong = entrySide == OrderSide.Buy;
 
+        // 已有未平仓持仓时，本次成交属于加仓：护栏必须继续保护原有仓位，
+        // 不能被新价重算的价格覆盖（覆盖会让旧仓位的止损静默抬高/压低，等于撤掉保护）。
+        // 只有在该策略无持仓（首次建仓）时才写入新护栏价。
+        var ownRemaining = await GetOwnOpenQuantityAsync(strategy, ct).ConfigureAwait(false);
+        if (ownRemaining > 0)
+        {
+            _logger.LogInformation(
+                "策略已有未平仓持仓，保留既有护栏价并把数量对齐全仓: {StrategyId} {Symbol} 止损 {StopLoss} 止盈 {TakeProfit} 未平量 {Qty}",
+                strategy.Id, strategy.Symbol, strategy.StopLossPrice, strategy.TakeProfitPrice, ownRemaining);
+            await _dataService.UpdateStrategyGuardrailsAsync(
+                strategy.Id, strategy.StopLossPrice, strategy.TakeProfitPrice, ownRemaining, ct)
+                .ConfigureAwait(false);
+            return;
+        }
+
         if (aiParams.ParsedExitStyle == ExitStyle.TrailingStop)
         {
             var trailingPercent = aiParams.TrailingPercent > 0
@@ -152,7 +184,7 @@ public sealed partial class AISignalStrategyExecutor
         var stopLossFallback = isLong
             ? currentPrice * (1 - aiParams.StopLossPercent / 100m)
             : currentPrice * (1 + aiParams.StopLossPercent / 100m);
-        var stopLoss = Math.Round(stopLossValid ? aiStopLoss!.Value : stopLossFallback, 8);
+        var stopLoss = Math.Round(stopLossValid ? aiStopLoss.GetValueOrDefault() : stopLossFallback, 8);
 
         decimal? aiTakeProfit = decision.TakeProfitPrice;
         var takeProfitValid = aiTakeProfit.HasValue &&
@@ -160,7 +192,7 @@ public sealed partial class AISignalStrategyExecutor
         var takeProfitFallback = isLong
             ? currentPrice * (1 + aiParams.TakeProfitPercent / 100m)
             : currentPrice * (1 - aiParams.TakeProfitPercent / 100m);
-        var takeProfit = Math.Round(takeProfitValid ? aiTakeProfit!.Value : takeProfitFallback, 8);
+        var takeProfit = Math.Round(takeProfitValid ? aiTakeProfit.GetValueOrDefault() : takeProfitFallback, 8);
 
         if (executedQty > 0)
             strategy.Quantity = executedQty;
@@ -175,9 +207,26 @@ public sealed partial class AISignalStrategyExecutor
                 ? "AI 决策价" : "风险档案兜底价");
     }
 
-    private static bool TryHandleHardBoundary(
-        TradingStrategy strategy,
+    /// <summary>
+    /// 该策略自身的未平仓余量（按 StrategyId 精确归属，不按 symbol 模糊匹配——
+    /// 同标的可能有多条策略，别的策略的仓位不应影响本策略的护栏判定）。
+    /// </summary>
+    private async Task<decimal> GetOwnOpenQuantityAsync(TradingStrategy strategy, CancellationToken ct)
+    {
+        var openPositions = await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct).ConfigureAwait(false);
+        return openPositions
+            .Where(position => string.Equals(position.StrategyId, strategy.Id, StringComparison.OrdinalIgnoreCase))
+            .Sum(position => position.RemainingQuantity);
+    }
+
+    /// <summary>
+    /// 硬性边界（固定止损/止盈价）触发判定。
+    /// 方向由实际持仓方向（isLongPosition，自本地账本解析）决定，不用 strategy.Side：
+    /// AI 决策驱动开仓方向后，合约下可反向开空，Side 只是创建时的初始方向。
+    /// </summary>
+    private static bool TryHandleHardBoundary(TradingStrategy strategy,
         decimal currentPrice,
+        bool isLongPosition,
         out string reasoning)
     {
         reasoning = string.Empty;
@@ -187,7 +236,7 @@ public sealed partial class AISignalStrategyExecutor
 
         if (strategy.StopLossPrice.HasValue)
         {
-            var stopTriggered = strategy.Side == OrderSide.Buy
+            var stopTriggered = isLongPosition
                 ? currentPrice <= strategy.StopLossPrice.Value
                 : currentPrice >= strategy.StopLossPrice.Value;
             if (stopTriggered)
@@ -199,7 +248,7 @@ public sealed partial class AISignalStrategyExecutor
 
         if (strategy.TakeProfitPrice.HasValue)
         {
-            var tpTriggered = strategy.Side == OrderSide.Buy
+            var tpTriggered = isLongPosition
                 ? currentPrice >= strategy.TakeProfitPrice.Value
                 : currentPrice <= strategy.TakeProfitPrice.Value;
             if (tpTriggered)

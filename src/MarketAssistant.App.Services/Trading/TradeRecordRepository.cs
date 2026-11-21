@@ -255,7 +255,7 @@ internal sealed class TradeRecordRepository(
         existingRecord.ExecutedPrice = latestExecutedPrice;
         existingRecord.Commission += deltaCommission;
         if (!string.IsNullOrWhiteSpace(latestOrder.CommissionAsset))
-            existingRecord.CommissionAsset = latestOrder.CommissionAsset!;
+            existingRecord.CommissionAsset = latestOrder.CommissionAsset;
         existingRecord.Status = latestStatus;
         existingRecord.CompletedAt = completedAt;
         existingRecord.RealizedPnl += realizedPnl;

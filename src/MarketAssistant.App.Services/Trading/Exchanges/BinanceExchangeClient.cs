@@ -51,17 +51,45 @@ public class BinanceExchangeClient(BinanceAccountServiceBase accountService, str
         CancellationToken ct = default)
     {
         var response = await _accountService.PlaceOrderAsync(
-            symbol, side.ToString().ToUpperInvariant(), type.ToString().ToUpperInvariant(),
+            symbol, side.ToString().ToUpperInvariant(), ToExchangeOrderType(type),
             quantity, price, clientOrderId, _positionSide ?? positionSide, reduceOnly,
-            stopPrice, trailingDelta, ct);
+            stopPrice, trailingDelta, postOnly: type == OrderType.PostOnlyLimit, ct);
 
         return MapOrderResponse(response);
     }
+
+    /// <summary>
+    /// 枚举名 → 币安订单类型字符串。
+    /// 必须显式映射而不是 <c>type.ToString().ToUpperInvariant()</c>：
+    /// 后者会把 <see cref="OrderType.StopMarket"/> 变成 "STOPMARKET"（缺下划线），
+    /// 被交易所按参数错误拒绝，条件单因此永远挂不上、保护从未真正上链。
+    /// </summary>
+    internal static string ToExchangeOrderType(OrderType type) => type switch
+    {
+        OrderType.Market => "MARKET",
+        OrderType.Limit => "LIMIT",
+        OrderType.StopMarket => "STOP_MARKET",
+        OrderType.TakeProfitMarket => "TAKE_PROFIT_MARKET",
+        OrderType.TrailingStopMarket => "TRAILING_STOP_MARKET",
+        // 现货条件单：触发即市价的 STOP_LOSS / TAKE_PROFIT（与合约 STOP_MARKET 语义一致）
+        OrderType.StopLoss => "STOP_LOSS",
+        OrderType.TakeProfit => "TAKE_PROFIT",
+        // post-only 类型串仍是 LIMIT：合约由账户服务加 timeInForce=GTX，现货由账户服务改写为 LIMIT_MAKER
+        OrderType.PostOnlyLimit => "LIMIT",
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "未知的订单类型")
+    };
 
     public async Task<ExchangeOrderResult> GetOrderAsync(
         string symbol, string orderId, CancellationToken ct = default)
     {
         var response = await _accountService.GetOrderAsync(symbol, long.Parse(orderId), ct);
+        return MapOrderResponse(response);
+    }
+
+    public async Task<ExchangeOrderResult> GetOrderByClientOrderIdAsync(
+        string symbol, string clientOrderId, CancellationToken ct = default)
+    {
+        var response = await _accountService.GetOrderByClientOrderIdAsync(symbol, clientOrderId, ct);
         return MapOrderResponse(response);
     }
 
@@ -77,6 +105,36 @@ public class BinanceExchangeClient(BinanceAccountServiceBase accountService, str
     {
         var orders = await _accountService.GetOpenOrdersAsync(symbol, ct);
         return [.. orders.Select(MapOrderResponse)];
+    }
+
+    /// <summary>
+    /// 现货保护性 OCO：转交账户服务（仅现货实现，合约客户端调用会抛 NotSupportedException，
+    /// 调用方只在 <see cref="IsFutures"/> 为 false 时走此路径）。返回顺序：止损腿、止盈腿。
+    /// </summary>
+    public async Task<IReadOnlyList<ExchangeOrderResult>> PlaceSpotOcoAsync(
+        string symbol, OrderSide side, decimal quantity,
+        string? stopClientOrderId, decimal stopPrice,
+        string? takeProfitClientOrderId, decimal takeProfitPrice,
+        CancellationToken ct = default)
+    {
+        var ocoResponse = await _accountService.PlaceSpotOcoAsync(
+            symbol, side.ToString().ToUpperInvariant(), quantity,
+            stopClientOrderId, stopPrice,
+            takeProfitClientOrderId, takeProfitPrice, ct);
+
+        // OCO 成员单的 clientOrderId 由交易所按请求回显，按 MC 前缀腿别识别归属
+        var stopOrder = ocoResponse.Orders.FirstOrDefault(o =>
+            string.Equals(o.ClientOrderId, stopClientOrderId, StringComparison.Ordinal))
+            ?? ocoResponse.Orders.FirstOrDefault(o => o.Type == "STOP_LOSS");
+        var takeProfitOrder = ocoResponse.Orders.FirstOrDefault(o =>
+            string.Equals(o.ClientOrderId, takeProfitClientOrderId, StringComparison.Ordinal))
+            ?? ocoResponse.Orders.FirstOrDefault(o => o.Type == "TAKE_PROFIT");
+
+        if (stopOrder == null || takeProfitOrder == null)
+            throw new InvalidOperationException(
+                $"OCO 响应缺少腿订单: orderListId={ocoResponse.OrderListId}，收到 {ocoResponse.Orders.Count} 腿");
+
+        return [MapOrderResponse(stopOrder), MapOrderResponse(takeProfitOrder)];
     }
 
     /// <summary>

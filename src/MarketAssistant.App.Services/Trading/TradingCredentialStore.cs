@@ -39,7 +39,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         IUserSettingService userSettingService,
         ILogger<TradingCredentialStore> logger)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _logger = logger;
         _cache = Load();
 
         // 首次启动时从 UserSetting 迁移已有密钥
@@ -197,6 +197,7 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         aes.Decrypt(nonce, ciphertext, tag, plaintextBytes);
 
         var json = Encoding.UTF8.GetString(plaintextBytes);
+        // 凭证文件合法取值包含 JSON null（首次使用/未配置），视同空配置；解密失败已在此前抛出
         var entries = JsonSerializer.Deserialize<Dictionary<TradingMode, CredentialEntry>>(json)
                ?? [];
         return new ConcurrentDictionary<TradingMode, CredentialEntry>(entries);

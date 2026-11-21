@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
 namespace MarketAssistant.Services.Trading;
@@ -44,7 +45,7 @@ public static class AISignalDecisionParser
     /// <summary>
     /// 尝试从响应文本解析决策。返回 false 表示文本中不存在合法 JSON 决策（视为 HOLD 处理）。
     /// </summary>
-    public static bool TryParse(string? responseText, out AISignalDecision? decision)
+    public static bool TryParse(string? responseText, [NotNullWhen(true)] out AISignalDecision? decision)
     {
         decision = null;
 

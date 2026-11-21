@@ -120,13 +120,23 @@ public sealed class OrderStateSyncService(
                         if (previousStatus != TradeRecordStatus.Filled && record.Status == TradeRecordStatus.Filled)
                             TradeRecordFilled?.Invoke(record);
 
-                        // 首次进入部分成交：提示用户剩余数量仍在挂单中。
-                        // 不自动撤单——挂单继续工作才能等到剩余成交；但用户必须知道
-                        // "策略已触发"并不等于"仓位已完全退出"
+                        // 首次进入部分成交：提示用户剩余数量仍在挂单中，并在超时后撤掉余量。
+                        // 撤单是必要的：策略已经认为"已触发"，若余量长期挂着，
+                        // 仓位会在策略不知情的情况下继续变化（后续止损数量随之失真）。
                         if (previousStatus != TradeRecordStatus.PartiallyFilled
                             && record.Status == TradeRecordStatus.PartiallyFilled)
                         {
                             await NotifyPartialFillAsync(record, ct).ConfigureAwait(false);
+                        }
+
+                        // 部分成交且已超过限价单超时时间：撤掉余量，把实际成交量作为最终结果。
+                        // 仅处理策略限价/挂单单：手动单与紧急平仓单由用户自己决策
+                        //（与 PendingOrderTimeoutService 的口径一致），
+                        // 条件单腿不经过此路径撤单（腿的保护语义必须常驻）
+                        if (record.Status == TradeRecordStatus.PartiallyFilled
+                            && PendingOrderTimeoutService.IsStrategyLimitOrder(record))
+                        {
+                            await CancelRemainingIfExpiredAsync(record, ct).ConfigureAwait(false);
                         }
                     }
                     catch (Exception ex) when (ex is FriendlyException or HttpRequestException)
@@ -176,6 +186,65 @@ public sealed class OrderStateSyncService(
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "上报部分成交告警失败: {OrderId}", record.ExchangeOrderId);
+        }
+    }
+
+    /// <summary>
+    /// 部分成交超时撤余量。
+    /// 判定依据：记录创建已超过 <see cref="RiskConfig.LimitOrderTimeoutSeconds"/>（0 表示不自动撤），
+    /// 且仍处于部分成交状态。调用方已按 <see cref="PendingOrderTimeoutService.IsStrategyLimitOrder"/>
+    /// 过滤（仅策略限价/挂单单）。撤单成功与否都不阻断同步主链——撤单失败下轮重试。
+    /// 撤单后不修改记录状态（等待交易所最终状态回填 CANCELED 或后续成交），
+    /// 只发一条告警让用户知道"本次实际只成交了这么多"。
+    /// </summary>
+    private async Task CancelRemainingIfExpiredAsync(TradeRecord record, CancellationToken ct)
+    {
+        if (record.ExchangeOrderId <= 0)
+            return;
+
+        RiskConfig riskConfig;
+        try
+        {
+            riskConfig = await _dataService.LoadRiskConfigAsync(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "读取风控配置失败，跳过部分成交撤余量: {OrderId}", record.ExchangeOrderId);
+            return;
+        }
+
+        if (riskConfig.LimitOrderTimeoutSeconds <= 0)
+            return;
+
+        var age = DateTime.UtcNow - record.CreatedAt;
+        if (age < TimeSpan.FromSeconds(riskConfig.LimitOrderTimeoutSeconds))
+            return;
+
+        try
+        {
+            await _exchangeClient.CancelOrderAsync(record.Symbol, record.ExchangeOrderId.ToString(), ct)
+                .ConfigureAwait(false);
+
+            var remaining = record.RequestedQty - record.ExecutedQty;
+            _logger.LogWarning(
+                "部分成交超时已撤余量: {Symbol} {OrderId} 已成交 {ExecutedQty} / 请求 {RequestedQty}，撤掉剩余 {Remaining}",
+                record.Symbol, record.ExchangeOrderId, record.ExecutedQty, record.RequestedQty, remaining);
+
+            await _alertCenterService.RaiseAlertAsync(new AlertEvent
+            {
+                MarketType = MarketType.Crypto,
+                Symbol = record.Symbol,
+                Level = AlertLevel.Info,
+                Source = AlertSource.System,
+                Title = "部分成交超时已撤余量",
+                Content = $"{record.Symbol} 订单超时未完全成交，已成交 {record.ExecutedQty}，"
+                          + $"剩余 {remaining} 已撤销"
+            }, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "部分成交撤余量失败，下轮重试: {Symbol} {OrderId}", record.Symbol, record.ExchangeOrderId);
         }
     }
 

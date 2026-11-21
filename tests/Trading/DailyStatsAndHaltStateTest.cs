@@ -170,7 +170,7 @@ public sealed class DailyStatsAndHaltStateTest
             exchangeClient.Object,
             haltState,
             apiHealth,
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null, null);
 
         // 1. 连续亏损熔断
         dataService
@@ -241,6 +241,11 @@ public sealed class DailyStatsAndHaltStateTest
     {
         var exchangeClient = new Mock<IExchangeClient>();
         exchangeClient.SetupGet(c => c.IsFutures).Returns(false);
+        exchangeClient.Setup(c => c.GetAccountInfoAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ExchangeAccountInfo
+            {
+                Balances = [new ExchangeBalance { Asset = "BTC", Free = 2m, Locked = 0m }]
+            });
 
         var portfolioService = new Mock<CryptoPortfolioService>(null!, null!, null!, null!, null!, NullLogger<CryptoPortfolioService>.Instance);
         portfolioService
@@ -289,7 +294,7 @@ public sealed class DailyStatsAndHaltStateTest
             exchangeClient.Object,
             haltState,
             new ApiHealthMonitor(),
-            NullLogger<RiskManager>.Instance);
+            NullLogger<RiskManager>.Instance, null, null);
 
         // 1. 开仓单被熔断拒绝
         var openResult = await riskManager.ValidateOrderAsync("BTCUSDT", OrderSide.Buy, 1m, 100m, OrderType.Limit);

@@ -25,8 +25,7 @@ public sealed class StrategyPerformanceServiceTest
             dataService.Object, NullLogger<ShadowTradingService>.Instance);
 
 
-        return new StrategyPerformanceService(
-            dataService.Object, shadowService, NullLogger<StrategyPerformanceService>.Instance);
+        return new StrategyPerformanceService(dataService.Object, shadowService);
     }
 
     private static TradeRecord CreateClose(DateTime createdAt, decimal pnl) => new()
@@ -103,5 +102,33 @@ public sealed class StrategyPerformanceServiceTest
         var service = CreateService([CreateClose(DateTime.UtcNow, 0m)]);
 
         Assert.IsEmpty(await service.GetAllAsync());
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetShadowAsync_ReadFails_ShouldPropagate()
+    {
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        var shadowService = new Mock<ShadowTradingService>(null!, NullLogger<ShadowTradingService>.Instance);
+        shadowService.Setup(s => s.LoadAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("账本损坏"));
+        var service = new StrategyPerformanceService(dataService.Object, shadowService.Object);
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.GetShadowAsync());
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetShadowAsync_Cancelled_ShouldPropagateCancellation()
+    {
+        var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        var shadowService = new Mock<ShadowTradingService>(null!, NullLogger<ShadowTradingService>.Instance);
+        shadowService.Setup(s => s.LoadAsync(
+                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
+        var service = new StrategyPerformanceService(dataService.Object, shadowService.Object);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => service.GetShadowAsync());
     }
 }

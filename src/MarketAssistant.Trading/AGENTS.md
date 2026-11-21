@@ -13,7 +13,7 @@ MarketAssistant.Trading/
 ├── TradeRecord.cs            ← 交易执行记录（持久化模型）
 ├── RiskModels.cs             ← RiskConfig / RiskCheckResult / DailyStats
 ├── StrategyParams.cs         ← GridTradingParams / DCAParams 策略参数
-├── TradingViewModels.cs      ← Agent 视图 DTO + Position + TradingContext
+├── TradingViewModels.cs      ← Agent 视图 DTO + Position
 ├── Abstractions/
 │   └── IExchangeClient.cs   ← 交易所客户端契约 + 相关 DTO
 └── MarketAssistant.Trading.csproj

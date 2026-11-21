@@ -47,6 +47,22 @@ public class AISignalParams
     /// <summary>追踪止损回调百分比（%），仅 TrailingStop 出场方式生效。</summary>
     public decimal TrailingPercent { get; set; } = 5;
 
+    /// <summary>
+    /// 进场下单方式：Market（市价，最快）/ MakerFirst（先挂 post-only 限价单）。
+    /// maker 费率显著低于 taker，是薄利策略唯一确定的正期望来源；但会牺牲"立即成交"。
+    /// post-only 被交易所拒单（盘口已穿越）时立即回退市价；挂上但未成交的余量
+    /// 由限价单超时撤单管理，不自动追单。
+    /// </summary>
+    public string EntryOrderStyle { get; set; } = "Market";
+
+    /// <summary>
+    /// maker 优先模式下，post-only 下单网络失败后回退市价前的等待秒数
+    ///（给短暂抖动留恢复窗口；拒单类失败不等待，立即回退）。
+    /// </summary>
+    public int MakerTimeoutSeconds { get; set; } = 10;
+
+    public bool IsMakerFirst => EntryOrderStyle.Equals("MakerFirst", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>影子模式：AI 决策仅记录日志与统计，不实际下单。</summary>
     public bool ShadowMode { get; set; }
 
@@ -60,19 +76,31 @@ public class AISignalParams
         PropertyNameCaseInsensitive = true
     };
 
-    /// <summary>从 CustomParams JSON 解析；为空或格式错误时返回 null（引擎按默认间隔处理）。</summary>
+    /// <summary>从 CustomParams JSON 解析；为空返回 null，非空损坏内容抛出 <see cref="JsonException"/>。</summary>
     public static AISignalParams? FromJson(string? customParams)
     {
         if (string.IsNullOrEmpty(customParams))
             return null;
 
+        return JsonSerializer.Deserialize<AISignalParams>(customParams, JsonOptions)
+               ?? throw new JsonException("AI 策略参数不能为 JSON null");
+    }
+
+    /// <summary>
+    /// 旁路链路安全解析：空/缺失返回 true 且参数为 null；JSON 损坏返回 false。
+    /// 执行链路必须继续使用 <see cref="FromJson"/>，确保损坏配置不会被实盘默认参数掩盖。
+    /// </summary>
+    public static bool TryFromJson(string? customParams, out AISignalParams? parameters)
+    {
         try
         {
-            return JsonSerializer.Deserialize<AISignalParams>(customParams, JsonOptions);
+            parameters = FromJson(customParams);
+            return true;
         }
         catch (JsonException)
         {
-            return null;
+            parameters = null;
+            return false;
         }
     }
 }

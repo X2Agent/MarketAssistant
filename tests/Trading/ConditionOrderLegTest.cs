@@ -19,7 +19,8 @@ public sealed class ConditionOrderLegTest
         Quantity = 0.5m,
         ExecutionCount = 1,
         StopLossPrice = 90m,
-        TakeProfitPrice = 120m
+        TakeProfitPrice = 120m,
+        CustomParams = """{"shadowMode":false}"""
     };
 
     [TestMethod]
@@ -168,5 +169,45 @@ public sealed class ConditionOrderLegTest
         Assert.IsFalse(ExchangeConditionOrderService.IsProtectiveExitStrategy(strategy),
             "影子策略不得在交易所挂真实条件单");
         Assert.IsEmpty(ExchangeConditionOrderService.ResolveLegs(strategy));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void AiSignalStrategy_MissingParameters_ShouldNotPlaceExchangeConditionOrders()
+    {
+        var strategy = CreateAiSignalStrategy();
+        strategy.CustomParams = null;
+
+        Assert.IsFalse(ExchangeConditionOrderService.IsProtectiveExitStrategy(strategy));
+        Assert.IsEmpty(ExchangeConditionOrderService.ResolveLegs(strategy));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void AiSignalStrategy_CorruptedParameters_ShouldPreserveProtection_WithoutPlacingNewLegs()
+    {
+        var strategy = CreateAiSignalStrategy();
+        strategy.CustomParams = "{broken";
+
+        Assert.IsTrue(ExchangeConditionOrderService.IsProtectiveExitStrategy(strategy),
+            "参数损坏时无法确认影子状态，必须保守保留既有交易所保护单");
+        Assert.IsEmpty(ExchangeConditionOrderService.ResolveLegs(strategy),
+            "参数未知时不得补挂新的保护腿");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void TrailingStop_CorruptedParameters_ShouldUseBalancedFallback_WithoutThrowing()
+    {
+        var strategy = CreateAiSignalStrategy();
+        strategy.Type = StrategyType.TrailingStop;
+        strategy.CustomParams = "{broken";
+
+        var basisPoints = TradeExecutor.ResolveTrailingDeltaBasisPoints(strategy);
+
+        Assert.AreEqual(
+            decimal.ToInt32(ScenarioPresets.GetTrailingPercent(RiskProfile.Balanced) * 100),
+            basisPoints,
+            "损坏参数应按稳健档案兜底，而不是中断条件单指纹推导");
     }
 }

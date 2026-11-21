@@ -25,15 +25,8 @@ internal sealed class RiskConfigRepository(
         var result = await cmd.ExecuteScalarAsync(ct);
         if (result is not string json || string.IsNullOrEmpty(json))
             return new RiskConfig();
-        try
-        {
-            return JsonSerializer.Deserialize<RiskConfig>(json) ?? new RiskConfig();
-        }
-        catch (JsonException ex)
-        {
-            Logger.LogWarning(ex, "风控配置反序列化失败，将使用默认配置");
-            return new RiskConfig();
-        }
+        return JsonSerializer.Deserialize<RiskConfig>(json)
+               ?? throw new JsonException("风控配置不能为 JSON null");
     }
 
     public async Task SaveRiskConfigAsync(RiskConfig config, CancellationToken ct = default)

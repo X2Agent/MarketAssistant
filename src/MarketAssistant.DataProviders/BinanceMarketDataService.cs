@@ -15,9 +15,9 @@ public sealed class BinanceMarketDataService(
     ILogger<BinanceMarketDataService> logger,
     IMemoryCache memoryCache)
 {
-    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
-    private readonly ILogger<BinanceMarketDataService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    private readonly IMemoryCache _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<BinanceMarketDataService> _logger = logger;
+    private readonly IMemoryCache _memoryCache = memoryCache;
 
     /// <summary>
     /// 交易所信息缓存键
@@ -67,6 +67,19 @@ public sealed class BinanceMarketDataService(
             _logger.LogError("币安服务在当前地区受限（状态码 {StatusCode}）: {Content}",
                 (int)response.StatusCode, content);
             throw new BinanceRegionUnavailableException(RegionUnavailableMessage);
+        }
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            try
+            {
+                if (JsonNode.Parse(content)?["code"]?.GetValue<int>() == -1121)
+                    throw new BinanceInvalidSymbolException();
+            }
+            catch (JsonException)
+            {
+                // 非 JSON 错误响应仍由下面的状态码检查作为普通 HTTP 故障抛出。
+            }
         }
 
         response.EnsureSuccessStatusCode();

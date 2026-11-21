@@ -52,6 +52,12 @@ public sealed class RoutingExchangeClient(
         CancellationToken ct = default)
         => TrackAsync(client => client.GetOrderAsync(instrumentSymbol, orderId, ct), ct);
 
+    public Task<ExchangeOrderResult> GetOrderByClientOrderIdAsync(
+        string instrumentSymbol,
+        string clientOrderId,
+        CancellationToken ct = default)
+        => TrackAsync(client => client.GetOrderByClientOrderIdAsync(instrumentSymbol, clientOrderId, ct), ct);
+
     public Task<ExchangeOrderResult> CancelOrderAsync(
         string instrumentSymbol,
         string orderId,
@@ -62,6 +68,19 @@ public sealed class RoutingExchangeClient(
         string? instrumentSymbol = null,
         CancellationToken ct = default)
         => TrackAsync(client => client.GetOpenOrdersAsync(instrumentSymbol, ct), ct);
+
+    public Task<IReadOnlyList<ExchangeOrderResult>> PlaceSpotOcoAsync(
+        string instrumentSymbol,
+        OrderSide side,
+        decimal quantity,
+        string? stopClientOrderId,
+        decimal stopPrice,
+        string? takeProfitClientOrderId,
+        decimal takeProfitPrice,
+        CancellationToken ct = default)
+        => TrackAsync(client => client.PlaceSpotOcoAsync(
+            instrumentSymbol, side, quantity, stopClientOrderId, stopPrice,
+            takeProfitClientOrderId, takeProfitPrice, ct), ct);
 
     public Task<List<ExchangePosition>> GetPositionsAsync(
         string? instrumentSymbol = null,

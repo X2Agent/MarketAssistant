@@ -79,7 +79,11 @@ public class CryptoPortfolioService(
                 Quantity = quantity,
                 EntryPrice = exchangePosition.EntryPrice,
                 CurrentPrice = exchangePosition.MarkPrice > 0 ? exchangePosition.MarkPrice : exchangePosition.EntryPrice,
-                IsShort = exchangePosition.PositionAmt < 0
+                IsShort = exchangePosition.PositionAmt < 0,
+                MarkPrice = exchangePosition.MarkPrice,
+                // 0 表示交易所未返回（全仓低风险等），展示层据此隐藏强平价
+                LiquidationPrice = exchangePosition.LiquidationPrice,
+                Leverage = exchangePosition.Leverage
             };
 
             if (position.EntryPrice > 0 && position.CurrentPrice > 0)
@@ -158,9 +162,9 @@ public class CryptoPortfolioService(
         {
             return await _marketDataService.Get24hrTickerAsync(symbol, ct).ConfigureAwait(false);
         }
-        catch (HttpRequestException)
+        catch (BinanceInvalidSymbolException)
         {
-            _logger.LogDebug("获取持仓价格失败，跳过: {Symbol}", symbol);
+            _logger.LogDebug("资产无对应 USDT 交易对: {Symbol}", symbol);
             return null;
         }
     }
@@ -177,6 +181,51 @@ public class CryptoPortfolioService(
         CancellationToken ct)
     {
         var summary = new AccountBalanceSummary();
+
+        // 估值行情一次批量拿回：本方法走 60s 风险巡检与 2min 快照刷新两条后台路径，
+        // 逐余额单独请求是 N+1 次串行 HTTP；批量端点（type=MINI）一次往返覆盖全部计价对
+        // 与持仓视图同源：统一走 CryptoSymbolConverter，包装币（WBTC 等）可正确拼出计价对
+        var quoteSymbols = new List<string>();
+        foreach (var balance in accountInfo.Balances)
+        {
+            if (balance.Free + balance.Locked <= 0)
+                continue;
+            if (!balance.Asset.Equals("USDT", StringComparison.OrdinalIgnoreCase))
+                quoteSymbols.Add(CryptoSymbolConverter.ToBinanceFormat(balance.Asset));
+        }
+
+        var tickersBySymbol = new Dictionary<string, Binance24hrTicker>(StringComparer.OrdinalIgnoreCase);
+        var unsupportedSymbols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var symbolGroup in quoteSymbols
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .Chunk(100))
+        {
+            try
+            {
+                var tickers = await _marketDataService.Get24hrTickersAsync([.. symbolGroup], ct).ConfigureAwait(false);
+                foreach (var ticker in tickers)
+                    tickersBySymbol[ticker.Symbol] = ticker;
+            }
+            catch (BinanceInvalidSymbolException)
+            {
+                // 批量端点会因一个无效交易对拒绝整组；仅在明确 -1121 时逐项确认，
+                // 其他网络、超时和解析异常直接传播，避免生成零估值的成功快照。
+                foreach (var symbol in symbolGroup)
+                {
+                    var ticker = await TryGetTickerAsync(symbol, ct).ConfigureAwait(false);
+                    if (ticker == null)
+                        unsupportedSymbols.Add(symbol);
+                    else
+                        tickersBySymbol[ticker.Symbol] = ticker;
+                }
+            }
+        }
+
+        foreach (var symbol in quoteSymbols)
+        {
+            if (!tickersBySymbol.ContainsKey(symbol) && !unsupportedSymbols.Contains(symbol))
+                throw new InvalidOperationException($"币安行情响应缺少 {symbol}，账户估值结果不完整");
+        }
 
         foreach (var balance in accountInfo.Balances)
         {
@@ -197,22 +246,11 @@ public class CryptoPortfolioService(
             {
                 assetBalance.ValueUSDT = totalAmount;
             }
-            else
+            else if (tickersBySymbol.TryGetValue(
+                         CryptoSymbolConverter.ToBinanceFormat(balance.Asset), out var ticker))
             {
-                try
-                {
-                    // 与持仓视图同源：统一走 CryptoSymbolConverter，包装币（WBTC 等）可正确拼出计价对
-                    var symbol = CryptoSymbolConverter.ToBinanceFormat(balance.Asset);
-                    var ticker = await _marketDataService.Get24hrTickerAsync(symbol, ct);
-                    if (ticker != null)
-                    {
-                        assetBalance.ValueUSDT = totalAmount * ticker.LastPrice;
-                    }
-                }
-                catch (HttpRequestException)
-                {
-                    _logger.LogDebug("跳过无 USDT 标的行情的资产估值: {Asset}", balance.Asset);
-                }
+                // 批量结果不含该计价对 = 无 USDT 交易对，与原先单次请求失败跳过同义
+                assetBalance.ValueUSDT = totalAmount * ticker.LastPrice;
             }
 
             summary.TotalValueUSDT += assetBalance.ValueUSDT;

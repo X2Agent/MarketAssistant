@@ -34,6 +34,14 @@ public sealed class SignalAlertEvaluator(
             $"{strategy.Type} 策略（{strategy.Symbol}）因交易被拒绝已暂停：{reason}。请检查风控配置或在策略页重新启用");
     }
 
+    /// <summary>AI 策略参数缺失或损坏，已暂停等待用户修复配置：Warning 留痕。</summary>
+    public Task NotifyStrategyConfigurationPausedSafeAsync(TradingStrategy strategy, string reason) =>
+        RaiseSafeAsync(
+            strategy,
+            AlertLevel.Warning,
+            "AI 策略配置无效已暂停",
+            $"{strategy.Symbol} 的 AI 策略参数无效，已暂停以避免误下单：{reason}。请修复策略参数后重新启用");
+
     /// <summary>策略完成全部计划执行次数并退出监控：Info 留痕。</summary>
     public Task NotifyStrategyCompletedSafeAsync(TradingStrategy strategy) =>
         RaiseSafeAsync(

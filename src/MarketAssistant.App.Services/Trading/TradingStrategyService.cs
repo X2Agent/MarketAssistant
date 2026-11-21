@@ -22,7 +22,8 @@ public class TradingStrategyService(TradingDataService dataService)
         CancellationToken ct = default)
         => _dataService.GetStrategiesByStatusAsync(status, ct);
 
-    public async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
+    /// <remarks>virtual 供策略创建表单单元测试替换。</remarks>
+    public virtual async Task SaveStrategyAsync(TradingStrategy strategy, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(strategy.Symbol))
         {
