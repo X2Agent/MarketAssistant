@@ -132,6 +132,30 @@ public sealed class McpServiceRuntimeTest : IDisposable
             () => service.GetAIToolsAsync([config]));
     }
 
+    // 同名工具会被模型与 FunctionInvokingChatClient 按名字路由到先出现的那个，调用落到错误的服务器
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetAITools_SameToolNameAcrossServers_ShouldKeepFirstServerAndSkipDuplicate()
+    {
+        var factory = new PerServerToolsSessionFactory(new Dictionary<string, string[]>
+        {
+            ["server-a"] = ["search", "only-a"],
+            ["server-b"] = ["search", "only-b"]
+        });
+        await using var service = CreateService(factory);
+        var serverA = CreateConfig();
+        serverA.Name = "server-a";
+        var serverB = CreateConfig();
+        serverB.Name = "server-b";
+
+        var tools = await service.GetAIToolsAsync([serverA, serverB]);
+
+        Assert.AreSequenceEqual(["search", "only-a", "only-b"], tools.Select(tool => tool.Name).ToArray());
+        var search = (AIFunction)tools.Single(tool => tool.Name == "search");
+        var owner = await search.InvokeAsync();
+        Assert.Contains("server-a", owner?.ToString() ?? string.Empty);
+    }
+
     private McpService CreateService(IMcpClientSessionFactory factory)
     {
         return new McpService(
@@ -160,6 +184,37 @@ public sealed class McpServiceRuntimeTest : IDisposable
                 ["REGION"] = "cn"
             }
         };
+    }
+
+    /// <summary>按服务器名返回各自工具集的工厂；每个工具被调用时返回所属服务器名，便于断言归属。</summary>
+    private sealed class PerServerToolsSessionFactory(Dictionary<string, string[]> toolNamesByServer)
+        : IMcpClientSessionFactory
+    {
+        public Task<IMcpClientSession> CreateAsync(
+            MCPServerConfig config,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<AITool> tools =
+            [
+                .. toolNamesByServer[config.Name].Select(name => AIFunctionFactory.Create(
+                    (Func<string>)(() => config.Name),
+                    new AIFunctionFactoryOptions { Name = name }))
+            ];
+            return Task.FromResult<IMcpClientSession>(new PerServerToolsSession(tools));
+        }
+    }
+
+    private sealed class PerServerToolsSession(IReadOnlyList<AITool> tools) : IMcpClientSession
+    {
+        public Task<IReadOnlyList<AITool>> ListToolsAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(tools);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class FakeMcpClientSessionFactory(bool failFirstList = false)

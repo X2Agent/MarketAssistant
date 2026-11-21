@@ -202,4 +202,16 @@ public class FavoriteServiceTest
         Assert.IsFalse(await service.IsFavoriteAsync("", "SH"));
         Assert.IsFalse(await service.IsFavoriteAsync("   ", "SH"));
     }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetFavoritesCodes_WhenCancelled_ShouldThrowInsteadOfReturningEmpty()
+    {
+        var service = _serviceProvider!.GetRequiredKeyedService<IFavoriteService>(MarketType.AShare);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.GetFavoritesCodesAsync(cts.Token));
+    }
 }

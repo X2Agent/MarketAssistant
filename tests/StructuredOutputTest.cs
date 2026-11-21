@@ -200,13 +200,14 @@ public sealed class StructuredOutputTest
             .Select(descriptor => descriptor.ImplementationType)
             .ToHashSet();
 
-        Assert.HasCount(6, parserRegistrations);
+        Assert.HasCount(7, parserRegistrations);
         Assert.Contains(typeof(CoordinatorCardParser), parserRegistrations);
         Assert.Contains(typeof(FinancialCardParser), parserRegistrations);
         Assert.Contains(typeof(FundamentalCardParser), parserRegistrations);
         Assert.Contains(typeof(SentimentCardParser), parserRegistrations);
         Assert.Contains(typeof(NewsCardParser), parserRegistrations);
         Assert.Contains(typeof(TechnicalCardParser), parserRegistrations);
+        Assert.Contains(typeof(CryptoMetricsCardParser), parserRegistrations);
 
         // 转换器消费整条解析器责任链，必须与解析器同容器注册
         Assert.Contains(descriptor => descriptor.ServiceType == typeof(AdaptiveCardConverter), services);

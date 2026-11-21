@@ -145,24 +145,19 @@ public class ChatClientFactoryTest
 
     [TestMethod]
     [TestCategory("Unit")]
-    public void CreateRuntime_MoreThanMaxCachedConfigurations_ShouldRejectWithoutEvictingLiveClients()
+    public void CreateRuntime_ManyDistinctConfigurations_ShouldNotRejectOrEvictLiveClients()
     {
         var fixture = CreateFixture();
         using var factory = fixture.Factory;
+        const int configurationCount = 64;
 
-        for (var index = 0; index < TestableChatClientFactory.MaxCachedRuntimeCount; index++)
+        for (var index = 0; index < configurationCount; index++)
         {
             fixture.Setting.ProviderModelIds["DeepSeek"] = $"model-{index}";
             factory.CreateRuntime();
         }
 
-        fixture.Setting.ProviderModelIds["DeepSeek"] = "model-overflow";
-        var exception = Assert.ThrowsExactly<FriendlyException>(() => factory.CreateRuntime());
-
-        Assert.Contains(
-            TestableChatClientFactory.MaxCachedRuntimeCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            exception.Message);
-        Assert.HasCount(TestableChatClientFactory.MaxCachedRuntimeCount, fixture.Factory.CreatedClients);
+        Assert.HasCount(configurationCount, fixture.Factory.CreatedClients);
         foreach (var client in fixture.Factory.CreatedClients)
             client.Verify(x => x.Dispose(), Times.Never);
     }
@@ -333,8 +328,6 @@ public class ChatClientFactoryTest
         IHttpClientFactory httpClientFactory)
         : ChatClientFactory(userSettingService, httpClientFactory)
     {
-        public static int MaxCachedRuntimeCount => MaxCachedRuntimes;
-
         public List<ClientCreationRequest> CreatedRequests { get; } = [];
         public List<Mock<IChatClient>> CreatedClients { get; } = [];
 

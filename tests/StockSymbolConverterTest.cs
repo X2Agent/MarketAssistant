@@ -215,4 +215,47 @@ public class StockSymbolConverterTest
             CultureInfo.CurrentCulture = original;
         }
     }
+
+    /// <summary>
+    /// 基金/ETF 代码段判定是「跳过智兔直连新浪」的依据：判错会让股票被误走兜底（丢掉智兔的成交额/昨收），
+    /// 或让基金继续白撞一次必然失败的请求。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("511010", true, "沪市 5 开头 ETF")]
+    [DataRow("SH511010", true, "带前缀同样识别")]
+    [DataRow("sh511010", true, "小写前缀同样识别")]
+    [DataRow("510300", true, "沪深300ETF")]
+    [DataRow("588000", true, "科创板 ETF")]
+    [DataRow("159915", true, "深市 15 开头 ETF")]
+    [DataRow("160119", true, "深市 16 开头 LOF")]
+    [DataRow("600519", false, "沪市主板股票")]
+    [DataRow("000001", false, "深市主板股票")]
+    [DataRow("300750", false, "创业板股票")]
+    [DataRow("688981", false, "科创板股票")]
+    [DataRow("430047", false, "北交所股票")]
+    [DataRow("113050", false, "可转债不是基金，仍走正常路径")]
+    [DataRow("", false, "空代码")]
+    [DataRow("51101", false, "位数不足不做猜测")]
+    public void IsFundOrEtf_ShouldMatchFundCodeSegmentsOnly(string input, bool expected, string reason)
+    {
+        Assert.AreEqual(expected, StockSymbolConverter.IsFundOrEtf(input), reason);
+    }
+
+    /// <summary>
+    /// 纯数字代码归一化是东财/智兔等 API 的入口约定：无数字输入返回空串
+    /// （由调用方按非法代码处理），不得抛异常。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("600519", "600519")]
+    [DataRow("sh600519", "600519")]
+    [DataRow("600519.SH", "600519")]
+    [DataRow("SH-600 519", "600519")]
+    [DataRow("贵州茅台", "")]
+    [DataRow("", "")]
+    public void ToDigitsOnly_ShouldExtractDigitsAndReturnEmptyWhenNone(string input, string expected)
+    {
+        Assert.AreEqual(expected, StockSymbolConverter.ToDigitsOnly(input));
+    }
 }

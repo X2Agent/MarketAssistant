@@ -1,10 +1,16 @@
+using MarketAssistant.Agents.Tools.AShare;
 using MarketAssistant.DataProviders;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Applications.Market;
+using MarketAssistant.Applications.Settings;
+using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using System.Web;
 
 namespace TestMarketAssistant.DataProviders;
 
@@ -229,5 +235,50 @@ public class AShareClientDeserializationTest
         var quote = await client.GetStockQuoteAsync("sh600519", "last_px");
 
         Assert.IsNull(quote);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetFundFlowAsync_TimestampStringAndUnorderedRows_ShouldMapLatestDayAndRequestRange()
+    {
+        // 智兔真实响应：t 为 "yyyy-MM-dd HH:mm:ss" 字符串，返回顺序不保证；这里故意把最新交易日放在最后一行
+        const string json = """
+            [
+              {"t":"2026-11-19 00:00:00","zmbtdcje":100,"zmbddcje":100,"zmbzdcje":10,"zmbxdcje":10,"zmstdcje":300,"zmsddcje":150,"zmszdcje":10,"zmsxdcje":10,"dddx":1.5},
+              {"t":"2026-11-18 00:00:00","zmbtdcje":400,"zmbddcje":200,"zmbzdcje":10,"zmbxdcje":10,"zmstdcje":100,"zmsddcje":100,"zmszdcje":10,"zmsxdcje":10,"dddx":2.5},
+              {"t":"2026-11-20 00:00:00","zmbtdcje":500,"zmbddcje":300,"zmbzdcje":50,"zmbxdcje":10,"zmstdcje":200,"zmsddcje":100,"zmszdcje":20,"zmsxdcje":5,"dddx":3.5}
+            ]
+            """;
+        Uri? requestUri = null;
+        var handler = new StubHandler(request =>
+        {
+            requestUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
+        });
+        var settingService = new Mock<IUserSettingService>();
+        settingService.SetupGet(s => s.CurrentSetting).Returns(new UserSetting { ZhiTuApiToken = "test-token" });
+        var tools = new AShareSentimentTools(
+            new ZhiTuMarketClient(CreateFactory(handler)),
+            settingService.Object,
+            NullLogger<AShareSentimentTools>.Instance);
+
+        var flow = await tools.GetFundFlowAsync("SH600519");
+
+        // 最新交易日 11-20：主力 = (500 + 300) − (200 + 100)，对外 Date 仍为 YYYYMMDD 整数
+        Assert.AreEqual(20261120, flow.Date);
+        Assert.AreEqual(800m, flow.MainFundIn);
+        Assert.AreEqual(300m, flow.MainFundOut);
+        Assert.AreEqual(500m, flow.MainFundDiff);
+        // 近 3 个交易日主力净流入：500 + (−250) + 400
+        Assert.AreEqual(650m, flow.MainFund3);
+
+        // 不带 st/et 时智兔只返回最近 1 个交易日，多日汇总必须传区间；lt 对该接口无效
+        var query = HttpUtility.ParseQueryString(requestUri!.Query);
+        Assert.IsNull(query["lt"]);
+        var windowDays = (DateTime.ParseExact(query["et"]!, "yyyyMMdd", CultureInfo.InvariantCulture)
+            - DateTime.ParseExact(query["st"]!, "yyyyMMdd", CultureInfo.InvariantCulture)).Days;
+        // 窗口至少覆盖 20 个交易日（≥ 28 个自然日），且不超过接口单次 365 天上限
+        Assert.IsGreaterThanOrEqualTo(28, windowDays);
+        Assert.IsLessThanOrEqualTo(365, windowDays);
     }
 }

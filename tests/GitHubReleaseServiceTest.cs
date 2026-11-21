@@ -13,7 +13,7 @@ namespace TestMarketAssistant;
 [TestClass]
 public class GitHubReleaseServiceTest
 {
-    private IReleaseService _service = null!;
+    private GitHubReleaseService _service = null!;
     private Mock<HttpMessageHandler> _httpHandlerMock = null!;
     private Mock<ILogger<GitHubReleaseService>> _loggerMock = null!;
 

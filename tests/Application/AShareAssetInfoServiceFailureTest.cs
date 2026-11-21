@@ -25,13 +25,30 @@ public class AShareAssetInfoServiceFailureTest
     private static HttpResponseMessage Json(string json, HttpStatusCode statusCode = HttpStatusCode.OK) =>
         new(statusCode) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
+    /// <summary>新浪 hq 接口返回 GBK 文本，桩必须按同一编码回写，否则中文名称会解成乱码。</summary>
+    private static HttpResponseMessage Gbk(string text)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(Encoding.GetEncoding("gbk").GetBytes(text))
+        };
+    }
+
     private static AShareAssetInfoService CreateService(StubHandler handler)
     {
         var factory = new Mock<IHttpClientFactory>();
+        // 两个数据源共用同一套客户端工厂：按命名客户端给出各自的服务域，桩才能区分请求来源
         factory.Setup(f => f.CreateClient(It.IsAny<string>()))
-            .Returns(() => new HttpClient(handler, disposeHandler: false) { BaseAddress = new Uri("https://www.cls.cn/") });
+            .Returns((string name) => new HttpClient(handler, disposeHandler: false)
+            {
+                BaseAddress = name.StartsWith("Sina", StringComparison.Ordinal)
+                    ? new Uri("https://hq.sinajs.cn/")
+                    : new Uri("https://www.cls.cn/")
+            });
         return new AShareAssetInfoService(
             new ClsQuoteClient(factory.Object),
+            new SinaStockQuoteClient(factory.Object),
             new SinaFundFlowClient(factory.Object),
             NullLogger<AShareAssetInfoService>.Instance);
     }
@@ -151,5 +168,54 @@ public class AShareAssetInfoServiceFailureTest
         Assert.AreEqual("600000", assetInfo.Code);
         Assert.AreEqual(string.Empty, assetInfo.CurrentPrice, "无行情时应留空而非伪造价格");
         Assert.AreEqual(string.Empty, assetInfo.ChangePercentage, "无涨跌幅时应留空而非显示 0.00%");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetAssetInfoAsync_WhenClsDoesNotCoverSymbol_ShouldFallBackToSina()
+    {
+        // 财联社对基金/ETF 不覆盖：data 非空但所有字段为 null（实测 sh511010）
+        const string clsPayload = """
+            {"data":{"secu_name":null,"secu_code":null,"last_px":null,"change":null}}
+            """;
+        const string sinaPayload = """
+            var hq_str_sh511010="国债ETF国泰,141.370,141.363,141.339,141.405,141.317,141.339,141.344,67106300,9488412378.000,6800,141.339,20300,141.338,1600,141.337,800,141.336,85400,141.334,50000,141.344,1000,141.346,3500,141.347,44400,141.348,77900,141.350,2026-11-13,15:34:59,00,D|1800|254410.20";
+            """;
+
+        var service = CreateService(new StubHandler(request =>
+            request.RequestUri!.ToString().Contains("hq.sinajs.cn", StringComparison.Ordinal)
+                ? Gbk(sinaPayload)
+                : Json(clsPayload)));
+
+        var assetInfo = await service.GetAssetInfoAsync("511010", "SH");
+
+        Assert.AreEqual("国债ETF国泰", assetInfo.Name, "名称应来自新浪兜底");
+        Assert.AreEqual("511010", assetInfo.Code);
+        Assert.AreEqual("SH", assetInfo.Market);
+        Assert.AreEqual("141.3390", assetInfo.CurrentPrice, "新浪不返回涨跌幅路径下的价格仍应展示");
+        Assert.AreEqual("-0.02%", assetInfo.ChangePercentage, "涨跌幅应按（最新-昨收）/昨收 现算");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetAssetInfoAsync_WhenSuspended_ShouldKeepNameAndNotBorrowSinaPrice()
+    {
+        // 财联社有名称但无最新价 = 停牌：不得用新浪行情伪装成实时价
+        const string clsPayload = """
+            {"data":{"secu_name":"测试股票","secu_code":"SH600000","last_px":null,"change":null}}
+            """;
+        const string sinaPayload = """
+            var hq_str_sh600000="浦发银行,10.000,10.000,10.500,10.600,9.900,10.500,10.510,1000000,10500000.000,800,10.500,900,10.499,700,10.498,600,10.497,500,10.496,700,10.501,800,10.502,900,10.503,600,10.504,500,10.505,2026-11-13,15:00:00,00";
+            """;
+
+        var service = CreateService(new StubHandler(request =>
+            request.RequestUri!.ToString().Contains("hq.sinajs.cn", StringComparison.Ordinal)
+                ? Gbk(sinaPayload)
+                : Json(clsPayload)));
+
+        var assetInfo = await service.GetAssetInfoAsync("600000", "SH");
+
+        Assert.AreEqual("测试股票", assetInfo.Name);
+        Assert.AreEqual(string.Empty, assetInfo.CurrentPrice, "停牌时应留空，不得回退新浪价格");
     }
 }

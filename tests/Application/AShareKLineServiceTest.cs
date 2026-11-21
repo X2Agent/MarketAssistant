@@ -259,22 +259,83 @@ public sealed class AShareKLineServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public async Task GetKLineDataAsync_FundOrEtfCode_ShouldSkipZhiTuAndCallSinaDirectly()
+    {
+        // 基金/ETF 代码段智兔不覆盖，直接走新浪：省掉一次必然失败的请求与其重试退避（线上曾等 15 秒）
+        var zhiTuCalls = 0;
+        var (sp, sinaRequests) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            sinaResponseContent: SinaKLineJson,
+            zhiTuRequestInspector: _ => zhiTuCalls++);
+        var service = sp.GetRequiredService<IKLineService>();
+
+        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+
+        Assert.HasCount(3, result);
+        Assert.AreEqual(0, zhiTuCalls, "基金/ETF 不应请求智兔");
+        Assert.HasCount(1, sinaRequests, "应直接请求一次新浪");
+        Assert.Contains("symbol=sh511010", sinaRequests[0].RequestUri!.Query);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("159915", "深市 15 开头 ETF")]
+    [DataRow("160119", "深市 16 开头 LOF")]
+    [DataRow("510300", "沪市 5 开头 ETF")]
+    public async Task GetKLineDataAsync_FundCodeSegments_ShouldAllSkipZhiTu(string code, string reason)
+    {
+        var zhiTuCalls = 0;
+        var (sp, _) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            sinaResponseContent: SinaKLineJson,
+            zhiTuRequestInspector: _ => zhiTuCalls++);
+        var service = sp.GetRequiredService<IKLineService>();
+
+        await service.GetKLineDataAsync(code, KLineType.Daily, 100);
+
+        Assert.AreEqual(0, zhiTuCalls, reason);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task GetKLineDataAsync_StockCode_ShouldStillPreferZhiTu()
+    {
+        // 跳过智兔只针对基金/ETF 代码段：普通股票必须仍走智兔（那里有成交额/昨收/复权类型）
+        var zhiTuCalls = 0;
+        var (sp, sinaRequests) = BuildServiceProvider(
+            HttpStatusCode.OK,
+            SampleKLineJson,
+            sinaResponseContent: SinaKLineJson,
+            zhiTuRequestInspector: _ => zhiTuCalls++);
+        var service = sp.GetRequiredService<IKLineService>();
+
+        var result = await service.GetKLineDataAsync("600519", KLineType.Daily, 100);
+
+        Assert.HasCount(3, result);
+        Assert.AreEqual(1, zhiTuCalls, "普通股票应请求智兔");
+        Assert.IsEmpty(sinaRequests, "智兔成功时不得请求新浪");
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public async Task GetKLineDataAsync_ZhiTuNotFound_ShouldFallBackToSina()
     {
-        // 复现线上问题：智兔对基金/ETF 返回 404 {"error":"not found"}，需回退新浪 K 线
+        // 智兔对未覆盖的标的返回 404 {"error":"not found"}，需回退新浪 K 线
         var (sp, sinaRequests) = BuildServiceProvider(
             HttpStatusCode.NotFound,
             "{\"error\":\"not found\"}",
             sinaResponseContent: SinaKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+        var result = await service.GetKLineDataAsync("sz002475", KLineType.Daily, 100);
 
         Assert.HasCount(3, result);
         Assert.AreEqual(new DateTime(2025, 6, 24), result[2].Timestamp);
         Assert.AreEqual(39.80m, result[2].Close);
         Assert.HasCount(1, sinaRequests, "应触发一次新浪兜底请求");
-        Assert.Contains("symbol=sh511010", sinaRequests[0].RequestUri!.Query);
+        Assert.Contains("symbol=sz002475", sinaRequests[0].RequestUri!.Query);
         Assert.Contains("scale=240", sinaRequests[0].RequestUri!.Query);
         Assert.Contains("datalen=100", sinaRequests[0].RequestUri!.Query);
     }
@@ -363,7 +424,7 @@ public sealed class AShareKLineServiceTest
             sinaResponseContent: SinaKLineJson);
         var service = sp.GetRequiredService<IKLineService>();
 
-        var result = await service.GetKLineDataAsync("sh511010", KLineType.Daily, 100);
+        var result = await service.GetKLineDataAsync("sz002475", KLineType.Daily, 100);
 
         Assert.HasCount(3, result);
         Assert.HasCount(1, sinaRequests);

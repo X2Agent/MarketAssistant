@@ -26,6 +26,8 @@ namespace TestMarketAssistant;
 [TestClass]
 public sealed class MarketAnalysisDegradationTest
 {
+    private const string CoordinatorArtifactToolName = "get_analyst_artifact";
+
     [TestMethod]
     [TestCategory("Unit")]
     public async Task AnalyzeAsync_SingleAnalystFails_ShouldDegradeAndReturnReport()
@@ -121,6 +123,8 @@ public sealed class MarketAnalysisDegradationTest
             {
                 if (ex.Message.Contains("所有分析师均执行失败", StringComparison.Ordinal))
                 {
+                    Assert.Contains(ThrowingChatClient.FailureReason, ex.Message,
+                        "终局报错应附带去重后的失败原因");
                     return;
                 }
 
@@ -134,12 +138,97 @@ public sealed class MarketAnalysisDegradationTest
         Assert.Fail("全部分析师失败时必须抛出 FriendlyException");
     }
 
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task AnalyzeAsync_CoordinatorReturnsNarrationJson_ShouldFailExplicitly()
+    {
+        // 事故复现回归：协调分析师返回"计划旁白"式 JSON（缺全部结论字段），
+        // 必填字段校验拒绝解析 → 修复重试 → 仍失败 → 硬失败，不得降级伪造全默认值报告
+        const int maxAttempts = 3;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var workflow = CreateWorkflow(
+                fundamentalFails: false,
+                newsEventFails: false,
+                out _,
+                out _,
+                out _,
+                coordinatorReply: """{"analysis":"我将开始分析","step":1,"action":"调用工具获取数据"}""");
+
+            try
+            {
+                await workflow.AnalyzeAsync("000001", Guid.NewGuid());
+                Assert.Fail("协调分析师旁白 JSON 缺结论字段，工作流必须显式失败");
+            }
+            catch (FriendlyException ex)
+            {
+                if (ex.Message.Contains("执行失败", StringComparison.Ordinal) &&
+                    ex.Message.Contains("不符合约束", StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                if (attempt == maxAttempts)
+                {
+                    Assert.Fail($"预期协调分析师硬失败错误，实际: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task AnalyzeAsync_CoordinatorRepairRetryAfterToolCall_ShouldCarryToolTrailAndPassGate()
+    {
+        // 回归：协调分析师首轮调用过工具但返回缺结论字段的 JSON，修复重试轮直接给出合法 JSON、不再调工具。
+        // 重试必须携带首轮的工具往返——工具闸门据此放行（否则整个分析被误杀），模型也无需重新取数。
+        const int maxAttempts = 5;
+        FriendlyException? lastFrameworkError = null;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            var workflow = CreateWorkflow(
+                fundamentalFails: false,
+                newsEventFails: false,
+                out var coordinatorRequests,
+                out _,
+                out _,
+                createCoordinatorAgent: CreateToolUsingCoordinator);
+
+            try
+            {
+                var report = await workflow.AnalyzeAsync("000001", Guid.NewGuid());
+
+                Assert.IsNotNull(report.CoordinatorResult);
+                Assert.AreEqual(7.5f, report.CoordinatorResult.OverallScore, "修复重试后应采用第二轮的合法结论");
+                Assert.HasCount(3, coordinatorRequests, "首轮工具往返 + 缺字段结论 + 修复重试，共三次模型请求");
+                var retryContents = coordinatorRequests[2].SelectMany(message => message.Contents).ToList();
+                Assert.Contains(content => content is FunctionCallContent { Name: CoordinatorArtifactToolName }, retryContents,
+                    "修复重试请求应携带首轮的工具调用");
+                Assert.Contains(content => content is FunctionResultContent, retryContents,
+                    "修复重试请求应携带首轮的工具结果");
+                return;
+            }
+            catch (FriendlyException ex) when (
+                ex.Message.Contains("综合报告生成环节异常", StringComparison.Ordinal) && attempt < maxAttempts)
+            {
+                // barrier 消息丢失的表现（见 AnalyzeAsync_SingleAnalystFails_ShouldDegradeAndReturnReport）→ 记录后重试
+                lastFrameworkError = ex;
+            }
+        }
+
+        Assert.Fail($"重试 {maxAttempts} 次后仍失败: {lastFrameworkError?.Message}");
+    }
+
     private static MarketAnalysisWorkflow CreateWorkflow(
         bool fundamentalFails,
         bool newsEventFails,
         out List<IReadOnlyList<ChatMessage>> coordinatorRequests,
         out List<AnalysisProgressEventArgs> progressEvents,
-        out List<string> diagnosticLogs)
+        out List<string> diagnosticLogs,
+        string? coordinatorReply = null,
+        Func<List<IReadOnlyList<ChatMessage>>, AIAgent>? createCoordinatorAgent = null)
     {
         coordinatorRequests = [];
         diagnosticLogs = [];
@@ -163,7 +252,13 @@ public sealed class MarketAnalysisDegradationTest
             "fingerprint",
             StructuredOutputMode.Text));
 
-        var coordinatorClient = new CoordinatorChatClient(coordinatorRequests);
+        var coordinatorAgent = createCoordinatorAgent?.Invoke(coordinatorRequests) ?? new ChatClientAgent(
+            new CoordinatorChatClient(coordinatorRequests, coordinatorReply),
+            new ChatClientAgentOptions
+            {
+                Name = "CoordinatorAnalyst",
+                ChatOptions = new ChatOptions()
+            });
         var analystFactory = new Mock<IAnalystAgentFactory>();
         analystFactory.Setup(factory => factory.CreateAnalyst(
                 It.Is<Type>(type => type.Name == "FundamentalAnalystAgent"),
@@ -184,13 +279,7 @@ public sealed class MarketAnalysisDegradationTest
                 It.IsAny<ChatClientRuntime>(),
                 It.IsAny<AIContextProvider[]?>(), It.IsAny<IEnumerable<AITool>?>(),
                 It.IsAny<Action<Exception>?>()))
-            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _, Action<Exception>? _) => new ChatClientAgent(
-                coordinatorClient,
-                new ChatClientAgentOptions
-                {
-                    Name = "CoordinatorAnalyst",
-                    ChatOptions = new ChatOptions()
-                }));
+            .Returns((Type _, ChatClientRuntime _, AIContextProvider[]? _, IEnumerable<AITool>? _, Action<Exception>? _) => coordinatorAgent);
 
         var marketContext = new MarketContext(settingService.Object, Mock.Of<IServiceProvider>());
         var workflow = new MarketAnalysisWorkflow(
@@ -224,6 +313,35 @@ public sealed class MarketAnalysisDegradationTest
             Name = name,
             ChatOptions = new ChatOptions()
         }).WithFailureIsolation(onAnalysisFailed);
+    }
+
+    /// <summary>
+    /// 与真实协调分析师一致地挂工具并装配工具驱动输出装饰器（闸门）：
+    /// 首轮调用工具后给出缺结论字段的 JSON，修复重试轮直接给出合法 JSON、不再调用工具。
+    /// </summary>
+    private static AIAgent CreateToolUsingCoordinator(List<IReadOnlyList<ChatMessage>> requests)
+    {
+        var tool = AIFunctionFactory.Create(
+            (string analystName) => "分析师产物全文",
+            name: CoordinatorArtifactToolName,
+            description: "测试用产物读取工具");
+        var client = new ScriptedCoordinatorChatClient(requests,
+        [
+            () => new ChatResponse(new ChatMessage(ChatRole.Assistant,
+            [
+                new FunctionCallContent("call-1", CoordinatorArtifactToolName,
+                    new Dictionary<string, object?> { ["analystName"] = "FundamentalAnalyst" })
+            ])),
+            () => new ChatResponse(new ChatMessage(ChatRole.Assistant, """{"analysis":"我将开始分析","step":1}""")),
+            () => new ChatResponse(new ChatMessage(ChatRole.Assistant, CreateCoordinatorResultJson())),
+        ]);
+
+        var agent = new ChatClientAgent(client, new ChatClientAgentOptions
+        {
+            Name = "CoordinatorAnalyst",
+            ChatOptions = new ChatOptions { Tools = [tool] }
+        });
+        return agent.WithToolDrivenOutput(client, typeof(CoordinatorResult), StructuredOutputMode.Text, [tool]);
     }
 
     internal static string CreateCoordinatorResultJson()
@@ -376,11 +494,11 @@ public sealed class MarketAnalysisDegradationTest
     }
 
     /// <summary>
-    /// 记录请求并返回合法 CoordinatorResult JSON 的 IChatClient 桩。
+    /// 记录请求并返回指定回复（默认为合法 CoordinatorResult JSON）的 IChatClient 桩。
     /// </summary>
-    private sealed class CoordinatorChatClient(List<IReadOnlyList<ChatMessage>> requests) : IChatClient
+    private sealed class CoordinatorChatClient(List<IReadOnlyList<ChatMessage>> requests, string? replyText = null) : IChatClient
     {
-        private readonly string _replyJson = CreateCoordinatorResultJson();
+        private readonly string _replyJson = replyText ?? CreateCoordinatorResultJson();
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages,
@@ -400,6 +518,37 @@ public sealed class MarketAnalysisDegradationTest
             await Task.Yield();
             yield return new ChatResponseUpdate(ChatRole.Assistant, _replyJson);
         }
+
+        public object? GetService(Type serviceType, object? serviceKey = null)
+            => serviceType.IsInstanceOfType(this) ? this : null;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// 按脚本顺序回复并记录每次请求的协调分析师 IChatClient 桩。
+    /// 协调器经 RunAsync 非流式调用，因此不提供流式实现。
+    /// </summary>
+    private sealed class ScriptedCoordinatorChatClient(
+        List<IReadOnlyList<ChatMessage>> requests,
+        IReadOnlyList<Func<ChatResponse>> script) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            requests.Add([.. messages]);
+            return Task.FromResult(script[requests.Count - 1]());
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("协调分析师经 RunAsync 非流式调用");
 
         public object? GetService(Type serviceType, object? serviceKey = null)
             => serviceType.IsInstanceOfType(this) ? this : null;
