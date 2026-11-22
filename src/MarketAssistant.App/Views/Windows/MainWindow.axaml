@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:MarketAssistant.ViewModels"
         xmlns:infra="using:MarketAssistant.Infrastructure.Core"
+        xmlns:views="using:MarketAssistant.Views.Components"
         xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -241,16 +242,19 @@
                                 ContentTemplate="{StaticResource ViewLocator}"/>
 
                 <!-- 返回导航条：仅二级页面（CanGoBack）时出现；根页面整行折叠为零高度，
-                     不再使用浮层——浮层会遮挡页面左上角的卡片与标题 -->
-                <StackPanel Grid.Row="0"
-                            Orientation="Horizontal"
-                            Spacing="{StaticResource SmallSpacing}"
-                            Margin="{StaticResource BackBarMargin}"
-                            VerticalAlignment="Center"
-                            IsVisible="{Binding CanGoBack}">
+                     不再使用浮层——浮层会遮挡页面左上角的卡片与标题。
+                     左侧「← 标题」，右侧是页面级操作槽：页面内不要为一个图标按钮另起一整行，
+                     否则顶部会多出一条几乎全空的横带。 -->
+                <Grid Grid.Row="0"
+                      ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="{StaticResource SmallSpacing}"
+                      Margin="{StaticResource BackBarMargin}"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding CanGoBack}">
                     <!-- 返回：btn-icon 提供 40×40 标准点击区，图标 20。
                          旧版是 btn-sm + Padding=0 的纯文本 ←，实际命中区只有约 10×20。 -->
-                    <Button Classes="btn-ghost btn-icon"
+                    <Button Grid.Column="0"
+                            Classes="btn-ghost btn-icon"
                             Command="{Binding GoBackCommand}"
                             ToolTip.Tip="返回（Esc）"
                             AutomationProperties.Name="返回">
@@ -258,12 +262,29 @@
                                   Width="{StaticResource SmallIconSize}"
                                   Height="{StaticResource SmallIconSize}"/>
                     </Button>
-                    <TextBlock Name="PageTitle"
+                    <TextBlock Grid.Column="1"
+                               Name="PageTitle"
                                Classes="body-sm"
                                FontWeight="{DynamicResource WeightTitle}"
                                Text="{Binding CurrentPageTitle}"
                                VerticalAlignment="Center"/>
-                </StackPanel>
+
+                    <!-- 页面级操作槽：按页面 ViewModel 类型注入操作控件，其 DataContext 即页面 VM。
+                         末尾的兜底空模板必须保留：全局 ViewLocator 匹配所有 ViewModelBase，
+                         没有它，其余二级页面会把整页视图渲染进返回条。 -->
+                    <ContentControl Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Content="{Binding CurrentPage}">
+                        <ContentControl.DataTemplates>
+                            <DataTemplate DataType="vm:AgentAnalysisViewModel">
+                                <views:AgentAnalysisMenuButton/>
+                            </DataTemplate>
+                            <DataTemplate DataType="vm:ViewModelBase">
+                                <Panel/>
+                            </DataTemplate>
+                        </ContentControl.DataTemplates>
+                    </ContentControl>
+                </Grid>
             </Grid>
         </Grid>
     </Panel>

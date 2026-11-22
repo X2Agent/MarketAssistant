@@ -6,6 +6,7 @@ using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
+using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Export;
@@ -33,6 +34,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
     [ObservableProperty]
     private string _stockCode = "";
+
+    /// <summary>
+    /// 当前标的名称（导航参数带入）。报告只归档代码，名称在此持有并回填到报告头部；
+    /// 为空时由 <see cref="ResolveAssetNameAsync"/> 回退到资产信息服务查询。
+    /// </summary>
+    private string _assetName = string.Empty;
 
     [ObservableProperty]
     private bool _isAnalysisInProgress;
@@ -428,6 +435,30 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         UsageIsEstimated = usage?.IsEstimated == true;
     }
 
+    /// <summary>
+    /// 解析标的名称：导航参数已带名称时直接复用，否则回退到当前市场的资产信息服务查询。
+    /// 名称只是报告头部的展示信息，取不到时留空（不阻断报告展示，与最近查看的行情补全同口径）。
+    /// </summary>
+    private async Task<string> ResolveAssetNameAsync(string assetCode)
+    {
+        if (!string.IsNullOrWhiteSpace(_assetName))
+            return _assetName;
+
+        if (MarketContext == null)
+            return string.Empty;
+
+        try
+        {
+            var info = await MarketContext.GetService<IAssetInfoService>().GetAssetInfoAsync(assetCode);
+            return info.Name;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger?.LogWarning(ex, "补全标的名称失败: {AssetCode}", assetCode);
+            return string.Empty;
+        }
+    }
+
     private void ResetProgressDisplay()
     {
         _smoothedPercent = 0;
@@ -496,12 +527,15 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             if (_disposed || runId != _activeAnalysisRunId)
                 return;
 
+            var assetName = await ResolveAssetNameAsync(report.AssetSymbol);
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 if (_disposed || runId != _activeAnalysisRunId)
                     return;
 
                 AnalysisReportViewModel.UpdateWithReport(report);
+                AnalysisReportViewModel.AssetName = assetName;
                 if (ChatSidebarViewModel != null)
                 {
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(StockCode, report.AnalystMessages);
@@ -631,12 +665,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// <summary>
     /// 从报告构建分享卡数据：亮点取前 3 条，Token 摘要直接复用展示层格式化。
     /// </summary>
-    private static ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
+    private ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
     {
         var coordinator = report.CoordinatorResult;
         return new ReportShareCardData
         {
-            AssetName = report.AssetSymbol,
+            // 与报告头部同源（含回查补全的名称）；缺失时回退到代码，避免分享卡标题空白
+            AssetName = AnalysisReportViewModel.HasAssetName ? AnalysisReportViewModel.AssetName : report.AssetSymbol,
             AssetSymbol = report.AssetSymbol,
             OverallScore = coordinator.OverallScore,
             InvestmentRating = coordinator.InvestmentRating.GetDescription(),
@@ -654,6 +689,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         if (!string.IsNullOrEmpty(parameter.Code))
         {
             StockCode = parameter.Code;
+            // 报告只归档代码，名称从导航参数带入；告警历史跳转时参数名称为空，
+            // 届时由 ResolveAssetNameAsync 在出报告后回查补全
+            _assetName = parameter.Name;
             Logger?.LogInformation("导航到 AI 分析页面，资产代码: {Code}，重新激活: {IsReactivation}", StockCode, isReactivation);
             // GoBack 重新激活时不重复启动分析，避免重复请求
             if (!isReactivation)
@@ -702,9 +740,12 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             AnalysisFailureMessage = string.Empty;
             ApplyTokenUsage(report.Usage);
 
+            var assetName = await ResolveAssetNameAsync(report.AssetSymbol);
+
             await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 AnalysisReportViewModel.UpdateWithReport(report);
+                AnalysisReportViewModel.AssetName = assetName;
                 if (ChatSidebarViewModel != null)
                     await ChatSidebarViewModel.InitializeWithAnalysisHistory(report.AssetSymbol, report.AnalystMessages);
             });
@@ -725,6 +766,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         _analysisCts = null;
         _activeAnalysisRunId = null;
         _lastReport = null;
+        _assetName = string.Empty;
 
         // 重置分析状态
         IsAnalysisInProgress = false;

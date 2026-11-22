@@ -1,9 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
-using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Extensions;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
 // 本类有同名的 InvestmentRating 字符串属性，直接写枚举名会解析成属性
@@ -16,14 +14,20 @@ namespace MarketAssistant.ViewModels;
 /// 负责展示 MarketAnalysisReport 中的 CoordinatorResult 结构化数据
 /// </summary>
 public partial class AnalysisReportViewModel(
-    ILogger<AnalysisReportViewModel> logger,
-    AdaptiveCardConverter adaptiveCardConverter) : ViewModelBase(logger)
+    ILogger<AnalysisReportViewModel> logger) : ViewModelBase(logger)
 {
     [ObservableProperty]
     private bool _isReportVisible;
 
     [ObservableProperty]
     private string _stockSymbol = string.Empty;
+
+    /// <summary>
+    /// 资产名称（如"贵州茅台"）。报告本身只归档代码，名称由页面从导航参数带入，
+    /// 缺失时回退到资产信息服务补全，因此空值属正常情况。
+    /// </summary>
+    [ObservableProperty]
+    private string _assetName = string.Empty;
 
     /// <summary>报告生成时间（本地时区，精确到分钟），空值时不展示</summary>
     [ObservableProperty]
@@ -73,9 +77,12 @@ public partial class AnalysisReportViewModel(
     public bool HasTimeHorizon => !string.IsNullOrWhiteSpace(TimeHorizon);
     public bool HasRiskLevel => !string.IsNullOrWhiteSpace(RiskLevel);
 
-    /// <summary>报告头部是否展示标的信息行（标的代码或生成时间任一存在即可）</summary>
+    /// <summary>是否存在资产名称（名称缺失时头部只显示代码与时间）</summary>
+    public bool HasAssetName => !string.IsNullOrWhiteSpace(AssetName);
+
+    /// <summary>报告头部是否展示标的信息行（名称、代码或生成时间任一存在即可）</summary>
     public bool HasReportHeader
-        => !string.IsNullOrWhiteSpace(StockSymbol) || !string.IsNullOrWhiteSpace(ReportCreatedAtText);
+        => HasAssetName || !string.IsNullOrWhiteSpace(StockSymbol) || !string.IsNullOrWhiteSpace(ReportCreatedAtText);
 
     // === 聚合的列表数据 ===
 
@@ -139,17 +146,6 @@ public partial class AnalysisReportViewModel(
     /// <summary>是否存在缺失数据维度（控制该区块显隐，避免 XAML 依赖 Count→bool 隐式转换）</summary>
     public bool HasMissingDataDimensions => MissingDataDimensions.Count > 0;
 
-    // === 各分析师的消息 ===
-
-    /// <summary>
-    /// 分析师完整结论（消息适配器，含结构化卡片解析结果），报告页"分析师明细"区块的数据源。
-    /// 与聊天侧栏共用 <see cref="ChatMessageAdapter"/>，保证同类内容两处渲染一致。
-    /// </summary>
-    public ObservableCollection<ChatMessageAdapter> AnalystMessages { get; } = [];
-
-    /// <summary>是否存在可展示的分析师明细</summary>
-    public bool HasAnalystMessages => AnalystMessages.Count > 0;
-
     partial void OnOverallScoreChanged(float value)
     {
         OnPropertyChanged(nameof(ScorePercentage));
@@ -165,6 +161,12 @@ public partial class AnalysisReportViewModel(
     }
 
     partial void OnStockSymbolChanged(string value) => OnPropertyChanged(nameof(HasReportHeader));
+
+    partial void OnAssetNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasAssetName));
+        OnPropertyChanged(nameof(HasReportHeader));
+    }
 
     partial void OnReportCreatedAtTextChanged(string value) => OnPropertyChanged(nameof(HasReportHeader));
 
@@ -258,21 +260,6 @@ public partial class AnalysisReportViewModel(
         HasQualityMetrics = qm.DataCompletenessPercent > 0 || qm.AnalystConsensusPercent > 0;
         OnPropertyChanged(nameof(HasMissingDataDimensions));
 
-        // 添加各专业分析师的自然语言分析（结构化数据由卡片解析器从 JSON 产物中提取）。
-        // 协调分析师的产物就是本页报告本身，再列一遍只会重复信息，故排除。
-        foreach (var message in report.AnalystMessages)
-        {
-            if (message.Role == ChatRole.System)
-                continue;
-
-            if (string.Equals(message.AuthorName, "CoordinatorAnalyst", StringComparison.Ordinal)
-                || string.Equals(message.AuthorName, "Coordinator", StringComparison.Ordinal))
-                continue;
-
-            AnalystMessages.Add(new ChatMessageAdapter(message, adaptiveCardConverter));
-        }
-        OnPropertyChanged(nameof(HasAnalystMessages));
-
         IsReportVisible = true;
 
         Logger?.LogInformation(
@@ -286,10 +273,11 @@ public partial class AnalysisReportViewModel(
         InvestmentHighlights.Clear();
         RiskFactors.Clear();
         OperationSuggestions.Clear();
-        AnalystMessages.Clear();
         MissingDataDimensions.Clear();
 
         StockSymbol = string.Empty;
+        // 名称由页面在 UpdateWithReport 之后回填，这里清掉上一份报告的旧名称
+        AssetName = string.Empty;
         ReportCreatedAtText = string.Empty;
         CoordinatorSummary = string.Empty;
         OverallScore = 0f;
@@ -315,7 +303,6 @@ public partial class AnalysisReportViewModel(
         TokenUsageSummary = string.Empty;
         TokenUsageDetail = string.Empty;
         TokenUsageIsEstimated = false;
-        OnPropertyChanged(nameof(HasAnalystMessages));
         OnPropertyChanged(nameof(HasMissingDataDimensions));
     }
 }

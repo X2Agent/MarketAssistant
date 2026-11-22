@@ -4,7 +4,6 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
              xmlns:controls="using:MarketAssistant.Views.Controls"
-             xmlns:views="using:MarketAssistant.Views.Components"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Components.AnalysisReportView"
@@ -81,28 +80,6 @@
             <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
             <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
         </Style>
-
-        <!-- 分析师明细：折叠项嵌在卡片内部，自身不再带表面色（避免卡片套卡片）。
-             头部只保留名称，展开箭头由 Fluent 模板提供。 -->
-        <Style Selector="Expander.analyst-detail">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-            <Setter Property="Padding" Value="{StaticResource NoPadding}"/>
-            <Setter Property="HorizontalAlignment" Value="Stretch"/>
-            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="MinHeight" Value="0"/>
-        </Style>
-        <Style Selector="Expander.analyst-detail /template/ ToggleButton#ExpanderHeader">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Padding" Value="{StaticResource ChipPadding}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-        </Style>
-        <Style Selector="Expander.analyst-detail /template/ ToggleButton#ExpanderHeader:pointerover">
-            <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-        </Style>
-        <Style Selector="Expander.analyst-detail /template/ ToggleButton#ExpanderHeader:pressed">
-            <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
-        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -117,10 +94,20 @@
                         <StackPanel Orientation="Horizontal"
                                     Spacing="{StaticResource SmallSpacing}"
                                     IsVisible="{Binding HasReportHeader}">
-                            <TextBlock Text="{Binding StockSymbol}"
-                                       Classes="body-sm"
+                            <TextBlock Text="{Binding AssetName}"
+                                       FontSize="{StaticResource BodyFontSize}"
                                        FontWeight="{DynamicResource WeightTitle}"
-                                       VerticalAlignment="Center"/>
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding HasAssetName}"/>
+                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource ReportTagPadding}"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding StockSymbol}"
+                                           Classes="caption"
+                                           FontFamily="{StaticResource DataFontFamily}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Border>
                             <TextBlock Text="{Binding ReportCreatedAtText}"
                                        Classes="caption"
                                        FontFamily="{StaticResource DataFontFamily}"
@@ -402,9 +389,11 @@
                     <StackPanel Spacing="{StaticResource DefaultSpacing}">
                         <TextBlock Text="深度分析报告" Classes="card-title"/>
 
-                        <controls:PageGrid ColumnSpacing="{StaticResource GridGutter}">
+                        <controls:PageGrid ColumnSpacing="{StaticResource GridGutter}"
+                                           RowSpacing="{StaticResource GridGutter}"
+                                           RowDefinitions="Auto,Auto">
                             <!-- 核心共识 -->
-                            <Border Grid.Column="0" Grid.ColumnSpan="6"
+                            <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="6"
                                     Classes="analysis-block"
                                     IsVisible="{Binding HasConsensusAnalysis}">
                                 <StackPanel Spacing="{StaticResource SmallSpacing}">
@@ -425,7 +414,7 @@
                             </Border>
 
                             <!-- 主要分歧 -->
-                            <Border Grid.Column="6" Grid.ColumnSpan="6"
+                            <Border Grid.Row="0" Grid.Column="6" Grid.ColumnSpan="6"
                                     Classes="analysis-block"
                                     IsVisible="{Binding HasDisagreementAnalysis}">
                                 <StackPanel Spacing="{StaticResource SmallSpacing}">
@@ -447,10 +436,9 @@
                             </Border>
 
                             <!-- 综合总结：强调色浅底标记"这是结论"，不是"这是选中项" -->
-                            <Border Grid.Column="0" Grid.ColumnSpan="12"
+                            <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="12"
                                     Classes="analysis-block"
-                                    Background="{DynamicResource AccentSubtleBrush}"
-                                    Margin="{StaticResource SmallTopMargin}">
+                                    Background="{DynamicResource AccentSubtleBrush}">
                                 <StackPanel Spacing="{StaticResource SmallSpacing}">
                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                                         <svg:Svg Path="/Assets/Images/icon_edit.svg"
@@ -569,65 +557,6 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-                </controls:CardView>
-
-                <!-- 6. 分析师明细：各分析师的完整结论此前只能去侧栏翻，报告页缺失。
-                     逐位折叠，默认收起，避免把报告拉成一条超长流水账。 -->
-                <controls:CardView IsVisible="{Binding HasAnalystMessages}">
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="分析师明细" Classes="card-title"/>
-
-                        <ItemsControl ItemsSource="{Binding AnalystMessages}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ChatMessageAdapter">
-                                    <Expander Classes="analyst-detail"
-                                              Margin="{StaticResource TinyVerticalMargin}">
-                                        <Expander.Header>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource SmallSpacing}">
-                                                <TextBlock Text="{Binding DisplaySender}"
-                                                           Classes="body-sm"
-                                                           FontWeight="{DynamicResource WeightEmphasis}"/>
-                                                <TextBlock Text="执行失败"
-                                                           Classes="caption"
-                                                           Foreground="{DynamicResource DangerPanelTextBrush}"
-                                                           VerticalAlignment="Center"
-                                                           IsVisible="{Binding IsAnalystFailure}"/>
-                                            </StackPanel>
-                                        </Expander.Header>
-
-                                        <StackPanel Spacing="{StaticResource SmallSpacing}"
-                                                    Margin="{StaticResource SmallTopMargin}">
-                                            <!-- 失败占位：与分析进度页同一语义色 -->
-                                            <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
-                                                    CornerRadius="{StaticResource SmallCornerRadius}"
-                                                    Padding="{StaticResource ReportNoticePadding}"
-                                                    IsVisible="{Binding IsAnalystFailure}">
-                                                <TextBlock Text="{Binding FailureNoticeText}"
-                                                           Classes="body-sm"
-                                                           TextWrapping="Wrap"
-                                                           Foreground="{DynamicResource DangerPanelTextBrush}"/>
-                                            </Border>
-
-                                            <!-- 结构化结果卡片（与聊天侧栏同一套 Adaptive Card 渲染） -->
-                                            <views:AdaptiveCardView Card="{Binding AdaptiveCard}"
-                                                                    IsVisible="{Binding IsAdaptiveCard}"/>
-
-                                            <!-- 纯文本 / Markdown 结论：报告内容是静态快照，不参与流式揭示 -->
-                                            <TextBlock Text="{Binding Content}"
-                                                       IsVisible="{Binding ShowPlainText}"
-                                                       Classes="body-sm"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-
-                                            <controls:RichTextBlock Text="{Binding Content}"
-                                                                    IsVisible="{Binding ShowRichTextFallback}"/>
-                                        </StackPanel>
-                                    </Expander>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                     </StackPanel>
                 </controls:CardView>
             </StackPanel>

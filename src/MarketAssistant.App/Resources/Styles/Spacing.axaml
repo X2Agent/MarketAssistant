@@ -211,9 +211,12 @@
     <x:Double x:Key="UpdateButtonHeight">36</x:Double>
 
     <!-- ========== 聊天/侧栏 ========== -->
-    <x:Double x:Key="SidebarDefaultWidth">360</x:Double>
-    <x:Double x:Key="SidebarMinWidth">300</x:Double>
-    <x:Double x:Key="SidebarMaxWidth">480</x:Double>
+    <!-- 智能助手抽屉：贴右边缘浮出、叠在报告之上（不挤压主区），
+         宽度按"能容下 Adaptive Card 双列指标"取值。
+         上限受主窗口最小宽度约束：720 - 72（窄窗图标轨）= 648，640 保证最小窗口下仍能完整显示 -->
+    <x:Double x:Key="ChatDrawerWidth">640</x:Double>
+    <!-- 抽屉贴边于右侧，只保留外侧两角：左侧圆角与内容区分层，右侧与窗口边齐平 -->
+    <CornerRadius x:Key="ChatDrawerCornerRadius">12,0,0,12</CornerRadius>
 
     <!-- ========== 通知 ========== -->
     <x:Double x:Key="NotificationWidth">420</x:Double>

@@ -63,6 +63,7 @@ MarketAssistant.App/
     或异步落库，双向绑定会在取消后留下错误的开关视觉；取消分支要 `OnPropertyChanged` 回推。
   - 开关放在**列表行内**时，若行容器是 `ListBoxItem`（有整行选中），外层要包一个 `Border` 接 `PointerPressed` 并 `e.Handled = true`，再显式执行命令，否则点击会冒泡被 `ListBoxItem` 吃掉并触发整行选中（进而打开编辑表单）。行容器是 `ItemsControl` + `Border`（无整行选中）时不需要这层拦截。
 - **页签**：全库只有一套实现 `Button.underline-tab`（`ButtonStyles.axaml`），选中态 = 强调色文字 + 底部 2px 指示条。`Classes.selected` 绑 VM 的 `IsXxxTabSelected`，点击走 `Command` + `CommandParameter`。**不要**每页各写一套页签 `ControlTemplate`，也不要用 `TabControl` 自己改 `TabItem` 模板（会带回 Fluent 的胶囊与焦点方框）；页签栏固定在内容区顶部，不放进页面的 `ScrollViewer`。规则见 `docs/design.md` 7.13。
+- **二级页面的页面级操作**（如 AI 分析的 `⋮` 更多操作）放进主窗口返回条右侧的操作槽：`MainWindow.axaml` 返回条里的 `ContentControl` 按页面 ViewModel 类型用 `DataTemplate` 注入控件（参考 `AgentAnalysisMenuButton`），与「← 标题」同一行，按钮用 `btn-ghost btn-icon`。**不要在页面内另起一整行只放一个图标按钮**，那会让顶部多出一条几乎全空的横带。槽位末尾 `ViewModelBase` 的兜底空模板必须保留：全局 `ViewLocator` 匹配所有 `ViewModelBase`，没有它其余二级页面会被整页渲染进返回条。
 - **区块底色**：卡片与区块用 `CardBackgroundBrush` / `SurfaceVariantBrush`。`SelectedBackgroundBrush` 的语义是"这一项被选中"，只能用在可选中元素的局部（导航项、列表项、行内小选中块），**不要拿它铺满整张卡片**；`accent` 浅底同理用 `AccentSubtleBrush`。
 - **状态标签**：`一次性` / `已触发` / `紧急` 这类标签用 12% 语义底（`WarningTagBackgroundBrush` / `DangerTagBackgroundBrush`）+ 同色 `Caption` 文字，不用语义色实底压白字。
 - **资产**：非必要不改动图片与资产文件。
