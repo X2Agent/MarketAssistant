@@ -38,6 +38,18 @@ MarketAssistant.App.Services/
 
 ---
 
+### 职责不重叠：同一分析维度只由一个分析师持有工具（强制约定）
+
+同一个分析维度只能由一个分析师持有对应工具，否则会重复取数并把输入体积成倍放大。
+
+- 反例（已修复）：`MarketSentimentAnalystAgent` 曾同时挂 `[RequiresTools(typeof(IFinancialTools))]` 与 `[RequiresTools(typeof(ISentimentTools))]`。A 股下它的 6 个工具里 5 个是与 `FinancialAnalystAgent` 重复的财务宽表工具，叠加四个并列子对象的输出契约，一次运行输入达 **26.6 万 Token**，运行约 53 秒即触发 `TokenTrackingMiddleware.MaxTokensPerRun`（200K）熔断，该维度降级。
+- 重复挂载是放大器，而非唯一变量：同配置在更早一次运行里只用了约 3 万 Token，是否熔断还取决于模型这次跑了几轮工具循环（每一轮都会把已取回的宽表重新带入上下文）。同一次运行里财务分析师挂同样 5 个宽表工具，32 秒完成、未熔断，说明问题在"重复"，不在"宽表"本身。
+- 结论：修复方式是让情绪分析师只挂 `ISentimentTools`（财务维度归 `FinancialAnalystAgent`），**不是**给工具加投影层。曾尝试把五张宽表投影成单一「财务概览」工具替代原 5 个工具，但日志证明财务分析师本就没有超限，该改动解决的是假设出来的问题，且会额外引入「一次拉 5 张表」的开销，已回退。
+- 新增分析师时检查：`[RequiresTools]` 声明的接口是否已被其他分析师持有；同一维度重复挂载是熔断的主要来源。
+- 工具输出的体积治理应放在通用层（如 `ToolExecutor` 统一截断），而不是逐个工具重写数据契约——后者会把「按需深取明细」的能力一并削掉。
+
+---
+
 ## 市场行情区块服务（Applications/Assets）
 
 详情页信息密度的数据来源，均为 **Keyed Services**（按 `MarketType` 注册，A 股与 Crypto 各一套实现）。
