@@ -411,9 +411,16 @@ public class StreamingTextReveal : Decorator
             target.Effect = effect;
             target.Opacity = 0.35;
 
+            // EffectTransition 继承自 Transition<IEffect>，Property 必须显式指定（不指定时
+            // 在加入 Transitions 集合的瞬间抛 "Transition has no property specified"）。
+            // 模糊半径是 BlurEffect 自身的属性，过渡要挂在 effect 上而不是 TextBlock 上：
+            // 挂在 TextBlock 上时该 Transition 找不到对应属性，只会抛同样的异常。
+            effect.Transitions = new Transitions
+            {
+                new DoubleTransition { Property = BlurEffect.RadiusProperty, Duration = RevealDuration, Easing = new CubicEaseOut() },
+            };
             target.Transitions = new Transitions
             {
-                new EffectTransition { Duration = RevealDuration, Easing = new CubicEaseOut() },
                 new DoubleTransition { Property = OpacityProperty, Duration = RevealDuration, Easing = new CubicEaseOut() },
             };
 
@@ -423,8 +430,9 @@ public class StreamingTextReveal : Decorator
             await Task.Delay(RevealDuration).ConfigureAwait(true);
 
             // 动画结束即摘掉滤镜与过渡：半径已为 0，但留着 Effect 会让每个块常驻一个位图滤镜
-            target.Effect = null;
+            effect.Transitions = null;
             target.Transitions = null;
+            target.Effect = null;
         }
         finally
         {
