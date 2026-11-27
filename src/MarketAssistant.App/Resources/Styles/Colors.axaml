@@ -25,11 +25,7 @@
     <Color x:Key="Neutral">#8A93A0</Color>
 
     <Color x:Key="Success">#16A34A</Color>
-    <Color x:Key="SuccessHover">#15803D</Color>
-    <Color x:Key="SuccessPressed">#14532D</Color>
     <Color x:Key="Warning">#D97706</Color>
-    <Color x:Key="WarningHover">#B45309</Color>
-    <Color x:Key="WarningPressed">#92400E</Color>
     <!-- Error 没有全局 Color：错误色明暗两套取值不同（暗色需提亮），
          统一在 ThemeDictionaries 里以 ErrorBrush 提供，避免这里放一个"看起来能用"的值。 -->
 
@@ -41,6 +37,12 @@
          语义色只出现在这类小面积标签上，不做实底块。 -->
     <SolidColorBrush x:Key="WarningTagBackgroundBrush" Color="#1FD97706"/>
     <SolidColorBrush x:Key="DangerTagBackgroundBrush" Color="#1FDC2626"/>
+    <!-- 低风险等“正向状态”标签：与 BearishTagBackgroundBrush 同色值但语义不同——
+         后者表达“价格下跌”，不能拿来标“安全/成功” -->
+    <SolidColorBrush x:Key="SuccessTagBackgroundBrush" Color="#1F16A34A"/>
+    <!-- 提示 / 模拟环境等中性说明标签：12% 强调色底，字色用 InfoPanelTextBrush。
+         与 SelectedBackgroundBrush 区分——后者只表达“选中”。 -->
+    <SolidColorBrush x:Key="InfoTagBackgroundBrush" Color="#1F0066FF"/>
 
     <!-- ================================================================== -->
     <!-- 主题色阶：Light / Dark                                              -->
@@ -59,6 +61,8 @@
             <SolidColorBrush x:Key="ItemBackgroundBrush">#FFFFFF</SolidColorBrush>
             <SolidColorBrush x:Key="SurfaceVariantBrush">#F0F2F5</SolidColorBrush>
             <SolidColorBrush x:Key="SunkenBackgroundBrush">#EEF0F3</SolidColorBrush>
+            <!-- 骨架灰条：浅色与 SurfaceVariant 同值 -->
+            <SolidColorBrush x:Key="SkeletonBrush">#F0F2F5</SolidColorBrush>
 
             <!-- 文字三档：主 / 次 / 弱。纯黑仅出现在主文字上。 -->
             <SolidColorBrush x:Key="TextPrimaryBrush">#14161A</SolidColorBrush>
@@ -78,7 +82,6 @@
 
             <!-- 语义面板：浅底 + 深字，不描边。
                  只有 Background 与 Text 两类：v3 不画边框，面板不需要 Border 色。 -->
-            <SolidColorBrush x:Key="ErrorBackgroundBrush">#FEF2F2</SolidColorBrush>
             <SolidColorBrush x:Key="SuccessPanelBackgroundBrush">#F0FDF4</SolidColorBrush>
             <SolidColorBrush x:Key="SuccessPanelTextBrush">#14532D</SolidColorBrush>
             <SolidColorBrush x:Key="WarningPanelBackgroundBrush">#FFFBEB</SolidColorBrush>
@@ -89,6 +92,11 @@
             <SolidColorBrush x:Key="DangerPanelBackgroundBrush">#FEF2F2</SolidColorBrush>
             <SolidColorBrush x:Key="DangerPanelTextBrush">#991B1B</SolidColorBrush>
             <SolidColorBrush x:Key="DangerPanelBackgroundStrongBrush">#FEE2E2</SolidColorBrush>
+            <!-- 涨跌标签字色：BullishBrush / BearishBrush 压在自己的 12% 色底上只有 3.3 / 2.9，
+                 12px 小字不达 AA，所以标签用同色相的深一档（浅色 5.0 / 6.2 以上，含次级面）。
+                 数值与图标仍用 BullishBrush / BearishBrush，保持全局“红涨绿跌”色相不变。 -->
+            <SolidColorBrush x:Key="BullishTagTextBrush">#BE2A30</SolidColorBrush>
+            <SolidColorBrush x:Key="BearishTagTextBrush">#166534</SolidColorBrush>
             <!-- 错误色（浅色）：#DC2626 在白色卡片上对比度 4.83，达标 -->
             <SolidColorBrush x:Key="ErrorBrush">#DC2626</SolidColorBrush>
 
@@ -104,6 +112,9 @@
             <SolidColorBrush x:Key="ItemBackgroundBrush">#161616</SolidColorBrush>
             <SolidColorBrush x:Key="SurfaceVariantBrush">#1C1C1C</SolidColorBrush>
             <SolidColorBrush x:Key="SunkenBackgroundBrush">#101010</SolidColorBrush>
+            <!-- 骨架灰条：灰条带 0.55–0.95 的呼吸透明度，暗色下 SurfaceVariant(#1C1C1C) 与 #161616 卡片
+                 只差 6 级、叠透明度后几乎消失，所以单独取更亮一档（#262626，与浅色同级的可见度） -->
+            <SolidColorBrush x:Key="SkeletonBrush">#262626</SolidColorBrush>
 
             <!-- 文字不提纯白（#EDEDED 而非 #FFFFFF），配合字重降档避免暗底发粗刺眼 -->
             <SolidColorBrush x:Key="TextPrimaryBrush">#EDEDED</SolidColorBrush>
@@ -120,7 +131,6 @@
             <SolidColorBrush x:Key="AccentSubtleBrush">#140066FF</SolidColorBrush>
 
             <!-- 暗色语义面板：低透明度色块 + 提亮文字，不描边 -->
-            <SolidColorBrush x:Key="ErrorBackgroundBrush">#2A1414</SolidColorBrush>
             <SolidColorBrush x:Key="SuccessPanelBackgroundBrush">#14251A</SolidColorBrush>
             <SolidColorBrush x:Key="SuccessPanelTextBrush">#4ADE80</SolidColorBrush>
             <SolidColorBrush x:Key="WarningPanelBackgroundBrush">#2A1F0F</SolidColorBrush>
@@ -131,6 +141,9 @@
             <SolidColorBrush x:Key="DangerPanelBackgroundBrush">#2A1414</SolidColorBrush>
             <SolidColorBrush x:Key="DangerPanelTextBrush">#FCA5A5</SolidColorBrush>
             <SolidColorBrush x:Key="DangerPanelBackgroundStrongBrush">#3A1A1A</SolidColorBrush>
+            <!-- 暗色涨跌标签字色：提亮同色相，压在 12% 色底上 ≥ 5.4（BullishBrush 原值仅 3.9–4.1） -->
+            <SolidColorBrush x:Key="BullishTagTextBrush">#FF6B70</SolidColorBrush>
+            <SolidColorBrush x:Key="BearishTagTextBrush">#3FCF6F</SolidColorBrush>
             <!-- 错误色（暗色）：#DC2626 在 #161616 卡片上仅 3.75，提亮到 #F87171 以满足正文 AA -->
             <SolidColorBrush x:Key="ErrorBrush">#F87171</SolidColorBrush>
 
@@ -151,11 +164,7 @@
     <SolidColorBrush x:Key="BearishBrush" Color="{StaticResource BearishGreen}"/>
     <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource Neutral}"/>
     <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
-    <SolidColorBrush x:Key="SuccessHoverBrush" Color="{StaticResource SuccessHover}"/>
-    <SolidColorBrush x:Key="SuccessPressedBrush" Color="{StaticResource SuccessPressed}"/>
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
-    <SolidColorBrush x:Key="WarningHoverBrush" Color="{StaticResource WarningHover}"/>
-    <SolidColorBrush x:Key="WarningPressedBrush" Color="{StaticResource WarningPressed}"/>
 
     <!-- 错误色按主题取值：暗色下 #DC2626 在卡片上对比度仅 3.75（低于正文 AA 4.5），
          故暗色改用更亮的红 #F87171（实测 6.54）。定义在 ThemeDictionaries 中。 -->

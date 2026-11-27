@@ -36,6 +36,7 @@ public partial class TradeMonitorViewModel
     {
         var confirmed = await _dialogService.ShowConfirmationAsync(
             "紧急停止",
+            $"当前环境：{CurrentEnvironmentText}\n\n" +
             "将停止市场监控、暂停全部策略并撤销本应用挂出的条件单（持仓保留）。\n\n" +
             "停止后新订单会被拒绝，需要逐个重新启用策略。是否继续？",
             "确认停止",
@@ -62,13 +63,16 @@ public partial class TradeMonitorViewModel
     [RelayCommand]
     private async Task StopAndCloseAllAsync()
     {
+        // 危险动作：确认钮用危险色，默认焦点与 Esc 落在“取消”，避免回车误触发市价平仓
         var confirmed = await _dialogService.ShowConfirmationAsync(
             "紧急停止并全部平仓",
+            $"当前环境：{CurrentEnvironmentText}\n\n" +
             "将停止监控、暂停全部策略、撤销条件单，并以市价卖出全部现货持仓、" +
             "平掉全部合约持仓。\n\n市价成交存在滑点风险，且此操作不可撤销。是否继续？",
             "确认全部平仓",
             "取消",
-            topmost: true);
+            topmost: true,
+            destructive: true);
         if (!confirmed)
             return;
 

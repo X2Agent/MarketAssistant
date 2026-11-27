@@ -3,7 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Applications.Telegrams;
 using MarketAssistant.ViewModels;
 
 namespace MarketAssistant.Views.Pages;
@@ -104,95 +103,4 @@ public partial class HomePageView : UserControl
                 break;
         }
     }
-
-    /// <summary>
-    /// 阻止事件冒泡
-    /// </summary>
-    private void OnPreventTapped(object? sender, TappedEventArgs e)
-    {
-        e.Handled = true;
-    }
-
-    /// <summary>
-    /// 热门资产卡片点击事件
-    /// </summary>
-    private void HotStockCard_Tapped(object? sender, RoutedEventArgs e)
-    {
-        ActivateHotAsset(sender);
-    }
-
-    private void HotStockCard_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (IsActivationKey(e))
-        {
-            ActivateHotAsset(sender);
-            e.Handled = true;
-        }
-    }
-
-    private void ActivateHotAsset(object? sender)
-    {
-        if (sender is Border border &&
-            border.Tag is HotAsset hotAsset &&
-            DataContext is HomePageViewModel viewModel)
-        {
-            viewModel.HotAssets.SelectHotAssetCommand.Execute(hotAsset);
-        }
-    }
-
-    /// <summary>
-    /// 最近查看资产卡片点击事件
-    /// </summary>
-    private void RecentStockCard_Tapped(object? sender, RoutedEventArgs e)
-    {
-        ActivateRecentAsset(sender);
-    }
-
-    private void RecentStockCard_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (IsActivationKey(e))
-        {
-            ActivateRecentAsset(sender);
-            e.Handled = true;
-        }
-    }
-
-    private void ActivateRecentAsset(object? sender)
-    {
-        if (sender is Border border &&
-            border.Tag is AssetItem assetItem &&
-            DataContext is HomePageViewModel viewModel)
-        {
-            viewModel.RecentAssets.SelectRecentAssetCommand.Execute(assetItem);
-        }
-    }
-
-    /// <summary>
-    /// 新闻卡片点击事件
-    /// </summary>
-    private void NewsCard_Tapped(object? sender, RoutedEventArgs e)
-    {
-        ActivateNews(sender);
-    }
-
-    private void NewsCard_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (IsActivationKey(e))
-        {
-            ActivateNews(sender);
-            e.Handled = true;
-        }
-    }
-
-    private void ActivateNews(object? sender)
-    {
-        if (sender is Border border &&
-            border.Tag is Telegram telegram &&
-            DataContext is HomePageViewModel viewModel)
-        {
-            viewModel.News.OpenNewsCommand.Execute(telegram);
-        }
-    }
-
-    private static bool IsActivationKey(KeyEventArgs e) => e.Key is Key.Enter or Key.Space;
 }

@@ -8,8 +8,9 @@ using MarketAssistant.Views.Windows;
 namespace MarketAssistant.Services.Dialog;
 
 /// <summary>
-/// Avalonia 平台的对话框服务，UI 模板定义在 <see cref="MessageDialogWindow"/> 与
-/// <see cref="InputDialogWindow"/>，本类仅负责窗口创建、UI 线程切换与结果回传。
+/// Avalonia 平台的对话框服务，UI 模板定义在 <see cref="MessageDialogWindow"/>、
+/// <see cref="TradeApprovalWindow"/> 与 <see cref="InputDialogWindow"/>，
+/// 本类仅负责窗口创建、UI 线程切换与结果回传。
 /// </summary>
 public class DialogService : IDialogService, IWindowService
 {
@@ -29,9 +30,9 @@ public class DialogService : IDialogService, IWindowService
     /// 取消令牌触发时主动关闭对话框，返回 false（取消语义）。
     /// </summary>
     /// <returns>如果用户点击确认返回 true，点击取消返回 false</returns>
-    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default, bool topmost = false)
+    public async Task<bool> ShowConfirmationAsync(string title, string message, string accept = "确认", string cancel = "取消", CancellationToken ct = default, bool topmost = false, bool destructive = false)
     {
-        var result = await ShowCustomDialogAsync(title, message, [accept, cancel], ct, topmost);
+        var result = await ShowCustomDialogAsync(title, message, [accept, cancel], ct, topmost, destructive);
         return result == accept;
     }
 
@@ -41,22 +42,45 @@ public class DialogService : IDialogService, IWindowService
     /// 避免"超时已自动拒绝但对话框仍挂在屏幕上、用户点击结果被丢弃"的错位。
     /// </summary>
     /// <returns>用户选择的按钮文本；取消令牌触发或无活动窗口时为 null</returns>
-    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons, CancellationToken ct = default, bool topmost = false)
+    public async Task<string?> ShowCustomDialogAsync(string title, string message, string[] buttons, CancellationToken ct = default, bool topmost = false, bool destructive = false)
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons, ct, topmost));
+            return await Dispatcher.UIThread.InvokeAsync(() => ShowCustomDialogAsync(title, message, buttons, ct, topmost, destructive));
         }
 
         var owner = GetActiveWindow();
         if (owner == null) return null;
 
         var dialog = new MessageDialogWindow();
-        dialog.SetContent(title, message, buttons);
+        dialog.SetContent(title, message, buttons, destructive);
         dialog.Topmost = topmost;
         using var cancelRegistration = ct.Register(() => Dispatcher.UIThread.Post(() => dialog.Close()));
         await dialog.ShowDialog(owner);
         return dialog.Result;
+    }
+
+    /// <summary>
+    /// 显示自动交易批准对话框。取消令牌触发时主动关闭窗口（视为拒绝），
+    /// 避免超时已自动拒绝但窗口仍挂在屏幕上、用户随后点击“批准”被丢弃的错位。
+    /// </summary>
+    /// <returns>仅用户点击“批准”时为 true；拒绝、Esc、关闭窗口、超时或无活动窗口均为 false</returns>
+    public async Task<bool> ShowTradeApprovalAsync(TradeApprovalRequest request, CancellationToken ct = default)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            return await Dispatcher.UIThread.InvokeAsync(() => ShowTradeApprovalAsync(request, ct));
+        }
+
+        var owner = GetActiveWindow();
+        if (owner == null) return false;
+
+        // 置顶：主窗口可能被全屏应用遮挡，非置顶的确认框会静默等到超时被拒绝
+        var window = new TradeApprovalWindow { Topmost = true };
+        window.SetContent(request);
+        using var cancelRegistration = ct.Register(() => Dispatcher.UIThread.Post(() => window.Close()));
+        await window.ShowDialog(owner);
+        return window.Approved;
     }
 
     /// <summary>

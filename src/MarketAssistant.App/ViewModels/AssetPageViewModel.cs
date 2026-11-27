@@ -164,11 +164,14 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     /// </summary>
     public bool SnapshotSkeletonVisible => SnapshotState.ShowSkeleton && IsSkeletonVisible;
 
-    /// <summary>当前价展示文本（按量级格式化，适配低价币）</summary>
-    public string CurrentPriceText => PriceFormatter.Format(CurrentPrice);
+    /// <summary>当前价展示文本（A 股按最小报价单位取位，虚拟币按量级取位）</summary>
+    public string CurrentPriceText => FormatPrice(CurrentPrice);
 
-    /// <summary>涨跌额展示文本（按量级格式化，适配低价币）</summary>
-    public string PriceChangeText => PriceFormatter.Format(PriceChange);
+    /// <summary>涨跌额展示文本（取位规则同当前价）</summary>
+    public string PriceChangeText => FormatPrice(PriceChange);
+
+    /// <summary>按当前市场与标的代码格式化价格；页头、价差与盘口档位共用，保证取位一致。</summary>
+    private string FormatPrice(decimal price) => PriceFormatter.Format(price, _marketContext.CurrentMarket, AssetCode);
 
     partial void OnCurrentPriceChanged(decimal value) => OnPropertyChanged(nameof(CurrentPriceText));
 
@@ -200,6 +203,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
                 return;
 
             OnPropertyChanged(nameof(SnapshotSkeletonVisible));
+            OnPropertyChanged(nameof(SnapshotSectionVisible));
             OnPropertyChanged(nameof(OrderBookSkeletonVisible));
         }
     }
@@ -524,7 +528,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
             MarketMetrics = metrics;
             // 快照存在但指标全无值时（如币安不提供市盈率/市净率）按空态处理，避免渲染空卡片
-            var hasMetricValue = metrics.Any(metric => metric.HasValue);
+            var hasMetricValue = metrics.Count > 0;
             SnapshotState = SnapshotState with
             {
                 State = snapshot is null || !hasMetricValue ? LoadState.Empty : LoadState.Ready,
@@ -671,7 +675,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         var levelText = levelCount > 0 ? $"{ChineseNumeral(levelCount)}档" : string.Empty;
         var spreadText = snapshot.Spread.HasValue
-            ? $"价差 {PriceFormatter.Format(snapshot.Spread.Value)}"
+            ? $"价差 {FormatPrice(snapshot.Spread.Value)}"
             : string.Empty;
         OrderBookSummaryText = string.Join(" · ", new[] { spreadText, levelText }.Where(text => text.Length > 0));
     }
@@ -702,7 +706,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
         OrderBookSummaryText = string.Empty;
     }
 
-    private static OrderBookLevelItem CreateOrderBookLevelItem(
+    private OrderBookLevelItem CreateOrderBookLevelItem(
         OrderBookLevel level,
         string levelLabel,
         decimal maxQuantity,
@@ -712,7 +716,7 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
 
         return new OrderBookLevelItem(
             LevelLabel: levelLabel,
-            PriceText: PriceFormatter.Format(level.Price),
+            PriceText: FormatPrice(level.Price),
             QuantityText: MarketValueFormatter.FormatQuantity(level.Quantity),
             AmountText: MarketValueFormatter.FormatAmount(level.Amount),
             DepthPercent: depthPercent,
@@ -721,15 +725,15 @@ public partial class AssetPageViewModel : ViewModelBase, INavigationAware<AssetN
     }
 
     /// <summary>构建行情数据指标。开高低收、成交量、成交额、振幅等逐 bar 数据由 K 线图图例展示，此处只保留快照级指标。
-    /// 数据源未提供的项保留占位（Value 为空）由界面隐藏，保证顺序稳定。</summary>
+    /// 数据源未提供的项直接略过（界面是两列等分网格，保留占位会留下空洞），其余项顺序固定。</summary>
     private static ObservableCollection<MarketMetricItem> BuildMarketMetrics(MarketSnapshot? snapshot) =>
-        new(
-        [
+        new(new[]
+        {
             new MarketMetricItem("换手率", MarketValueFormatter.FormatPercent(snapshot?.TurnoverRate)),
             new MarketMetricItem("量比", MarketValueFormatter.FormatRatio(snapshot?.VolumeRatio)),
             new MarketMetricItem("市盈率", MarketValueFormatter.FormatRatio(snapshot?.Pe)),
             new MarketMetricItem("市净率", MarketValueFormatter.FormatRatio(snapshot?.Pb))
-        ]);
+        }.Where(metric => metric.HasValue));
 
     private void CalculatePriceInfo(List<KLineData> data)
     {

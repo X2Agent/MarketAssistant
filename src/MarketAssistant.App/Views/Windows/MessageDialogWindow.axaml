@@ -26,8 +26,11 @@
                        TextAlignment="Center"
                        HorizontalAlignment="Center"/>
 
-            <!-- 按钮区域 -->
-            <ItemsControl Name="ButtonItemsControl">
+            <!-- 按钮区域：首个按钮是确认动作（主按钮；危险操作时为危险按钮）。
+                 危险操作的取消钮绑定 Esc 并在窗口打开后取得焦点，回车 / 空格默认落在安全侧。
+                 ItemsControl 默认 ClipToBounds=True，而这一行的高度正好等于按钮高度，
+                 不关掉的话取消钮的焦点环会被裁掉上下两边 -->
+            <ItemsControl Name="ButtonItemsControl" ClipToBounds="False">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal"
@@ -40,6 +43,8 @@
                         <Button Content="{Binding Text}"
                                 MinWidth="{StaticResource SmallButtonMinWidth}"
                                 Classes.btn-primary="{Binding IsPrimary}"
+                                Classes.btn-danger="{Binding IsDanger}"
+                                IsCancel="{Binding IsCancel}"
                                 Click="OnButtonClick"/>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

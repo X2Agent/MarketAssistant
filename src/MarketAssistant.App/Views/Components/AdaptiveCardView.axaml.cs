@@ -21,6 +21,8 @@ public partial class AdaptiveCardView : UserControl
     private const int ContainerSpacing = 8;
     private const int ContainerPadding = 12;
     private const int ContainerCornerRadius = 6;
+    private const int ColumnGutter = 16;
+    private const int SmallColumnGutter = 8;
 
     public static readonly StyledProperty<AdaptiveCard?> CardProperty =
         AvaloniaProperty.Register<AdaptiveCardView, AdaptiveCard?>(nameof(Card));
@@ -198,7 +200,16 @@ public partial class AdaptiveCardView : UserControl
         for (int i = 0; i < columnSet.Columns.Count; i++)
         {
             var col = columnSet.Columns[i];
-            var panel = new StackPanel { Spacing = 4 };
+            var panel = new StackPanel
+            {
+                Spacing = 4,
+                VerticalAlignment = col.VerticalContentAlignment switch
+                {
+                    AdaptiveVerticalContentAlignment.Center => VerticalAlignment.Center,
+                    AdaptiveVerticalContentAlignment.Bottom => VerticalAlignment.Bottom,
+                    _ => VerticalAlignment.Top
+                }
+            };
 
             foreach (var item in col.Items)
             {
@@ -209,7 +220,15 @@ public partial class AdaptiveCardView : UserControl
                 }
             }
 
-            var border = new Border { Child = panel };
+            // 卡片标准里 Spacing 表示"与前一个元素的间距"：列与列之间的间距由后一列的 Spacing 决定，
+            // 用左外边距实现，不另占列，这样 50% / 50% 的等宽列仍严格等宽
+            var gutter = i == 0 ? 0 : col.Spacing switch
+            {
+                AdaptiveSpacing.None => 0,
+                AdaptiveSpacing.Small => SmallColumnGutter,
+                _ => ColumnGutter
+            };
+            var border = new Border { Child = panel, Margin = new Thickness(gutter, 0, 0, 0) };
             Grid.SetColumn(border, i);
             grid.Children.Add(border);
         }

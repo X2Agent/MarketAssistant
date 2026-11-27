@@ -123,8 +123,20 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Clear()
+    private async Task ClearAsync()
     {
+        var credentialGroup = CredentialStatuses.First(status =>
+            status.Mode == (IsLiveMode ? TradingMode.LiveSpot : TradingMode.SpotDemo));
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "清除 API 密钥",
+            $"将清除「{credentialGroup.DisplayName}」的 API Key 与 Secret Key。\n\n" +
+            "清除后无法恢复，需重新输入才能继续使用。",
+            "清除",
+            "取消",
+            destructive: true);
+        if (!confirmed)
+            return;
+
         SafeExecute(() =>
         {
             _credentialStore.ClearCredentials(SelectedMode);
@@ -168,9 +180,10 @@ public partial class ApiKeyConfigViewModel : ViewModelBase
             {
                 var confirmed = await _dialogService.ShowConfirmationAsync(
                     "切换到实盘模式",
-                    "⚠️ 市场监控正在运行中！切换到实盘模式后，后续触发的交易将立即对真实账户下单。\n\n请确认是否继续切换到实盘模式？",
+                    "市场监控正在运行中！切换到实盘模式后，后续触发的交易将立即对真实账户下单。\n\n请确认是否继续切换到实盘模式？",
                     "确认切换",
-                    "取消");
+                    "取消",
+                    destructive: true);
 
                 if (!confirmed)
                 {

@@ -113,13 +113,14 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     /// <summary>告警历史子 ViewModel。</summary>
     public AlertHistoryViewModel AlertHistory { get; }
 
-    partial void OnSelectedTabIndexChanged(int value)
+    partial void OnSelectedTabIndexChanged(int oldValue, int newValue)
     {
         OnPropertyChanged(nameof(IsHistoryTabSelected));
         OnPropertyChanged(nameof(IsRulesTabSelected));
 
-        // 进入历史标签页即视为已阅：清除未读徽标（MainWindowViewModel 经 AlertsChanged 刷新）
-        if (value == 1)
+        // 离开历史标签页才视为已阅：停留期间列表用强调点 + 字重区分未读，用户才看得出哪些是新的
+        // （MainWindowViewModel 经 AlertsChanged 刷新导航未读徽标）
+        if (oldValue == 1 && newValue != 1)
             _ = AlertHistory.MarkAllReadCommand.ExecuteAsync(null);
     }
 
@@ -323,7 +324,8 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
             "删除告警",
             $"确定要删除 {rule.AssetName}({rule.AssetCode}) 的告警规则吗？",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
         if (!confirmed) return;
 
         await SafeExecuteAsync(async () =>
@@ -381,6 +383,10 @@ public partial class PriceAlertPageViewModel : ViewModelBase, INavigationAware<A
     public void OnNavigatedFrom()
     {
         _assetLoadCts?.Cancel();
+
+        // 带着历史标签页离开页面同样视为已阅
+        if (IsHistoryTabSelected)
+            _ = AlertHistory.MarkAllReadCommand.ExecuteAsync(null);
     }
 
     public void Dispose()

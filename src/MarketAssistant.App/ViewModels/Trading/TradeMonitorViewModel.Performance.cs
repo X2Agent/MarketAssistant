@@ -9,9 +9,33 @@ namespace MarketAssistant.ViewModels.Trading;
 /// </summary>
 public partial class TradeMonitorViewModel
 {
-    /// <summary>总体实盘绩效摘要（无平仓成交时显示引导文案）。</summary>
+    private const string EmptyPerformanceHint = "暂无平仓成交，成交后此处显示胜率 / 总盈亏 / 最大回撤";
+
+    /// <summary>是否已有实盘平仓成交（决定展示指标还是引导文案）。</summary>
     [ObservableProperty]
-    private string _overallPerformanceText = "暂无平仓成交，成交后此处显示胜率 / 盈亏比 / 最大回撤";
+    private bool _hasPerformance;
+
+    /// <summary>没有指标可展示时的说明：区分“还没有平仓成交”与“加载失败”。</summary>
+    [ObservableProperty]
+    private string _performanceHintText = EmptyPerformanceHint;
+
+    [ObservableProperty]
+    private int _performanceStrategyCount;
+
+    [ObservableProperty]
+    private int _performanceClosedTrades;
+
+    /// <summary>总体胜率（0-100）。</summary>
+    [ObservableProperty]
+    private decimal _performanceWinRatePercent;
+
+    /// <summary>各策略累计已实现盈亏之和（USDT）。</summary>
+    [ObservableProperty]
+    private decimal _performanceTotalPnl;
+
+    /// <summary>各策略最大回撤中的最大值（USDT）；不同策略的回撤发生在不同时段，不能相加。</summary>
+    [ObservableProperty]
+    private decimal _performanceMaxDrawdown;
 
     /// <summary>影子模式绩效摘要。</summary>
     [ObservableProperty]
@@ -23,19 +47,19 @@ public partial class TradeMonitorViewModel
         try
         {
             var performances = await _performanceService.GetAllAsync();
-            if (performances.Count == 0)
+            HasPerformance = performances.Count > 0;
+            if (HasPerformance)
             {
-                OverallPerformanceText = "暂无平仓成交，成交后此处显示胜率 / 盈亏比 / 最大回撤";
+                var closedTrades = performances.Sum(p => p.ClosedTrades);
+                PerformanceStrategyCount = performances.Count;
+                PerformanceClosedTrades = closedTrades;
+                PerformanceWinRatePercent = performances.Sum(p => p.WinningTrades) / (decimal)closedTrades * 100;
+                PerformanceTotalPnl = performances.Sum(p => p.TotalPnl);
+                PerformanceMaxDrawdown = performances.Max(p => p.MaxDrawdown);
             }
             else
             {
-                var closed = performances.Sum(p => p.ClosedTrades);
-                var won = performances.Sum(p => p.WinningTrades);
-                var pnl = performances.Sum(p => p.TotalPnl);
-                var drawdown = performances.Max(p => p.MaxDrawdown);
-                OverallPerformanceText =
-                    $"{performances.Count} 个策略 · 平仓 {closed} 笔 · 胜率 {won / (decimal)closed * 100:F1}% · "
-                    + $"总盈亏 {pnl:+0.00;-0.00;0.00} USDT · 最大回撤 {drawdown:F2} USDT";
+                PerformanceHintText = EmptyPerformanceHint;
             }
 
             var shadow = await _performanceService.GetShadowAsync();
@@ -47,6 +71,8 @@ public partial class TradeMonitorViewModel
         catch (Exception ex)
         {
             Logger?.LogWarning(ex, "加载策略绩效失败");
+            HasPerformance = false;
+            PerformanceHintText = "绩效加载失败，下次刷新时重试";
         }
     }
 }

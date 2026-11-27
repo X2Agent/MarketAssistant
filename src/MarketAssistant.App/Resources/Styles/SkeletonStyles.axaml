@@ -17,7 +17,7 @@
     <!-- ================================================================== -->
 
     <Style Selector="Border.skeleton">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource SkeletonBrush}"/>
         <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
         <Setter Property="Transitions">
             <Transitions>
@@ -87,8 +87,8 @@
 
     <!-- ===== SkeletonCard 卡片壳 =====
          四个形态的 Padding / CornerRadius 必须与真实卡片保持一致：
-           variant-card  == CardView（卡片底色 20 / 圆角 12）
-           variant-tile  == Border.hot-stock-card（次级表面 16 / 圆角 12）
+           variant-card  == CardView、AssetCardView.Card（卡片底色 20 / 圆角 12）
+           variant-tile  == AssetCardView.Tile（次级表面 16 / 圆角 12）
            variant-row   == 列表行与新闻行（卡片底色 16 / 圆角 8）
            variant-bare  == 无表面，仅用于"骨架块即灰条"的场合 -->
     <Style Selector="controls|SkeletonCard.variant-card">

@@ -11,7 +11,7 @@
     <!--  - 可点击卡片才给 hover 反馈；纯展示卡片保持静止。                      -->
     <!-- ================================================================== -->
 
-    <!-- 可点击卡片的 hover 由各页面按自身语义定义（如 fav-card / hot-stock-card），
+    <!-- 可点击卡片的 hover 由各自的控件或页面按自身语义定义（如 AssetCardView / mode-card），
          不再提供通用 card-interactive：它会把 Cursor=Hand 塞给任何卡片，
          让只读卡片看起来可点。 -->
 
@@ -26,9 +26,15 @@
         <!-- 内容内边距由页面自己给（ExpanderContentPadding），壳不再预留高度 -->
         <Setter Property="MinHeight" Value="0"/>
     </Style>
+    <!-- Fluent 的头部与内容区各自带描边，壳上的 BorderThickness 管不到它们；
+         v3 不画边框，分层靠表面色阶，所以这里单独清零。 -->
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader">
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Padding" Value="20,16"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Expander.section-card /template/ Border#ExpanderContent">
+        <Setter Property="BorderThickness" Value="0"/>
     </Style>
     <Style Selector="Expander.section-card /template/ ToggleButton#ExpanderHeader:pointerover">
         <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
@@ -48,25 +54,51 @@
     <!-- 卡片内标题统一用 card-title（16px + WeightTitle）；
          不再提供 section-card 专属的 section-title 类——它会和 card-title 抢同一层级。 -->
 
-    <!-- ===== 热门资产瓦片 ===== -->
-    <Style Selector="Border.hot-stock-card">
-        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+    <!-- ===== 行内折叠 ===== -->
+    <!-- 卡片内部的次要内容（AI 决策推理、高级选项）：不画壳，只留一行可点的标题。
+         裸用 Fluent Expander 会在卡片里画出头部与内容区两个描边框（暗色下是纯黑盒子），
+         和 v3 的“不画边框”冲突；整页级分组仍用 section-card。 -->
+    <Style Selector="Expander.inline">
+        <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
-        <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <BrushTransition Property="Background" Duration="0:0:0.15"/>
-            </Transitions>
-        </Setter>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <!-- Expander 默认 ClipToBounds=True。inline 的内容与卡片正文齐边（内边距 0），
+             里面输入框的聚焦环、标题向左多出的 8px 悬停热区都画在它的边界之外，不能裁剪；Fluent Expander 没有展开 / 收起动画，放开无副作用。 -->
+        <Setter Property="ClipToBounds" Value="False"/>
     </Style>
-    <Style Selector="Border.hot-stock-card:pointerover">
+    <!-- 负外边距抵消左内边距：标题文字与卡片正文左对齐，悬停底色向左多出 8px 形成点击热区。
+         标题用次要色小字号，读起来是“补充信息”而不是与正文同级的一行内容。 -->
+    <Style Selector="Expander.inline /template/ ToggleButton#ExpanderHeader">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
+        <Setter Property="Margin" Value="-8,0,0,0"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Expander.inline /template/ Border#ExpanderContent">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Expander.inline /template/ ToggleButton#ExpanderHeader:pointerover">
         <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
     </Style>
-    <Style Selector="Border.hot-stock-card:pointerover Button.favorite-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
+    <Style Selector="Expander.inline /template/ ToggleButton#ExpanderHeader:pressed">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
+    <Style Selector="Expander.inline /template/ ToggleButton#ExpanderHeader:pointerover /template/ Border#ExpandCollapseChevronBorder">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Expander.inline /template/ ToggleButton#ExpanderHeader:pressed /template/ Border#ExpandCollapseChevronBorder">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
 
     <!-- ===== 选股模式卡片 ===== -->
@@ -149,9 +181,10 @@
         <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
     </Style>
 
-    <!-- 说明：语义面板（panel-success/warning/danger/info）与通用 tag 类已下线。
+    <!-- 说明：语义面板（panel-success/warning/danger/info）的通用类已下线。
          仓库内每个面板都自带具体底色与内边距，通用类零使用；
          留着会让人以为"语义面板有一套统一外观"，实际改它不影响任何页面。
+         状态标签后来在十余处重复手写，已收敛为 StatusTag 控件（Views/Controls/StatusTag.axaml）。
          需要新面板时直接给 Background 绑定对应的 XxxPanelBackgroundBrush 令牌。 -->
 
 </Styles>

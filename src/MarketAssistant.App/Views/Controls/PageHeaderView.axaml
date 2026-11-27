@@ -5,7 +5,8 @@
     <!-- ================================================================== -->
     <!-- PageHeaderView — 标题 24 + 行内说明 12 + 右侧操作槽                          -->
     <!--                                                                             -->
-    <!-- 全库唯一使用点是自选页：它的操作槽承载「卡片视图 / 表格视图」切换。            -->
+    <!-- 只在操作槽里有真实操作时使用：自选页（「卡片视图 / 表格视图」切换）、            -->
+    <!-- AI 选股/选币结果头（「新的选股」）。                                         -->
     <!-- 其它页面不再写页头——根页面标题由左侧导航表达，二级页面标题由返回窄条表达。     -->
     <!-- 说明与标题同行，窄窗下 TextTrimming 截断，不出现两行页头。                     -->
     <!-- 排版属性与 TextStyles 的 title / caption 同令牌，保持视觉一致。                 -->
@@ -15,7 +16,7 @@
             <ControlTemplate TargetType="controls:PageHeaderView">
                 <Grid ColumnDefinitions="Auto,*,Auto"
                       VerticalAlignment="Center"
-                      Margin="{StaticResource BottomMargin}">
+                      Margin="{StaticResource NoMargin}">
                     <TextBlock Grid.Column="0"
                                Text="{TemplateBinding Title}"
                                FontSize="{StaticResource TitleFontSize}"

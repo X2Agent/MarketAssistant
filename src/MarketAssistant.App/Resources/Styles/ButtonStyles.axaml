@@ -25,6 +25,8 @@
         <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
         <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
         <Setter Property="Background" Value="Transparent"/>
+        <!-- 关闭 Fluent 默认的黑色方框焦点装饰：键盘焦点统一走下方的 FocusRing -->
+        <Setter Property="FocusAdorner" Value="{x:Null}"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
@@ -47,9 +49,18 @@
     <Style Selector="Button.btn-primary:disabled">
         <Setter Property="Opacity" Value="0.4"/>
     </Style>
-    <Style Selector="Button.btn-primary:focus-visible /template/ ContentPresenter">
+
+    <!-- 键盘焦点环：所有按钮变体共用，仅 Tab / 方向键导航时出现，鼠标点击不会触发。
+         Avalonia 的 Button 默认 ClipToBounds=True，焦点环画在边界之外会被裁成四个角，
+         所以获得键盘焦点时临时关闭裁剪。危险确认框把默认焦点放在“取消”上，
+         靠这道环让用户看见回车会落在哪个按钮。 -->
+    <Style Selector="Button:focus-visible">
+        <Setter Property="ClipToBounds" Value="False"/>
+    </Style>
+    <Style Selector="Button:focus-visible /template/ ContentPresenter">
         <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
     </Style>
+
     <!-- ===== Secondary：次要操作，色阶底，无描边 ===== -->
     <Style Selector="Button.btn-secondary">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
@@ -225,30 +236,8 @@
         <Setter Property="Opacity" Value="0.45"/>
     </Style>
 
-    <!-- 成功 / 警告 / 信息按钮：语义实底，仅用于确认类动作 -->
-    <Style Selector="Button.success">
-        <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-    </Style>
-    <Style Selector="Button.success:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource SuccessHoverBrush}"/>
-    </Style>
-    <Style Selector="Button.success:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource SuccessPressedBrush}"/>
-    </Style>
-
-    <Style Selector="Button.warning">
-        <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
-        <Setter Property="Foreground" Value="{StaticResource TextOnEmphasisBrush}"/>
-        <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-    </Style>
-    <Style Selector="Button.warning:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource WarningHoverBrush}"/>
-    </Style>
-    <Style Selector="Button.warning:pressed /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource WarningPressedBrush}"/>
-    </Style>
+    <!-- 语义实底按钮（success / warning）已下线：全库只有 btn-primary 一个强调色按钮，
+         成功 / 警告语义靠 StatusBanner 与语义图标表达，不再做绿色、橙色的实底按钮。 -->
 
     <!-- 信息按钮：中性色阶，不用强调色。
          v3 规定一个视图只允许一个 btn-primary；若此处也用强调色，
@@ -283,19 +272,4 @@
     <Style Selector="Button.feature-button:pressed">
         <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
     </Style>
-
-    <!-- 悬停才出现的删除/收藏按钮 -->
-    <Style Selector="Button.delete-button, Button.favorite-button">
-        <Setter Property="Opacity" Value="0"/>
-        <Setter Property="IsHitTestVisible" Value="False"/>
-        <Setter Property="Transitions">
-            <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
-            </Transitions>
-        </Setter>
-    </Style>
-    <Style Selector="Button.favorite-button">
-        <Setter Property="Background" Value="Transparent"/>
-    </Style>
-
 </Styles>

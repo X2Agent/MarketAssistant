@@ -50,7 +50,11 @@ public class SkeletonLines : StackPanel
     public static readonly StyledProperty<int> LineCountProperty =
         AvaloniaProperty.Register<SkeletonLines, int>(nameof(LineCount), 1);
 
-    /// <summary>每行宽度，逗号分隔；<c>*</c> 表示撑满，条目少于行数时后续行沿用最后一个宽度。</summary>
+    /// <summary>
+    /// 每行宽度，逗号分隔；<c>*</c> 表示该行撑满。<b>行数以条目数为准</b>：
+    /// 只想要 N 行撑满的灰条时不要写此项，只写 <see cref="LineCount"/>
+    /// （<c>LineCount="N" LineWidths="*"</c> 只会得到 1 行）。
+    /// </summary>
     public static readonly StyledProperty<string?> LineWidthsProperty =
         AvaloniaProperty.Register<SkeletonLines, string?>(nameof(LineWidths));
 

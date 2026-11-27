@@ -305,12 +305,7 @@ public class KLineChartView : UserControl
 
             ShowLoading();
 
-            string htmlContent = await LoadHtmlContentAsync("kline_chart.html");
-            if (string.IsNullOrEmpty(htmlContent))
-            {
-                ShowError("无法加载图表 HTML 文件");
-                return;
-            }
+            var htmlContent = await LoadChartHtmlAsync();
 
             var webView = EnsureWebView();
             if (webView == null)
@@ -330,112 +325,23 @@ public class KLineChartView : UserControl
         }
     }
 
-    private async Task<string> LoadHtmlContentAsync(string htmlFileName)
+    /// <summary>
+    /// 读取内嵌的 K 线页面，并把 KLineCharts 脚本内联进去（NavigateToString 无法解析相对路径的脚本引用）。
+    /// 两个文件都随 Assets\** 打进程序集，缺失即构建问题，异常交给 InitializeChartAsync 统一展示。
+    /// </summary>
+    private static async Task<string> LoadChartHtmlAsync()
     {
-        try
-        {
-            var html = await LoadRawAssetTextAsync(htmlFileName);
-            if (!string.IsNullOrEmpty(html))
-            {
-                const string bundlePlaceholder = "/* __KLINECHARTS_BUNDLE__ */";
-                if (html.Contains(bundlePlaceholder, StringComparison.Ordinal))
-                {
-                    var bundleScript = await LoadRawAssetTextAsync("klinecharts.min.js");
-                    if (!string.IsNullOrEmpty(bundleScript))
-                    {
-                        html = html.Replace(bundlePlaceholder, bundleScript, StringComparison.Ordinal);
-                    }
-                }
-                return html;
-            }
-
-            return GetDefaultChartHtml();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"加载图表 HTML 内容失败，回退到默认图表: {ex.Message}");
-            return GetDefaultChartHtml();
-        }
+        var html = await LoadRawAssetTextAsync("kline_chart.html");
+        var bundleScript = await LoadRawAssetTextAsync("klinecharts.min.js");
+        return html.Replace("/* __KLINECHARTS_BUNDLE__ */", bundleScript, StringComparison.Ordinal);
     }
 
-    private static async Task<string?> LoadRawAssetTextAsync(string fileName)
+    private static async Task<string> LoadRawAssetTextAsync(string fileName)
     {
-        var assetUri = new Uri($"avares://MarketAssistant/Assets/Raw/{fileName}");
-        if (AssetLoader.Exists(assetUri))
-        {
-            using var stream = AssetLoader.Open(assetUri);
-            using var reader = new StreamReader(stream);
-            return await reader.ReadToEndAsync();
-        }
-
-        var appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        var filePath = Path.Combine(appDirectory, "Assets", "Raw", fileName);
-        if (File.Exists(filePath))
-        {
-            return await File.ReadAllTextAsync(filePath);
-        }
-
-        return null;
+        using var stream = AssetLoader.Open(new Uri($"avares://MarketAssistant/Assets/Raw/{fileName}"));
+        using var reader = new StreamReader(stream);
+        return await reader.ReadToEndAsync();
     }
-
-    private string GetDefaultChartHtml() => @"<!DOCTYPE html>
-<html lang=""zh-CN"">
-<head>
-    <meta charset=""UTF-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>K线图表</title>
-    <!-- 仓库未内置 ECharts 本地资源，此处回退到 CDN -->
-    <script src=""https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js""></script>
-    <style>
-        body { margin: 0; padding: 10px; font-family: Arial, sans-serif; background-color: #161616; color: #EDEDED; }
-        #chartContainer { width: 100%; height: 400px; }
-        .loading { text-align: center; padding: 20px; color: #A0A0A0; }
-    </style>
-</head>
-<body>
-    <div id=""chartContainer""><div class=""loading"">正在加载图表数据...</div></div>
-    <script>
-        window.stockChartInterface = {
-            chart: null,
-            init: function() {
-                this.chart = echarts.init(document.getElementById('chartContainer'));
-                this.chart.setOption({
-                    title: { text: 'K线图', left: 'center' },
-                    tooltip: { trigger: 'axis' },
-                    xAxis: { type: 'category', data: [] },
-                    yAxis: { type: 'value' },
-                    series: [{ type: 'candlestick', data: [], itemStyle: { color: '#E5484D', color0: '#16A34A', borderColor: '#E5484D', borderColor0: '#16A34A' } }]
-                });
-            },
-            setLoading: function(loading) {
-                if (!this.chart) return;
-                if (loading) {
-                    this.chart.showLoading('default', { text: '正在加载...', color: '#0066FF', textColor: '#A0A0A0', maskColor: 'rgba(22, 22, 22, 0.8)' });
-                } else {
-                    this.chart.hideLoading();
-                }
-            },
-            loadData: function(klineData) {
-                if (!this.chart || !klineData) return;
-                const dates = klineData.map(item => item.date || item.Date);
-                const values = klineData.map(item => [
-                    parseFloat(item.open || item.Open || 0),
-                    parseFloat(item.close || item.Close || 0),
-                    parseFloat(item.low || item.Low || 0),
-                    parseFloat(item.high || item.High || 0)
-                ]);
-                this.chart.setOption({ xAxis: { data: dates }, series: [{ data: values }] });
-            },
-            setError: function(hasError, message) {
-                if (hasError) {
-                    document.getElementById('chartContainer').innerHTML = '<div class=""loading"" style=""color: #F87171;"">加载失败: ' + message + '</div>';
-                }
-            }
-        };
-        document.addEventListener('DOMContentLoaded', function() { window.stockChartInterface.init(); });
-    </script>
-</body>
-</html>";
 
     private void ShowLoading()
     {

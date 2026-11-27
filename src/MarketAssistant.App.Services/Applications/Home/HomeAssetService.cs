@@ -1,31 +1,22 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
-using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Dialog;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Home;
 
 /// <summary>
-/// 首页资产服务：封装搜索、热门、历史与收藏流程。
+/// 首页资产服务：封装搜索、热门与历史流程。
 /// 通过 <see cref="ServiceKeyAttribute"/> 从 Keyed DI 注册键自动获取市场类型，
 /// 构造时一次性解析同市场的 keyed 依赖。
 /// </summary>
 public sealed class HomeAssetService(
     [ServiceKey] MarketType marketType,
-    IServiceProvider serviceProvider,
-    IDialogService dialogService,
-    ILogger<HomeAssetService> logger) : IHomeAssetService
+    IServiceProvider serviceProvider) : IHomeAssetService
 {
     private readonly IAssetInfoService _assetInfoService = serviceProvider.GetRequiredKeyedService<IAssetInfoService>(marketType);
     private readonly IAssetHistoryService _historyService = serviceProvider.GetRequiredKeyedService<IAssetHistoryService>(marketType);
-    private readonly IFavoriteService _favoriteService = serviceProvider.GetRequiredKeyedService<IFavoriteService>(marketType);
-    private readonly IDialogService _dialogService = dialogService;
-    private readonly ILogger<HomeAssetService> _logger = logger;
-    private readonly MarketType _marketType = marketType;
 
     public async Task<List<AssetItem>> SearchAssetAsync(string query, CancellationToken cancellationToken = default)
     {
@@ -45,76 +36,4 @@ public sealed class HomeAssetService(
 
     public async Task AddToRecentAssetsAsync(AssetItem asset, CancellationToken cancellationToken = default)
         => await _historyService.AddHistoryAsync(asset, cancellationToken);
-
-    public async Task<bool> AddToFavoriteAsync(object assetParameter)
-    {
-        if (!TryMapFavoriteAsset(assetParameter, out var code, out var market, out var assetName, out var errorMessage))
-        {
-            if (!string.IsNullOrWhiteSpace(errorMessage))
-            {
-                _logger.LogWarning("添加到收藏失败: {Reason}", errorMessage);
-                await _dialogService.ShowMessageAsync("错误", errorMessage);
-            }
-            return false;
-        }
-
-        if (await _favoriteService.IsFavoriteAsync(code, market))
-        {
-            await _dialogService.ShowMessageAsync("提示", "该资产已在自选列表中");
-            return false;
-        }
-
-        var confirmed = await _dialogService.ShowConfirmationAsync(
-            "加入自选",
-            $"确定要将 {assetName} 加入自选列表吗？",
-            "确认",
-            "取消");
-
-        if (!confirmed)
-            return false;
-
-        await _favoriteService.AddFavoriteAsync(code, market);
-        await _dialogService.ShowMessageAsync("加入自选成功", $"已将 {assetName} 加入自选列表");
-        return true;
-    }
-
-    private bool TryMapFavoriteAsset(
-        object assetParameter,
-        out string code,
-        out string market,
-        out string assetName,
-        out string? errorMessage)
-    {
-        errorMessage = null;
-        code = string.Empty;
-        market = string.Empty;
-        assetName = string.Empty;
-
-        if (assetParameter is HotAsset hotAsset)
-        {
-            assetName = hotAsset.Name;
-            market = _marketType == MarketType.AShare ? hotAsset.Market : string.Empty;
-            code = FavoriteCodeNormalizer.Normalize(hotAsset.Code, _marketType);
-            return true;
-        }
-
-        if (assetParameter is AssetItem assetItem)
-        {
-            assetName = assetItem.Name;
-
-            // A 股保留交易所标记（如 sh600519 → Market: SH, Code: 600519）；虚拟币无标记。
-            // 前缀识别统一走 StockSymbolConverter（沪深京一套规则）
-            market = string.Empty;
-            if (_marketType == MarketType.AShare)
-            {
-                (market, _) = StockSymbolConverter.SplitExchangePrefix(assetItem.Code);
-            }
-
-            code = FavoriteCodeNormalizer.Normalize(assetItem.Code, _marketType);
-            return true;
-        }
-
-        errorMessage = "添加到收藏失败：参数类型不匹配";
-        return false;
-    }
 }

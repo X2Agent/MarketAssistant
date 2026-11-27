@@ -67,7 +67,7 @@ public class CryptoAssetInfoService(
             Name = ExtractBaseCurrency(ticker.Symbol),
             MarketType = MarketType.Crypto,
             Market = "Binance",
-            CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
+            CurrentPrice = PriceFormatter.Format(ticker.LastPrice, MarketType.Crypto),
             ChangePercentage = FormatPercentage(ticker.PriceChangePercent),
             Volume24h = FormatVolume(ticker.Volume),
             MarketCap = await FetchMarketCapAsync(ExtractBaseCurrency(ticker.Symbol), cancellationToken)
@@ -127,7 +127,7 @@ public class CryptoAssetInfoService(
                 Name = ExtractBaseCurrency(ticker.Symbol),
                 MarketType = MarketType.Crypto,
                 Market = "Binance",
-                CurrentPrice = PriceFormatter.Format(ticker.LastPrice),
+                CurrentPrice = PriceFormatter.Format(ticker.LastPrice, MarketType.Crypto),
                 // 批量接口使用 type=MINI，不返回 priceChangePercent，需回退按 openPrice/lastPrice 计算
                 ChangePercentage = ticker.PriceChangePercent.HasValue
                     ? FormatPercentage(ticker.PriceChangePercent)
@@ -167,7 +167,7 @@ public class CryptoAssetInfoService(
                 Name = ExtractBaseCurrency(t.Symbol),
                 Code = t.Symbol,
                 Market = "Binance",
-                CurrentPrice = PriceFormatter.Format(t.LastPrice),
+                CurrentPrice = PriceFormatter.Format(t.LastPrice, MarketType.Crypto),
                 ChangePercentage = FormatOpenClosePercentage(t.OpenPrice, t.LastPrice),
                 MarketType = MarketType.Crypto,
                 MetricLabel = "交易量",

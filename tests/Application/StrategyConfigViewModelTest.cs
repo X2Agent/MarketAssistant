@@ -84,7 +84,61 @@ public sealed class StrategyConfigViewModelTest
                 It.IsAny<TradingStrategy>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private static (StrategyConfigViewModel ViewModel, Mock<TradingStrategyService> StrategyService) CreateViewModel()
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task DeleteStrategy_UserCancels_ShouldKeepStrategyAndSkipDeletion()
+    {
+        var dialog = CreateConfirmationDialog(confirmed: false);
+        var (viewModel, strategyService) = CreateViewModel(dialog.Object);
+        using var disposable = viewModel;
+        var strategy = new TradingStrategy { Symbol = "BTCUSDT", Type = StrategyType.StopLoss };
+        viewModel.Strategies.Add(strategy);
+
+        await viewModel.DeleteStrategyCommand.ExecuteAsync(strategy);
+
+        CollectionAssert.Contains(viewModel.Strategies, strategy);
+        strategyService.Verify(s => s.DeleteStrategyAsync(
+                It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task DeleteStrategy_UserConfirms_ShouldWarnAboutConditionOrdersThenDelete()
+    {
+        var dialog = CreateConfirmationDialog(confirmed: true);
+        var (viewModel, strategyService) = CreateViewModel(dialog.Object);
+        using var disposable = viewModel;
+        var strategy = new TradingStrategy { Symbol = "BTCUSDT", Type = StrategyType.StopLoss };
+        viewModel.Strategies.Add(strategy);
+
+        await viewModel.DeleteStrategyCommand.ExecuteAsync(strategy);
+
+        Assert.AreEqual(0, viewModel.Strategies.Count);
+        strategyService.Verify(s => s.DeleteStrategyAsync(
+                strategy.Id, It.IsAny<CancellationToken>()), Times.Once);
+        dialog.Verify(d => d.ShowConfirmationAsync(
+                "删除策略",
+                It.Is<string>(message => message.Contains("BTCUSDT · 止损") && message.Contains("条件单")),
+                "删除",
+                "取消",
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>(),
+                true),
+            Times.Once);
+    }
+
+    private static Mock<IDialogService> CreateConfirmationDialog(bool confirmed)
+    {
+        var dialog = new Mock<IDialogService>();
+        dialog.Setup(d => d.ShowConfirmationAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<CancellationToken>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ReturnsAsync(confirmed);
+        return dialog;
+    }
+
+    private static (StrategyConfigViewModel ViewModel, Mock<TradingStrategyService> StrategyService) CreateViewModel(
+        IDialogService? dialogService = null)
     {
         var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
         dataService.Setup(s => s.LoadRiskConfigAsync(It.IsAny<CancellationToken>()))
@@ -100,7 +154,7 @@ public sealed class StrategyConfigViewModelTest
             strategyService.Object,
             dataService.Object,
             monitor.Object,
-            Mock.Of<IDialogService>(),
+            dialogService ?? Mock.Of<IDialogService>(),
             portfolioService.Object,
             Mock.Of<INotificationService>(),
             NullLogger<StrategyConfigViewModel>.Instance);

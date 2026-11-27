@@ -268,17 +268,21 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             return;
         }
 
-        config.IsEnabled = !config.IsEnabled;
-        _configService.AddOrUpdateConfig(config);
-        _mcpToolProvider.Invalidate();
-
-        // 正在编辑同一台服务器时同步表单字段，否则点「保存」会把开关拨回原值
-        if (_editingConfig is not null && _editingConfig.Id == config.Id)
+        SafeExecute(() =>
         {
-            _editingConfig.IsEnabled = config.IsEnabled;
-        }
+            config.IsEnabled = !config.IsEnabled;
+            try { _configService.AddOrUpdateConfig(config); }
+            catch { config.IsEnabled = !config.IsEnabled; throw; }
+            _mcpToolProvider.Invalidate();
 
-        Logger?.LogInformation("MCP 服务器启用状态切换: {Name} -> {Enabled}", config.Name, config.IsEnabled);
+            // 正在编辑同一台服务器时同步表单字段，否则点「保存」会把开关拨回原值
+            if (_editingConfig is not null && _editingConfig.Id == config.Id)
+            {
+                _editingConfig.IsEnabled = config.IsEnabled;
+            }
+
+            Logger?.LogInformation("MCP 服务器启用状态切换: {Name} -> {Enabled}", config.Name, config.IsEnabled);
+        }, "切换 MCP 服务器状态");
     }
 
     /// <summary>
@@ -447,7 +451,8 @@ public partial class MCPConfigPageViewModel : ViewModelBase, INavigationAware
             "确认删除",
             "确定要删除此服务器配置吗？此操作无法撤销。",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
 
         if (confirmed)
         {

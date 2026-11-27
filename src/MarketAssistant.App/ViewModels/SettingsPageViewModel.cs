@@ -328,7 +328,8 @@ public partial class SettingsPageViewModel : ViewModelBase, IDisposable
                     "切换到实盘模式",
                     "市场监控正在运行。保存后会先停止监控并切换到实盘模式，后续触发的交易将发送到真实账户。\n\n请确认是否继续？",
                     "确认切换",
-                    "取消");
+                    "取消",
+                    destructive: true);
 
                 if (!confirmed)
                 {

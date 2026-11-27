@@ -15,10 +15,11 @@
     <UserControl.Resources>
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
         <converters:PriceTextConverter x:Key="PriceTextConverter"/>
-        <!-- 新建策略从栏宽度：MinWidth 保证表单字段不被压扁，MaxWidth 保证主列表有足够空间 -->
-        <x:Double x:Key="StrategyDrawerWidth">320</x:Double>
-        <!-- 从栏内容滚动上限：避免表单过长把页面撑出视口 -->
-        <x:Double x:Key="StrategyDrawerMaxHeight">560</x:Double>
+        <!-- 新建策略从栏宽度：360 才放得下“风险档案”三段分段控件与带单位的字段标签，
+             320 时分段控件会越过卡片右缘被裁掉 -->
+        <x:Double x:Key="StrategyDrawerWidth">360</x:Double>
+        <!-- 从栏内容滚动上限：只约束表单区；“创建策略”与校验提示固定在滚动区外，始终可见 -->
+        <x:Double x:Key="StrategyDrawerMaxHeight">520</x:Double>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -67,6 +68,7 @@
         </Style>
         <!-- 风险档案分段选择胶囊 -->
         <Style Selector="RadioButton.profile-chip">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="{StaticResource SegmentButtonPadding}"/>
             <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -120,13 +122,15 @@
                                        Margin="{StaticResource LeftMargin}">
                     <StackPanel Spacing="{StaticResource SmallSpacing}">
                         <controls:SkeletonLines Row="Body" LineWidths="88"/>
-                        <controls:SkeletonLines Row="BodySm" LineCount="3" LineWidths="*"/>
+                        <controls:SkeletonLines Row="BodySm" LineCount="3"/>
                     </StackPanel>
                 </controls:SkeletonCard>
             </Grid>
 
-    <!-- 策略列表（主） / 新建策略（从，创建时浮出右栏） -->
-    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding !IsInitialLoading}">
+    <!-- 策略列表（主） / 新建策略（从，创建时浮出右栏）。
+         只在加载成功后显示：加载失败时列表与风控配置都是未知的，
+         不能再显示"暂无策略"（把失败伪装成空）或开放新建 / 保存入口 -->
+    <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsReady}">
             <controls:CardView>
                 <controls:CardView.Header>
                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
@@ -154,8 +158,10 @@
                                            Text="监控未启动" IsVisible="{Binding !IsMonitorRunning}"/>
                             </StackPanel>
                         </StackPanel>
+                        <!-- 创建表单展开后，主操作让给表单里的「创建策略」；这里的「取消」降为次要 -->
                         <Button Grid.Column="1"
-                                Classes="btn-primary"
+                                Classes.btn-primary="{Binding !IsCreating}"
+                                Classes.btn-secondary="{Binding IsCreating}"
                                 Command="{Binding ToggleCreateFormCommand}"
                                 VerticalAlignment="Center">
                             <Panel>
@@ -187,22 +193,14 @@
                                                     IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Active}}"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ToggleStrategyCommand}"
                                                     CommandParameter="{Binding}"/>
-                                            <!-- Paused 状态：显示「启动」操作 -->
+                                            <!-- Paused 状态：显示「启动」操作。每行都有，不能是主按钮：
+                                                 页面的主操作只有一个（新建 / 提交） -->
                                             <Button Content="启动"
-                                                    Classes="btn-primary"
+                                                    Classes="btn-secondary"
                                                     IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Paused}}"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ToggleStrategyCommand}"
                                                     CommandParameter="{Binding}"/>
-                                            <!-- Completed 状态：禁用，提示不可操作 -->
-                                            <Button Content="已完成"
-                                                    Classes="btn-secondary"
-                                                    IsEnabled="False"
-                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Completed}}"/>
-                                            <!-- Failed 状态：禁用，标红提示 -->
-                                            <Button Content="失败"
-                                                    Classes="btn-danger"
-                                                    IsEnabled="False"
-                                                    IsVisible="{Binding Status, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static models:StrategyStatus.Failed}}"/>
+                                            <!-- 已完成 / 失败：状态已由行内状态标签表达，不再放一个禁用按钮重复同一个词 -->
                                             <Button Content="历史"
                                                     Classes="btn-secondary"
                                                     Command="{Binding $parent[ItemsControl].((vm:StrategyConfigViewModel)DataContext).ViewHistoryCommand}"
@@ -230,10 +228,11 @@
                     <controls:CardView.Header>
                         <TextBlock Text="新建策略" Classes="card-title"/>
                     </controls:CardView.Header>
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
                     <ScrollViewer MaxHeight="{StaticResource StrategyDrawerMaxHeight}"
                                   HorizontalScrollBarVisibility="Disabled">
-                    <!-- 新建表单（三场景卡片向导） -->
-                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                    <!-- 新建表单（三场景卡片向导）。右侧留出滚动条的位置，避免滚动条压在输入框上 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="0,0,12,0">
 
                         <!-- 场景卡片：唯一创建入口 -->
                         <RadioButton GroupName="Scenario" IsChecked="{Binding IsAISmartScenario}" Classes="scenario-card">
@@ -276,39 +275,29 @@
                             </StackPanel>
                         </RadioButton>
 
-                        <!-- 风险档案：驱动参数预填与引擎兜底护栏，分段胶囊样式 -->
+                        <!-- 风险档案：驱动参数预填与引擎兜底护栏。标签在上、三段等宽分段控件铺满一行，
+                             不再与标签挤在同一行（窄栏里会越过卡片右缘被裁掉） -->
                         <StackPanel Spacing="{StaticResource TinySpacing}">
-                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="风险档案" VerticalAlignment="Center" Classes="form-label"/>
-                                <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                        CornerRadius="{StaticResource SmallCornerRadius}"
-                                        Padding="{StaticResource TinyPadding}"
-                                        VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsConservativeProfile}">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_shield.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
-                                                <TextBlock Text="保守" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </RadioButton>
-                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsBalancedProfile}">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_scale.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
-                                                <TextBlock Text="稳健" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </RadioButton>
-                                        <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsAggressiveProfile}">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_rocket.svg" Width="{StaticResource MiniIconSize}" Height="{StaticResource MiniIconSize}" VerticalAlignment="Center"/>
-                                                <TextBlock Text="进取" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </RadioButton>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                            <TextBlock Text="影响各场景参数预填与引擎兜底护栏（创建后可在高级参数中手动调整）"
-                                       FontSize="{StaticResource CaptionFontSize}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock Text="风险档案" Classes="form-label"/>
+                            <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                    CornerRadius="{StaticResource SmallCornerRadius}"
+                                    Padding="{StaticResource TinyPadding}">
+                                <UniformGrid Columns="3">
+                                    <!-- 只放文字：图标是固定蓝色，选中态底色也是强调蓝，选中的那一段图标会消失，
+                                         三段看起来不一致 -->
+                                    <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsConservativeProfile}">
+                                        <TextBlock Text="保守" HorizontalAlignment="Center"/>
+                                    </RadioButton>
+                                    <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsBalancedProfile}">
+                                        <TextBlock Text="稳健" HorizontalAlignment="Center"/>
+                                    </RadioButton>
+                                    <RadioButton GroupName="RiskProfile" Classes="profile-chip" IsChecked="{Binding IsAggressiveProfile}">
+                                        <TextBlock Text="进取" HorizontalAlignment="Center"/>
+                                    </RadioButton>
+                                </UniformGrid>
+                            </Border>
+                            <TextBlock Classes="caption" TextWrapping="Wrap"
+                                       Text="决定各场景参数的预填值与引擎兜底护栏，预填值可在下方表单中修改"/>
                         </StackPanel>
 
                         <!-- 共用字段 -->
@@ -322,15 +311,11 @@
                                 <TextBlock Text="单次开仓预算 (USDT)" Classes="form-label"/>
                                 <TextBox Text="{Binding AiBudgetUsdt}" PlaceholderText="如 100"/>
                             </StackPanel>
-                            <StackPanel Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="方向" Classes="form-label"/>
-                                <TextBlock Classes="caption" TextWrapping="Wrap"
-                                           Text="由 AI 决策驱动：合约可开多或开空，现货仅做多（SELL 决策视为离场）。"/>
-                            </StackPanel>
-                            <TextBlock Text="止盈止损位由 AI 决策给出；置信度不足自动 HOLD，下单量随置信度浮动，仓位上限由系统强制执行。"
-                                       Classes="caption" TextWrapping="Wrap"/>
-                            <Expander Header="高级参数（已按风险档案预填）" HorizontalAlignment="Stretch">
-                                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                            <!-- 方向与止盈止损都不是表单字段，合并成一段说明，避免“方向”只有标签没有输入框 -->
+                            <TextBlock Classes="caption" TextWrapping="Wrap"
+                                       Text="方向与止盈止损位均由 AI 决策给出：合约可开多或开空，现货仅做多（SELL 决策视为离场）。置信度不足自动 HOLD，下单量随置信度浮动，仓位上限由系统强制执行。"/>
+                            <Expander Classes="inline" Header="高级参数（已按风险档案预填）" HorizontalAlignment="Stretch">
+                                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource TinyTopMargin}">
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
                                         <TextBlock Text="分析间隔 (秒)" Classes="form-label"/>
                                         <TextBox Text="{Binding AiIntervalSeconds}"/>
@@ -426,8 +411,8 @@
                                 <TextBlock Text="止损线 (% 持仓均价)" Classes="form-label"/>
                                 <TextBox Text="{Binding DcaStopLossPercent}" PlaceholderText="达到后暂停定投或清仓"/>
                             </StackPanel>
-                            <Expander Header="高级参数" HorizontalAlignment="Stretch">
-                                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
+                            <Expander Classes="inline" Header="高级参数" HorizontalAlignment="Stretch">
+                                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource TinyTopMargin}">
                                     <StackPanel Spacing="{StaticResource TinySpacing}">
                                         <TextBlock Text="最高买入价（可选）" Classes="form-label"/>
                                         <TextBox Text="{Binding DcaMaxBuyPrice}" PlaceholderText="超过此价不买"/>
@@ -442,168 +427,200 @@
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
-                        <!-- 校验错误提示 -->
-                        <TextBlock Text="{Binding ValidationError}"
-                                   IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Foreground="{DynamicResource ErrorBrush}"
-                                   FontSize="{StaticResource BodySmFontSize}"
-                                   TextWrapping="Wrap"/>
-
-                        <Button Content="创建策略"
-                                Command="{Binding CreateStrategyCommand}"
-                                Classes="btn-primary"
-                                HorizontalAlignment="Stretch"
-                                Margin="{StaticResource TinyTopMargin}"/>
                     </StackPanel>
                     </ScrollViewer>
+
+                    <!-- 校验错误与提交固定在滚动区外：表单再长，主操作和出错原因也始终在视口内 -->
+                    <TextBlock Text="{Binding ValidationError}"
+                               IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                               Foreground="{DynamicResource ErrorBrush}"
+                               FontSize="{StaticResource BodySmFontSize}"
+                               TextWrapping="Wrap"/>
+                    <Button Content="创建策略"
+                            Command="{Binding CreateStrategyCommand}"
+                            Classes="btn-primary"
+                            HorizontalAlignment="Stretch"
+                            Margin="{StaticResource TinyTopMargin}"/>
+                    </StackPanel>
                 </controls:CardView>
             </Grid>
 
 
-            <!-- 风控设置：默认折叠 -->
-            <Expander Classes="section-card">
+            <!-- 风控设置：默认折叠。加载失败时隐藏——此时风险配置没读到，
+                 保存会把默认值覆盖掉用户原有的风控限额。
+                 14 项限额按“管什么”分成五组，每组独立两列，不再是一整面无差别的输入框墙 -->
+            <Expander Classes="section-card" IsVisible="{Binding !HasError}">
                 <Expander.Header>
                     <TextBlock Classes="card-title" Text="风控设置"/>
                 </Expander.Header>
-                <StackPanel Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource ExpanderContentPadding}">
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-                          ColumnSpacing="{StaticResource DefaultSpacing}"
-                          RowSpacing="{StaticResource SmallSpacing}">
-                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="单笔最大仓位 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxSingleOrderPercent}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="日最大亏损 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxDailyLossPercent}"/>
-                        </StackPanel>
+                <StackPanel Spacing="{StaticResource SectionSpacing}" Margin="{StaticResource ExpanderContentPadding}">
 
-                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="总仓位上限 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxTotalPositionPercent}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="日最大交易次数" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxDailyTrades}"/>
-                        </StackPanel>
+                    <!-- 仓位与下单：单笔与整体敞口的上限，以及小额 / 大额订单的门槛 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="仓位与下单" Classes="body-sm" FontWeight="{DynamicResource WeightTitle}"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
+                              ColumnSpacing="{StaticResource DefaultSpacing}"
+                              RowSpacing="{StaticResource SmallSpacing}">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="单笔最大仓位 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxSingleOrderPercent}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="总仓位上限 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxTotalPositionPercent}"/>
+                            </StackPanel>
 
-                        <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="最小下单金额 (USDT)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MinOrderAmount}"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="确认阈值 (USDT)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.ConfirmationThreshold}"/>
-                        </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="最小下单金额 (USDT)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MinOrderAmount}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="确认阈值 (USDT)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.ConfirmationThreshold}"
+                                         ToolTip.Tip="订单金额达到该值时，需人工确认后才下单"/>
+                            </StackPanel>
 
-                        <StackPanel Grid.Row="3" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="合约杠杆倍数 (1-125)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.FuturesLeverage, Mode=TwoWay}"
-                                           Minimum="1"
-                                           Maximum="125"
-                                           Increment="1"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="合约开仓前设置的杠杆倍数；越高强平风险越大"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="3" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="合约名义敞口上限 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxFuturesNotionalPercent}"
-                                     ToolTip.Tip="Σ|持仓名义|+本单名义 占权益比例上限，0 表示不限制"/>
-                        </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="同时持仓标的上限 (个)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.MaxConcurrentPositions, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="50"
+                                               Increment="1"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="限制同时持有的不同标的数量，防止多标的同时同向开仓把相关性风险叠成一笔大杠杆；0 表示不限制"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
 
-                        <StackPanel Grid.Row="4" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="强平距离预警 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.LiquidationWarnPercent}"
-                                     ToolTip.Tip="标记价距强平价小于该百分比时告警"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="4" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="强平距离紧急 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.LiquidationCriticalPercent}"
-                                     ToolTip.Tip="小于该百分比时发紧急告警并阻止该标的自动加仓"/>
-                        </StackPanel>
-                    </Grid>
+                    <!-- 亏损与频率熔断：触达后停止新开仓 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="亏损与频率熔断" Classes="body-sm" FontWeight="{DynamicResource WeightTitle}"/>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto"
+                              ColumnSpacing="{StaticResource DefaultSpacing}"
+                              RowSpacing="{StaticResource SmallSpacing}">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="日最大亏损 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxDailyLossPercent}"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="日最大交易次数" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxDailyTrades}"/>
+                            </StackPanel>
 
-                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-                          ColumnSpacing="{StaticResource DefaultSpacing}"
-                          RowSpacing="{StaticResource SmallSpacing}"
-                          Margin="{StaticResource SmallTopMargin}">
-                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="连续亏损熔断 (次)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.MaxConsecutiveLosses, Mode=TwoWay}"
-                                           Minimum="0"
-                                           Maximum="50"
-                                           Increment="1"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="当日实现亏损笔数连续达到该值时停止新开仓，0 表示不限制"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="滑点告警阈值 (%)" Classes="form-label"/>
-                            <TextBox Text="{Binding RiskConfig.MaxSlippagePercent}"
-                                     ToolTip.Tip="市价单成交价相对信号价偏离超过该百分比时告警"/>
-                        </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="连续亏损熔断 (次)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.MaxConsecutiveLosses, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="50"
+                                               Increment="1"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="当日实现亏损笔数连续达到该值时停止新开仓，0 表示不限制"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="API 失败熔断 (次)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.ApiFailureThreshold, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="50"
+                                               Increment="1"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="5 分钟窗口内交易所接口失败达到该次数时拒单并告警，0 表示不限制"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
 
-                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="限价单超时撤单 (秒)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.LimitOrderTimeoutSeconds, Mode=TwoWay}"
-                                           Minimum="0"
-                                           Maximum="3600"
-                                           Increment="30"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="策略限价单挂起超过该时长未成交则撤单并告警，0 表示不自动撤单"/>
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="API 失败熔断 (次)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.ApiFailureThreshold, Mode=TwoWay}"
-                                           Minimum="0"
-                                           Maximum="50"
-                                           Increment="1"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="5 分钟窗口内交易所接口失败达到该次数时拒单并告警，0 表示不限制"/>
-                        </StackPanel>
+                    <!-- 执行质量：成交偏差与挂单时长 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="执行质量" Classes="body-sm" FontWeight="{DynamicResource WeightTitle}"/>
+                        <Grid ColumnDefinitions="*,*"
+                              ColumnSpacing="{StaticResource DefaultSpacing}">
+                            <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="滑点告警阈值 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxSlippagePercent}"
+                                         ToolTip.Tip="市价单成交价相对信号价偏离超过该百分比时告警"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="限价单超时撤单 (秒)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.LimitOrderTimeoutSeconds, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="3600"
+                                               Increment="30"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="策略限价单挂起超过该时长未成交则撤单并告警，0 表示不自动撤单"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
 
-                        <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="同时持仓标的上限 (个)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.MaxConcurrentPositions, Mode=TwoWay}"
-                                           Minimum="0"
-                                           Maximum="50"
-                                           Increment="1"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="限制同时持有的不同标的数量，防止多标的同时同向开仓把相关性风险叠成一笔大杠杆；0 表示不限制"/>
+                    <!-- 合约专用：杠杆、名义敞口、强平距离与资金费都只对合约生效，现货模式下不会被用到 -->
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                            <TextBlock Text="合约专用" Classes="body-sm" FontWeight="{DynamicResource WeightTitle}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Text="现货模式下不生效" Classes="caption" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="资金费护栏 (分钟)" Classes="form-label"/>
-                            <NumericUpDown Value="{Binding RiskConfig.FundingRateGuardMinutes, Mode=TwoWay}"
-                                           Minimum="0"
-                                           Maximum="60"
-                                           Increment="5"
-                                           ShowButtonSpinner="False"
-                                           HorizontalAlignment="Stretch"
-                                           ToolTip.Tip="距下次资金结算少于该分钟数且费率对本方向不利时推迟开仓；0 表示不限制"/>
-                        </StackPanel>
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto"
+                              ColumnSpacing="{StaticResource DefaultSpacing}"
+                              RowSpacing="{StaticResource SmallSpacing}">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="合约杠杆倍数 (1-125)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.FuturesLeverage, Mode=TwoWay}"
+                                               Minimum="1"
+                                               Maximum="125"
+                                               Increment="1"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="合约开仓前设置的杠杆倍数；越高强平风险越大"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="合约名义敞口上限 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.MaxFuturesNotionalPercent}"
+                                         ToolTip.Tip="Σ|持仓名义|+本单名义 占权益比例上限，0 表示不限制"/>
+                            </StackPanel>
 
-                        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Spacing="{StaticResource TinySpacing}">
-                            <!-- 风险策略收紧开关：有保存按钮 → 复选框（design.md 7.12） -->
-                            <CheckBox IsChecked="{Binding RiskConfig.RequireLivePromotion, Mode=TwoWay}"
-                                      Content="要求策略通过影子验证才允许实盘自动开仓"/>
-                            <TextBlock Classes="caption" TextWrapping="Wrap"
-                                       Text="开启后，AI/定投/网格策略需积累至少 30 笔影子平仓、累计盈亏转正、盈亏比不低于 1.1 且回撤不超过累计盈利，才允许在实盘下单。已持仓的止损离场不受影响。"/>
-                        </StackPanel>
-                    </Grid>
+                            <StackPanel Grid.Row="1" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="强平距离预警 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.LiquidationWarnPercent}"
+                                         ToolTip.Tip="标记价距强平价小于该百分比时告警"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="强平距离紧急 (%)" Classes="form-label"/>
+                                <TextBox Text="{Binding RiskConfig.LiquidationCriticalPercent}"
+                                         ToolTip.Tip="小于该百分比时发紧急告警并阻止该标的自动加仓"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Spacing="{StaticResource TinySpacing}">
+                                <TextBlock Text="资金费护栏 (分钟)" Classes="form-label"/>
+                                <NumericUpDown Value="{Binding RiskConfig.FundingRateGuardMinutes, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="60"
+                                               Increment="5"
+                                               ShowButtonSpinner="False"
+                                               HorizontalAlignment="Stretch"
+                                               ToolTip.Tip="距下次资金结算少于该分钟数且费率对本方向不利时推迟开仓；0 表示不限制"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 实盘准入：风险策略收紧开关，有保存按钮 → 复选框（design.md 7.12） -->
+                    <StackPanel Spacing="{StaticResource TinySpacing}">
+                        <TextBlock Text="实盘准入" Classes="body-sm" FontWeight="{DynamicResource WeightTitle}"/>
+                        <CheckBox IsChecked="{Binding RiskConfig.RequireLivePromotion, Mode=TwoWay}"
+                                  Content="要求策略通过影子验证才允许实盘自动开仓"/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="开启后，AI/定投/网格策略需积累至少 30 笔影子平仓、累计盈亏转正、盈亏比不低于 1.1 且回撤不超过累计盈利，才允许在实盘下单。已持仓的止损离场不受影响。"/>
+                    </StackPanel>
 
                     <Button Content="保存风控设置"
                             Command="{Binding SaveRiskConfigCommand}"
                             Classes="btn-primary"
-                            HorizontalAlignment="Left"
-                            Margin="{StaticResource TinyTopMargin}"/>
+                            HorizontalAlignment="Left"/>
                 </StackPanel>
             </Expander>
 
-            <!-- 失败态：浮层只负责失败重试（空列表不算无数据页，新建表单必须可操作） -->
+            <!-- 失败态：页面内容已隐藏，这里给失败说明与重试入口（空列表不是失败，由列表卡片自己提示） -->
             <controls:StateOverlayView State="{Binding OverlayState}"
                                        Message="{Binding OverlayMessage}"
                                        RetryCommand="{Binding RetryCommand}"

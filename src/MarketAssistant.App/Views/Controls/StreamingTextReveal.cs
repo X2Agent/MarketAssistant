@@ -77,7 +77,9 @@ public class StreamingTextReveal : Decorator
 
     public StreamingTextReveal()
     {
-        _settledText = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        // 初始不可见：空 TextBlock 仍会占一整行高度，首段文字走活动面板时气泡顶部会多出一行空白，
+        // 等到出现换行并入静态文本后内容又整体上跳一行
+        _settledText = new TextBlock { TextWrapping = TextWrapping.Wrap, IsVisible = false };
         _livePanel = new WrapPanel { Orientation = Orientation.Horizontal };
 
         _root = new StackPanel();

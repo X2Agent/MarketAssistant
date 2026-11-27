@@ -38,31 +38,29 @@
                 <Border Grid.Row="0" 
                         Padding="{StaticResource PagePadding}" 
                         Background="Transparent">
+                    <!-- 右栏出现编辑表单时，页面的主操作是「保存」：此处降为次要，避免同屏两个主按钮 -->
                     <Button Content="添加服务器" 
                             Command="{Binding AddServerCommand}" 
-                            Classes="btn-primary"
+                            Classes.btn-primary="{Binding !IsEditing}"
+                            Classes.btn-secondary="{Binding IsEditing}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"/>
                 </Border>
 
                 <!-- 服务器列表 -->
                 <Grid Grid.Row="1">
+                    <!-- plain-list：条目底色由 Fluent 画在 ListBoxItem 的 presenter 上，
+                         不清掉的话选中会露出一块饱和蓝底、悬停露出灰块，盖住下面卡片自己的状态样式 -->
                     <ListBox ItemsSource="{Binding ServerConfigs}"
+                             Classes="plain-list"
                              SelectedItem="{Binding SelectedConfig, Mode=TwoWay}"
                              Background="Transparent"
                              BorderThickness="{StaticResource NoBorderThickness}"
                              Padding="{StaticResource NoPadding}"
-                             Margin="{StaticResource SmallPadding}"
+                             Margin="{StaticResource TinyMargin}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              AutomationProperties.Name="MCP 服务器列表">
                         <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
-                            <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-                                <Setter Property="Background" Value="Transparent"/>
-                            </Style>
                             <!-- 服务器卡片表面：必须写成样式而不是 Border 上的局部属性，
                                  否则局部 Background 的优先级会盖住下面 hover / 选中 的样式。 -->
                             <Style Selector="Border.serverCard">
@@ -88,8 +86,10 @@
                         </ListBox.Styles>
                         <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="settings:MCPServerConfig">
+                                    <!-- 四周各留 4px：选中态的 AccentRing 向外延伸 4px，条目容器按自身边界裁剪，
+                                         不留白的话只剩底边一条蓝线 -->
                                     <Border Classes="serverCard"
-                                            Margin="{StaticResource TinyBottomMargin}">
+                                            Margin="{StaticResource TinyMargin}">
 
                                         <StackPanel Spacing="{StaticResource TinySpacing}">
                                             <Grid ColumnDefinitions="*,Auto">

@@ -23,7 +23,6 @@
                  Width="{Binding #Root.IconSize}"
                  Height="{Binding #Root.IconSize}"
                  HorizontalAlignment="Center"
-                 Opacity="0.85"
                  IsVisible="{Binding #Root.IsEmptyState}"/>
 
         <!-- 失败 -->
@@ -69,7 +68,10 @@
                 Command="{Binding #Root.RetryCommand}"
                 IsVisible="{Binding #Root.CanRetry}">
             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="14" Height="14" VerticalAlignment="Center"/>
+                <PathIcon Data="{StaticResource RefreshIcon}"
+                          Width="{StaticResource MiniIconSize}"
+                          Height="{StaticResource MiniIconSize}"
+                          VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding #Root.RetryText}" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>

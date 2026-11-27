@@ -56,38 +56,37 @@
         <Style Selector="Grid.compact Button.market-chip">
             <Setter Property="Padding" Value="0"/>
         </Style>
-        <Style Selector="Grid.compact TextBlock#MarketChipArrow">
+        <Style Selector="Grid.compact PathIcon#MarketChipArrow">
             <Setter Property="IsVisible" Value="False"/>
         </Style>
 
         <!-- ============================================================ -->
         <!-- 侧边导航项：图标 + 文字。v3 从 72px 纯图标轨升级为 240px 文字导航 -->
+        <!-- Fluent 的列表项外观由 plain-list 清掉（见 ListStyles.axaml），这里只给导航自己的状态底色。 -->
+        <!-- 状态底色必须写在 ContentPresenter#PART_ContentPresenter 上：Fluent 的悬停 / 选中底色画在它身上， -->
+        <!-- 改 ListBoxItem.Background 会被盖住。 -->
         <!-- ============================================================ -->
         <Style Selector="ListBox.nav-list ListBoxItem">
-            <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
             <Setter Property="Height" Value="{StaticResource NavItemHeight}"/>
             <Setter Property="CornerRadius" Value="{StaticResource SmallCornerRadius}"/>
-            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.nav-list ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Transitions">
                 <Transitions>
                     <BrushTransition Property="Background" Duration="0:0:0.15"/>
                 </Transitions>
             </Setter>
         </Style>
-        <Style Selector="ListBox.nav-list ListBoxItem:pointerover">
+        <Style Selector="ListBox.nav-list ListBoxItem:pointerover:not(:selected) /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
         </Style>
         <!-- 选中态：强调色浅底 + 强调色文字，不用左侧竖条（v3 去掉装饰性指示条） -->
-        <Style Selector="ListBox.nav-list ListBoxItem:selected">
+        <Style Selector="ListBox.nav-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource SelectedBackgroundBrush}"/>
-        </Style>
-        <Style Selector="ListBox.nav-list ListBoxItem:selected TextBlock.nav-label">
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
         </Style>
 
         <Style Selector="TextBlock.nav-label">
@@ -95,6 +94,11 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <!-- 必须声明在基础 TextBlock.nav-label 之后：Avalonia 没有选择器特异性，同一属性后声明者胜出 -->
+        <Style Selector="ListBox.nav-list ListBoxItem:selected TextBlock.nav-label">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
         </Style>
 
         <Style Selector="TextBlock.nav-group">
@@ -141,7 +145,7 @@
                     <!-- 品牌区 -->
                     <StackPanel DockPanel.Dock="Top" Classes="nav-header" Margin="{StaticResource NavHeaderPadding}" Spacing="{StaticResource LargeSpacing}">
                         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                            <Border Classes="brand" Width="{StaticResource AppLogoSize}"
+                            <Border Width="{StaticResource AppLogoSize}"
                                     Height="{StaticResource AppLogoSize}"
                                     CornerRadius="{StaticResource SmallCornerRadius}"
                                     ClipToBounds="True">
@@ -166,7 +170,12 @@
                                 ToolTip.Tip="点击切换市场（Ctrl+M）">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" HorizontalAlignment="Center">
                                 <TextBlock Text="{Binding CurrentMarketText}" VerticalAlignment="Center"/>
-                                <TextBlock Name="MarketChipArrow" Text="⇄" VerticalAlignment="Center" Opacity="0.6"/>
+                                <PathIcon Name="MarketChipArrow"
+                                          Data="{StaticResource SwapIcon}"
+                                          Width="{StaticResource MiniIconSize}"
+                                          Height="{StaticResource MiniIconSize}"
+                                          VerticalAlignment="Center"
+                                          Opacity="0.6"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -176,7 +185,7 @@
                         <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="{StaticResource SmallBottomMargin}"/>
                         <ListBox ItemsSource="{Binding BottomNavigationItems}"
                                  SelectedItem="{Binding SelectedBottomNavigationItem}"
-                                 Classes="nav-list"
+                                 Classes="nav-list plain-list"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="{StaticResource NoPadding}">
@@ -189,7 +198,7 @@
                                             <svg:Svg Width="20" Height="20" Path="{Binding SelectedIconPath}"
                                                      IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
                                         </Panel>
-                                        <TextBlock Grid.Column="1" Classes="nav-label" Text="{Binding Title}"
+                                        <TextBlock Grid.Column="1" Classes="nav-label" Text="{Binding Label}"
                                                    Margin="{StaticResource SmallLeftMargin}"/>
                                     </Grid>
                                 </DataTemplate>
@@ -203,7 +212,7 @@
                             <TextBlock Classes="nav-group" Text="市场"/>
                             <ListBox ItemsSource="{Binding MainNavigationItems}"
                                      SelectedItem="{Binding SelectedMainNavigationItem}"
-                                     Classes="nav-list"
+                                     Classes="nav-list plain-list"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      Padding="{StaticResource NoPadding}">
@@ -217,7 +226,7 @@
                                                      IsVisible="{Binding $parent[ListBoxItem].IsSelected}"/>
                                         </Panel>
                                         <TextBlock Grid.Column="1" Classes="nav-label"
-                                                   Text="{Binding Title}" Margin="{StaticResource SmallLeftMargin}"/>
+                                                   Text="{Binding Label}" Margin="{StaticResource SmallLeftMargin}"/>
                                         <!-- 未读告警 -->
                                         <Border Grid.Column="2"
                                                 Width="6" Height="6" CornerRadius="3"

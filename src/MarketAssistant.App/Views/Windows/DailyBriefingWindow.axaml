@@ -18,6 +18,13 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PageBackgroundBrush}">
 
+    <Window.Styles>
+        <!-- 重新生成期间旧正文变淡：表示"这份即将被替换"，避免被当成新结果阅读 -->
+        <Style Selector="ScrollViewer.generating">
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
+    </Window.Styles>
+
     <Border Padding="{StaticResource CardPadding}">
         <DockPanel LastChildFill="True">
 
@@ -39,22 +46,15 @@
                            TextTrimming="CharacterEllipsis"
                            Text="{Binding BriefingMetaText}"/>
 
-                <!-- 生成态：圆形 loading + 文案。只在弹窗内呈现，
-                     首页标题栏不指示简报状态，避免与快讯自身的加载混淆。 -->
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            Spacing="{StaticResource TinySpacing}"
-                            Margin="{StaticResource SmallLeftMargin}"
-                            VerticalAlignment="Center"
-                            IsVisible="{Binding IsGenerating}">
-                    <ProgressBar IsIndeterminate="True"
-                                 Width="{StaticResource SmallSpacing}"
-                                 Height="{StaticResource SmallSpacing}"/>
-                    <TextBlock Text="生成中…"
-                               FontSize="{StaticResource CaptionFontSize}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
+                <!-- 生成态只在弹窗内呈现，首页标题栏不指示简报状态；
+                     "正在生成"的视觉由正文区骨架承担，这里只留一句文案。 -->
+                <TextBlock Grid.Column="2"
+                           Text="生成中..."
+                           FontSize="{StaticResource CaptionFontSize}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Margin="{StaticResource SmallLeftMargin}"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding IsGenerating}"/>
 
                 <!-- 生成今日简报（纯手动策略：唯一会产生模型调用与费用的入口，
                      因此显式命名并给出确认语义，不做任何后台自动生成；
@@ -99,13 +99,27 @@
                 <!-- 全文：Width 由 Window 固定，Markdown 控件树因此正常折行、
                      高度自适应内容；ScrollViewer 负责超长文本的兜底滚动。
                      使用项目既有的 RichTextBlock（Markdown.Avalonia）渲染，
-                     裸 TextBlock 只会显示 ** 与列表符等未渲染标记。 -->
-                <ScrollViewer IsVisible="{Binding HasBriefing}">
-                    <controls:RichTextBlock Text="{Binding BriefingContent}"/>
-                </ScrollViewer>
+                     裸 TextBlock 只会显示 ** 与列表符等未渲染标记。
+                     重新生成期间保留旧正文并调淡（不叠骨架）；重新生成失败时旧正文照常可读，
+                     失败信息走顶部提示条，与交易监控页的刷新失败条同一做法。 -->
+                <DockPanel IsVisible="{Binding HasBriefing}">
+                    <controls:StatusBanner DockPanel.Dock="Top"
+                                           Severity="Danger"
+                                           Message="{Binding ErrorMessage}"
+                                           Margin="{StaticResource SmallBottomMargin}"
+                                           IsVisible="{Binding ShowRegenerateFailedBanner}">
+                        <Button Content="重试"
+                                Classes="btn-secondary btn-sm"
+                                Command="{Binding RetryCommand}"/>
+                    </controls:StatusBanner>
 
-                <!-- 空态 / 失败态 -->
-                <controls:StateOverlayView State="{Binding OverlayState}"
+                    <ScrollViewer Classes.generating="{Binding IsGenerating}">
+                        <controls:RichTextBlock Text="{Binding BriefingContent}"/>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <!-- 空态 / 失败态：只在既无简报又不在生成时出现 -->
+                <controls:StateOverlayView State="{Binding BodyOverlayState}"
                                            Message="{Binding OverlayMessage}"
                                            RetryCommand="{Binding RetryCommand}"
                                            RetryText="重试"

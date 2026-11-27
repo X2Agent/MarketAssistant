@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Threading;
 using MarketAssistant.ViewModels;
@@ -77,6 +78,8 @@ public class RichTextBlock : UserControl
     /// </summary>
     private bool _markdownLocked;
     private bool _markdownStyleAdded;
+
+    private static readonly Uri MarkdownStylesUri = new("avares://MarketAssistant/Resources/Styles/MarkdownStyles.axaml");
 
     /// <summary>
     /// 当前监听状态变化的 DataContext（ChatMessageAdapter）
@@ -327,13 +330,21 @@ public class RichTextBlock : UserControl
             if (!_markdownStyleAdded)
             {
                 Styles.Add(new global::Markdown.Avalonia.StyleCollections.MarkdownStyleFluentTheme());
+                // 令牌覆盖层必须排在库样式集之后：同一属性后加入的样式优先
+                Styles.Add(new StyleInclude(MarkdownStylesUri) { Source = MarkdownStylesUri });
                 _markdownStyleAdded = true;
             }
         }
 
         // 引擎每次解析产出全新控件树，靠 ContentControl.Content 原子替换，
         // 不存在“先清空再逐步填充”的中间态
-        _contentContainer.Content = _markdownEngine.Transform(markdownContent);
+        var document = _markdownEngine.Transform(markdownContent);
+
+        // FluentTheme 样式集的每条选择器都限定在 .Markdown_Avalonia_MarkdownViewer 之下，
+        // 该类原本由 MarkdownScrollViewer 挂在文档根上；绕开它直接用引擎时必须自己补，
+        // 否则标题、列表、引用、表格、代码块的样式全部不生效，整篇渲染成一团平文本
+        document.Classes.Add("Markdown_Avalonia_MarkdownViewer");
+        _contentContainer.Content = document;
     }
 
     /// <summary>

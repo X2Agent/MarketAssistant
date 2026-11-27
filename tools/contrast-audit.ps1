@@ -156,6 +156,56 @@ foreach ($t in @(@('TextPrimaryBrush','主文字'), @('TextSecondaryBrush','次�
     Write-Host ("  {0,-7} on 卡片 = {1,-6} {2}" -f $t[1], $ratio, $mark)
 }
 
+# ---- StatusTag：配对文字色 on（12% 语义底合成到卡片 / 次级面） ----
+# 标签底是半透明色，必须先合成到所在表面再算对比度；字色用 Panel 文字令牌与 Bullish/BearishTagTextBrush，
+# 而不是语义主色（语义主色在 12% 底上只有约 3:1，不达 12px 正文的 4.5）。
+function Get-OverHex([string]$overlayHex, [string]$baseHex) {
+    $c = Get-Composite $overlayHex (To-Rgb $baseHex)
+    return '#{0:X2}{1:X2}{2:X2}' -f [int][Math]::Round($c.R), [int][Math]::Round($c.G), [int][Math]::Round($c.B)
+}
+
+$tagBackgrounds = @{}
+foreach ($m in [regex]::Matches($raw, '<SolidColorBrush x:Key="(\w+TagBackgroundBrush)" Color="(#[0-9A-Fa-f]+)"/>')) {
+    $tagBackgrounds[$m.Groups[1].Value] = $m.Groups[2].Value
+}
+
+$tagTones = @(
+    @('中性', 'NeutralTagBackgroundBrush', 'TextSecondaryBrush'),
+    @('提示', 'InfoTagBackgroundBrush', 'InfoPanelTextBrush'),
+    @('成功', 'SuccessTagBackgroundBrush', 'SuccessPanelTextBrush'),
+    @('警告', 'WarningTagBackgroundBrush', 'WarningPanelTextBrush'),
+    @('危险', 'DangerTagBackgroundBrush', 'DangerPanelTextBrush'),
+    @('涨 / 买入', 'BullishTagBackgroundBrush', 'BullishTagTextBrush'),
+    @('跌 / 卖出', 'BearishTagBackgroundBrush', 'BearishTagTextBrush')
+)
+$tagSurfaces = @(@('CardBackgroundBrush', '卡片'), @('SurfaceVariantBrush', '次级面'))
+
+foreach ($theme in @(@('深色', $dark), @('浅色', $light))) {
+    Write-Host "`n=== $($theme[0])模式：StatusTag 配对文字 on 合成底 ===" -ForegroundColor Cyan
+    $map = $theme[1]
+    foreach ($tone in $tagTones) {
+        if (-not $tagBackgrounds.ContainsKey($tone[1]) -or -not $map.ContainsKey($tone[2])) { continue }
+        $line = "  {0,-10}" -f $tone[0]
+        foreach ($surface in $tagSurfaces) {
+            $composite = Get-OverHex $tagBackgrounds[$tone[1]] $map[$surface[0]]
+            $ratio = Get-Ratio $map[$tone[2]] $composite
+            $mark = if ($ratio -ge 4.5) { 'OK' } else { 'LOW' }
+            if ($ratio -lt 4.5) { [void]$failures.Add("$($theme[0]) 标签 $($tone[0]) on $($surface[1]) = $ratio") }
+            $line += " {0}={1}({2}) " -f $surface[1], $ratio, $mark
+        }
+        Write-Host $line
+    }
+
+    # 告警条件值、评级徽标等直接把涨跌配对色写在文字上
+    foreach ($k in @('BullishTagTextBrush', 'BearishTagTextBrush')) {
+        if (-not $map.ContainsKey($k)) { continue }
+        $ratio = Get-Ratio $map[$k] $map['CardBackgroundBrush']
+        $mark = if ($ratio -ge 4.5) { 'OK' } else { 'LOW' }
+        if ($ratio -lt 4.5) { [void]$failures.Add("$($theme[0]) $k on 卡片 = $ratio") }
+        Write-Host ("  {0,-22} on 卡片 = {1,-6} {2}" -f $k, $ratio, $mark)
+    }
+}
+
 Write-Host ""
 if ($failures.Count -eq 0) {
     Write-Host "全部达标（>= 4.5）" -ForegroundColor Green

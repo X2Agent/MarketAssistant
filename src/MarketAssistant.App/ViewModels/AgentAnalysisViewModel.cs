@@ -41,6 +41,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     /// </summary>
     private string _assetName = string.Empty;
 
+    /// <summary>进度卡副标题：「名称 · 代码」；导航参数没带名称（如告警历史跳转）时只显示代码。</summary>
+    public string AnalysisSubjectText => string.IsNullOrEmpty(_assetName) ? StockCode : $"{_assetName} · {StockCode}";
+
     [ObservableProperty]
     private bool _isAnalysisInProgress;
 
@@ -692,6 +695,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
             // 报告只归档代码，名称从导航参数带入；告警历史跳转时参数名称为空，
             // 届时由 ResolveAssetNameAsync 在出报告后回查补全
             _assetName = parameter.Name;
+            OnPropertyChanged(nameof(AnalysisSubjectText));
             Logger?.LogInformation("导航到 AI 分析页面，资产代码: {Code}，重新激活: {IsReactivation}", StockCode, isReactivation);
             // GoBack 重新激活时不重复启动分析，避免重复请求
             if (!isReactivation)
@@ -777,6 +781,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisFailureMessage = string.Empty;
 
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(AnalysisSubjectText));
     }
 
     public void Dispose()

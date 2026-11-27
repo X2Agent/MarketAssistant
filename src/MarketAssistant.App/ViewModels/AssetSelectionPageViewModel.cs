@@ -1,16 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Applications;
-using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.InvestmentSelection;
 using MarketAssistant.Applications.InvestmentSelection.Models;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels;
 
@@ -39,11 +34,11 @@ public enum SelectionModeType
     QuickStrategy
 }
 
-public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
+public partial class AssetSelectionPageViewModel : ViewModelBase, IRecipient<AssetFavoritesChanged>, IDisposable
 {
     private readonly InvestmentSelectionService _investmentSelectionService;
     private readonly MarketContext _marketContext;
-    private readonly IDialogService _dialogService;
+    private bool _disposed;
 
     [ObservableProperty]
     private string _userRequirements = string.Empty;
@@ -56,12 +51,6 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private SelectionModeItem? _selectedMode;
-
-    [ObservableProperty]
-    private InvestmentSelectionResult? _selectionResult;
-
-    [ObservableProperty]
-    private bool _hasResult;
 
     [ObservableProperty]
     private ObservableCollection<QuickSelectionStrategyInfo> _quickStrategies = [];
@@ -108,6 +97,11 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// 输入态：既没有在运行，也没有结果。三个阶段（输入 / 运行 / 结果）互斥显示。
+    /// </summary>
+    public bool IsComposing => !IsBusy && SelectionResult == null;
+
+    /// <summary>
     /// 输入区域是否可见（非快速策略模式时显示）
     /// </summary>
     public bool IsInputAreaVisible => SelectedMode?.ModeType != SelectionModeType.QuickStrategy;
@@ -125,7 +119,9 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         SelectionModeType.UserRequirement => _marketContext.CurrentMarket == MarketType.Crypto
             ? "请描述您的选币需求，例如：寻找市值前50、24h涨幅超过5%、交易量活跃的虚拟币"
             : "请描述您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍，近期涨幅不超过10%的价值股",
-        SelectionModeType.NewsAnalysis => "请输入新闻内容或热点信息，例如：央行降准利好银行股，新能源汽车销量创新高等",
+        SelectionModeType.NewsAnalysis => _marketContext.CurrentMarket == MarketType.Crypto
+            ? "请输入新闻内容或热点信息，例如：交易所上线新币、链上活跃地址创新高、机构增持比特币等"
+            : "请输入新闻内容或热点信息，例如：央行降准利好银行股，新能源汽车销量创新高等",
         _ => "请输入内容"
     };
 
@@ -136,7 +132,7 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            var noun = _marketContext.CurrentMarket == MarketType.Crypto ? "选币" : "选股";
+            var noun = SelectionNoun;
             return SelectedMode?.ModeType switch
             {
                 SelectionModeType.UserRequirement => $"开始{noun}",
@@ -145,34 +141,6 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             };
         }
     }
-
-    /// <summary>
-    /// 推荐投资标的列表（用于UI绑定）。
-    /// 集合实例保持不变、结果变更时原地替换内容：
-    /// 每次绑定求值新建集合会让整个 ItemsControl 重建（丢滚动位置）
-    /// </summary>
-    public ObservableCollection<InvestmentRecommendation> RecommendedStocks { get; } = [];
-
-    /// <summary>
-    /// 格式化的风险提示文本（用于UI绑定）
-    /// </summary>
-    public string FormattedRiskWarnings =>
-        SelectionResult?.RiskWarnings != null && SelectionResult.RiskWarnings.Count > 0
-            ? string.Join("\n• ", new[] { "" }.Concat(SelectionResult.RiskWarnings))
-            : string.Empty;
-
-    /// <summary>
-    /// 是否有风险提示
-    /// </summary>
-    public bool HasRiskWarnings =>
-        SelectionResult?.RiskWarnings != null && SelectionResult.RiskWarnings.Count > 0;
-
-    /// <summary>
-    /// 加载提示文字，根据当前市场类型动态调整
-    /// </summary>
-    public string LoadingText => _marketContext.CurrentMarket == MarketType.Crypto
-        ? "AI 正在为您精选优质虚拟币，请稍候..."
-        : "AI 正在为您精选优质股票，请稍候...";
 
     /// <summary>
     /// 页面标题，根据当前市场类型动态调整
@@ -199,34 +167,29 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         : "选择预设的选股策略，快速获得投资建议";
 
     /// <summary>
-    /// 结果区域标题
+    /// 标的类别名词（选股 / 选币）：拼进页面内所有"选股"类文案，避免虚拟币市场出现股票措辞。
     /// </summary>
-    public string ResultTitle => _marketContext.CurrentMarket == MarketType.Crypto ? "选币结果" : "选股结果";
-
-    /// <summary>
-    /// 推荐列表标题
-    /// </summary>
-    public string RecommendationTitle => _marketContext.CurrentMarket == MarketType.Crypto
-        ? "推荐虚拟币"
-        : "推荐股票";
+    private string SelectionNoun => _marketContext.CurrentMarket == MarketType.Crypto ? "选币" : "选股";
 
     public AssetSelectionPageViewModel(
         ILogger<AssetSelectionPageViewModel> logger,
         InvestmentSelectionService investmentSelectionService,
-        MarketContext marketContext,
-        IDialogService dialogService) : base(logger)
+        MarketContext marketContext) : base(logger)
     {
         _investmentSelectionService = investmentSelectionService;
         _marketContext = marketContext;
         SubscribeToMarketChanges(_marketContext);
-        _dialogService = dialogService;
+        WeakReferenceMessenger.Default.Register(this);
 
-        EmptyMessage = "暂无可用选股模式，请稍后重试";
+        _elapsedTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, OnElapsedTimerTick);
+        _elapsedTimer.Stop();
+
+        EmptyMessage = $"暂无可用{SelectionNoun}模式，请稍后重试";
         SetRetryCommand(() => LoadPageAsync());
         _ = LoadPageAsync();
     }
 
-    /// <summary>首屏加载：选股模式卡与快速策略列表。</summary>
+    /// <summary>首屏加载：模式卡与快速策略列表。</summary>
     private async Task LoadPageAsync()
     {
         await LoadAsync(async _ =>
@@ -234,8 +197,10 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             await LoadSelectionModesAsync();
             await LoadQuickStrategiesAsync();
             return SelectionModes.Count > 0;
-        }, "加载选股页面");
+        }, $"加载{SelectionNoun}页面");
     }
+
+    protected override void OnBusyChanged() => OnPropertyChanged(nameof(IsComposing));
 
     partial void OnSelectedModeChanged(SelectionModeItem? value)
     {
@@ -249,91 +214,32 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         }
     }
 
-    partial void OnSelectionResultChanged(InvestmentSelectionResult? value)
-    {
-        RecommendedStocks.Clear();
-        if (value?.Recommendations != null)
-        {
-            foreach (var recommendation in value.Recommendations)
-                RecommendedStocks.Add(recommendation);
-        }
-        OnPropertyChanged(nameof(FormattedRiskWarnings));
-        OnPropertyChanged(nameof(HasRiskWarnings));
-    }
-
-    private bool _disposed;
-
     protected override void OnMarketChanged(MarketType newMarket)
     {
         // 事件来自单例 MarketContext，Dispose 后不得再触发（更新状态/启动加载）
         if (_disposed)
             return;
 
-        OnPropertyChanged(nameof(LoadingText));
+        // 旧市场的在途任务与结果在新市场下不再成立（收藏归属、跳转目标都依赖市场），继续运行只会白耗 Token
+        _runCts?.Cancel();
+        SelectionResult = null;
+        FailureMessage = string.Empty;
+
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(ModeLabel));
         OnPropertyChanged(nameof(QuickStrategyTitle));
         OnPropertyChanged(nameof(QuickStrategyDescription));
         OnPropertyChanged(nameof(ResultTitle));
         OnPropertyChanged(nameof(RecommendationTitle));
+        OnPropertyChanged(nameof(RunningTitle));
+        OnPropertyChanged(nameof(NewSelectionText));
         OnPropertyChanged(nameof(CurrentPlaceholder));
+        OnPropertyChanged(nameof(CurrentButtonText));
+        EmptyMessage = $"暂无可用{SelectionNoun}模式，请稍后重试";
+
+        // 模式卡描述原地更新：不重建集合，避免把用户已选的模式重置回第一个
+        ApplyModeDescriptions();
         _ = LoadQuickStrategiesAsync();
-    }
-
-    [RelayCommand]
-    private void ViewStockDetail(InvestmentRecommendation? stock)
-    {
-        if (stock == null) return;
-
-        WeakReferenceMessenger.Default.Send(
-            new NavigationMessage("Asset", new AssetNavigationParameter(stock.Symbol, stock.Name)));
-    }
-
-    [RelayCommand]
-    private async Task AddToFavorites(InvestmentRecommendation? stock)
-    {
-        if (stock == null) return;
-
-        // 归一化：统一大写，A股剥离交易所前缀（如 SH600000 → Market: SH, Code: 600000）。
-        // 市场归属从前缀统一识别（沪深京一套规则），不再用「长度是否变短」反推
-        string market = string.Empty;
-        var rawSymbol = stock.Symbol.Trim().ToUpperInvariant();
-        var code = FavoriteCodeNormalizer.Normalize(rawSymbol, _marketContext.CurrentMarket);
-
-        if (_marketContext.CurrentMarket == MarketType.AShare)
-        {
-            (market, _) = StockSymbolConverter.SplitExchangePrefix(rawSymbol);
-        }
-
-        var favoriteService = _marketContext.GetService<IFavoriteService>();
-        if (await favoriteService.IsFavoriteAsync(code, market))
-        {
-            await _dialogService.ShowMessageAsync("提示", $"{stock.Name} ({stock.Symbol}) 已在自选列表中");
-            return;
-        }
-
-        await favoriteService.AddFavoriteAsync(code, market);
-        await _dialogService.ShowMessageAsync("成功", $"已将 {stock.Name} ({stock.Symbol}) 加入自选");
-    }
-
-    [RelayCommand]
-    private async Task ExecuteAnalysisAsync()
-    {
-        if (SelectedMode == null)
-            return;
-
-        switch (SelectedMode.ModeType)
-        {
-            case SelectionModeType.UserRequirement:
-                await ExecuteSelectionAsync();
-                break;
-            case SelectionModeType.NewsAnalysis:
-                await ExecuteNewsSelectionAsync();
-                break;
-            case SelectionModeType.QuickStrategy:
-                await ShowQuickSelectionAsync();
-                break;
-        }
     }
 
     [RelayCommand]
@@ -346,102 +252,16 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
             item.IsSelected = item == mode;
         }
 
+        FailureMessage = string.Empty;
         SelectedMode = mode;
-    }
-
-    [RelayCommand]
-    private async Task ShowQuickSelectionAsync()
-    {
-        var firstStrategy = QuickStrategies.FirstOrDefault();
-        if (firstStrategy != null)
-        {
-            await ExecuteQuickSelectionAsync(firstStrategy);
-        }
-    }
-
-    [RelayCommand]
-    private async Task ExecuteQuickSelectionAsync(QuickSelectionStrategyInfo? strategy)
-    {
-        if (strategy == null)
-            return;
-
-        await SafeExecuteAsync(async () =>
-        {
-            var result = await _investmentSelectionService.QuickSelectAsync(strategy.Strategy, _marketContext.CurrentMarket);
-            SelectionResult = result;
-            HasResult = result != null && (
-                (result.Recommendations?.Count ?? 0) > 0 ||
-                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
-
-            UserRequirements = $"快速选股：{strategy.Name}";
-        }, $"执行快速选股：{strategy.Name}");
     }
 
     [RelayCommand]
     private void ClearContent()
     {
         CurrentInputContent = string.Empty;
-        ClearResult();
-    }
-
-    private async Task ExecuteSelectionAsync()
-    {
-        if (string.IsNullOrWhiteSpace(UserRequirements))
-        {
-            ShowValidationMessage("请输入您的选股需求，例如：寻找市值在100-500亿之间，PE低于20倍的价值股");
-            return;
-        }
-
         ClearValidationMessage();
-        await SafeExecuteAsync(async () =>
-        {
-            var request = new InvestmentRecommendationRequest
-            {
-                MarketType = _marketContext.CurrentMarket,
-                UserRequirements = UserRequirements
-            };
-
-            var result = await _investmentSelectionService.RecommendByUserRequirementAsync(request);
-            SelectionResult = result;
-            HasResult = result != null && (
-                (result.Recommendations?.Count ?? 0) > 0 ||
-                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
-        }, "执行AI选股");
-    }
-
-    private async Task ExecuteNewsSelectionAsync()
-    {
-        if (string.IsNullOrWhiteSpace(NewsContent))
-        {
-            ShowValidationMessage("请输入新闻内容或热点信息，例如：央行降准利好银行股，新能源汽车销量创新高等");
-            return;
-        }
-
-        ClearValidationMessage();
-        await SafeExecuteAsync(async () =>
-        {
-            var request = new NewsBasedInvestmentRequest
-            {
-                MarketType = _marketContext.CurrentMarket,
-                NewsContent = NewsContent,
-                MaxRecommendations = 5
-            };
-
-            var result = await _investmentSelectionService.RecommendByNewsAsync(request);
-            SelectionResult = result;
-            HasResult = result != null && (
-                (result.Recommendations?.Count ?? 0) > 0 ||
-                !string.IsNullOrWhiteSpace(result.AnalysisSummary));
-        }, "执行新闻选股");
-    }
-
-    private void ClearResult()
-    {
-        SelectionResult = null;
-        HasResult = false;
-        UserRequirements = string.Empty;
-        NewsContent = string.Empty;
-        ClearValidationMessage();
+        FailureMessage = string.Empty;
     }
 
     private void ShowValidationMessage(string message)
@@ -474,9 +294,9 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
     {
         var modes = new ObservableCollection<SelectionModeItem>
         {
-            new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = "根据用户输入的选股需求进行选股", ModeType = SelectionModeType.UserRequirement, IsSelected = true },
-            new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = "根据新闻内容进行选股", ModeType = SelectionModeType.NewsAnalysis },
-            new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = "使用预设的快速选股策略", ModeType = SelectionModeType.QuickStrategy }
+            new SelectionModeItem { Name = "用户需求", IconPath = "avares://MarketAssistant/Assets/Images/icon_users.svg", Description = BuildModeDescription(SelectionModeType.UserRequirement), ModeType = SelectionModeType.UserRequirement, IsSelected = true },
+            new SelectionModeItem { Name = "新闻分析", IconPath = "avares://MarketAssistant/Assets/Images/icon_document.svg", Description = BuildModeDescription(SelectionModeType.NewsAnalysis), ModeType = SelectionModeType.NewsAnalysis },
+            new SelectionModeItem { Name = "快速策略", IconPath = "avares://MarketAssistant/Assets/Images/icon_bolt.svg", Description = BuildModeDescription(SelectionModeType.QuickStrategy), ModeType = SelectionModeType.QuickStrategy }
         };
 
         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -492,13 +312,30 @@ public partial class AssetSelectionPageViewModel : ViewModelBase, IDisposable
         });
     }
 
+    /// <summary>切换市场时就地刷新模式卡描述（文案含"选股/选币"，不重建集合以免重置已选模式）。</summary>
+    private void ApplyModeDescriptions()
+    {
+        foreach (var mode in SelectionModes)
+        {
+            mode.Description = BuildModeDescription(mode.ModeType);
+        }
+    }
+
+    private string BuildModeDescription(SelectionModeType modeType) => modeType switch
+    {
+        SelectionModeType.UserRequirement => $"根据用户输入的{SelectionNoun}需求进行{SelectionNoun}",
+        SelectionModeType.NewsAnalysis => $"根据新闻内容进行{SelectionNoun}",
+        _ => $"使用预设的快速{SelectionNoun}策略"
+    };
+
     public void Dispose()
     {
         _disposed = true;
+        _runCts?.Cancel();
+        _elapsedTimer.Stop();
+        _elapsedTimer.Tick -= OnElapsedTimerTick;
         UnsubscribeFromMarketChanges(_marketContext);
+        WeakReferenceMessenger.Default.UnregisterAll(this);
         GC.SuppressFinalize(this);
     }
 }
-
-
-

@@ -192,7 +192,7 @@ public class AShareAssetInfoServiceFailureTest
         Assert.AreEqual("国债ETF国泰", assetInfo.Name, "名称应来自新浪兜底");
         Assert.AreEqual("511010", assetInfo.Code);
         Assert.AreEqual("SH", assetInfo.Market);
-        Assert.AreEqual("141.3390", assetInfo.CurrentPrice, "新浪不返回涨跌幅路径下的价格仍应展示");
+        Assert.AreEqual("141.339", assetInfo.CurrentPrice, "新浪不返回涨跌幅路径下的价格仍应展示；ETF 最小报价单位 0.001，取 3 位");
         Assert.AreEqual("-0.02%", assetInfo.ChangePercentage, "涨跌幅应按（最新-昨收）/昨收 现算");
     }
 

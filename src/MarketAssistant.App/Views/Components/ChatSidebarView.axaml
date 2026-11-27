@@ -40,6 +40,16 @@
         <Thickness x:Key="SendIconMargin">4,0,0,0</Thickness>
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <!-- 消息头里的发送者名：主色 + 标题字重，时间仍是 caption 的次要色。
+             必须用类样式：DataTemplate 里元素上本地写的 DynamicResource 优先级低于 caption 类，写在元素上不生效。
+             AI 与用户两侧统一 WeightTitle（此前一侧写 Emphasis、一侧写 Title；Emphasis 在中文回退字体上不稳定） -->
+        <Style Selector="TextBlock.sender-name">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
     <!-- 面板本身（圆角 + 表面色）由宿主页面提供，这里不再铺底色，
          否则会在宿主面板上再压一层同色面，圆角边界反而消失 -->
     <DockPanel Background="Transparent">
@@ -120,6 +130,7 @@
         <!-- 2. 消息列表 + 历史会话覆盖层 -->
         <Grid>
             <ListBox x:Name="ChatListBox"
+                     Classes="plain-list"
                      ItemsSource="{Binding ChatMessages}"
                      Background="Transparent"
                      Margin="{StaticResource NoMargin}"
@@ -132,34 +143,6 @@
                         <StackPanel/>
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
-                <ListBox.Styles>
-                    <Style Selector="ListBoxItem">
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="Margin" Value="0"/>
-                        <Setter Property="Background" Value="Transparent"/>
-                        <Setter Property="Template">
-                            <ControlTemplate>
-                                <ContentPresenter Name="PART_ContentPresenter"
-                                                  Background="{TemplateBinding Background}"
-                                                  BorderBrush="{TemplateBinding BorderBrush}"
-                                                  BorderThickness="{TemplateBinding BorderThickness}"
-                                                  CornerRadius="{TemplateBinding CornerRadius}"
-                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                  Content="{TemplateBinding Content}"
-                                                  Padding="{TemplateBinding Padding}"
-                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
-                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" />
-                            </ControlTemplate>
-                        </Setter>
-                    </Style>
-                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
-                        <Setter Property="Background" Value="Transparent"/>
-                    </Style>
-                </ListBox.Styles>
-
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:ChatMessageAdapter">
                         <Panel Margin="{StaticResource MessageItemMargin}">
@@ -191,7 +174,7 @@
                                 <!-- 气泡内容 -->
                                 <StackPanel Grid.Column="1" HorizontalAlignment="Left" MaxWidth="{StaticResource MaxChatBubbleWidth}">
                                     <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}" Margin="{StaticResource BubbleHeaderMargin}">
-                                        <TextBlock Text="{Binding DisplaySender}" Classes="caption" FontWeight="{DynamicResource WeightEmphasis}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding DisplaySender}" Classes="caption sender-name"/>
                                         <TextBlock Text="{Binding FormattedTime}" Classes="caption" VerticalAlignment="Bottom"/>
                                     </StackPanel>
 
@@ -209,22 +192,10 @@
                                                        VerticalAlignment="Center"/>
                                         </StackPanel>
 
-                                        <!-- 分析师失败占位卡片：与进度页同一危险语义底，无边框 -->
-                                        <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
-                                                CornerRadius="{StaticResource SmallCornerRadius}"
-                                                Padding="{StaticResource DefaultCardPadding}"
-                                                IsVisible="{Binding IsAnalystFailure}">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                                                <svg:Svg Path="/Assets/Images/icon_warning.svg"
-                                                         Width="{StaticResource TinyIconSize}"
-                                                         Height="{StaticResource TinyIconSize}"
-                                                         VerticalAlignment="Top"/>
-                                                <TextBlock Text="{Binding FailureNoticeText}"
-                                                           Classes="body-sm"
-                                                           TextWrapping="Wrap"
-                                                           Foreground="{DynamicResource DangerPanelTextBrush}"/>
-                                            </StackPanel>
-                                        </Border>
+                                        <!-- 分析师失败占位卡片：与进度页同一危险语义提示条 -->
+                                        <controls:StatusBanner Severity="Danger"
+                                                               Message="{Binding FailureNoticeText}"
+                                                               IsVisible="{Binding IsAnalystFailure}"/>
 
                                         <!-- 气泡：只有纯文本/富文本才需要气泡底色。
                                              结构化卡片自带表面与内边距，再套气泡会让卡片内的
@@ -288,7 +259,7 @@
                                 <StackPanel Grid.Column="0" HorizontalAlignment="Right" MaxWidth="{StaticResource MaxChatBubbleWidth}">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource BubbleRightHeaderMargin}">
                                         <TextBlock Text="{Binding FormattedTime}" Classes="caption" Margin="{StaticResource BubbleRightTimeMargin}" VerticalAlignment="Bottom"/>
-                                        <TextBlock Text="{Binding Sender}" Classes="caption" FontWeight="{DynamicResource WeightTitle}" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding Sender}" Classes="caption sender-name"/>
                                     </StackPanel>
 
                                     <Border Background="{DynamicResource SelectedBackgroundBrush}"

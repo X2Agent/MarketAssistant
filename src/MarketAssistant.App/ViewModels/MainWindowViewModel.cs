@@ -146,7 +146,14 @@ public partial class MainWindowViewModel : ViewModelBase
             MainNavigationItems.Add(new NavigationItemViewModel("首页", "avares://MarketAssistant/Assets/Images/tab_home.svg", "avares://MarketAssistant/Assets/Images/tab_home_on.svg", () => _pageViewModelFactory.Create<HomePageViewModel>()));
             MainNavigationItems.Add(new NavigationItemViewModel("自选", "avares://MarketAssistant/Assets/Images/tab_favorites.svg", "avares://MarketAssistant/Assets/Images/tab_favorites_on.svg", () => _pageViewModelFactory.Create<FavoritesPageViewModel>()));
             MainNavigationItems.Add(new NavigationItemViewModel("告警", "avares://MarketAssistant/Assets/Images/tab_alert.svg", "avares://MarketAssistant/Assets/Images/tab_alert_on.svg", () => _pageViewModelFactory.Create<PriceAlertPageViewModel>()));
-            MainNavigationItems.Add(new NavigationItemViewModel("AI选股", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>()));
+            // Title 是根导航标识（切换市场时按它回定位），Label 才随市场变化：
+            // 页面本身已有 Crypto → 选币 的完整文案与工作流分支，导航文案必须跟上，否则虚拟币市场仍显示「AI选股」。
+            MainNavigationItems.Add(new NavigationItemViewModel(
+                "AI选股",
+                "avares://MarketAssistant/Assets/Images/tab_analysis.svg",
+                "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg",
+                () => _pageViewModelFactory.Create<AssetSelectionPageViewModel>(),
+                label: _marketContext.CurrentMarket == MarketType.Crypto ? "AI选币" : "AI选股"));
             // 交易入口跟随市场能力：虚拟币等支持交易的市场可见，A 股不可见
             if (IsTradingVisible())
             {
@@ -299,9 +306,14 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 }
 
-public class NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel) : ViewModelBase
+public class NavigationItemViewModel(string title, string iconPath, string selectedIconPath, Func<ViewModelBase> createViewModel, string? label = null) : ViewModelBase
 {
+    /// <summary>根导航标识：市场切换后按它回定位当前页，不随市场变化的展示需求而改变。</summary>
     public override string Title { get; } = title;
+
+    /// <summary>导航栏展示文案，默认与 <see cref="Title"/> 相同；市场相关入口（如 AI 选股 / 选币）可覆盖。</summary>
+    public string Label { get; } = label ?? title;
+
     public string IconPath { get; } = iconPath;
     public string SelectedIconPath { get; } = selectedIconPath;
     public Func<ViewModelBase> CreateViewModel { get; } = createViewModel;

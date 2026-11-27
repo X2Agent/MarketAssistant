@@ -49,6 +49,7 @@ public class CoordinatorCardParser : BaseAdaptiveCardParser<CoordinatorResult>
             scoreCols.Columns.Add(new AdaptiveColumn
             {
                 Width = "stretch",
+                Spacing = AdaptiveSpacing.Medium,
                 VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                 Items = { new AdaptiveTextBlock { Text = model.Summary, Wrap = true, Weight = AdaptiveTextWeight.Bolder } }
             });

@@ -55,7 +55,6 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
     // 派生展示属性（由 RefreshAsync 计算）
     [ObservableProperty] private decimal _todayPnlPercent;
-    [ObservableProperty] private bool _isTodayProfitable;
     [ObservableProperty] private bool _isDailyLossHigh;
     [ObservableProperty] private bool _isPositionHigh;
 
@@ -74,12 +73,10 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
             ? $"{FuturesNotionalPercent:F0}% / {RiskConfig.MaxFuturesNotionalPercent:F0}%"
             : "--";
 
-    /// <summary>当前交易模式（含环境标识），供状态主卡展示与切换后刷新。</summary>
-    public string ExchangeModeText => TradingEnvironmentService.GetModeDisplayName(_environmentService.CurrentMode);
+    /// <summary>当前交易环境名称，写进启动 / 紧急停止等确认框，让用户在决策点就看到订单会落到哪里。</summary>
+    private string CurrentEnvironmentText => TradingEnvironmentService.GetModeDisplayName(_environmentService.CurrentMode);
 
-    /// <summary>是否测试网环境（状态主卡提示用）。</summary>
-    public bool IsTestnetMode => _environmentService.IsTestnetMode;
-
+    // 说明：交易环境（实盘 / 测试网）由 TradingPageViewModel 在页签栏统一展示，本页不再重复。
     // 说明：Human-in-the-Loop 交易确认已上移至应用级 TradeConfirmationService
     // （全局对话框，不依赖本页存活），本 ViewModel 不再订阅 ConfirmationRequested。
 
@@ -120,22 +117,18 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         // 停机状态是本页横幅与按钮的数据源；首屏加载时刷新
         _haltState.HaltStateChanged += OnHaltStateChanged;
 
-        // 交易模式标签在主卡内展示，随环境切换刷新（合约/现货也会改变强平风险与敞口的可见性）
+        // 合约 / 现货切换会改变名义敞口的展示，随环境切换刷新
         _environmentService.ModeChanged += OnTradingModeChanged;
 
-        // 本页为分区仪表盘：空态由各分区自行提示，浮层只承担首屏骨架与失败重试
+        // 本页为分区仪表盘：空态由各分区自行提示；首屏用骨架，失败用页内失败条（HasError + RetryCommand），
+        // 不用居中浮层，避免盖住紧急停止与风控指标
         SetRetryCommand(() => RefreshAsync());
     }
 
     private void OnTradingModeChanged(TradingMode mode)
     {
         // ModeChanged 可能由后台线程触发（如监控停止路径），绑定属性更新必须切回 UI 线程
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            OnPropertyChanged(nameof(ExchangeModeText));
-            OnPropertyChanged(nameof(IsTestnetMode));
-            OnPropertyChanged(nameof(FuturesNotionalText));
-        });
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(FuturesNotionalText)));
     }
 
     [RelayCommand]
@@ -188,12 +181,10 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
 
                     // 派生展示属性
                     TodayPnlPercent = TodayStats.TotalPnl / TotalValueUSDT * 100;
-                    IsTodayProfitable = TodayStats.TotalPnl >= 0;
                 }
                 else
                 {
                     TodayPnlPercent = 0;
-                    IsTodayProfitable = true;
                 }
 
                 // 风控阈值预警（达到限额 80% 视为高位）
@@ -299,7 +290,8 @@ public partial class TradeMonitorViewModel : ViewModelBase, IDisposable
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
                 "启动交易监控",
-                "启动后，已启用的策略会在价格条件满足时自动下单（当前交易模式见状态栏）。是否继续？",
+                $"当前环境：{CurrentEnvironmentText}\n\n" +
+                "启动后，已启用的策略会在价格条件满足时自动下单。是否继续？",
                 "启动监控",
                 "取消",
                 topmost: true);

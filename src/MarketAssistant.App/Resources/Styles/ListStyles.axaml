@@ -16,6 +16,28 @@
         <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
     </Style>
 
+    <!-- ===== plain-list：条目自己负责全部视觉（导航项、卡片、聊天气泡） =====
+         Fluent 把悬停 / 按下 / 选中的底色画在 ContentPresenter#PART_ContentPresenter 上，
+         只改 ListBoxItem.Background 不会生效，所以这里直接在 presenter 上把各状态清成透明。
+         需要状态底色的页面（如 nav-list）在自己的 Window / 页面样式里再覆盖 presenter：
+         页面样式离控件更近，优先级高于这里。 -->
+    <Style Selector="ListBox.plain-list ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.plain-list ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.plain-list ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.plain-list ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.plain-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
     <!-- ===== 数据行 ===== -->
     <!-- 说明：data-row / stock-item 两个列表行变体已下线。全库列表行都用
          <c>ListBoxItem</c> 的基础外观 + 页面自己的行样式（如 nav-list、serverCard），

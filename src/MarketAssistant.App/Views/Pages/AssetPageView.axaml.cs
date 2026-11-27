@@ -29,14 +29,15 @@ public partial class AssetPageView : UserControl
     /// </summary>
     private async void FavoriteButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not AssetPageViewModel viewModel)
+        if (DataContext is not AssetPageViewModel viewModel || !viewModel.ToggleFavoriteCommand.CanExecute(null))
         {
             return;
         }
 
+        var wasFavorite = viewModel.IsFavorite;
         await viewModel.ToggleFavoriteCommand.ExecuteAsync(null);
 
-        if (!viewModel.IsFavorite)
+        if (wasFavorite || !viewModel.IsFavorite)
         {
             return;
         }

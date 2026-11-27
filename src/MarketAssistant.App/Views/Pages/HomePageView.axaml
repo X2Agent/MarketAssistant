@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:homevm="using:MarketAssistant.ViewModels.Home"
              xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:components="using:MarketAssistant.Views.Components"
              xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
@@ -17,7 +18,7 @@
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
     </UserControl.Resources>
 
-    <!-- 热门资产卡片瓦片 / 最近查看条目样式 -->
+    <!-- 最近查看条目样式（热门资产卡片见 AssetCardView） -->
     <UserControl.Styles>
         <!-- 最近查看条目：无卡片效果，仅悬停高亮 -->
         <Style Selector="Border.recent-chip">
@@ -33,6 +34,12 @@
         </Style>
         <Style Selector="Border.recent-chip:pointerover">
             <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+        </Style>
+
+        <!-- 快讯标题：略强调。必须用类样式：DataTemplate 里元素上本地写的 DynamicResource
+             优先级低于 body-sm 类，写在元素上不生效 -->
+        <Style Selector="TextBlock.news-title">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
         </Style>
     </UserControl.Styles>
 
@@ -113,7 +120,7 @@
                 Padding="{StaticResource SmallPadding}">
           <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
             <!-- 搜索图标 -->
-            <svg:Svg Path="/Assets/Images/search_icon.svg"
+            <svg:Svg Path="/Assets/Images/icon_magnifier.svg"
                      Width="{StaticResource TinyIconSize}"
                      Height="{StaticResource TinyIconSize}"
                      VerticalAlignment="Center"/>
@@ -171,11 +178,10 @@
                   <DataTemplate x:DataType="assets:AssetItem">
                     <Border Classes="recent-chip"
                             Margin="{StaticResource SmallRightMargin}"
-                            Tapped="RecentStockCard_Tapped"
-                            KeyDown="RecentStockCard_KeyDown"
+                            controls:Activation.Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).RecentAssets.SelectRecentAssetCommand}"
+                            controls:Activation.CommandParameter="{Binding}"
                             Focusable="True"
-                            AutomationProperties.Name="{Binding Name}"
-                            Tag="{Binding .}">
+                            AutomationProperties.Name="{Binding Name}">
                       <StackPanel Orientation="Horizontal"
                                   Spacing="{StaticResource TinySpacing}"
                                   VerticalAlignment="Center">
@@ -218,7 +224,7 @@
             <!-- 上排右列：7*24小时新闻快讯（每日简报为其 AI 解读入口，同属资讯域） -->
             <controls:CardView Grid.Column="7" Grid.ColumnSpan="5" Grid.Row="0">
                 <controls:CardView.Header>
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto,Auto">
                         <TextBlock Grid.Column="0"
                                    Text="7*24小时快讯"
                                    FontSize="{StaticResource BodyFontSize}" 
@@ -226,8 +232,8 @@
 
                         <!-- 每日简报入口：与快讯同属资讯域（简报是快讯+自选的 AI 解读），
                              置于同一卡片标题栏语义自洽，也不占用首页黄金位置。
-                             此处不承载加载态——简报的生成状态只在弹窗内呈现：
-                             标题栏是导航区，塞入指示器会与快讯自身的刷新状态混淆。 -->
+                             此处不承载加载态——简报的生成状态只在弹窗内呈现；
+                             快讯的首次加载由下方骨架承担，标题栏是导航区，不放加载指示器。 -->
                         <Button Grid.Column="1"
                                 Content="简报"
                                 Classes="btn-secondary"
@@ -236,17 +242,7 @@
                                 Margin="{StaticResource SmallLeftMargin}"
                                 VerticalAlignment="Center"/>
 
-                        <!-- 快讯列表自身的加载态：首次推送到达前显示圆形 loading，
-                             归属明确（它加载的就是这个列表本身） -->
-                        <ProgressBar Grid.Column="2"
-                                     IsIndeterminate="True"
-                                     Width="{StaticResource LargeSpacing}"
-                                     Height="{StaticResource LargeSpacing}"
-                                     Margin="{StaticResource SmallLeftMargin}"
-                                     VerticalAlignment="Center"
-                                     IsVisible="{Binding News.IsAwaitingFirstNews}"/>
-
-                        <TextBlock Grid.Column="3"
+                        <TextBlock Grid.Column="2"
                                    Text="{Binding News.TelegraphRefreshCountdown}"
                                    FontSize="{StaticResource CaptionFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
@@ -281,8 +277,7 @@
                         <svg:Svg Path="/Assets/Images/empty_data.svg"
                                  Width="48"
                                  Height="48"
-                                 HorizontalAlignment="Center"
-                                 Opacity="0.7"/>
+                                 HorizontalAlignment="Center"/>
                         <TextBlock Text="暂无快讯" Classes="form-label"
                                    HorizontalAlignment="Center"/>
                     </StackPanel>
@@ -297,21 +292,18 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="telegrams:Telegram">
                                 <Border Classes="news-card"
-                                        Tapped="NewsCard_Tapped"
-                                        KeyDown="NewsCard_KeyDown"
+                                        controls:Activation.Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).News.OpenNewsCommand}"
+                                        controls:Activation.CommandParameter="{Binding}"
                                         Focusable="True"
-                                        AutomationProperties.Name="{Binding Title}"
-                                        Tag="{Binding .}">
+                                        AutomationProperties.Name="{Binding Title}">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <!-- 左侧内容 -->
                                         <StackPanel Grid.Column="0" Spacing="6">
                                             <TextBlock Text="{Binding Title}"
-                                                       Classes="body-sm"
-                                                       FontWeight="{DynamicResource WeightEmphasis}"
+                                                       Classes="body-sm news-title"
                                                        TextWrapping="Wrap"/>
                                             <TextBlock Text="{Binding Content}"
                                                        Classes="caption"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"
                                                        TextWrapping="Wrap"
                                                        MaxLines="3"/>
                                             
@@ -330,8 +322,7 @@
                                                                 Padding="{StaticResource TagPadding}"
                                                                 Margin="0,0,4,4">
                                                             <TextBlock Text="{Binding .}"
-                                                                       Classes="caption"
-                                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                                       Classes="caption"/>
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -372,10 +363,11 @@
                 </controls:CardView.Header>
                 
                 <Panel>
-                    <!-- 首屏骨架：两列瓦片。多列用 ItemsPanel 表达。 -->
+                    <!-- 首屏骨架：两列瓦片。多列用 ItemsPanel 表达；
+                         外层不加 Margin，与真实 ItemsControl 同构（边距只由每张卡的 SmallMargin 提供） -->
                     <controls:SkeletonList Count="6"
-                                           IsVisible="{Binding HotAssets.IsInitialLoading}"
-                                           Margin="{StaticResource SmallMargin}">
+                                           VerticalAlignment="Top"
+                                           IsVisible="{Binding HotAssets.IsInitialLoading}">
                         <controls:SkeletonList.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <UniformGrid Columns="2"/>
@@ -383,20 +375,11 @@
                         </controls:SkeletonList.ItemsPanel>
                         <controls:SkeletonList.ItemTemplate>
                             <DataTemplate>
-                                <!-- 瓦片：名称 14 / 代码 12 左栏，价格 14 / 指标 12 右栏 -->
-                                <controls:SkeletonCard Variant="Tile"
-                                                       Margin="{StaticResource SmallMargin}">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                            <controls:SkeletonLines Row="BodySm" LineWidths="96"/>
-                                            <controls:SkeletonLines Row="Caption" LineWidths="64"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                                            <controls:SkeletonLines Row="BodySm" LineWidths="56"/>
-                                            <controls:SkeletonLines Row="Caption" LineWidths="40"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </controls:SkeletonCard>
+                                <!-- 与真实热门卡同构（含名次与指标行），改卡片结构时同步改 AssetCardSkeleton -->
+                                <controls:AssetCardSkeleton Variant="Tile"
+                                                            HasRank="True"
+                                                            HasMetric="True"
+                                                            Margin="{StaticResource SmallMargin}"/>
                             </DataTemplate>
                         </controls:SkeletonList.ItemTemplate>
                     </controls:SkeletonList>
@@ -411,69 +394,36 @@
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="assets:HotAsset">
-                                <!-- 卡片瓦片：内边距与悬停效果由 hot-stock-card 样式统一管理 -->
-                                <Border Classes="hot-stock-card"
-                                        Margin="{StaticResource SmallMargin}"
-                                        Tapped="HotStockCard_Tapped"
-                                        KeyDown="HotStockCard_KeyDown"
-                                        Focusable="True"
-                                        AutomationProperties.Name="{Binding Name}"
-                                        Tag="{Binding .}">
-                                    <Grid ColumnDefinitions="*,Auto,Auto" Cursor="Hand">
-                                        <!-- 左栏：名称与代码 -->
-                                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}"
-                                                       Classes="body-sm"
-                                                       FontWeight="{DynamicResource WeightEmphasis}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <TextBlock Text="{Binding Code}"
-                                                       Classes="caption"/>
-                                        </StackPanel>
-
-                                        <!-- 右栏：价格/涨跌在上、指标在下，右对齐形成整齐数字列 -->
-                                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" Margin="0,0,8,0">
-                                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                                                <TextBlock Text="{Binding CurrentPrice}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource BodySmFontSize}"
-                                                           FontWeight="{DynamicResource WeightNumber}"
-                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                                <TextBlock Text="{Binding ChangePercentage}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource CaptionFontSize}"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
-                                                <TextBlock Text="{Binding MetricLabel}"
-                                                           Classes="caption"/>
-                                                <TextBlock Text="{Binding FormattedMetric}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontSize="{StaticResource CaptionFontSize}"
-                                                           FontWeight="{DynamicResource WeightNumber}"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </StackPanel>
-                                        </StackPanel>
-
-                                        <!-- 收藏 -->
-                                        <Button Grid.Column="2"
-                                                Classes="favorite-button"
-                                                Background="Transparent"
-                                                Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.AddToFavoriteCommand}"
-                                                CommandParameter="{Binding .}"
-                                                Tapped="OnPreventTapped"
-                                                Width="{StaticResource SmallIconSize}"
-                                                Height="{StaticResource SmallIconSize}"
-                                                Padding="{StaticResource NoPadding}"
-                                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <DataTemplate x:DataType="homevm:HotAssetItem">
+                                <!-- 点击卡片进详情；右上角星标直接加入/取消自选（星标自己的点击不会冒泡成进详情，见 AssetCardView） -->
+                                <controls:AssetCardView Variant="Tile"
+                                                        Margin="{StaticResource SmallMargin}"
+                                                        Title="{Binding Asset.Name}"
+                                                        Code="{Binding Asset.Code}"
+                                                        Price="{Binding Asset.CurrentPrice}"
+                                                        ChangeText="{Binding Asset.ChangePercentage}"
+                                                        MetricLabel="{Binding Asset.MetricLabel}"
+                                                        MetricValue="{Binding Asset.MetricValue}"
+                                                        RankText="{Binding RankText}"
+                                                        controls:Activation.Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.SelectHotAssetCommand}"
+                                                        controls:Activation.CommandParameter="{Binding}">
+                                    <Button Classes="btn-icon-sm"
+                                            ToolTip.Tip="{Binding FavoriteToolTip}"
+                                            AutomationProperties.Name="{Binding FavoriteToolTip}"
+                                            Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).HotAssets.ToggleFavoriteCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Panel>
                                             <svg:Svg Path="/Assets/Images/tab_favorites.svg"
-                                                     Width="{StaticResource MiniIconSize}"
-                                                     Height="{StaticResource MiniIconSize}"/>
-                                        </Button>
-                                    </Grid>
-                                </Border>
+                                                     Width="{StaticResource TinyIconSize}"
+                                                     Height="{StaticResource TinyIconSize}"
+                                                     IsVisible="{Binding !IsFavorite}"/>
+                                            <svg:Svg Path="/Assets/Images/tab_favorites_on.svg"
+                                                     Width="{StaticResource TinyIconSize}"
+                                                     Height="{StaticResource TinyIconSize}"
+                                                     IsVisible="{Binding IsFavorite}"/>
+                                        </Panel>
+                                    </Button>
+                                </controls:AssetCardView>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

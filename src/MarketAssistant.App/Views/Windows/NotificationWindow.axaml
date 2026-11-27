@@ -22,19 +22,21 @@
 
         <Grid ColumnDefinitions="Auto,*,Auto">
 
-            <!-- 图标区域：语义色圆角块，尺寸与标题字号协调 -->
-            <Border Grid.Column="0"
+            <!-- 图标区域：语义色圆角块 + 白色几何符号；底色与符号由 SetMessage 按通知类型切换 -->
+            <Border Name="StatusBadge"
+                    Grid.Column="0"
                     Width="{StaticResource MediumIconSize}"
                     Height="{StaticResource MediumIconSize}"
                     CornerRadius="{StaticResource NotificationIconCornerRadius}"
                     Background="{DynamicResource SuccessBrush}"
                     VerticalAlignment="Center">
-                <TextBlock Text="✓"
-                           FontSize="{StaticResource BodyFontSize}"
-                           FontWeight="{DynamicResource WeightEmphasis}"
-                           Foreground="{StaticResource TextOnEmphasisBrush}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"/>
+                <PathIcon Name="StatusIcon"
+                          Data="{StaticResource CheckIcon}"
+                          Width="{StaticResource TinyIconSize}"
+                          Height="{StaticResource TinyIconSize}"
+                          Foreground="{StaticResource TextOnEmphasisBrush}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
             </Border>
 
             <!-- 消息内容 -->
@@ -57,10 +59,8 @@
             <!-- 关闭按钮 -->
             <Button Grid.Column="2"
                     Name="CloseButton"
-                    Content="✕"
                     Width="{StaticResource DefaultIconSize}"
                     Height="{StaticResource DefaultIconSize}"
-                    FontSize="{StaticResource CaptionFontSize}"
                     Foreground="{StaticResource NotificationTextSecondaryBrush}"
                     Background="Transparent"
                     BorderThickness="{StaticResource NoBorderThickness}"
@@ -80,6 +80,10 @@
                         <Setter Property="Foreground" Value="{StaticResource NotificationTextLightBrush}"/>
                     </Style>
                 </Button.Styles>
+                <!-- 关闭符号继承按钮前景色，悬停 / 按下时随按钮样式变亮 -->
+                <PathIcon Data="{StaticResource CloseIcon}"
+                          Width="{StaticResource MiniIconSize}"
+                          Height="{StaticResource MiniIconSize}"/>
             </Button>
         </Grid>
     </Border>

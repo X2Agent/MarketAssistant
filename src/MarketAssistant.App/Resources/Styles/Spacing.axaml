@@ -61,7 +61,6 @@
     <!-- ========== 圆角 ========== -->
     <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
     <CornerRadius x:Key="DefaultCornerRadius">12</CornerRadius>
-    <CornerRadius x:Key="MediumCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="SmallCornerRadius">8</CornerRadius>
     <CornerRadius x:Key="TinyCornerRadius">6</CornerRadius>
     <CornerRadius x:Key="PillCornerRadius">999</CornerRadius>
@@ -90,7 +89,6 @@
     <Thickness x:Key="SmallPadding">8</Thickness>
     <Thickness x:Key="DefaultPadding">12</Thickness>
     <Thickness x:Key="NoPadding">0</Thickness>
-    <Thickness x:Key="SmallHorizontalPadding">8,0</Thickness>
     <Thickness x:Key="ListItemPadding">12,10</Thickness>
     <Thickness x:Key="SegmentButtonPadding">12,6</Thickness>
     <Thickness x:Key="ChipPadding">8,2</Thickness>
@@ -101,18 +99,24 @@
     <Thickness x:Key="ExpanderContentPadding">20,16,20,20</Thickness>
 
     <!-- ========== Margin ========== -->
+    <!-- 页面页头外边距：左右上 24、底部 0。与内容区自身的 PagePadding 顶边距合成
+         24 区块间距；页头模板不再自带底部外边距，否则两处叠加成 36。 -->
+    <Thickness x:Key="PageHeaderMargin">24,24,24,0</Thickness>
     <Thickness x:Key="DefaultMargin">12</Thickness>
     <Thickness x:Key="SmallMargin">8</Thickness>
     <Thickness x:Key="TinyMargin">4</Thickness>
     <Thickness x:Key="LargeMargin">24</Thickness>
     <Thickness x:Key="NoMargin">0</Thickness>
     <Thickness x:Key="DefaultVerticalMargin">0,12</Thickness>
-    <Thickness x:Key="StatusDotMargin">0,0,8,0</Thickness>
-    <Thickness x:Key="CardGridMargin">0,0,16,16</Thickness>
     <Thickness x:Key="SmallCardGridMargin">0,0,8,8</Thickness>
 
-    <!-- 自选卡片宽度：与骨架屏共用同一令牌，避免两处各写一个字面量而漂移 -->
+    <!-- 自选卡片最小列宽：自适应网格按它决定列数，骨架屏共用同一令牌，
+         避免两处各写一个字面量而漂移 -->
     <x:Double x:Key="FavCardWidth">300</x:Double>
+
+    <!-- AI 选股结果卡最小列宽：卡内有四列指标（现价/目标价/止损价/预期收益）与两个操作按钮，
+         窄于它会换行，所以只在宽窗口切到两列 -->
+    <x:Double x:Key="SelectionCardWidth">440</x:Double>
 
     <Thickness x:Key="BottomMargin">0,0,0,12</Thickness>
     <Thickness x:Key="SmallBottomMargin">0,0,0,8</Thickness>
@@ -166,14 +170,13 @@
     <x:Double x:Key="DividerHeight">1</x:Double>
     <x:Double x:Key="ProgressBarHeight">6</x:Double>
     <x:Double x:Key="IndicatorSize">12</x:Double>
+    <!-- 状态圆点：运行中/等待/完成/失败四态共用同一尺寸，外层容器用 IndicatorSize 留白居中 -->
+    <x:Double x:Key="StatusDotSize">9</x:Double>
 
     <x:Double x:Key="MaxDialogWidth">560</x:Double>
     <x:Double x:Key="DialogCardWidth">440</x:Double>
     <x:Double x:Key="MaxChatBubbleWidth">760</x:Double>
     <x:Double x:Key="MaxInputHeight">160</x:Double>
-    <x:Double x:Key="InputAreaMinWidth">320</x:Double>
-    <x:Double x:Key="InputAreaMaxWidth">880</x:Double>
-    <x:Double x:Key="MessageMaxWidth">280</x:Double>
 
     <!-- ========== 导航 ========== -->
     <!-- v3：240px 文字导航（图标 + 标签 + 分组标题），窄窗收敛为 72px 图标轨 -->

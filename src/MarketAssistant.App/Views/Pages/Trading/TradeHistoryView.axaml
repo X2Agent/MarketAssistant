@@ -5,13 +5,13 @@
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:models="using:MarketAssistant.Trading.Models"
              xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:trading="using:MarketAssistant.Views.Components.Trading"
              xmlns:converters="using:MarketAssistant.Converters"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradeHistoryView"
              x:DataType="vm:TradeHistoryViewModel">
 
     <UserControl.Resources>
-        <converters:PriceTextConverter x:Key="PriceTextConverter"/>
         <converters:PriceChangeColorConverter x:Key="PnlColorConverter"/>
         <!-- 交易对筛选框宽度：比输入框默认宽度窄，避免挤压右侧统计摘要 -->
         <x:Double x:Key="FilterSymbolWidth">220</x:Double>
@@ -19,10 +19,11 @@
 
     <Grid RowDefinitions="Auto,Auto,*">
 
-        <!-- 页签内标题：与其余两个页签同一结构（card-title + caption） -->
+        <!-- 页签内标题：与其余两个页签同一结构（card-title + caption）。
+             记录按当前交易环境隔离，且包含已取消 / 失败的订单，副标题据实说明范围 -->
         <StackPanel Grid.Row="0" Spacing="{StaticResource TinySpacing}">
             <TextBlock Classes="card-title" Text="交易历史"/>
-            <TextBlock Classes="caption" Text="已成交订单记录 · 可按交易对与时间范围筛选"/>
+            <TextBlock Classes="caption" Text="当前环境最近 100 条订单记录（含已取消与失败）· 可按交易对筛选"/>
         </StackPanel>
 
         <!-- 筛选工具栏：与其余页签同用 CardView（圆角 12），不再单独用 8 圆角的裸 Border -->
@@ -84,83 +85,7 @@
                 <ItemsControl ItemsSource="{Binding Records}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:TradeRecord">
-                            <controls:CardView Margin="{StaticResource TinyBottomMargin}">
-                                <StackPanel Spacing="{StaticResource SmallSpacing}">
-
-                                    <!-- 头部：符号 + 方向 + 状态 ... 成交时间 -->
-                                    <Grid ColumnDefinitions="Auto,*,Auto"
-                                          ColumnSpacing="{StaticResource DefaultSpacing}">
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal"
-                                                    Spacing="{StaticResource SmallSpacing}">
-                                            <TextBlock Text="{Binding Symbol}"
-                                                       FontSize="{StaticResource BodySmFontSize}"
-                                                       FontWeight="{DynamicResource WeightTitle}"
-                                                       VerticalAlignment="Center"/>
-                                            <Border Background="{DynamicResource SelectedBackgroundBrush}"
-                                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TagPadding}"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Side}"
-                                                           FontSize="{StaticResource CaptionFontSize}"
-                                                           FontWeight="{DynamicResource WeightEmphasis}"
-                                                           Foreground="{StaticResource AccentBrush}"/>
-                                            </Border>
-                                            <Border Background="{DynamicResource SurfaceVariantBrush}"
-                                                    CornerRadius="{StaticResource TinyCornerRadius}"
-                                                    Padding="{StaticResource TagPadding}"
-                                                    VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Status}"
-                                                           FontSize="{StaticResource CaptionFontSize}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                            </Border>
-                                        </StackPanel>
-
-                                        <!-- 已实现盈亏是该行最重要的数字，单独右对齐 -->
-                                        <TextBlock Grid.Column="1"
-                                                   Classes="num"
-                                                   HorizontalAlignment="Right"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{Binding RealizedPnl, Converter={StaticResource PnlColorConverter}}"
-                                                   Text="{Binding RealizedPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"
-                                                   IsVisible="{Binding HasRealizedPnl}"/>
-
-                                        <TextBlock Grid.Column="2"
-                                                   Classes="caption"
-                                                   VerticalAlignment="Center"
-                                                   Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}}"/>
-                                    </Grid>
-
-                                    <!-- 明细：请求 / 成交 / 均价 / 手续费 / 滑点 -->
-                                    <TextBlock Classes="num-sm"
-                                               Foreground="{DynamicResource TextSecondaryBrush}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="请求 {0:F6} · 成交 {1:F6} @ {2} · 手续费 {3:F4} {4}">
-                                                <Binding Path="RequestedQty"/>
-                                                <Binding Path="ExecutedQty"/>
-                                                <Binding Path="ExecutedPrice"/>
-                                                <Binding Path="Commission"/>
-                                                <Binding Path="CommissionAsset"/>
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-
-                                    <TextBlock Classes="num-sm"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"
-                                               IsVisible="{Binding HasSlippage}"
-                                               Text="{Binding SlippagePercent, StringFormat='滑点 {0:F3}%'}"/>
-
-                                    <!-- AI 决策推理：默认折叠，不占列表高度 -->
-                                    <Expander Header="AI 决策推理"
-                                              IsVisible="{Binding AIReasoning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                              HorizontalAlignment="Stretch"
-                                              Padding="{StaticResource NoPadding}">
-                                        <TextBlock Text="{Binding AIReasoning}"
-                                                   TextWrapping="Wrap"
-                                                   Classes="caption"
-                                                   Margin="{StaticResource SmallCardPadding}"/>
-                                    </Expander>
-                                </StackPanel>
-                            </controls:CardView>
+                            <trading:TradeRecordRowView/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

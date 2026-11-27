@@ -1,4 +1,5 @@
 using MarketAssistant.Applications.Assets.Models;
+using MarketAssistant.Applications.Market;
 using MarketAssistant.DataProviders.AShare;
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
@@ -91,7 +92,7 @@ public class AShareAssetInfoService(
             // 当前价格（CLS 对停牌/无成交返回 null，保留默认空串表示「未提供」，不伪造 0）
             if (data.LastPrice is { } lastPrice)
             {
-                assetInfo.CurrentPrice = PriceFormatter.Format(lastPrice);
+                assetInfo.CurrentPrice = PriceFormatter.Format(lastPrice, MarketType.AShare, assetInfo.Code);
             }
             else
             {
@@ -140,7 +141,7 @@ public class AShareAssetInfoService(
         }
 
         assetInfo.Name = quote.Name;
-        assetInfo.CurrentPrice = PriceFormatter.Format(quote.CurrentPrice);
+        assetInfo.CurrentPrice = PriceFormatter.Format(quote.CurrentPrice, MarketType.AShare, assetInfo.Code);
 
         if (quote.PreClose is { } preClose && preClose > 0m)
         {
@@ -169,7 +170,7 @@ public class AShareAssetInfoService(
                     CurrentPrice = item.Price,
                     ChangePercentage = PercentFormatter.Format(item.ChangeRatio * 100),
                     MetricLabel = "净流入",
-                    MetricValue = item.NetAmount.ToString("F0"),
+                    MetricValue = MarketValueFormatter.FormatAmount((decimal)item.NetAmount),
                     MarketType = MarketType.AShare
                 };
             })];

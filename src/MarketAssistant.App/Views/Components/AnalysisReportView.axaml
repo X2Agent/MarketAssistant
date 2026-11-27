@@ -20,18 +20,7 @@
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- 报告内的小节标题：比 card-title 低一级，用于同一卡片内的分区 -->
-        <Style Selector="TextBlock.subsection-title">
-            <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
-            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
-            <Setter Property="Margin" Value="{StaticResource SmallBottomMargin}"/>
-        </Style>
-
-        <!-- 标签样式 -->
-        <Style Selector="TextBlock.label">
-            <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-        </Style>
+        <!-- 指标名用全局 caption；值用下面的 value（等宽数字档） -->
 
         <!-- 值样式：数值用等宽档，语义色不参与——层级靠字重与字号 -->
         <Style Selector="TextBlock.value">
@@ -41,7 +30,8 @@
             <Setter Property="Margin" Value="{StaticResource TinyTopMargin}"/>
         </Style>
 
-        <!-- 评级徽章：语义浅底 + 同色文字（与涨跌标签同几何）。
+        <!-- 评级徽章：语义浅底 + 配对字色令牌（与涨跌标签同几何；BearishBrush 压在自己的色底上只有 2.9:1，
+             所以字色取 BullishTagTextBrush / BearishTagTextBrush）。
              中性评级不套语义色——中性不是"数据语义"，用中性色块表达。 -->
         <Style Selector="Border.ratingBadge">
             <Setter Property="CornerRadius" Value="{StaticResource DefaultCornerRadius}"/>
@@ -53,13 +43,13 @@
             <Setter Property="Background" Value="{StaticResource BullishTagBackgroundBrush}"/>
         </Style>
         <Style Selector="Border.ratingBadge.tonePositive TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource BullishBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BullishTagTextBrush}"/>
         </Style>
         <Style Selector="Border.ratingBadge.toneNegative">
             <Setter Property="Background" Value="{StaticResource BearishTagBackgroundBrush}"/>
         </Style>
         <Style Selector="Border.ratingBadge.toneNegative TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource BearishBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BearishTagTextBrush}"/>
         </Style>
         <Style Selector="Border.ratingBadge.toneNeutral">
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
@@ -159,7 +149,7 @@
                                 <StackPanel Grid.Row="0" Grid.Column="0"
                                             Margin="{StaticResource ReportMetricMargin}"
                                             IsVisible="{Binding HasTargetPrice}">
-                                    <TextBlock Text="目标价格" Classes="label"/>
+                                    <TextBlock Text="目标价格" Classes="caption"/>
                                     <TextBlock Text="{Binding TargetPrice}"
                                                Classes="value"
                                                TextWrapping="Wrap"
@@ -168,7 +158,7 @@
 
                                 <!-- 风险等级 -->
                                 <StackPanel Grid.Row="0" Grid.Column="1" IsVisible="{Binding HasRiskLevel}">
-                                    <TextBlock Text="风险等级" Classes="label"/>
+                                    <TextBlock Text="风险等级" Classes="caption"/>
                                     <Border Background="{DynamicResource SurfaceVariantBrush}"
                                             HorizontalAlignment="Left"
                                             CornerRadius="{StaticResource TinyCornerRadius}"
@@ -184,7 +174,7 @@
                                 <StackPanel Grid.Row="1" Grid.Column="0"
                                             Margin="{StaticResource ReportMetricMargin}"
                                             IsVisible="{Binding HasConfidence}">
-                                    <TextBlock Text="置信度" Classes="label"/>
+                                    <TextBlock Text="置信度" Classes="caption"/>
                                     <TextBlock Text="{Binding ConfidenceText}"
                                                Classes="value"
                                                FontFamily="{StaticResource DataFontFamily}"/>
@@ -192,7 +182,7 @@
 
                                 <!-- 投资期限 -->
                                 <StackPanel Grid.Row="1" Grid.Column="1" IsVisible="{Binding HasTimeHorizon}">
-                                    <TextBlock Text="投资期限" Classes="label"/>
+                                    <TextBlock Text="投资期限" Classes="caption"/>
                                     <TextBlock Text="{Binding TimeHorizon}"
                                                Classes="value"
                                                TextWrapping="Wrap"/>
@@ -201,7 +191,7 @@
                                 <!-- 价格预期 -->
                                 <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                                             IsVisible="{Binding HasPriceChangeExpectation}">
-                                    <TextBlock Text="价格预期" Classes="label"/>
+                                    <TextBlock Text="价格预期" Classes="caption"/>
                                     <TextBlock Text="{Binding PriceChangeExpectation}"
                                                Classes="value"
                                                TextWrapping="Wrap"/>
@@ -475,7 +465,7 @@
                         <Grid ColumnDefinitions="*,*,*" ColumnSpacing="{StaticResource LargeSpacing}">
                             <!-- 数据完整度 -->
                             <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="数据完整度" Classes="label"/>
+                                <TextBlock Text="数据完整度" Classes="caption"/>
                                 <TextBlock Text="{Binding DataCompletenessPercent, StringFormat='{}{0}%'}"
                                            Classes="value"
                                            FontFamily="{StaticResource DataFontFamily}"/>
@@ -489,7 +479,7 @@
 
                             <!-- 分析师一致性 -->
                             <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="分析师一致性" Classes="label"/>
+                                <TextBlock Text="分析师一致性" Classes="caption"/>
                                 <TextBlock Text="{Binding AnalystConsensusPercent, StringFormat='{}{0}%'}"
                                            Classes="value"
                                            FontFamily="{StaticResource DataFontFamily}"/>
@@ -503,7 +493,7 @@
 
                             <!-- 综合质量等级 -->
                             <StackPanel Grid.Column="2" Spacing="{StaticResource TinySpacing}">
-                                <TextBlock Text="综合质量" Classes="label"/>
+                                <TextBlock Text="综合质量" Classes="caption"/>
                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                         Padding="{StaticResource ReportBadgePadding}"
@@ -519,7 +509,7 @@
                         <!-- 缺失数据维度 -->
                         <StackPanel IsVisible="{Binding HasMissingDataDimensions}"
                                     Spacing="{StaticResource TinySpacing}">
-                            <TextBlock Text="缺失数据维度" Classes="label"/>
+                            <TextBlock Text="缺失数据维度" Classes="caption"/>
                             <ItemsControl ItemsSource="{Binding MissingDataDimensions}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>

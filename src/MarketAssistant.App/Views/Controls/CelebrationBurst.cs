@@ -109,7 +109,7 @@ public class CelebrationBurst : Control
         var seconds = _elapsed.TotalSeconds;
 
         // 颜色跟随唯一强调色：v3 允许烟花是"表达"，但不允许引入第二个强调色或语义色装饰
-        var brush = (IBrush?)this.FindResource("AccentBrush") ?? Brushes.DodgerBlue;
+        var brush = (IBrush)this.FindResource("AccentBrush")!;
 
         // 先整体散开、后半程才开始变淡：粒子在最强时清晰可见，尾部才消融
         var opacity = progress < 0.45 ? 1 : 1 - (progress - 0.45) / 0.55;

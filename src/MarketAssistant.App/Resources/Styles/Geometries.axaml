@@ -15,5 +15,28 @@
          不使用 ✓ 字形——字形在不同字体回退链下粗细与基线都不一致。 -->
     <StreamGeometry x:Key="CheckIcon">M9,16.17L4.83,12L3.41,13.41L9,19L21,7L19.59,5.59L9,16.17Z</StreamGeometry>
 
+    <!-- 纯字形图标：与 CheckIcon 同为 2px 笔画（24 视口），放在语义色块里当白色符号。
+         通知窗口曾用 ✓ ✕ ! i 四个文字字形，粗细与基线随字体回退链各不相同，故统一成几何。 -->
+    <StreamGeometry x:Key="CloseIcon">M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z</StreamGeometry>
+    <StreamGeometry x:Key="ExclamationIcon">M11,4.5H13V15H11V4.5M13,17.5V19.5H11V17.5H13Z</StreamGeometry>
+    <StreamGeometry x:Key="InfoMarkIcon">M11,4.5H13V6.5H11V4.5M11,9H13V19.5H11V9Z</StreamGeometry>
+
+    <!-- 方向与切换：替代 ↑ ↓ ⇄ 文字字形（字形在不同字体回退链下大小与基线都不一致） -->
+    <StreamGeometry x:Key="ArrowUpIcon">M13,20H11V8L5.5,13.5L4.08,12.08L12,4.16L19.92,12.08L18.5,13.5L13,8V20Z</StreamGeometry>
+    <StreamGeometry x:Key="ArrowDownIcon">M11,4H13V16L18.5,10.5L19.92,11.92L12,19.84L4.08,11.92L5.5,10.5L11,16V4Z</StreamGeometry>
+    <StreamGeometry x:Key="SwapIcon">M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z</StreamGeometry>
+
+    <!-- 语义提示条图标（StatusBanner 使用）：用几何 + 面板文字色绘制，与底色同一语义。
+         不用 icon_warning.svg / icon_danger.svg：它们写死了琥珀 / 红色，
+         放到另一种语义底上会出现"琥珀图标 + 红底"的混色。 -->
+    <StreamGeometry x:Key="InfoIcon">M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+    <StreamGeometry x:Key="SuccessIcon">M12,2C6.5,2 2,6.5 2,12C2,17.5 6.5,22 12,22C17.5,22 22,17.5 22,12C22,6.5 17.5,2 12,2M10,17L5,12L6.41,10.59L10,14.17L17.59,6.58L19,8L10,17Z</StreamGeometry>
+    <StreamGeometry x:Key="WarningIcon">M13,14H11V10H13M13,18H11V16H13M1,21H23L12,2L1,21Z</StreamGeometry>
+    <StreamGeometry x:Key="DangerIcon">M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z</StreamGeometry>
+
+    <!-- GitHub 标志：用几何 + 主题前景色绘制，随浅 / 深色自动换色。
+         原 github.svg 写死 #333333，暗色卡片上对比度只有约 1.4:1，几乎看不见。 -->
+    <StreamGeometry x:Key="GithubIcon">M12 1.27 a11 11 0 0 0 -3.48 21.46 c0.55 0.09 0.73 -0.24 0.73 -0.53 v-1.85 c-3.03 0.66 -3.67 -1.45 -3.67 -1.45 c-0.55 -1.29 -1.28 -1.65 -1.28 -1.65 c-1.03 -0.71 0.1 -0.7 0.1 -0.7 c1.15 0.08 1.75 1.18 1.75 1.18 c1.02 1.75 2.67 1.24 3.32 0.95 c0.1 -0.74 0.4 -1.25 0.72 -1.54 c-2.47 -0.28 -5.07 -1.24 -5.07 -5.5 c0 -1.21 0.43 -2.2 1.14 -2.98 c-0.11 -0.28 -0.49 -1.4 0.11 -2.91 c0 0 0.93 -0.3 3.05 1.14 a10.65 10.65 0 0 1 5.5 0 c2.12 -1.44 3.05 -1.14 3.05 -1.14 c0.6 1.51 0.22 2.63 0.1 2.91 c0.72 0.78 1.15 1.77 1.15 2.98 c0 4.27 -2.6 5.22 -5.08 5.5 c0.4 0.35 0.77 1.04 0.77 2.1 v3.12 c0 0.29 0.19 0.63 0.74 0.52 A11 11 0 0 0 12 1.27 Z</StreamGeometry>
+
 </ResourceDictionary>
 

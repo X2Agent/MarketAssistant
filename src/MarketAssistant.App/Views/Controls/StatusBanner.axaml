@@ -1,0 +1,95 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Views.Controls">
+
+    <!-- ================================================================== -->
+    <!-- StatusBanner — 语义提示条                                            -->
+    <!--                                                                     -->
+    <!-- 浅语义底 + 同色文字 + 同色图标，不描边。底色 / 文字色用成对的            -->
+    <!-- XxxPanelBackgroundBrush / XxxPanelTextBrush，跨主题对比度已校准。       -->
+    <!--                                                                     -->
+    <!-- 内边距 12、圆角 8、正文 BodySm（与 TextStyles 的 body-sm 同令牌）。       -->
+    <!-- 图标放在一个与正文行高等高的槽里居中，所以单行时图标与文字垂直居中，      -->
+    <!-- 多行时图标对齐首行，而不是漂在整块中间。                                -->
+    <!-- ================================================================== -->
+    <Style Selector="controls|StatusBanner">
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:StatusBanner">
+                <Border x:Name="PART_Surface"
+                        CornerRadius="{StaticResource SmallCornerRadius}"
+                        Padding="{StaticResource CompactCardPadding}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Panel Grid.Column="0"
+                               Height="{StaticResource BodySmLineHeight}"
+                               Margin="{StaticResource SmallRightMargin}"
+                               VerticalAlignment="Top">
+                            <PathIcon x:Name="PART_Icon"
+                                      Width="{StaticResource TinyIconSize}"
+                                      Height="{StaticResource TinyIconSize}"
+                                      VerticalAlignment="Center"/>
+                        </Panel>
+                        <TextBlock x:Name="PART_Message"
+                                   Grid.Column="1"
+                                   Text="{TemplateBinding Message}"
+                                   FontSize="{StaticResource BodySmFontSize}"
+                                   FontWeight="{DynamicResource WeightBody}"
+                                   LineHeight="{StaticResource BodySmLineHeight}"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center"/>
+                        <ContentPresenter Grid.Column="2"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Margin="{StaticResource SmallLeftMargin}"
+                                          VerticalAlignment="Center"
+                                          IsVisible="{TemplateBinding Content, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- 四种语义：底色 / 图标 / 文字色成组切换 -->
+    <Style Selector="controls|StatusBanner.severity-info /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource InfoPanelBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-info /template/ PathIcon#PART_Icon">
+        <Setter Property="Data" Value="{StaticResource InfoIcon}"/>
+        <Setter Property="Foreground" Value="{DynamicResource InfoPanelTextBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-info /template/ TextBlock#PART_Message">
+        <Setter Property="Foreground" Value="{DynamicResource InfoPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusBanner.severity-success /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource SuccessPanelBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-success /template/ PathIcon#PART_Icon">
+        <Setter Property="Data" Value="{StaticResource SuccessIcon}"/>
+        <Setter Property="Foreground" Value="{DynamicResource SuccessPanelTextBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-success /template/ TextBlock#PART_Message">
+        <Setter Property="Foreground" Value="{DynamicResource SuccessPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusBanner.severity-warning /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource WarningPanelBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-warning /template/ PathIcon#PART_Icon">
+        <Setter Property="Data" Value="{StaticResource WarningIcon}"/>
+        <Setter Property="Foreground" Value="{DynamicResource WarningPanelTextBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-warning /template/ TextBlock#PART_Message">
+        <Setter Property="Foreground" Value="{DynamicResource WarningPanelTextBrush}"/>
+    </Style>
+
+    <Style Selector="controls|StatusBanner.severity-danger /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource DangerPanelBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-danger /template/ PathIcon#PART_Icon">
+        <Setter Property="Data" Value="{StaticResource DangerIcon}"/>
+        <Setter Property="Foreground" Value="{DynamicResource DangerPanelTextBrush}"/>
+    </Style>
+    <Style Selector="controls|StatusBanner.severity-danger /template/ TextBlock#PART_Message">
+        <Setter Property="Foreground" Value="{DynamicResource DangerPanelTextBrush}"/>
+    </Style>
+</Styles>

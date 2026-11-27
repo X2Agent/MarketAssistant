@@ -118,12 +118,14 @@ public partial class ChatMessageAdapter : ObservableObject
 
     /// <summary>
     /// 该消息是否可复制：流式进行中内容仍会变化，此时不提供复制入口。
-    /// 仅在终态且内容非空时允许复制——结构化卡片同样可复制其原始产物，便于外部留档。
+    /// 仅在终态且内容非空时允许复制——结构化卡片同样可复制其原始产物，便于外部留档；
+    /// 分析师失败占位只是内部标记，复制出去没有意义，不提供入口。
     /// </summary>
     public bool CanCopy
         => !IsUser
            && Status is MessageStatus.Sent or MessageStatus.Failed
-           && !string.IsNullOrWhiteSpace(Content);
+           && !string.IsNullOrWhiteSpace(Content)
+           && !IsAnalystFailure;
 
     /// <summary>
     /// 复制反馈触发令牌：每次复制成功递增一次，

@@ -13,85 +13,40 @@
 
     <UserControl.Resources>
         <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
-        <converts:NullableVisibilityConverter x:Key="NullableVisibilityConverter"/>
     </UserControl.Resources>
 
     <Design.DataContext>
         <vm:FavoritesPageViewModel/>
     </Design.DataContext>
 
-    <!-- 收藏卡片（v3：无边框，靠表面色阶分层；hover 加深底色而非描边） -->
-    <UserControl.Styles>
-        <Style Selector="Border.fav-card">
-            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
-            <Setter Property="BorderThickness" Value="{StaticResource NoBorderThickness}"/>
-            <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
-            <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Transitions">
-                <Transitions>
-                    <BrushTransition Property="Background" Duration="0:0:0.15"/>
-                </Transitions>
-            </Setter>
-        </Style>
-    <Style Selector="Border.fav-card:pointerover">
-        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
-    </Style>
-    <!-- 删除按钮全局默认透明且不接收点击（见 ButtonStyles），必须在这里让它在悬停或键盘聚焦时浮现。
-         缺这条规则时卡片视图的删除入口完全不可用——只剩表格视图能删。
-         键盘场景用 :focus-visible（与 q-card 一致），鼠标点击卡片不该让删除按钮一直停在那里。 -->
-    <Style Selector="Border.fav-card:pointerover Button.delete-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
-    </Style>
-    <Style Selector="Border.fav-card:focus-visible Button.delete-button">
-        <Setter Property="Opacity" Value="1"/>
-        <Setter Property="IsHitTestVisible" Value="True"/>
-    </Style>
-    </UserControl.Styles>
-
     <!-- 根用 Panel 叠放各状态，使空态/加载占位可撑满整页垂直居中 -->
     <Panel Background="{DynamicResource PageBackgroundBrush}">
 
         <!-- 首屏骨架：卡片视图占位。
-             每张卡是 fav-card 的结构克隆：同宽（FavCardWidth）、同内边距、同 CardGridMargin，
-             内部按同样的左右两栏排布，数据到达时高度零跳动。 -->
+             每张卡是真实 AssetCardView 的结构克隆（AssetCardSkeleton）：同一自适应网格面板、
+             同 SmallMargin，数据到达时零跳动。 -->
         <Grid IsVisible="{Binding IsInitialLoading}"
               RowDefinitions="Auto,*">
             <Border Grid.Row="0"
                     Classes="skeleton skeleton-line-title"
                     Width="180"
                     HorizontalAlignment="Left"
-                    Margin="{StaticResource PagePadding}"/>
-            <Grid Grid.Row="1" Margin="{StaticResource PagePadding}">
-                <!-- 与真实 WrapPanel 同构，窄窗口按相同卡宽和边距自动换行。 -->
-                <controls:SkeletonList Count="6">
+                    Margin="{StaticResource PageHeaderMargin}"/>
+            <Grid Grid.Row="1" Margin="{StaticResource PagePaddingCompact}">
+                <!-- 与真实网格同构：同一面板、同一最小列宽，窄窗口按相同列数收缩。
+                     必须 VerticalAlignment=Top：UniformGrid 会把单元格高度按可用高度均分，
+                     否则 ScrollViewer 的视口高度会把单行骨架拉成整屏。 -->
+                <controls:SkeletonList Count="6" VerticalAlignment="Top">
                     <controls:SkeletonList.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel/>
+                            <controls:AdaptiveUniformGrid MinColumnWidth="{StaticResource FavCardWidth}"
+                                                          MaxColumns="4"/>
                         </ItemsPanelTemplate>
                     </controls:SkeletonList.ItemsPanel>
                     <controls:SkeletonList.ItemTemplate>
                         <DataTemplate>
-                            <controls:SkeletonCard Variant="Card"
-                                                   Width="{StaticResource FavCardWidth}"
-                                                   Margin="{StaticResource CardGridMargin}">
-                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
-                                    <StackPanel Grid.Column="0"
-                                                Spacing="{StaticResource TinySpacing}"
-                                                VerticalAlignment="Center">
-                                        <controls:SkeletonLines Row="Caption" LineWidths="52"/>
-                                        <controls:SkeletonLines Row="BodySm" LineWidths="120"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1"
-                                                Spacing="{StaticResource TinySpacing}"
-                                                HorizontalAlignment="Right"
-                                                VerticalAlignment="Center">
-                                        <controls:SkeletonLines Row="Title" LineWidths="110"/>
-                                        <controls:SkeletonLines Row="Caption" LineWidths="48"/>
-                                    </StackPanel>
-                                </Grid>
-                            </controls:SkeletonCard>
+                            <controls:AssetCardSkeleton Variant="Card"
+                                                        Margin="{StaticResource SmallMargin}"/>
                         </DataTemplate>
                     </controls:SkeletonList.ItemTemplate>
                 </controls:SkeletonList>
@@ -100,9 +55,9 @@
 
         <!-- 内容区域（非首次加载） -->
         <Grid IsVisible="{Binding !IsInitialLoading}" RowDefinitions="Auto,*">
-            <!-- 页面标题 + 视图切换：全库唯一保留页头的页面，因为操作槽里有真实操作 -->
+            <!-- 页面标题 + 视图切换：保留页头是因为操作槽里有真实操作 -->
             <controls:PageHeaderView Grid.Row="0"
-                                     Margin="{StaticResource PagePadding}"
+                                     Margin="{StaticResource PageHeaderMargin}"
                                      Title="自选看板"
                                      Description="卡片视图适合盯盘，表格视图适合多字段对比">
                 <!-- 视图切换分段器（有数据时显示）：当前视图禁用，另一视图可点 -->
@@ -117,94 +72,40 @@
                 </StackPanel>
             </controls:PageHeaderView>
             <Panel Grid.Row="1">
-            <!-- 收藏网格（对齐原型 fav-grid：auto-fill 自适应换行） -->
+            <!-- 收藏网格：自适应等分列铺满整行（容器 16 + 条目 8 合成 24 页边距，
+                 卡片间距 16）。固定卡宽 + WrapPanel 会让右边缘参差并留下大块空白。 -->
             <ScrollViewer IsVisible="{Binding IsCardView}">
                 <ItemsControl ItemsSource="{Binding Assets}"
-                              Margin="{StaticResource PagePadding}">
+                              Margin="{StaticResource PagePaddingCompact}"
+                              VerticalAlignment="Top">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel/>
+                            <controls:AdaptiveUniformGrid MinColumnWidth="{StaticResource FavCardWidth}"
+                                                          MaxColumns="4"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="assets:AssetInfo">
-                        <Border Classes="fav-card"
-                                Width="{StaticResource FavCardWidth}"
-                                Margin="{StaticResource CardGridMargin}"
-                                Tapped="OnStockItemTapped"
-                                KeyDown="OnStockItemKeyDown"
-                                Focusable="True"
-                                AutomationProperties.Name="{Binding Name}"
-                                Tag="{Binding .}">
-                            <!-- 左右两栏：左「代码/板块 + 名称」，右「价格 + 涨跌」右对齐。
-                                 价格是等宽数字且右对齐，同一网格里各卡的价格逐位对齐，
-                                 盯盘时视线不必来回扫；也消除了旧版 *,Auto 撑出的中间空洞。
-                                 第三列预留删除按钮位（与首页热门卡同构：按钮默认透明但仍占位，
-                                 悬停时浮现，避免出现时把价格挤走造成跳动）。 -->
-                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
-                                <!-- 左栏：代码 / 板块 / 名称 -->
-                                <StackPanel Grid.Column="0"
-                                            Spacing="{StaticResource TinySpacing}"
-                                            VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                        <TextBlock Text="{Binding Code}" Classes="caption"/>
-                                        <TextBlock Text="{Binding SectorName}"
-                                                   Classes="caption"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   IsVisible="{Binding SectorName, Converter={StaticResource NullableVisibilityConverter}}"/>
-                                    </StackPanel>
-
-                                    <TextBlock Text="{Binding Name}"
-                                               Classes="body-sm"
-                                               FontWeight="{DynamicResource WeightEmphasis}"
-                                               TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-
-                                <!-- 右栏：价格（视觉锚点）+ 涨跌徽标 -->
-                                <StackPanel Grid.Column="1"
-                                            Spacing="{StaticResource TinySpacing}"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding CurrentPrice}"
-                                               HorizontalAlignment="Right"
-                                               FontFamily="{StaticResource DataFontFamily}"
-                                               FontSize="{StaticResource TitleFontSize}"
-                                               FontWeight="{DynamicResource WeightNumber}"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <Border HorizontalAlignment="Right"
-                                            Background="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"
-                                            CornerRadius="{StaticResource TinyCornerRadius}"
-                                            Padding="{StaticResource TagPadding}">
-                                        <TextBlock Text="{Binding ChangePercentage}"
-                                                   FontFamily="{StaticResource DataFontFamily}"
-                                                   FontSize="{StaticResource CaptionFontSize}"
-                                                   FontWeight="{DynamicResource WeightNumber}"
-                                                   Foreground="{Binding ChangePercentage, Converter={StaticResource PriceChangeColorConverter}}"/>
-                                    </Border>
-                                </StackPanel>
-
-                                <!-- 删除：独立成一列，悬停/键盘聚焦时才出现（样式见 fav-card:pointerover） -->
-                                <Button Grid.Column="2"
-                                        Classes="delete-button"
-                                        VerticalAlignment="Center"
-                                        Margin="{StaticResource TinyLeftMargin}"
-                                        Width="{StaticResource TinyIconButtonSize}"
-                                        Height="{StaticResource TinyIconButtonSize}"
-                                        Cursor="Hand"
-                                        Background="Transparent"
-                                        BorderThickness="{StaticResource NoBorderThickness}"
-                                        Padding="{StaticResource NoPadding}"
-                                        ToolTip.Tip="移出自选"
-                                        Tapped="OnDeleteButtonTapped"
-                                        Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}"
-                                        CommandParameter="{Binding .}">
-                                    <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
-                                              Width="{StaticResource TinyIconSize}"
-                                              Height="{StaticResource TinyIconSize}"
-                                              Foreground="{DynamicResource ErrorBrush}" />
-                                </Button>
-                            </Grid>
-                        </Border>
+                        <!-- 点击卡片进详情；右上角实心心形取消自选（确认框在 ViewModel 里，点它不会冒泡成进详情，见 AssetCardView） -->
+                        <controls:AssetCardView Variant="Card"
+                                                Margin="{StaticResource SmallMargin}"
+                                                Title="{Binding Name}"
+                                                Code="{Binding Code}"
+                                                Subtitle="{Binding SectorName}"
+                                                Price="{Binding CurrentPrice}"
+                                                ChangeText="{Binding ChangePercentage}"
+                                                controls:Activation.Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).SelectFavoriteAssetCommand}"
+                                                controls:Activation.CommandParameter="{Binding}">
+                            <Button Classes="btn-icon-sm"
+                                    ToolTip.Tip="取消自选"
+                                    AutomationProperties.Name="取消自选"
+                                    Command="{Binding $parent[UserControl].((vm:FavoritesPageViewModel)DataContext).RemoveFavoriteCommand}"
+                                    CommandParameter="{Binding}">
+                                <svg:Svg Path="/Assets/Images/tab_favorites_on.svg"
+                                         Width="{StaticResource TinyIconSize}"
+                                         Height="{StaticResource TinyIconSize}"/>
+                            </Button>
+                        </controls:AssetCardView>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
                 </ItemsControl>

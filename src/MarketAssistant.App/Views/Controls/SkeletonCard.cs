@@ -7,10 +7,10 @@ namespace MarketAssistant.Views.Controls;
 /// <summary>骨架卡片的表面形态，取值与真实卡片的样式类一一对应。</summary>
 public enum SkeletonCardVariant
 {
-    /// <summary>卡片：卡片底色 + 圆角 12 + 内边距 20（对应 <c>CardView</c>）。</summary>
+    /// <summary>卡片：卡片底色 + 圆角 12 + 内边距 20（对应 <c>CardView</c> 与 <c>AssetCardView</c> 的 Card 形态）。</summary>
     Card,
 
-    /// <summary>瓦片：次级表面色 + 圆角 12 + 内边距 16（对应 <c>Border.hot-stock-card</c>）。</summary>
+    /// <summary>瓦片：次级表面色 + 圆角 12 + 内边距 16（对应 <c>AssetCardView</c> 的 Tile 形态）。</summary>
     Tile,
 
     /// <summary>行内卡：卡片底色 + 圆角 8 + 内边距 16（对应列表行、新闻行）。</summary>

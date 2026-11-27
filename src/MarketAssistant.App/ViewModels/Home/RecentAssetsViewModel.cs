@@ -18,9 +18,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
     private IAssetHistoryService HistoryService =>
         _marketContext.GetService<IAssetHistoryService>();
 
-    private IHomeAssetService HomeAssetService =>
-        _marketContext.GetService<IHomeAssetService>();
-
     private IAssetInfoService AssetInfoService =>
         _marketContext.GetService<IAssetInfoService>();
 
@@ -100,17 +97,6 @@ public partial class RecentAssetsViewModel : ViewModelBase, IDisposable
         if (asset == null) return;
 
         RecentAssetSelected?.Invoke(this, asset);
-    }
-
-    [RelayCommand]
-    private async Task AddToFavoriteAsync(AssetItem? asset)
-    {
-        if (asset == null) return;
-
-        await SafeExecuteAsync(async () =>
-        {
-            await HomeAssetService.AddToFavoriteAsync(asset);
-        }, "加入自选");
     }
 
     public void Dispose()

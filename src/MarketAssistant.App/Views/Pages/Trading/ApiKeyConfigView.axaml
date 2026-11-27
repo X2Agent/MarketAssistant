@@ -14,127 +14,93 @@
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
     </UserControl.Resources>
 
-    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="{StaticResource DefaultSpacing}">
+    <!-- 本视图只嵌在交易页的「API 密钥设置」手风琴里：手风琴标题已经说明了这一块是什么，
+         所以这里不再重复页面标题，直接给三组内容；外层页面本身可滚动，也不再套一层 ScrollViewer -->
+    <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- 页签内标题：父级「交易终端」已是页面级标题，这里用小一级的卡片标题 -->
-            <StackPanel Spacing="{StaticResource TinySpacing}">
-                <TextBlock Classes="card-title" Text="API 配置"/>
-                <TextBlock Classes="caption" Text="交易所密钥与交易模式 · 密钥仅保存在本机安全存储"/>
-            </StackPanel>
-
-            <!-- 交易模式选择 -->
-            <controls:CardView>
-                <controls:CardView.Header>
-                    <TextBlock Text="交易模式" Classes="card-title"/>
-                </controls:CardView.Header>
-                <StackPanel Spacing="{StaticResource SmallSpacing}">
-                    <ComboBox ItemsSource="{Binding TradingModes}"
-                              SelectedItem="{Binding SelectedMode}"
-                              HorizontalAlignment="Stretch">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <TextBlock Text="{Binding ModeDescription}"
-                               Classes="caption"
-                               TextWrapping="Wrap"/>
-                    <Button Content="应用此模式"
-                            Command="{Binding ApplyModeCommand}"
-                            Classes="btn-primary"
-                            HorizontalAlignment="Left"/>
-                </StackPanel>
-            </controls:CardView>
-
-            <!-- 实盘警告 -->
-            <Border IsVisible="{Binding IsLiveMode}"
-                    Background="{DynamicResource DangerPanelBackgroundBrush}"
-                    BorderThickness="{StaticResource NoBorderThickness}"
-                    CornerRadius="{StaticResource SmallCornerRadius}"
-                    Padding="{StaticResource DefaultPadding}">
-                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                    <svg:Svg Path="/Assets/Images/icon_danger.svg"
-                             Width="{StaticResource BodyFontSize}"
-                             Height="{StaticResource BodyFontSize}"
-                             VerticalAlignment="Top"/>
-                    <TextBlock Text="实盘模式将使用真实资金进行交易。请确认 API Key 已在 binance.com 配置正确的权限（仅开启现货/合约交易，不要开启提现权限）。"
-                               Classes="caption"
-                               Foreground="{DynamicResource DangerPanelTextBrush}"
-                               TextWrapping="Wrap"/>
-                </StackPanel>
-            </Border>
-
-            <!-- API 密钥配置 -->
-            <controls:CardView>
-                <controls:CardView.Header>
-                    <TextBlock Text="API 密钥配置" Classes="card-title"/>
-                </controls:CardView.Header>
-                <StackPanel Spacing="{StaticResource DefaultSpacing}">
-                    <StackPanel Spacing="{StaticResource TinySpacing}">
-                        <TextBlock Text="API Key" Classes="form-label"/>
-                        <TextBox Text="{Binding ApiKey}"
-                                 PlaceholderText="请输入 API Key"
-                                 PasswordChar="●"/>
-                    </StackPanel>
-                    <StackPanel Spacing="{StaticResource TinySpacing}">
-                        <TextBlock Text="Secret Key" Classes="form-label"/>
-                        <TextBox Text="{Binding SecretKey}"
-                                 PlaceholderText="请输入 Secret Key"
-                                 PasswordChar="●"/>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                        <Button Content="保存密钥"
-                                Command="{Binding SaveCommand}"
-                                Classes="btn-primary"/>
-                        <Button Content="清除密钥"
-                                Command="{Binding ClearCommand}"
-                                Classes="btn-danger"/>
-                    </StackPanel>
-                    <TextBlock Text="密钥使用 AES-GCM 加密存储，独立于应用设置，仅存储在本地。"
-                               Classes="form-hint"/>
-                </StackPanel>
-            </controls:CardView>
-
-            <!-- 各模式配置状态 -->
-            <controls:CardView>
-                <controls:CardView.Header>
-                    <TextBlock Text="密钥配置状态" Classes="card-title"/>
-                </controls:CardView.Header>
-                <ItemsControl ItemsSource="{Binding CredentialStatuses}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="vm:CredentialStatus">
-                            <Grid ColumnDefinitions="*,Auto" Margin="{StaticResource TinyVerticalMargin}">
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding DisplayName}"
-                                           VerticalAlignment="Center"/>
-                                <Border Grid.Column="1"
-                                        IsVisible="{Binding IsConfigured}"
-                                        Background="{DynamicResource SuccessPanelBackgroundBrush}"
-                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                        Padding="{StaticResource TagPadding}"
-                                        VerticalAlignment="Center">
-                                    <TextBlock Text="已配置"
-                                               FontSize="{StaticResource CaptionFontSize}"
-                                               Foreground="{DynamicResource SuccessPanelTextBrush}"/>
-                                </Border>
-                                <Border Grid.Column="1"
-                                        IsVisible="{Binding !IsConfigured}"
-                                        Background="{DynamicResource SurfaceVariantBrush}"
-                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                        Padding="{StaticResource TagPadding}"
-                                        VerticalAlignment="Center">
-                                    <TextBlock Text="未配置"
-                                               FontSize="{StaticResource CaptionFontSize}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                </Border>
-                            </Grid>
+        <!-- 交易模式选择 -->
+        <controls:CardView>
+            <controls:CardView.Header>
+                <TextBlock Text="交易模式" Classes="card-title"/>
+            </controls:CardView.Header>
+            <StackPanel Spacing="{StaticResource SmallSpacing}">
+                <ComboBox ItemsSource="{Binding TradingModes}"
+                          SelectedItem="{Binding SelectedMode}"
+                          HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </controls:CardView>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Text="{Binding ModeDescription}"
+                           Classes="caption"
+                           TextWrapping="Wrap"/>
+                <!-- 本页唯一主操作是「保存密钥」；切换模式是次要操作 -->
+                <Button Content="应用此模式"
+                        Command="{Binding ApplyModeCommand}"
+                        Classes="btn-secondary"
+                        HorizontalAlignment="Left"/>
+            </StackPanel>
+        </controls:CardView>
 
-        </StackPanel>
-    </ScrollViewer>
+        <!-- 实盘警告 -->
+        <controls:StatusBanner Severity="Danger"
+                               Message="实盘模式将使用真实资金进行交易。请确认 API Key 已在 binance.com 配置正确的权限（仅开启现货/合约交易，不要开启提现权限）。"
+                               IsVisible="{Binding IsLiveMode}"/>
+
+        <!-- 当前所选模式的密钥表单 -->
+        <controls:CardView>
+            <controls:CardView.Header>
+                <TextBlock Text="API 密钥" Classes="card-title"/>
+            </controls:CardView.Header>
+            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <TextBlock Text="API Key" Classes="form-label"/>
+                    <TextBox Text="{Binding ApiKey}"
+                             PlaceholderText="请输入 API Key"
+                             PasswordChar="●"/>
+                </StackPanel>
+                <StackPanel Spacing="{StaticResource TinySpacing}">
+                    <TextBlock Text="Secret Key" Classes="form-label"/>
+                    <TextBox Text="{Binding SecretKey}"
+                             PlaceholderText="请输入 Secret Key"
+                             PasswordChar="●"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
+                    <Button Content="保存密钥"
+                            Command="{Binding SaveCommand}"
+                            Classes="btn-primary"/>
+                    <Button Content="清除密钥"
+                            Command="{Binding ClearCommand}"
+                            Classes="btn-danger"/>
+                </StackPanel>
+                <TextBlock Text="密钥使用 AES-GCM 加密存储，独立于应用设置，仅保存在本地、不会上传。"
+                           Classes="form-hint"/>
+            </StackPanel>
+        </controls:CardView>
+
+        <!-- 各模式配置状态 -->
+        <controls:CardView>
+            <controls:CardView.Header>
+                <TextBlock Text="各模式密钥状态" Classes="card-title"/>
+            </controls:CardView.Header>
+            <ItemsControl ItemsSource="{Binding CredentialStatuses}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:CredentialStatus">
+                        <Grid ColumnDefinitions="*,Auto" Margin="{StaticResource TinyVerticalMargin}">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding DisplayName}"
+                                       VerticalAlignment="Center"/>
+                            <controls:StatusTag Grid.Column="1" Text="已配置" Classes="success"
+                                                IsVisible="{Binding IsConfigured}"/>
+                            <controls:StatusTag Grid.Column="1" Text="未配置"
+                                                IsVisible="{Binding !IsConfigured}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </controls:CardView>
+
+    </StackPanel>
 </UserControl>

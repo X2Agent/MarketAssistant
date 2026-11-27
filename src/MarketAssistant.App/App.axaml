@@ -26,7 +26,14 @@
     </Application.Resources>
   
     <Application.Styles>
-        <FluentTheme />
+        <!-- 锁定品牌强调色：FluentTheme 默认跟随 Windows 个性化强调色，
+             复选框、单选框、进度条、选中项会因此偏离 #0066FF（设计系统只允许一个强调色）。 -->
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light" Accent="{StaticResource AccentColor}"/>
+                <ColorPaletteResources x:Key="Dark" Accent="{StaticResource AccentColor}"/>
+            </FluentTheme.Palettes>
+        </FluentTheme>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
 
         <!-- 全局默认字体：Inter（拉丁）+ 中文回退链。必须在主题样式之后、组件样式之前，
@@ -55,9 +62,13 @@
         <StyleInclude Source="/Resources/Styles/TextStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/ListStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/SkeletonStyles.axaml"/>
+        <StyleInclude Source="/Resources/Styles/StatusStyles.axaml"/>
         <StyleInclude Source="/Resources/Styles/FormStyles.axaml"/>
         <StyleInclude Source="/Views/Controls/CardView.axaml"/>
         <StyleInclude Source="/Views/Controls/PageHeaderView.axaml"/>
+        <StyleInclude Source="/Views/Controls/AssetCardView.axaml"/>
+        <StyleInclude Source="/Views/Controls/StatusBanner.axaml"/>
+        <StyleInclude Source="/Views/Controls/StatusTag.axaml"/>
     </Application.Styles>
 
     <!-- 系统托盘图标 -->

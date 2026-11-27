@@ -35,9 +35,10 @@
                                 Height="{StaticResource SmallIconSize}"
                                 ToolTip.Tip="在 GitHub 上查看源码"
                                 Command="{Binding OpenGitHubCommand}">
-                            <svg:Svg Path="/Assets/Images/github.svg"
-                                     Width="{StaticResource SmallIconSize}"
-                                     Height="{StaticResource SmallIconSize}"/>
+                            <PathIcon Data="{StaticResource GithubIcon}"
+                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                      Width="{StaticResource SmallIconSize}"
+                                      Height="{StaticResource SmallIconSize}"/>
                         </Button>
                     </Grid>
                 </controls:CardView.Header>
@@ -102,11 +103,12 @@
                                    FontSize="{StaticResource CaptionFontSize}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    HorizontalAlignment="Center"
-                                   TextAlignment="Center"/>
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"/>
 
-                        <!-- 检查更新按钮 -->
+                        <!-- 检查更新是常驻的中性操作；发现新版本后，下面的「下载更新」才是本页唯一的主操作 -->
                         <Button Content="检查更新"
-                                Classes="success"
+                                Classes="btn-secondary"
                                 FontSize="{StaticResource CaptionFontSize}"
                                 FontWeight="{DynamicResource WeightTitle}"
                                 Height="{StaticResource UpdateButtonHeight}"
@@ -116,7 +118,7 @@
 
                         <!-- 下载更新按钮 -->
                         <Button Content="下载更新"
-                                Classes="warning"
+                                Classes="btn-primary"
                                 FontSize="{StaticResource CaptionFontSize}"
                                 FontWeight="{DynamicResource WeightTitle}"
                                 Height="{StaticResource UpdateButtonHeight}"

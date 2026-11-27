@@ -20,6 +20,22 @@
         <x:Double x:Key="RiskMetricLabelWidth">72</x:Double>
     </UserControl.Resources>
 
+    <UserControl.Styles>
+        <!-- 风控指标达到限额 80% 起变色（阈值由 ViewModel 的 IsDailyLossHigh / IsPositionHigh 给出）：
+             进度条用警告色，数值字用配对的面板字色（直接用警告色压白底只有 2.8:1） -->
+        <Style Selector="ProgressBar.near-limit">
+            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.near-limit">
+            <Setter Property="Foreground" Value="{DynamicResource WarningPanelTextBrush}"/>
+        </Style>
+        <!-- 强平价次于“距强平百分比”：写在 DataTemplate 里，元素上的 {DynamicResource} 会被 num-sm 类样式盖掉，
+             所以用具名类表达次要色 -->
+        <Style Selector="TextBlock.liquidation-price">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid>
         <!-- ===== 首屏骨架：按真实结构克隆（状态主卡 + 7:5 双栏） ===== -->
         <StackPanel Spacing="{StaticResource DefaultSpacing}"
@@ -30,9 +46,13 @@
                 <TextBlock Classes="caption" Text="持仓、挂单与风控指标的实时状态"/>
             </StackPanel>
 
-            <controls:PageGrid ColumnSpacing="{StaticResource GridGutter}">
+            <!-- PageGrid 只是预置了 12 列的普通 Grid：多行布局必须显式声明行并给子元素 Grid.Row，
+                 否则状态主卡会与双栏叠在同一行 -->
+            <controls:PageGrid ColumnSpacing="{StaticResource GridGutter}"
+                               RowSpacing="{StaticResource DefaultSpacing}"
+                               RowDefinitions="Auto,Auto">
                 <!-- 状态主卡占满 12 列：左侧状态，右侧四项指标 -->
-                <controls:SkeletonCard Grid.Column="0" Grid.ColumnSpan="12">
+                <controls:SkeletonCard Grid.Column="0" Grid.ColumnSpan="12" Grid.Row="0">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="{StaticResource DefaultSpacing}">
                         <controls:SkeletonLines Grid.Column="0" Row="BodySm" LineCount="1" LineWidths="140"
                                                 VerticalAlignment="Center"/>
@@ -42,12 +62,12 @@
                 </controls:SkeletonCard>
 
                 <!-- 左栏 7 列：风控指标、强平风险、持仓 -->
-                <StackPanel Grid.Column="0" Grid.ColumnSpan="7"
+                <StackPanel Grid.Column="0" Grid.ColumnSpan="7" Grid.Row="1"
                             Spacing="{StaticResource DefaultSpacing}">
                     <controls:SkeletonCard>
                         <StackPanel Spacing="{StaticResource DefaultSpacing}">
                             <controls:SkeletonLines Row="Body" LineCount="1" LineWidths="72"/>
-                            <controls:SkeletonLines Row="BodySm" LineCount="4" LineWidths="*"/>
+                            <controls:SkeletonLines Row="BodySm" LineCount="4"/>
                         </StackPanel>
                     </controls:SkeletonCard>
                     <controls:SkeletonCard>
@@ -59,12 +79,12 @@
                 </StackPanel>
 
                 <!-- 右栏 5 列：策略绩效、活跃策略、未完成订单 -->
-                <StackPanel Grid.Column="7" Grid.ColumnSpan="5"
+                <StackPanel Grid.Column="7" Grid.ColumnSpan="5" Grid.Row="1"
                             Spacing="{StaticResource DefaultSpacing}">
                     <controls:SkeletonCard>
                         <StackPanel Spacing="{StaticResource SmallSpacing}">
                             <controls:SkeletonLines Row="Body" LineCount="1" LineWidths="72"/>
-                            <controls:SkeletonLines Row="BodySm" LineCount="2" LineWidths="*"/>
+                            <controls:SkeletonLines Row="BodySm" LineCount="2"/>
                         </StackPanel>
                     </controls:SkeletonCard>
                     <controls:SkeletonCard>
@@ -86,8 +106,21 @@
                     <TextBlock Classes="caption" Text="持仓、挂单与风控指标的实时状态"/>
                 </StackPanel>
 
+                <!-- ===== 加载失败条：就地提示并给重试入口。
+                     本页是风控仪表盘，失败时不能用居中浮层盖住内容：
+                     紧急停止 / 全部平仓必须始终可达；空态由各分区自行提示 ===== -->
+                <controls:StatusBanner Severity="Danger"
+                                       Message="{Binding ErrorMessage}"
+                                       IsVisible="{Binding HasError}">
+                    <Button Content="重新加载"
+                            Classes="btn-secondary btn-sm"
+                            Command="{Binding RetryCommand}"/>
+                </controls:StatusBanner>
+
                 <!-- ===== 紧急停止横幅 ===== -->
-                <Border Background="{DynamicResource ErrorBackgroundBrush}"
+                <!-- 语义面板令牌对（浅底 + 深字）与 StatusBanner 的 Danger 同源，对比度经 contrast-audit 校验；
+                     这里内容是「标题 + 原因 + 说明 + 操作」，StatusBanner 的单行消息装不下，所以保留自有结构 -->
+                <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
                         BorderThickness="{StaticResource NoBorderThickness}"
                         CornerRadius="{StaticResource CardCornerRadius}"
                         Padding="{StaticResource DefaultCardPadding}"
@@ -97,7 +130,7 @@
                             <TextBlock Text="交易已紧急停止"
                                        FontSize="{StaticResource BodySmFontSize}"
                                        FontWeight="{DynamicResource WeightTitle}"
-                                       Foreground="{DynamicResource ErrorBrush}"/>
+                                       Foreground="{DynamicResource DangerPanelTextBrush}"/>
                             <TextBlock Text="{Binding HaltReasonText}"
                                        Classes="caption"
                                        TextWrapping="Wrap"/>
@@ -113,11 +146,22 @@
                     </Grid>
                 </Border>
 
-                <!-- ===== 状态主卡：监控状态 / 模式 / 今日盈亏 / 启停 / 紧急动作 ===== -->
+                <!-- ===== 数据陈旧提示：币安账户 / 持仓 / 挂单本轮刷新失败 =====
+                     失败时页面保留上一轮数据，而总资产、风控指标、持仓、挂单全都依赖它，
+                     所以放在页顶而不是藏在某一张卡里；交易环境由页签栏的标签表达 -->
+                <controls:StatusBanner Severity="Warning"
+                                       Message="币安数据本轮刷新失败（API 未配置或网络异常）：总资产、风控指标、持仓与挂单均为上一次成功刷新的结果"
+                                       IsVisible="{Binding IsBinanceDataStale}">
+                    <Button Content="重新加载"
+                            Classes="btn-secondary btn-sm"
+                            Command="{Binding RefreshCommand}"/>
+                </controls:StatusBanner>
+
+                <!-- ===== 状态主卡：监控状态 / 今日盈亏 / 启停 / 紧急动作 ===== -->
                 <controls:CardView>
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{StaticResource SectionSpacing}">
 
-                        <!-- 左：运行状态 + 模式 -->
+                        <!-- 左：运行状态 + 四项指标 -->
                         <StackPanel Grid.Column="0" Spacing="{StaticResource SmallSpacing}"
                                     VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
@@ -139,26 +183,6 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            VerticalAlignment="Center"
                                            IsVisible="{Binding !IsMonitorRunning}"/>
-                                <Border Background="{DynamicResource SelectedBackgroundBrush}"
-                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                        Padding="{StaticResource TagPadding}"
-                                        VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding ExchangeModeText}"
-                                               FontSize="{StaticResource CaptionFontSize}"
-                                               FontWeight="{DynamicResource WeightEmphasis}"
-                                               Foreground="{StaticResource AccentBrush}"/>
-                                </Border>
-                                <!-- 测试网提示：颜色语义是"注意这是模拟环境"，不与强调色抢焦点 -->
-                                <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
-                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                        Padding="{StaticResource TagPadding}"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding IsTestnetMode}">
-                                    <TextBlock Text="测试网"
-                                               FontSize="{StaticResource CaptionFontSize}"
-                                               FontWeight="{DynamicResource WeightEmphasis}"
-                                               Foreground="{DynamicResource WarningPanelTextBrush}"/>
-                                </Border>
                             </StackPanel>
 
                             <!-- 四项核心指标：横向排布，与状态同一视觉层，不再单独占一行卡片 -->
@@ -251,9 +275,11 @@
                                                  Minimum="0"
                                                  Maximum="{Binding RiskConfig.MaxDailyLossPercent}"
                                                  Value="{Binding DailyLossPercent}"
+                                                 Classes.near-limit="{Binding IsDailyLossHigh}"
                                                  Height="{StaticResource ProgressBarHeight}"
                                                  VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Classes="num-sm" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="2" Classes="num-sm" VerticalAlignment="Center"
+                                               Classes.near-limit="{Binding IsDailyLossHigh}">
                                         <TextBlock.Text>
                                             <MultiBinding StringFormat="{}{0:F1}% / {1:F0}%">
                                                 <Binding Path="DailyLossPercent"/>
@@ -271,9 +297,11 @@
                                                  Minimum="0"
                                                  Maximum="{Binding RiskConfig.MaxTotalPositionPercent}"
                                                  Value="{Binding TotalPositionPercent}"
+                                                 Classes.near-limit="{Binding IsPositionHigh}"
                                                  Height="{StaticResource ProgressBarHeight}"
                                                  VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Classes="num-sm" VerticalAlignment="Center">
+                                    <TextBlock Grid.Column="2" Classes="num-sm" VerticalAlignment="Center"
+                                               Classes.near-limit="{Binding IsPositionHigh}">
                                         <TextBlock.Text>
                                             <MultiBinding StringFormat="{}{0:F1}% / {1:F0}%">
                                                 <Binding Path="TotalPositionPercent"/>
@@ -315,26 +343,40 @@
                                 <TextBlock Text="标记价距强平价的百分比距离，距离越小风险越高；紧急级会同时阻止该标的自动加仓。"
                                            Classes="caption"
                                            TextWrapping="Wrap"/>
-                                <ItemsControl ItemsSource="{Binding LiquidationRisks}">
+                                <!-- 共享列宽：各行强平价与距离按右边缘对齐，不随数字位数左右漂移 -->
+                                <ItemsControl ItemsSource="{Binding LiquidationRisks}"
+                                              Grid.IsSharedSizeScope="True">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="tradingvm:LiquidationRiskInfo">
-                                            <Grid ColumnDefinitions="*,Auto,Auto"
-                                                  ColumnSpacing="{StaticResource SmallSpacing}"
+                                            <Grid ColumnSpacing="{StaticResource DefaultSpacing}"
                                                   Margin="{StaticResource TinyBottomMargin}">
-                                                <TextBlock Grid.Column="0" Classes="body-sm"
-                                                           VerticalAlignment="Center">
-                                                    <Run Text="{Binding Symbol}"/>
-                                                    <Run Text=" "/>
-                                                    <Run Text="{Binding DirectionText}"/>
-                                                </TextBlock>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="LiquidationPrice"/>
+                                                    <ColumnDefinition Width="Auto" SharedSizeGroup="LiquidationDistance"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                            Spacing="{StaticResource SmallSpacing}">
+                                                    <TextBlock Classes="body-sm" VerticalAlignment="Center">
+                                                        <Run Text="{Binding Symbol}"/>
+                                                        <Run Text=" "/>
+                                                        <Run Text="{Binding DirectionText}"/>
+                                                    </TextBlock>
+                                                    <!-- 级别标签：接近 = 警告，紧急 = 危险（紧急级会阻止该标的自动加仓）；安全级不显示 -->
+                                                    <controls:StatusTag Text="{Binding LevelText}"
+                                                                        Classes="warning"
+                                                                        Classes.danger="{Binding IsCritical}"
+                                                                        IsVisible="{Binding LevelText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                </StackPanel>
                                                 <TextBlock Grid.Column="1"
-                                                           Classes="num-sm"
+                                                           Classes="num-sm liquidation-price"
                                                            VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           HorizontalAlignment="Right"
                                                            Text="{Binding LiquidationPrice, StringFormat='强平 {0:N4}'}"/>
                                                 <TextBlock Grid.Column="2"
                                                            Classes="num-sm"
                                                            VerticalAlignment="Center"
+                                                           HorizontalAlignment="Right"
                                                            Text="{Binding DistancePercent, StringFormat='{}{0:F1}%'}"/>
                                             </Grid>
                                         </DataTemplate>
@@ -351,31 +393,20 @@
                                                Text="{Binding Positions.Count, StringFormat={}{0} 个}"/>
                                 </StackPanel>
                             </controls:CardView.Header>
-                            <StackPanel>
-                                <Border IsVisible="{Binding IsBinanceDataStale}"
-                                        Background="{DynamicResource SurfaceVariantBrush}"
-                                        CornerRadius="{StaticResource TinyCornerRadius}"
-                                        Padding="{StaticResource SmallCardPadding}"
-                                        Margin="{StaticResource SmallMargin}">
-                                    <TextBlock Classes="caption"
-                                               TextWrapping="Wrap"
-                                               Text="币安数据本轮刷新失败（API 未配置或网络异常），余额、持仓与挂单为上一次成功刷新的结果"/>
-                                </Border>
-                                <Panel>
-                                    <TextBlock Text="暂无持仓"
-                                               IsVisible="{Binding !Positions.Count}"
-                                               Classes="caption"
-                                               HorizontalAlignment="Center"
-                                               Margin="{StaticResource DefaultMargin}"/>
-                                    <ItemsControl ItemsSource="{Binding Positions}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="models:PositionInfo">
-                                                <trading:PositionRowView/>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </Panel>
-                            </StackPanel>
+                            <Panel>
+                                <TextBlock Text="暂无持仓"
+                                           IsVisible="{Binding !Positions.Count}"
+                                           Classes="caption"
+                                           HorizontalAlignment="Center"
+                                           Margin="{StaticResource DefaultMargin}"/>
+                                <ItemsControl ItemsSource="{Binding Positions}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:PositionInfo">
+                                            <trading:PositionRowView/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Panel>
                         </controls:CardView>
                     </StackPanel>
 
@@ -385,9 +416,39 @@
 
                         <controls:CardView Header="策略绩效">
                             <StackPanel Spacing="{StaticResource SmallSpacing}">
-                                <TextBlock Text="{Binding OverallPerformanceText}"
-                                           Classes="num-sm"
-                                           TextWrapping="Wrap"/>
+                                <!-- 实盘：三项核心指标沿用顶部指标的“小标签 + 大数字”写法；统计口径放在下方说明行 -->
+                                <StackPanel Spacing="{StaticResource SmallSpacing}" IsVisible="{Binding HasPerformance}">
+                                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SectionSpacing}">
+                                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="胜率" Classes="caption"/>
+                                            <TextBlock Classes="num-lg"
+                                                       Text="{Binding PerformanceWinRatePercent, StringFormat={}{0:F1}%}"/>
+                                        </StackPanel>
+                                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="总盈亏 (USDT)" Classes="caption"/>
+                                            <TextBlock Classes="num-lg"
+                                                       Foreground="{Binding PerformanceTotalPnl, Converter={StaticResource PnlColorConverter}}"
+                                                       Text="{Binding PerformanceTotalPnl, StringFormat={}{0:+0.00;-0.00;0.00}}"/>
+                                        </StackPanel>
+                                        <StackPanel Spacing="{StaticResource TinySpacing}">
+                                            <TextBlock Text="最大回撤 (USDT)" Classes="caption"/>
+                                            <TextBlock Classes="num-lg"
+                                                       Text="{Binding PerformanceMaxDrawdown, StringFormat={}{0:F2}}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <TextBlock Classes="caption" TextWrapping="Wrap">
+                                        <TextBlock.Text>
+                                            <MultiBinding StringFormat="{}{0} 个策略 · 平仓 {1} 笔 · 最大回撤取单个策略的最大值">
+                                                <Binding Path="PerformanceStrategyCount"/>
+                                                <Binding Path="PerformanceClosedTrades"/>
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Classes="caption"
+                                           TextWrapping="Wrap"
+                                           IsVisible="{Binding !HasPerformance}"
+                                           Text="{Binding PerformanceHintText}"/>
                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                         Padding="{StaticResource SmallCardPadding}">
@@ -449,13 +510,6 @@
                 </controls:PageGrid>
             </StackPanel>
         </ScrollViewer>
-
-        <!-- 失败态（含重试入口）；空态由各分区自行提示，不遮挡风控指标 -->
-        <controls:StateOverlayView State="{Binding OverlayState}"
-                                   Message="{Binding OverlayMessage}"
-                                   RetryCommand="{Binding RetryCommand}"
-                                   RetryText="重新加载"
-                                   ShowLoading="False"/>
 
         <!-- 交易确认（Human-in-the-Loop）已上移至应用级 TradeConfirmationService：全局对话框弹出，
              不再依赖本页存活，此处不再渲染页内模态确认层 -->

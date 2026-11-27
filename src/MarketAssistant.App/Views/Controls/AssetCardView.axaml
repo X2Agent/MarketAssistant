@@ -1,0 +1,167 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:MarketAssistant.Views.Controls"
+        xmlns:converts="using:MarketAssistant.Converters">
+
+    <!-- ================================================================== -->
+    <!-- AssetCardView — 热门资产与自选看板共用的资产卡片                         -->
+    <!--                                                                     -->
+    <!-- 信息层级（两页一致）：                                                  -->
+    <!--   名称 14 / 代码·板块 12   →   价格 24（中性色，视觉锚点）   →   指标 12   -->
+    <!-- 价格不着涨跌色：涨跌由右侧 12% 语义底色标签表达，名称不再与价格抢横向空间。  -->
+    <!--                                                                     -->
+    <!-- 状态：hover 只把表面色阶加深一档，不位移；键盘焦点走 FocusRing，不画描边。   -->
+    <!-- Tile 的底色（SurfaceVariant）与 HoverBackground 在浅色下同值，          -->
+    <!-- 所以 Tile 的 hover 取 PressedBackground，才有可见的加深。               -->
+    <!--                                                                     -->
+    <!-- 骨架见 AssetCardSkeleton：两者结构必须同步修改。                         -->
+    <!-- ================================================================== -->
+
+    <Styles.Resources>
+        <converts:PriceChangeColorConverter x:Key="PriceChangeColorConverter"/>
+    </Styles.Resources>
+
+    <Style Selector="controls|AssetCardView">
+        <Setter Property="Focusable" Value="True"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="CornerRadius" Value="{StaticResource CardCornerRadius}"/>
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:AssetCardView">
+                <Border x:Name="PART_Surface"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                        </Transitions>
+                    </Border.Transitions>
+
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+
+                        <!-- 头部：名次 | 名称 + 代码·板块 | 操作位 -->
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Border Grid.Column="0"
+                                    Background="{DynamicResource NeutralTagBackgroundBrush}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource TagPadding}"
+                                    Margin="{StaticResource SmallRightMargin}"
+                                    VerticalAlignment="Top"
+                                    IsVisible="{TemplateBinding RankText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{TemplateBinding RankText}"
+                                           FontFamily="{StaticResource DataFontFamily}"
+                                           FontSize="{StaticResource CaptionFontSize}"
+                                           FontWeight="{DynamicResource WeightNumber}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Spacing="{StaticResource TinySpacing}"
+                                        VerticalAlignment="Center">
+                                <TextBlock Text="{TemplateBinding Title}"
+                                           Classes="body-sm asset-card-name"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <Grid ColumnDefinitions="Auto,Auto,*">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{TemplateBinding Code}"
+                                               Classes="caption"/>
+                                    <TextBlock Grid.Column="1"
+                                               Text="·"
+                                               Classes="caption"
+                                               Margin="{StaticResource TinyMargin}"
+                                               IsVisible="{TemplateBinding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{TemplateBinding Subtitle}"
+                                               Classes="caption"
+                                               TextTrimming="CharacterEllipsis"
+                                               IsVisible="{TemplateBinding Subtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- 操作位：吞掉 Tapped，点星标不会触发"打开详情"（见 AssetCardView.OnApplyTemplate） -->
+                            <Panel x:Name="PART_ActionHost"
+                                   Grid.Column="2"
+                                   Margin="{StaticResource SmallLeftMargin}"
+                                   VerticalAlignment="Top"
+                                   IsVisible="{TemplateBinding Content, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <ContentPresenter Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                            </Panel>
+                        </Grid>
+
+                        <!-- 价格行：现价（LineHeight 与骨架的 Title 行同令牌）| 涨跌标签 -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0"
+                                       Text="{TemplateBinding Price}"
+                                       Classes="num-lg"
+                                       LineHeight="{StaticResource TitleLineHeight}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"/>
+                            <Border Grid.Column="1"
+                                    Margin="{StaticResource SmallLeftMargin}"
+                                    CornerRadius="{StaticResource TinyCornerRadius}"
+                                    Padding="{StaticResource TagPadding}"
+                                    VerticalAlignment="Center"
+                                    Background="{Binding ChangeText, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource PriceChangeColorConverter}, ConverterParameter=tag}"
+                                    IsVisible="{TemplateBinding ChangeText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{TemplateBinding ChangeText}"
+                                           FontFamily="{StaticResource DataFontFamily}"
+                                           FontSize="{StaticResource CaptionFontSize}"
+                                           FontWeight="{DynamicResource WeightNumber}"
+                                           Foreground="{Binding ChangeText, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource PriceChangeColorConverter}}"/>
+                            </Border>
+                        </Grid>
+
+                        <!-- 指标行（仅热门卡）：名称 + 值 -->
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="{StaticResource TinySpacing}"
+                                    IsVisible="{TemplateBinding MetricLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <TextBlock Text="{TemplateBinding MetricLabel}"
+                                       Classes="caption"/>
+                            <TextBlock Text="{TemplateBinding MetricValue}"
+                                       Classes="caption asset-card-metric"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <!-- ===== 文字：名称与指标值 =====
+         模板里元素上本地写的字重 / 字体，优先级低于 body-sm / caption 这类排版类（它们都会设字重），
+         写在元素上不生效；必须走类样式。 -->
+    <Style Selector="controls|AssetCardView /template/ TextBlock.asset-card-name">
+        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
+    </Style>
+    <Style Selector="controls|AssetCardView /template/ TextBlock.asset-card-metric">
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightNumber}"/>
+    </Style>
+
+    <!-- ===== 形态：底色与内边距（与 SkeletonCard 的 variant-tile / variant-card 对齐） ===== -->
+    <Style Selector="controls|AssetCardView.variant-tile">
+        <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <Setter Property="Padding" Value="{StaticResource DefaultCardPadding}"/>
+    </Style>
+    <Style Selector="controls|AssetCardView.variant-card">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="Padding" Value="{StaticResource CardPadding}"/>
+    </Style>
+
+    <!-- ===== 状态 ===== -->
+    <Style Selector="controls|AssetCardView.variant-tile:pointerover /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource PressedBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|AssetCardView.variant-card:pointerover /template/ Border#PART_Surface">
+        <Setter Property="Background" Value="{DynamicResource HoverBackgroundBrush}"/>
+    </Style>
+    <Style Selector="controls|AssetCardView:focus-visible /template/ Border#PART_Surface">
+        <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+
+    <!-- 卡片 hover 时的底色已是 Hover/Pressed 色阶，操作位按钮若再用 HoverBackground 就看不出反馈；
+         改回卡片底色，在两种形态、两套主题下都与卡片 hover 色有可见差。 -->
+    <Style Selector="controls|AssetCardView Button.btn-icon-sm:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+    </Style>
+</Styles>

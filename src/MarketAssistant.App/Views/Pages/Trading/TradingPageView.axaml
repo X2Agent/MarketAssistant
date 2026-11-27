@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:MarketAssistant.ViewModels.Trading"
              xmlns:converts="using:MarketAssistant.Converters"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
              xmlns:trading="using:MarketAssistant.Views.Pages.Trading"
              mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="MarketAssistant.Views.Pages.Trading.TradingPageView"
@@ -19,17 +20,27 @@
                 Background="{DynamicResource CardBackgroundBrush}"
                 BorderThickness="{StaticResource NoBorderThickness}"
                 CornerRadius="{StaticResource CardCornerRadius}">
-            <StackPanel Orientation="Horizontal" Margin="{StaticResource HorizontalMargin}">
-                <Button Classes="underline-tab" Content="策略配置"
-                        Classes.selected="{Binding IsConfigTabSelected}"
-                        Command="{Binding SelectTabCommand}" CommandParameter="0"/>
-                <Button Classes="underline-tab" Content="实时监控"
-                        Classes.selected="{Binding IsMonitorTabSelected}"
-                        Command="{Binding SelectTabCommand}" CommandParameter="1"/>
-                <Button Classes="underline-tab" Content="交易历史"
-                        Classes.selected="{Binding IsHistoryTabSelected}"
-                        Command="{Binding SelectTabCommand}" CommandParameter="2"/>
-            </StackPanel>
+            <Grid ColumnDefinitions="*,Auto" Margin="{StaticResource HorizontalMargin}">
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Classes="underline-tab" Content="策略配置"
+                            Classes.selected="{Binding IsConfigTabSelected}"
+                            Command="{Binding SelectTabCommand}" CommandParameter="0"/>
+                    <Button Classes="underline-tab" Content="实时监控"
+                            Classes.selected="{Binding IsMonitorTabSelected}"
+                            Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                    <Button Classes="underline-tab" Content="交易历史"
+                            Classes.selected="{Binding IsHistoryTabSelected}"
+                            Command="{Binding SelectTabCommand}" CommandParameter="2"/>
+                </StackPanel>
+
+                <!-- 当前交易环境：三个页签共用，始终可见。
+                     实盘动用真实资金，用红色危险标签；测试网 / Demo 用警告色提示“这里不是真实资金”。 -->
+                <controls:StatusTag Grid.Column="1"
+                                    Text="{Binding CurrentTradingModeText}"
+                                    Classes.warning="{Binding IsTestnetTradingMode}"
+                                    Classes.danger="{Binding !IsTestnetTradingMode}"
+                                    ToolTip.Tip="{Binding TradingModeDescription}"/>
+            </Grid>
         </Border>
 
         <!-- ===== 页签内容 ===== -->
@@ -41,7 +52,7 @@
                         <Expander.Header>
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
                                 <TextBlock Classes="card-title" Text="API 密钥设置" VerticalAlignment="Center"/>
-                                <TextBlock Text="· 密钥按交易模式保存在本地，不会上传" VerticalAlignment="Center"
+                                <TextBlock Text="· 每种交易模式单独保存一组密钥" VerticalAlignment="Center"
                                            Classes="caption"/>
                             </StackPanel>
                         </Expander.Header>

@@ -63,39 +63,20 @@ public partial class NotificationWindow : Window
     /// </summary>
     public void SetMessage(string message, NotificationType type)
     {
-        var messageText = this.FindControl<TextBlock>("MessageText");
-        if (messageText != null)
-        {
-            messageText.Text = message;
-        }
+        this.FindControl<TextBlock>("MessageText")!.Text = message;
 
-        var notificationBorder = this.FindControl<Border>("NotificationBorder");
-        if (notificationBorder?.Child is Grid grid && grid.Children.Count > 0)
+        var (badgeBrushKey, iconKey) = type switch
         {
-            // 第一个子元素是图标 Border
-            if (grid.Children[0] is Border iconBorder && iconBorder.Child is TextBlock iconText)
-            {
-                switch (type)
-                {
-                    case NotificationType.Success:
-                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("SuccessBrush");
-                        iconText.Text = "✓";
-                        break;
-                    case NotificationType.Error:
-                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("ErrorBrush");
-                        iconText.Text = "✕";
-                        break;
-                    case NotificationType.Warning:
-                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("WarningBrush");
-                        iconText.Text = "!";
-                        break;
-                    case NotificationType.Info:
-                        iconBorder[!Border.BackgroundProperty] = new DynamicResourceExtension("AccentBrush");
-                        iconText.Text = "i";
-                        break;
-                }
-            }
-        }
+            NotificationType.Success => ("SuccessBrush", "CheckIcon"),
+            NotificationType.Error => ("ErrorBrush", "CloseIcon"),
+            NotificationType.Warning => ("WarningBrush", "ExclamationIcon"),
+            NotificationType.Info => ("AccentBrush", "InfoMarkIcon"),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+        };
+
+        // 动态资源绑定：跟随主题切换，不在代码里写死颜色与几何
+        this.FindControl<Border>("StatusBadge")![!Border.BackgroundProperty] = new DynamicResourceExtension(badgeBrushKey);
+        this.FindControl<PathIcon>("StatusIcon")![!PathIcon.DataProperty] = new DynamicResourceExtension(iconKey);
     }
 
     /// <summary>

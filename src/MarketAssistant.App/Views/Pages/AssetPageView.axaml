@@ -140,7 +140,9 @@
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
                                     <svg:Svg x:Name="FavoriteIcon"
                                              Path="/Assets/Images/tab_favorites.svg"
-                                             Width="16" Height="16" VerticalAlignment="Center"/>
+                                             Width="{StaticResource TinyIconSize}"
+                                             Height="{StaticResource TinyIconSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding FavoriteLabel}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -152,7 +154,10 @@
                                 Command="{Binding NavigateToTradingCommand}"
                                 IsVisible="{Binding CanTrade}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                <svg:Svg Path="/Assets/Images/icon_money.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <svg:Svg Path="/Assets/Images/icon_money.svg"
+                                         Width="{StaticResource TinyIconSize}"
+                                         Height="{StaticResource TinyIconSize}"
+                                         VerticalAlignment="Center"/>
                                 <TextBlock Text="快捷交易" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -161,7 +166,11 @@
                         <Button Classes="action-button"
                                 Command="{Binding NavigateToAlertCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                <svg:Svg Path="/Assets/Images/icon_warning.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <!-- 铃铛而非警示三角：价格预警是"设置提醒"，不是"当前有警告"（语义色图标只表达警告） -->
+                                <svg:Svg Path="/Assets/Images/icon_bell.svg"
+                                         Width="{StaticResource TinyIconSize}"
+                                         Height="{StaticResource TinyIconSize}"
+                                         VerticalAlignment="Center"/>
                                 <TextBlock Text="价格预警" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -170,7 +179,10 @@
                         <Button Classes="action-button"
                                 Command="{Binding NavigateToAnalysisCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                <svg:Svg Path="/Assets/Images/icon_ai.svg"
+                                         Width="{StaticResource TinyIconSize}"
+                                         Height="{StaticResource TinyIconSize}"
+                                         VerticalAlignment="Center"/>
                                 <TextBlock Text="AI分析" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -195,8 +207,10 @@
                                     Orientation="Horizontal"
                                     Spacing="{StaticResource DefaultSpacing}"
                                     VerticalAlignment="Center">
+                            <!-- 图例色必须与 K 线实际涨跌色同源（BullishBrush / BearishBrush = kline_chart.html 的 upColor / downColor），
+                                 不用 ErrorBrush / SuccessBrush：它们是语义色且随主题变色，暗色下的红会与蜡烛不一致 -->
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                <Border Background="{DynamicResource ErrorBrush}"
+                                <Border Background="{StaticResource BullishBrush}"
                                         Width="{StaticResource IndicatorSize}"
                                         Height="{StaticResource IndicatorSize}"
                                         CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -206,7 +220,7 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
-                                <Border Background="{StaticResource SuccessBrush}"
+                                <Border Background="{StaticResource BearishBrush}"
                                         Width="{StaticResource IndicatorSize}"
                                         Height="{StaticResource IndicatorSize}"
                                         CornerRadius="{StaticResource TinyCornerRadius}" />
@@ -233,7 +247,11 @@
                             <Button Classes="action-button"
                                     ToolTip.Tip="指标显示开关">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_ai.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                    <!-- 指标用柱状图，不与"AI分析"共用芯片图标：同一页两个按钮不能是同一个图标 -->
+                                    <svg:Svg Path="/Assets/Images/icon_chart.svg"
+                                             Width="{StaticResource TinyIconSize}"
+                                             Height="{StaticResource TinyIconSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="指标" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <Button.Flyout>
@@ -260,7 +278,10 @@
                                     Command="{Binding RefreshDataCommand}"
                                     ToolTip.Tip="刷新行情数据">
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
-                                    <svg:Svg Path="/Assets/Images/icon_refresh.svg" Width="16" Height="16" VerticalAlignment="Center"/>
+                                    <svg:Svg Path="/Assets/Images/icon_refresh.svg"
+                                             Width="{StaticResource TinyIconSize}"
+                                             Height="{StaticResource TinyIconSize}"
+                                             VerticalAlignment="Center"/>
                                     <TextBlock Text="刷新" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -313,7 +334,6 @@
                                                         Spacing="{StaticResource SmallSpacing}"/>
                                 <controls:SkeletonLines Row="BodySm"
                                                         LineCount="10"
-                                                        LineWidths="*"
                                                         Spacing="{StaticResource SmallSpacing}"/>
                                 <controls:SkeletonLines Row="Caption" LineWidths="160"/>
                             </StackPanel>
@@ -357,41 +377,35 @@
                         <StackPanel>
                             <TextBlock Classes="sectionHeader" Text="行情数据"/>
 
-                            <!-- 骨架：6 组「标签 + 数值」两列指标。这里必须保留 Grid + WrapPanel：
-                                 指标是网格布局而非线性行，用线性控件表达会丢掉列对齐。 -->
-                            <WrapPanel IsVisible="{Binding SnapshotSkeletonVisible}"
-                                       Margin="{StaticResource SmallTopMargin}">
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
+                            <!-- 骨架：4 组「标签 + 数值」，与数据到达后的 2 × 2 同构（换手率 / 量比 / 市盈率 / 市净率）。
+                                 用 UniformGrid 两列等分而不是固定宽度单元格：卡片内容宽最多 320，
+                                 两个 148 宽单元格加间距放不下，会被折成单列并在右侧留出一半空白。 -->
+                            <UniformGrid Columns="2"
+                                         ColumnSpacing="{StaticResource LargeSpacing}"
+                                         RowSpacing="{StaticResource SmallSpacing}"
+                                         IsVisible="{Binding SnapshotSkeletonVisible}"
+                                         Margin="{StaticResource SmallTopMargin}">
+                                <Grid ColumnDefinitions="Auto,*">
                                     <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="44"/>
                                     <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="48"
                                                             HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
+                                <Grid ColumnDefinitions="Auto,*">
                                     <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="32"/>
                                     <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="44"
                                                             HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
+                                <Grid ColumnDefinitions="Auto,*">
                                     <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="44"/>
                                     <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="52"
                                                             HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
+                                <Grid ColumnDefinitions="Auto,*">
                                     <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="32"/>
                                     <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="40"
                                                             HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
-                                    <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="44"/>
-                                    <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="48"
-                                                            HorizontalAlignment="Right"/>
-                                </Grid>
-                                <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*">
-                                    <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="32"/>
-                                    <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="44"
-                                                            HorizontalAlignment="Right"/>
-                                </Grid>
-                            </WrapPanel>
+                            </UniformGrid>
 
                             <StackPanel Orientation="Horizontal"
                                         Spacing="{StaticResource SmallSpacing}"
@@ -414,12 +428,14 @@
                                           IsVisible="{Binding SnapshotState.HasData}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <WrapPanel/>
+                                        <UniformGrid Columns="2"
+                                                     ColumnSpacing="{StaticResource LargeSpacing}"
+                                                     RowSpacing="{StaticResource SmallSpacing}"/>
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:MarketMetricItem">
-                                        <Grid Width="148" Margin="0,0,16,8" ColumnDefinitions="Auto,*" IsVisible="{Binding HasValue}">
+                                        <Grid ColumnDefinitions="Auto,*">
                                             <TextBlock Grid.Column="0" Classes="cellLabel" Text="{Binding Label}"/>
                                             <TextBlock Grid.Column="1" Classes="metricValue" Text="{Binding Value}"/>
                                         </Grid>
@@ -445,7 +461,7 @@
                                  每档 20 高、行间 2px，总高与数据到达后完全一致（五档市场也吻合）。 -->
                             <StackPanel Margin="{StaticResource SmallTopMargin}"
                                         IsVisible="{Binding OrderBookSkeletonVisible}">
-                                <Grid ColumnDefinitions="34,*,56,60" Margin="0,0,0,2">
+                                <Grid ColumnDefinitions="34,*,76,76" Margin="0,0,0,2">
                                     <controls:SkeletonLines Grid.Column="0" Row="Caption" LineCount="1" LineWidths="20"/>
                                     <controls:SkeletonLines Grid.Column="1" Row="Caption" LineCount="1" LineWidths="48"
                                                             HorizontalAlignment="Right"/>
@@ -455,11 +471,9 @@
                                                             HorizontalAlignment="Right"/>
                                 </Grid>
                                 <!-- 五档：真实档位高 20 + 上下各 1px 行距；行高由 RowHeight 覆盖 -->
-                                <controls:SkeletonLines Row="BodySm" RowHeight="20" LineCount="5"
-                                                        Spacing="2" LineWidths="*"/>
+                                <controls:SkeletonLines Row="BodySm" RowHeight="20" LineCount="5" Spacing="2"/>
                                 <controls:SkeletonLines Row="BodySm" LineCount="1" LineWidths="72" Margin="0,4"/>
-                                <controls:SkeletonLines Row="BodySm" RowHeight="20" LineCount="5"
-                                                        Spacing="2" LineWidths="*"/>
+                                <controls:SkeletonLines Row="BodySm" RowHeight="20" LineCount="5" Spacing="2"/>
                                 <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
                                     <Border Grid.Column="0" Classes="skeleton" Height="6"
                                             CornerRadius="{StaticResource TinyCornerRadius}"
@@ -488,8 +502,10 @@
 
                             <StackPanel Margin="{StaticResource SmallTopMargin}"
                                         IsVisible="{Binding OrderBookState.HasData}">
-                                <!-- 表头 -->
-                                <Grid ColumnDefinitions="34,*,56,60" Margin="0,0,0,2">
+                                <!-- 表头。数量 / 金额列按 MarketValueFormatter 的最长真实输出定宽（12px 等宽字：
+                                     「9,999.99万」约 70px，「9,900.00」约 58px），再留 6px 与相邻列的间隙；
+                                     过窄时右对齐的数字会向左压进价格列，骨架与下方档位行共用同一组列宽 -->
+                                <Grid ColumnDefinitions="34,*,76,76" Margin="0,0,0,2">
                                     <TextBlock Grid.Column="0" Classes="cellLabel" Text="档位"/>
                                     <TextBlock Grid.Column="1" Classes="cellLabel" Text="价格" HorizontalAlignment="Right"/>
                                     <TextBlock Grid.Column="2" Classes="cellLabel" Text="数量" HorizontalAlignment="Right"/>
@@ -500,7 +516,7 @@
                                 <ItemsControl ItemsSource="{Binding Asks}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:OrderBookLevelItem">
-                                            <Grid ColumnDefinitions="34,*,56,60" Height="20" Margin="0,1">
+                                            <Grid ColumnDefinitions="34,*,76,76" Height="20" Margin="0,1">
                                                 <ProgressBar Grid.ColumnSpan="4"
                                                              Classes="depthBar"
                                                              Value="{Binding DepthPercent}"
@@ -533,7 +549,7 @@
                                 <ItemsControl ItemsSource="{Binding Bids}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:OrderBookLevelItem">
-                                            <Grid ColumnDefinitions="34,*,56,60" Height="20" Margin="0,1">
+                                            <Grid ColumnDefinitions="34,*,76,76" Height="20" Margin="0,1">
                                                 <ProgressBar Grid.ColumnSpan="4"
                                                              Classes="depthBar"
                                                              Value="{Binding DepthPercent}"

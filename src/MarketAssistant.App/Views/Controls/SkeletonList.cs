@@ -42,6 +42,12 @@ public class SkeletonList : ItemsControl
     public static readonly StyledProperty<Orientation> OrientationProperty =
         AvaloniaProperty.Register<SkeletonList, Orientation>(nameof(Orientation), Orientation.Vertical);
 
+    /// <summary>
+    /// 沿用 <see cref="ItemsControl"/> 的主题：派生控件默认按自身类型找主题，找不到就没有模板，
+    /// 整个列表渲染为空（骨架因此一直不可见）。
+    /// </summary>
+    protected override Type StyleKeyOverride => typeof(ItemsControl);
+
     public int Count
     {
         get => GetValue(CountProperty);

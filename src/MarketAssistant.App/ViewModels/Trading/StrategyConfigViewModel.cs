@@ -87,8 +87,6 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
         set { if (value) SelectedProfile = RiskProfile.Aggressive; }
     }
 
-    public OrderSide[] OrderSides => Enum.GetValues<OrderSide>();
-
     // ---- 智能策略（AI）参数 ----
     [ObservableProperty] private string _aiBudgetUsdt = string.Empty;
     [ObservableProperty] private string _aiIntervalSeconds = string.Empty;
@@ -201,7 +199,8 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     /// 首屏加载策略列表与风控配置。走 <see cref="ViewModelBase.LoadAsync"/> 以统一
     /// 加载/空/失败三态（骨架屏 + StateOverlayView），不再用 SafeExecuteAsync 静默失败。
     /// 空列表不算失败也不算"无数据页"：新建表单必须始终可操作，故空态由卡片内文案承担，
-    /// 浮层只负责失败重试。
+    /// 浮层只负责失败重试；失败时页面只显示浮层（列表与风控设置都未读到，
+    /// 不能显示"暂无策略"，也不能开放保存），重试成功后恢复。
     /// </summary>
     private async Task LoadStrategiesAsync()
     {
@@ -257,7 +256,7 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
             // 安全警示必须显式可见：本应用没有交易所原生条件单兜底，
             // 止损/止盈/追踪止损全部由客户端按秒轮询执行，进程退出或网络中断期间不生效
             _notificationService.ShowWarning(
-                "⚠ 注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
+                "注意：止损/止盈/追踪止损由本程序每秒轮询执行，程序退出或断网期间不会触发，请勿完全依赖程序止损。");
 
             ClearForm();
         }, "创建策略");
@@ -498,6 +497,18 @@ public partial class StrategyConfigViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private async Task DeleteStrategyAsync(TradingStrategy strategy)
     {
+        var confirmed = await _dialogService.ShowConfirmationAsync(
+            "删除策略",
+            $"确定删除策略「{strategy.Symbol} · {strategy.Type.GetDescription()}」吗？\n\n" +
+            "删除后无法恢复，成交记录与持仓会保留。\n\n" +
+            "它在交易所挂的止损 / 止盈条件单（如有）会被撤销，对应持仓将失去这层保护；" +
+            "监控未运行时，撤销推迟到下次启动监控。",
+            "删除",
+            "取消",
+            destructive: true);
+        if (!confirmed)
+            return;
+
         await SafeExecuteAsync(async () =>
         {
             await _strategyService.DeleteStrategyAsync(strategy.Id);

@@ -47,6 +47,13 @@
                             <Style Selector="Button:disabled">
                                 <Setter Property="Opacity" Value="0.45"/>
                             </Style>
+                            <!-- 历史报告的标题行（日期）：数据字体 + 主色 + 标题字重。
+                                 必须用类样式：DataTemplate 里元素上本地写的 DynamicResource 优先级低于 caption 类，写在元素上不生效 -->
+                            <Style Selector="TextBlock.history-title">
+                                <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+                                <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Style>
                         </StackPanel.Styles>
 
                         <!-- 重新分析：报告已经展示时也需要重跑入口，
@@ -111,14 +118,13 @@
                             <ItemsControl ItemsSource="{Binding ReportHistory}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:ReportSummary">
-                                        <Button Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
+                                        <!-- 全局 Button 固定 36 高：日期 / 总分 / 分项三行会被裁成只剩日期，这里按内容撑高 -->
+                                        <Button Height="NaN"
+                                                Command="{Binding $parent[ItemsControl].((vm:AgentAnalysisViewModel)DataContext).LoadHistoryReportCommand}"
                                                 CommandParameter="{Binding}">
                                             <StackPanel Spacing="{StaticResource CompactSpacing}">
                                                 <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}"
-                                                           Classes="caption"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="{DynamicResource WeightTitle}"
-                                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                           Classes="caption history-title"/>
                                                 <TextBlock Text="{Binding ScoreTrendText}"
                                                            Classes="caption"/>
                                                 <TextBlock Text="{Binding KeyScoreChangeText}"

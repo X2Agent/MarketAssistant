@@ -3,32 +3,12 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:MarketAssistant.ViewModels"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
              mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="360"
              x:Class="MarketAssistant.Views.Components.ProgressDisplayView"
              x:Name="Root">
 
-    <UserControl.Resources>
-        <!-- 状态圆点：四态共用同一尺寸，容器稍大以便居中留白 -->
-        <x:Double x:Key="StatusDotSize">9</x:Double>
-    </UserControl.Resources>
-
     <UserControl.Styles>
-        <!-- 运行中分析师的呼吸点 -->
-        <Style Selector="Ellipse.PulseDot">
-            <Style.Animations>
-                <Animation Duration="0:0:1.2" IterationCount="Infinite">
-                    <KeyFrame Cue="0%">
-                        <Setter Property="Opacity" Value="0.35"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="50%">
-                        <Setter Property="Opacity" Value="1"/>
-                    </KeyFrame>
-                    <KeyFrame Cue="100%">
-                        <Setter Property="Opacity" Value="0.35"/>
-                    </KeyFrame>
-                </Animation>
-            </Style.Animations>
-        </Style>
         <!-- 步骤条：未激活 -->
         <Style Selector="Border.phaseStep">
             <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
@@ -85,15 +65,20 @@
         
         <StackPanel Spacing="{StaticResource DefaultSpacing}">
 
-            <!-- 标题 -->
-            <StackPanel Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        Spacing="{StaticResource SmallSpacing}">
+            <!-- 标题 + 标的：等待期间始终能看到分析的是哪只标的 -->
+            <StackPanel HorizontalAlignment="Center"
+                        Spacing="{StaticResource TinySpacing}">
                 <TextBlock Text="AI 分析中..."
                            FontSize="{StaticResource TitleFontSize}"
                            FontWeight="{DynamicResource WeightTitle}"
-                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
                            Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="{Binding #Root.SubjectText}"
+                           FontSize="{StaticResource BodySmFontSize}"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           IsVisible="{Binding #Root.SubjectText,
+                               Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
             <!-- 流程步骤条：准备 → 分析 → 聚合 → 报告 → 完成 -->
@@ -213,17 +198,10 @@
             </StackPanel>
 
             <!-- 失败分析师提示 -->
-            <Border Background="{DynamicResource DangerPanelBackgroundBrush}"
-                    CornerRadius="{StaticResource SmallCornerRadius}"
-                    Padding="{StaticResource CompactCardPadding}"
-                    IsVisible="{Binding #Root.FailedAnalystsInfo, 
-                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Text="{Binding #Root.FailedAnalystsInfo}"
-                           FontSize="{StaticResource CaptionFontSize}"
-                           Foreground="{DynamicResource DangerPanelTextBrush}"
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap"/>
-            </Border>
+            <controls:StatusBanner Severity="Danger"
+                                   Message="{Binding #Root.FailedAnalystsInfo}"
+                                   IsVisible="{Binding #Root.FailedAnalystsInfo,
+                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
             <!-- 取消按钮：次要操作，不用强调色（强调色此刻是进度本身） -->
             <Button Content="取消分析"

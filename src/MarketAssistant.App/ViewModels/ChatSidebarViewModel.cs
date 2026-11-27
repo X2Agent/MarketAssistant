@@ -327,7 +327,8 @@ public partial class ChatSidebarViewModel : ViewModelBase, IDisposable
             "删除会话",
             $"确定要删除会话「{item.Title}」吗？删除后无法恢复。",
             "删除",
-            "取消");
+            "取消",
+            destructive: true);
         if (!confirmed)
             return;
 

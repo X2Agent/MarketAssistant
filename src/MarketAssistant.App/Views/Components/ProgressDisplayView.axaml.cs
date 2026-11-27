@@ -14,6 +14,10 @@ public partial class ProgressDisplayView : UserControl
     public static readonly StyledProperty<string> AnalysisStageProperty =
         AvaloniaProperty.Register<ProgressDisplayView, string>(nameof(AnalysisStage), string.Empty);
 
+    /// <summary>标题下的标的副标题（名称 · 代码），为空时隐藏</summary>
+    public static readonly StyledProperty<string> SubjectTextProperty =
+        AvaloniaProperty.Register<ProgressDisplayView, string>(nameof(SubjectText), string.Empty);
+
     public static readonly StyledProperty<int> ProgressPercentProperty =
         AvaloniaProperty.Register<ProgressDisplayView, int>(nameof(ProgressPercent), 0);
 
@@ -44,6 +48,12 @@ public partial class ProgressDisplayView : UserControl
     {
         get => GetValue(AnalysisStageProperty);
         set => SetValue(AnalysisStageProperty, value);
+    }
+
+    public string SubjectText
+    {
+        get => GetValue(SubjectTextProperty);
+        set => SetValue(SubjectTextProperty, value);
     }
 
     public int ProgressPercent

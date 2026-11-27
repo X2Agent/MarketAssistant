@@ -8,6 +8,17 @@
              x:Class="MarketAssistant.Views.Pages.Trading.BalanceDetailPageView"
              x:DataType="vm:BalanceDetailPageViewModel">
 
+    <UserControl.Styles>
+        <!-- 余额行写在 DataTemplate 里：模板内本地的 {DynamicResource} 值会被 num-sm 类样式盖掉，
+             所以可用 / 冻结的次要色与估值的字重用具名类表达，而不是写在元素属性上 -->
+        <Style Selector="TextBlock.balance-muted">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.balance-value">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid>
         <ScrollViewer Padding="{StaticResource PagePadding}"
                       IsVisible="{Binding !IsInitialLoading}">
@@ -16,7 +27,7 @@
             <!-- 页签内标题：父级「交易终端」已是页面级标题，这里用小一级的卡片标题 -->
             <StackPanel Spacing="{StaticResource TinySpacing}">
                 <TextBlock Classes="card-title" Text="资产明细"/>
-                <TextBlock Classes="caption" Text="现货账户余额与持仓估值"/>
+                <TextBlock Classes="caption" Text="当前交易环境的账户余额与持仓估值"/>
             </StackPanel>
 
             <!-- ===== 汇总栏 =====
@@ -63,74 +74,89 @@
             <!-- ===== 余额明细 ===== -->
             <controls:CardView>
                 <controls:CardView.Header>
-                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SmallSpacing}">
-                        <TextBlock Text="余额明细" Classes="card-title"/>
-                        <TextBlock Classes="caption" VerticalAlignment="Center"
-                                   Text="{Binding Balances.Count, StringFormat={}{0} 个币种}"/>
-                        <Panel/>
-                        <Button Content="刷新" Command="{Binding RefreshCommand}"
+                    <!-- 标题在左，刷新在右：StackPanel 里的空 Panel 不会撑开，按钮会紧贴币种数量 -->
+                    <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                    Spacing="{StaticResource SmallSpacing}"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="余额明细" Classes="card-title"/>
+                            <TextBlock Classes="caption" VerticalAlignment="Center"
+                                       Text="{Binding Balances.Count, StringFormat={}{0} 个币种}"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="刷新" Command="{Binding RefreshCommand}"
                                 Classes="btn-secondary"
+                                VerticalAlignment="Center"
                                 MinWidth="{StaticResource SmallButtonMinWidth}"/>
-                    </StackPanel>
+                    </Grid>
                 </controls:CardView.Header>
 
-                <StackPanel Spacing="{StaticResource TinySpacing}">
+                <!-- 表头与每一行共用一个尺寸作用域：估值与占比两列取全表最宽值，
+                     可用 / 冻结两列平分剩余宽度，所以表头与各行的列严格对齐 -->
+                <StackPanel Spacing="{StaticResource TinySpacing}" Grid.IsSharedSizeScope="True">
                     <!-- 表头 -->
-                    <Grid ColumnDefinitions="80,*,*,*,Auto"
-                          IsVisible="{Binding HasData}"
+                    <Grid IsVisible="{Binding HasData}"
+                          ColumnSpacing="{StaticResource DefaultSpacing}"
                           Margin="{StaticResource SmallCardPadding}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="BalanceValue"/>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="BalancePercent"/>
+                        </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="币种" Classes="caption"/>
                         <TextBlock Grid.Column="1" Text="可用" Classes="caption"/>
                         <TextBlock Grid.Column="2" Text="冻结" Classes="caption"/>
                         <TextBlock Grid.Column="3" Text="USDT 估值"
                                    Classes="caption" HorizontalAlignment="Right"/>
                         <TextBlock Grid.Column="4" Text="占比"
-                                   Classes="caption" HorizontalAlignment="Right"
-                                   Margin="{StaticResource SmallLeftMargin}"/>
+                                   Classes="caption" HorizontalAlignment="Right"/>
                     </Grid>
 
                     <ItemsControl ItemsSource="{Binding Balances}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:BalanceDisplayItem">
+                            <DataTemplate x:DataType="vm:BalanceDisplayItem">
                                 <Border Background="{DynamicResource SurfaceVariantBrush}"
                                         CornerRadius="{StaticResource TinyCornerRadius}"
                                         Padding="{StaticResource SmallCardPadding}"
                                         Margin="{StaticResource TinyBottomMargin}">
-                                    <Grid ColumnDefinitions="80,*,*,*,Auto">
+                                    <Grid ColumnSpacing="{StaticResource DefaultSpacing}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="BalanceValue"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="BalancePercent"/>
+                                        </Grid.ColumnDefinitions>
                                         <!-- 币种 -->
                                         <TextBlock Grid.Column="0" Text="{Binding Asset}"
                                                    FontWeight="{DynamicResource WeightTitle}"
                                                    FontSize="{StaticResource CaptionFontSize}"
                                                    VerticalAlignment="Center"/>
 
-                                        <!-- 可用 -->
+                                        <!-- 可用 / 冻结：去掉末尾补零（原先固定 8 位小数，USDT 也显示成 4620.10000000）；
+                                             冻结为 0 时显示破折号，一眼看出哪些币种有挂单占用 -->
                                         <TextBlock Grid.Column="1"
-                                                   Classes="num-sm"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Classes="num-sm balance-muted"
                                                    VerticalAlignment="Center"
-                                                   Text="{Binding Free, StringFormat={}{0:F8}}"/>
-
-                                        <!-- 冻结 -->
+                                                   Text="{Binding Free, StringFormat={}{0:0.########;-0.########;0}}"/>
                                         <TextBlock Grid.Column="2"
-                                                   Classes="num-sm"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Classes="num-sm balance-muted"
                                                    VerticalAlignment="Center"
-                                                   Text="{Binding Locked, StringFormat={}{0:F8}}"/>
+                                                   Text="{Binding Locked, StringFormat={}{0:0.########;-0.########;—}}"/>
 
                                         <!-- USDT 估值 -->
                                         <TextBlock Grid.Column="3"
-                                                   Classes="num-sm"
-                                                   FontWeight="{DynamicResource WeightTitle}"
+                                                   Classes="num-sm balance-value"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Right"
-                                                   Text="{Binding ValueUSDT, StringFormat={}{0:F2} USDT}"/>
+                                                   Text="{Binding ValueUSDT, StringFormat={}{0:N2} USDT}"/>
 
                                         <!-- 占比 -->
                                         <TextBlock Grid.Column="4"
                                                    Classes="caption"
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Right"
-                                                   Margin="{StaticResource SmallLeftMargin}"
                                                    Text="{Binding PortfolioPercent, StringFormat={}{0:F1}%}"/>
                                     </Grid>
                                 </Border>
@@ -142,13 +168,14 @@
         </StackPanel>
     </ScrollViewer>
 
-        <!-- 首屏骨架：标题 + 汇总卡 + 四条余额行，与真实内容结构一致。 -->
+        <!-- 首屏骨架：标题 + 汇总卡 + 四条余额行，与真实内容结构一致。
+             标题是静态文案，骨架只替代数据，所以这里直接显示真实文字，不画灰条。 -->
         <Border Padding="{StaticResource PagePadding}"
                 IsVisible="{Binding IsInitialLoading}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}">
                 <StackPanel Spacing="{StaticResource TinySpacing}">
-                    <controls:SkeletonLines Row="BodySm" LineWidths="72"/>
-                    <controls:SkeletonLines Row="Caption" LineWidths="180"/>
+                    <TextBlock Classes="card-title" Text="资产明细"/>
+                    <TextBlock Classes="caption" Text="当前交易环境的账户余额与持仓估值"/>
                 </StackPanel>
                 <controls:SkeletonCard Variant="Card">
                     <StackPanel Spacing="{StaticResource SmallSpacing}">

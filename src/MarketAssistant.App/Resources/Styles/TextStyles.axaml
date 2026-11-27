@@ -56,14 +56,6 @@
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
 
-    <!-- 表单标签 -->
-    <Style Selector="TextBlock.label">
-        <Setter Property="FontSize" Value="{StaticResource BodySmFontSize}"/>
-        <Setter Property="FontWeight" Value="{DynamicResource WeightEmphasis}"/>
-        <Setter Property="LineHeight" Value="{StaticResource BodySmLineHeight}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-    </Style>
-
     <!-- ===== 数值（等宽，只给数字） ===== -->
     <!-- 数字锁定宽度靠两件事：DataFontFamily（等宽字体族）+ 全局 TextBlock 的
          FontFeatures="tnum"（见 App.axaml）。tnum 是表格数字，保证等宽字体族缺失
@@ -87,6 +79,17 @@
         <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
         <Setter Property="FontWeight" Value="{DynamicResource WeightBody}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+
+    <!-- ===== 明细行（容器类，不是文字类） ===== -->
+    <!-- 持仓 / 挂单 / 策略 / 成交记录行的“数量 · 价格 · 手续费”明细：每个字段是一段独立的 TextBlock，
+         才能按字段隐藏（现货没有强平价、未成交没有均价）；容器统一给等宽 12px 次要色，
+         一行放不下时整段换行，不再出现被省略号截断的数字。 -->
+    <Style Selector="WrapPanel.meta > TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DataFontFamily}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
+        <Setter Property="FontWeight" Value="{DynamicResource WeightBody}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
 
     <!-- v3 排版类只有这一组：title / card-title / body / body-sm / caption / label /

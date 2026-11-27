@@ -85,10 +85,11 @@
             </StackPanel>
         </ScrollViewer>
 
-        <!-- 主内容区域 -->
+        <!-- 主内容区域：只在加载成功后显示。加载失败时表单里是默认值，
+             不能让用户在这上面编辑再保存，覆盖掉已有设置 -->
         <ScrollViewer Grid.Row="0"
                       Background="{DynamicResource PageBackgroundBrush}"
-                      IsVisible="{Binding !IsInitialLoading}">
+                      IsVisible="{Binding IsReady}">
             <StackPanel Spacing="{StaticResource DefaultSpacing}" Margin="{StaticResource PagePadding}">
 
                 <!-- 通用设置（主题 + 通知 + 日志） -->
@@ -584,9 +585,10 @@
                                              Text="{Binding UserSetting.KnowledgeFileDirectory}"
                                              PlaceholderText="请选择知识库目录"
                                              IsReadOnly="True"/>
+                                    <!-- 本页的主操作是底部「保存」；目录选择与上方日志路径的「浏览」同为辅助操作 -->
                                     <Button Grid.Column="1"
                                             Content="浏览"
-                                            Classes="btn-primary"
+                                            Classes="btn-info"
                                             Command="{Binding SelectKnowledgeDirectoryCommand}"
                                             Margin="{StaticResource SmallLeftMargin}"/>
                                 </Grid>
@@ -598,7 +600,7 @@
                                 
                                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource DefaultSpacing}">
                                     <Button Content="向量化文档"
-                                            Classes="success"
+                                            Classes="btn-info"
                                             Command="{Binding VectorizeDocumentsCommand}"
                                             IsEnabled="{Binding IsKnowledgeDirectoryValid}"/>
                                     <PathIcon Data="{StaticResource LoadingIcon}"
@@ -682,9 +684,7 @@
                                                     Padding="{StaticResource TagPadding}"
                                                     VerticalAlignment="Center"
                                                     IsVisible="{Binding IsRequired}">
-                                                <TextBlock Text="必需"
-                                                           Classes="caption"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <TextBlock Text="必需" Classes="caption"/>
                                             </Border>
                                         </StackPanel>
                                         <TextBlock Grid.Row="1" Grid.Column="1"
@@ -733,10 +733,12 @@
                                    ShowLoading="False"
                                    ZIndex="999"/>
 
-        <!-- 底部操作栏：v3 不画分隔线，用次级表面色阶与内容区分 -->
+        <!-- 底部操作栏：v3 不画分隔线，用次级表面色阶与内容区分。
+             与表单同进退：表单不可见（加载中 / 失败）时保存与重置没有意义 -->
         <Border Grid.Row="1" 
                 Background="{DynamicResource CardBackgroundBrush}"
-                Padding="{StaticResource FooterPadding}">
+                Padding="{StaticResource FooterPadding}"
+                IsVisible="{Binding IsReady}">
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Right"
                         Spacing="{StaticResource DefaultSpacing}">

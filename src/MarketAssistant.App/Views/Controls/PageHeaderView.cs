@@ -5,7 +5,8 @@ namespace MarketAssistant.Views.Controls;
 
 /// <summary>
 /// 页面头：标题（24px）+ 行内说明（12px）+ 右侧操作槽（Content）。
-/// 全库唯一使用点是自选页，操作槽承载「卡片视图 / 表格视图」切换；
+/// 只用在操作槽里有真实操作的地方：自选页（「卡片视图 / 表格视图」切换）与
+/// AI 选股/选币的结果头（「新的选股」）；
 /// 其它页面的标题由左侧导航（根页面）或返回窄条（二级页面）表达。
 /// </summary>
 public class PageHeaderView : ContentControl

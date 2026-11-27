@@ -80,6 +80,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
             colSet.Columns.Add(new AdaptiveColumn
             {
                 Width = "stretch",
+                Spacing = AdaptiveSpacing.Small,
                 VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                 Items =
                 {
@@ -122,7 +123,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         if (score == null) return;
         var colSet = new AdaptiveColumnSet { Spacing = AdaptiveSpacing.Small };
         colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Items = { new AdaptiveTextBlock { Text = label } } });
-        colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Items = { new AdaptiveTextBlock { Text = score, Weight = AdaptiveTextWeight.Bolder } } });
+        colSet.Columns.Add(new AdaptiveColumn { Width = "auto", Spacing = AdaptiveSpacing.Small, Items = { new AdaptiveTextBlock { Text = score, Weight = AdaptiveTextWeight.Bolder } } });
         container.Add(colSet);
     }
 
@@ -139,6 +140,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         colSet.Columns.Add(new AdaptiveColumn
         {
             Width = "stretch",
+            Spacing = AdaptiveSpacing.Small,
             VerticalContentAlignment = AdaptiveVerticalContentAlignment.Bottom,
             Items = { new AdaptiveTextBlock { Text = label, IsSubtle = true, Wrap = true } }
         });
@@ -226,6 +228,7 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
         titleCols.Columns.Add(new AdaptiveColumn
         {
             Width = "stretch",
+            Spacing = AdaptiveSpacing.Small,
             VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
             Items =
             {

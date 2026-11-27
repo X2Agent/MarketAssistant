@@ -17,6 +17,7 @@
         <!-- 进度显示区域 - 仅在分析时显示 -->
         <views:ProgressDisplayView
             IsVisible="{Binding IsBusy}"
+            SubjectText="{Binding AnalysisSubjectText}"
             AnalysisStage="{Binding AnalysisStage}"
             ProgressPercent="{Binding AnalysisProgressPercent}"
             AnalysisPhase="{Binding AnalysisPhase}"

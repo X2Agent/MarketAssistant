@@ -95,7 +95,7 @@ public partial class AboutPageViewModel : ViewModelBase
                 }
                 else
                 {
-                    UpdateStatus = "已是最新版本 ✓";
+                    UpdateStatus = "已是最新版本";
                     _notificationService.ShowSuccess("当前已是最新版本！");
                     Logger?.LogInformation("当前已是最新版本");
                 }

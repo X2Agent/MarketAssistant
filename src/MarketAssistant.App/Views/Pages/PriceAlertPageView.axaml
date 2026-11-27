@@ -30,22 +30,29 @@
         <Style Selector="Ellipse.rule-dot.triggered">
             <Setter Property="Fill" Value="{StaticResource WarningBrush}"/>
         </Style>
-        <!-- 一次性 / 已触发 / 持续：12% 语义底 + 同色字（design.md 7.5）。
-             不用语义色实底——实底会抢走强调色的焦点，白字对比度也不足。 -->
-        <Style Selector="Border.rule-tag">
-            <Setter Property="CornerRadius" Value="{StaticResource TinyCornerRadius}"/>
-            <Setter Property="Padding" Value="{StaticResource TagPadding}"/>
-            <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
+        <!-- 告警条件的方向箭头：几何图标，与同行标签文字垂直居中。
+             不用 ↑ ↓ 文字字形——字形大小与基线随字体回退链变化 -->
+        <Style Selector="PathIcon.condition-arrow">
+            <Setter Property="Width" Value="{StaticResource MiniIconSize}"/>
+            <Setter Property="Height" Value="{StaticResource MiniIconSize}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Border.rule-tag TextBlock">
-            <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <!-- 规则行写在 DataTemplate 里：模板内本地的 {DynamicResource} 值会被 body-sm / num 这类
+             类样式盖掉（字重落回 Normal、前景落回主色），所以行内需要加粗或着色的文字一律用具名类表达。
+             条件文本（名称与目标值）：有方向的名称取涨跌标签字色（压在行底色上比 BullishBrush / BearishBrush
+             对比度高），量比这类无方向条件保持主文字色。全部 15 种条件共用一套模板。 -->
+        <Style Selector="TextBlock.rule-name">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
         </Style>
-        <Style Selector="Border.rule-tag.warning">
-            <Setter Property="Background" Value="{StaticResource WarningTagBackgroundBrush}"/>
+        <Style Selector="TextBlock.condition-text">
+            <Setter Property="FontWeight" Value="{DynamicResource WeightTitle}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style Selector="Border.rule-tag.warning TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+        <Style Selector="TextBlock.condition-text.up">
+            <Setter Property="Foreground" Value="{DynamicResource BullishTagTextBrush}"/>
+        </Style>
+        <Style Selector="TextBlock.condition-text.down">
+            <Setter Property="Foreground" Value="{DynamicResource BearishTagTextBrush}"/>
         </Style>
     </UserControl.Styles>
 
@@ -196,15 +203,14 @@
                                    Classes="form-error"
                                    IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
-                        <!-- 高级选项：卡片内嵌手风琴用裸 Expander（同 StrategyConfigView 的「高级参数」）。
+                        <!-- 高级选项：卡片内嵌手风琴用 inline 变体（同 StrategyConfigView 的「高级参数」）。
                              section-card 是页面级分组壳，套进卡片会与父卡同色、只剩一圈无效圆角。 -->
-                        <Expander HorizontalAlignment="Stretch"
+                        <Expander Classes="inline"
+                                  Header="高级选项（去抖确认 / 冷却 / 触发次数 / 交易联动）"
+                                  HorizontalAlignment="Stretch"
                                   IsExpanded="{Binding IsAdvancedOptionsExpanded, Mode=TwoWay}">
-                            <Expander.Header>
-                                <TextBlock Text="高级选项（去抖确认 / 冷却 / 触发次数 / 交易联动）" Classes="form-label"/>
-                            </Expander.Header>
                             <StackPanel Spacing="{StaticResource DefaultSpacing}"
-                                        Margin="{StaticResource ExpanderContentPadding}">
+                                        Margin="{StaticResource TinyTopMargin}">
                                 <Grid ColumnDefinitions="*,*,*,*"
                                       ColumnSpacing="{StaticResource GridGutter}">
                                     <StackPanel Grid.Column="0" Spacing="{StaticResource TinySpacing}">
@@ -258,15 +264,9 @@
                             </StackPanel>
                         </Expander>
 
-                        <Border Background="{DynamicResource WarningPanelBackgroundBrush}"
-                                CornerRadius="{StaticResource SmallCornerRadius}"
-                                Padding="{StaticResource SmallCardPadding}"
-                                IsVisible="{Binding !IsNotificationEnabled}">
-                            <TextBlock Text="桌面通知已关闭：告警触发状态仍会记录，但不会显示弹窗。请在“设置 → 通知设置”中开启通知。"
-                                       FontSize="{StaticResource CaptionFontSize}"
-                                       Foreground="{DynamicResource WarningPanelTextBrush}"
-                                       TextWrapping="Wrap"/>
-                        </Border>
+                        <controls:StatusBanner Severity="Warning"
+                                               Message="桌面通知已关闭：告警触发状态仍会记录，但不会显示弹窗。请在“设置 → 通知设置”中开启通知。"
+                                               IsVisible="{Binding !IsNotificationEnabled}"/>
                     </StackPanel>
                 </Border>
 
@@ -285,14 +285,8 @@
                             Classes="btn-secondary btn-sm"
                             VerticalAlignment="Center"
                             Margin="{StaticResource SmallRightMargin}"/>
-                    <Border Grid.Column="2"
-                            Background="{DynamicResource SurfaceVariantBrush}"
-                            CornerRadius="{StaticResource TinyCornerRadius}"
-                            Padding="{StaticResource TagPadding}"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding Rules.Count, StringFormat='{}{0} 条'}"
-                                   Classes="caption"/>
-                    </Border>
+                    <controls:StatusTag Grid.Column="2"
+                                        Text="{Binding Rules.Count, StringFormat='{}{0} 条'}"/>
                 </Grid>
 
                 <Grid Grid.Row="2">
@@ -368,62 +362,38 @@
                                                      Height="{StaticResource DotIconSize}"
                                                      VerticalAlignment="Center"/>
                                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding AssetName}" Classes="body-sm"
-                                                           FontWeight="{DynamicResource WeightTitle}"
+                                                <TextBlock Text="{Binding AssetName}" Classes="body-sm rule-name"
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <StackPanel Orientation="Horizontal"
                                                             Spacing="{StaticResource TinySpacing}"
                                                             Margin="{StaticResource TinyTopMargin}">
-                                                    <TextBlock Text="{Binding AssetCode}" Classes="caption"/>
-                                                    <Border Classes="rule-tag">
-                                                        <TextBlock Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                    </Border>
-                                                    <Border Classes="rule-tag warning" IsVisible="{Binding IsOneTime}">
-                                                        <TextBlock Text="一次性"/>
-                                                    </Border>
-                                                    <Border Classes="rule-tag" IsVisible="{Binding !IsOneTime}">
-                                                        <TextBlock Text="持续"/>
-                                                    </Border>
-                                                    <Border Classes="rule-tag warning" IsVisible="{Binding Triggered}">
-                                                        <TextBlock Text="已触发"/>
-                                                    </Border>
+                                                    <TextBlock Text="{Binding AssetCode}" Classes="caption" VerticalAlignment="Center"/>
+                                                    <controls:StatusTag Text="{Binding MarketType, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                    <controls:StatusTag Text="一次性" Classes="warning" IsVisible="{Binding IsOneTime}"/>
+                                                    <controls:StatusTag Text="持续" IsVisible="{Binding !IsOneTime}"/>
+                                                    <controls:StatusTag Text="已触发" Classes="warning" IsVisible="{Binding Triggered}"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
 
                                         <StackPanel Grid.Column="1" Spacing="{StaticResource TinySpacing}" VerticalAlignment="Center">
                                             <TextBlock Text="告警条件" Classes="caption"/>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceAbove}}">
-                                                <TextBlock Text="↑ 涨破" FontWeight="{DynamicResource WeightTitle}" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="{DynamicResource WeightTitle}"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.PriceBelow}}">
-                                                <TextBlock Text="↓ 跌破" FontWeight="{DynamicResource WeightTitle}" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="{DynamicResource WeightTitle}"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentAbove}}">
-                                                <TextBlock Text="↑ 涨幅超" FontWeight="{DynamicResource WeightTitle}" Foreground="{StaticResource BullishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="{DynamicResource WeightTitle}"/>
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal"
-                                                        Spacing="{StaticResource TinySpacing}"
-                                                        IsVisible="{Binding Condition, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static alert:AlertCondition.ChangePercentBelow}}">
-                                                <TextBlock Text="↓ 跌幅超" FontWeight="{DynamicResource WeightTitle}" Foreground="{StaticResource BearishBrush}"/>
-                                                <TextBlock Text="{Binding TargetPrice, StringFormat='{}{0:N2}%'}"
-                                                           FontFamily="{StaticResource DataFontFamily}"
-                                                           FontWeight="{DynamicResource WeightTitle}"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource TinySpacing}">
+                                                <PathIcon Classes="condition-arrow"
+                                                          Data="{StaticResource ArrowUpIcon}"
+                                                          Foreground="{StaticResource BullishBrush}"
+                                                          IsVisible="{Binding IsUpwardCondition}"/>
+                                                <PathIcon Classes="condition-arrow"
+                                                          Data="{StaticResource ArrowDownIcon}"
+                                                          Foreground="{StaticResource BearishBrush}"
+                                                          IsVisible="{Binding IsDownwardCondition}"/>
+                                                <TextBlock Classes="condition-text"
+                                                           Classes.up="{Binding IsUpwardCondition}"
+                                                           Classes.down="{Binding IsDownwardCondition}"
+                                                           Text="{Binding Condition, Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                <TextBlock Classes="num condition-text"
+                                                           Text="{Binding ConditionValueText}"
+                                                           IsVisible="{Binding ConditionValueText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                             </StackPanel>
                                             <TextBlock Text="{Binding RuleOptionsText}"
                                                        Classes="caption"
@@ -468,10 +438,10 @@
                                                 CommandParameter="{Binding Id}"
                                                 VerticalAlignment="Center"
                                                 ToolTip.Tip="删除">
+                                            <!-- 图标继承按钮前景：静止中性、悬停加深。删除的破坏性由确认弹窗承担，行内不常驻红色 -->
                                             <PathIcon Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"
                                                       Width="{StaticResource TinyIconSize}"
-                                                      Height="{StaticResource TinyIconSize}"
-                                                      Foreground="{DynamicResource ErrorBrush}"/>
+                                                      Height="{StaticResource TinyIconSize}"/>
                                         </Button>
                                     </Grid>
                                 </Border>
