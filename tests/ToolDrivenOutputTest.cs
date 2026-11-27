@@ -92,7 +92,7 @@ public sealed class ToolDrivenOutputTest
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             () => agent.RunAsync([new ChatMessage(ChatRole.User, "分析 600519")]));
 
-        Assert.Contains("没有调用任何工具", exception.Message);
+        Assert.Contains("成功结果", exception.Message);
         Assert.HasCount(1, client.CapturedOptions, "闸门必须先于收尾调用拦截");
     }
 
@@ -125,7 +125,7 @@ public sealed class ToolDrivenOutputTest
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             () => agent.RunAsync([new ChatMessage(ChatRole.User, "分析 600519")]));
 
-        Assert.Contains("没有调用任何工具", exception.Message);
+        Assert.Contains("成功结果", exception.Message);
     }
 
     [TestMethod]
@@ -233,7 +233,7 @@ public sealed class ToolDrivenOutputTest
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             () => agent.RunAsync(CreateConversationWithPriorToolCall("other_tool")));
 
-        Assert.Contains("没有调用任何工具", exception.Message);
+        Assert.Contains("成功结果", exception.Message);
         Assert.HasCount(1, client.CapturedOptions, "闸门必须先于收尾调用拦截");
     }
 
@@ -248,7 +248,7 @@ public sealed class ToolDrivenOutputTest
         var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(
             () => CollectUpdatesAsync(agent, updates));
 
-        Assert.Contains("没有调用任何工具", exception.Message);
+        Assert.Contains("成功结果", exception.Message);
         Assert.IsEmpty(updates, "闸门失败时不得产出任何部分更新");
         Assert.HasCount(1, client.CapturedOptions, "闸门必须先于收尾调用拦截");
     }
@@ -281,11 +281,51 @@ public sealed class ToolDrivenOutputTest
             new FunctionCallContent("prior-call", toolName, new Dictionary<string, object?> { ["symbol"] = "600519" })
         ]),
         new ChatMessage(ChatRole.Tool, [new FunctionResultContent("prior-call", "探针数据：600519 现价 1500 元")]),
-        new ChatMessage(ChatRole.User, "上一轮结论缺字段，请修正后重新输出。"),
+        new ChatMessage(ChatRole.User, "上一轮结论缺字段，请修正后重新输出。")
+        { AdditionalProperties = new() { [AIAgentToolDrivenOutput.RepairFeedbackKey] = true } },
     ];
 
     private static ProbeAnalystAgent CreateAgent(ScriptedChatClient client, StructuredOutputMode mode)
         => new(client, [CreateProbeTool()], mode);
+
+    [TestMethod, TestCategory("Unit")]
+    [DataRow("missing")]
+    [DataRow("wrong-id")]
+    [DataRow("failed")]
+    [DataRow("unrelated-history")]
+    public async Task ToolEvidenceMustBelongToSuccessfulCallAndCurrentAnalysis(string scenario)
+    {
+        var messages = CreateConversationWithPriorToolCall("get_probe_data");
+        switch (scenario)
+        {
+            case "missing": messages.RemoveAt(2); break;
+            case "wrong-id": messages[2].Contents = [new FunctionResultContent("other", "data")]; break;
+            case "failed": messages[2].Contents = [new FunctionResultContent("prior-call", "error") { Exception = new IOException() }]; break;
+            case "unrelated-history": messages[^1] = new ChatMessage(ChatRole.User, "分析另一标的"); break;
+        }
+        var client = new ScriptedChatClient([() => TextResponse("结论")]);
+        var error = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => CreateAgent(client, StructuredOutputMode.JsonObject).RunAsync(messages));
+        Assert.Contains("成功结果", error.Message);
+    }
+
+    [TestMethod, TestCategory("Unit")]
+    public async Task EmptyConclusionFailsWithoutFabricatingReport()
+    {
+        var client = new ScriptedChatClient([() => ToolCallResponse(), () => TextResponse(" ")]);
+        var error = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => CreateAgent(client, StructuredOutputMode.JsonObject).RunAsync("分析"));
+        Assert.Contains("正文", error.Message);
+        Assert.HasCount(2, client.CapturedOptions);
+    }
+
+    [TestMethod, TestCategory("Unit")]
+    public async Task WrongFieldTypeTriggersRepairAndInvalidRepairFails()
+    {
+        var client = new ScriptedChatClient([() => ToolCallResponse(), () => TextResponse("""{"score":{},"note":"结论"}"""),
+            () => TextResponse("""{"score":2,"note":[]}""")]);
+        var error = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => CreateAgent(client, StructuredOutputMode.JsonObject).RunAsync("分析"));
+        Assert.Contains("收尾", error.Message);
+        Assert.HasCount(3, client.CapturedOptions);
+    }
 
     private static AIFunction CreateProbeTool() => AIFunctionFactory.Create(
         (string symbol) => "探针数据：600519 现价 1500 元",

@@ -243,7 +243,8 @@ public sealed partial class CoordinatorExecutor(
                 // 携带首轮完整消息（含工具调用与结果）而非仅最后一条文本：重试所见与工具闸门一致，
                 // 模型也能基于已取到的数据直接修正结论，不必重新取数。
                 messages = [.. messages, .. agentResponse.Messages,
-                    new ChatMessage(ChatRole.User, BuildRepairFeedback(rawText, validationErrors, parseFailed))];
+                    new ChatMessage(ChatRole.User, BuildRepairFeedback(rawText, validationErrors, parseFailed))
+                    { AdditionalProperties = new() { [MarketAssistant.Agents.Analysts.AIAgentToolDrivenOutput.RepairFeedbackKey] = true } }];
             }
         }
 

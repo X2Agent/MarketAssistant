@@ -1,6 +1,8 @@
 using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Agents.Analysts;
 
@@ -16,8 +18,7 @@ namespace MarketAssistant.Agents.Analysts;
 /// 由本装饰器在工具回合结束后补齐，而不是放弃结构化保证。
 /// </para>
 /// <para>
-/// 闸门：入参与响应里都没有命中 Agent 自身工具的 <see cref="FunctionCallContent"/> 即判定失败
-/// ——没用过工具的结论不可信。入参也算数：协调器的修复重试会把首轮的工具往返随输入带回，
+/// 闸门：自身工具的调用必须按 CallId 匹配后续成功结果。仅协调器标记的修复请求可以复用入参里的工具往返，
 /// 此时本轮可以只改写结论而不再调工具。闸门必须先于收尾调用执行，保证转换的输入是取过数的结论。
 /// </para>
 /// <para>
@@ -38,6 +39,13 @@ namespace MarketAssistant.Agents.Analysts;
 /// </remarks>
 public static class AIAgentToolDrivenOutput
 {
+    public const string RepairFeedbackKey = "MarketAssistant.ReportRepair";
+    private static readonly JsonSerializerOptions ReportOptions = new(JsonSerializerDefaults.General)
+    {
+        PropertyNameCaseInsensitive = true,
+        RespectNullableAnnotations = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
     /// <summary>收尾调用的格式转换指令；Schema 由 <see cref="StructuredOutputOptions.AppendSchemaInstructions"/> 追加。</summary>
     private const string ConverterInstructions = """
         你是格式转换器。把给定的分析结论整理为一个符合下方 JSON Schema 的合法 JSON 对象。
@@ -59,6 +67,7 @@ public static class AIAgentToolDrivenOutput
         // 仅 JsonObject 需要收尾调用：JsonSchema 服务端在最终文本上约束 Schema（可与 tools 共存），
         // Text 模式没有可下发的 response_format。
         var deferStructuredOutput = structuredOutputMode == StructuredOutputMode.JsonObject;
+        var schema = deferStructuredOutput ? AIJsonUtilities.CreateJsonSchema(resultType) : default;
 
         // 只提供 runFunc：流式由 MAF 在批量结果上回放，闸门先于任何更新执行
         return agent.AsBuilder()
@@ -75,18 +84,18 @@ public static class AIAgentToolDrivenOutput
             var response = await innerAgent.RunAsync(messages, session, options, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (!UsedOwnTool(messages, response))
+            var repair = messages.LastOrDefault() is { Role: var role, AdditionalProperties: { } properties }
+                && role == ChatRole.User && properties.TryGetValue(RepairFeedbackKey, out var value) && value is true;
+            if (!HasSuccessfulToolResult(response.Messages) && !(repair && HasSuccessfulToolResult(messages)))
             {
                 throw new InvalidOperationException(
-                    "模型没有调用任何工具就给出了结论，结论不可信。请更换支持函数调用（Tool Calling）的模型");
+                    "未取得本轮分析工具的成功结果，无法生成可信结论");
             }
 
-            if (!deferStructuredOutput)
-                return response;
-
             var final = response.Messages.LastOrDefault(message => message.Role == ChatRole.Assistant);
-            if (final is null || string.IsNullOrWhiteSpace(final.Text) ||
-                LlmJsonExtractor.TryExtractJson(final.Text, out _))
+            if (final is null || string.IsNullOrWhiteSpace(final.Text))
+                throw new InvalidOperationException("模型未返回分析正文");
+            if (!deferStructuredOutput || MatchesReport(final.Text, out _))
             {
                 return response;
             }
@@ -104,7 +113,7 @@ public static class AIAgentToolDrivenOutput
                 },
                 cancellationToken).ConfigureAwait(false);
 
-            if (!LlmJsonExtractor.TryExtractJson(structured.Text, out var json))
+            if (!MatchesReport(structured.Text, out var json))
             {
                 var preview = structured.Text is { Length: > 200 } ? structured.Text[..200] : structured.Text;
                 throw new InvalidOperationException($"收尾结构化调用未返回合法 JSON: {preview}");
@@ -128,10 +137,32 @@ public static class AIAgentToolDrivenOutput
             return response;
         }
 
-        bool UsedOwnTool(IEnumerable<ChatMessage> messages, AgentResponse response) => messages
-            .Concat(response.Messages)
-            .SelectMany(message => message.Contents)
-            .OfType<FunctionCallContent>()
-            .Any(content => content.Name is not null && requiredToolNames.Contains(content.Name));
+        bool MatchesReport(string? text, out string json)
+        {
+            if (!LlmJsonExtractor.TryExtractJson(text, out json)) return false;
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return false;
+            var names = root.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (schema.TryGetProperty("properties", out var properties) && !properties.EnumerateObject().Any(p => names.Contains(p.Name))) return false;
+            if (schema.TryGetProperty("required", out var required) && required.EnumerateArray().Any(p => !names.Contains(p.GetString()!))) return false;
+            try { return root.Deserialize(resultType, ReportOptions) != null; }
+            catch (JsonException) { return false; }
+        }
+
+        bool HasSuccessfulToolResult(IEnumerable<ChatMessage> history)
+        {
+            var calls = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var message in history)
+            {
+                if (message.Role == ChatRole.Assistant)
+                    foreach (var call in message.Contents.OfType<FunctionCallContent>())
+                        if (requiredToolNames.Contains(call.Name)) calls.Add(call.CallId);
+                if (message.Role == ChatRole.Tool)
+                    foreach (var result in message.Contents.OfType<FunctionResultContent>())
+                        if (calls.Remove(result.CallId) && result.Exception == null) return true;
+            }
+            return false;
+        }
     }
 }
