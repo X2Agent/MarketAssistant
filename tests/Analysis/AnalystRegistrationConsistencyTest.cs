@@ -13,8 +13,8 @@ namespace TestMarketAssistant.Analysis;
 
 /// <summary>
 /// 分析师扩展点一致性：新增分析师要在多处同步登记（YAML 提示词、AnalystNames 常量、AnalystSignalParser 映射、
-/// SupportedMarkets、各市场的 Keyed 工具注册），漏掉任何一处都不会报错而是静默降级——提示词回退到共用配置、
-/// 信号被当作未知作者丢弃、工具缺失时分析师没有数据照常出报告。
+/// AnalystDisplayNameMapper 中文显示名、SupportedMarkets、各市场的 Keyed 工具注册），漏掉任何一处都不会报错而是静默降级——
+/// 提示词回退到共用配置、信号被当作未知作者丢弃、作者名显示成 ASCII 标识、工具缺失时分析师没有数据照常出报告。
 /// 这里以 AnalystTypeRegistry 为唯一事实来源逐项核对。
 /// </summary>
 [TestClass]
@@ -85,6 +85,18 @@ public sealed class AnalystRegistrationConsistencyTest
 
             Assert.IsNotNull(snapshot,
                 $"{analystName} 缺少 AnalystSignalParser 映射；若它不产出方向性信号，请加入 SignalExemptNames 并在 Agents/AGENTS.md 说明");
+        }
+    }
+
+    // 显示名漏登记不会报错：聊天侧栏与 Markdown 导出的作者名会静默回退成 ASCII 标识
+    [TestMethod]
+    [TestCategory("Unit")]
+    public void EveryRegisteredName_ShouldHaveChineseDisplayName()
+    {
+        foreach (var name in RegisteredNames)
+        {
+            Assert.AreNotEqual(name, AnalystDisplayNameMapper.GetDisplayName(name),
+                $"{name} 未在 AnalystDisplayNameMapper 登记中文显示名");
         }
     }
 

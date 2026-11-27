@@ -208,8 +208,7 @@ public partial class AnalysisReportViewModel(
         IsRatingNeutral = !IsRatingPositive && !IsRatingNegative;
         TargetPrice = coordinatorResult.TargetPrice;
         PriceChangeExpectation = coordinatorResult.PriceChangeExpectation;
-        TimeHorizon = coordinatorResult.TimeHorizon.GetDescription() +
-                      (string.IsNullOrWhiteSpace(coordinatorResult.TimeHorizonDescription) ? "" : $" ({coordinatorResult.TimeHorizonDescription})");
+        TimeHorizon = coordinatorResult.DescribeTimeHorizon();
         RiskLevel = coordinatorResult.RiskLevel.GetDescription();
         ConfidencePercentage = coordinatorResult.ConfidencePercentage;
 

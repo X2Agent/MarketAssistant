@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MarketAssistant.ViewModels"
+             xmlns:views="using:MarketAssistant.Views.Components"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:models="using:MarketAssistant.Agents.MarketAnalysis.Models"
+             xmlns:svg="clr-namespace:Avalonia.Svg.Skia;assembly=Svg.Controls.Skia.Avalonia"
+             x:Class="MarketAssistant.Views.Components.ReportImageView"
+             x:DataType="vm:ReportImageViewModel"
+             Background="{DynamicResource PageBackgroundBrush}">
+    <UserControl.Styles>
+        <!-- Svg 控件异步加载图标，离屏同步渲染时尚未就绪，只会在标题左侧留一块空位；导出里直接不要图标 -->
+        <Style Selector="svg|Svg">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+    </UserControl.Styles>
+
+    <!-- 导出长图：上半就是页面上的同一个 AnalysisReportView（DataContext 取渲染器给的 Report），
+         下半是页面没有、导出补全的附录。宽度由渲染器固定、高度随内容。
+         不要在这里另起一套报告排版，否则导出会与页面渐行渐远。 -->
+    <StackPanel>
+        <views:AnalysisReportView DataContext="{Binding Report}"/>
+
+        <!-- 附录：左右边距与上面报告的页面内边距一致 -->
+        <StackPanel Margin="24,0" Spacing="{StaticResource SectionSpacing}">
+
+            <!-- 关键指标：协调分析师从各专业分析师结论里提炼的数据点 -->
+            <controls:CardView IsVisible="{Binding HasKeyIndicators}">
+                <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                    <TextBlock Text="关键指标" Classes="card-title"/>
+                    <ItemsControl ItemsSource="{Binding KeyIndicators}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="{StaticResource SmallSpacing}"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:KeyIndicator">
+                                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                        CornerRadius="{StaticResource SmallCornerRadius}"
+                                        Padding="{StaticResource CompactCardPadding}">
+                                    <Grid ColumnDefinitions="*,Auto,Auto"
+                                          RowDefinitions="Auto,Auto"
+                                          ColumnSpacing="{StaticResource DefaultSpacing}"
+                                          RowSpacing="{StaticResource TinySpacing}">
+                                        <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}"
+                                                       TextWrapping="Wrap"
+                                                       FontWeight="{DynamicResource WeightTitle}"/>
+                                            <TextBlock Classes="caption" TextWrapping="Wrap">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="{}{0} · {1}">
+                                                        <Binding Path="Category"/>
+                                                        <Binding Path="AnalystSource"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <!-- 值右对齐、封顶宽度：短值不占位，长值（如一整句数据描述）到宽度上限才换行 -->
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                                   Classes="num"
+                                                   Text="{Binding Value}"
+                                                   MaxWidth="260"
+                                                   TextWrapping="Wrap"
+                                                   TextAlignment="Right"
+                                                   VerticalAlignment="Center"/>
+                                        <controls:StatusTag Grid.Row="0" Grid.Column="2"
+                                                            Text="{Binding Signal}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                                   Classes="body-sm"
+                                                   Text="{Binding Suggestion}"
+                                                   TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </controls:CardView>
+
+            <!-- 各分析师详细分析：与聊天侧栏同一套卡片（AdaptiveCardView），没有对应卡片的原文兜底 -->
+            <TextBlock Text="各分析师详细分析"
+                       Classes="title"
+                       IsVisible="{Binding HasAnalystMessages}"/>
+            <ItemsControl ItemsSource="{Binding AnalystMessages}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Spacing="{StaticResource SectionSpacing}"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChatMessageAdapter">
+                        <controls:CardView>
+                            <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                                <TextBlock Text="{Binding DisplaySender}" Classes="card-title"/>
+                                <views:AdaptiveCardView Card="{Binding AdaptiveCard}"
+                                                        IsVisible="{Binding IsAdaptiveCard}"/>
+                                <Border Background="{DynamicResource SurfaceVariantBrush}"
+                                        CornerRadius="{StaticResource SmallCornerRadius}"
+                                        Padding="{StaticResource DefaultCardPadding}"
+                                        IsVisible="{Binding ShowRichText}">
+                                    <TextBlock Text="{Binding Content}"
+                                               TextWrapping="Wrap"
+                                               FontFamily="{StaticResource DataFontFamily}"
+                                               FontSize="{StaticResource CaptionFontSize}"/>
+                                </Border>
+                            </StackPanel>
+                        </controls:CardView>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <TextBlock Classes="caption"
+                   Text="MarketAssistant · AI 生成，数据来源网络，仅供参考。投资有风险，入市需谨慎！"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="24"/>
+    </StackPanel>
+</UserControl>

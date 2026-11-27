@@ -1,5 +1,7 @@
 using System.Text;
+using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.MarketAnalysis.Models;
+using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Extensions;
 using Microsoft.Extensions.AI;
 
@@ -31,7 +33,7 @@ public static class MarkdownReportExporter
         sb.AppendLine($"| 投资评级 | {EscapeTableCell(cr.InvestmentRating.GetDescription())} |");
         sb.AppendLine($"| 目标价格 | {EscapeTableCell(cr.TargetPrice)} |");
         sb.AppendLine($"| 价格预期 | {EscapeTableCell(cr.PriceChangeExpectation)} |");
-        sb.AppendLine($"| 投资周期 | {EscapeTableCell(cr.TimeHorizon.GetDescription() + " " + cr.TimeHorizonDescription)} |");
+        sb.AppendLine($"| 投资周期 | {EscapeTableCell(cr.DescribeTimeHorizon())} |");
         sb.AppendLine($"| 风险等级 | {EscapeTableCell(cr.RiskLevel.GetDescription())} |");
         sb.AppendLine($"| 置信度 | {cr.ConfidencePercentage:F0}% |");
         sb.AppendLine();
@@ -164,14 +166,32 @@ public static class MarkdownReportExporter
         {
             var author = string.IsNullOrWhiteSpace(message.AuthorName)
                 ? GetRoleDisplayName(message.Role)
-                : message.AuthorName;
+                : AnalystDisplayNameMapper.GetDisplayName(message.AuthorName);
             if (string.IsNullOrWhiteSpace(message.Text)) continue;
 
             sb.AppendLine($"### {EscapeInline(author)}");
             sb.AppendLine();
-            sb.AppendLine(EscapeInline(message.Text));
+            AppendAnalystText(sb, message.Text);
             sb.AppendLine();
         }
+    }
+
+    /// <summary>
+    /// 分析师产物是结构化 JSON：以 json 代码块原样输出，避免行内转义破坏引号、反斜杠与围栏。
+    /// 与聊天卡片、信号解析同一语义——只认文本里的首个结果 JSON，前后的说明文字、代码围栏、
+    /// 模型重复输出的第二份都不进导出。不含 JSON 的文本（如失败标记）整体按行内转义。
+    /// </summary>
+    private static void AppendAnalystText(StringBuilder sb, string text)
+    {
+        if (!LlmJsonExtractor.TryExtractJson(text, out var json))
+        {
+            sb.AppendLine(EscapeInline(text));
+            return;
+        }
+
+        sb.AppendLine("```json");
+        sb.AppendLine(json);
+        sb.AppendLine("```");
     }
 
     private static string GetQualityLevelText(AnalysisQualityLevel level) => level switch

@@ -27,28 +27,22 @@ public abstract class BaseAdaptiveCardParser<T> : IAdaptiveCardParser<T>
             }
         }
 
-        try
+        var options = new JsonSerializerOptions
         {
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true
-            };
-            options.Converters.Add(new JsonStringEnumConverter());
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
 
-            var model = JsonSerializer.Deserialize<T>(json, options);
-            if (model != null && IsValid(model))
-            {
-                card = Parse(model);
-                return true;
-            }
-        }
-        catch (Exception ex)
+        // 预检已命中说明这是本解析器负责的类型：反序列化或构卡失败属于异常，直接抛出，由转换器统一记录并回退原文
+        var model = JsonSerializer.Deserialize<T>(json, options);
+        if (model != null && IsValid(model))
         {
-            // 反序列化失败时记录警告，便于排查 JSON 格式问题
-            System.Diagnostics.Debug.WriteLine($"AdaptiveCard 反序列化失败: {ex.Message}");
+            card = Parse(model);
+            return true;
         }
+
         return false;
     }
 

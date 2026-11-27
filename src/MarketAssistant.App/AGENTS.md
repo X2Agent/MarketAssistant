@@ -30,7 +30,8 @@ MarketAssistant.App/
 │   ├── Controls/                  ← 自定义控件
 │   ├── Components/                ← 复合组件
 │   ├── Pages/                     ← 页面视图
-│   └── Windows/                   ← 窗口
+│   ├── Windows/                   ← 窗口
+│   └── Demo/                      ← 调试预览页（卡片预览，导航入口仅 Debug 构建）
 ├── skills/                        ← 输出到运行目录的 Skill/参考资源
 └── Assets/                        ← 图片、图标
 ```
@@ -248,6 +249,14 @@ MarketAssistant.App/
 - **设计令牌覆盖层**在 `Resources/Styles/MarkdownStyles.axaml`（前景、标题字号与字重、列表缩进、表格与代码块的边框 / 底色），由 `RichTextBlock` 在库样式集**之后**加到控件级 `Styles`（同一属性后加入的样式优先）。**不要放进 `App.axaml`**：应用级的后代选择器会让全库每个 `TextBlock` 都去评估祖先链。
 - 改了覆盖层或渲染结构，用无头渲染看一遍亮 / 暗两套主题（标题层级、表格斑马纹、行内代码、引用条），暗色下标题只能靠字号区分层级（`WeightTitle` 的 Medium 在中文字体下渲染为 Regular，是全局限制）。
 
+### 分析师卡片（AdaptiveCard）与卡片预览页
+
+- **转换入口唯一**：`AdaptiveCardConverter.Convert(text)` 先经 `LlmJsonExtractor` 在边界一次性取出 JSON（容忍前置说明文字与 json 代码块），再走解析器链。`ChatMessageAdapter` 不再预判「是否以 `{` 开头」，UI 层也不要重复做这类判断；否则带说明文字的回复会整条显示成原文 JSON。
+- **解析失败要可见**：`BaseAdaptiveCardParser.TryParse` 不吞异常。某个解析器认出了产物却解析失败时，由转换器按解析器隔离、记 Warning 并回退原文，其余解析器不受影响。
+- **可空数值字段**（提示词约定「无数据时为 null」）在卡片里显示 `N/A`，不要拼出孤立的 `%`；财务卡片的百分比字段统一经 `FinancialCardParser.FormatPercent`。
+- **新增 / 修改分析师卡片后**，在 Debug 构建的导航底部打开「卡片预览」（`Views/Demo/CardPreviewView`，样本在 `ViewModels/Demo/CardPreviewSamples.cs`）目测验证。新增卡片类型时把样本补进 `CardPreviewSamples.All`，`AdaptiveCardConverterTest` 会据此保证样本始终能被识别。
+- **预览页的边界**：导航入口只在 `MainWindowViewModel` 的 `#if DEBUG` 里挂载，页面与 ViewModel 在所有配置下编译（Avalonia 总会编译全部 `.axaml`）。它的聊天会话用固定回复的假客户端（`PreviewChatSessionFactory`）与隔离的临时库（`ChatSessionPersistenceService` 的可选 `dbPath`），不碰真实模型与历史会话。
+
 ### 资产详情页（AssetPageView）
 
 - **价格取位按市场**：`PriceFormatter.Format(price, market, code)` —— A 股股票固定 2 位、基金 / ETF（`StockSymbolConverter.IsFundOrEtf`）固定 3 位（按最小报价单位）；虚拟币价格跨度极大，按量级取位（≥1000 取 2 位，≥1 取 4 位，<1 取 6 位，保护低价币）。页头价格、涨跌额、价差、盘口档位统一经 `AssetPageViewModel.FormatPrice`，不要在各处自己按量级格式化，否则 A 股涨跌额会显示成 `0.470000`。
@@ -257,11 +266,16 @@ MarketAssistant.App/
 
 ### 报告导出（Markdown / 分享图 / PDF）
 
-- Markdown 导出走 App.Services 的 `MarkdownReportExporter`（纯文本，无渲染依赖）。
-- 分享图/PDF 走本项目的 `ReportShareCardRenderer`：固定 1080×1350 画布离屏渲染 `ReportShareCardView`（Avalonia 视觉树，中文与应用字体由宿主保证），PDF 由渲染位图经 SkiaSharp `SKDocument` 封装单页——**不引入第二套排版**，分享图与 PDF 永远视觉一致。
-- `RenderTargetBitmap` 要求 UI 线程：导出命令只在 VM（UI 线程）同步调用渲染，不要 `Task.Run`。
+- Markdown 导出走 App.Services 的 `MarkdownReportExporter`（纯文本，无渲染依赖）。「各分析师详细分析」一节里分析师产物是结构化 JSON：只认文本里的**首个**结果 JSON（与聊天卡片、`AnalystSignalParser`、`CoordinatorExecutor` 共用 `LlmJsonExtractor`），以 ```` ```json ```` 代码块原样输出，**不能走行内转义**（引号、反斜杠、围栏会被破坏，整段还会挤成一个段落）；JSON 前后的说明文字、模型在 JSON 之外重复输出的第二份都不进导出，不含 JSON 的文本（如失败标记）整体按行内转义；小标题经 `AnalystDisplayNameMapper`（`MarketAssistant.Agents` 项目）转为中文名，与聊天侧栏一致。
+- 分享图 / PDF 走本项目的 `ReportImageRenderer`：把**整份报告**离屏渲染成 1080px 宽、高度随内容的长图。内容 = 页面上的同一个 `AnalysisReportView` + 页面没有的附录（协调分析师提炼的「关键指标」表、「各分析师详细分析」）+ 一行页脚声明，都在 `ReportImageView` 里；按 720 DIP 的窄宽度排版后整体放大 1.5 倍输出（正文在手机上也读得清；放大的是渲染，字号仍是设计系统五档）。PDF 由**同一张位图**按 A4 页高切段后经 SkiaSharp `SKDocument` 封装——**不引入第二套排版**，分享图与 PDF 永远视觉一致，也与页面一致。
+- **别再做摘要版「分享卡」**：此前的 1080×1350 摘要卡只放评级、评分和 3 条亮点，真实数据里目标价、价格预期这类长句还会被横向 `StackPanel` 截断、置信度整个被挤出画布，用户看到的是「内容少了很多」。报告主体新增区块只改 `AnalysisReportView`，导出自动跟随；只在导出里出现的附录改 `ReportImageView`；不要在导出里另写一份报告版式。
+- 展示数据由 `ReportImageViewModel.Create(report, assetName, converter)` 用传入的 `MarketAnalysisReport` 现建：一份 `AnalysisReportViewModel`（`UpdateWithReport` + 名称）加附录数据，与页面当前绑定的实例解耦，不受页面异步回填时序影响；不要把 `MarketAnalysisReport` 直接绑到视图上。**分析师详情复用聊天侧栏的 `ChatMessageAdapter` + `AdaptiveCardView`**（同一份结论在导出里与侧栏里是同一张卡片，不为导出重写卡片版式），所以 `ReportImageRenderer` 的入口要传 DI 里的 `AdaptiveCardConverter`；协调分析师的结论就是报告主体，不再作为详情重复出现。
+- **PDF 分页只看像素**（`ReportPdfPager`，纯函数，脱离渲染平台单测）：每页在下半段从下往上找切口——先找卡片之间整行页面底色的空隙（每张卡片保持完整；空隙前面的内容块低于 80 行视为章节标题，不独自留在页尾，跟着下一张卡片去下一页），整页都没有（卡片比一页还高）才退到卡片内无文字的空白行，再没有才在页高处硬切。**颜色容差必须小于卡片与页面底色的差**：浅色主题下白色卡片与页面底色三通道总共只差 22，容差取到 24 时卡片边缘探测不到、整张卡片被当成「空隙」，页面会从卡片中间劈开；`ReportPdfPagerTest` 用同样的色值锁住了这一点。
+- `RenderTargetBitmap` 与 `Window` 都要求 UI 线程：导出命令只在 VM（UI 线程）同步调用渲染，不要 `Task.Run`。
+- **离屏渲染必须把视图挂进窗口树**：`ReportImageView` 是 `new` 出来的游离控件，不挂载就拿不到应用主题与控件模板（视觉树只剩空壳），`RenderTargetBitmap.Render` 得到的是整张透明图——PNG 全透明、PDF 是空白页，但文件仍有几 KB，光看文件大小发现不了。`ReportImageRenderer.Render` 用一个从未 `Show` 的 `Window` 作宿主完成样式 / 模板，渲染完 `Close()`；宿主窗口尺寸与导出无关，内容高度由视图按固定宽度、不限高度单独 `Measure` 得到。
+- **手动布局要排两遍，且 SVG 图标要隐藏**（都是离屏特有，页面里没有这些问题）：① `ProgressBar` 在 `Arrange` 里才改写指示块宽度，指示块随即失效，而手动布局没有布局管理器的后续轮次——只排一遍，进度条只剩灰色轨道、没有强调色填充；所以渲染器把整棵树 `InvalidateMeasure` 后再 `Measure` / `Arrange` 一遍。② `Svg` 控件异步加载图标，同步离屏渲染时 `_svg` 还是 `null`，只会在标题左侧留一块空位；`ReportImageView` 用本地样式把 `svg|Svg` 设为不可见。位图高度要对齐到整像素，否则最后一行半透明。
+- **改动导出或报告页后的验证**：用真实长度的报告数据（目标价、价格预期、风险因素这类长句）离屏渲染，**放大看**，别只看文件大小或颜色数（> 1）：检查无截断、进度条有填充、标题无空位、浅 / 深色都正常，再把 PDF 光栅化后**逐页**看切口（卡片是否被劈开、章节标题是否孤零零留在页尾、末页是否只剩一小截）。验证方法：临时探针里 `AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().SetupWithoutStarting()` 后直接调 `ReportImageRenderer.RenderToPngBytes` / `SavePdf`（`AdaptiveCardConverter` 用与生产同序的解析器链，参见 `tests/AdaptiveCardConverterTest.CreateConverter`；PDF 可在 Windows PowerShell 5.1 里用 `Windows.Data.Pdf` 光栅化成 PNG 再看）；不要把依赖本机图形平台的渲染测试留在默认单元测试里（CI 是无图形环境的 ubuntu），分页等纯像素逻辑用合成位图单测（`ReportPdfPagerTest`）。
 - PDF 写入前先释放 `SaveFilePickerAsync` 返回的流，再以本地路径交给 SkiaSharp，避免文件占用；本地路径取 `IStorageFile.TryGetLocalPath()`。
-- 分享卡数据模型是 `ReportShareCardData`（不可变快照）：只带展示必需字段，不要把 `MarketAnalysisReport` 直接绑到离屏视图上。
 
 ---
 

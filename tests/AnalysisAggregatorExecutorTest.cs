@@ -80,6 +80,43 @@ public sealed class AnalysisAggregatorExecutorTest
         Assert.Contains("最终版结论".Length.ToString(), payload[1].Text, "摘要字符数应对应去重后的最后一条");
     }
 
+    /// <summary>
+    /// 模型常在 JSON 前后附说明、围栏，偶尔把同一份 JSON 输出两遍。聚合器是所有分析师产物的唯一汇聚点，
+    /// 在此一次性提取结果 JSON，落盘产物（报告导出、聊天卡片、协调分析师读取的都是它）才不会因模型而异。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow("{\"score\":8}\n{\"score\":8}", DisplayName = "同一份 JSON 连续输出两遍")]
+    [DataRow("```json\n{\"score\":8}\n```\n{\"score\":8}", DisplayName = "围栏内外各一份")]
+    [DataRow("好的，以下是分析结论：\n```json\n{\"score\":8}\n```\n以上。", DisplayName = "前置说明与代码围栏")]
+    public async Task Collect_AnalystTextWithNoise_ShouldStoreOnlyResultJson(string rawText)
+    {
+        var (aggregator, context, sentBatches, store) = CreateAggregator(expectedAnalystCount: 1);
+
+        await DeliverAsync(aggregator, context, CreateAssistantMessage("MarketSentimentAnalyst", rawText));
+
+        Assert.HasCount(1, sentBatches);
+        Assert.AreEqual("{\"score\":8}", await store.GetAsync(TestRunId, "MarketSentimentAnalyst"));
+        Assert.Contains("共 11 字符", sentBatches[0][1].Text, "摘要字符数应按提取后的 JSON 计");
+    }
+
+    /// <summary>失败原因里可能带花括号（例如收尾结构化调用的返回预览），失败标记必须原样附入载荷。</summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    public async Task Collect_FailureMarkerWithBraces_ShouldStayVerbatim()
+    {
+        var (aggregator, context, sentBatches, _) = CreateAggregator(expectedAnalystCount: 2);
+        var failureText = AnalystFailureMessages.BuildFailureText(
+            "FundamentalAnalyst", "收尾结构化调用未返回合法 JSON: {\"score\":8}");
+
+        await DeliverAsync(aggregator, context,
+            CreateAssistantMessage("FundamentalAnalyst", failureText),
+            CreateAssistantMessage("NewsEventAnalyst", "正常结论"));
+
+        Assert.HasCount(1, sentBatches);
+        Assert.IsTrue(sentBatches[0].Any(message => message.Text == failureText), "失败标记应原样附入载荷");
+    }
+
     [TestMethod]
     [TestCategory("Unit")]
     public async Task Collect_UserRoleMessages_ShouldBeIgnored()

@@ -6,6 +6,7 @@ using MarketAssistant.Agents.MarketAnalysis.Models;
 using MarketAssistant.Agents.TokenManagement;
 using MarketAssistant.Applications.Analysis;
 using MarketAssistant.Applications.Assets;
+using MarketAssistant.Infrastructure.AdaptiveCards;
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Archive;
 using MarketAssistant.Services.Export;
@@ -30,6 +31,9 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     };
 
     private readonly AnalysisOrchestrationService _orchestrationService;
+
+    /// <summary>导出长图时把各分析师的结论解析成与聊天侧栏同一套卡片。</summary>
+    private readonly AdaptiveCardConverter _adaptiveCardConverter;
 
     [ObservableProperty]
     private string _stockCode = "";
@@ -220,11 +224,13 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         AnalysisOrchestrationService orchestrationService,
         AnalysisReportViewModel analysisReportViewModel,
         ChatSidebarViewModel chatSidebarViewModel,
+        AdaptiveCardConverter adaptiveCardConverter,
         MarketContext marketContext,
         ILogger<AgentAnalysisViewModel> logger) : base(logger)
     {
         _orchestrationService = orchestrationService;
         _analysisReportViewModel = analysisReportViewModel;
+        _adaptiveCardConverter = adaptiveCardConverter;
 
         _progressSmoothTimer = new DispatcherTimer(SmoothTickInterval, DispatcherPriority.Background, OnProgressSmoothTimerTick);
         _progressSmoothTimer.Stop();
@@ -576,11 +582,10 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         if (_lastReport == null || _storageProvider == null)
             return;
 
-        var suggestedName = $"{_lastReport.AssetSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出分析报告",
-            SuggestedFileName = suggestedName,
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("Markdown") { Patterns = ["*.md"] },
@@ -599,7 +604,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
     }
 
     /// <summary>
-    /// 导出分享卡图片（PNG）。分享卡为固定画布离屏渲染，与 PDF 视觉一致。
+    /// 导出报告长图（PNG）：页面同一份完整报告加关键指标、各分析师详情附录，离屏渲染，与 PDF 视觉一致。
     /// </summary>
     [RelayCommand]
     private async Task ExportShareImageAsync()
@@ -610,7 +615,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出分享图",
-            SuggestedFileName = BuildShareCardFileName(),
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("PNG 图片") { Patterns = ["*.png"] },
@@ -620,15 +625,16 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
 
         if (file == null) return;
 
+        // 先渲染再打开目标文件：渲染失败时不会留下 0 字节文件
+        var bytes = ReportImageRenderer.RenderToPngBytes(_lastReport, AnalysisReportViewModel.AssetName, _adaptiveCardConverter);
         await using var stream = await file.OpenWriteAsync();
-        var bytes = ReportShareCardRenderer.RenderToPngBytes(BuildShareCardData(_lastReport));
         await stream.WriteAsync(bytes);
 
         Logger?.LogInformation("分享图已导出: {Path}", file.Name);
     }
 
     /// <summary>
-    /// 导出分享卡 PDF（单页，内容与分享图一致）。
+    /// 导出报告 PDF（A4 分页，内容与分享图一致）。
     /// </summary>
     [RelayCommand]
     private async Task ExportPdfAsync()
@@ -639,7 +645,7 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         var file = await _storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "导出 PDF",
-            SuggestedFileName = BuildShareCardFileName(),
+            SuggestedFileName = BuildReportFileName(),
             FileTypeChoices =
             [
                 new FilePickerFileType("PDF 文档") { Patterns = ["*.pdf"] },
@@ -656,35 +662,14 @@ public partial class AgentAnalysisViewModel : ViewModelBase, INavigationAware<As
         }
 
         var localPath = file.TryGetLocalPath() ?? file.Name;
-        ReportShareCardRenderer.SavePdf(BuildShareCardData(_lastReport), localPath);
+        ReportImageRenderer.SavePdf(_lastReport, AnalysisReportViewModel.AssetName, _adaptiveCardConverter, localPath);
 
         Logger?.LogInformation("PDF 已导出: {Path}", localPath);
     }
 
-    private string BuildShareCardFileName()
-        => $"{_lastReport!.AssetSymbol}_分析卡片_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
-
-    /// <summary>
-    /// 从报告构建分享卡数据：亮点取前 3 条，Token 摘要直接复用展示层格式化。
-    /// </summary>
-    private ReportShareCardData BuildShareCardData(MarketAnalysisReport report)
-    {
-        var coordinator = report.CoordinatorResult;
-        return new ReportShareCardData
-        {
-            // 与报告头部同源（含回查补全的名称）；缺失时回退到代码，避免分享卡标题空白
-            AssetName = AnalysisReportViewModel.HasAssetName ? AnalysisReportViewModel.AssetName : report.AssetSymbol,
-            AssetSymbol = report.AssetSymbol,
-            OverallScore = coordinator.OverallScore,
-            InvestmentRating = coordinator.InvestmentRating.GetDescription(),
-            TargetPrice = coordinator.TargetPrice,
-            PriceChangeExpectation = coordinator.PriceChangeExpectation,
-            ConfidencePercentage = coordinator.ConfidencePercentage,
-            Highlights = [.. coordinator.InvestmentHighlights.Take(3)],
-            UsageSummary = TokenUsageFormatter.FormatSummary(report.Usage),
-            GeneratedAt = report.CreatedAt
-        };
-    }
+    /// <summary>三种导出共用的建议文件名（不含扩展名）。</summary>
+    private string BuildReportFileName()
+        => $"{_lastReport!.AssetSymbol}_分析报告_{_lastReport.CreatedAt.ToLocalTime():yyyyMMdd}";
 
     public void OnNavigatedTo(AssetNavigationParameter parameter, bool isReactivation)
     {

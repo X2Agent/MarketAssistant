@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:MarketAssistant.ViewModels.Demo"
+             xmlns:controls="using:MarketAssistant.Views.Controls"
+             xmlns:components="using:MarketAssistant.Views.Components"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+             x:Class="MarketAssistant.Views.Demo.CardPreviewView"
+             x:DataType="vm:CardPreviewViewModel">
+
+    <Grid ColumnDefinitions="*,Auto" Background="{DynamicResource PageBackgroundBrush}">
+
+        <!-- 左：控制面板 -->
+        <ScrollViewer Grid.Column="0">
+            <StackPanel Margin="{StaticResource PagePadding}" Spacing="{StaticResource LargeSpacing}">
+
+                <controls:CardView>
+                    <StackPanel Spacing="{StaticResource SmallSpacing}">
+                        <TextBlock Text="卡片预览" Classes="card-title"/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="右侧是线上同一套聊天侧栏，示例回复经真实的解析器链渲染成 Adaptive Card。输入框背后是固定回复的假客户端，不调用真实模型，也不会写入历史会话。样本均为虚构的示例数据，仅 Debug 构建可见。"/>
+                    </StackPanel>
+                </controls:CardView>
+
+                <controls:CardView>
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="回复形态" Classes="card-title"/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="线上模型有时会在 JSON 前加一段说明文字，或把 JSON 包进代码块；这些形态都应该渲染成卡片。"/>
+                        <ComboBox ItemsSource="{Binding ShapeOptions}"
+                                  SelectedItem="{Binding SelectedShapeOption}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CardPreviewShapeOption">
+                                    <TextBlock Text="{Binding Label}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </controls:CardView>
+
+                <controls:CardView>
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="追加单个分析师" Classes="card-title"/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="按上面选中的形态，把一条分析师回复追加到聊天里。"/>
+                        <ItemsControl ItemsSource="{Binding Samples}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CardPreviewSample">
+                                    <Button Classes="btn-secondary btn-sm"
+                                            Margin="{StaticResource TinyMargin}"
+                                            Content="{Binding Label}"
+                                            Command="{Binding $parent[ItemsControl].((vm:CardPreviewViewModel)DataContext).AddSampleCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </controls:CardView>
+
+                <controls:CardView>
+                    <StackPanel Spacing="{StaticResource DefaultSpacing}">
+                        <TextBlock Text="整轮分析" Classes="card-title"/>
+                        <TextBlock Classes="caption" TextWrapping="Wrap"
+                                   Text="模拟打开一份历史分析报告：6 位分析师的回复混用上面几种形态，其中财务分析师缺失数据（百分比应显示 N/A）。"/>
+                        <WrapPanel>
+                            <Button Classes="btn-secondary"
+                                    Margin="{StaticResource SmallRightMargin}"
+                                    Content="载入一次完整分析"
+                                    Command="{Binding LoadFullAnalysisCommand}"/>
+                            <Button Classes="btn-secondary"
+                                    Content="清空"
+                                    Command="{Binding ClearMessagesCommand}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </controls:CardView>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右：聊天抽屉，尺寸、圆角、阴影与线上抽屉一致 -->
+        <Border Grid.Column="1"
+                Width="{StaticResource ChatDrawerWidth}"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderThickness="{StaticResource NoBorderThickness}"
+                CornerRadius="{StaticResource ChatDrawerCornerRadius}"
+                BoxShadow="{StaticResource ShadowOverlay}"
+                ClipToBounds="True">
+            <components:ChatSidebarView DataContext="{Binding Sidebar}"/>
+        </Border>
+    </Grid>
+</UserControl>

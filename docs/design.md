@@ -163,9 +163,9 @@ v2 的 `Primary` / `PrimaryBrush` / `PrimaryLightBrush` / `PrimaryDarkBrush` / `
 | **正文小** | `BodySmFontSize` | 14 / 21 | `WeightBody` | **主力档**：表格、卡片、表单、按钮 |
 | **辅助** | `CaptionFontSize` | 12 / 18 | `WeightBody` | 时间戳、单位、表头、代码、标签 |
 
-**唯一例外**：报告分享卡（`ReportShareCardView`，固定 1080×1350 离屏画布）使用
-48 / 36 / 96 等放大字号。它是导出到外部尺寸的位图，不参与应用内排版权重，
-故不遵守应用内五档。除该文件外不得出现第六档。
+**没有例外**：报告导出（`ReportImageRenderer`）复用页面同一个 `AnalysisReportView`，
+按窄于桌面窗口的宽度排版后**整体按倍率放大**输出 1080px 宽的位图——放大的是渲染，
+不是字号，导出里的字号仍是上面五档。不要为导出位图另起放大字号的排版。
 
 卡片标题使用 `BodyFontSize` + `WeightTitle`（`card-title` 类），**靠字重而非新字号**拉开层级。
 
@@ -776,7 +776,19 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 （聊天气泡与分析报告页共用同一套，没有第二套原生卡片）。多空文字取色走 `BaseAdaptiveCardParser.DirectionColor`，
 遵循 2.5「红涨绿跌」。
 
-当前接入点：聊天气泡（`ChatMessageAdapter.ShowPlainText` / `ShowRichTextFallback` 互斥门控）。
+**JSON 在边界只提取一次**：模型回复并不总是纯 JSON，常见的是「说明文字 + JSON」，或被 Markdown 的 json 代码块包裹。
+`AdaptiveCardConverter.Convert` 先经 `LlmJsonExtractor` 取出 JSON（容忍前后说明文字与代码块），再交给解析器链；
+UI 层不要再用「是否以 `{` 开头」之类的预判决定尝试与否，否则带说明文字的回复会整条退回原文显示。
+某个解析器认出了产物（必需键齐全）却解析失败时，转换器按解析器隔离，记一条 Warning 并回退为原文——失败要可见，
+不能当成「这不是卡片」悄悄吞掉。
+
+当前接入点：聊天气泡（`ChatMessageAdapter.ShowPlainText` / `ShowRichTextFallback` 互斥门控）。卡片只是展示形态，
+`Content` 保持模型原文，「复制」拿到的仍是全文。
+
+**卡片预览页**：Debug 构建的导航底部有「卡片预览」（`CardPreviewView`），右侧是线上同一套聊天侧栏，
+用虚构样本（`CardPreviewSamples`）按 4 种回复形态渲染全部分析师卡片；改解析器或卡片样式后在这里目测，无需真跑一轮分析。
+页面背后是固定回复的假聊天客户端与隔离的临时库，不触碰真实模型与历史会话；Release 构建不出现该入口。
+`AdaptiveCardConverterTest` 会保证所有样本始终能被解析器识别。
 
 ### 7.8 CopyFeedback 复制反馈
 

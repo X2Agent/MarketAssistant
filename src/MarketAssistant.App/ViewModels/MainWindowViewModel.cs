@@ -163,6 +163,10 @@ public partial class MainWindowViewModel : ViewModelBase
             // 底部固定：设置 / 关于（对齐原型 sidebar nav-bot）
             BottomNavigationItems.Add(new NavigationItemViewModel("设置", "avares://MarketAssistant/Assets/Images/tab_settings.svg", "avares://MarketAssistant/Assets/Images/tab_settings_on.svg", () => _pageViewModelFactory.Create<SettingsPageViewModel>()));
             BottomNavigationItems.Add(new NavigationItemViewModel("关于", "avares://MarketAssistant/Assets/Images/tab_about.svg", "avares://MarketAssistant/Assets/Images/tab_about_on.svg", () => _pageViewModelFactory.Create<AboutPageViewModel>()));
+#if DEBUG
+            // 仅 Debug 构建：分析师卡片预览页（示例回复经真实解析器链渲染），Release 不出现该入口
+            BottomNavigationItems.Add(new NavigationItemViewModel("卡片预览", "avares://MarketAssistant/Assets/Images/tab_analysis.svg", "avares://MarketAssistant/Assets/Images/tab_analysis_on.svg", () => _pageViewModelFactory.Create<Demo.CardPreviewViewModel>()));
+#endif
 
             SyncNavigationSelectionToRootTitle();
         }

@@ -15,6 +15,7 @@ using MarketAssistant.Services.Notification;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.ViewModels;
+using MarketAssistant.ViewModels.Demo;
 using MarketAssistant.ViewModels.Home;
 using MarketAssistant.ViewModels.Trading;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,6 +97,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<BalanceDetailPageViewModel>();
         services.AddTransient<TradeHistoryViewModel>();
         services.AddTransient<ApiKeyConfigViewModel>();
+
+        // 卡片预览页：页面本身在所有配置下编译（Avalonia 总会编译全部 axaml），仅导航入口受 #if DEBUG 限制
+        services.AddTransient<CardPreviewViewModel>();
 
         return services;
     }

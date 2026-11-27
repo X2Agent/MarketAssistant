@@ -13,6 +13,7 @@ MarketAssistant.Agents/
 │   ├── AIAgentToolDrivenOutput.cs     ← 工具驱动 Agent 输出装饰器（工具闸门 + 收尾结构化调用）
 │   ├── StructuredOutputOptions.cs    ← 按服务商模式生成 response_format / Schema 提示词
 │   ├── AnalystNames.cs                ← 分析师 ASCII 名称常量（与 YAML name 一一对应）
+│   ├── AnalystDisplayNameMapper.cs    ← ASCII 名 → 中文显示名（聊天侧栏、Markdown 导出等面向用户的展示共用）
 │   └── Attributes/
 │       ├── RequiredAnalystAttribute.cs   ← 标记必需分析师
 │       └── RequiresToolsAttribute.cs     ← 声明分析师所需工具接口
@@ -66,7 +67,7 @@ MarketAssistant.Agents/
 2. 使用 `[RequiresTools(typeof(IXxxTools))]` 声明所需工具——`AnalystAgentFactory` 会自动按当前 `MarketType` 从 DI 解析。工具缺失时工厂只记错误日志并继续（不会创建失败），分析师会在没有数据的情况下照常出报告；市场模块的注册在运行期是固定的，所以「每个受支持市场都有对应的 Keyed 注册」由 `AnalystRegistrationConsistencyTest` 在测试期保证。某市场没有对应数据时，部分工具可注册空实现（如 A 股的 `NoopOnChainTools`），整个分析师在该市场没有意义则用 `[SupportedMarkets]` 排除。
 3. 可选使用 `[RequiredAnalyst]` 标记为必需分析师。
 4. 分析师的具体实现位于 `MarketAssistant.App.Services/Agents/Analysts/`，本项目只提供基类、属性和结果模型。
-5. **登记清单**——漏掉任一项都是静默降级而非报错（提示词回退到共用配置、信号被当作未知作者丢弃），由 `tests/Analysis/AnalystRegistrationConsistencyTest.cs` 以 `AnalystTypeRegistry` 为准逐项核对：`config/prompts/{market}/{分析师名}.yaml` 提示词（`name` 必须等于类型名去掉 `Agent` 后缀；覆写文件名拼错或所属分析师不支持该市场也会被测试拦下）、`AnalystNames` 常量、`AnalystSignalParser.Parse` 映射（不产出方向性信号的须加入测试内的 `SignalExemptNames` 豁免名单）、`[SupportedMarkets]`（缺省即全市场）、`[RequiresTools]` 声明的接口在每个受支持市场的 Keyed 注册（`IMarketModule`；漏注册的运行期表现只是一条错误日志）。
+5. **登记清单**——漏掉任一项都是静默降级而非报错（提示词回退到共用配置、信号被当作未知作者丢弃、作者名显示成 ASCII 标识），由 `tests/Analysis/AnalystRegistrationConsistencyTest.cs` 以 `AnalystTypeRegistry` 为准逐项核对：`config/prompts/{market}/{分析师名}.yaml` 提示词（`name` 必须等于类型名去掉 `Agent` 后缀；覆写文件名拼错或所属分析师不支持该市场也会被测试拦下）、`AnalystNames` 常量、`AnalystDisplayNameMapper` 中文显示名、`AnalystSignalParser.Parse` 映射（不产出方向性信号的须加入测试内的 `SignalExemptNames` 豁免名单）、`[SupportedMarkets]`（缺省即全市场）、`[RequiresTools]` 声明的接口在每个受支持市场的 Keyed 注册（`IMarketModule`；漏注册的运行期表现只是一条错误日志）。
 
 ### 工具驱动 Agent 的结构化输出契约
 
@@ -102,7 +103,7 @@ MarketAssistant.Agents/
 - **解析失败必须静默降级**：`LlmJsonExtractor.Deserialize` 对无法解析的文本抛 `JsonException`，`Parse` 捕获后返回 `null`——信号提取绝不能阻断报告生成。
 - **失败标记与未知作者不产出信号**：`AnalystFailureMessages` 标记的消息、`CoordinatorAnalyst`（其结论以 `CoordinatorResult` 为准）与不产出方向性字段的分析师（`CryptoMetricsAnalyst`）均返回 `null`。
 - 嵌套子对象（如 `Strategy`、`GrowthValue`、`ShortTermStrategy`）可能被模型输出为 `null` 或整体缺失，读取一律用 `?.`。
-- 新增分析师时：在 YAML `name` 与 `AnalystNames` 注册常量，并在 `AnalystSignalParser.Parse` 的分支中补映射。
+- 新增分析师时：在 YAML `name` 与 `AnalystNames` 注册常量，在 `AnalystDisplayNameMapper` 登记中文显示名，并在 `AnalystSignalParser.Parse` 的分支中补映射。
 
 ### Token 管理
 

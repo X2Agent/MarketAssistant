@@ -151,6 +151,7 @@ public partial class ChatMessageAdapter : ObservableObject
     public ChatMessageAdapter(ChatMessage chatMessage, AdaptiveCardConverter? converter = null)
     {
         _converter = converter;
+        // 给 Content 赋值会触发 OnContentChanged，首次卡片解析由它完成
         Content = chatMessage.Text ?? string.Empty;
         IsUser = chatMessage.Role == ChatRole.User;
         Sender = chatMessage.AuthorName ?? (IsUser ? "用户" : "助手");
@@ -162,8 +163,6 @@ public partial class ChatMessageAdapter : ObservableObject
         if (createdAt.HasValue && createdAt.Value.Offset == TimeSpan.Zero)
             createdAt = createdAt.Value.ToLocalTime();
         Timestamp = createdAt ?? DateTimeOffset.Now;
-
-        TryParseAdaptiveCard(Content);
     }
 
     partial void OnContentChanged(string value)
@@ -179,7 +178,7 @@ public partial class ChatMessageAdapter : ObservableObject
         if (Status is MessageStatus.Streaming or MessageStatus.Sending)
             return;
 
-        if (AdaptiveCard == null && IsJsonContent(value))
+        if (AdaptiveCard == null)
         {
             TryParseAdaptiveCard(value);
         }
@@ -197,7 +196,7 @@ public partial class ChatMessageAdapter : ObservableObject
         if (value is not (MessageStatus.Sent or MessageStatus.Failed))
             return;
 
-        if (AdaptiveCard == null && IsJsonContent(Content))
+        if (AdaptiveCard == null)
         {
             TryParseAdaptiveCard(Content);
         }
@@ -205,23 +204,16 @@ public partial class ChatMessageAdapter : ObservableObject
 
     private void TryParseAdaptiveCard(string content)
     {
-        if (_converter == null || string.IsNullOrWhiteSpace(content))
+        if (_converter?.Convert(content) is not { } card)
             return;
 
-        if (!IsJsonContent(content))
-            return;
-
-        var card = _converter.Convert(content);
-        if (card != null)
-        {
-            AdaptiveCard = card;
-            OnPropertyChanged(nameof(AdaptiveCard));
-            OnPropertyChanged(nameof(IsAdaptiveCard));
-            OnPropertyChanged(nameof(ShowRichText));
-            OnPropertyChanged(nameof(ShowPlainText));
-            OnPropertyChanged(nameof(ShowRichTextFallback));
-            OnPropertyChanged(nameof(CanCopy));
-        }
+        AdaptiveCard = card;
+        OnPropertyChanged(nameof(AdaptiveCard));
+        OnPropertyChanged(nameof(IsAdaptiveCard));
+        OnPropertyChanged(nameof(ShowRichText));
+        OnPropertyChanged(nameof(ShowPlainText));
+        OnPropertyChanged(nameof(ShowRichTextFallback));
+        OnPropertyChanged(nameof(CanCopy));
     }
 
     /// <summary>
@@ -241,28 +233,6 @@ public partial class ChatMessageAdapter : ObservableObject
                 ? DisplaySender
                 : AnalystDisplayNameMapper.GetDisplayName(agentName);
             return $"{displayName} 本次执行失败：{AnalystFailureMessages.ExtractFailureReason(Content)}";
-        }
-    }
-
-    private static bool IsJsonContent(string content)
-    {
-        if (string.IsNullOrWhiteSpace(content)) return false;
-        content = content.Trim();
-
-        if (!((content.StartsWith('{') && content.EndsWith('}')) ||
-              (content.StartsWith('[') && content.EndsWith(']'))))
-        {
-            return false;
-        }
-
-        try
-        {
-            JsonDocument.Parse(content);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
         }
     }
 }

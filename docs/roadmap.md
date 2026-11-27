@@ -47,7 +47,7 @@
 | P0-1 | **AssetPage 多区块**：行情速览 / 技术指标数值面板（MA/MACD/BOLL/KDJ）/ 盘口深度 / 逐笔成交，四区块并行加载、单区块失败只降级自身，页面内直达加自选 / AI 研判 / 告警入口（**2026-10 修订**：A 股逐笔数据源经复核为字段误读，已随数据源修正一并移除，现为 K线/快照/盘口三区块，见 S6） | `b9aa710` / `AShareOrderBookService`（A 股与 Crypto 均接入） |
 | P0-2 | **Token 消耗透明**：报告与进度面板展示按分析师归属的 Token 消耗；设置页按分析师角色配置模型（分级调度）；`AnalysisCacheService` 指纹纳入角色映射防串缓存（同期交付的模型价格表已于 2026-10 移除，见 S4） | `b9aa710` / `453fe00` |
 | P0-3 | **稳定性降级**：10 个页面首屏骨架屏 + 统一 `StateOverlayView`（加载/空/失败+重试）；"无结果"与"数据源不可用"在 UI 可区分；AssetPage 单区块重试 | `b9aa710` |
-| P1-4 | **报告导出**：Markdown（既有）+ 分享图 PNG + PDF 三通道；1080×1350 固定画布离屏渲染，PDF 由同一位图经 SkiaSharp 封装，与分享图视觉一致 | `453fe00` / `ReportShareCardRenderer` |
+| P1-4 | **报告导出**：Markdown（既有）+ 分享图 PNG + PDF 三通道；PNG / PDF 为与页面同源的完整报告长图（复用 `AnalysisReportView` 离屏渲染，1080px 宽、高度随内容，另附关键指标与各分析师详细分析），PDF 由同一位图按 A4 分页（`ReportPdfPager` 切在卡片之间）经 SkiaSharp 封装，与分享图视觉一致 | `453fe00` / `ReportImageRenderer` |
 | P1-5 | **每日 AI 简报**（留存钩子 v1）：首页卡片 + 弹窗，**纯手动触发**（构造仅读缓存）；自选按异动优先纳入，要闻取 100 条带 28~29h 覆盖，Token 预算硬边界；当天按市场缓存复用 SQLite `briefings` 表；`DailyBriefingWindow` 弹窗独立窗口化（在途） | `40f8021` / `DailyBriefingService` |
 | 工程 | **版本号自动对齐（已修复）**：`MarketAssistant.App.csproj` 新增 `ResolveVersionFromGitTag` 编译期自动读取最新 Git Tag，`release.yml` 发版后自动回写 `<FallbackVersion>`，本地打包脚本统一自动解析版本 | `MarketAssistant.App.csproj` / `release.yml` |
 | S1 | **信号采集字段补齐**：分析师级置信度 / 结论周期、报告级 `MarketType`、`reports` 新增 `market_type`/`rating` 可索引列 + 旧库迁移 | `2c89dd2` / `AnalystSignalSnapshot` |

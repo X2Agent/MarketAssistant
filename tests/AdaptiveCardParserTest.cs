@@ -56,6 +56,30 @@ public sealed class AdaptiveCardParserTest
         Assert.AreEqual(expectedColor, ratingBlock.Color);
     }
 
+    /// <summary>
+    /// 提示词示例就把期限词写进补充说明（「中期 6-12 个月」），展示文本不能再叠一层前缀。
+    /// 页面、Markdown 导出、聊天卡片共用 <see cref="CoordinatorResult.DescribeTimeHorizon"/>，三处文本一致。
+    /// </summary>
+    [TestMethod]
+    [TestCategory("Unit")]
+    [DataRow(Duration.MediumTerm, "中期 6-12 个月", "中期 6-12 个月", DisplayName = "补充说明已含期限词")]
+    [DataRow(Duration.MediumTerm, "6-12 个月", "中期 (6-12 个月)", DisplayName = "补充说明不含期限词")]
+    [DataRow(Duration.LongTerm, "", "长期", DisplayName = "无补充说明")]
+    [DataRow(Duration.ShortTerm, "  ", "短期", DisplayName = "补充说明为空白")]
+    public void CoordinatorResult_TimeHorizon_ShouldNotRepeatHorizonLabel(
+        Duration horizon,
+        string description,
+        string expected)
+    {
+        var result = new CoordinatorResult { TimeHorizon = horizon, TimeHorizonDescription = description };
+
+        Assert.AreEqual(expected, result.DescribeTimeHorizon());
+
+        var card = new CoordinatorCardParser().Parse(result);
+        var horizonFact = card.Body.OfType<AdaptiveFactSet>().SelectMany(set => set.Facts).Single(fact => fact.Title == "投资周期");
+        Assert.AreEqual(expected, horizonFact.Value);
+    }
+
     [TestMethod]
     [TestCategory("Unit")]
     public void CryptoMetricsCard_ShouldRenderFourMetricsAndRiskBoxWhenVolatilityIsHigh()
@@ -113,7 +137,7 @@ public sealed class AdaptiveCardParserTest
         Assert.IsFalse(new CryptoMetricsCardParser().TryParse("""{ "MarketCap": {} }""", out _));
     }
 
-    private static IEnumerable<AdaptiveElement> Flatten(IEnumerable<AdaptiveElement> elements)
+    internal static IEnumerable<AdaptiveElement> Flatten(IEnumerable<AdaptiveElement> elements)
     {
         foreach (var element in elements)
         {

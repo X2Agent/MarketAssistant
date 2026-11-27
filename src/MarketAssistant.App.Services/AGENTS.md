@@ -187,6 +187,10 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
 | `Microsoft.SemanticKernel.Connectors.SqliteVec` | `1.74.0-preview` | `Services/ServiceCollectionExtensions.cs` 的 `AddSqliteVectorStore`（库文件 `%APPDATA%/{AppName}/vector.sqlite`）；记录模型 `Rag/TextParagraph.cs`（`[VectorStoreKey/Data/Vector]` 特性），由 `RetrievalOrchestrator`、`RagIngestionService`、`DocumentVectorizationService` 读写 | 特性名、`VectorStore` 抽象与落盘表结构都可能变。升级前备份 `vector.sqlite`，升级后用既有库跑一次入库 + 检索；不兼容时需重建向量库（文档重新导入） |
 | `Microsoft.SemanticKernel.Plugins.Web` | `1.77.0-alpha` | `Infrastructure/Factories/WebSearchService.cs`（Bing / Brave / Tavily 的 `TextSearch`） | 命名空间与 `ITextSearch<TRecord>` 泛型 API 可能调整（编译期显性）。升级后三家提供商各做一次真实搜索，确认 `TextSearchResult` 的 `Name` / `Link` / `Value` 映射仍完整——`GroundingSearchTools` 的结果渲染与外部数据围栏依赖它 |
 
+### 分析师产物在汇聚点规整一次
+
+`AnalysisAggregatorExecutor` 是分析师文本进入下游的**唯一边界**：失败标记原样保留（原因里可能含花括号），其余消息经 `LlmJsonExtractor.TryExtractJson` 规整为首个结果 JSON 再入库 / 转发，取不到 JSON 才保留原文。模型在 JSON 之外加的说明文字、代码围栏、重复输出的第二份，在这里就丢掉，下游（`CoordinatorExecutor` 的反序列化、`AnalystSignalParser`、报告的 `AnalystMessages`、各导出通道）拿到的都是同一份干净结果，不要在各消费方再各自去重 / 清洗——此前正是只有 Markdown 导出把 JSON 之外的残留原样打了出来，才出现「卡片只有一份、导出里重复」的不一致。回归测试：`AnalysisAggregatorExecutorTest.Collect_AnalystTextWithNoise_ShouldStoreOnlyResultJson`、`Collect_FailureMarkerWithBraces_ShouldStayVerbatim`。
+
 ### 分析师结构化信号落库
 
 `CoordinatorExecutor` 生成报告时调用 `AnalystSignalParser.ExtractSignals(reportAnalystMessages)`，把各分析师的结构化 JSON 提取为 `MarketAnalysisReport.AnalystSignals`（解析约定见 `src/MarketAssistant.Agents/AGENTS.md`）。信号随报告由 `ReportArchiveService` 全量序列化持久化，是 M3 回测与分析师绩效统计的数据基础；提取失败仅缺失单项，不阻断报告。
