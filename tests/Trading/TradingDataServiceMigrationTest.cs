@@ -51,6 +51,7 @@ public sealed class TradingDataServiceMigrationTest
         // 交易模块成熟化新增的持久化结构
         await AssertColumnExistsAsync(connection, "trade_records", "slippage_percent");
         await AssertColumnExistsAsync(connection, "trade_records", "realized_pnl");
+        await AssertColumnExistsAsync(connection, "trade_records", "reduce_only");
         await AssertColumnExistsAsync(connection, "daily_stats", "consecutive_losses");
         await AssertTableExistsAsync(connection, "trading_control");
         await AssertTableExistsAsync(connection, "shadow_trades");
@@ -80,6 +81,26 @@ public sealed class TradingDataServiceMigrationTest
         await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM daily_stats", 1L);
         await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM account_snapshots", 1L);
         await AssertRowValueAsync(connection, "SELECT COUNT(*) FROM risk_config", 1L);
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public async Task MigrateDatabaseSchemaAsync_WhenReduceOnlyColumnMissing_AddsColumnWithDefaultFalse()
+    {
+        await using var connection = await CreateLegacyDatabaseAsync();
+        await TradingDataService.MigrateDatabaseSchemaAsync(connection);
+
+        // 模拟金额列已是 TEXT、但尚无 reduce_only 的旧库：这类库不会走金额列重建路径，只能靠 EnsureColumnAsync 补列
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "ALTER TABLE trade_records DROP COLUMN reduce_only";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await TradingDataService.MigrateDatabaseSchemaAsync(connection);
+
+        await AssertColumnExistsAsync(connection, "trade_records", "reduce_only");
+        await AssertRowValueAsync(connection, "SELECT reduce_only FROM trade_records WHERE id = 'record-1'", 0L);
     }
 
     [TestMethod]
