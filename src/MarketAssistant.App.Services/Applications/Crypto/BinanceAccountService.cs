@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Net.Http.Json;
-using System.Text.Json;
-using MarketAssistant.Infrastructure;
 using MarketAssistant.Trading.Abstractions;
 using Microsoft.Extensions.Logging;
 

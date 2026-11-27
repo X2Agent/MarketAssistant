@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Infrastructure.Core;
 
@@ -37,12 +36,11 @@ public static class LlmJsonExtractor
             return default;
 
         var jsonOptions = options ?? JsonSerializerOptions.Web;
-        Exception? lastException = null;
 
         // 第一层：直接解析（最理想情况，LLM 严格遵守了 JSON Schema 输出）
         if (TryDeserialize<T>(rawText, jsonOptions, out var result1, out var ex1))
             return result1;
-        lastException = ex1;
+        var lastException = ex1;
 
         // 第二层：剥离 markdown 代码块（```json ... ``` 或 ``` ... ```）
         var stripped = StripMarkdownCodeFence(rawText);

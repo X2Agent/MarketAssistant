@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MarketAssistant.DataProviders.AShare;
@@ -32,7 +31,7 @@ public sealed record SinaKLineBar(
 /// <b>实测边界（2026-10 本机验证，50 连续 + 30 并发 0 失败，无限流、无需 Referer）</b>：
 /// </para>
 /// <list type="bullet">
-/// <item><paramref name="MaxBarCount"/>：datalen 1~1900 正常，≥2000 返回空（count=0）；</item>
+/// <item><see cref="MaxBarCount"/>：datalen 1~1900 正常，≥2000 返回空（count=0）；</item>
 /// <item>datalen 传 0 会返回<b>全历史</b>，因此调用方必须传正整数，本客户端钳制到 [1, 1900]；</item>
 /// <item>无效代码或非法 scale 时响应为 JSON <c>null</c>（非数组），按「无数据」返回空列表；</item>
 /// <item>scale 取值：240=日、1200=周、7200=月、5/15=分钟。</item>

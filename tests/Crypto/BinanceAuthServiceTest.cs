@@ -1,7 +1,6 @@
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Models;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace MarketAssistant.Tests.Crypto;
 
@@ -20,15 +19,7 @@ public class BinanceAuthServiceTest
     [TestCategory("Unit")]
     public void TestHmacSignature_WithBinanceExample()
     {
-        // Arrange - 使用币安文档中的示例密钥（仅用于测试）
-        var authService = new BinanceAuthService(
-            CreateCredentialStore(TradingMode.LiveSpot,
-                "vmPUZE6mv9SD5VNHk4HlWFsOr6aKE2zvsw0MuIgwCIPy6utIco14y7Ju91duEh8A",
-                "NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j"),
-            TradingMode.LiveSpot,
-            "Binance");
-
-        // Act - 构建币安文档中的示例payload（不包含timestamp，手动测试签名算法）
+        // Act - 使用币安文档中的示例密钥（仅用于测试）与示例payload（不包含timestamp，手动测试签名算法）
         var testPayload = "symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559";
 
         // 使用反射调用私有方法进行测试（仅用于单元测试）

@@ -1,8 +1,6 @@
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Technical;
-using MarketAssistant.Infrastructure.Core;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.PriceAlert;
@@ -114,7 +112,7 @@ public sealed class IndicatorAlertEvaluator : IDisposable
                 var key = (rule.MarketType, symbol, rule.KLineType);
                 if (!metricCache.TryGetValue(key, out var metric))
                 {
-                    metric = await CalculateMetricAsync(rule.MarketType, symbol, rule.KLineType, ct)
+                    metric = await CalculateMetricAsync(rule.MarketType, symbol, rule.KLineType)
                         .ConfigureAwait(false);
                     metricCache[key] = metric;
                 }
@@ -130,7 +128,7 @@ public sealed class IndicatorAlertEvaluator : IDisposable
     }
 
     private async Task<AlertRuleMetric?> CalculateMetricAsync(
-        MarketType market, string symbol, KLineType kLineType, CancellationToken ct)
+        MarketType market, string symbol, KLineType kLineType)
     {
         try
         {

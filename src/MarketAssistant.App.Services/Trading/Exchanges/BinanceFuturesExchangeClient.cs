@@ -1,6 +1,5 @@
 using MarketAssistant.Applications.Crypto;
 using MarketAssistant.Trading.Abstractions;
-using MarketAssistant.Trading.Models;
 using System.Globalization;
 
 namespace MarketAssistant.Services.Trading.Exchanges;

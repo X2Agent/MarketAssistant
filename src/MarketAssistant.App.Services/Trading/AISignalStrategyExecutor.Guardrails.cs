@@ -1,4 +1,3 @@
-using System.Text.Json;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 

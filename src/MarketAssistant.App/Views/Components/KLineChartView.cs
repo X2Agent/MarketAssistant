@@ -7,7 +7,6 @@ using Avalonia.Platform;
 using Avalonia.Styling;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Views.Controls;
-using System.Text.Json;
 
 namespace MarketAssistant.Views.Components;
 

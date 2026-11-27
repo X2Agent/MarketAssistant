@@ -1,8 +1,6 @@
 using MarketAssistant.Agents.Middleware;
 using MarketAssistant.Agents.Trading;
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Agents.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Infrastructure.Factories;
@@ -16,7 +14,7 @@ public interface ITradingAgentFactory
 }
 
 /// <summary>
-/// 交易 Agent 工厂实现。<see cref="MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
+/// 交易 Agent 工厂实现。<see cref="MarketAssistant.Services.Market.MarketContext.CurrentMarket"/> 仅影响界面与分析链路；
 /// 自主交易与工具解析<strong>始终</strong>使用 <see cref="MarketType.Crypto"/> 的 Keyed 注册（现货 Binance），与当前所选市场无关。
 /// </summary>
 public class TradingAgentFactory(

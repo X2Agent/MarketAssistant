@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml.MarkupExtensions;
-using Avalonia.Media;
 
 namespace MarketAssistant.Views.Windows;
 
@@ -40,7 +39,7 @@ public partial class NotificationWindow : Window
     }
 
     /// <summary>
-    /// 设置堆叠槽位，由 <see cref="NotificationService"/> 在显示前分配
+    /// 设置堆叠槽位，由 <see cref="MarketAssistant.Services.Notification.NotificationService"/> 在显示前分配
     /// </summary>
     public void SetStackSlot(int slot) => _slot = Math.Max(0, slot);
 

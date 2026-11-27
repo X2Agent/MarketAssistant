@@ -1,8 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Infrastructure.Core;
-using MarketAssistant.Services.Dialog;
-using MarketAssistant.Services.Trading;
 
 namespace MarketAssistant.ViewModels.Trading;
 

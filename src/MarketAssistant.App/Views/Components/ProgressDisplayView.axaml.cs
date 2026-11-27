@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Styling;
 using MarketAssistant.Agents.MarketAnalysis;
 using MarketAssistant.ViewModels;
 

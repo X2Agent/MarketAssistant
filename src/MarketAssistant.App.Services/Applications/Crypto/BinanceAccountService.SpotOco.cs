@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Net.Http.Json;
-using MarketAssistant.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Crypto;

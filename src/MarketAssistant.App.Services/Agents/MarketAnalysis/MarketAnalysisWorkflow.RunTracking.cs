@@ -194,7 +194,7 @@ public partial class MarketAnalysisWorkflow
 
     /// <summary>
     /// 从工作流 ExecutorId 中提取分析师显示名称。
-    /// 按第一个下划线切出 Name 前缀，再在 <see cref="_agentNameToDisplayName"/> 中查中文显示名。
+    /// 按第一个下划线切出 Name 前缀，再在 <paramref name="agentNameToDisplayName"/> 中查中文显示名。
     /// </summary>
     private static string GetDisplayNameForExecutorId(
         string executorId,

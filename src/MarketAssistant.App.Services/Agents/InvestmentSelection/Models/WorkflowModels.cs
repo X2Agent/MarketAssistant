@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Applications.AssetScreener.Models;
 
 namespace MarketAssistant.Agents.InvestmentSelection.Models;

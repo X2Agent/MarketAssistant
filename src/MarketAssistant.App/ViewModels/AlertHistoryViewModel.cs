@@ -1,11 +1,9 @@
 using System.Collections.ObjectModel;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Services.Market;
-using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels;

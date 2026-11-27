@@ -96,7 +96,6 @@ public class TextChunkingService(ITokenCounter? tokenCounter = null) : ITextChun
 
         private List<string> InternalSplitLines(string text, int maxTokensPerLine, bool trim, string?[] splitOptions)
         {
-            var result = new List<string>();
             text = text.Replace("\r\n", "\n"); // normalize line endings
 
             // 初始列表包含完整文本

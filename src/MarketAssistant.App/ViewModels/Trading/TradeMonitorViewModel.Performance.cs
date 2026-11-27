@@ -1,5 +1,4 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using MarketAssistant.Services.Trading;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.ViewModels.Trading;

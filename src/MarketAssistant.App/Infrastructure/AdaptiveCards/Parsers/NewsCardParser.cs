@@ -37,7 +37,6 @@ public class NewsCardParser : BaseAdaptiveCardParser<NewsEventAnalysisResult>
             hasLeft = true;
             var type = GetEnumDescription(model.EventAnalysis.EventType);
             var nature = GetEnumDescription(model.EventAnalysis.EventNature);
-            var color = DirectionColor(nature);
 
             // 1. 标题加粗
             leftCol.Items.Add(new AdaptiveTextBlock

@@ -54,7 +54,7 @@ public sealed class AnalysisAggregatorExecutorTest
     [TestCategory("Unit")]
     public async Task Collect_AllFailed_ShouldNotDispatchCoordinator()
     {
-        var (aggregator, context, sentBatches, store) = CreateAggregator(expectedAnalystCount: 2);
+        var (aggregator, context, sentBatches, _) = CreateAggregator(expectedAnalystCount: 2);
 
         await DeliverAsync(aggregator, context,
             CreateAssistantMessage("FundamentalAnalyst", AnalystFailureMessages.BuildFailureText("FundamentalAnalyst", "错误A")));
@@ -68,7 +68,7 @@ public sealed class AnalysisAggregatorExecutorTest
     [TestCategory("Unit")]
     public async Task Collect_DuplicateAuthorInSameBatch_ShouldKeepLastMessage()
     {
-        var (aggregator, context, sentBatches, store) = CreateAggregator(expectedAnalystCount: 1);
+        var (aggregator, context, sentBatches, _) = CreateAggregator(expectedAnalystCount: 1);
 
         await DeliverAsync(aggregator, context,
             CreateAssistantMessage("NewsEventAnalyst", "第一版结论"),
@@ -84,7 +84,7 @@ public sealed class AnalysisAggregatorExecutorTest
     [TestCategory("Unit")]
     public async Task Collect_UserRoleMessages_ShouldBeIgnored()
     {
-        var (aggregator, context, sentBatches, store) = CreateAggregator(expectedAnalystCount: 1);
+        var (aggregator, context, sentBatches, _) = CreateAggregator(expectedAnalystCount: 1);
 
         await DeliverAsync(aggregator, context, new ChatMessage(ChatRole.User, "请对标的 000001 进行专业分析，提供投资建议。"));
         Assert.IsEmpty(sentBatches);

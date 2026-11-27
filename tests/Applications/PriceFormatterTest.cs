@@ -1,6 +1,5 @@
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Infrastructure.Core;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Globalization;
 
 namespace TestMarketAssistant.Applications;

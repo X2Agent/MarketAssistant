@@ -1,5 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
-
 namespace MarketAssistant.Applications.Assets;
 
 /// <summary>

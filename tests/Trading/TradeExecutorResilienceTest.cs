@@ -1,4 +1,3 @@
-using System.Net.Http;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Settings;
 using MarketAssistant.Infrastructure.Core;

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using MarketAssistant.Applications.AlertCenter;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;

@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
-using System.Text.Json;
 using MarketAssistant.Services.Trading.Exchanges;
-using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 

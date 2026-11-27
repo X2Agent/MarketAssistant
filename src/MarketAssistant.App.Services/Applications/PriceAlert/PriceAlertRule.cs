@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Charts.Models;
-using MarketAssistant.Infrastructure.Core;
 
 namespace MarketAssistant.Applications.PriceAlert;
 

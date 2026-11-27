@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Sockets;
-using System.Text.Json;
 using MarketAssistant.Applications.AlertCenter;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Trading.Exchanges;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
@@ -575,8 +573,7 @@ public class TradeExecutor(
             }
 
             return await ExecuteApprovedOrderAsync(
-                exchangeClient, modeAtEntry,
-                instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
+                exchangeClient, instrumentSymbol, side, type, quantity, currentPrice, limitPrice,
                 strategyId, aiReasoning, requireClose, ct).ConfigureAwait(false);
         }
         finally
@@ -585,10 +582,6 @@ public class TradeExecutor(
         }
     }
 
-    /// <summary>
-    /// 解析当前活跃客户端快照：RoutingExchangeClient 按当前模式路由，
-    /// 其他实现（单元测试 Mock）原样返回。
-    /// </summary>
     /// <summary>
     /// 紧急平仓（kill switch 的"全部平仓"路径）：绕过风控校验与人工确认——
     /// 紧急场景下等确认等于把用户暴露在风险中——但保留客户端快照一致性、symbol 锁、
@@ -624,8 +617,7 @@ public class TradeExecutor(
             }
 
             return await ExecuteApprovedOrderAsync(
-                exchangeClient, modeAtEntry,
-                instrumentSymbol, side, OrderType.Market, quantity, currentPrice, null,
+                exchangeClient, instrumentSymbol, side, OrderType.Market, quantity, currentPrice, null,
                 EmergencyStopService.EmergencyCloseStrategyId,
                 "紧急停止：全部平仓",
                 requireClose: true,
@@ -637,6 +629,10 @@ public class TradeExecutor(
         }
     }
 
+    /// <summary>
+    /// 解析当前活跃客户端快照：RoutingExchangeClient 按当前模式路由，
+    /// 其他实现（单元测试 Mock）原样返回。
+    /// </summary>
     private static IExchangeClient ResolveClientSnapshot(IExchangeClient client)
         => client is RoutingExchangeClient router ? router.GetActiveClientSnapshot() : client;
 
@@ -678,8 +674,7 @@ public class TradeExecutor(
     internal IExchangeClient ResolveClientSnapshot() => ResolveClientSnapshot(_exchangeClient);
 
     private async Task<TradeResult> ExecuteApprovedOrderAsync(
-        IExchangeClient exchangeClient, TradingMode? modeAtEntry,
-        string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
+        IExchangeClient exchangeClient, string instrumentSymbol, OrderSide side, OrderType type, decimal quantity,
         decimal currentPrice, decimal? limitPrice,
         string strategyId, string? aiReasoning, bool requireClose,
         CancellationToken ct)
@@ -866,8 +861,8 @@ public class TradeExecutor(
 
     /// <summary>
     /// 判断合约交易方向是否为平仓操作。
-    /// 持有多头（PositionAmt > 0）时卖出 = 平多
-    /// 持有空头（PositionAmt < 0）时买入 = 平空
+    /// 持有多头（PositionAmt &gt; 0）时卖出 = 平多
+    /// 持有空头（PositionAmt &lt; 0）时买入 = 平空
     /// 返回 null 表示持仓查询失败、开/平仓无法判定（调用方必须中止下单）。
     /// </summary>
     private async Task<bool?> IsClosePositionAsync(IExchangeClient exchangeClient, string symbol, OrderSide side, CancellationToken ct)

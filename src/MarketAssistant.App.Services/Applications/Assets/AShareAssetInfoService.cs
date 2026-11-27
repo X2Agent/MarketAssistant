@@ -1,7 +1,6 @@
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.Market;
 using MarketAssistant.DataProviders.AShare;
-using MarketAssistant.Infrastructure.Core;
 using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Applications.Assets;

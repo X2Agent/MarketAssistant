@@ -1,7 +1,6 @@
 using MarketAssistant.Infrastructure.Extensions;
 using MarketAssistant.Services.Dialog;
 using MarketAssistant.Services.Notification;
-using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
 

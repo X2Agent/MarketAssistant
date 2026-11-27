@@ -1,12 +1,10 @@
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Assets.Models;
 using MarketAssistant.Applications.History;
 using MarketAssistant.Services.Market;
 using Microsoft.Extensions.Logging;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 
 namespace MarketAssistant.ViewModels.Home;
 

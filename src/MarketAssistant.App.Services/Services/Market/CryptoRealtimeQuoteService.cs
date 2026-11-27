@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using MarketAssistant.DataProviders;
-using MarketAssistant.Infrastructure.Core;
 using static MarketAssistant.Infrastructure.Core.CryptoSymbolConverter;
-using Microsoft.Extensions.Logging;
 
 namespace MarketAssistant.Services.Market;
 
@@ -19,7 +17,7 @@ public sealed class CryptoRealtimeQuoteService : IRealtimeQuoteService
 
     public event Action<string, decimal, decimal>? PriceUpdated;
 
-    public CryptoRealtimeQuoteService(BinanceWebSocketService wsService, ILogger<CryptoRealtimeQuoteService> logger)
+    public CryptoRealtimeQuoteService(BinanceWebSocketService wsService)
     {
         _wsService = wsService;
         _wsService.PriceUpdated += OnWebSocketPriceUpdated;

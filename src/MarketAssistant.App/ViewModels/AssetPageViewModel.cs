@@ -1,15 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
-using MarketAssistant.Applications;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Charts;
 using MarketAssistant.Applications.Charts.Models;
 using MarketAssistant.Applications.Favorites;
 using MarketAssistant.Applications.Market;
 using MarketAssistant.Applications.Market.Models;
-using MarketAssistant.Infrastructure;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Market;
 using MarketAssistant.Services.Navigation;
 using Microsoft.Extensions.Logging;

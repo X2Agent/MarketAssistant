@@ -1,4 +1,3 @@
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;

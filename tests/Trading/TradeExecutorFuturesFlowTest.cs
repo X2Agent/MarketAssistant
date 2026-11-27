@@ -1,4 +1,3 @@
-using System.Net.Http;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;

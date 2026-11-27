@@ -3,11 +3,9 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
-using Avalonia.Threading;
 using MarketAssistant.ViewModels;
 using MdaMarkdown = Markdown.Avalonia.Markdown;
 using System.ComponentModel;
-using System.Text.RegularExpressions;
 
 namespace MarketAssistant.Views.Controls;
 

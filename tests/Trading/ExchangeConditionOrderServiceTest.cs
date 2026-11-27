@@ -1,5 +1,4 @@
 using MarketAssistant.Applications.Settings;
-using MarketAssistant.Infrastructure.Factories;
 using MarketAssistant.Services.Settings;
 using MarketAssistant.Services.Trading;
 using MarketAssistant.Services.Trading.Exchanges;

@@ -1,4 +1,3 @@
-using System;
 using AdaptiveCards;
 using Avalonia;
 using Avalonia.Controls;

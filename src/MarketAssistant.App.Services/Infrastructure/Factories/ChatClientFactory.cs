@@ -1,7 +1,5 @@
 using System.ClientModel;
 using System.Security.Cryptography;
-using System.Text;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;

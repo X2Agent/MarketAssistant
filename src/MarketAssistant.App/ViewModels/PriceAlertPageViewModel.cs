@@ -1,8 +1,6 @@
 using System.Collections.ObjectModel;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using MarketAssistant.Applications;
 using MarketAssistant.Applications.AlertCenter;
 using MarketAssistant.Applications.Assets;
 using MarketAssistant.Applications.Charts.Models;

@@ -1,5 +1,4 @@
 using MarketAssistant.DataProviders;
-using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Trading.Abstractions;
 using MarketAssistant.Trading.Models;
 using Microsoft.Extensions.Logging;
