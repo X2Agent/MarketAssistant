@@ -5,11 +5,9 @@ using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Providers;
 using MarketAssistant.Services.Settings;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
 using OllamaSharp;
 using OpenAI;
-using Polly;
 
 namespace MarketAssistant.Infrastructure.Factories;
 
@@ -59,8 +57,7 @@ public class ChatClientFactory(
     private readonly object _lock = new();
     private readonly Dictionary<ModelRuntimeKey, IChatClient> _clients = [];
 
-    // CreateOllamaClient 为每个 Ollama runtime 裸创建 HttpClient（SDK 不会托管释放），
-    // 必须记入此列表统一释放，否则每个缓存 runtime 悬挂一个连接池
+    // OllamaSharp 不接管外部传入的 HttpClient。
     private readonly List<HttpClient> _httpClients = [];
     private bool _disposed;
 
@@ -164,21 +161,8 @@ public class ChatClientFactory(
     /// </summary>
     private OllamaApiClient CreateOllamaClient(string endpoint, string modelId)
     {
-        var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
-            .AddRetry(new HttpRetryStrategyOptions
-            {
-                MaxRetryAttempts = 3,
-                Delay = TimeSpan.FromSeconds(1),
-                BackoffType = DelayBackoffType.Exponential,
-                UseJitter = true
-            })
-            .Build();
-
-        var httpClient = new HttpClient(new ResilienceHandler(pipeline))
-        {
-            BaseAddress = new Uri(endpoint),
-            Timeout = TimeSpan.FromMinutes(3)
-        };
+        var httpClient = _httpClientFactory.CreateClient("Ollama");
+        httpClient.BaseAddress = new Uri(endpoint);
         _httpClients.Add(httpClient);
 
         return new OllamaApiClient(httpClient, modelId);
