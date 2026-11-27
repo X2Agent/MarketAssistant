@@ -38,10 +38,18 @@
     </Style>
 
     <!-- 聚焦：双环。BoxShadow 只存在于 Border / ContentPresenter 上，
-         故必须打在模板内部 Border 上，不能直接写 TextBox.BoxShadow。 -->
+         故必须打在模板内部 Border 上，不能直接写 TextBox.BoxShadow。
+         Fluent 的聚焦态自带 2px 强调色边框，下面那条普通规则压不住，须在这里一并归零，否则与双环叠成两层。 -->
     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+
+    <!-- 环画在边界之外，而输入类控件及其模板根 DataValidationErrors 默认 ClipToBounds=True，会把外环裁成四个角；
+         聚焦时临时关闭裁剪（与 Button:focus-visible 同一做法）。复合控件要逐层放开，见各自小节。 -->
+    <Style Selector="TextBox:focus, TextBox:focus /template/ DataValidationErrors">
+        <Setter Property="ClipToBounds" Value="False"/>
     </Style>
 
     <Style Selector="TextBox:disabled">
@@ -71,6 +79,10 @@
         <Setter Property="Padding" Value="12,0"/>
         <Setter Property="MinHeight" Value="{StaticResource InputHeight}"/>
     </Style>
+    <!-- 聚焦环由内部 TextBox 画（上方 TextBox 规则），外壳同样默认裁剪，聚焦时放开 -->
+    <Style Selector="AutoCompleteBox:focus-within">
+        <Setter Property="ClipToBounds" Value="False"/>
+    </Style>
 
     <!-- ===== ComboBox ===== -->
     <Style Selector="ComboBox">
@@ -91,8 +103,27 @@
     <Style Selector="ComboBox:pointerover /template/ Border#Background">
         <Setter Property="Background" Value="{DynamicResource SurfaceVariantBrush}"/>
     </Style>
-    <Style Selector="ComboBox:focus /template/ Border#Background, ComboBox:open /template/ Border#Background">
+
+    <!-- 聚焦 / 展开：双环 + 白底，与 TextBox 一致。
+         普通 ComboBox 展开后焦点转入弹层，自身只剩 :dropdownopen；可编辑 ComboBox 的焦点落在内部输入框，
+         自身不会进入 :focus，只有 :focus-within。两种形态展开时都要保持环，所以两个伪类都列（Avalonia 没有 :open）。 -->
+    <Style Selector="ComboBox:focus-within /template/ Border#Background, ComboBox:dropdownopen /template/ Border#Background">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+    <!-- 环画在边界之外：ComboBox 与模板根 DataValidationErrors 默认裁剪，聚焦 / 展开时放开 -->
+    <Style Selector="ComboBox:focus-within, ComboBox:dropdownopen, ComboBox:focus-within /template/ DataValidationErrors, ComboBox:dropdownopen /template/ DataValidationErrors">
+        <Setter Property="ClipToBounds" Value="False"/>
+    </Style>
+    <!-- Fluent 在键盘聚焦（:focus-visible）时会盖一层强调色实心底，与双环冲突 -->
+    <Style Selector="ComboBox:focus-visible /template/ Border#HighlightBackground">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <!-- 可编辑 ComboBox 的外壳才是视觉主体；内部输入框命中上方 TextBox 的悬停 / 聚焦 / 禁用规则时会自己填色并画环，
+         必须退回透明且无环，否则文字区与箭头区出现两层底色、环套环。 -->
+    <Style Selector="ComboBox[IsEditable=True] /template/ TextBox#PART_EditableTextBox:pointerover /template/ Border#PART_BorderElement, ComboBox[IsEditable=True] /template/ TextBox#PART_EditableTextBox:focus /template/ Border#PART_BorderElement, ComboBox[IsEditable=True] /template/ TextBox#PART_EditableTextBox:disabled /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BoxShadow" Value="none"/>
     </Style>
 
     <!-- ===== CheckBox / RadioButton / ToggleSwitch ===== -->
@@ -129,8 +160,24 @@
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
     </Style>
-    <Style Selector="NumericUpDown:focus-within /template/ Border#PART_BorderElement">
+    <!-- 聚焦：外壳是模板内 ButtonSpinner 的无名 Border（输入框与加减按钮同属这一块），白底与双环都画在它上面。
+         加减按钮的底色 TemplateBinding 自 ButtonSpinner，是直角的，会盖住外壳圆角处的环（聚焦时环在右上 / 右下角被切出缺口），
+         聚焦时改成透明，露出外壳的白底。
+         NumericUpDown、ButtonSpinner 及两层模板根 DataValidationErrors 默认裁剪，聚焦时逐层放开。 -->
+    <Style Selector="NumericUpDown:focus-within /template/ ButtonSpinner#PART_Spinner /template/ Border">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         <Setter Property="BoxShadow" Value="{StaticResource FocusRing}"/>
+    </Style>
+    <Style Selector="NumericUpDown:focus-within /template/ ButtonSpinner#PART_Spinner /template/ RepeatButton">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="NumericUpDown:focus-within, NumericUpDown:focus-within /template/ DataValidationErrors, NumericUpDown:focus-within /template/ ButtonSpinner#PART_Spinner, NumericUpDown:focus-within /template/ ButtonSpinner#PART_Spinner /template/ DataValidationErrors">
+        <Setter Property="ClipToBounds" Value="False"/>
+    </Style>
+    <!-- 内部输入框铺满外壳，命中 TextBox 的悬停 / 聚焦 / 禁用规则时同样要退回透明且无环 -->
+    <Style Selector="NumericUpDown /template/ TextBox#PART_TextBox:pointerover /template/ Border#PART_BorderElement, NumericUpDown /template/ TextBox#PART_TextBox:focus /template/ Border#PART_BorderElement, NumericUpDown /template/ TextBox#PART_TextBox:disabled /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BoxShadow" Value="none"/>
     </Style>
     <Style Selector="NumericUpDown:disabled">
         <Setter Property="Opacity" Value="0.45"/>

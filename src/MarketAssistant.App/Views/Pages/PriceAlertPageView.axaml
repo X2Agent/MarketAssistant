@@ -104,6 +104,7 @@
                                           PlaceholderText="{Binding AssetPlaceholderText}"
                                           MaxDropDownHeight="{StaticResource DropDownMaxHeight}"
                                           MinHeight="{StaticResource InputHeight}"
+                                          HorizontalAlignment="Stretch"
                                           IsEnabled="{Binding !IsWatchlistScopeSelected}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate x:DataType="vm:AssetOption">
