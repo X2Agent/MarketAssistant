@@ -151,19 +151,32 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
 
 ### MAF 升级复核清单
 
-以下 7 处代码依赖 MAF 框架内部行为（非稳定契约），升级 `Microsoft.Agents.AI` 版本时必须人工复核并跑 `tests/MarketAnalysisWorkflowMafContractTest.cs`：
+以下 8 处代码依赖 MAF 框架内部行为（非稳定契约），升级 `Microsoft.Agents.AI` 版本时必须人工复核并跑 `tests/MarketAnalysisWorkflowMafContractTest.cs`：
 
 | 依赖点 | 位置 | 失效表象 | 护栏 |
 |--------|------|---------|------|
 | AIAgent 两阶段调用（ChatMessage 转发 → TurnToken 真实执行），进度只统计 TurnToken 阶段 | `MarketAnalysisWorkflow.ExecuteWorkflowAsync` 的 `executingAnalysts` | 进度条瞬间冲满 / 分析师永不标记完成（无异常） | 契约测试（进度不变量断言） |
 | ExecutorId 由 ASCII Name 经 `GetDescriptiveId` 派生，名称→显示名按前缀回查 | `MarketAnalysisWorkflow` 的 `NameToDisplayName` / `GetExecutorNamePrefix` | 显示名错乱、Token 归属"未知" | 契约测试（ExecutorId 前缀断言） |
-| `WithOutputFrom` auto-yield 在流式路径的时序缺陷 → Coordinator 显式 `YieldOutputAsync` | `CoordinatorExecutor.HandleAsync` | 报告丢失（抛"未收到输出"友好错误） | 契约测试（成功返回报告即守护） |
+| `WithOutputFrom` auto-yield 在流式路径的时序缺陷 → Coordinator / 选股 `AnalyzeAssetsExecutor` 显式 `YieldOutputAsync` | `CoordinatorExecutor.HandleAsync`、`AnalyzeAssetsExecutor.HandleAsync` | 报告 / 选股结果丢失（分别抛"未收到输出"/"未返回结果"友好错误） | 报告：契约测试（成功返回报告即守护）；选股：无自动化护栏，升级后跑一次真实选股 |
+| 选股进度依赖 `ExecutorInvokedEvent` / `ExecutorCompletedEvent` 的 ExecutorId 以 Executor 名为前缀 | `InvestmentSelectionWorkflow.ToStep` | 三步状态点不推进（无异常，结果仍正常返回） | 无自动化护栏，升级后跑一次真实选股观察三步推进 |
 | Fan-In barrier 目标执行器异常不以 `ExecutorFailedEvent` 暴露 + 偶发消息路由丢失 | `AnalysisAggregatorExecutor` 宽限降级 | 事件流无声终止 / 降级发送失效 | `MarketAnalysisDegradationTest` |
 | 默认 workflow state scope 跨 Executor 不可见（issue #2162）→ 显式 scope | `AnalysisDispatcherExecutor.QueueStateUpdateAsync` | Coordinator 取不到标的代码，抛错（显性） | 现有构建与降级测试 |
 | `Microsoft.Agents.AI.Compaction` 实验性 API（MAAI001） | `MarketAssistant.Agents` 项目 `Middleware/ConversationCompressionMiddleware.cs` 内的 `ConversationCompactionProviderFactory`（`CompactionProvider` + `SummarizationCompactionStrategy`，文件内 `#pragma warning disable MAAI001` 局部抑制；文件名为历史命名，类型是 `AIContextProvider` 工厂而非中间件） | 编译错误（显性） | 编译 |
 | `AIAgentBuilder.Use` 仅提供 `runFunc` 时流式为批量结果回放；宿主按 `MessageId` 重建响应；`AgentResponse.Messages` 可原位追加、`Usage` 可原位累加 | `AIAgentToolDrivenOutput.RunAsync` | 收尾 JSON 被并入上一条消息 / 收尾调用用量丢失 / NotSupportedException（需改为构造新 AgentResponse） | `tests/ToolDrivenOutputTest.cs`（宿主重建与用量守恒断言） |
 
-**幂等规避**（框架修复后代码照常工作，无需专项测试）：显式 `YieldOutputAsync`、显式 state scope、宽限降级——升级时确认即可，不必改动。
+**幂等规避**（框架修复后代码照常工作，无需专项测试）：显式 `YieldOutputAsync`（Coordinator 与选股 `AnalyzeAssetsExecutor` 各一处）、显式 state scope、宽限降级——升级时确认即可，不必改动。
+
+### AI 选股 / 选币工作流（Agents/InvestmentSelection）
+
+三步确定性流程（生成筛选条件 → 执行筛选 → AI 分析）与 `MarketAnalysisWorkflow` 一样经 `RunStreamingAsync` + `WatchStreamAsync` 消费事件；
+`InvestmentSelectionService` 的三个入口（需求 / 新闻 / 快速策略）都带可选 `IProgress<InvestmentSelectionProgress>`，不传即无进度。
+
+- **进度是工作流的真实阶段，不是定时器假进度**：`ExecutorInvokedEvent` → 该步 `Running`，`ExecutorCompletedEvent` → `Completed`
+  （可带一句结果摘要，如"候选 48 个标的"）。服务层只 `progress?.Report`，不关心线程；UI 侧用 `Progress<T>` 在构造线程（UI）回调。
+- **推荐项的现价与涨跌幅是展示快照**：`AnalyzeAssetsExecutor` 校验通过后把筛选快照的 `Current` / `Pct` 回填到
+  `InvestmentRecommendation.CurrentPrice` / `ChangePercent`，两者带 `[JsonIgnore]`，**不属于 LLM 输出契约**，不要让模型生成它们。
+- **失败与"0 推荐"必须可区分**：事件流未产出结果抛 `FriendlyException`（"未返回结果"），不要伪装成默认的 0 推荐结果；
+  取消靠 `CancellationToken` 贯穿到模型调用，UI 取消后丢弃结果。
 
 ### 预发布依赖升级关注点
 
@@ -252,7 +265,7 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
   方向驱动后，**硬性边界与影子退出的持仓方向必须从本地账本解析**
   （`ResolveIsLongPositionAsync` / `RecordShadowExitAsync` 按方向分列结算），
   不得再用 `strategy.Side`——合约下 AI 反向开空后 Side 已不代表持仓方向。
-- **护栏不得被二次覆盖**：`ApplyGuardrailsAsync` 先查该策略自身是否有未平仓持仓，
+- **护栏不得被二次覆盖**：以下单前该策略自身是否有未平仓持仓区分首次建仓与加仓，
   有则保留原止损止盈价、并把数量对齐到该策略全部未平余量（只写增量会让原有仓位
   失去交易所侧保护）。用新价重算会静默抬高/压低已有仓位的止损。
 - **订单类型必须是显式映射**：`BinanceExchangeClient.ToExchangeOrderType` 的 switch
@@ -260,8 +273,8 @@ OpenAI 协议客户端（`ChatClientFactory.CreateOpenAIClient`）的 SDK 级重
   交易所拒单后只在日志留一条 warning，表现为"策略看起来有止损、实际没有"。
   回归测试：`ExchangeOrderTypeMappingTest`。
 - **下单幂等由"回查收敛"保证，不依赖交易所去重**：普通下单 `clientOrderId` 每次调用
-  随机生成（同一次调用内重试复用同一 ID），网络重试耗尽后必须先用
-  `GetOrderByClientOrderIdAsync` 按同一 ID 回查再决定是否失败。**不要改成按业务键确定性
+  随机生成并在提交前作为本地记录主键落库。结果不确定时只用
+  `GetOrderByClientOrderIdAsync` 查单，不重发 POST；未决意图阻止同标的再次提交。**不要改成按业务键确定性
   派生**：交易所只对未完结订单按幂等 ID 去重，且同键合法重复下单（手动二连、网格震荡
   再触发）会被误判成重复，拿到上一笔订单的结果。条件单的 `MC` 前缀 ID 除外——
   策略+腿与订单 1:1 映射，确定性 ID 正是对账所依赖的。

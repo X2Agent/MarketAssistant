@@ -51,6 +51,17 @@ MarketAssistant 是面向专业投资者的 AI 原生市场工作站，横跨 A 
 
 **纪律**：一个视图内原则上只出现一个 `btn-primary`。次要按钮一律用中性色阶，不得使用第二个彩色。
 
+- 「一个视图」按用户同时看到的屏幕算：左右分栏、固定底栏、抽屉都算同一视图。
+  MCP 页的「添加服务器」与「保存」、设置页的「浏览」与「保存」、API 密钥页的「应用此模式」与「保存密钥」
+  都曾因此同屏出现两个主按钮。
+- 主次随状态切换时，用互斥的条件类，不要让两个按钮同时是主按钮：
+  `Classes.btn-primary="{Binding !IsEditing}"` + `Classes.btn-secondary="{Binding IsEditing}"`
+  （MCP 页的「添加服务器」：没有编辑表单时是主操作，编辑时让位给「保存」）。
+- 实底的绿色 / 橙色按钮（`success` / `warning`）**已下线**：成功、警告语义交给 `StatusBanner`、语义图标与标签表达，
+  「检查更新」这类常驻的中性操作用 `btn-secondary`，发现新版本后出现的「下载更新」才是主操作。
+- `App.axaml` 锁定了 `FluentTheme` 调色板的 `Accent`（`FluentTheme.Palettes`）：Fluent 自带的复选框、单选框、
+  进度条与选中态默认跟随 Windows 个性化强调色，不锁定就会偏离 `#0066FF`。
+
 ### 2.2 中性色阶（浅色）
 
 层次完全由相邻层的极小色差产生，这是"无边框也能分层"的原理。
@@ -102,9 +113,26 @@ MarketAssistant 是面向专业投资者的 AI 原生市场工作站，横跨 A 
 | `ErrorBrush` | `#DC2626` | 错误、危险 |
 
 **纪律**：语义色不得用于图标底色、装饰块、品牌表达。涨跌色只出现在数值本身与涨跌标签上。
-状态标签（一次性 / 已触发 / 紧急）用 12% 语义底 + 同色字，见 7.5；不要用语义色实底。
+状态标签（一次性 / 已触发 / 紧急）用 12% 语义底 + **配对文字令牌**（不是语义主色本身），见 7.5 与 7.18；不要用语义色实底。
 
-涨跌标签使用 12% 透明度色块 + 同色文字（`BullishTagBackgroundBrush` 等），不使用描边。
+涨跌标签使用 12% 透明度色块 + 配对文字（`BullishTagBackgroundBrush` + `BullishTagTextBrush` 等），不使用描边。
+
+**为什么字色不能直接用 `BullishBrush` / `WarningBrush`**：语义主色是为"落在白卡 / 深卡上的数值"挑的，
+叠在自己的 12% 底上对比度只有约 2.8–3.1:1，低于 12px 文字要求的 4.5:1。标签、评级徽标、告警条件值一律用下表的配对令牌；
+`tools/contrast-audit.ps1` 按「12% 底合成到卡片 / 次级面」逐项校验，两种主题均 ≥ 4.5：
+
+| 语义 | 底 | 字 |
+|---|---|---|
+| 中性 | `NeutralTagBackgroundBrush` | `TextSecondaryBrush` |
+| 提示 | `InfoTagBackgroundBrush` | `InfoPanelTextBrush` |
+| 成功 / 低风险 | `SuccessTagBackgroundBrush` | `SuccessPanelTextBrush` |
+| 警告 | `WarningTagBackgroundBrush` | `WarningPanelTextBrush` |
+| 危险 / 高风险 | `DangerTagBackgroundBrush` | `DangerPanelTextBrush` |
+| 涨 / 买入 | `BullishTagBackgroundBrush` | `BullishTagTextBrush`（浅 `#BE2A30` / 暗 `#FF6B70`） |
+| 跌 / 卖出 | `BearishTagBackgroundBrush` | `BearishTagTextBrush`（浅 `#166534` / 暗 `#3FCF6F`） |
+
+`BearishTagBackgroundBrush` 与 `SuccessTagBackgroundBrush` 色值相同但**语义不同**，不要合并：
+前者是"跌 / 卖出"，后者是"低风险 / 已配置"这类正向状态，将来换涨跌配色（如国际惯例）时只改前者，成功态不跟着变。
 
 ### 2.6 v2 令牌键已删除
 
@@ -154,6 +182,36 @@ v2 的 `Primary` / `PrimaryBrush` / `PrimaryLightBrush` / `PrimaryDarkBrush` / `
 
 **这是硬性要求**：`FontWeight="Bold"` / `"SemiBold"` 等字面量已全库清除。
 新增代码必须使用 `{DynamicResource WeightTitle}` 形式，否则暗色模式会出现"白字发粗刺眼"。
+
+**中文回退字体实际只有 400 / 700 两档**：Windows 的 `Microsoft YaHei UI`（及多数 CJK 回退字体）没有 500 / 600 字面。
+`SemiBold`（600）稳定落到 Bold；`Medium`（500）却取决于 Avalonia 字体缓存里先加载了哪一档——
+进程里先请求过 ≥600 的中文文字，后面的 500 就会落到 Bold，否则落到 Regular。离屏渲染实测同一份样式在不同场景顺序下，
+`btn-secondary` 文字可以一会儿 Regular、一会儿 Bold。所以：
+
+- 需要**稳定的两档对比**（未读 / 已读、选中 / 未选中）时，用 `WeightBody`（400）对 `WeightTitle`（600），
+  不要拿 `WeightEmphasis`（500）当中间档。
+- `WeightEmphasis` 只用在"略强调"的位置（标签文字、表头、按钮），不依赖它与相邻文字拉开层级。
+- 对比两张离屏渲染图时，字重差异先排除这一点：用同样的场景顺序重渲，再判断是不是样式改动造成的。
+
+**模板内的本地值会被类样式盖掉**：元素带 `Classes`（`body-sm`、`caption`、`num`、`num-sm`、`title`、`card-title`、`body`
+这些排版类都会设字重 / 前景色），又在模板里把**同一属性**写成本地值时，谁生效取决于模板种类与写法（Avalonia 12.1.1 实测）：
+
+| 本地值写法 | `ControlTemplate` | `DataTemplate` | 模板之外 |
+|---|---|---|---|
+| 字面量 / `StaticResource` | 被类样式盖掉 | 本地值生效 | 本地值生效 |
+| `DynamicResource` | 被类样式盖掉 | 被类样式盖掉 | 本地值生效 |
+| `TemplateBinding` | 被类样式盖掉 | — | — |
+| `Binding` | 本地值生效 | 本地值生效 | 本地值生效 |
+
+两种模板互相嵌套时按 `ControlTemplate` 计。被盖掉时编译与运行都不报错，字重和颜色只是静默退回类样式的取值，
+只有逐像素对比才看得出来。需要在带排版类的文字上覆写字重或颜色时，
+在 `UserControl.Styles` 里写一个**具名类**（如 `TextBlock.alert-unread`、`TextBlock.balance-muted`、首页的 `news-title`、
+选币页的 `rec-emphasis`），再用 `Classes` / `Classes.xxx="{Binding ...}"` 套上去——类对类按作用域就近、声明靠后胜出。
+`TradeMonitorView` 的 `near-limit` 是这个写法的范例；本地值若与类样式取值相同，直接删掉。
+
+**脚本守卫**：`tests/Architecture/TemplateStyleOverrideGuardTest.cs` 随 `dotnet test`（含 CI 的 `unit.runsettings`）扫描
+`src/MarketAssistant.App/**/*.axaml`，按上表找出被类样式盖掉的模板内本地值，失败信息直接给出 `文件:行号`、元素、属性与命中的选择器。
+它的匹配刻意保守：只看选择器最后一段、忽略祖先条件，带伪类的样式不参与。遇到误报同样改成具名类，不要放宽测试。
 
 ### 3.3 字体族
 
@@ -292,6 +350,22 @@ DataFontFamily = JetBrains Mono, SF Mono, Consolas, Cascadia Mono, Menlo, monosp
 注意：`BoxShadow` 只存在于 `Border` / `ContentPresenter` 上，因此聚焦环必须打在模板内部
 `Border#PART_BorderElement` 上，不能直接写 `TextBox.BoxShadow`。
 
+**按钮的焦点环（`ButtonStyles.axaml`，所有变体共用）**：`Button` 默认 `ClipToBounds=True`，画在边界之外的环会被裁成四个角，
+所以 `:focus-visible` 时临时关闭裁剪，再把 `FocusRing` 打在 `ContentPresenter` 上；同时全局关闭 Fluent 默认的黑色方框
+`FocusAdorner`。`:focus-visible` 只在 Tab / 方向键导航时出现，鼠标点击不会触发。
+危险确认框把默认焦点放在"取消"上，正是靠这道环让用户看见回车会落在哪个按钮（见 7.10）。
+环不止会被 `Button` 自己裁：祖先链上任何 `ClipToBounds=True` 且尺寸紧贴按钮的容器都会裁掉上下两边——`ItemsControl` 默认就是
+`ClipToBounds=True`，确认弹窗的按钮行高度正好等于按钮高度，所以 `MessageDialogWindow` 的按钮 `ItemsControl` 显式写了 `ClipToBounds="False"`。
+新增"按钮行用 `ItemsControl` 生成"的场景照此处理；截图验收焦点环要放大到按钮四边都看得到。
+
+**输入类控件的焦点环（`FormStyles.axaml`）**：`TextBox` / `AutoCompleteBox` / `ComboBox` / `NumericUpDown` 与按钮同一做法——
+控件及其模板根 `DataValidationErrors` 默认 `ClipToBounds=True`，所以聚焦时（`ComboBox` 还包括下拉展开时）临时关闭裁剪，
+再把 `FocusRing` + `CardBackgroundBrush` 打在铺在内容之下的背景 `Border` 上。Fluent 聚焦态自带的 2px 强调色边框、
+以及 `ComboBox` 键盘聚焦时的强调色实心底（`Border#HighlightBackground`）都要关掉，否则与双环叠成两层。
+复合控件的外壳才是视觉主体：可编辑 `ComboBox` 用 `Border#Background`；`NumericUpDown` 用模板内 `ButtonSpinner` 的无名 `Border`
+（输入框与加减按钮同属这一块）。内部 `TextBox` 的悬停 / 聚焦 / 禁用填色与环一律退回透明、无环；`NumericUpDown` 的加减按钮
+底色是直角的，会盖住外壳圆角处的环，所以聚焦时把按钮底色设为透明。外壳、内层控件和每层 `DataValidationErrors` 要逐层放开裁剪。`Expander.inline` 同样不裁剪（内边距为 0，内容与卡片正文齐边），否则里面输入框的环会被裁掉左 / 右 / 下三边。
+
 ---
 
 ## 六、动效系统
@@ -388,6 +462,7 @@ DataFontFamily = JetBrains Mono, SF Mono, Consolas, Cascadia Mono, Menlo, monosp
 | `btn-primary` | 强调色实底 + 白字 | 页面唯一主操作 |
 | `btn-secondary` | `SurfaceVariantBrush` 底 + 主文字 | 次要操作（无描边） |
 | `btn-ghost` | 透明底，hover 才出底色 | 低优先级、工具栏 |
+| `btn-info` | `SurfaceVariantBrush` 底 + 强调色字 | 设置页的辅助操作（测试连接、浏览、向量化…）：次级强调，不与 `btn-primary` 同级 |
 | `btn-danger` | 危险浅语义底 + 语义字 | 破坏性操作（非实心红，避免抢焦点） |
 | `btn-icon` / `btn-icon-sm` | 纯图标，40 / 32 点击区 | 图标操作 |
 
@@ -422,17 +497,22 @@ DataFontFamily = JetBrains Mono, SF Mono, Consolas, Cascadia Mono, Menlo, monosp
 | disabled | `Opacity` 0.45 |
 
 `CaretBrush` = 强调色；`SelectionBrush` = `SelectedBackgroundBrush`。
-模板内 `Border#PART_BorderElement` 的 `BorderThickness` 必须归零，否则与双环叠加成双层描边。
+模板内 `Border#PART_BorderElement` 的 `BorderThickness` 必须归零，`:focus` 态也要（Fluent 聚焦态自带 2px 强调色边框，普通规则压不住），否则与双环叠加成双层描边。
+聚焦时还要临时关闭裁剪，否则外环只剩四个角，见 5.3。
+
+**可编辑 `ComboBox`**（`IsEditable=True`）：焦点落在内部输入框上，`ComboBox` 自身不进入 `:focus`，聚焦按 `:focus-within` 判定；
+普通 `ComboBox` 下拉展开后焦点转入弹层，自身只剩 `:dropdownopen`（Avalonia 没有 `:open`）。两种形态展开时都要保持焦点环，所以两个伪类都列。
+环与白底画在整块背景（含箭头区）上，内部输入框退回透明、无环。使用处须写 `HorizontalAlignment="Stretch"`，否则宽度随文字变化。
 
 ### 7.3 Card 卡片
 
 | 类名 | 视觉 |
 |---|---|
 | `card` | 白底（暗色 `#161616`）、圆角 12、内边距 20、**无边框无阴影** |
-| `hot-stock-card` | `SurfaceVariantBrush` 底，hover 加深 |
+| `AssetCardView`（控件，非样式类） | 资产卡：首页热门（`Variant=Tile`，`SurfaceVariantBrush` 底、内边距 16）与自选看板（`Variant=Card`，`CardBackgroundBrush` 底、内边距 20）共用，见下文 |
 | `mode-card` | 可选卡片，选中态 `SelectedBackgroundBrush` + `AccentRing` 阴影环（不是 1px 描边） |
 | `rightSection` | 侧栏区块，同 `card` |
-| 页面内自定义（`fav-card` / `q-card` / `rst-card` / `serverCard`） | 各页面自己声明；hover 一律加深色阶、选中用 `AccentRing` |
+| 页面内自定义（`q-card` / `rst-card` / `serverCard`） | 各页面自己声明；hover 一律加深色阶、选中用 `AccentRing` |
 
 **没有通用 `card-interactive`**：它会把 `Cursor=Hand` 塞给任何卡片，让只读卡片看起来可点。
 可点击性由具体卡片的样式类表达。
@@ -440,14 +520,46 @@ DataFontFamily = JetBrains Mono, SF Mono, Consolas, Cascadia Mono, Menlo, monosp
 **`CardView` 控件**：字符串标题 → 16px `WeightTitle`；视图标题走 `Header` 属性。
 v3 移除了标题与内容之间的分隔线，改由标题的 12px 底部外边距（`BottomMargin`）建立间距。
 
+**`AssetCardView` 资产卡**（`Views/Controls/AssetCardView.axaml`）：首页热门资产与自选看板共用同一个控件，
+不再各写一套模板。信息层级两页一致：
+
+| 区域 | 内容 |
+|---|---|
+| 头部 | 名次（仅热门，`#1` 中性标签）｜名称 14（`WeightEmphasis`）+ 代码 · 板块 12｜**操作位** |
+| 价格行 | 现价 24（`num-lg`，**中性色**，是视觉锚点）｜涨跌 12% 语义底标签（红涨绿跌，`PriceChangeColorConverter`） |
+| 指标行 | 仅热门卡：`MetricLabel` + 等宽 `MetricValue`（A 股「净流入」按亿/万缩写，加密货币「交易量」） |
+
+- **价格不着涨跌色**：涨跌由右侧标签表达，价格保持主文字色，才能在一屏里做稳定的视觉锚点。
+- **操作位**是控件的 `Content`（一个 `btn-icon-sm`）：热门卡是空心/实心星切换收藏（**直接切换，无确认框、无成功框**），
+  自选卡是常驻实心星 = 取消自选（仍保留确认框）。控件吞掉操作位里的 `Tapped`，点星标不会冒泡成"打开详情"，
+  页面代码后置不用再写阻止冒泡的处理器。
+- **整卡可点**：用 `controls:Activation.Command` / `CommandParameter`（见 7.16），一处声明同时覆盖点击与键盘（Enter / Space），
+  页面代码后置不再处理 `Tapped` / `KeyDown`；键盘焦点走 `FocusRing`，不画描边。
+- **hover 只加深一档色阶**：`Tile` 的底色（`SurfaceVariantBrush`）在浅色下与 `HoverBackgroundBrush` 同值，
+  所以 `Tile` 的 hover 取 `PressedBackgroundBrush`，`Card` 取 `HoverBackgroundBrush`。操作位按钮在卡片 hover 时改用卡片底色做反馈，
+  两种形态、两套主题下都与卡片 hover 色有可见差。
+- **不发行情请求、不画迷你走势图**：价格与涨跌来自列表数据本身；走势图会让一屏多张卡各发一条 K 线请求，
+  且与"价格是盯盘锚点"的信息层级冲突。
+- 骨架是 `AssetCardSkeleton`（`Variant` / `HasRank` / `HasMetric`），**结构必须与 `AssetCardView` 同步修改**。
+
 ### 7.4 列表与表格
 
 | 类名 | 视觉 |
 |---|---|
 | `nav-list ListBoxItem` | 高度 40，圆角 8，选中 `SelectedBackgroundBrush` + 强调色标签 |
+| `ListBox.plain-list` | 条目自己负责全部视觉（导航项、服务器卡、聊天气泡）：清掉 Fluent 的悬停 / 按下 / 选中底色与内边距 |
 
 `ListBoxItem` 只有基础外观；具体行样式由页面声明（如 `serverCard`、`recent-chip`）。
 通用的 `data-row` / `stock-item` 变体已下线——仓库内零使用，留着只会让人以为"表格行有统一外观"。
+
+**条目要自绘状态就加 `plain-list`**：Fluent 把悬停 / 按下 / 选中的底色画在 `ListBoxItem` 的
+`ContentPresenter#PART_ContentPresenter` 上，只改 `ListBoxItem.Background` 不生效，不清掉就会在条目下面露出一整块
+饱和蓝底（选中）或灰块（悬停），盖住条目自己的状态样式。`plain-list` 在 presenter 上把这些状态清成透明；
+需要状态底色的列表（`nav-list`）在自己的页面 / 窗口样式里再覆盖 presenter。
+
+**`AccentRing` 要留出 4px**：选中环向外延伸 4px（1px 实环 + 3px 半透明晕），而 `ListBoxItem` 的 presenter 与
+`ScrollViewer` 视口都按自身边界裁剪。条目内卡片贴边时选中环只剩底边与四角（`MCPConfigPageView` 曾如此），
+所以列表项里的卡片四周要留 `TinyMargin`（4），列表自身的外边距相应减 4 以保持视觉位置不变。
 
 `DataGrid`：无外框、无竖线，仅水平极浅分隔；表头 12px `WeightEmphasis` + 次级色。
 
@@ -455,16 +567,18 @@ v3 移除了标题与内容之间的分隔线，改由标题的 12px 底部外�
 
 | 类名 | 视觉 |
 |---|---|
-| 涨跌标签 | 12% 语义色底 + 同色 `WeightNumber` 文字，圆角 6，内边距 6,2，无边框 |
-| 状态标签（一次性 / 已触发 / 紧急） | 12% 语义色底（`WarningTagBackgroundBrush` / `DangerTagBackgroundBrush`）+ 同色 `Caption` 文字 |
+| 涨跌标签 | 12% 语义色底 + 配对文字（`BullishTagTextBrush` / `BearishTagTextBrush`），圆角 6，内边距 6,2，无边框；方向类标签（买入 / 卖出 / 多头 / 空头）用 `StatusTag` 的 `bullish` / `bearish` 类 |
+| 状态标签（一次性 / 已触发 / 紧急） | 12% 语义色底（`WarningTagBackgroundBrush` / `DangerTagBackgroundBrush`）+ **配对文字令牌**（`WarningPanelTextBrush` / `DangerPanelTextBrush`）+ `Caption` 文字；一律用 `StatusTag`（7.18） |
 | 代码徽章 | `SurfaceVariantBrush` 底 + 次级文字（非实心强调色） |
 
 **状态标签一律不用语义色实底**：实心 `WarningBrush` / `ErrorBrush` 底 + 白字对比度不足 AA，
 且会在页面上凭空造出第二个高饱和焦点，与「一屏只有一个强调色」冲突。
 
-语义面板同理：**没有通用 `panel-*` 类**，直接给 `Background` 绑定对应的
+语义面板同理：**没有通用 `panel-*` 类**。单行提示一律用 `StatusBanner`（见 7.17）；它装不下的多段结构
+（如交易监控的紧急停止横幅：标题 + 原因 + 说明 + 操作）才手写，直接给 `Background` 绑定对应的
 `XxxPanelBackgroundBrush` 令牌，再配圆角与内边距。提示条的文字必须用配对的 `XxxPanelTextBrush`，
 不要用裸 `WarningBrush` / `ErrorBrush` 配 `SurfaceVariantBrush` 底（跨主题对比度会翻车）。
+`ErrorBackgroundBrush` 已删除（与 `DangerPanelBackgroundBrush` 同值，纯重复），危险底色统一用后者。
 
 ### 7.6 骨架屏
 
@@ -502,7 +616,7 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 把多个 `SkeletonLines` 写进 `Content`：
 
 ```xml
-<!-- 自选卡：代码 12（两行）/ 名称 14 / 价格 24 -->
+<!-- 多段示意：代码 12（两行）/ 名称 14 / 价格 24（资产卡的真实骨架已封装为 AssetCardSkeleton） -->
 <controls:SkeletonCard Variant="Card" Width="290">
     <StackPanel Spacing="10">
         <controls:SkeletonLines Row="Caption" LineWidths="52,40" Spacing="2"/>
@@ -585,7 +699,7 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 |---|---|
 | `Row` | 行高档位 `Caption`(18) / `BodySm`(21) / `Body`(24) / `Title`(32)，高度取 `Spacing.axaml` 行高令牌 |
 | `LineWidths` | 逗号分隔行宽，`*` 撑满；**给了此项时行数以它为准** |
-| `LineCount` | 不写 `LineWidths` 时的行数 |
+| `LineCount` | 不写 `LineWidths` 时的行数。要 N 行撑满的灰条只写 `LineCount="N"`；`LineCount="N" LineWidths="*"` 只会得到 1 行（`*` 是一个条目） |
 | `Spacing` | 段内行间距，默认 6 |
 | `RowHeight` | 覆盖行高，用于非文字占位（盘口档位 20、周期按钮 38） |
 | `LineWidth` + `Orientation="Horizontal"` | 横向一排等宽小块 |
@@ -593,13 +707,20 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 #### 约束
 
 - 骨架只服务首屏（`IsInitialLoading`）；刷新（已有内容）不显示骨架。
+- **骨架只替换数据，不替换静态文字**：页标题、字段名、按钮文案在加载前就已确定，保持真实文字
+  （如资产明细页的标题与副标题）；整页灰条会让用户以为连页面本身都没就绪。
+- 灰条颜色用 `SkeletonBrush`（`Border.skeleton` 已绑定）：浅色与 `SurfaceVariantBrush` 同值；暗色单独取 `#262626`——
+  灰条带 0.55–0.95 的呼吸透明度，暗色下 `SurfaceVariantBrush`（`#1C1C1C`）与 `#161616` 卡片只差 6 级，
+  叠透明度后几乎消失，卡片里的骨架行读不出来。
 - 呼吸 1.6s，Opacity 0.55↔0.95，只用色阶、不用渐变扫光（暗色下扫光像"发光"）。
 - 行宽刻意参差：读起来是"内容即将出现"，等宽等高的一摞灰条则像"表格在加载"。
 - **禁止用 `MinHeight` 猜高度**。`skeleton-text/title/row/card/panel` 已全部下线。
-- **不要复用真实卡片的样式类**（`news-card` / `fav-card`）当骨架容器：会带上 `Cursor=Hand`
+- **不要复用真实卡片的样式类**（`news-card` / `q-card`）当骨架容器：会带上 `Cursor=Hand`
   与 hover 高亮，让占位看起来可点。用 `Variant` 代替。
 - **不要手写 `<Border>` 充当骨架专用的卡片壳**，也不要复用真实卡片的样式类
-  （`news-card` / `fav-card`，会带上 `Cursor=Hand` 与 hover 高亮）。用 `SkeletonCard.Variant`。
+  （`news-card` / `q-card`，会带上 `Cursor=Hand` 与 hover 高亮）。用 `SkeletonCard.Variant`。
+- **资产卡骨架用 `AssetCardSkeleton`**：它是 `AssetCardView` 的结构克隆（内部仍由 `SkeletonCard` 做壳），
+  热门与自选两页的首屏骨架直接引用，不要各自再拼一份。
 - **但骨架在真实卡片内部时不要包 `SkeletonCard`**：例如 `AssetPageView` 右栏的
   `<Border Classes="rightSection">` 本身就是真实卡片（数据到达后仍在），骨架只是填它的内容区。
   再包一层会变成"真实卡里套骨架卡"，双重表面 + 双重内边距。判据：**这个壳在加载完成后还在吗？**
@@ -634,6 +755,23 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 闪一块亮白。`MarkdownStyleFluentTheme` 的所有前景/背景都经 `DynamicResource` 取 Fluent
 主题资源（如 `TextControlForegroundFocused`），随主题切换自动重算。纯文本分支同理，
 `TextBlock` 的前景与字号必须显式绑 `TextPrimaryBrush` / `BodyFontSize`，不能依赖继承。
+
+**直接用 Markdown 引擎（不经 `MarkdownScrollViewer`）时，必须给文档根补 `Markdown_Avalonia_MarkdownViewer`
+类**：样式集的每条选择器都限定在该类之下，类原本由 `MarkdownScrollViewer` 挂上；漏掉它整篇不会报错，
+只是标题、列表、引用、表格、代码块全部不生效，渲染成一团平文本。`RichTextBlock.RenderAsMarkdown` 已处理。
+
+库样式集有几处不属于本设计系统（标题 Light 字重 + 灰色 + 放大、表格满格黑线 + 斑马行、代码块上下粗条、
+行内代码紫调底色），由令牌覆盖层 `Resources/Styles/MarkdownStyles.axaml` 逐条换掉：
+
+| 元素 | 规则 |
+|---|---|
+| 正文前景 | `TextPrimaryBrush`（库靠继承拿 Fluent 纯白，暗色发刺） |
+| 标题 | H1 `TitleFontSize` / H2 `BodyFontSize` / H3、H4 `BodySmFontSize`，字重 `WeightTitle` |
+| 表格 | 只留行分隔线 `BorderBrush`，表头 `AccentSubtleBrush` 淡底，不做斑马行 |
+| 代码块 / 行内代码 | 块：`CardBackgroundBrush` 圆角底；行内：`AccentSubtleBrush` 淡底 |
+
+覆盖层只挂在 `RichTextBlock.Styles` 上、排在库样式集之后（同一属性后加入的样式优先），
+**不要放进 `App.axaml`**：后代选择器会让应用里每个 `TextBlock` 都去匹配祖先类。
 分析师 JSON 产物经 `AdaptiveCardConverter` 解析器链转成 Adaptive Card，统一由 `AdaptiveCardView` 渲染
 （聊天气泡与分析报告页共用同一套，没有第二套原生卡片）。多空文字取色走 `BaseAdaptiveCardParser.DirectionColor`，
 遵循 2.5「红涨绿跌」。
@@ -663,10 +801,39 @@ Huskui 的 `SkeletonContainer` 都要么依赖渐变扫光、要么拖进整套�
 图标尺寸由 `IconSize` 控制，标题用 `card-title`，说明用 `caption`。
 重试按钮为 `btn-secondary btn-sm`（不是主按钮——重试不是页面的主操作）。
 
+**失败必须看得见，且与"空"可区分**：
+
+- 内容区用 `IsReady`（或 `!HasError`）门控，失败时让位给失败视图；只用 `!IsInitialLoading` 门控会让
+  `Failed` 状态下的默认值被当成真实数据展示（设置页、策略配置页曾如此，用户看到的是一份"全默认"的配置）。
+- 例外是交易监控：紧急停止 / 风控链路必须始终可达，不能被失败视图盖住，
+  所以失败时在页面顶部用 Danger `StatusBanner`（带重试）就地提示，其余内容照常保留。
+- 空态与失败态的文案和图标不同；"没有数据"绝不能用来掩盖"加载失败"。
+
 ### 7.10 对话框
 
 居中卡片规范：宽 **440**（400–480 区间），内边距 **24**，圆角 **12**，无边框。
 `MessageDialogWindow` 与 `InputDialogWindow` 均已按此实现。
+
+**危险确认的按钮分级**（`IDialogService.ShowConfirmationAsync` / `ShowCustomDialogAsync` 的 `destructive: true`）：
+
+| | 普通确认 | 危险确认 |
+|---|---|---|
+| 接受钮 | `btn-primary` | `btn-danger`（浅语义底 + 语义字，不是实心红） |
+| 取消钮 | `btn-secondary` | `btn-secondary` |
+| 默认焦点 / `Esc` | 接受钮 | **取消钮**（回车不会误确认；焦点环见 5.3） |
+
+危险确认**不得出现 `btn-primary`**：强调色是"放心去点"的信号。当前走危险确认的操作：删除告警规则 / 聊天会话 / MCP 服务器 / 交易策略、清除 API 密钥、
+切换到实盘模式（设置页与 API 密钥页）、全部平仓。资金相关的人审确认另加 `topmost: true`，避免被全屏应用遮挡后静默超时拒绝。
+确认文案必须写清**连带后果**，不能只问"确定吗"：删除策略会撤销它挂在交易所的止损 / 止盈条件单（监控运行时立即撤销，否则下次启动监控时撤销），
+成交记录与持仓保留；清除密钥会连带清除共享同一组密钥的配对模式（实盘现货 + 合约、Demo 现货 + Futures Testnet）。
+确认框放在 `SafeExecuteAsync` 之前，避免对话框期间页面处于 `IsBusy`。
+
+**自动交易批准窗口**（`TradeApprovalWindow`，`IDialogService.ShowTradeApprovalAsync(TradeApprovalRequest)`）：
+结构化展示"落到哪、买卖什么、多大、为什么、还剩多久"——标题行右侧是交易环境 `StatusTag`（实盘合约 / 现货为 `danger` 红色，提示"真实资金"；
+测试网 / Demo 为 `warning`，提示"不是真实资金"）；订单摘要卡是交易对 + 方向标签（`bullish` / `bearish`）+ 参考价 / 数量 / 名义金额（等宽数字）；
+再往下是触发原因与倒计时进度条。`批准` 是 `btn-primary`，`拒绝` 绑定 `Esc` 且打开后取得焦点。
+**这个窗口只负责展示**：只有点击"批准"才返回 true，拒绝 / `Esc` / 关闭窗口 / 超时 / 无可用窗口一律视为拒绝（fail-closed），
+超时由调用方的取消令牌驱动，窗口内倒计时只是显示——改样式时不要动这条语义。
 
 ### 7.11 通知
 
@@ -819,13 +986,80 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 
 **全库唯一挂载点：资产详情页的「加入自选」。** 刻意不扩散，理由：
 
-- 首页热门资产的收藏会先弹确认框再弹成功框（`HomeAssetService.AddToFavoriteAsync`），
-  烟花会被模态窗压住、延迟到关窗后才播，等于白做。
-- 自选页只有删除，没有新增。
+- 首页热门卡与 AI 选股结果卡的星标是列表里的高频小操作：直接切换，没有确认框也没有成功框
+  （曾经的"确认框 + 成功框"两层模态已删除），一屏多张卡每点一次星都放烟花只会变成噪音。
+- 自选页只有取消，没有新增。
 - **取消收藏不播**：那会读成"操作被撤销得很值得庆祝"。
 
 实现用单个 `Render` + 定时器驱动，而不是给 12 个 `Ellipse` 各挂一套 Animation：
 粒子每帧位置都在变，用动画系统反而要生成大量过渡对象。
+
+### 7.16 Activation 整块可点
+
+`Views/Controls/Activation.cs`：附加行为，给任意 `InputElement`（`Border`、`AssetCardView` 等没有内置键盘激活的元素）
+一处声明点击与键盘激活：
+
+```xml
+<Border controls:Activation.Command="{Binding $parent[UserControl].((vm:HomePageViewModel)DataContext).News.OpenNewsCommand}"
+        controls:Activation.CommandParameter="{Binding}"
+        Focusable="True">
+```
+
+| 约定 | 说明 |
+|---|---|
+| 触发 | `Tapped`，以及聚焦时的 Enter / Space |
+| 键盘 | 元素必须自己声明 `Focusable="True"`，否则永远收不到 `KeyDown` |
+| 命令 | 执行前检查 `CanExecute`；触发后标记事件已处理，不会冒泡成外层的点击 |
+| 参数 | `CommandParameter` 通常绑 `{Binding}`（条目本身），不再用 `Border.Tag` 或代码后置取 `DataContext` |
+| 页面命令 | 条目在 `DataTemplate` 里，用 `$parent[UserControl].((vm:XxxViewModel)DataContext)` 回到页面 VM |
+| 内部操作位 | `AssetCardView` 的操作位（星标）会吞掉自己的 `Tapped`，点星标不会触发整卡命令 |
+| 无障碍 | 同时给元素一个 `AutomationProperties.Name`（条目名称 / 标题），否则读屏只会逐个念出卡内零散文字 |
+
+用到它的地方：首页热门卡 / 最近查看 / 快讯卡、自选看板卡、AI 选股的模式卡与快捷策略卡。
+新增"整块可点"的元素直接用它，不要再写 `Tapped` + `KeyDown` 两个处理器。
+
+### 7.17 StatusBanner 语义提示条
+
+`Views/Controls/StatusBanner.axaml` / `.cs`：单行语义提示（失败条、校验提示、风险提醒）的唯一实现。
+
+| 成员 | 说明 |
+|---|---|
+| `Severity` | `Info` / `Success` / `Warning` / `Danger`；底色、图标、文字色成组切换 |
+| `Message` | 提示文字，`BodySm`，自动换行 |
+| `Content` | 可选，右侧操作槽（如 `重试` 的 `btn-secondary btn-sm`） |
+
+浅语义底 + 同色图标与文字，不描边；底色 / 文字色取成对的 `XxxPanelBackgroundBrush` / `XxxPanelTextBrush`，
+内边距 12、圆角 8，图标放在与正文行高等高的槽里（单行居中、多行对齐首行）。
+可见性由使用点用 `IsVisible` 绑定，不要在页面里再手写内联的语义色条。
+
+### 7.18 StatusTag 状态标签
+
+`Views/Controls/StatusTag.axaml` / `.cs`：状态 / 方向 / 环境标签的唯一实现（此前在十余处各手写一份
+`Border` + `TextBlock`，底色与字色各不相同，且字色用语义主色导致对比度不足）。
+
+| 成员 | 说明 |
+|---|---|
+| `Text` | 标签文字，`Caption` + `WeightEmphasis` |
+| 语义类 | 不加类 = 中性；`info` / `success` / `warning` / `danger`；方向类 `bullish`（红）/ `bearish`（绿） |
+
+- 底 = 12% 语义底，字 = **配对文字令牌**（对应关系与对比度见 2.5），圆角 `TinyCornerRadius`、内边距 `TagPadding`，不描边。
+- 用 `Classes.warning="{Binding IsXxx}"` 按布尔属性切换；**同时带多个语义类时声明靠后的生效**：
+  中性 < info < success < warning < danger < bullish < bearish，所以"默认中性、异常时升级"这类写法不需要互斥绑定。
+- 颜色写在样式里而不是模板里——模板内的属性值是本地值，样式覆盖不了。
+- 用到它的地方：交易页签栏的环境标签、强平级别、策略 / 订单 / 持仓行的状态与方向、规则行与告警历史的标签、
+  AI 选股的风险等级、自动交易批准窗口。新增标签直接用它，不要再手写 `Border` + `TextBlock`。
+
+### 7.19 行内折叠 `Expander.inline`
+
+卡片内部的次要内容（AI 决策推理、告警规则的"高级选项"、交易数据的补充明细）用 `Expander Classes="inline"`：
+不画壳，只留一行可点的次要色小字标题，悬停才出现底色。**裸用 Fluent `Expander` 会在卡片里画出头部与内容区两个描边框**
+（暗色下是纯黑盒子），与"不画边框"冲突；整页级分组仍用 `section-card`。
+
+### 7.20 明细行容器 `WrapPanel.meta`
+
+持仓 / 挂单 / 策略 / 成交记录行的"数量 · 价格 · 手续费"明细：每个字段是一段独立的 `TextBlock`（才能按字段隐藏——
+现货没有强平价、未成交没有均价），容器 `WrapPanel Classes="meta"` 统一给等宽 12px 次要色；一行放不下时整段换行，
+不再出现被省略号截断的数字。
 
 ---
 
@@ -866,8 +1100,9 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
   "设置""关于"是重复信息，只是把内容往下推。
 - **二级页面不写标题**：返回窄条（`BackBarMargin`）里已经有"← + 页面标题"，
   页面内再写标题会出现一屏两个标题。
-- **唯一例外是自选页**：它用 `PageHeaderView` 只是为了承载右侧的
-  「卡片视图 / 表格视图」切换操作槽，标题是操作槽的搭档而非装饰。
+- **例外只有两处，都是因为操作槽里有真实操作**：自选页用 `PageHeaderView` 承载右侧的
+  「卡片视图 / 表格视图」切换；AI 选股 / 选币的**结果态**用它承载「新的选股」（标题「选股结果」，
+  行内说明是需求摘要与生成时间）。标题都是操作槽的搭档而非装饰。
 - **页面标题不进卡片**：`CardView.Header` 只用于区块级标题（如"热门资产"）。
 - **二级页面返回区**：返回按钮 + 页面标题为布局内窄条
   （`BackBarMargin`，根页面折叠为零高度），禁止浮层式返回——浮层会遮挡页面左上角内容。
@@ -887,14 +1122,14 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 
 | 页面 | 布局 | 关键约束 |
 |---|---|---|
-| **首页** | 行情条 / 搜索框 / 最近查看（各占一行）→ 7:5 双列（热门资产 / 7×24 快讯） | 快讯条目用可悬停行，不用独立卡片（避免卡片套卡片） |
-| **自选** | 标题 + 视图切换 → 卡片网格 / 高密度表格 | 价格用 `TitleFontSize` 等宽数字作卡片视觉锚点 |
+| **首页** | 行情条 / 搜索框 / 最近查看（各占一行）→ 7:5 双列（热门资产 / 7×24 快讯） | 快讯条目用可悬停行，不用独立卡片（避免卡片套卡片）。热门资产是两列 `AssetCardView`（`Variant=Tile`）：名次 + 名称/代码 + 星标 + 现价/涨跌 + 指标行（A 股净流入 / 加密货币交易量），星标直接加入/取消自选（无确认框与成功框），见 7.3 |
+| **自选** | 标题 + 视图切换 → 卡片网格 / 高密度表格 | 卡片是共享的 `AssetCardView`（`Variant=Card`），结构与规则见 7.3；价格用 `num-lg` 作盯盘视觉锚点。卡片网格用 `AdaptiveUniformGrid`（`MinColumnWidth=FavCardWidth`、`MaxColumns=4`、`ItemsControl` 必须 `VerticalAlignment="Top"`，否则 `ScrollViewer` 视口高度会把行高均分撑满整屏）等分铺满整行；容器 `PagePaddingCompact`(16) + 条目 `SmallMargin`(8) 合成 24 页边距、卡片间距 16。右上角**操作位**是常驻实心星（取消自选，保留确认框），它**不得与价格同行**，也不得用 hover 位移把价格让开（价格是盯盘锚点，禁用 `TranslateTransform`）。首屏骨架用 `AssetCardSkeleton`，与真实卡同一面板、同一最小列宽 |
 | **资产详情** | 顶部单行（名称+代码 / 价格+涨跌 / 操作）→ K 线主栏 + 右栏 360px（行情数据 + 盘口） | 价格用 `DisplayFontSize`（32px），代码徽章用中性底 |
 | **AI 分析** | 报告主栏（页内无顶部工具栏，`⋮` 更多操作在主窗口返回条右侧，与「← 标题」同行）+ 智能助手遮罩抽屉（`ChatDrawerWidth` 640，贴右边缘浮出） | 报告区不重复标题，标题只由主窗口返回条提供；报告主栏**始终独占整宽**，智能助手以 `DarkOverlayBrush` 遮罩 + 贴边面板（`CardBackgroundBrush` + `ShadowOverlay`，仅左侧两角圆角）叠在其上，点遮罩或抽屉头部关闭按钮收起，不挤压主区。报告页 hero 区承担标的信息行（名称 + 代码徽章 + 生成时间）与置信度；评级徽章是**唯一**携带数据语义色的元素，综合评分与维度进度条一律走主文字 + `AccentBrush`。分析师完整结论只在智能助手里看（按市场渲染 Adaptive Card 与对话上下文），报告页不再重复一份 |
 | **交易** | 页签栏 → 页签内容（状态主卡 → 7:5 双栏） | 见 8.4；页签选中用下划线指示条，状态主卡承载监控开关与紧急动作 |
 | **告警规则** | 固定页签栏（规则 / 历史）→ 创建卡 → 规则列表（可滚动） | 见 8.5 |
 | **设置** | 手风琴分组卡片 + 底部白色操作栏 | 分组卡片用全局 `Expander.section-card`，无边框；页面底色为 `PageBackgroundBrush`，底部栏用 `CardBackgroundBrush` |
-| **AI 选股** | 模式卡片 → 输入区 → 结果区 | 模式卡用 `CardBackgroundBrush`（与页面底色拉开层次）；提示条用语义底，不用 ⚠️ 等 Emoji |
+| **AI 选股 / 选币** | 三态互斥：输入态（模式卡片 → 输入区 → 快捷策略）→ 运行态（内联进度卡）→ 结果态（独占内容区、从页面顶部开始） | 模式卡用 `CardBackgroundBrush`（与页面底色拉开层次）；提示条用语义底，不用 ⚠️ 等 Emoji。**运行态不用整页遮罩**（会盖住刚写的需求且无取消入口）：需求条（摘要 + 已用时 + `取消`）+ 三步进度卡，状态点语言与 `ProgressDisplayView` 一致（运行中 `AccentBrush` + `PulseDot` 呼吸 / 待开始灰点 / 完成绿点），三步对应工作流真实阶段而非定时器假进度；`取消` 用次要按钮（强调色此刻是进度本身）。**失败就地显示**：回到输入态，顶部 `DangerPanel` 失败条 + `重试`，不弹全局模态框；取消静默回到输入态。**结果态**：结果头（`PageHeaderView`：「选股结果」+ 需求摘要与生成时间 + `新的选股`）→ AI 研判（置信度仅在有推荐时显示）→ 推荐卡网格（`AdaptiveUniformGrid`，`MaxColumns=2`）→ 投资建议 / 风险提示；`新的选股` 回输入态、保留输入内容、丢弃结果。0 推荐只给说明与「返回修改条件」，不渲染默认占位文案。推荐卡的操作行钉在卡片底部，星标直接切换（无确认框）。离开页面或切换市场会取消在途运行，结果不跨页保留 |
 
 ### 8.4 交易模块（三个页签共用一套骨架）
 
@@ -909,11 +1144,12 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 2. **栅格**：内容区用 `PageGrid`（12 列）+ `ColumnSpacing="{StaticResource GridGutter}"`。
    常用跨度 `7:5`（主区 : 侧区）。不要写 `ColumnDefinitions="*,12,*"` 这类比例 + 硬编码 gutter。
 3. **卡片**：一律 `CardView`（圆角 12、内边距 20）。筛选栏也是卡片，不要用 8 圆角的裸 `Border`。
-4. **行模板**：策略 / 持仓 / 挂单三种行各有唯一实现，放在
+4. **行模板**：策略 / 持仓 / 挂单 / 成交记录四种行各有唯一实现，放在
    `Views/Components/Trading/`，页签只引用不复制：
-   - `StrategyRowView`（DataContext = `TradingStrategy`，操作按钮经 `Actions` 注入）
-   - `PositionRowView`（DataContext = `PositionInfo`）
-   - `OrderRowView`（DataContext = `ExchangeOrderResult`，含成交进度条）
+   - `StrategyRowView`（DataContext = `TradingStrategy`，操作按钮经 `Actions` 注入；状态用 `StatusTag`，次要信息用 `WrapPanel.meta`）
+   - `PositionRowView`（DataContext = `PositionInfo`；方向用 `bullish` / `bearish` 标签，盈亏按涨跌色）
+   - `OrderRowView`（DataContext = `ExchangeOrderResult`，含成交进度条；市价单没有委托价，价格块整体隐藏而不是显示 `0.00`，由 `HasDisplayPrice` 判定，订单类型由"市价"标签表达）
+   - `TradeRecordRowView`（DataContext = `TradeRecord`；交易历史页与策略执行历史窗口共用）
    行容器统一 `SurfaceVariantBrush` + `TinyCornerRadius` + `SmallCardPadding`。
 5. **三态**：首屏骨架（绑定 `IsInitialLoading`，结构克隆真实布局）+ `StateOverlayView`
    （`ShowLoading="False"`）。空态由各分区自行提示。
@@ -939,6 +1175,38 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
   保证四条进度条左端对齐；不要用 `Auto`（每条标签字数不同会让进度条参差不齐）。
 - **紧急动作的危险方向用 `btn-danger`**（全部平仓），安全方向用 `btn-secondary`（紧急停止）。
 
+**风险可见性（本页是风控仪表盘，状态必须一眼可读）：**
+
+- **交易环境常驻在页签栏右侧**（`TradingPageView`）：实盘合约 / 现货是红色 `danger` `StatusTag`（真实资金），测试网 / Demo 是 `warning`（虚拟资金），
+  `ToolTip` 给完整说明。三个页签共用、始终可见，不要在各页签里再各放一份。
+- **风控进度条有阈值态**：日亏损 / 持仓占比逼近上限时，进度条与数值同时切到警示色（`near-limit` 类，
+  由 `IsDailyLossHigh` / `IsPositionHigh` 驱动）；数值本身始终显示，不只靠色差。
+- **强平风险用级别标签**（`LevelText` → `StatusTag`：紧急 / 警告 / 提示），不再只靠一颗彩色圆点；强平价用次要色等宽数字。
+- **数据陈旧页顶横幅**：币安账户 / 持仓 / 挂单本轮刷新失败时，页面保留上一轮数据，而总资产、风控指标、持仓、挂单全都依赖它，
+  所以用 `StatusBanner`（`Warning`，带"重新加载"）放在页顶，而不是藏在某一张卡里。加载失败的 `Danger` 横幅同理就地提示，
+  不用居中浮层——紧急停止 / 全部平仓必须始终可达。
+- **紧急停止 / 全部平仓 / 解除紧急停止的位置与逻辑不属于样式决策**：只在用户明确要求时调整；全部平仓走危险确认（7.10）。
+
+**数据展示约定：**
+
+- **没有值就别画假值**：市价单没有委托价，未成交没有均价，现货没有强平价——这些字段按"有没有"隐藏（挂单行用 `HasDisplayPrice`，
+  明细行用 `WrapPanel.meta` 逐字段隐藏），不显示 `0.00`。
+- **策略绩效**：胜率 / 总盈亏 / 最大回撤并列。"最大回撤"取各策略回撤的**最大值**而不是求和
+  （不同策略的回撤发生在不同时段，不能相加）。没有平仓成交时给引导文案，加载失败给另一条"绩效加载失败，下次刷新时重试"——
+  "没有数据"不能掩盖"加载失败"。
+- **卡片内的补充明细用 `Expander.inline`**（7.19），不要裸用 `Expander`。
+
+**表单与资产明细：**
+
+- **新建策略抽屉**：策略类型卡 → 风险档案（纯文字分段控件：保守 / 稳健 / 进取 + 一行说明）→ 字段 → 校验提示 → `创建策略`。
+  字段区可滚动，**创建按钮钉在抽屉底部**，窄窗下不溢出。
+- **风控设置分五组**：仓位与下单 / 亏损与频率熔断 / 执行质量 / 合约专用（标题旁注"现货模式下不生效"）/ 实盘准入；
+  组标题 `body-sm` + `WeightTitle`，组内两列网格，保存按钮在最后。14 项限额按"管什么"分组，不再是一整面无差别的输入框墙。
+- **API 密钥页**：交易模式 → API 密钥 → 各模式密钥状态（`已配置` = `success`、`未配置` = 中性 `StatusTag`）；
+  每张卡只讲一件事，不在多处重复"当前模式"。
+- **资产明细**：币种 / 可用 / 冻结 / USDT 估值 / 占比用 `Grid.IsSharedSizeScope` + `SharedSizeGroup`，让表头与每一行逐列对齐；
+  数值列右对齐、等宽数字。
+
 ### 8.5 告警规则页（PriceAlertPage → 规则 / 历史）
 
 ```
@@ -949,7 +1217,7 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 │   创建规则卡（CardBackgroundBrush）                       │
 │     ├ 4 字段（标签在上、控件在下，2×2 网格）              │
 │     ├ 仅提醒一次 + 创建告警（独立一行）                   │
-│     └ 高级选项（裸 Expander，默认收起）                   │
+│     └ 高级选项（Expander.inline，默认收起）               │
 │   列表标题行：标题 + 说明 + 刷新 + 条数                   │
 │   规则行 × N                                             │
 └────────────────────────────────────────────────────────┘
@@ -964,8 +1232,22 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
   混排会让每列宽度由标签字数决定，行与行之间无法对齐。主按钮从字段网格里拿出来，
   与「仅提醒一次」并排成独立一行，避免按钮被挤成与输入框同宽的窄条。
   指标类规则的「K线周期」放第二行首列，不要挤进常用字段那一行。
-- **规则行里的状态标签**（一次性 / 持续 / 已触发）用 7.5 的 12% 语义底 + 同色字，
-  不用语义色实底。
+- **规则行里的标签**用 `StatusTag`（7.18）：`一次性` / `已触发` = `warning`，`持续` 与市场标签 = 中性；不用语义色实底。
+- **条件模板覆盖全部 15 种条件**（`PriceAlertRule.IsUpwardCondition` / `IsDownwardCondition` / `ConditionValueText`）：
+  方向箭头（涨破 / 金叉 / 超买 / 上轨突破 = 红色上箭头；跌破 / 死叉 / 超卖 / 下轨跌破 = 绿色下箭头；量比无方向，不画箭头）
+  + 条件名（`WeightTitle`，方向色取 `BullishTagTextBrush` / `BearishTagTextBrush`）
+  + 目标值（等宽数字；价格类按 `#,##0.########` 显示，低价币种不会被格式化成 `0.00`，涨跌幅带 `%`；
+  金叉 / 死叉 / 布林突破没有目标值，整段隐藏）
+  + 一行 `caption` 的附加条件（K 线周期 / 去抖 / 冷却等，`RuleOptionsText`）。新增条件类型时同步补这三个属性。
+- **删除图标是中性色**（`btn-icon-sm`，图标继承按钮前景：静止中性、悬停加深），不常驻红色；
+  破坏性由删除确认弹窗承担（7.10）。
+- **告警历史行**（`AlertHistoryView`）：左侧 8px 强调点 = 未读（无点 = 已读）；未读标题 `WeightTitle`、已读 `WeightBody`
+  （稳定的两档，见 3.2）；级别用 `StatusTag`（提示 = `info`、警告 = `warning`、紧急 = `danger`）；
+  正文用次要色；末行是等宽 `WrapPanel.meta`：标的 · 市场 · 本地时间；有标的的行右侧给 `AI 归因`。
+- **已读时机**：停留在历史页签期间保留未读标记，**离开历史页签或离开告警页才整体标记已读**
+  （`PriceAlertPageViewModel.OnSelectedTabIndexChanged` / `OnNavigatedFrom` → `AlertHistory.MarkAllReadCommand`，
+  经 `AlertsChanged` 同步刷新导航栏未读徽标）。进入即标记已读会让用户永远看不出哪些是新的。
+  「全部已读」按钮仍可手动触发；命令走 `SafeExecuteAsync`。
 - **「跌幅超」用绿色、「涨幅超」用红色是正确的**：本项目以 A 股与国内用户习惯为准，
   `BullishBrush` 是红、`BearishBrush` 是绿（见 2.5）。不要按欧美惯例"修正"成红跌绿涨。
 - 列表行容器是 `ItemsControl` + `Border`（无整行选中），行内开关**不需要** `PointerPressed` 拦截。
@@ -975,17 +1257,26 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 
 ## 九、图标
 
-- 全部为 SVG 矢量资源，位于 `Assets/Images/`。
+- 两类来源，按"要不要随主题变色"选：
+  - **几何图标**（`Resources/Styles/Geometries.axaml` + `PathIcon`）：状态、箭头、关闭、刷新、GitHub 这类小图标。
+    `Foreground` 绑主题令牌（`TextSecondaryBrush`、`XxxPanelTextBrush`…），明暗主题自动跟随；
+    C# 里用 `DynamicResourceExtension` 绑定。
+  - **SVG 资源**（`Assets/Images/`）：固定配色的功能图标与插画（如暗色可读的 `empty_data.svg`）。
 - **v3 统一配色**：全部图标只用 `#0066FF`（强调）与中性灰（`#5C6470` 未选中 / `#8A93A0` 装饰），
   语义色仅用于 `icon_warning` / `icon_danger` 等语义图标。
 - 移除了旧版的琥珀 `#F7B548`（选中态）、紫 `#512BD4`、浅蓝 `#42A5F5`、橙 `#FF6B35`。
-- 图标尺寸走 `DefaultIconSize`(24) / `SmallIconSize`(20) / `TinyIconSize`(16) 令牌。
+- 图标尺寸走 `DefaultIconSize`(24) / `SmallIconSize`(20) / `TinyIconSize`(16) / `MiniIconSize`(14) 令牌。
+- **语义一图一义，不重复**：价格预警用铃铛 `icon_bell.svg`（警告三角只表达"警告"）；指标用 `icon_chart.svg`
+  （不与 AI 分析的芯片图标混用）。同一个图形已有资源时不再另存一份
+  （`search_icon.svg` 与 `icon_magnifier.svg` 重复已删，`github.svg` 已由 `GithubIcon` 几何取代）。
+- **不用 Emoji 或字形字符（✅ ❌ ⚠ ⇄ ✕ ↑ ↓）表示状态、箭头、关闭**：不同字体回退下渲染不一，也不能随主题着色。
+  行文里的叙述性箭头（"→"）不在此列。
 
 ---
 
 ## 十、可访问性与工程约束
 
-- **不吞异常**，不用 Emoji 表示状态（全部改用 SVG 图标）。
+- **不吞异常**，不用 Emoji 表示状态（用几何图标或 SVG 图标，见第九章）。
 - 所有主题感知资源用 `{DynamicResource}`；`{StaticResource}` 不会随主题切换刷新。
 - `BoxShadow` 只能写在 `Border` / `ContentPresenter` 上。
 - `FontWeight`、配色、字号一律走令牌，禁止字面量。C# 创建的控件同样适用
@@ -1015,7 +1306,16 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 - [ ] 选择控件符合 7.12：有保存按钮的页面用复选框，即时生效才用开关
 - [ ] 没有用两个开关拼出二选一（互斥一律 `RadioButton`）
 - [ ] 阴影只出现在下拉菜单 / 弹窗 / 悬浮通知
-- [ ] 深色模式看过一眼，字重是否发粗
+- [ ] 同屏只有一个 `btn-primary`（左右分栏、固定底栏、抽屉一并算）；没有绿色 / 橙色实底按钮
+- [ ] 整块可点的元素用 `Activation`，没有 `Tapped` + `KeyDown` 两个处理器
+- [ ] 自绘状态的 `ListBox` 加了 `plain-list`；列表项里的 `AccentRing` 卡片四周留了 4px
+- [ ] 单行语义提示用 `StatusBanner`；失败视图没有被"空态"或"默认值"盖住
+- [ ] 状态 / 方向 / 环境标签用 `StatusTag`，字色是配对文字令牌（2.5），没有拿 `BullishBrush` / `WarningBrush` 等语义主色直接写在 12% 底上
+- [ ] 危险确认走 `destructive: true`（接受钮 `btn-danger`、默认焦点在取消），没有出现 `btn-primary` 的删除 / 平仓 / 切实盘确认（7.10）
+- [ ] 需要稳定两档字重对比时用 `WeightBody` 对 `WeightTitle`，没有把 `WeightEmphasis`(500) 当中间档（3.2）
+- [ ] `DataTemplate` / `ControlTemplate` 里要覆写带排版类文字的字重 / 颜色，用 `UserControl.Styles` 里的具名类，而不是元素上的本地值（3.2 的实测表；`TemplateStyleOverrideGuardTest` 会拦）
+- [ ] 状态与箭头图标是几何 / SVG，不是 Emoji 或字形字符
+- [ ] 深色模式看过一眼，字重是否发粗，骨架灰条与空状态插图是否可见
 - [ ] 窄窗（< 1024px）导航收起且图标居中
 - [ ] `tools/verify-resource-keys.ps1` 通过（XAML 与 C# 字符串键均无失效引用）
 
@@ -1025,15 +1325,17 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 
 | 文件 | 内容 |
 |---|---|
-| `Resources/Styles/Colors.axaml` | 强调色、中性阶、语义色、主题字典 |
+| `Resources/Styles/Colors.axaml` | 强调色、中性阶、语义色、骨架色 `SkeletonBrush`、主题字典 |
+| `Resources/Styles/Geometries.axaml` | 状态 / 箭头 / 关闭 / 刷新 / GitHub 几何图标（`PathIcon` 用，随主题着色） |
 | `Resources/Styles/Spacing.axaml` | 字号、字重（主题化）、间距、圆角、控件尺寸 |
 | `Resources/Styles/Elevation.axaml` | 阴影层级、焦点双环 |
 | `Resources/Styles/Motion.axaml` | 时长、缓动、流式动效参数 |
 | `Resources/Styles/ButtonStyles.axaml` | 按钮全部变体与状态；页签 `Button.underline-tab` |
 | `Resources/Styles/FormStyles.axaml` | 输入类控件 |
 | `Resources/Styles/CardStyles.axaml` | 卡片与表面、手风琴壳、涨跌瓦片（无通用语义面板类） |
-| `Resources/Styles/ListStyles.axaml` | ListBoxItem 基础与 DataGrid |
-| `Resources/Styles/SkeletonStyles.axaml` | 骨架屏（`skeleton-line-*` 行高基元） |
+| `Resources/Styles/ListStyles.axaml` | ListBoxItem 基础、`ListBox.plain-list`（条目自绘状态）与 DataGrid |
+| `Resources/Styles/SkeletonStyles.axaml` | 骨架屏（`skeleton-line-*` 行高基元；灰条色取 `SkeletonBrush`） |
+| `Resources/Styles/StatusStyles.axaml` | 任务状态点语言（`Ellipse.PulseDot` 呼吸点），AI 分析进度与 AI 选股运行态共用 |
 | `Resources/Styles/TextStyles.axaml` | 排版类 |
 | `Resources/Styles/ToggleSwitchStyles.axaml` | ToggleSwitch 全局主题（弹性圆点） |
 | `Views/Controls/CardView.axaml` | 卡片控件模板 |
@@ -1046,6 +1348,14 @@ return (_resources?.TryGetResource(key, theme, out value) ?? false) ||
 | `Views/Controls/SkeletonList.cs` | 骨架列表（重复 N 个骨架） |
 | `Views/Controls/SkeletonCard.cs` | 骨架卡片（一个骨架的壳 + 内容） |
 | `Views/Controls/SkeletonLines.cs` | 骨架一段等高灰条 |
+| `Views/Controls/AssetCardView.axaml` / `.cs` | 资产卡（首页热门 `Tile` / 自选 `Card`，操作位 = `Content`） |
+| `Views/Controls/AssetCardSkeleton.axaml` / `.cs` | 资产卡骨架（`AssetCardView` 的结构克隆） |
+| `Views/Controls/PageHeaderView.axaml` / `.cs` | 页头（标题 + 行内说明 + 操作槽），仅自选页与 AI 选股结果头使用 |
+| `Views/Controls/StatusBanner.axaml` / `.cs` | 语义提示条（`Severity` + `Message` + 右侧操作槽），见 7.17 |
+| `Views/Controls/StatusTag.axaml` / `.cs` | 状态 / 方向 / 环境标签（12% 语义底 + 配对文字令牌，语义类切换色调），见 7.18 |
+| `Views/Controls/Activation.cs` | 整块可点附加行为（`Command` / `CommandParameter`，点击 + Enter / Space），见 7.16 |
 | `Views/Components/Trading/StrategyRowView.axaml` | 策略行（配置页 / 监控页共用） |
 | `Views/Components/Trading/PositionRowView.axaml` | 持仓行（含强平价、杠杆、未实现盈亏） |
-| `Views/Components/Trading/OrderRowView.axaml` | 挂单行（含成交进度） |
+| `Views/Components/Trading/OrderRowView.axaml` | 挂单行（含成交进度；无委托价的市价单隐藏价格块） |
+| `Views/Components/Trading/TradeRecordRowView.axaml` | 成交记录行（交易历史页与策略执行历史窗口共用） |
+| `Views/Windows/TradeApprovalWindow.axaml` | 自动交易批准窗口（结构化订单摘要 + 倒计时；fail-closed），见 7.10 |

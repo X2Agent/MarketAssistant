@@ -73,7 +73,7 @@ MarketAssistant.Agents/
 `AnalystAgentBase.CreateInnerAgent` 为挂工具的分析师/协调分析师统一装配 `AIAgentToolDrivenOutput`（闸门 + 收尾结构化），新增分析师无需改动：
 
 - **JsonObject 服务商两段式**：`tools` 与 `response_format` 同请求会被推理后端当作整段输出约束解码，压制工具调用（OpenRouter 已实测复现：模型把调用意图写成 JSON 旁白）。工具回合不携带 `response_format`，Schema 仍写入提示词；最终回复缺可解析 JSON 时，由无工具、带 `response_format` 的收尾调用补结构化，输出经 `LlmJsonExtractor.TryExtractJson` 校验后追加为同作者 Assistant 消息（聚合器同作者取最后一条）。
-- **闸门**：入参与响应里都没有命中自身工具的 `FunctionCallContent` 即抛明确异常——没用过工具的结论不可信；入参也算数，因为协调器的修复重试会把首轮的工具往返随输入带回，此时本轮可以只改写结论而不再调工具。闸门先于收尾调用，保证转换输入是取过数的结论。JsonSchema（OpenAI，服务端约束最终文本）与 Text 模式同样受闸门约束，但不做收尾调用。
+- **闸门**：本轮自身工具调用必须按 CallId 匹配后续无异常的工具结果；正常查无数据也算成功。仅协调器标记的修复请求可以复用入参里的成功往返。空正文直接失败；JsonObject 的首轮和收尾 JSON 都检查报告字段并按目标类型反序列化。JsonSchema 和 Text 模式同样检查工具结果与空正文，不做收尾调用。
 - **收尾调用失败不吞**：统一抛出，分析师走失败隔离降级，协调分析师走修复重试后硬失败。
 - **Token 统计**：收尾调用用量并入 `AgentResponse.Usage`（`UsageDetails.Add`），不塞进消息内容；流式回放时 MAF 把 `Usage` 转为 `UsageContent` 更新，`TokenTrackingMiddleware` 无需为此改动。
 - 装饰器位于管道最内层（`ChatClientAgent` 之上、TokenTracking 之下），中间件顺序契约不变。**流式路径**：`AIAgentBuilder.Use` 只提供 `runFunc`，由 MAF 把批量结果回放为流式更新（不要自写 `runStreamingFunc`），闸门因此先于任何更新执行；宿主随后按 `MessageId` 重建响应，仅当上一条消息也带 `MessageId` 且二者不同才会切分，所以追加的收尾消息必须带独立 `MessageId`、上一条缺省时由装饰器补齐（部分服务商不返回消息 ID），否则 JSON 会被并入上一条 Assistant 文本。

@@ -41,13 +41,8 @@
 
 将枚举值转换为 `[Description]` 特性中指定的描述文本，用于 UI 显示。
 
-### 4. NullableValueConverter
-
-可空值格式化转换器，参数格式 `format|fallback`（如 `"{0:F2}元|--"`）。
-
-### 5. NullableVisibilityConverter
-
-当值为 null 时返回 false，用于 `IsVisible` 绑定。
+> `NullableValueConverter`、`NullableVisibilityConverter` 已删除：可空值的展示文案由 ViewModel 直接给出
+> （空值统一显示"—"），可见性用 Avalonia 内置的 `ObjectConverters.IsNotNull` / `StringConverters.IsNotNullOrEmpty`。
 
 > `ScoreToColorConverter` 已删除。它把评分映射成红/橙/黄/绿五档色值（`#10B981` 等），
 > 这些色值不在 `Colors.axaml` 里，暗色模式也没算过对比度，且一屏同时出现评级实底色块、
