@@ -370,6 +370,22 @@ public sealed class DailyStatsAndHaltStateTest
                 ExchangeOrderId = 88801
             };
             await records.SaveTradeRecordAsync(pendingSell);
+            var partial = new ExchangeOrderResult { OrderId = "88801", Status = "PARTIALLY_FILLED", ExecutedQty = 0.5m, CumulativeQuoteQty = 55m };
+            await using (var fault = new SqliteConnection($"Data Source={tempDbPath}"))
+            {
+                await fault.OpenAsync();
+                using var cmd = fault.CreateCommand();
+                cmd.CommandText = "CREATE TRIGGER reject_order_update BEFORE UPDATE ON trade_records BEGIN SELECT RAISE(ABORT, 'injected failure'); END";
+                await cmd.ExecuteNonQueryAsync();
+                await Assert.ThrowsExactlyAsync<SqliteException>(() => records.ReconcileTradeRecordAsync(pendingSell, partial));
+                Assert.AreEqual(1m, (await positions.GetOpenPositionsAsync("BTCUSDT")).Single().RemainingQuantity);
+                Assert.AreEqual(0, (await dailyStats.GetTodayStatsAsync()).TradeCount);
+                cmd.CommandText = "DROP TRIGGER reject_order_update";
+                await cmd.ExecuteNonQueryAsync();
+            }
+            Assert.AreEqual(5m, (await records.ReconcileTradeRecordAsync(pendingSell, partial)).RealizedPnl);
+            await records.ReconcileTradeRecordAsync(pendingSell, partial);
+            Assert.AreEqual(0.5m, (await positions.GetOpenPositionsAsync("BTCUSDT")).Single().RemainingQuantity);
 
             // 3. 异步对账成交：卖出 1 BTC @ 120 USDT → FIFO 已实现盈亏应为 (120 - 100) * 1 = 20
             var reconciled = await records.ReconcileTradeRecordAsync(pendingSell, new ExchangeOrderResult

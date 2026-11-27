@@ -57,12 +57,6 @@ public sealed class PositionReconciliationService(
         {
             return await ReconcileCoreAsync(ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // 对账失败不得影响交易主链：记录后等下个周期重试
-            _logger.LogWarning(ex, "持仓对账失败，本地账本可能暂时与交易所不一致");
-            return 0;
-        }
         finally
         {
             _gate.Release();
@@ -97,6 +91,7 @@ public sealed class PositionReconciliationService(
             try
             {
                 // 锁内复核：与交易的持仓落库互斥，读到的一定是交易前后的稳定状态
+                if ((await _dataService.GetUnsettledTradeRecordsAsync(key.Symbol, ct)).Count != 0) continue;
                 var freshExchange = await exchangeClient.GetPositionsAsync(key.Symbol, ct)
                     .ConfigureAwait(false);
                 var freshLocal = await _dataService.GetOpenPositionsAsync(key.Symbol, ct)
@@ -111,7 +106,7 @@ public sealed class PositionReconciliationService(
                 if (IsWithinTolerance(freshLocalQty, freshExchangeQty))
                     continue;
 
-                var entryPrice = ResolveEntryPrice(freshExchange.Where(p => p.PositionAmt != 0));
+                var entryPrice = ResolveEntryPrice(freshExchange.Where(p => p.PositionAmt != 0 && (p.PositionAmt > 0) == key.IsLong));
                 await _dataService
                     .ReconcileOpenPositionAsync(key.Symbol, side, freshExchangeQty, entryPrice, ct)
                     .ConfigureAwait(false);
@@ -182,15 +177,16 @@ public sealed class PositionReconciliationService(
 
         // 第一阶段（批量对比）：找"交易所余额比本地账本少"的漂移标的
         var driftedSymbols = new List<(string Symbol, decimal LocalQty, string BaseAsset)>();
-        foreach (var group in localPositions.GroupBy(p => p.Symbol.ToUpperInvariant()))
+        foreach (var group in localPositions.GroupBy(p => CryptoSymbolConverter.ExtractBaseCurrency(p.Symbol)))
         {
             var localQty = group.Sum(p => p.RemainingQuantity);
             if (localQty <= 0)
                 continue;
 
             // 复用统一的计价后缀解析；未匹配到已知后缀时原样返回，与输入相同视为无法映射余额，跳过
-            var baseAsset = CryptoSymbolConverter.ExtractBaseCurrency(group.Key);
-            if (string.Equals(baseAsset, group.Key, StringComparison.OrdinalIgnoreCase))
+            var baseAsset = group.Key;
+            var symbol = group.First().Symbol;
+            if (string.Equals(baseAsset, symbol, StringComparison.OrdinalIgnoreCase))
                 continue;
 
             var exchangeQty = balances.TryGetValue(baseAsset, out var balance) ? balance : 0m;
@@ -200,7 +196,12 @@ public sealed class PositionReconciliationService(
             if (exchangeQty >= localQty || IsWithinTolerance(localQty, exchangeQty))
                 continue;
 
-            driftedSymbols.Add((group.Key, localQty, baseAsset));
+            if (group.Any(p => p.Symbol != symbol))
+            {
+                await RaiseNoticeAsync(symbol, $"{baseAsset} 跨交易对库存不足：账本 {localQty}，余额 {exchangeQty}。无法归属差额，请核对成交。", ct);
+                continue;
+            }
+            driftedSymbols.Add((symbol, localQty, baseAsset));
         }
 
         var corrected = 0;
@@ -214,6 +215,7 @@ public sealed class PositionReconciliationService(
             try
             {
                 // 锁内复核：批量读与写之间可能有新成交改变两侧数量
+                if ((await _dataService.GetUnsettledTradeRecordsAsync(symbol, ct)).Count != 0) continue;
                 var freshAccount = await _exchangeClient.GetAccountInfoAsync(ct).ConfigureAwait(false);
                 var freshBalance = freshAccount.Balances
                     .FirstOrDefault(b => b.Asset.Equals(baseAsset, StringComparison.OrdinalIgnoreCase));

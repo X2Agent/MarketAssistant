@@ -30,6 +30,7 @@ public sealed class TradeExecutorConcurrencyTest
                 OrderId = "1001",
                 Status = "FILLED",
                 ExecutedQty = 0.6m,
+                Price = 100m,
                 RequestedQty = 0.6m
             });
 
@@ -67,6 +68,7 @@ public sealed class TradeExecutorConcurrencyTest
             dataService.Object,
             NullLogger<TradeExecutor>.Instance);
 
+        using var ledger = new OrderLedgerFixture(dataService);
         var first = executor.ExecuteOrderAsync("BTCUSDT", OrderSide.Sell, OrderType.Market, 0.6m, 100m);
         var second = executor.ExecuteOrderAsync("BTCUSDT", OrderSide.Sell, OrderType.Market, 0.6m, 100m);
         var results = await Task.WhenAll(first, second);
@@ -259,8 +261,10 @@ public sealed class TradeExecutorConcurrencyTest
             dataService.Object,
             NullLogger<TradeExecutor>.Instance);
 
+        using var ledger = new OrderLedgerFixture(dataService);
         var result = await executor.ExecuteOrderAsync(
             "BTCUSDT", OrderSide.Sell, OrderType.Market, 0.5m, 100m);
+        persisted = (await ledger.Records.GetTradeRecordsAsync()).Single();
 
         Assert.IsTrue(result.Success, "市价卖出应成交成功");
         Assert.IsNotNull(persisted, "成交记录必须落库");

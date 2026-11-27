@@ -29,6 +29,7 @@ public class GridTradingParams
     /// 每格交易数量
     /// </summary>
     public decimal QuantityPerGrid { get; set; }
+    public decimal RoundTripCostPercent { get; set; } = 0.2m;
 
     /// <summary>
     /// 上次触发的网格价格索引（用于追踪状态）

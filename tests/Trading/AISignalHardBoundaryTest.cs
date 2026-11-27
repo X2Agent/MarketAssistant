@@ -223,6 +223,7 @@ public sealed class AISignalHardBoundaryTest
         settingService.SetupGet(service => service.CurrentSetting).Returns(new UserSetting());
 
         var dataService = new Mock<TradingDataService>(null!, NullLogger<TradingDataService>.Instance);
+        dataService.Setup(d => d.GetUnsettledTradeRecordsAsync(It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync([]);
         // 方向解析走本地账本（ResolveIsLongPositionAsync）：有持仓时必须提供带 StrategyId 的多头行，
         // 否则方向回退到 strategy.Side；无持仓时返回空列表走 Side 兜底
         dataService

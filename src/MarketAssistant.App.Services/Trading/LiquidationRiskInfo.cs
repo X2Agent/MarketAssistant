@@ -15,6 +15,17 @@ public sealed record LiquidationRiskInfo(
 {
     /// <summary>持仓方向展示文本。</summary>
     public string DirectionText => IsShort ? "空头" : "多头";
+
+    /// <summary>级别展示文本；安全级为空，供标签按文本是否存在决定显隐。</summary>
+    public string LevelText => Level switch
+    {
+        LiquidationRiskLevel.Critical => "紧急",
+        LiquidationRiskLevel.Warning => "接近",
+        _ => string.Empty
+    };
+
+    /// <summary>是否紧急级（标签由警告色升级为危险色）。</summary>
+    public bool IsCritical => Level == LiquidationRiskLevel.Critical;
 }
 
 /// <summary>

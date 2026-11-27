@@ -54,12 +54,12 @@ internal sealed class TradingSchemaInitializer(ILogger logger, string? dbPath = 
                 commission_asset TEXT,
                 status INTEGER NOT NULL,
                 binance_order_id INTEGER,
+                reduce_only INTEGER NOT NULL DEFAULT 0,
                 ai_reasoning TEXT,
                 created_at TEXT NOT NULL,
                 completed_at TEXT,
                 slippage_percent TEXT,
-                realized_pnl TEXT,
-                FOREIGN KEY (strategy_id) REFERENCES strategies(id)
+                realized_pnl TEXT
             )
             """,
 

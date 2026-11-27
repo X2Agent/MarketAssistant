@@ -44,7 +44,8 @@ public class TradingStrategyService(TradingDataService dataService)
         RaiseStrategiesChanged();
     }
 
-    public async Task DeleteStrategyAsync(string strategyId, CancellationToken ct = default)
+    /// <remarks>virtual 供策略配置页单元测试替换（确认框取消后不得触达删除）。</remarks>
+    public virtual async Task DeleteStrategyAsync(string strategyId, CancellationToken ct = default)
     {
         await _dataService.DeleteStrategyAsync(strategyId, ct).ConfigureAwait(false);
         RaiseStrategiesChanged();

@@ -20,7 +20,16 @@ internal sealed class PositionRepository(
     {
         await EnsureInitializedAsync();
         await using var conn = await OpenConnectionAsync(ct);
+        using var tx = conn.BeginTransaction();
+        await OpenPositionAsync(position, tx, ct);
+        tx.Commit();
+    }
+
+    internal async Task OpenPositionAsync(Position position, SqliteTransaction tx, CancellationToken ct)
+    {
+        var conn = tx.Connection!;
         await using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = """
             INSERT INTO positions (id, environment, symbol, side, quantity, entry_price, closed_quantity, strategy_id, opened_at)
             VALUES (@id, @environment, @symbol, @side, @qty, @entry, 0, @stratId, @openedAt)
@@ -49,70 +58,74 @@ internal sealed class PositionRepository(
 
         await EnsureInitializedAsync();
         await using var conn = await OpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
+        using var tx = conn.BeginTransaction();
+        var pnl = await ClosePositionFifoAsync(symbol, closeQty, closePrice, side, tx, ct);
+        tx.Commit();
+        return pnl;
+    }
 
-        try
-        {
-            await using var cmd = conn.CreateCommand();
-            cmd.Transaction = (SqliteTransaction)tx;
-            cmd.CommandText = """
+    internal async Task<decimal> ClosePositionFifoAsync(string symbol, decimal closeQty, decimal closePrice,
+        PositionSide side, SqliteTransaction tx, CancellationToken ct, string? gridStrategyId = null)
+    {
+        var conn = tx.Connection!;
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = (SqliteTransaction)tx;
+        cmd.CommandText = """
                 SELECT id, quantity, entry_price, closed_quantity
                 FROM positions
                 WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
+                  AND (@strategy IS NULL OR strategy_id = @strategy OR NOT EXISTS
+                      (SELECT 1 FROM strategies WHERE id = @strategy AND type IN (@gridType, @aiType)))
                 ORDER BY opened_at ASC
                 """;
-            cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-            cmd.Parameters.AddWithValue("@symbol", symbol);
-            cmd.Parameters.AddWithValue("@side", (int)side);
+        cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
+        cmd.Parameters.AddWithValue("@symbol", symbol);
+        cmd.Parameters.AddWithValue("@side", (int)side);
+        cmd.Parameters.AddWithValue("@strategy", (object?)gridStrategyId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@gridType", (int)StrategyType.GridTrading);
+        cmd.Parameters.AddWithValue("@aiType", (int)StrategyType.AISignal);
 
-            var toClose = new List<(string id, decimal available, decimal entryPrice)>();
-            await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        var toClose = new List<(string id, decimal available, decimal entryPrice)>();
+        await using (var reader = await cmd.ExecuteReaderAsync(ct))
+        {
+            while (await reader.ReadAsync(ct))
             {
-                while (await reader.ReadAsync(ct))
-                {
-                    var id = reader.GetString(0);
-                    var qty = ReadDecimal(reader, 1);
-                    var entry = ReadDecimal(reader, 2);
-                    var closed = ReadDecimal(reader, 3);
-                    toClose.Add((id, qty - closed, entry));
-                }
+                var id = reader.GetString(0);
+                var qty = ReadDecimal(reader, 1);
+                var entry = ReadDecimal(reader, 2);
+                var closed = ReadDecimal(reader, 3);
+                toClose.Add((id, qty - closed, entry));
             }
+        }
 
-            decimal realizedPnl = 0;
-            var remaining = closeQty;
+        decimal realizedPnl = 0;
+        var remaining = closeQty;
 
-            foreach (var (id, available, entry) in toClose)
-            {
-                if (remaining <= 0)
-                    break;
+        foreach (var (id, available, entry) in toClose)
+        {
+            if (remaining <= 0)
+                break;
 
-                var closeThis = Math.Min(remaining, available);
-                // 空头平仓时开仓价高于平仓价才盈利，与多头相反
-                realizedPnl += side == PositionSide.Long
-                    ? (closePrice - entry) * closeThis
-                    : (entry - closePrice) * closeThis;
+            var closeThis = Math.Min(remaining, available);
+            // 空头平仓时开仓价高于平仓价才盈利，与多头相反
+            realizedPnl += side == PositionSide.Long
+                ? (closePrice - entry) * closeThis
+                : (entry - closePrice) * closeThis;
 
-                await using var updateCmd = conn.CreateCommand();
-                updateCmd.Transaction = (SqliteTransaction)tx;
-                updateCmd.CommandText = """
+            await using var updateCmd = conn.CreateCommand();
+            updateCmd.Transaction = (SqliteTransaction)tx;
+            updateCmd.CommandText = """
                     UPDATE positions SET closed_quantity = closed_quantity + @close
                     WHERE id = @id
                     """;
-                updateCmd.Parameters.AddWithValue("@close", ToDb(closeThis));
-                updateCmd.Parameters.AddWithValue("@id", id);
-                await updateCmd.ExecuteNonQueryAsync(ct);
+            updateCmd.Parameters.AddWithValue("@close", ToDb(closeThis));
+            updateCmd.Parameters.AddWithValue("@id", id);
+            await updateCmd.ExecuteNonQueryAsync(ct);
 
-                remaining -= closeThis;
-            }
+            remaining -= closeThis;
+        }
 
-            await tx.CommitAsync(ct);
-            return realizedPnl;
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
+        return realizedPnl;
     }
 
     /// <summary>
@@ -288,22 +301,6 @@ internal sealed class PositionRepository(
                 addCmd.Parameters.AddWithValue("@entry", ToDb(exchangeEntryPrice > 0 ? exchangeEntryPrice : 0));
                 addCmd.Parameters.AddWithValue("@openedAt", DateTime.UtcNow.ToString("O"));
                 await addCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-            }
-
-            // 交易所开仓均价是仓位真实成本：本地均价与它不一致时以交易所为准
-            if (exchangeEntryPrice > 0)
-            {
-                await using var priceCmd = conn.CreateCommand();
-                priceCmd.Transaction = (SqliteTransaction)tx;
-                priceCmd.CommandText = """
-                    UPDATE positions SET entry_price = @entry
-                    WHERE environment = @environment AND symbol = @symbol AND side = @side AND (quantity - closed_quantity) > 0
-                    """;
-                priceCmd.Parameters.AddWithValue("@entry", ToDb(exchangeEntryPrice));
-                priceCmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
-                priceCmd.Parameters.AddWithValue("@symbol", symbol);
-                priceCmd.Parameters.AddWithValue("@side", (int)side);
-                await priceCmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             }
 
             await tx.CommitAsync(ct).ConfigureAwait(false);

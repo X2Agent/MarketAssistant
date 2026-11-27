@@ -73,6 +73,9 @@ public class PositionInfo
 
     /// <summary>是否为杠杆持仓（合约）。现货为 false，用于隐藏杠杆与强平价字段。</summary>
     public bool IsLeveraged => Leverage > 0;
+
+    /// <summary>当前价的名称：合约的 <see cref="CurrentPrice"/> 取标记价，现货取最新成交价。</summary>
+    public string CurrentPriceLabel => IsLeveraged ? "标记" : "现价";
 }
 
 [Description("交易执行结果")]
@@ -132,7 +135,9 @@ public enum TradeFailureCategory
     OrderStateUnknown,
 
     [Description("其他失败")]
-    Other
+    Other,
+    PostOnlyWouldTake,
+    Deferred
 }
 
 /// <summary>

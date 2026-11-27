@@ -187,12 +187,16 @@ public sealed class StrategyEngineTriggerTest
         var downCount = down.Count;
         var downSide = downCount > 0 ? down[0].EffectiveSide : default(OrderSide);
         var downQty = downCount > 0 ? down[0].EffectiveQuantity : 0m;
+        ctx.Data.Setup(d => d.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>())).ReturnsAsync([
+            new Position { Symbol = Symbol, StrategyId = strategy.Id, Side = PositionSide.Long, EntryPrice = 94m, Quantity = 0.4m }
+        ]);
         var up = await ctx.Engine.EvaluateAndUpdateStrategiesAsync(Symbol, 106m);
 
         Assert.AreEqual(1, downCount, $"下穿应触发一次，落库参数: {persistedAfterDown}");
         Assert.AreEqual(OrderSide.Buy, downSide, "下穿网格线应买入");
         Assert.AreEqual(1m, downQty);
         Assert.HasCount(1, up);
+        Assert.AreEqual(0.4m, up[0].EffectiveQuantity);
         Assert.AreEqual(OrderSide.Sell, up[0].EffectiveSide, "上穿网格线应卖出");
         Assert.AreSame(strategy, down[0].Strategy, "策略本体不应被改写，仅有效字段承载触发值");
     }

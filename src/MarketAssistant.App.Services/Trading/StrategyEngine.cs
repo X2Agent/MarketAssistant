@@ -347,7 +347,8 @@ public class StrategyEngine
                 // 价格跌破网格下界：检查破网止损
                 if (gridParams.StopLossPrice.HasValue && currentPrice <= gridParams.StopLossPrice.Value)
                 {
-                    var stopQty = gridParams.QuantityPerGrid * gridParams.GridCount;
+                    var stopQty = await GridExitQuantityAsync();
+                    if (stopQty <= 0) return (false, OrderSide.Sell, 0);
                     _logger.LogWarning(
                         "网格破网止损触发: {StrategyId} 价格 {Price} <= 止损位 {StopLoss}，清仓 {Qty}",
                         strategy.Id, currentPrice, gridParams.StopLossPrice, stopQty);
@@ -361,7 +362,8 @@ public class StrategyEngine
                 // 与破网止损方向对称；若反向买入会在高点开出全网格量多头。
                 if (gridParams.TakeProfitPrice.HasValue && currentPrice >= gridParams.TakeProfitPrice.Value)
                 {
-                    var takeQty = gridParams.QuantityPerGrid * gridParams.GridCount;
+                    var takeQty = await GridExitQuantityAsync();
+                    if (takeQty <= 0) return (false, OrderSide.Sell, 0);
                     _logger.LogWarning(
                         "网格破网止盈触发: {StrategyId} 价格 {Price} >= 止盈位 {TakeProfit}，清仓 {Qty}",
                         strategy.Id, currentPrice, gridParams.TakeProfitPrice, takeQty);
@@ -391,6 +393,17 @@ public class StrategyEngine
                 return (false, strategy.Side, strategy.Quantity);
 
             var effectiveSide = currentIndex < gridParams.LastTriggeredIndex ? OrderSide.Buy : OrderSide.Sell;
+            var tradeQty = gridParams.QuantityPerGrid;
+            if (effectiveSide == OrderSide.Sell && _environmentService.CurrentMode is TradingMode.SpotDemo or TradingMode.LiveSpot)
+            {
+                var inventory = (await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct))
+                    .Where(p => p.StrategyId == strategy.Id && p.Side == PositionSide.Long)
+                    .OrderBy(p => p.OpenedAt);
+                var eligible = inventory.TakeWhile(p => currentPrice >= p.EntryPrice + spacing
+                    && currentPrice > p.EntryPrice * (1 + gridParams.RoundTripCostPercent / 100m));
+                tradeQty = Math.Min(tradeQty, eligible.Sum(p => p.RemainingQuantity));
+                if (tradeQty <= 0) return (false, effectiveSide, 0);
+            }
 
             gridParams.LastTriggeredIndex = currentIndex;
             strategy.CustomParams = JsonSerializer.Serialize(gridParams);
@@ -399,7 +412,10 @@ public class StrategyEngine
             _logger.LogInformation(
                 "网格交易触发: {StrategyId} 网格 {Index} → {Side}，价格: {Price}",
                 strategy.Id, currentIndex, effectiveSide, currentPrice);
-            return (true, effectiveSide, gridParams.QuantityPerGrid);
+            return (true, effectiveSide, tradeQty);
+
+            async Task<decimal> GridExitQuantityAsync() => (await _dataService.GetOpenPositionsAsync(strategy.Symbol, ct))
+                .Where(p => p.StrategyId == strategy.Id && p.Side == PositionSide.Long).Sum(p => p.RemainingQuantity);
         }
         catch (Exception ex)
         {

@@ -192,6 +192,12 @@ public class MarketMonitor : IDisposable
                 return;
             }
 
+            if (_tradeExecutor.ResolveClientSnapshot() is Exchanges.BinanceFuturesExchangeClient futures)
+                await futures.EnsureOneWayModeAsync(CancellationToken.None);
+
+            await _orderStateSyncService.SyncPendingOrdersAsync(force: true).ConfigureAwait(false);
+            await _positionReconciliationService.ReconcileAsync().ConfigureAwait(false);
+
             _cts = new CancellationTokenSource();
             _isRunning = true;
 
@@ -205,25 +211,13 @@ public class MarketMonitor : IDisposable
                 await _webSocketService.SubscribeAsync(WebSocketSubscriberKeys.MarketMonitor, instrumentSymbols);
 
             _webSocketService.PriceUpdated += _priceUpdatedAdapter;
-            _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
             _userDataStreamService.OrderUpdate += OnOrderUpdate;
             await _userDataStreamService.StartAsync();
 
-            // 持仓对账必须先于任何策略评估：本地账本可能在应用关闭期间与交易所漂移
-            // （外部手动平仓、条件单成交），不先校准就用它算风控可用量与 DCA 均价，
-            // 会让第一笔交易就建立在错的持仓上。失败只记日志，不阻塞监控启动。
-            try
-            {
-                await _positionReconciliationService.ReconcileAsync(_cts.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _logger.LogWarning(ex, "启动时持仓对账失败，将在后续周期重试");
-            }
-
             // 条件单对账：启动即对账一次（接管重启前的交易所挂单），之后周期补挂/撤孤儿单
             await _conditionOrderService.StartAsync();
+            _consumerTask = Task.Run(() => ConsumePriceUpdatesAsync(_cts.Token));
 
             // 周期持仓对账：长会话期间交易所侧成交不会实时进入本地账本，需定期收敛
             _reconciliationTask = Task.Run(() => RunPositionReconciliationLoopAsync(_cts.Token));
@@ -761,6 +755,13 @@ public class MarketMonitor : IDisposable
             await _conditionOrderService
                 .CancelSiblingLegsAsync(strategy.Id, record.Symbol, record.ExchangeOrderId, MonitorToken)
                 .ConfigureAwait(false);
+
+            if (strategy.Type == StrategyType.AISignal && (await _dataService.GetOpenPositionsAsync(record.Symbol, MonitorToken))
+                .Any(p => p.StrategyId == strategy.Id && p.RemainingQuantity > 0))
+            {
+                _conditionOrderService.ClearLiveOrder(strategy.Id);
+                return;
+            }
 
             await _strategyService.UpdateStrategyStatusAsync(strategy.Id, StrategyStatus.Completed, MonitorToken);
             await _strategyEngine.ClearPeakPriceAsync(strategy.Id);

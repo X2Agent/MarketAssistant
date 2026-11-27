@@ -113,6 +113,7 @@ public class RiskCheckResult
 {
     public bool Passed { get; set; }
     public bool NeedsConfirmation { get; set; }
+    public bool Deferred { get; init; }
     public string? Reason { get; set; }
 
     public static RiskCheckResult Pass() => new() { Passed = true };

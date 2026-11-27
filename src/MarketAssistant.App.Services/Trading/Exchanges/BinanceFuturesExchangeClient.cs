@@ -15,11 +15,15 @@ public sealed class BinanceFuturesExchangeClient(
 {
     private readonly BinanceFuturesAccountService _futuresAccountService = accountService;
 
+    internal Task EnsureOneWayModeAsync(CancellationToken ct) => _futuresAccountService.EnsureOneWayModeAsync(ct);
+
     /// <inheritdoc />
     public override async Task<List<ExchangePosition>> GetPositionsAsync(
         string? instrumentSymbol = null, CancellationToken ct = default)
     {
         var positions = await _futuresAccountService.GetPositionInfoAsync(instrumentSymbol, ct);
+        if (positions.Any(p => p.PositionSide is "LONG" or "SHORT"))
+            throw new FriendlyException("合约交易仅支持单向持仓模式，当前账户使用双向持仓");
 
         return [.. positions
             .Where(p => decimal.TryParse(p.PositionAmt, NumberStyles.Number, CultureInfo.InvariantCulture, out var amt) && amt != 0)

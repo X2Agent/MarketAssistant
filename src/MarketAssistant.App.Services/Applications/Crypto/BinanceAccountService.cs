@@ -218,6 +218,12 @@ public abstract class BinanceAccountServiceBase(
                 parameters["reduceOnly"] = "true";
 
             var typeUpper = parameters["type"];
+            var algo = IsFuturesApi && typeUpper is "STOP_MARKET" or "TAKE_PROFIT_MARKET" or "TRAILING_STOP_MARKET";
+            if (algo)
+            {
+                parameters["algoType"] = "CONDITIONAL";
+                if (parameters.Remove("newClientOrderId", out var clientId)) parameters["clientAlgoId"] = clientId;
+            }
             if (typeUpper is "LIMIT" or "LIMIT_MAKER")
             {
                 if (!price.HasValue)
@@ -244,18 +250,18 @@ public abstract class BinanceAccountServiceBase(
             {
                 // 触发价同样受 tickSize 约束，否则条件单会被交易所以精度错误拒绝
                 var roundedStopPrice = ExchangeSymbolFilterCache.RoundPriceToTick(stopPrice.Value, filters?.TickSize) ?? stopPrice.Value;
-                parameters["stopPrice"] = roundedStopPrice.ToString("F8", CultureInfo.InvariantCulture);
+                parameters[algo ? "triggerPrice" : "stopPrice"] = roundedStopPrice.ToString("F8", CultureInfo.InvariantCulture);
             }
 
             if (trailingDelta.HasValue && typeUpper == "TRAILING_STOP_MARKET")
             {
-                parameters["trailingDelta"] = trailingDelta.Value.ToString(CultureInfo.InvariantCulture);
+                parameters["callbackRate"] = (trailingDelta.Value / 100m).ToString(CultureInfo.InvariantCulture);
             }
 
             var queryString = string.Join("&",
                 parameters.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
             var signedQuery = await AuthService.SignQueryStringAsync(queryString, cancellationToken);
-            var url = $"{OrderEndpoint}?{signedQuery}";
+            var url = $"{(algo ? "/fapi/v1/algoOrder" : OrderEndpoint)}?{signedQuery}";
             var request = new HttpRequestMessage(HttpMethod.Post, url);
             AuthService.AddAuthHeaders(request);
 
@@ -266,7 +272,9 @@ public abstract class BinanceAccountServiceBase(
             var response = await httpClient.SendAsync(request, cancellationToken);
             await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}下单", cancellationToken);
 
-            var orderResponse = await ParseOrderResponseAsync(response.Content, cancellationToken);
+            var orderResponse = algo
+                ? (await response.Content.ReadFromJsonAsync<FuturesAlgoOrder>(cancellationToken) ?? throw new JsonException("缺少条件单响应")).ToOrder()
+                : await ParseOrderResponseAsync(response.Content, cancellationToken);
 
             Logger.LogInformation("{Label}下单成功，订单ID: {OrderId}, 状态: {Status}",
                 Label, orderResponse.OrderId, orderResponse.Status);
@@ -294,14 +302,27 @@ public abstract class BinanceAccountServiceBase(
             var response = await httpClient.SendAsync(request, cancellationToken);
             await EnsureSuccessWithBinanceErrorAsync(response, $"{Label}查询订单", cancellationToken);
 
-            return await ParseOrderResponseAsync(response.Content, cancellationToken);
+            var order = await ParseOrderResponseAsync(response.Content, cancellationToken);
+            if (decimal.TryParse(order.ExecutedQty, NumberStyles.Number, CultureInfo.InvariantCulture, out var qty) && qty > 0 && order.Fills.Count == 0)
+            {
+                var tradesQuery = await AuthService.SignQueryStringAsync($"symbol={symbol.ToUpperInvariant()}&orderId={order.OrderId}&limit=1000", cancellationToken);
+                using var tradesRequest = new HttpRequestMessage(HttpMethod.Get, $"{(IsFuturesApi ? "/fapi/v1/userTrades" : "/api/v3/myTrades")}?{tradesQuery}");
+                AuthService.AddAuthHeaders(tradesRequest);
+                using var tradesResponse = await httpClient.SendAsync(tradesRequest, cancellationToken);
+                await EnsureSuccessWithBinanceErrorAsync(tradesResponse, "查询订单成交明细", cancellationToken);
+                var fills = await tradesResponse.Content.ReadFromJsonAsync<List<BinanceFill>>(cancellationToken) ?? [];
+                if (fills.Sum(fill => decimal.Parse(fill.Qty, CultureInfo.InvariantCulture)) != qty)
+                    throw new InvalidOperationException("成交明细数量与订单回报不一致，等待重新同步");
+                order.Fills = fills;
+            }
+            return order;
         });
     }
 
     /// <summary>
     /// 按订单 ID 查询。
     /// </summary>
-    public Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
+    public virtual Task<BinanceOrderResponse> GetOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
         => QueryOrderAsync(symbol, $"orderId={orderId}", cancellationToken);
 
     /// <summary>
@@ -315,7 +336,7 @@ public abstract class BinanceAccountServiceBase(
     /// <summary>
     /// 撤销订单。
     /// </summary>
-    public async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
+    public virtual async Task<BinanceOrderResponse> CancelOrderAsync(string symbol, long orderId, CancellationToken cancellationToken = default)
     {
         return await ExecuteWithFriendlyErrorsAsync("取消订单", async () =>
         {
@@ -342,7 +363,7 @@ public abstract class BinanceAccountServiceBase(
     /// <summary>
     /// 查询当前挂单。
     /// </summary>
-    public async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null, CancellationToken cancellationToken = default)
+    public virtual async Task<List<BinanceOrderResponse>> GetOpenOrdersAsync(string? symbol = null, CancellationToken cancellationToken = default)
     {
         return await ExecuteWithFriendlyErrorsAsync("查询挂单", async () =>
         {
@@ -391,19 +412,25 @@ public abstract class BinanceAccountServiceBase(
         try
         {
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            var error = JsonSerializer.Deserialize<BinanceApiError>(content);
+            var error = JsonSerializer.Deserialize<BinanceApiError>(content, JsonSerializerOptions.Web);
             binanceErrorCode = error?.Code;
             errorDetail = error != null && !string.IsNullOrEmpty(error.Msg)
                 ? $"[{error.Code}] {error.Msg}"
                 : (string.IsNullOrEmpty(content) ? $"HTTP {statusCode}" : content);
         }
-        catch
+        catch (JsonException)
         {
             errorDetail = $"HTTP {statusCode}";
         }
 
         if (binanceErrorCode == -2013)
             throw new OrderNotFoundException($"{operation}失败: {errorDetail}");
+
+        if (binanceErrorCode == -5022 || (binanceErrorCode == -2010 && errorDetail.Contains("immediately match and take", StringComparison.OrdinalIgnoreCase)))
+            throw new PostOnlyWouldTakeException(errorDetail);
+
+        if (statusCode >= 500 || statusCode == 408 || binanceErrorCode is -1006 or -1007 || errorDetail.Contains("Duplicate order", StringComparison.OrdinalIgnoreCase))
+            throw new HttpRequestException(errorDetail, null, response.StatusCode);
 
         throw new FriendlyException($"{operation}失败: {errorDetail}");
     }
@@ -535,6 +562,7 @@ public class BinanceOcoResponse
     public long OrderListId { get; set; }
     public string ContingencyType { get; set; } = string.Empty;
     public string ListStatusType { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonPropertyName("orderReports")]
     public List<BinanceOrderResponse> Orders { get; set; } = [];
 }
 

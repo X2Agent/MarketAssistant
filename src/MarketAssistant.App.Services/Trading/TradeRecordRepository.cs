@@ -28,11 +28,11 @@ internal sealed class TradeRecordRepository(
             INSERT INTO trade_records
                 (id, environment, strategy_id, symbol, side, order_type, requested_qty, executed_qty,
                  requested_price, executed_price, commission, commission_asset, status,
-                 binance_order_id, ai_reasoning, created_at, completed_at, slippage_percent, realized_pnl)
+                 binance_order_id, ai_reasoning, created_at, completed_at, slippage_percent, realized_pnl, reduce_only)
             VALUES
                 (@id, @environment, @stratId, @symbol, @side, @orderType, @reqQty, @execQty,
                  @reqPrice, @execPrice, @commission, @commAsset, @status,
-                 @binanceId, @aiReasoning, @createdAt, @completedAt, @slippagePercent, @realizedPnl)
+                 @binanceId, @aiReasoning, @createdAt, @completedAt, @slippagePercent, @realizedPnl, @reduceOnly)
             """;
         cmd.Parameters.AddWithValue("@id", record.Id);
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -48,6 +48,7 @@ internal sealed class TradeRecordRepository(
         cmd.Parameters.AddWithValue("@commAsset", (object?)record.CommissionAsset ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@status", (int)record.Status);
         cmd.Parameters.AddWithValue("@binanceId", record.ExchangeOrderId);
+        cmd.Parameters.AddWithValue("@reduceOnly", record.ReduceOnly);
         cmd.Parameters.AddWithValue("@aiReasoning", (object?)record.AIReasoning ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@createdAt", record.CreatedAt.ToString("O"));
         cmd.Parameters.AddWithValue("@completedAt", record.CompletedAt.HasValue ? (object)record.CompletedAt.Value.ToString("O") : DBNull.Value);
@@ -124,7 +125,6 @@ internal sealed class TradeRecordRepository(
         var conditions = new List<string>
         {
             "environment = @environment",
-            "binance_order_id > 0",
             "(status = @pending OR status = @partial)"
         };
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
@@ -151,6 +151,22 @@ internal sealed class TradeRecordRepository(
         ExchangeOrderResult latestOrder,
         CancellationToken ct = default)
     {
+        await EnsureInitializedAsync();
+        await using var conn = await OpenConnectionAsync(ct);
+        using var tx = conn.BeginTransaction();
+        await using (var lookup = conn.CreateCommand())
+        {
+            lookup.Transaction = tx;
+            lookup.CommandText = "SELECT * FROM trade_records WHERE id = @id AND environment = @env";
+            lookup.Parameters.AddWithValue("@id", existingRecord.Id);
+            lookup.Parameters.AddWithValue("@env", CurrentEnvironmentKey);
+            await using var reader = await lookup.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct)) throw new InvalidOperationException("订单记录不存在");
+            existingRecord = ReadTradeRecord(reader);
+        }
+        if (latestOrder.ExecutedQty < existingRecord.ExecutedQty || (IsTerminalStatus(existingRecord.Status) &&
+            (latestOrder.FillCommission <= existingRecord.Commission || !IsTerminalStatus(MapTradeRecordStatus(latestOrder.Status)))))
+            return existingRecord;
         var latestStatus = MapTradeRecordStatus(latestOrder.Status);
         var latestExecutedQty = Math.Max(existingRecord.ExecutedQty, latestOrder.ExecutedQty);
         var latestExecutedPrice = CalculateEffectiveExecutedPrice(latestOrder, existingRecord.ExecutedPrice);
@@ -158,6 +174,8 @@ internal sealed class TradeRecordRepository(
         var deltaCommission = latestOrder.FillCommission > existingRecord.Commission
             ? latestOrder.FillCommission - existingRecord.Commission
             : 0;
+        if (deltaCommission > 0 && existingRecord.Commission > 0 && latestOrder.CommissionAsset != existingRecord.CommissionAsset)
+            throw new InvalidOperationException("订单手续费资产发生变化，需要核对成交明细");
         DateTime? completedAt = IsTerminalStatus(latestStatus)
             ? existingRecord.CompletedAt ?? DateTime.UtcNow
             : null;
@@ -168,91 +186,47 @@ internal sealed class TradeRecordRepository(
             || latestExecutedPrice != existingRecord.ExecutedPrice
             || completedAt != existingRecord.CompletedAt;
 
-        if (!hasMeaningfulChange)
+        if (!hasMeaningfulChange && existingRecord.ExchangeOrderId != 0)
             return existingRecord;
 
         decimal realizedPnl = 0;
         if (deltaExecutedQty > 0)
         {
-            // 合约模式下买卖方向无法单独确定开平仓，需结合本地持仓判断：
-            // 买入 = 平空（若存在空头持仓）否则开多；卖出 = 平多（若存在多头持仓）否则开空。
-            if (IsFuturesMode)
-            {
-                var positions = await _positions.GetOpenPositionsAsync(existingRecord.Symbol, ct).ConfigureAwait(false);
-                if (existingRecord.Side == OrderSide.Buy)
-                {
-                    if (positions.Any(p => p.Side == PositionSide.Short))
-                    {
-                        realizedPnl = await _positions.ClosePositionFifoAsync(
-                            existingRecord.Symbol, deltaExecutedQty, latestExecutedPrice, ct, PositionSide.Short)
-                            .ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await _positions.OpenPositionAsync(new Position
-                        {
-                            Symbol = existingRecord.Symbol,
-                            Side = PositionSide.Long,
-                            Quantity = deltaExecutedQty,
-                            EntryPrice = latestExecutedPrice,
-                            StrategyId = existingRecord.StrategyId,
-                            OpenedAt = DateTime.UtcNow
-                        }, ct).ConfigureAwait(false);
-                    }
-                }
-                else
-                {
-                    if (positions.Any(p => p.Side == PositionSide.Long))
-                    {
-                        realizedPnl = await _positions.ClosePositionFifoAsync(
-                            existingRecord.Symbol, deltaExecutedQty, latestExecutedPrice, ct, PositionSide.Long)
-                            .ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await _positions.OpenPositionAsync(new Position
-                        {
-                            Symbol = existingRecord.Symbol,
-                            Side = PositionSide.Short,
-                            Quantity = deltaExecutedQty,
-                            EntryPrice = latestExecutedPrice,
-                            StrategyId = existingRecord.StrategyId,
-                            OpenedAt = DateTime.UtcNow
-                        }, ct).ConfigureAwait(false);
-                    }
-                }
-            }
-            else if (existingRecord.Side == OrderSide.Buy)
+            var fillPrice = (latestExecutedQty * latestExecutedPrice - existingRecord.ExecutedQty * existingRecord.ExecutedPrice) / deltaExecutedQty;
+            if (fillPrice <= 0) throw new InvalidOperationException("缺少可结算的增量成交金额");
+            var buy = existingRecord.Side == OrderSide.Buy;
+            if (!(existingRecord.ReduceOnly || (!IsFuturesMode && !buy)))
             {
                 await _positions.OpenPositionAsync(new Position
                 {
                     Symbol = existingRecord.Symbol,
-                    Side = PositionSide.Long,
-                    Quantity = deltaExecutedQty,
-                    EntryPrice = latestExecutedPrice,
+                    Side = buy ? PositionSide.Long : PositionSide.Short,
+                    Quantity = !IsFuturesMode && latestOrder.CommissionAsset == MarketAssistant.Infrastructure.Core.CryptoSymbolConverter.ExtractBaseCurrency(existingRecord.Symbol)
+                        ? deltaExecutedQty - deltaCommission : deltaExecutedQty,
+                    EntryPrice = fillPrice,
                     StrategyId = existingRecord.StrategyId,
                     OpenedAt = DateTime.UtcNow
-                }, ct).ConfigureAwait(false);
+                }, tx, ct).ConfigureAwait(false);
             }
             else
             {
                 realizedPnl = await _positions.ClosePositionFifoAsync(
                     existingRecord.Symbol,
                     deltaExecutedQty,
-                    latestExecutedPrice,
-                    ct).ConfigureAwait(false);
+                    fillPrice, buy ? PositionSide.Short : PositionSide.Long, tx, ct, existingRecord.StrategyId).ConfigureAwait(false);
             }
         }
-
         // 交易次数仅在订单从未成交变为首次成交（existingRecord.ExecutedQty == 0）时增加一次；
         // 下单时已计数或对账增量补充过的订单不再重复计数
         if (deltaExecutedQty > 0 || deltaCommission > 0)
-            await _dailyStats.UpdateDailyStatsAsync(realizedPnl, deltaCommission,
-                countTrade: existingRecord.ExecutedQty == 0 && deltaExecutedQty > 0, ct).ConfigureAwait(false);
+            await _dailyStats.UpdateDailyStatsAsync(realizedPnl, latestOrder.CommissionAsset == "USDT" ? deltaCommission : 0m,
+                existingRecord.ExecutedQty == 0 && deltaExecutedQty > 0, tx, ct).ConfigureAwait(false);
 
         existingRecord.RequestedQty = latestOrder.RequestedQty > 0 ? latestOrder.RequestedQty : existingRecord.RequestedQty;
         existingRecord.ExecutedQty = latestExecutedQty;
         existingRecord.ExecutedPrice = latestExecutedPrice;
+        if (existingRecord.OrderType == OrderType.Market && existingRecord.RequestedPrice is > 0 && latestExecutedQty > 0)
+            existingRecord.SlippagePercent = Math.Abs(latestExecutedPrice / existingRecord.RequestedPrice.Value - 1m) * 100m;
         existingRecord.Commission += deltaCommission;
         if (!string.IsNullOrWhiteSpace(latestOrder.CommissionAsset))
             existingRecord.CommissionAsset = latestOrder.CommissionAsset;
@@ -260,18 +234,19 @@ internal sealed class TradeRecordRepository(
         existingRecord.CompletedAt = completedAt;
         existingRecord.RealizedPnl += realizedPnl;
 
-        await UpdateTradeRecordAsync(existingRecord, ct).ConfigureAwait(false);
+        if (long.TryParse(latestOrder.OrderId, out var orderId)) existingRecord.ExchangeOrderId = orderId;
+        await UpdateTradeRecordAsync(existingRecord, tx, ct).ConfigureAwait(false);
+        tx.Commit();
         return existingRecord;
     }
 
-    private async Task UpdateTradeRecordAsync(TradeRecord record, CancellationToken ct)
+    private async Task UpdateTradeRecordAsync(TradeRecord record, SqliteTransaction tx, CancellationToken ct)
     {
-        await EnsureInitializedAsync();
-        await using var conn = await OpenConnectionAsync(ct);
-        await using var cmd = conn.CreateCommand();
+        await using var cmd = tx.Connection!.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = """
             UPDATE trade_records
-            SET requested_qty = @requestedQty,
+            SET binance_order_id = @orderId, slippage_percent = @slippage, requested_qty = @requestedQty,
                 executed_qty = @executedQty,
                 executed_price = @executedPrice,
                 commission = @commission,
@@ -282,6 +257,8 @@ internal sealed class TradeRecordRepository(
             WHERE id = @id AND environment = @environment
             """;
         cmd.Parameters.AddWithValue("@id", record.Id);
+        cmd.Parameters.AddWithValue("@orderId", record.ExchangeOrderId);
+        cmd.Parameters.AddWithValue("@slippage", ToDbNullable(record.SlippagePercent));
         cmd.Parameters.AddWithValue("@environment", CurrentEnvironmentKey);
         cmd.Parameters.AddWithValue("@requestedQty", ToDb(record.RequestedQty));
         cmd.Parameters.AddWithValue("@executedQty", ToDb(record.ExecutedQty));
@@ -321,6 +298,7 @@ internal sealed class TradeRecordRepository(
             Commission = ReadDecimal(reader, reader.GetOrdinal("commission")),
             Status = (TradeRecordStatus)reader.GetInt32(reader.GetOrdinal("status")),
             ExchangeOrderId = reader.GetInt64(reader.GetOrdinal("binance_order_id")),
+            ReduceOnly = reader.GetBoolean(reader.GetOrdinal("reduce_only")),
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("created_at")), CultureInfo.InvariantCulture)
         };
 
@@ -350,6 +328,7 @@ internal sealed class TradeRecordRepository(
         if (latestOrder.ExecutedQty > 0 && latestOrder.CumulativeQuoteQty > 0)
             return latestOrder.CumulativeQuoteQty / latestOrder.ExecutedQty;
 
+        if (latestOrder.AveragePrice > 0) return latestOrder.AveragePrice;
         if (latestOrder.Price > 0)
             return latestOrder.Price;
 

@@ -19,6 +19,8 @@ namespace TestMarketAssistant.Trading;
 public sealed class TradeExecutorResilienceTest
 {
     private const string Symbol = "BTCUSDT";
+    private OrderLedgerFixture? _ledger;
+    [TestCleanup] public void Cleanup() => _ledger?.Dispose();
 
     private static Mock<IExchangeClient> CreateSpotClient()
     {
@@ -81,21 +83,20 @@ public sealed class TradeExecutorResilienceTest
         return risk;
     }
 
-    private static TradeExecutor CreateExecutor(
+    private TradeExecutor CreateExecutor(
         Mock<IExchangeClient> client, Mock<RiskManager> risk, Mock<TradingDataService> data,
         TradingEnvironmentService? environment = null, IAlertGate? alertGate = null)
     {
+        _ledger = new OrderLedgerFixture(data);
         var executor = new TradeExecutor(
             client.Object, risk.Object, data.Object,
             NullLogger<TradeExecutor>.Instance, environment, alertGate);
-        // 重试用例注入零延迟，避免指数退避（1s/2s/4s）拖慢测试
-        executor.RetryDelayFactory = (_, _) => Task.CompletedTask;
         return executor;
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task RetryExhausted_RecoveryByClientOrderId_ShouldSucceedWithoutDuplicateOrder()
+    public async Task LostResponse_RecoveryByClientOrderId_ShouldSettleWithoutDuplicateOrder()
     {
         // 下单响应丢失但订单已在交易所落地：按同一幂等 ID 回查命中后必须照常落库，不得重新下单
         var client = CreateSpotClient();
@@ -117,38 +118,31 @@ public sealed class TradeExecutorResilienceTest
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(recovered);
 
-        TradeRecord? persisted = null;
         var data = CreateData();
-        data.Setup(d => d.SaveTradeRecordAsync(It.IsAny<TradeRecord>(), It.IsAny<CancellationToken>()))
-            .Callback<TradeRecord, CancellationToken>((record, _) => persisted = record)
-            .Returns(Task.CompletedTask);
-        data.Setup(d => d.ClosePositionFifoAsync(
-                It.IsAny<string>(), It.IsAny<decimal>(), It.IsAny<decimal>(),
-                It.IsAny<CancellationToken>(), It.IsAny<PositionSide>()))
-            .ReturnsAsync(10m);
 
         using var executor = CreateExecutor(client, CreateRisk(RiskCheckResult.Pass), data);
+        await _ledger!.Positions.OpenPositionAsync(new Position { Side = PositionSide.Long, Symbol = Symbol, Quantity = 0.5m, EntryPrice = 81m });
 
         var result = await executor.ExecuteOrderAsync(
             Symbol, OrderSide.Sell, OrderType.Limit, 0.5m, 100m);
 
         Assert.IsTrue(result.Success, result.ErrorMessage);
+        var persisted = (await _ledger.Records.GetTradeRecordsAsync()).Single();
         Assert.IsNotNull(persisted, "回查命中的订单必须照常落库");
         Assert.AreEqual(900L, persisted!.ExchangeOrderId);
         Assert.AreEqual(0.5m, persisted.ExecutedQty);
         Assert.AreEqual(TradeRecordStatus.Filled, persisted.Status);
+        Assert.AreEqual(10m, persisted.RealizedPnl);
         client.Verify(c => c.PlaceOrderAsync(
             It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<OrderType>(), It.IsAny<decimal>(),
             It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>(),
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(3), "重试耗尽（3 次）后绝不能再下单");
+            Times.Once, "结果不确定时只回查，不再次提交");
         client.Verify(c => c.GetOrderByClientOrderIdAsync(
             Symbol, It.Is<string>(id => id.StartsWith("MA", StringComparison.Ordinal)),
             It.IsAny<CancellationToken>()),
             Times.Once, "收敛查询必须按同一次调用生成的幂等 ID 回查");
-        data.Verify(d => d.UpdateTradeRecordRealizedPnlAsync(
-            persisted.Id, 10m, It.IsAny<CancellationToken>()), Times.Once,
-            "回查成交的已实现盈亏必须回写记录");
+        Assert.AreEqual(0, (await _ledger.Records.GetUnsettledTradeRecordsAsync()).Count);
     }
 
     [TestMethod]
@@ -178,12 +172,12 @@ public sealed class TradeExecutorResilienceTest
             It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<OrderType>(), It.IsAny<decimal>(),
             It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>(),
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(3));
+            Times.Once);
     }
 
     [TestMethod]
     [TestCategory("Unit")]
-    public async Task RecoveryQueryOrderNotFound_ShouldRemainNetworkRetryable()
+    public async Task RecoveryQueryOrderNotFound_ShouldFreezeWithoutResubmission()
     {
         var client = CreateSpotClient();
         client.Setup(c => c.PlaceOrderAsync(
@@ -201,13 +195,12 @@ public sealed class TradeExecutorResilienceTest
             Symbol, OrderSide.Sell, OrderType.Limit, 0.5m, 100m);
 
         Assert.IsFalse(result.Success);
-        Assert.AreEqual(TradeFailureCategory.Network, result.FailureCategory,
-            "交易所明确确认订单不存在时才允许普通网络冷却重试");
+        Assert.AreEqual(TradeFailureCategory.OrderStateUnknown, result.FailureCategory);
         client.Verify(c => c.PlaceOrderAsync(
             It.IsAny<string>(), It.IsAny<OrderSide>(), It.IsAny<OrderType>(), It.IsAny<decimal>(),
             It.IsAny<decimal?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<string?>(),
             It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
-            Times.Exactly(3));
+            Times.Once);
     }
 
     [TestMethod]
@@ -398,6 +391,7 @@ public sealed class TradeExecutorResilienceTest
             Symbol, OrderSide.Sell, 0.5m, 100m);
 
         Assert.IsTrue(result.Success, result.ErrorMessage);
+        persisted = (await _ledger!.Records.GetTradeRecordsAsync()).Single();
         Assert.IsNotNull(persisted, "紧急平仓必须照常落库（成交记录与持仓回写不走捷径）");
         Assert.AreEqual(EmergencyStopService.EmergencyCloseStrategyId, persisted!.StrategyId);
         StringAssert.Contains(persisted.AIReasoning ?? string.Empty, "紧急停止");

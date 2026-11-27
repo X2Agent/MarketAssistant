@@ -50,7 +50,8 @@ public sealed class OrderStateSyncService(
         if (!force && !ShouldSync(syncKey))
             return 0;
 
-        if (!await _syncGate.WaitAsync(0, ct).ConfigureAwait(false))
+        if (force) await _syncGate.WaitAsync(ct).ConfigureAwait(false);
+        else if (!await _syncGate.WaitAsync(0, ct).ConfigureAwait(false))
             return 0;
 
         try
@@ -94,20 +95,23 @@ public sealed class OrderStateSyncService(
             await _symbolQueryGate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                foreach (var record in symbolGroup)
+                foreach (var pending in symbolGroup)
                 {
+                    var record = pending;
                     var previousStatus = record.Status;
                     var previousQty = record.ExecutedQty;
                     var previousCompletedAt = record.CompletedAt;
 
                     try
                     {
-                        var latest = await _exchangeClient.GetOrderAsync(
+                        var latest = record.ExchangeOrderId == 0
+                            ? await _exchangeClient.GetOrderByClientOrderIdAsync(record.Symbol, record.Id, ct)
+                            : await _exchangeClient.GetOrderAsync(
                             record.Symbol,
                             record.ExchangeOrderId.ToString(),
                             ct).ConfigureAwait(false);
 
-                        await _dataService.ReconcileTradeRecordAsync(record, latest, ct).ConfigureAwait(false);
+                        record = await _dataService.ReconcileTradeRecordAsync(record, latest, ct).ConfigureAwait(false);
 
                         if (record.Status != previousStatus
                             || record.ExecutedQty != previousQty

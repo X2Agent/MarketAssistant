@@ -131,7 +131,7 @@ public sealed partial class ExchangeConditionOrderService
     /// 条件单参数指纹（类型|腿别|方向|数量|触发价|回调基点）：策略编辑或 AI 护栏更新后与在途挂单比对，
     /// 不一致则撤旧挂新。AI 信号策略按腿取 StopLossPrice / TakeProfitPrice。
     /// </summary>
-    internal static string BuildFingerprint(TradingStrategy strategy, ConditionOrderLeg leg)
+    internal static string BuildFingerprint(TradingStrategy strategy, ConditionOrderLeg leg, decimal? quantity = null)
     {
         var triggerPrice = strategy.Type == StrategyType.AISignal
             ? (leg == ConditionOrderLeg.Stop ? strategy.StopLossPrice : strategy.TakeProfitPrice) ?? 0m
@@ -139,7 +139,7 @@ public sealed partial class ExchangeConditionOrderService
         var trailingDelta = strategy.Type == StrategyType.TrailingStop && leg == ConditionOrderLeg.Stop
             ? TradeExecutor.ResolveTrailingDeltaBasisPoints(strategy).ToString()
             : string.Empty;
-        return $"{strategy.Type}|{leg}|{strategy.Side}|{strategy.Quantity}|{triggerPrice}|{trailingDelta}";
+        return FormattableString.Invariant($"{strategy.Type}|{leg}|{strategy.Side}|{quantity ?? strategy.Quantity:G29}|{triggerPrice:G29}|{trailingDelta}");
     }
 
     /// <summary>判断策略已持久化的指纹串（支持双腿以 ';' 分隔）是否包含指定腿的期望指纹。</summary>
@@ -387,7 +387,7 @@ public sealed partial class ExchangeConditionOrderService
         // （部分成交未同步、加仓只记增量），超量卖出在现货会卖出用户其他来源的资产
         if (!exchangeClient.IsFutures && strategy.Type == StrategyType.AISignal && legs.Count == 2)
         {
-            await EnsureSpotOcoAsync(exchangeClient, strategy, managedOrders, ct).ConfigureAwait(false);
+            await EnsureSpotOcoAsync(exchangeClient, strategy, quantityOverride!.Value, managedOrders, ct).ConfigureAwait(false);
             return;
         }
 
@@ -428,7 +428,7 @@ public sealed partial class ExchangeConditionOrderService
         var clientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, leg);
         var existing = managedOrders.FirstOrDefault(o =>
             string.Equals(o.ClientOrderId, clientOrderId, StringComparison.Ordinal));
-        var expectedFingerprint = BuildFingerprint(strategy, leg);
+        var expectedFingerprint = BuildFingerprint(strategy, leg, quantityOverride);
         var legKey = (strategy.Id, leg);
 
         if (existing != null)

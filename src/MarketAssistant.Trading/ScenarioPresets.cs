@@ -49,17 +49,10 @@ public class AISignalParams
 
     /// <summary>
     /// 进场下单方式：Market（市价，最快）/ MakerFirst（先挂 post-only 限价单）。
-    /// maker 费率显著低于 taker，是薄利策略唯一确定的正期望来源；但会牺牲"立即成交"。
     /// post-only 被交易所拒单（盘口已穿越）时立即回退市价；挂上但未成交的余量
     /// 由限价单超时撤单管理，不自动追单。
     /// </summary>
     public string EntryOrderStyle { get; set; } = "Market";
-
-    /// <summary>
-    /// maker 优先模式下，post-only 下单网络失败后回退市价前的等待秒数
-    ///（给短暂抖动留恢复窗口；拒单类失败不等待，立即回退）。
-    /// </summary>
-    public int MakerTimeoutSeconds { get; set; } = 10;
 
     public bool IsMakerFirst => EntryOrderStyle.Equals("MakerFirst", StringComparison.OrdinalIgnoreCase);
 

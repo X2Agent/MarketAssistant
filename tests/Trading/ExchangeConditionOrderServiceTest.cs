@@ -87,6 +87,31 @@ public sealed class ExchangeConditionOrderServiceTest
 
     [TestMethod]
     [TestCategory("Unit")]
+    public async Task SpotOco_ChangedProtection_ShouldCancelOnceAndClearLiveFlagWhenReplacementFails()
+    {
+        var ctx = CreateContext(futures: false);
+        var strategy = new TradingStrategy { Id = "grid-ai", Type = StrategyType.AISignal, Symbol = Symbol,
+            Status = StrategyStatus.Active, ExecutionCount = 1, Quantity = 1m, Side = OrderSide.Buy,
+            StopLossPrice = 90m, TakeProfitPrice = 110m, CustomParams = "{}" };
+        var stop = CreateManagedOrder(strategy.Id);
+        var take = CreateManagedOrder(strategy.Id);
+        take.ClientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.TakeProfit);
+        take.OrderId = "1000";
+        ctx.Strategies.Setup(s => s.GetStrategiesByStatusAsync(StrategyStatus.Active, It.IsAny<CancellationToken>())).ReturnsAsync([strategy]);
+        ctx.Data.Setup(d => d.GetOpenPositionsAsync(Symbol, It.IsAny<CancellationToken>())).ReturnsAsync([
+            new Position { StrategyId = strategy.Id, Side = PositionSide.Long, Quantity = 0.7m }]);
+        ctx.Client.Setup(c => c.GetOpenOrdersAsync(null, It.IsAny<CancellationToken>())).ReturnsAsync([stop, take]);
+        ctx.Executor.Setup(e => e.PlaceSpotProtectiveOcoAsync(strategy, 0.7m, It.IsAny<CancellationToken>())).ReturnsAsync(new OcoPlacementResult { Success = false });
+
+        await ctx.Service.ReconcileAsync(CancellationToken.None);
+
+        ctx.Client.Verify(c => c.CancelOrderAsync(Symbol, stop.OrderId, It.IsAny<CancellationToken>()), Times.Once);
+        ctx.Executor.Verify(e => e.PlaceSpotProtectiveOcoAsync(strategy, 0.7m, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.IsFalse(ctx.Service.HasLiveOrder(strategy.Id));
+    }
+
+    [TestMethod]
+    [TestCategory("Unit")]
     public async Task Futures_MissingProtectiveOrder_ShouldPlace_AndStoreFingerprint()
     {
         var ctx = CreateContext(futures: true);

@@ -15,6 +15,8 @@ namespace TestMarketAssistant.Trading;
 public sealed class TradeExecutorFuturesFlowTest
 {
     private const string Symbol = "BTCUSDT";
+    private OrderLedgerFixture? _ledger;
+    [TestCleanup] public void Cleanup() => _ledger?.Dispose();
 
     private static Mock<IExchangeClient> CreateFuturesClient(params ExchangePosition[] positions)
     {
@@ -73,13 +75,12 @@ public sealed class TradeExecutorFuturesFlowTest
         Price = price
     };
 
-    private static TradeExecutor CreateExecutor(
+    private TradeExecutor CreateExecutor(
         Mock<IExchangeClient> client, Mock<RiskManager> risk, Mock<TradingDataService> data)
     {
+        if (client.Object.IsFutures) _ledger = new OrderLedgerFixture(data, futures: true);
         var executor = new TradeExecutor(
             client.Object, risk.Object, data.Object, NullLogger<TradeExecutor>.Instance);
-        // 网络重试路径注入零延迟，避免指数退避（1s/2s/4s）拖慢测试
-        executor.RetryDelayFactory = (_, _) => Task.CompletedTask;
         return executor;
     }
 
@@ -98,6 +99,7 @@ public sealed class TradeExecutorFuturesFlowTest
         var data = CreateData();
         using var executor = CreateExecutor(client, risk, data);
 
+        await _ledger!.Positions.OpenPositionAsync(new Position { Symbol = Symbol, Side = PositionSide.Long, Quantity = 1m, EntryPrice = 100m });
         var result = await executor.ExecuteOrderAsync(
             Symbol, OrderSide.Sell, OrderType.Market, 0.5m, 100m, requireClose: true);
 
@@ -110,9 +112,8 @@ public sealed class TradeExecutorFuturesFlowTest
             "持多卖出必须以 reduceOnly=true 下单");
         client.Verify(c => c.SetLeverageAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()),
             Times.Never, "平仓路径不得被杠杆问题阻塞");
-        data.Verify(d => d.ClosePositionFifoAsync(
-            Symbol, 0.5m, 101m, It.IsAny<CancellationToken>(), PositionSide.Long),
-            Times.Once, "平多必须按 FIFO 匹配多头持仓结算盈亏");
+        Assert.AreEqual(0.5m, (await _ledger.Positions.GetOpenPositionsAsync(Symbol)).Single().RemainingQuantity);
+        Assert.AreEqual(0.5m, result.Record!.RealizedPnl);
         risk.Verify(r => r.ValidateOrderAsync(
             Symbol, OrderSide.Sell, 0.5m, 100m, OrderType.Market, It.IsAny<string?>(),
             It.Is<bool>(isExit => isExit), It.IsAny<CancellationToken>()),
@@ -150,6 +151,7 @@ public sealed class TradeExecutorFuturesFlowTest
             It.Is<bool>(reduceOnly => !reduceOnly),
             It.IsAny<string?>(), It.IsAny<decimal?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()),
             "无持仓时买入是新开仓，reduceOnly 必须为 false");
+        opened = (await _ledger!.Positions.GetOpenPositionsAsync(Symbol)).Single();
         Assert.IsNotNull(opened, "开仓成交必须写入本地 FIFO 持仓");
         Assert.AreEqual(PositionSide.Long, opened!.Side);
         Assert.AreEqual(0.2m, opened.Quantity);

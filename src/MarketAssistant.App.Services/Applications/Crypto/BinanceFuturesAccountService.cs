@@ -11,7 +11,7 @@ namespace MarketAssistant.Applications.Crypto;
 /// 端点：/fapi/v2/account、/fapi/v1/order、/fapi/v1/openOrders、/fapi/v2/positionRisk
 /// API文档：https://developers.binance.com/docs/derivatives/usds-margined-futures/general-info
 /// </summary>
-public sealed class BinanceFuturesAccountService(
+public sealed partial class BinanceFuturesAccountService(
     IHttpClientFactory httpClientFactory,
     ILogger<BinanceFuturesAccountService> logger,
     IBinanceAuthService authService,

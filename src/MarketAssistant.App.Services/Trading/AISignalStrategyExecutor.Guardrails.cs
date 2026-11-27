@@ -113,6 +113,7 @@ public sealed partial class AISignalStrategyExecutor
         OrderSide entrySide,
         decimal currentPrice,
         decimal executedQty,
+        decimal previousQty,
         AISignalDecision decision,
         CancellationToken ct)
     {
@@ -121,14 +122,13 @@ public sealed partial class AISignalStrategyExecutor
         // 已有未平仓持仓时，本次成交属于加仓：护栏必须继续保护原有仓位，
         // 不能被新价重算的价格覆盖（覆盖会让旧仓位的止损静默抬高/压低，等于撤掉保护）。
         // 只有在该策略无持仓（首次建仓）时才写入新护栏价。
-        var ownRemaining = await GetOwnOpenQuantityAsync(strategy, ct).ConfigureAwait(false);
-        if (ownRemaining > 0)
+        if (previousQty > 0 && aiParams.ParsedExitStyle != ExitStyle.TrailingStop && strategy.StopLossPrice.HasValue && strategy.TakeProfitPrice.HasValue)
         {
             _logger.LogInformation(
                 "策略已有未平仓持仓，保留既有护栏价并把数量对齐全仓: {StrategyId} {Symbol} 止损 {StopLoss} 止盈 {TakeProfit} 未平量 {Qty}",
-                strategy.Id, strategy.Symbol, strategy.StopLossPrice, strategy.TakeProfitPrice, ownRemaining);
+                strategy.Id, strategy.Symbol, strategy.StopLossPrice, strategy.TakeProfitPrice, executedQty);
             await _dataService.UpdateStrategyGuardrailsAsync(
-                strategy.Id, strategy.StopLossPrice, strategy.TakeProfitPrice, ownRemaining, ct)
+                strategy.Id, strategy.StopLossPrice, strategy.TakeProfitPrice, executedQty, ct)
                 .ConfigureAwait(false);
             return;
         }
@@ -198,7 +198,7 @@ public sealed partial class AISignalStrategyExecutor
             strategy.Quantity = executedQty;
         strategy.StopLossPrice = stopLoss;
         strategy.TakeProfitPrice = takeProfit;
-        await _dataService.UpdateStrategyGuardrailsAsync(strategy.Id, stopLoss, takeProfit, executedQty, ct)
+        await _dataService.UpdateStrategyGuardrailsAsync(strategy.Id, stopLoss, takeProfit, executedQty > 0 ? executedQty : null, ct)
             .ConfigureAwait(false);
         _logger.LogInformation(
             "AI 护栏已附加: {StrategyId} 止损 {StopLoss} 止盈 {TakeProfit}（{Source}）",

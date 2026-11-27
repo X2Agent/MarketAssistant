@@ -162,6 +162,8 @@ public class BinanceExchangeClient(BinanceAccountServiceBase accountService, str
         {
             foreach (var fill in response.Fills)
             {
+                if (commissionAsset != null && commissionAsset != fill.CommissionAsset)
+                    throw new InvalidOperationException("订单包含多种手续费资产，不能合并为单币种费用，请核对该订单");
                 if (decimal.TryParse(fill.Commission, NumberStyles.Number, CultureInfo.InvariantCulture, out var c))
                     totalCommission += c;
                 commissionAsset ??= fill.CommissionAsset;

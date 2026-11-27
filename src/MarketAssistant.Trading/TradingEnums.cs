@@ -47,27 +47,35 @@ public enum OrderSide
 /// </summary>
 public enum OrderType
 {
+    [Description("市价")]
     Market,
+    [Description("限价")]
     Limit,
     /// <summary>止损市价单（合约专用，触发后以市价平仓）</summary>
+    [Description("止损")]
     StopMarket,
     /// <summary>止盈市价单（合约专用，触发后以市价平仓）</summary>
+    [Description("止盈")]
     TakeProfitMarket,
     /// <summary>追踪止损市价单（合约专用，按回调比例触发）</summary>
+    [Description("追踪止损")]
     TrailingStopMarket,
     /// <summary>
     /// 只做 maker 的限价单。价格会穿越盘口时被交易所直接拒绝而不是转 taker，
     /// 因此可以确保成交时为 maker 费率。用于"maker 优先、拒单回退市价"的进场路径。
     /// 现货形态为 LIMIT_MAKER 订单类型；合约形态为 LIMIT + timeInForce=GTX。
     /// </summary>
+    [Description("只做 Maker")]
     PostOnlyLimit,
     /// <summary>
     /// 止损市价单（现货专用）。现货没有 STOP_MARKET，但 STOP_LOSS 触发后同样以 MARKET 成交
     /// （币安现货 API 文档："This will execute a MARKET order when the conditions are met"），
     /// 与合约止损语义完全一致，不存在限价止损跳空后挂盘不成交的风险。
     /// </summary>
+    [Description("止损")]
     StopLoss,
     /// <summary>止盈市价单（现货专用）。触发后以 MARKET 成交。</summary>
+    [Description("止盈")]
     TakeProfit
 }
 

@@ -333,6 +333,7 @@ public static class BusinessServiceCollectionExtensions
     /// </summary>
     private static void ConfigureBinanceRateLimiter(HttpStandardResilienceOptions options)
     {
+        options.Retry.DisableForUnsafeHttpMethods();
         var limiter = new ConcurrencyLimiter(new ConcurrencyLimiterOptions
         {
             PermitLimit = 10,

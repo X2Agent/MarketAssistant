@@ -44,6 +44,7 @@ public sealed partial class BinanceSpotAccountService
                 ["symbol"] = symbol.ToUpperInvariant(),
                 ["side"] = side.ToUpperInvariant(),
                 ["quantity"] = roundedQuantity.ToString("F8", CultureInfo.InvariantCulture),
+                ["newOrderRespType"] = "FULL",
                 // SELL 方向：above 为止盈（价格涨到触发价，市价卖出），below 为止损（价格跌破触发价，市价卖出）
                 ["aboveType"] = "TAKE_PROFIT",
                 ["aboveStopPrice"] = roundedTakeProfitPrice.ToString("F8", CultureInfo.InvariantCulture),

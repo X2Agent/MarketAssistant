@@ -155,6 +155,44 @@ public class ExchangeOrderResult
     /// <summary>未成交数量（请求量 − 已成交量）。已完全成交时为 0。</summary>
     public decimal RemainingQty => Math.Max(0, RequestedQty - ExecutedQty);
 
+    /// <summary>是否买单（交易所原始方向 BUY）。供挂单行按买卖方向着色。</summary>
+    public bool IsBuy => string.Equals(Side, "BUY", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>展示用方向中文名。</summary>
+    public string SideText => IsBuy ? "买入" : "卖出";
+
+    /// <summary>
+    /// 是否条件单（止损 / 止盈 / 追踪止损）。条件单的关键价格是触发价而不是委托价，触发前不会有成交。
+    /// </summary>
+    public bool IsConditional =>
+        Type.StartsWith("STOP", StringComparison.OrdinalIgnoreCase)
+        || Type.StartsWith("TAKE_PROFIT", StringComparison.OrdinalIgnoreCase)
+        || Type.StartsWith("TRAILING_STOP", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>展示用订单类型中文名；未识别的类型原样显示，不吞掉交易所新增的类型。</summary>
+    public string TypeText => Type.ToUpperInvariant() switch
+    {
+        "LIMIT" => "限价",
+        "MARKET" => "市价",
+        "LIMIT_MAKER" => "只做 Maker",
+        "STOP" or "STOP_MARKET" or "STOP_LOSS" or "STOP_LOSS_LIMIT" => "止损",
+        "TAKE_PROFIT" or "TAKE_PROFIT_MARKET" or "TAKE_PROFIT_LIMIT" => "止盈",
+        "TRAILING_STOP_MARKET" => "追踪止损",
+        _ => Type
+    };
+
+    /// <summary>展示用关键价格：条件单取触发价，其余取委托价。0 表示交易所未返回。</summary>
+    public decimal DisplayPrice => IsConditional ? StopPrice : Price;
+
+    /// <summary>关键价格的名称（触发价 / 委托价）。</summary>
+    public string PriceLabel => IsConditional ? "触发价" : "委托价";
+
+    /// <summary>是否有可展示的关键价格（0 表示交易所未返回，展示层不得把 0 当真实价格）。</summary>
+    public bool HasDisplayPrice => DisplayPrice > 0;
+
+    /// <summary>是否已有成交（部分成交的订单仍在挂单列表里）。</summary>
+    public bool HasFill => ExecutedQty > 0;
+
     /// <summary>
     /// 成交进度百分比（0-100），供挂单行进度条直接绑定。
     /// 请求量为 0（交易所未返回）时返回 0，避免除零。

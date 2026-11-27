@@ -111,11 +111,11 @@ public class TradingDataService
     /// <remarks>virtual 供单元测试替换（绩效统计）。</remarks>
     public virtual Task<List<TradeRecord>> GetRecordsByStrategyAsync(string strategyId, CancellationToken ct = default)
         => _records.GetRecordsByStrategyAsync(strategyId, ct);
-    public Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
+    public virtual Task<List<TradeRecord>> GetUnsettledTradeRecordsAsync(
         string? symbol = null, CancellationToken ct = default)
         => _records.GetUnsettledTradeRecordsAsync(symbol, ct);
 
-    public Task<TradeRecord> ReconcileTradeRecordAsync(
+    public virtual Task<TradeRecord> ReconcileTradeRecordAsync(
         TradeRecord existingRecord, ExchangeOrderResult latestOrder, CancellationToken ct = default)
         => _records.ReconcileTradeRecordAsync(existingRecord, latestOrder, ct);
 

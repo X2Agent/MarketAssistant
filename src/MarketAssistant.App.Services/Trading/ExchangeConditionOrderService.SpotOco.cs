@@ -36,6 +36,7 @@ public sealed partial class ExchangeConditionOrderService
     private async Task EnsureSpotOcoAsync(
         IExchangeClient exchangeClient,
         TradingStrategy strategy,
+        decimal quantity,
         List<ExchangeOrderResult> managedOrders,
         CancellationToken ct)
     {
@@ -46,6 +47,8 @@ public sealed partial class ExchangeConditionOrderService
         var existingTakeProfit = managedOrders.FirstOrDefault(o =>
             string.Equals(o.ClientOrderId, takeProfitId, StringComparison.Ordinal));
 
+        var stopFingerprint = BuildFingerprint(strategy, ConditionOrderLeg.Stop, quantity);
+        var takeProfitFingerprint = BuildFingerprint(strategy, ConditionOrderLeg.TakeProfit, quantity);
         if (existingStop != null && existingTakeProfit != null)
         {
             _liveOrderIds[(strategy.Id, ConditionOrderLeg.Stop)] = existingStop.OrderId;
@@ -53,32 +56,16 @@ public sealed partial class ExchangeConditionOrderService
 
             // 指纹一致（腿别|方向|数量|触发价|回调基点）说明在途 OCO 就是当前护栏期望的形态；
             // 漂移（用户改价/AI 更新护栏）走下方撤旧重挂
-            var stopFingerprint = BuildFingerprint(strategy, ConditionOrderLeg.Stop);
-            var takeProfitFingerprint = BuildFingerprint(strategy, ConditionOrderLeg.TakeProfit);
-            if (HasMatchingFingerprint(strategy.ConditionOrderFingerprint, stopFingerprint)
-                && HasMatchingFingerprint(strategy.ConditionOrderFingerprint, takeProfitFingerprint))
+            if (existingStop.RequestedQty == existingTakeProfit.RequestedQty
+                && HasMatchingFingerprint(strategy.ConditionOrderFingerprint, FormattableString.Invariant($"{stopFingerprint}|{existingStop.RequestedQty:G29}"))
+                && HasMatchingFingerprint(strategy.ConditionOrderFingerprint, FormattableString.Invariant($"{takeProfitFingerprint}|{existingTakeProfit.RequestedQty:G29}")))
                 return;
 
-            try
-            {
-                // 撤销任一成员单即撤销整个 orderList（币安现货行为）
-                await exchangeClient.CancelOrderAsync(existingStop.Symbol, existingStop.OrderId, ct).ConfigureAwait(false);
-                _logger.LogInformation("护栏参数已变化，撤销旧 OCO 待重挂: {StrategyId} {Symbol} {OrderId}",
-                    strategy.Id, strategy.Symbol, existingStop.OrderId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "OCO 参数漂移撤单失败，下个对账周期重试: {StrategyId} {OrderId}",
-                    strategy.Id, existingStop.OrderId);
-                return;
-            }
         }
 
         // 只有一腿在途（异常中间态）：撤掉该成员单让整个 orderList 消失，随后整单重挂
-        if (existingStop != null || existingTakeProfit != null)
+        if ((existingStop ?? existingTakeProfit) is { } orphan)
         {
-            var orphan = existingStop ?? existingTakeProfit
-                ?? throw new System.Diagnostics.UnreachableException("现货 OCO 残缺中间态：两腿均无在途单");
             try
             {
                 await exchangeClient.CancelOrderAsync(orphan.Symbol, orphan.OrderId, ct).ConfigureAwait(false);
@@ -94,8 +81,8 @@ public sealed partial class ExchangeConditionOrderService
 
         // OCO 数量取策略护栏数量与实际持仓余量的较小者：部分成交/加仓会让两者漂移，
         // 超量卖出在现货会卖出用户其他来源的资产
-        var own = await GetOwnOpenPositionAsync(strategy, ct).ConfigureAwait(false);
-        var quantity = Math.Min(strategy.Quantity, own.Remaining);
+        ClearLiveOrder(strategy.Id);
+        if (quantity <= 0) return;
 
         var result = await _tradeExecutor.PlaceSpotProtectiveOcoAsync(strategy, quantity, ct)
             .ConfigureAwait(false);
@@ -107,12 +94,7 @@ public sealed partial class ExchangeConditionOrderService
             // 双腿指纹一次写入。指纹表达"策略参数的期望形态"（与单腿路径同语义），
             // 用于检测护栏价/数量变化；实挂数量可能因持仓封顶小于 strategy.Quantity，
             // 不会写进指纹，避免封顶场景被误判为漂移而反复撤挂
-            var updatedFingerprint = MergeLegFingerprint(
-                strategy.ConditionOrderFingerprint, ConditionOrderLeg.Stop,
-                BuildFingerprint(strategy, ConditionOrderLeg.Stop));
-            updatedFingerprint = MergeLegFingerprint(
-                updatedFingerprint, ConditionOrderLeg.TakeProfit,
-                BuildFingerprint(strategy, ConditionOrderLeg.TakeProfit));
+            var updatedFingerprint = FormattableString.Invariant($"{stopFingerprint}|{result.StopRecord.RequestedQty:G29};{takeProfitFingerprint}|{result.TakeProfitRecord.RequestedQty:G29}");
             strategy.ConditionOrderFingerprint = updatedFingerprint;
             await _dataService
                 .UpdateStrategyConditionOrderFingerprintAsync(strategy.Id, updatedFingerprint, ct)
