@@ -93,8 +93,7 @@
             <StackPanel Orientation="Horizontal"
                         HorizontalAlignment="Center"
                         Spacing="{StaticResource SmallSpacing}">
-                <Button Name="ApproveButton"
-                        Content="批准"
+                <Button Content="批准"
                         Classes="btn-primary"
                         MinWidth="{StaticResource SmallButtonMinWidth}"
                         Click="OnApproveClick"/>

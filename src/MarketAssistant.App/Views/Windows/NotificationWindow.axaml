@@ -12,8 +12,7 @@
         WindowStartupLocation="Manual">
 
     <!-- 悬浮通知：v3 唯一允许用重阴影的场景之一；无边框，靠表面色阶与阴影浮起 -->
-    <Border Name="NotificationBorder"
-            Background="{StaticResource NotificationDarkBackgroundBrush}"
+    <Border Background="{StaticResource NotificationDarkBackgroundBrush}"
             BorderThickness="{StaticResource NoBorderThickness}"
             CornerRadius="{StaticResource CardCornerRadius}"
             Padding="{StaticResource DefaultCardPadding}"

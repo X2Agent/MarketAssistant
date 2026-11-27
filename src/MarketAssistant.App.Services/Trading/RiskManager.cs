@@ -454,8 +454,12 @@ public class RiskManager(
         if (!sidePays)
             return null;
 
-        return new RiskCheckResult { Deferred = true, Reason = $"{instrumentSymbol} 距资金结算仅 {minutesToFunding:F0} 分钟，"
-            + $"当前费率 {fundingRatePercent:F4}% 对本次{SafeSideName(side)}方向不利，已推迟开仓" };
+        return new RiskCheckResult
+        {
+            Deferred = true,
+            Reason = $"{instrumentSymbol} 距资金结算仅 {minutesToFunding:F0} 分钟，"
+                + $"当前费率 {fundingRatePercent:F4}% 对本次{SafeSideName(side)}方向不利，已推迟开仓"
+        };
 
         static string SafeSideName(OrderSide value) => value == OrderSide.Buy ? "买入（多头）" : "卖出（空头）";
     }

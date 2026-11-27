@@ -90,9 +90,19 @@ public sealed class ExchangeConditionOrderServiceTest
     public async Task SpotOco_ChangedProtection_ShouldCancelOnceAndClearLiveFlagWhenReplacementFails()
     {
         var ctx = CreateContext(futures: false);
-        var strategy = new TradingStrategy { Id = "grid-ai", Type = StrategyType.AISignal, Symbol = Symbol,
-            Status = StrategyStatus.Active, ExecutionCount = 1, Quantity = 1m, Side = OrderSide.Buy,
-            StopLossPrice = 90m, TakeProfitPrice = 110m, CustomParams = "{}" };
+        var strategy = new TradingStrategy
+        {
+            Id = "grid-ai",
+            Type = StrategyType.AISignal,
+            Symbol = Symbol,
+            Status = StrategyStatus.Active,
+            ExecutionCount = 1,
+            Quantity = 1m,
+            Side = OrderSide.Buy,
+            StopLossPrice = 90m,
+            TakeProfitPrice = 110m,
+            CustomParams = "{}"
+        };
         var stop = CreateManagedOrder(strategy.Id);
         var take = CreateManagedOrder(strategy.Id);
         take.ClientOrderId = TradeExecutor.BuildConditionOrderClientOrderId(strategy.Id, ConditionOrderLeg.TakeProfit);

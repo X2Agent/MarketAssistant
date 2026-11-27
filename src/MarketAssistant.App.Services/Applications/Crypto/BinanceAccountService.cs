@@ -327,7 +327,7 @@ public abstract class BinanceAccountServiceBase(
 
     /// <summary>
     /// 按客户端订单 ID 查询。用于网络异常后"订单是否已落地"的收敛查询：
-    /// 币安对未找到的 clientOrderId 返回 -2013，调用方据此区分"确实没下成"与"下成了但响应丢失"。
+    /// 币安对未找到的 clientOrderId 返回 -2013，按普通业务错误抛出；调用方须按状态未知处理，不得据此重发。
     /// </summary>
     public Task<BinanceOrderResponse> GetOrderByClientOrderIdAsync(
         string symbol, string clientOrderId, CancellationToken cancellationToken = default)
@@ -422,9 +422,6 @@ public abstract class BinanceAccountServiceBase(
         {
             errorDetail = $"HTTP {statusCode}";
         }
-
-        if (binanceErrorCode == -2013)
-            throw new OrderNotFoundException($"{operation}失败: {errorDetail}");
 
         if (binanceErrorCode == -5022 || (binanceErrorCode == -2010 && errorDetail.Contains("immediately match and take", StringComparison.OrdinalIgnoreCase)))
             throw new PostOnlyWouldTakeException(errorDetail);

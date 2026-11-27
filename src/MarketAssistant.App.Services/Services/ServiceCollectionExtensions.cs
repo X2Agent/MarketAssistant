@@ -309,14 +309,16 @@ public static class BusinessServiceCollectionExtensions
             client.DefaultRequestHeaders.UserAgent.ParseAdd(AppInfo.UserAgent);
         });
 
-        // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
         services.AddHttpClient("Ollama", client => client.Timeout = TimeSpan.FromMinutes(3))
             .AddResilienceHandler("retry", pipeline => pipeline.AddRetry(new HttpRetryStrategyOptions
             {
-                MaxRetryAttempts = 3, Delay = TimeSpan.FromSeconds(1),
-                BackoffType = DelayBackoffType.Exponential, UseJitter = true
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(1),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true
             }));
 
+        // OpenAI SDK 已提供请求重试；此客户端只负责匿名传输，避免叠加 HttpClient resilience 重试。
         services.AddHttpClient("AnonymousOpenAI", client =>
         {
             client.Timeout = TimeSpan.FromMinutes(3);

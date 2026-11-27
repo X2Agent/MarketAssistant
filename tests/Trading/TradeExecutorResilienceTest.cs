@@ -187,7 +187,7 @@ public sealed class TradeExecutorResilienceTest
             .ThrowsAsync(new HttpRequestException("模拟网络中断"));
         client.Setup(c => c.GetOrderByClientOrderIdAsync(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OrderNotFoundException("订单不存在"));
+            .ThrowsAsync(new FriendlyException("订单不存在"));
 
         using var executor = CreateExecutor(client, CreateRisk(RiskCheckResult.Pass), CreateData());
 

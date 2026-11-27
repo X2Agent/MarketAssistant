@@ -43,9 +43,8 @@ public interface IExchangeClient
 
     /// <summary>
     /// 按客户端订单 ID 查询订单。用于网络异常后的收敛查询：
-    /// 下单请求超时并不代表未落地，必须按同一个 clientOrderId 回查，
-    /// 才能区分"确实没下成"与"下成了但响应丢失"，避免重试造成重复下单。
-    /// 交易所回查不到该 ID 时抛异常（币安 -2013）。
+    /// 下单请求超时并不代表未落地，必须按同一个 clientOrderId 回查而不是重发，避免重复下单。
+    /// 交易所回查不到该 ID 时抛异常（币安 -2013）；查不到不能证明没下成，调用方须按状态未知处理。
     /// </summary>
     Task<ExchangeOrderResult> GetOrderByClientOrderIdAsync(
         string instrumentSymbol, string clientOrderId, CancellationToken ct = default);

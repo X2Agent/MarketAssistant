@@ -55,8 +55,14 @@ internal sealed record FuturesAlgoOrder(long AlgoId, string ClientAlgoId, string
     // 两套 API 的数值 ID 不在同一命名空间。本地负数标识 algo 单；发送给交易所时还原正数。
     internal BinanceOrderResponse ToOrder() => new()
     {
-        OrderId = -AlgoId, ClientOrderId = ClientAlgoId, Symbol = Symbol, Side = Side, Type = OrderType,
-        OrigQty = Quantity, StopPrice = TriggerPrice, Status = AlgoStatus switch
+        OrderId = -AlgoId,
+        ClientOrderId = ClientAlgoId,
+        Symbol = Symbol,
+        Side = Side,
+        Type = OrderType,
+        OrigQty = Quantity,
+        StopPrice = TriggerPrice,
+        Status = AlgoStatus switch
         {
             "CANCELED" or "REJECTED" or "EXPIRED" => AlgoStatus,
             _ => "NEW"
