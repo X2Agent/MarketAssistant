@@ -26,10 +26,11 @@ public class InvestmentSelectionWorkflow(
     private readonly ILogger<InvestmentSelectionWorkflow> _logger = logger;
 
     /// <summary>
-    /// 执行基于用户需求的 AI 投资分析。
+    /// 执行基于用户需求的 AI 投资分析；<paramref name="progress"/> 接收三步骤的开始/完成事件。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeUserRequirementAsync(
         InvestmentRecommendationRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var workflowRequest = new InvestmentSelectionWorkflowRequest
@@ -45,14 +46,15 @@ public class InvestmentSelectionWorkflow(
             MaxRecommendations = request.MaxRecommendations
         };
 
-        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+        return await ExecuteWorkflowAsync(workflowRequest, progress, cancellationToken);
     }
 
     /// <summary>
-    /// 执行基于新闻内容的 AI 投资分析。
+    /// 执行基于新闻内容的 AI 投资分析；<paramref name="progress"/> 接收三步骤的开始/完成事件。
     /// </summary>
     public async Task<InvestmentSelectionResult> AnalyzeNewsHotspotAsync(
         NewsBasedInvestmentRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var workflowRequest = new InvestmentSelectionWorkflowRequest
@@ -63,11 +65,12 @@ public class InvestmentSelectionWorkflow(
             MaxRecommendations = request.MaxRecommendations
         };
 
-        return await ExecuteWorkflowAsync(workflowRequest, cancellationToken);
+        return await ExecuteWorkflowAsync(workflowRequest, progress, cancellationToken);
     }
 
     private async Task<InvestmentSelectionResult> ExecuteWorkflowAsync(
         InvestmentSelectionWorkflowRequest request,
+        IProgress<InvestmentSelectionProgress>? progress,
         CancellationToken cancellationToken)
     {
         _logger.LogInformation(
@@ -97,23 +100,37 @@ public class InvestmentSelectionWorkflow(
         };
 
         var workflow = workflowBuilder.Build();
-        await using Run run = await InProcessExecution.RunAsync(
+        await using StreamingRun run = await InProcessExecution.RunStreamingAsync(
             workflow,
             request,
             cancellationToken: cancellationToken);
 
         InvestmentSelectionResult? finalResult = null;
 
-        foreach (WorkflowEvent evt in run.NewEvents)
+        await foreach (WorkflowEvent evt in run.WatchStreamAsync(cancellationToken).ConfigureAwait(false))
         {
             switch (evt)
             {
                 case ExecutorInvokedEvent executorInvoked:
                     _logger.LogInformation("步骤开始: {ExecutorId}", executorInvoked.ExecutorId);
+                    if (ToStep(executorInvoked.ExecutorId) is { } startedStep)
+                    {
+                        progress?.Report(new InvestmentSelectionProgress(
+                            startedStep, InvestmentSelectionStepStatus.Running));
+                    }
                     break;
                 case ExecutorCompletedEvent executorCompleted:
                     _logger.LogInformation("步骤完成: {ExecutorId}", executorCompleted.ExecutorId);
+                    if (ToStep(executorCompleted.ExecutorId) is { } completedStep)
+                    {
+                        progress?.Report(new InvestmentSelectionProgress(
+                            completedStep,
+                            InvestmentSelectionStepStatus.Completed,
+                            DescribeStepResult(executorCompleted.Data)));
+                    }
                     break;
+                // AgentResponseUpdateEvent 继承自 WorkflowOutputEvent，必须在其之前匹配，
+                // 否则 LLM 的中间流式更新会被误当作最终输出。
                 case AgentResponseUpdateEvent:
                     break;
                 case WorkflowOutputEvent workflowOutput:
@@ -150,4 +167,22 @@ public class InvestmentSelectionWorkflow(
 
         return finalResult;
     }
+
+    private static InvestmentSelectionStep? ToStep(string executorId)
+    {
+        if (executorId.StartsWith("GenerateCriteria", StringComparison.Ordinal))
+            return InvestmentSelectionStep.GenerateCriteria;
+        if (executorId.StartsWith("ScreenInvestmentTargets", StringComparison.Ordinal))
+            return InvestmentSelectionStep.ScreenTargets;
+        if (executorId.StartsWith("AnalyzeAssets", StringComparison.Ordinal))
+            return InvestmentSelectionStep.AnalyzeAssets;
+        return null;
+    }
+
+    private static string? DescribeStepResult(object? data) => data switch
+    {
+        CriteriaGenerationResult { CriteriaCount: > 0 } criteria => $"已生成 {criteria.CriteriaCount} 个筛选条件",
+        AssetScreeningResult screening => $"候选 {screening.ScreenedAssets.Count} 个标的",
+        _ => null
+    };
 }

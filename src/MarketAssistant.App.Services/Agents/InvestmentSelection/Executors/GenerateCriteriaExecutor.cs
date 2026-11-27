@@ -69,17 +69,17 @@ public sealed class GenerateCriteriaExecutor<TCriteria>(
                     chatOptions,
                     cancellationToken);
 
-            var criteria = _strategy.DeserializeCriteria(response.Text, input);
+            var result = new CriteriaGenerationResult
+            {
+                Criteria = _strategy.DeserializeCriteria(response.Text, input),
+                OriginalRequest = input
+            };
 
             _logger.LogInformation("[步骤1/3-{MarketType}] 筛选条件生成完成，包含 {Count} 个条件",
                 _strategy.SupportedMarketType,
-                GetCriteriaCount(criteria));
+                result.CriteriaCount);
 
-            return new CriteriaGenerationResult
-            {
-                Criteria = criteria,
-                OriginalRequest = input
-            };
+            return result;
         }
         // 取消与已带用户友好信息的 FriendlyException 原样上抛，不二次包装
         catch (Exception ex) when (ex is not (OperationCanceledException or FriendlyException))
@@ -87,15 +87,5 @@ public sealed class GenerateCriteriaExecutor<TCriteria>(
             _logger.LogError(ex, "[步骤1/3-{MarketType}] 生成筛选条件失败", _strategy.SupportedMarketType);
             throw new FriendlyException($"生成筛选条件失败: {ex.Message}", ex);
         }
-    }
-
-    private static int GetCriteriaCount(TCriteria criteria)
-    {
-        return criteria switch
-        {
-            StockCriteria stock => stock.Criteria?.Count ?? 0,
-            CryptoCriteria crypto => crypto.Criteria?.Count ?? 0,
-            _ => 0
-        };
     }
 }

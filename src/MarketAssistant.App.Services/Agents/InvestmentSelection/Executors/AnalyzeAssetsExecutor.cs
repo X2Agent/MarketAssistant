@@ -2,6 +2,7 @@ using System.Text.Json;
 using MarketAssistant.Agents.Analysts;
 using MarketAssistant.Agents.InvestmentSelection.Models;
 using MarketAssistant.Agents.InvestmentSelection.Strategies;
+using MarketAssistant.Applications.AssetScreener.Models;
 using MarketAssistant.Applications.InvestmentSelection.Models;
 using MarketAssistant.Infrastructure.Core;
 using MarketAssistant.Infrastructure.Factories;
@@ -35,6 +36,19 @@ public sealed partial class AnalyzeAssetsExecutor(
         AssetScreeningResult input,
         IWorkflowContext context,
         CancellationToken cancellationToken = default)
+    {
+        var result = await AnalyzeAsync(input, cancellationToken);
+
+        // 显式推入工作流输出队列：WithOutputFrom 的 auto-yield 在 RunStreamingAsync 路径下
+        // 会晚于事件流结束入队，WorkflowOutputEvent 丢失（同 CoordinatorExecutor）
+        await context.YieldOutputAsync(result, cancellationToken);
+
+        return result;
+    }
+
+    private async Task<InvestmentSelectionResult> AnalyzeAsync(
+        AssetScreeningResult input,
+        CancellationToken cancellationToken)
     {
         var originalRequest = input.OriginalRequest
             ?? throw new InvalidOperationException("[步骤3/3] 缺少原始请求信息：上游工作流状态不一致");
@@ -106,6 +120,8 @@ public sealed partial class AnalyzeAssetsExecutor(
                     response.Text?.Length ?? 0);
             }
 
+            AttachScreeningQuotes(result, input.ScreenedAssets);
+
             _logger.LogInformation("[步骤3/3-{MarketType}] 分析完成，推荐 {Count} 个资产，置信度: {Score}",
                 originalRequest.MarketType, result.Recommendations.Count, result.ConfidenceScore);
 
@@ -116,6 +132,23 @@ public sealed partial class AnalyzeAssetsExecutor(
         {
             _logger.LogError(ex, "[步骤3/3-{MarketType}] AI分析失败", originalRequest.MarketType);
             throw new FriendlyException($"AI 分析失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 把筛选快照中的现价与涨跌幅回填到推荐项，供界面对照目标价/止损价；
+    /// 调用前 <see cref="ValidateResult"/> 已保证每个推荐都存在于筛选结果中。
+    /// </summary>
+    private static void AttachScreeningQuotes(
+        InvestmentSelectionResult result,
+        List<ScreenerAssetInfo> screenedAssets)
+    {
+        var quotesBySymbol = screenedAssets.ToLookup(asset => asset.Symbol, StringComparer.OrdinalIgnoreCase);
+        foreach (var recommendation in result.Recommendations)
+        {
+            var quote = quotesBySymbol[recommendation.Symbol].First();
+            recommendation.CurrentPrice = quote.Current;
+            recommendation.ChangePercent = quote.Pct;
         }
     }
 

@@ -22,6 +22,7 @@ public class InvestmentSelectionService(
     /// </summary>
     public async Task<InvestmentSelectionResult> RecommendByUserRequirementAsync(
         InvestmentRecommendationRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.UserRequirements))
@@ -34,7 +35,7 @@ public class InvestmentSelectionService(
 
         var validatedRequest = ValidateAndNormalizeUserRequest(request);
 
-        var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, cancellationToken);
+        var result = await _selectionWorkflow.AnalyzeUserRequirementAsync(validatedRequest, progress, cancellationToken);
 
         if (validatedRequest.RiskPreference == "conservative")
         {
@@ -56,6 +57,7 @@ public class InvestmentSelectionService(
     /// </summary>
     public async Task<InvestmentSelectionResult> RecommendByNewsAsync(
         NewsBasedInvestmentRequest request,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("开始基于热点新闻的AI投资选择，市场: {Market}，推荐数: {Max}",
@@ -63,7 +65,7 @@ public class InvestmentSelectionService(
 
         var validatedRequest = ValidateAndNormalizeNewsRequest(request);
 
-        var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, cancellationToken);
+        var result = await _selectionWorkflow.AnalyzeNewsHotspotAsync(validatedRequest, progress, cancellationToken);
 
         if (result.Recommendations.Count > validatedRequest.MaxRecommendations)
         {
@@ -87,13 +89,14 @@ public class InvestmentSelectionService(
     public async Task<InvestmentSelectionResult> QuickSelectAsync(
         QuickSelectionStrategy strategy,
         MarketType marketType,
+        IProgress<InvestmentSelectionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("开始执行快速选择，策略: {Strategy}, 市场: {Market}", strategy, marketType);
 
         var request = ConvertStrategyToUserRequest(strategy, marketType);
 
-        var result = await RecommendByUserRequirementAsync(request, cancellationToken);
+        var result = await RecommendByUserRequirementAsync(request, progress, cancellationToken);
 
         _logger.LogInformation("快速选择完成，策略: {Strategy}，结果数量: {Count}",
             strategy, result.Recommendations.Count);

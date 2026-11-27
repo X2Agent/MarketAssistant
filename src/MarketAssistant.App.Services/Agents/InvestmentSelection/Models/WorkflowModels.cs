@@ -39,6 +39,16 @@ public record CriteriaGenerationResult
     public object Criteria { get; init; } = new();
 
     /// <summary>
+    /// 筛选条件个数（用于日志与进度摘要）
+    /// </summary>
+    public int CriteriaCount => Criteria switch
+    {
+        StockCriteria stock => stock.Criteria?.Count ?? 0,
+        CryptoCriteria crypto => crypto.Criteria?.Count ?? 0,
+        _ => 0
+    };
+
+    /// <summary>
     /// 原始请求（用于传递到后续步骤）
     /// </summary>
     public InvestmentSelectionWorkflowRequest OriginalRequest { get; init; } = new();

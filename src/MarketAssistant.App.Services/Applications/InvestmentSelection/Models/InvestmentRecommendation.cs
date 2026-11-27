@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace MarketAssistant.Applications.InvestmentSelection.Models;
 
@@ -76,5 +77,17 @@ public class InvestmentRecommendation
     [Range(0.01, 100000000)]
     [Description("止损价格，单位：元或USDT，范围0.01-100000000，无法预测时设为null")]
     public decimal? StopLoss { get; set; }
+
+    /// <summary>
+    /// 筛选快照中的现价，仅供界面与目标价/止损价对照；由 Executor 回填，不属于 LLM 输出契约
+    /// </summary>
+    [JsonIgnore]
+    public decimal? CurrentPrice { get; set; }
+
+    /// <summary>
+    /// 筛选快照中的涨跌幅(%)，仅供界面展示；由 Executor 回填，不属于 LLM 输出契约
+    /// </summary>
+    [JsonIgnore]
+    public decimal? ChangePercent { get; set; }
 }
 
