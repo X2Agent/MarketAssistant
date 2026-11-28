@@ -142,7 +142,8 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
         {
             try
             {
-                var json = JsonSerializer.Serialize(_cache);
+                // 以枚举数值为键持久化：成员改名不再使已保存的凭证失效
+                var json = JsonSerializer.Serialize(_cache.ToDictionary(pair => (int)pair.Key, pair => pair.Value));
                 var encrypted = Encrypt(json);
                 File.WriteAllBytes(FilePath, encrypted);
             }
@@ -198,9 +199,10 @@ public sealed class TradingCredentialStore : ITradingCredentialStore
 
         var json = Encoding.UTF8.GetString(plaintextBytes);
         // 凭证文件合法取值包含 JSON null（首次使用/未配置），视同空配置；解密失败已在此前抛出
-        var entries = JsonSerializer.Deserialize<Dictionary<TradingMode, CredentialEntry>>(json)
+        var entries = JsonSerializer.Deserialize<Dictionary<int, CredentialEntry>>(json)
                ?? [];
-        return new ConcurrentDictionary<TradingMode, CredentialEntry>(entries);
+        return new ConcurrentDictionary<TradingMode, CredentialEntry>(
+            entries.Select(pair => KeyValuePair.Create((TradingMode)pair.Key, pair.Value)));
     }
 
     /// <summary>
